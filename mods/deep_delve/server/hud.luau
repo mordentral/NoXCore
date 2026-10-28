@@ -1,15 +1,17 @@
 --!strict
 -- What each player's UI shows (ui/main.luau): its character's name, level and experience, the
--- area it's in, whether its town portal is open, whether it has cleared the act and its passive
--- points left; in a lair, the boss's health; and what the bigger windows show (windows.luau and
+-- area it's in, whether its town portal is open, whether it has cleared the act, its passive
+-- points left and its options (store.OPTIONS: how ground loot's names show); in a lair, the boss's health; and what the bigger windows show (windows.luau and
 -- the modules it names). Each is a small value (nox.send) sent when it changes, under a key: a
--- newer value under the same key replaces one not sent yet. A UI that isn't ready yet, or a
--- player too far behind, is sent its values again by the beat below until it takes them.
+-- newer value under the same key replaces one not sent yet. A send refused (a UI that isn't ready
+-- yet, a player too far behind or with too many unacknowledged) keeps its value owed, tried again
+-- by the beat below each frame until it's taken; and a player is sent at most a few a frame.
 --
 -- A value is at most 900 bytes (the UI channel's limit): a list too long for one goes in parts
 -- (hud.parts), each part carrying the list's serial so the UI puts the parts of one list together.
 
 local progress = require("progress")
+local store = require("store")
 local tree = require("tree")
 
 local hud = {}
@@ -24,20 +26,42 @@ local owed: { [number]: { [string]: any } } = {}
 local partsSent: { [number]: { [string]: number } } = {}
 local beat: number? = nil
 
+-- The most values a player is sent in one frame: a long list (the labels after a map load) goes
+-- over a few frames, never in one burst.
+local PER_FRAME = 3
+
+-- Each player's values owed, PER_FRAME at most each, until a send is refused (its UI isn't ready,
+-- or it has too many unacknowledged): what's left stays owed, and the beat tries again next frame.
+-- Nothing is dropped but a value replaced by a newer one under its key, or a player gone.
+local sentIn: { [number]: { frame: number, n: number } } = {}
 local function flush()
+	local now = nox.frame()
 	for peer, values in owed do
 		if not nox.player(peer) then
 			owed[peer] = nil
-		else
+			sentIn[peer] = nil
+		elseif nox.hasUi(peer) or now % 15 == 0 then
+			-- (a player whose client runs no UI, or not yet, is tried twice a second)
+			local s = sentIn[peer]
+			if not s or s.frame ~= now then
+				s = { frame = now, n = 0 }
+				sentIn[peer] = s
+			end
 			for key, value in values do
-				if nox.send(peer, value) then
-					values[key] = nil
+				if s.n >= PER_FRAME or not nox.send(peer, value) then
+					break
 				end
+				values[key] = nil
+				s.n += 1
 			end
 			if next(values) == nil then
 				owed[peer] = nil
 			end
 		end
+	end
+	if next(owed) == nil and beat then
+		nox.cancelTimer(beat)
+		beat = nil
 	end
 end
 
@@ -49,8 +73,17 @@ local function owe(peer: number, key: string, value: any)
 	end
 	values[key] = value
 	if not beat then
-		beat = nox.every(15, flush)
+		beat = nox.every(1, flush)
 	end
+end
+
+-- How many values a player is owed now (for "dd hud").
+function hud.owed(peer: number): number
+	local n = 0
+	for _ in owed[peer] or {} do
+		n += 1
+	end
+	return n
 end
 
 -- A value to a player's UI under `key` (sent now when it can be, else by the beat).
@@ -140,6 +173,7 @@ function hud.hero(h: any)
 		act = area.act,
 		cleared = area.act ~= nil and progress.isCleared(h.record, area.act),
 		points = left,
+		lootNames = store.option(h.record, "lootNames"),
 	})
 	if bossValue then
 		owe(h.peer, "boss", bossValue)
@@ -175,6 +209,7 @@ end
 function hud.forget(peer: number)
 	owed[peer] = nil
 	partsSent[peer] = nil
+	sentIn[peer] = nil
 end
 
 return hud

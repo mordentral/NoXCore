@@ -52,9 +52,10 @@ void applySettings(App& app, const nox::config::Config& config)
     }
     if (const auto mode = config.setting("VideoMode")) {
         if (const auto wh = parseSize(*mode)) {
-            // One of the game's resolutions: never more of the world than its largest.
-            app.viewWidth = std::clamp(wh->first, 320, 1024);
-            app.viewHeight = std::clamp(wh->second, 240, 768);
+            // One of the game's resolutions: never more of the world than its largest, or than the
+            // ultra widescreen 1376 x 576 when wider than 1024.
+            app.viewWidth = std::clamp(wh->first, 320, 1376);
+            app.viewHeight = std::clamp(wh->second, 240, app.viewWidth > 1024 ? 576 : 768);
         }
     }
     if (const auto size = config.setting("VideoSize")) {

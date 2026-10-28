@@ -72,6 +72,35 @@ numbers.boss = {
 	drop = { rare = 2, levelUp = 2, rolls = 6, better = 1.5 },
 }
 
+-- ---- The party (design 7)
+
+-- Party scaling, counted from the players in the game (each extra player beyond the first adds
+-- this much; one player: all 1, as solo). `most` players are counted at most.
+--   health      every monster's most health (live ones changed as players come and go)
+--   damage      the damage monsters deal
+--   experience  a kill's experience, before it's split between the players in play
+--   packs       packs in an area (extra packs at the generator's spots, as the area is entered)
+--   loot        a death's loot rolls (a part roll is a chance of one more)
+numbers.party = {
+	health = 0.5,
+	damage = 0.2,
+	experience = 0.5,
+	packs = 0.1,
+	loot = 0.15,
+	most = 6,
+}
+
+-- The party strip: each member's numbers looked at every `every` frames, sent when changed.
+numbers.strip = { every = 8 }
+
+-- A vote to change area (the whole game moves): `seconds` to answer; a player whose vote failed
+-- may ask again after `again` frames; the vote's clock looked at every `beat` frames.
+numbers.vote = { seconds = 30, again = 30 * 5, beat = 15 }
+
+-- Ground loot's labels (shown on NoX Core clients while Alt is held): each player is sent those
+-- within `reach` of its unit (at most `most`, nearest first), looked at every `every` frames.
+numbers.labels = { reach = 450, most = 96, every = 15 }
+
 -- ---- The game
 
 numbers.timing = {

@@ -9,6 +9,6 @@
   "levels": "generated",
   "mapPrefix": "DD",
   "ui": "ui/main.luau",
-  "uiApi": 2,
+  "uiApi": 3,
   "reference": true
 }

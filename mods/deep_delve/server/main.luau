@@ -11,7 +11,13 @@
 --   combat.luau    the damage tiers and affixes change (onDamage)
 --   areas.luau     the act's chain of generated areas, the next built ahead, the ways between
 --   waypoints.luau waypoints: found, kept, travelled
---   portal.luau    the town portal
+--   votes.luau     the party's vote to change area (the whole game moves)
+--   portal.luau    the town portal (anyone's open portal takes the party back out, its owner gone
+--                  or not)
+--   party.luau     the party strip's numbers; the party's size for the scaling
+--   scale.luau     party scaling: monsters' health, damage and experience, packs, loot
+--   labels.luau    ground loot's labels on each player's UI
+--   offers.luau    nox.choice offers and their answers
 --   tree.luau      the passive tree's rules (points, nodes taken, respec, what it adds and gives)
 --   book.luau      the spells (a warrior: the abilities) the tree gives, on the unit and its client
 --   windows.luau   the bigger windows: which are open, the carried list, their beat
@@ -25,9 +31,11 @@
 --   data/*.luau    the tables it's all tuned by
 --   ../gen/*.luau  the area generator (run by nox.generate in its own VM)
 --
--- Single player today: the town (its stash, vendor, healer and the passive tree's respec), act 1's
--- chain of areas to its boss, waypoints and the town portal, monsters by tier, loot by rarity, a
--- character that's kept with its passive tree, its spells from the tree, and its stash.
+-- Alone or as a party: the town (its stash, vendor, healer and the passive tree's respec), act 1's
+-- chain of areas to its boss, waypoints and the town portal, monsters by tier, loot by rarity
+-- (named on the ground), a character that's kept with its passive tree, its spells from the tree,
+-- and its stash. A party sees each other on the strip, votes to change area, shares its portals,
+-- has a vendor stock each, splits each kill's experience and meets monsters scaled to its size.
 --
 -- The game is a plain game, not a quest; a dead player keeps everything it carries and wears
 -- (keepThingsOnDeath), so a death costs nothing. The book is the mod's (bookIsTheMod): what the
@@ -37,14 +45,17 @@ local areas = require("areas")
 local boss = require("boss")
 local combat = require("combat")
 local hero = require("hero")
+local labels = require("labels")
 local loot = require("loot")
 local monsters = require("monsters")
+local offers = require("offers")
+local party = require("party")
 local portal = require("portal")
 local _sheet = require("sheet") -- (it registers the sheet's window)
 local stash = require("stash")
 local treeview = require("treeview")
 local vendor = require("vendor")
-local waypoints = require("waypoints")
+local votes = require("votes")
 local windows = require("windows")
 local numbers = require("data/numbers")
 local town = require("town")
@@ -65,6 +76,8 @@ end
 
 function mode.start()
 	nox.every(numbers.timing.saveEvery, hero.saveAll, "every minute")
+	party.start()
+	labels.start()
 end
 
 function mode.stop()
@@ -83,15 +96,29 @@ end
 
 function mode.onJoin(player: any)
 	hero.join(player)
+	party.changed()
 end
 
+-- A player left: its record written, its open portal kept for the others, no longer waited for in
+-- a vote.
 function mode.onLeave(player: any)
+	portal.left(hero.byPeer(player.peer))
 	hero.leave(player)
+	offers.forget(player.peer)
+	votes.left(player.peer)
+	party.changed()
 end
 
--- A player's client ready in the map (its join, and each map change once it has the new map).
+-- A player's client ready in the map (its join, and each map change once it has the new map):
+-- its UI sent the strip, the vote and the ground's labels again.
 function mode.playerReady(player: any)
 	hero.clientReady(player)
+	local h = hero.byPeer(player.peer)
+	if h then
+		party.resend(h)
+		labels.resend(h)
+		votes.resend(h)
+	end
 end
 
 -- A player's death (its record written; it keeps its things).
@@ -100,7 +127,7 @@ function mode.onKill(victim: number, _killer: number?, _assist: number?)
 end
 
 -- The player's UI: its Town portal button, its windows (open and close; the stash's, the
--- vendor's and the tree's clicks).
+-- vendor's and the tree's clicks), its options (the Character window's), its answer to a vote.
 function mode.onUiMessage(player: any, value: any)
 	if type(value) ~= "table" then
 		return
@@ -125,22 +152,39 @@ function mode.onUiMessage(player: any, value: any)
 		vendor.message(h, value)
 	elseif kind == "tree" then
 		treeview.message(h, value)
+	elseif kind == "option" then
+		if type(value.name) == "string" and type(value.value) == "string" then
+			hero.setOption(h, value.name, value.value)
+		end
+	elseif kind == "vote" then
+		if value.answer == "yes" or value.answer == "no" then
+			votes.cast(h, value.answer == "yes")
+		elseif value.answer == "cancel" then
+			votes.cancel(h)
+		end
 	end
 end
 
--- Saying "portal" opens a town portal too.
+-- Saying "portal" opens a town portal too; while a vote is under way, "yes" or "no" answers it.
 function mode.onChat(player: any, text: string): boolean?
 	local said = string.lower((string.gsub(text, "^%s*(.-)%s*$", "%1")))
 	if said == "portal" then
 		portal.open(hero.byPeer(player.peer))
 		return true
 	end
+	if (said == "yes" or said == "no") and votes.active() then
+		local h = hero.byPeer(player.peer)
+		if h and votes.mark(h.peer) == "?" then
+			votes.cast(h, said == "yes")
+			return true
+		end
+	end
 	return nil
 end
 
--- An answer to an offer (the town's waypoints).
+-- An answer to an offer (the town's waypoints, the open portals).
 function mode.onChoice(player: any, index: number)
-	waypoints.chosen(player.peer, index)
+	offers.chosen(player.peer, index)
 end
 
 -- A unit comes into play (its first spawn, after a death, in a new map): set up again from its
@@ -160,17 +204,17 @@ function mode.collide(thing: number, other: number?)
 end
 
 -- A monster the mod made died: experience to the heroes, its loot on the ground (the act boss:
--- its own drop, and the act cleared).
+-- its own drop, and the act cleared); both by the party's size (scale.luau).
 function mode.onObjectKilled(e: any)
 	local m = monsters.killed(e.id)
 	if not m then
 		return
 	end
-	hero.award(m.experience, e.by)
+	hero.award(monsters.experienceOf(m), e.by)
 	if m.boss then
 		boss.killed(e.id, e.x, e.y)
 	else
-		loot.drop(e.x, e.y, m.level, 1 + m.drops, m.drops * 0.25)
+		loot.drop(e.x, e.y, m.level, loot.rollsFor(1 + m.drops), m.drops * 0.25)
 	end
 end
 

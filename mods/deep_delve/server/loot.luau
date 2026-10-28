@@ -7,10 +7,57 @@
 -- only ever one that fits the slot of that item (nox.modifierFits: the game's own rule), and no
 -- dearer than the area level allows (data/loot.luau's worth).
 
+--
+-- Every item the mod puts on the ground (gear, gold, potions) is kept in one index while it lies
+-- there, with its label: its name in its rarity's colour, which labels.luau sends to the players
+-- near it (NoX Core clients show it while Alt is held). A party's deaths roll more loot
+-- (scale.luau's loot factor).
+
 local data = require("data/loot")
 local items = require("items")
+local scale = require("scale")
 
 local loot = {}
+
+-- Each item lying on the ground from the mod: id -> { code (its net code), text, rarity, x, y }.
+local ground: { [number]: any } = {}
+
+-- A thing type's name as words ("LeatherBoots": "Leather Boots").
+local function spaced(name: string): string
+	local s = string.gsub(name, "(%l)(%u)", "%1 %2")
+	return s
+end
+
+-- An item on the ground indexed with its label ("gold" for a pile of gold).
+local function index(id: number, rec: any, rarity: string, x: number, y: number)
+	local o = nox.object(id)
+	if not o then
+		return
+	end
+	local words = (data.words :: any)[rarity] or ""
+	local text = if rarity == "gold" then "Gold" else ((if words ~= "" then words .. " " else "") .. spaced(rec.type))
+	ground[id] = { code = o.netCode, text = text, rarity = rarity, x = x, y = y }
+end
+
+-- The ground's index (labels.luau reads it; an entry whose item is gone is dropped there).
+function loot.ground(): { [number]: any }
+	return ground
+end
+
+-- A death's loot rolls for the party now: `rolls` times the party's loot factor, a part of one a
+-- chance of one more (one player: `rolls`, nothing drawn).
+function loot.rollsFor(rolls: number): number
+	local f = scale.factor("loot")
+	if f == 1 then
+		return rolls
+	end
+	local want = rolls * f
+	local n = math.floor(want)
+	if nox.random() < want - n then
+		n += 1
+	end
+	return n
+end
 
 -- ---- Picking by weight
 
@@ -233,6 +280,7 @@ function loot.place(rec: any, x: number, y: number): number?
 	end
 	items.setMeta(id, { rarity = rec.rarity or "normal", affixes = rec.affixes, level = rec.level })
 	showOnGround(id, rec.rarity or "normal", x, y)
+	index(id, rec, rec.rarity or "normal", x, y)
 	return id
 end
 
@@ -247,8 +295,14 @@ function loot.drop(x: number, y: number, level: number, rolls: number, better: n
 			local id: number? = nil
 			if d.kind == "gold" then
 				id = nox.create("Gold", px, py)
+				if id then
+					index(id, { type = "Gold" }, "gold", px, py)
+				end
 			elseif d.kind == "potion" then
 				id = nox.create(d.type, px, py)
+				if id then
+					index(id, { type = d.type }, "normal", px, py)
+				end
 			else
 				id = loot.place(d.record, px, py)
 			end
@@ -281,15 +335,16 @@ function loot.bossDrop(x: number, y: number, level: number, d: any): { number }
 			table.insert(made, id)
 		end
 	end
-	for _, id in loot.drop(x, y, level, d.rolls, d.better) do
+	for _, id in loot.drop(x, y, level, loot.rollsFor(d.rolls), d.better) do
 		table.insert(made, id)
 	end
 	return made
 end
 
--- An item picked up (by anyone): its sparks stop.
+-- An item picked up (by anyone): its sparks stop, its label goes.
 function loot.pickedUp(item: number)
 	hide(item)
+	ground[item] = nil
 end
 
 -- The items sparking on the ground now, as "id effect" lines (for "dd ground").
@@ -305,6 +360,7 @@ end
 -- A new map: the old one's items went with it.
 function loot.reset()
 	table.clear(shown)
+	table.clear(ground)
 	count = 0
 end
 

@@ -25,7 +25,40 @@ local store = {}
 --      there from a record's next set-up; a reader takes none for missing); an item record may
 --      carry its level. Version 2's tree list became tree.nodes, and each act it had cleared a
 --      boss point.
-store.VERSION = 3
+--   4  options = { lootNames = "alt" | "always" }: the player's choices for its character (ground
+--      loot's names shown while Alt is held, or always). Version 3's records get the defaults.
+store.VERSION = 4
+
+-- The options' defaults, and the values each may take (the first: the default).
+store.OPTIONS = {
+	lootNames = { "alt", "always" },
+}
+
+-- A record's option `name`, its default when it's missing or not one it may take.
+function store.option(rec: any, name: string): string
+	local allowed: { string }? = (store.OPTIONS :: any)[name]
+	if not allowed then
+		return ""
+	end
+	local o = if type(rec.options) == "table" then rec.options[name] else nil
+	if type(o) == "string" and table.find(allowed, o) then
+		return o
+	end
+	return allowed[1]
+end
+
+-- A record's option `name` set to `value`; whether it may take it.
+function store.setOption(rec: any, name: string, value: string): boolean
+	local allowed: { string }? = (store.OPTIONS :: any)[name]
+	if not allowed or not table.find(allowed, value) then
+		return false
+	end
+	if type(rec.options) ~= "table" then
+		rec.options = {}
+	end
+	rec.options[name] = value
+	return true
+end
 
 local STASH_TABS: number = require("data/vendor").stash.tabs
 
@@ -66,6 +99,7 @@ function store.new(player: any): any
 		world = { act = 1, deepest = 0, progress = {}, bosses = {} },
 		spells = { spells = {}, abilities = {}, creatures = {} }, -- what its passive tree gives (book.luau)
 		records = { kills = 0, deaths = 0, frames = 0 }, -- frames: time played, in game frames
+		options = { lootNames = "alt" }, -- see VERSION
 	}
 	for t = 1, STASH_TABS do
 		rec.stash.tabs[t] = {}
@@ -152,6 +186,16 @@ local function toVersion3(rec: any)
 	rec.version = 3
 end
 
+-- Version 3 -> 4: the options, each at its default.
+local function toVersion4(rec: any)
+	local options = {}
+	for name, allowed in store.OPTIONS :: any do
+		options[name] = allowed[1]
+	end
+	rec.options = options
+	rec.version = 4
+end
+
 -- An older record brought up to date (each version's step in turn).
 local function migrate(rec: any): any
 	if rec.version < 2 then
@@ -159,6 +203,9 @@ local function migrate(rec: any): any
 	end
 	if rec.version < 3 then
 		toVersion3(rec)
+	end
+	if rec.version < 4 then
+		toVersion4(rec)
 	end
 	rec.version = store.VERSION
 	return rec

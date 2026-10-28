@@ -2,8 +2,10 @@
 // middle; game_showOptions from the main menu, game_initOptionsInGame in
 // a game), on nox.cfg's settings:
 //
-//   Screen Resolution     VideoMode: 640 x 480, 800 x 600, 1024 x 768, 1024 x 576. It sets how
-//                         much of the world a game shows (App::viewWidth). All four can be
+//   Screen Resolution     VideoMode: 640 x 480, 800 x 600, 1024 x 768, 1024 x 576 and noxsdl's
+//                         ultra widescreen 1376 x 576, a drop-down in place of the game's radio
+//                         buttons (five rows don't fit the panel's box). It sets how
+//                         much of the world a game shows (App::viewWidth). All five can be
 //                         chosen in a game too, applied at once (the game, game_initOptionsInGame, leaves only
 //                         the one in use on).
 //   Game Window Size      VideoSize: 65, 75, 85 or 100 percent (windowOptionsProc).
@@ -133,6 +135,9 @@ private:
     /// A drop-down's choices shown under it, or not; its button's text.
     void showDrop(const DropDown& d, bool open);
     void setDropText(const DropDown& d);
+    /// The resolution drop-down: the one in use (kResolutions' index, -1 none) on its button and lit
+    /// in its list, the list shown or not.
+    void showResolutions(int inUse, bool open);
     /// The mouse speed's label, with the speed ("Mouse x1.25").
     void setMouseText();
     /// The panel's page shown (0 General, 1 More): its tab lit, its rows shown, the other's hidden.
@@ -149,6 +154,7 @@ private:
     nox::config::Config config_;
     Extras extras_;
     SoundOn sound_{true, true, true};
+    int resolution_ = -1; ///< the resolution drop-down's choice (kResolutions' index, -1 none)
     bool inGame_ = false;
     bool open_ = false;
     std::vector<std::function<void()>> deferred_;

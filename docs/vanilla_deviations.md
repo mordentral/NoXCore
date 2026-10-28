@@ -252,6 +252,13 @@ Options switch unless noted.
   Without a nox.cfg (default.cfg's 640 x 480) or a VideoMode in it, the view is 1024 x 576 (was
   1024 x 768), most screens being 16:9. Revert: options_window.cpp's added button and main.cpp's
   default "1024 576 16".
+- **Screen Resolution is a drop-down, with an ultra widescreen 1376 x 576** (2026-10-28): the five
+  don't fit the panel's box as radio buttons, so a drop-down (as the advanced panel's) takes their
+  place, labelled "1024 X 576 (16:9)" and "1376 X 576 (21:9)" for the widescreen two. 1376 x 576 is
+  3440 x 1440 screens' shape: 576 high as 1024 x 576 and about the area of 1024 x 768 (792k against
+  786k units), more of the world sideways and less up and down than a 4:3 player. A VideoMode wider
+  than 1024 is held to 1376 x 576 (app_settings.cpp), the rest to 1024 x 768 as before; the server
+  sends what the join's screen size covers, as vanilla's does for any size.
 - **Options' advanced panel has two tabs** (2026-10-14): General and More
   along its top, drawn as the Server Settings' tabs (servopts.wnd's UITabs art); More holds the
   rarely changed switches (Soft Shadow Edge, Fade Objects, Render GUI, Frame Rate), General the

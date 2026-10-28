@@ -1,32 +1,41 @@
 --!strict
--- Deep Delve's UI on a NoX Core client (UI API 2). The server sends the numbers (server/hud.luau
--- and the window modules windows.luau names) when they change; this draws them and sends the
--- clicks back. Its windows:
+-- Deep Delve's UI on a NoX Core client (UI API 3). The server sends the numbers (server/hud.luau
+-- and the modules it names) when they change; this draws them and sends the clicks back. Its
+-- windows:
 --
---   hero    the character's name, level and experience, the area, the Town portal, Tree and
---           Sheet buttons, the act (cleared or not);
+--   party   the party strip across the top of the screen (no frame, a HUD piece): a card for each
+--           member (name, class, level, health and mana, where they are, dead or not); during a
+--           vote to change area, its row under the cards (who asks, where to, the time left, Yes /
+--           No, or Cancel for its asker) and each member's answer under their card. It lets the
+--           game have the mouse except during a vote. A player alone in the game has none: it
+--           opens when a second player joins and closes when they leave;
+--   hero    (the Character window) the character's name, level and experience, the area, the Town
+--           portal, Tree and Sheet buttons, the loot names option (shown while Alt is held, or
+--           always; kept with the character), the act (cleared or not);
 --   boss    while an act boss lives: a bar with its health under its name;
 --   stash   (touching the town's chest) the stash's tabs and what the character carries: a click
 --           moves an item across;
---   vendor  (touching the town's anvil) its stock and what the character carries: a click buys or
---           sells, a right click rerolls a magic or rare piece;
---   tree    the passive tree: panning (the arrows, on screen or the keys), zoom (1-3), nodes and
---           the lines between them, a node's words under the mouse, a click takes it; Respec by
---           the fountain;
+--   vendor  (touching the town's anvil) its own stock and what the character carries: a click buys
+--           or sells, a right click rerolls a magic or rare piece;
+--   tree    the passive tree: nodes and the lines between them, panned by dragging (or the arrows,
+--           on screen or the keys) and zoomed by the wheel (or 1-3); a click takes a node; Respec
+--           by the fountain;
 --   sheet   the character sheet.
+--
+-- An item's or a node's words are a tooltip at the mouse. The loot lying near the player is named
+-- over each item in its rarity's colour while Alt is held, or always as the character's option
+-- has it (nox.label by the item's net code; the server sends the list as it changes, and the
+-- labels are set again now and then, as a client lets a label go when its item leaves its world).
 --
 -- A list too long for one value comes in parts with a serial (hud.parts); the newest whole list
 -- is drawn, the one before it until the next is whole.
---
--- What the toolbox doesn't give a window, worked round here: no lines but boxes (the tree's links
--- are drawn square, across then down), no dragging (items move by a click, the tree pans by
--- buttons and keys), no hover text outside a window (an item's or a node's words are written
--- at its window's foot).
 
 local ui = {}
 
-local W, H = 168, 84
+local W, H = 168, 100
 local BOSS_W, BOSS_H = 220, 26
+-- The framed windows start below the party strip.
+local TOP = 84
 
 local shown: any = nil
 local bossShown: any = nil
@@ -63,7 +72,7 @@ local function takePart(v: any)
 	end
 end
 
-local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true }
+local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true, labels = true }
 
 -- ---- Drawing helpers
 
@@ -168,6 +177,217 @@ local function drawWords(text: string?, x: number, y: number, width: number, lin
 	end
 end
 
+-- An item's tooltip at the mouse: its words in its rarity's colour, and `extra` (a price) under
+-- them.
+local function tipItem(e: any, extra: string?)
+	local lines: { any } = {}
+	for _, l in wrap(e.d or e.t or "", 250) do
+		if #lines < 12 then
+			table.insert(lines, { l, RARITY[e.r] or RARITY.normal })
+		end
+	end
+	if extra then
+		table.insert(lines, { extra, { 230, 190, 80 } })
+	end
+	nox.tooltip(lines)
+end
+
+-- ---- The party strip
+
+local CLASS_COLOUR: { [string]: { number } } = {
+	warrior = { 215, 95, 75 },
+	wizard = { 95, 145, 235 },
+	conjurer = { 95, 205, 115 },
+}
+local CLASS_TITLE: { [string]: string } = { warrior = "Warrior", wizard = "Wizard", conjurer = "Conjurer" }
+local CARD_H = 40
+local GAP = 4
+local VOTE_Y, VOTE_H = 46, 18
+local STRIP_H = VOTE_Y + VOTE_H + 2
+local VOTE_W = 380
+
+local party: { any } = {}
+local vote: any = nil -- the vote's value ({ active, by, to, how, left, yes, of, mine, asker, done })
+local voteEnds = 0 -- (the client's clock when it runs out)
+local doneUntil = 0 -- (a finished vote's line shown till then)
+-- How the strip's window was last opened ("hidden": closed, the player alone in the game).
+local stripSpec: string = "hidden"
+
+local function cardWidth(n: number): number
+	return math.min(124, (640 + GAP) // math.max(1, n) - GAP)
+end
+
+-- The strip's window as the party and the vote want it (opened again only when that changes): none
+-- while the player is alone in the game (the server's list of one card, or none yet).
+local function placeStrip()
+	local n = #party
+	if n < 2 then
+		if stripSpec ~= "hidden" then
+			stripSpec = "hidden"
+			nox.closeWindow("party")
+		end
+		return
+	end
+	local cw = cardWidth(n)
+	local w = math.max(n * (cw + GAP) - GAP, VOTE_W)
+	local voting = vote ~= nil and vote.active == true
+	local spec = string.format("%d/%s", w, tostring(voting))
+	if spec == stripSpec then
+		return
+	end
+	stripSpec = spec
+	-- (the game's clicks pass through it except during a vote, whose buttons are its own)
+	nox.window("party", { frame = false, hud = true, clickThrough = not voting, x = (640 - w) // 2, y = 2, w = w, h = STRIP_H })
+end
+
+-- Text cut to `width` (an ellipsis where it was cut).
+local function fit(text: string, width: number): string
+	if nox.textWidth(text) <= width then
+		return text
+	end
+	local s = text
+	while #s > 1 and nox.textWidth(s .. "..") > width do
+		s = string.sub(s, 1, #s - 1)
+	end
+	return s .. ".."
+end
+
+local function bar(x: number, y: number, w: number, share: number, fill: { number }, back: { number })
+	nox.box(x, y, w, 4, back)
+	nox.box(x, y, math.floor(w * math.clamp(share, 0, 100) / 100 + 0.5), 4, fill)
+end
+
+local function drawCard(m: any, x: number, w: number, me: boolean)
+	local cc = CLASS_COLOUR[m.c] or { 180, 170, 150 }
+	nox.box(x, 0, w, CARD_H, { 14, 11, 8, 205 })
+	nox.outline(x, 0, w, CARD_H, if me then { 220, 180, 80 } else { cc[1] // 2 + 40, cc[2] // 2 + 40, cc[3] // 2 + 40 })
+	local level = "L" .. tostring(m.l)
+	local lw = nox.textWidth(level)
+	nox.text(fit(tostring(m.n), w - lw - 12), x + 4, 2, if me then "gold" else "bright")
+	nox.text(level, x + w - 4 - lw, 2, "dim")
+	local where = if m.d then "Dead" else tostring(m.w)
+	local ww = nox.textWidth(where)
+	nox.text(fit(CLASS_TITLE[m.c] or tostring(m.c), w - ww - 12), x + 4, 14, cc)
+	nox.text(where, x + w - 4 - ww, 14, if m.d then "red" else "dim")
+	bar(x + 4, 27, w - 8, m.h or 0, { 200, 40, 36 }, { 50, 16, 14 })
+	if (m.m or -1) >= 0 then
+		bar(x + 4, 33, w - 8, m.m, { 60, 90, 220 }, { 16, 20, 50 })
+	end
+	if m.d then
+		nox.box(x + 1, 1, w - 2, CARD_H - 2, { 60, 0, 0, 90 })
+	end
+	-- (during a vote, its answer under the card: green yes, red no, amber waiting)
+	if vote and vote.active and m.v then
+		local col = if m.v == "y" then { 70, 200, 80 } elseif m.v == "n" then { 220, 50, 40 } else { 220, 170, 50 }
+		nox.box(x, CARD_H + 1, w, 3, col)
+	end
+end
+
+local function drawVote(w: number)
+	local v = vote
+	local now = nox.time()
+	local x0 = (w - VOTE_W) // 2
+	if v and v.active then
+		local left = math.max(0, math.ceil((voteEnds - now) / 1000))
+		nox.box(x0, VOTE_Y, VOTE_W, VOTE_H, { 20, 16, 10, 225 })
+		nox.outline(x0, VOTE_Y, VOTE_W, VOTE_H, { 200, 160, 70 })
+		local line = tostring(v.by) .. ": on to " .. tostring(v.to) .. (if v.how == "waypoint" then " (waypoint)" else "") .. "? "
+			.. tostring(v.yes or 0) .. "/" .. tostring(v.of or 0) .. ", " .. tostring(left) .. " s"
+		local room = VOTE_W - 8 - (if v.mine == "?" then 76 elseif v.asker then 56 else 0)
+		nox.text(fit(line, room), x0 + 4, VOTE_Y + 4, "bright")
+		if v.mine == "?" then
+			button("party", x0 + VOTE_W - 74, VOTE_Y + 2, 34, 14, "Yes", true, function()
+				nox.send({ kind = "vote", answer = "yes" })
+			end)
+			button("party", x0 + VOTE_W - 38, VOTE_Y + 2, 34, 14, "No", true, function()
+				nox.send({ kind = "vote", answer = "no" })
+			end)
+		elseif v.asker then
+			button("party", x0 + VOTE_W - 54, VOTE_Y + 2, 50, 14, "Cancel", true, function()
+				nox.send({ kind = "vote", answer = "cancel" })
+			end)
+		end
+	elseif v and v.done and now < doneUntil then
+		nox.box(x0, VOTE_Y, VOTE_W, VOTE_H, { 20, 16, 10, 200 })
+		nox.text(fit(tostring(v.done), VOTE_W - 8), x0 + 4, VOTE_Y + 4, "dim")
+	end
+end
+
+-- ---- Ground labels
+
+local LABEL_COLOUR: { [string]: { number } } = {
+	normal = { 225, 222, 210 },
+	magic = { 110, 160, 255 },
+	rare = { 250, 220, 80 },
+	unique = { 200, 130, 255 },
+	gold = { 225, 175, 60 },
+}
+-- The labels set now: net code -> { text, rarity }; set again every RELABEL ms.
+local labelled: { [number]: any } = {}
+local labelSerial = -1
+local nextRelabel = 0
+local RELABEL = 1500
+-- The character's option: "alt" (shown while Alt is held) or "always".
+local lootNames = "alt"
+
+local function setLabel(code: number, l: any)
+	nox.label(code, l.t, LABEL_COLOUR[l.r] or LABEL_COLOUR.normal, { show = if lootNames == "always" then "always" else "alt" })
+end
+
+-- The newest whole list of labels: the ones gone cleared, the rest set.
+local function takeLabels()
+	local w = whole.labels
+	if not w or w.serial == labelSerial then
+		return
+	end
+	labelSerial = w.serial
+	local now: { [number]: any } = {}
+	for _, l in w.items do
+		if type(l.o) == "number" then
+			now[l.o] = l
+		end
+	end
+	for code in labelled do
+		if not now[code] then
+			nox.clearLabel(code)
+		end
+	end
+	labelled = now
+	for code, l in labelled do
+		setLabel(code, l)
+	end
+	nextRelabel = nox.time() + RELABEL
+end
+
+-- (a label whose item left the client's world for a while is let go there: set again; `now`: at
+-- once, as the option changed)
+local function relabel(now: boolean?)
+	local t = nox.time()
+	if t < nextRelabel and not now then
+		return
+	end
+	nextRelabel = t + RELABEL
+	for code, l in labelled do
+		setLabel(code, l)
+	end
+end
+
+local function drawParty()
+	local n = #party
+	if n == 0 then
+		return
+	end
+	local cw = cardWidth(n)
+	local cardsW = n * (cw + GAP) - GAP
+	local w = math.max(cardsW, VOTE_W)
+	local me = nox.player()
+	local myName = me and string.sub(me.name, 1, 16)
+	for i, m in party do
+		drawCard(m, (w - cardsW) // 2 + (i - 1) * (cw + GAP), cw, m.n == myName)
+	end
+	drawVote(w)
+end
+
 -- ---- The hero's window
 
 local function openTreeOrSheet(name: string)
@@ -210,9 +430,23 @@ local function drawHero()
 	button("hero", 86, 54, 78, 13, "Sheet", true, function()
 		openTreeOrSheet("sheet")
 	end)
+	-- The loot names option: a click changes it (the server keeps it with the character and sends
+	-- it back).
+	local always = lootNames == "always"
+	button("hero", 4, 70, W - 8, 13, if always then "Loot names: always" else "Loot names: with Alt", true, function()
+		nox.send({ kind = "option", name = "lootNames", value = if always then "alt" else "always" })
+	end)
+	local mx, my = mouseIn("hero")
+	if over(mx, my, 4, 70, W - 8, 13) then
+		nox.tooltip({
+			{ "Names over the loot on the ground", "bright" },
+			{ if always then "Shown always." else "Shown while Alt is held.", { 230, 190, 80 } },
+			{ "Click to change; kept with your character.", "dim" },
+		})
+	end
 	if shown.act then
 		local line: string = "Act " .. tostring(shown.act) .. (if shown.cleared then " cleared" else "")
-		nox.text(line, 4, 70, if shown.cleared then "gold" else "dim")
+		nox.text(line, 4, 86, if shown.cleared then "gold" else "dim")
 	end
 end
 
@@ -318,8 +552,13 @@ local function drawStash()
 		nox.send({ kind = "stash", op = "put", item = e.i, tab = stashTab })
 	end)
 	nox.box(0, 366, SW, 1, { 90, 70, 40 })
-	local words = if hot then hot.d elseif hotCarried then hotCarried.d else nil
-	drawWords(words, 4, 370, SW - 8, 3, RARITY[(hot or hotCarried or {}).r or "normal"])
+	if hot then
+		tipItem(hot, "Click to take it")
+	elseif hotCarried then
+		tipItem(hotCarried, "Click to stash it")
+	else
+		nox.text("Point at an item to read it.", 4, 372, "dim")
+	end
 	drawNote(w, 4, 396)
 end
 
@@ -366,10 +605,12 @@ local function drawVendor()
 	nox.box(0, 302, SW, 1, { 90, 70, 40 })
 	local hot = hotStock or hotCarried
 	if hot then
-		drawWords(hot.d, 4, 306, SW - 8, 3, RARITY[hot.r] or RARITY.normal)
 		local line = if hotStock then "Buy for " .. tostring(hot.p) .. " gold"
 			else "Sells for " .. tostring(hot.p) .. " gold" .. (if hot.q then "; reroll " .. tostring(hot.q) .. " gold" else "")
-		nox.text(line, 4, 342, "gold")
+		tipItem(hot, line)
+		nox.text(line, 4, 306, "gold")
+	else
+		nox.text("Point at an item to read it.", 4, 306, "dim")
 	end
 	drawNote(w, 4, 396)
 end
@@ -458,6 +699,34 @@ local function clipBox(x: number, y: number, w: number, h: number, colour: any)
 	end
 end
 
+-- A line clipped to the canvas (its part inside, if any).
+local function clipLine(x1: number, y1: number, x2: number, y2: number, colour: any, width: number)
+	local t0, t1 = 0, 1
+	local dx, dy = x2 - x1, y2 - y1
+	for _, e in { { -dx, x1 }, { dx, TW - x1 }, { -dy, y1 }, { dy, CANVAS_H - y1 } } do
+		local p, q = e[1], e[2]
+		if p == 0 then
+			if q < 0 then
+				return
+			end
+		else
+			local r = q / p
+			if p < 0 then
+				if r > t1 then
+					return
+				end
+				t0 = math.max(t0, r)
+			else
+				if r < t0 then
+					return
+				end
+				t1 = math.min(t1, r)
+			end
+		end
+	end
+	nox.line(x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy, colour, width)
+end
+
 local function drawTree()
 	local w = "tree"
 	local nodes = treeNodes()
@@ -481,7 +750,7 @@ local function drawTree()
 	local function at(n: any): (number, number)
 		return ox + n.x * unit, oy + n.y * unit
 	end
-	-- The links: across, then down (the toolbox draws boxes, not lines).
+	-- The links: a line each, kept to the canvas.
 	for _, n in nodes do
 		local x1, y1 = at(n)
 		for _, id in n.l or {} do
@@ -489,9 +758,7 @@ local function drawTree()
 			if m then
 				local x2, y2 = at(m)
 				local lit = isTaken(n.i) and isTaken(m.i)
-				local col = if lit then { 230, 190, 90 } else { 70, 64, 54 }
-				clipBox(math.min(x1, x2), y1 - 1, math.abs(x2 - x1) + 1, 2, col)
-				clipBox(x2 - 1, math.min(y1, y2), 2, math.abs(y2 - y1) + 1, col)
+				clipLine(x1, y1, x2, y2, if lit then { 230, 190, 90 } else { 80, 72, 60 }, if lit then 2 else 1)
 			end
 		end
 	end
@@ -540,10 +807,16 @@ local function drawTree()
 	nox.box(0, CANVAS_H, TW, TH - CANVAS_H, { 14, 11, 8 })
 	nox.box(0, CANVAS_H, TW, 1, { 110, 84, 44 })
 	if hot then
-		nox.text(hot.n, 4, CANVAS_H + 4, RARITY.rare)
 		local status = if isTaken(hot.i) then "(yours)" else "(click to take: 1 point)"
+		local tip: { any } = { { tostring(hot.n), RARITY.rare }, { status, { 160, 150, 130 } } }
+		for _, l in wrap(hot.d or "", 260) do
+			if #tip < 14 then
+				table.insert(tip, { l, { 235, 230, 215 } })
+			end
+		end
+		nox.tooltip(tip)
+		nox.text(hot.n, 4, CANVAS_H + 4, RARITY.rare)
 		nox.text(status, 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
-		drawWords(hot.d, 4, CANVAS_H + 16, TW - 8, 2, "bright")
 	else
 		nox.text("A node next to one you have takes a point. Spells and summons come from their branch's nodes.", 4, CANVAS_H + 4, "dim")
 	end
@@ -563,7 +836,7 @@ local function drawTree()
 	button(w, bx + 98, CANVAS_H + 58, 22, 14, "+", zoom < #ZOOMS, function() setZoom(zoom + 1) end)
 	button(w, bx + 122, CANVAS_H + 58, 22, 14, "-", zoom > 1, function() setZoom(zoom - 1) end)
 	button(w, bx + 148, CANVAS_H + 58, 44, 14, "Home", true, centre)
-	nox.text("Arrows pan, 1-3 zoom, 0 home", 4, CANVAS_H + 60, "dim")
+	nox.text("Drag or arrows pan, wheel or 1-3 zoom, 0 home", 4, CANVAS_H + 60, "dim")
 	drawNote(w, 300, CANVAS_H + 60)
 	closeBox(w, TW)
 end
@@ -612,7 +885,8 @@ end
 -- ---- The hooks
 
 function ui.start()
-	nox.window("hero", { title = "Character", x = 6, y = 24, w = W, h = H })
+	nox.window("hero", { title = "Character", x = 6, y = TOP, w = W, h = H })
+	placeStrip()
 end
 
 local SPEC: { [string]: any } = {
@@ -629,10 +903,16 @@ function ui.onMessage(value: any)
 	local kind = value.kind
 	if kind == "hero" then
 		shown = value
+		local want = if value.lootNames == "always" then "always" else "alt"
+		if want ~= lootNames then
+			-- (the option changed: every label set again with it)
+			lootNames = want
+			relabel(true)
+		end
 	elseif kind == "boss" then
 		if value.most and value.most > 0 then
 			if not bossShown then
-				nox.window("boss", { title = value.name, x = 320 - BOSS_W // 2, y = 24, w = BOSS_W, h = BOSS_H })
+				nox.window("boss", { title = value.name, x = 320 - BOSS_W // 2, y = TOP, w = BOSS_W, h = BOSS_H })
 			end
 			bossShown = value
 		elseif bossShown then
@@ -645,8 +925,26 @@ function ui.onMessage(value: any)
 	elseif kind == "close" and SPEC[value.window] then
 		opened[value.window] = nil
 		nox.closeWindow(value.window)
+	elseif kind == "party" then
+		party = if type(value.list) == "table" then value.list else {}
+		placeStrip()
+	elseif kind == "vote" then
+		local was = vote
+		vote = value
+		if value.active then
+			voteEnds = nox.time() + (tonumber(value.left) or 0) * 1000
+			if not (was and was.active) then
+				nox.gameSound("ButtonPress", 70)
+			end
+		elseif value.done and (was == nil or was.active or was.done ~= value.done) then
+			doneUntil = nox.time() + 6000
+		end
+		placeStrip()
 	elseif PARTS[kind] then
 		takePart(value)
+		if kind == "labels" then
+			takeLabels()
+		end
 	elseif kind == "treeState" or kind == "sheet" then
 		whole[kind] = if kind == "sheet" then value else { header = value }
 	elseif kind == "note" then
@@ -657,7 +955,11 @@ end
 
 function ui.draw(window: string)
 	zones[window] = {}
-	if window == "hero" then
+	-- (the labels kept set: whichever window is drawn, the Character window at least)
+	relabel()
+	if window == "party" then
+		drawParty()
+	elseif window == "hero" then
 		drawHero()
 	elseif window == "boss" then
 		drawBoss()
@@ -718,6 +1020,33 @@ function ui.key(window: string, key: string): boolean
 		return true
 	end
 	return false
+end
+
+-- The wheel over the tree zooms it.
+function ui.wheel(window: string, _x: number, _y: number, steps: number): boolean
+	if window == "tree" and steps ~= 0 then
+		setZoom(zoom + (if steps > 0 then 1 else -1))
+		return true
+	end
+	return false
+end
+
+-- Dragging the tree pans it.
+local dragFrom: any = nil
+function ui.drag(window: string, phase: string, x: number, y: number, _button: number): boolean
+	if window ~= "tree" then
+		return false
+	end
+	if phase == "start" then
+		dragFrom = { x = x, y = y, px = panX, py = panY }
+	elseif dragFrom then
+		panX = dragFrom.px + (x - dragFrom.x)
+		panY = dragFrom.py + (y - dragFrom.y)
+		if phase == "end" then
+			dragFrom = nil
+		end
+	end
+	return true
 end
 
 return ui

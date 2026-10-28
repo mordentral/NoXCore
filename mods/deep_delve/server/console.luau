@@ -38,13 +38,32 @@
 --                        unit's book and field guide are exactly that ("server ok")
 --   dd sheet             its character sheet, "key value" lines
 --   dd ui WINDOW         a window opened on its UI (stash, vendor: it's moved by the station)
+--   dd as NAME COMMAND   any command above as the player NAME instead of the first
+--   dd party             the party strip: "name class level health% mana% where alive|dead vote"
+--   dd scale             the party's size and its factors, and one monster's health (the lowest id)
+--   dd exit              the first player steps on the area's exit (the game on, or a vote)
+--   dd vote [yes | no | cancel | seconds N]   answer the vote (as the first player), call it off,
+--                        or set its time; alone, the vote: its asker, where to, time, each answer
+--   dd labels            the ground's labels ("id code rarity text") and the codes the first
+--                        player's UI was last sent
+--   dd portals           the open portals, "owner x y" ("owner(left)": its owner left the game)
+--   dd portal take       the first player through the town's portal pentagram (as its touch)
+--   dd hud               how many values the first player's UI is owed (sends not taken yet)
+--   dd option [NAME VALUE]   the first player's options ("name value"), or one set (as its
+--                        Character window does): lootNames alt | always
 
 local areas = require("areas")
 local boss = require("boss")
 local hero = require("hero")
+local hud = require("hud")
+local labels = require("labels")
 local loot = require("loot")
 local monsters = require("monsters")
+local party = require("party")
 local portal = require("portal")
+local scale = require("scale")
+local store = require("store")
+local votes = require("votes")
 local progress = require("progress")
 local town = require("town")
 local waypoints = require("waypoints")
@@ -63,7 +82,13 @@ local vendorData = require("data/vendor")
 
 local console = {}
 
+-- "dd as NAME ...": the hero the command acts as, in place of the first.
+local acting: any = nil
+
 local function firstHero(): any
+	if acting then
+		return acting
+	end
 	local best = nil
 	for peer, h in hero.all() do
 		if not best or peer < best.peer then
@@ -79,6 +104,10 @@ local function words(line: string): { string }
 		table.insert(out, w)
 	end
 	return out
+end
+
+local function reply(ok: boolean, why: string?): { string }
+	return { if ok then "ok" else "not: " .. tostring(why) }
 end
 
 local commands: { [string]: (args: { string }) -> { string } } = {}
@@ -235,12 +264,101 @@ function commands.trial(args: { string }): { string }
 	return { if ok then "ok" else string.format("seed %d area %d: %s", seed, index, tostring(why)) }
 end
 
-function commands.portal(_args: { string }): { string }
+function commands.portal(args: { string }): { string }
 	local h = firstHero()
 	if not h then
 		return { "no player" }
 	end
+	if args[2] == "take" then
+		local list = portal.openFor(h)
+		portal.touched(h.unit)
+		return { if #list == 0 then "none open" elseif list[1].owner == h or #list == 1 then "through" else "offered" }
+	end
 	return { portal.open(h) }
+end
+
+function commands.portals(_args: { string }): { string }
+	local out = portal.lines()
+	return if #out > 0 then out else { "none" }
+end
+
+-- ---- The party (Phase 4)
+
+function commands.party(_args: { string }): { string }
+	return party.lines()
+end
+
+function commands.scale(_args: { string }): { string }
+	local n = scale.players()
+	local out = {
+		string.format("players %d: health x%.2f, damage x%.2f, experience x%.2f, packs x%.2f, loot x%.2f", n, scale.factor("health"),
+			scale.factor("damage"), scale.factor("experience"), scale.factor("packs"), scale.factor("loot")),
+	}
+	local s = monsters.sample()
+	if s then
+		table.insert(out, table.concat({ "sample", tostring(s.id), tostring(s.health) .. "/" .. tostring(s.most), "base", tostring(s.base), "damage",
+			string.format("%.4f", tonumber(s.damage) or 0), "xp", tostring(s.experience) }, " "))
+	else
+		table.insert(out, "sample none")
+	end
+	table.insert(out, "packs " .. tostring(monsters.packsMade()))
+	return out
+end
+
+function commands.exit(_args: { string }): { string }
+	local h = firstHero()
+	if not h or not nox.present(h.unit) then
+		return { "no player" }
+	end
+	local ok, why = areas.exitTouched(h.unit)
+	return { if ok then (if why == "vote" then "vote" else "going") else "not: " .. tostring(why) }
+end
+
+function commands.vote(args: { string }): { string }
+	local op = args[2]
+	if op == "seconds" then
+		votes.setSeconds(tonumber(args[3]) or 30)
+		return { "ok" }
+	end
+	if not op then
+		return votes.lines()
+	end
+	local h = firstHero()
+	if not h then
+		return { "no player" }
+	end
+	if op == "cancel" then
+		return reply(votes.cancel(h))
+	end
+	return reply(votes.cast(h, op == "yes"))
+end
+
+function commands.hud(_args: { string }): { string }
+	local h = firstHero()
+	if not h then
+		return { "no player" }
+	end
+	return { "owed " .. tostring(hud.owed(h.peer)) }
+end
+
+function commands.option(args: { string }): { string }
+	local h = firstHero()
+	if not h then
+		return { "no player" }
+	end
+	if args[2] then
+		return reply(hero.setOption(h, args[2], tostring(args[3])))
+	end
+	local out = {}
+	for name in store.OPTIONS :: any do
+		table.insert(out, tostring(name) .. " " .. store.option(h.record, name))
+	end
+	table.sort(out)
+	return out
+end
+
+function commands.labels(_args: { string }): { string }
+	return labels.lines(firstHero())
 end
 
 function commands.waypoint(args: { string }): { string }
@@ -467,10 +585,6 @@ end
 
 -- ---- The town (Phase 3)
 
-local function reply(ok: boolean, why: string?): { string }
-	return { if ok then "ok" else "not: " .. tostring(why) }
-end
-
 function commands.gold(args: { string }): { string }
 	local h = firstHero()
 	if not h or not nox.present(h.unit) then
@@ -550,7 +664,7 @@ function commands.vendor(args: { string }): { string }
 		end
 		return reply(vendor.reroll(h, id))
 	end
-	return vendor.lines()
+	return vendor.lines(h)
 end
 
 function commands.tree(args: { string }): { string }
@@ -673,6 +787,8 @@ function commands.help(_args: { string }): { string }
 		"dd progress | boss | smite | trial SEED N",
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L]",
 		"dd tree [take ID...|respec|nodes [REGION]] | book | sheet | ui stash|vendor|tree|sheet",
+		"dd as NAME COMMAND | party | scale | exit | vote [yes|no|cancel|seconds N] | labels | portals | portal take | hud",
+		"dd option [lootNames alt|always]",
 	}
 end
 
@@ -683,6 +799,29 @@ function console.run(line: string): { string }?
 		return nil
 	end
 	table.remove(w, 1)
+	if w[1] == "as" then
+		-- (the player by name, then the rest of the line as it)
+		local name = w[2]
+		local who = nil
+		for _, h in hero.all() do
+			if h.record.identity.name == name then
+				who = h
+			end
+		end
+		if not who then
+			return { "no player " .. tostring(name) }
+		end
+		table.remove(w, 1)
+		table.remove(w, 1)
+		local fn = commands[w[1] or "help"] or commands.help
+		acting = who
+		local ok, out = pcall(fn, w)
+		acting = nil
+		if not ok then
+			error(out, 0)
+		end
+		return out
+	end
 	local fn = commands[w[1] or "help"]
 	if not fn then
 		return commands.help(w)

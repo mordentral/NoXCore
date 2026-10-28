@@ -4,9 +4,12 @@
 -- read back from the unit when it's saved, its experience and levels.
 --
 -- A hero is { peer, unit, key, record, ready, bonus, need, since, arrival, fell, portal, open,
--- told }:
+-- told, mapReady, stock, partySig, labelSig }:
 --   ready  the unit carries the record's state (set up, not dead, not between maps): only then is
 --          the unit read back into the record;
+--   mapReady its client has this map loaded (playerReady), so world labels reach it;
+--   stock  its own vendor stock (vendor.luau); partySig, labelSig what its UI was last sent of the
+--          party strip and the ground's labels (party.luau, labels.luau);
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
 --          mana, strength, healthPct, manaPct, own (% more by a hit's thing type: a spell's own) };
 --   open   its windows open (windows.luau);
@@ -21,8 +24,8 @@
 -- Gear is given from the record when a unit first comes into play and in every new map (a map
 -- change outside a quest strips a player); never after a death, which keeps everything.
 --
--- When the record is written: on an area change, a level up, a death, leaving, the game's end and
--- every numbers.timing.saveEvery frames.
+-- When the record is written: on an area change, a level up, a death, an option set, leaving, the
+-- game's end and every numbers.timing.saveEvery frames.
 
 local store = require("store")
 local progress = require("progress")
@@ -314,6 +317,7 @@ function hero.clientReady(p: any)
 	if not h then
 		return
 	end
+	h.mapReady = true
 	keepInPlay(h)
 	if h.ready then
 		book.apply(h, true)
@@ -339,6 +343,7 @@ end
 function hero.mapChanging()
 	for _, h in byPeer do
 		h.ready = false
+		h.mapReady = false -- (its client loads the new map: playerReady again)
 		h.fell = false
 		h.portal = nil
 		h.told = nil -- (its client's book swept again in the new map)
@@ -512,8 +517,8 @@ end
 
 -- ---- Gear
 
--- A unit picked an item up: a magic or better find is told to its finder (the item's tooltip
--- waits for A9).
+-- A unit picked an item up: a magic or better find is told to its finder (its modifiers and
+-- affixes, which its label on the ground doesn't name).
 function hero.pickedUp(unit: number, item: number)
 	local h = byUnit[unit]
 	local m = items.meta(item)
@@ -546,6 +551,17 @@ function hero.treeChanged(h: any, why: string)
 	end
 	hero.save(h, why)
 	hud.hero(h)
+end
+
+-- A player's option for its character (store.OPTIONS: "lootNames" "alt" or "always") set, from
+-- its UI or the console: kept in its record (written now) and its UI told. Whether it may take it.
+function hero.setOption(h: any, name: string, value: string): (boolean, string?)
+	if not store.setOption(h.record, name, value) then
+		return false, "no such option or value"
+	end
+	hero.save(h, "option")
+	hud.hero(h)
+	return true, nil
 end
 
 -- An area entered (`info`: areas.info's): the deepest each character has been, in the act and

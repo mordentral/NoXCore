@@ -3,10 +3,14 @@
 -- rolled at the area level, buys what a player carries for gold by its rarity and level, and for
 -- gold rerolls a magic or rare piece's modifiers (and a rare's affixes) at its level.
 --
--- Its stock is the game's, not a character's: rolled as each area is entered and again when an
--- act is cleared, and kept nowhere (a new game's vendor rolls its own). Prices are
--- data/vendor.luau's. A sale, a purchase or a reroll is one step on the server, the record written
--- at once (as the stash's moves are: an item is never in two places, and gold never counted twice).
+-- Its stock is each player's own (by decision, for a party): each player sees and buys from a
+-- stock of their own. A stock is rolled anew as each area is entered and again when an act is
+-- cleared (a "restock"); kept on the hero, never in the record (a new game's vendor rolls its own).
+-- At a restock one stock is rolled at once, as it always was, and goes to the first player to
+-- look; anyone else's is rolled when they first look (so a player alone sees what the shared stock
+-- was). Prices are data/vendor.luau's. A sale, a purchase or a reroll is one step on the server,
+-- the record written at once (as the stash's moves are: an item is never in two places, and gold
+-- never counted twice).
 
 local hero = require("hero")
 local items = require("items")
@@ -18,9 +22,11 @@ local lootData = require("data/loot")
 
 local vendor = {}
 
--- The stock now: { { rec | type (a potion), price, potion } }, and the area level it was rolled at.
-local stock: { any } = {}
+-- The restock now: its serial (a hero's stock of an older one is rolled again when looked at),
+-- its area level, and the stock rolled with it until someone takes it.
+local restocks = 0
 local stockLevel = 1
+local fresh: { any }? = nil
 
 local potionPrice: { [string]: number } = {}
 for _, p in data.potions do
@@ -49,10 +55,9 @@ function vendor.rerollPrice(rec: any): number
 	return math.max(1, math.floor(vendor.price(rec) * data.prices.reroll))
 end
 
--- The stock rolled again at the area level.
-function vendor.restock(level: number)
-	stockLevel = math.max(1, level)
-	table.clear(stock)
+-- One stock at the area level now: { { rec | type (a potion), price, potion } }.
+local function rollStock(): { any }
+	local stock = {}
 	for _, p in data.potions do
 		table.insert(stock, { type = p.type, price = p.price, potion = true })
 	end
@@ -79,7 +84,29 @@ function vendor.restock(level: number)
 		local rec = loot.makeGear(pick.type, rarity, stockLevel)
 		table.insert(stock, { rec = rec, price = vendor.price(rec) })
 	end
-	-- (anyone looking at it sees the new stock)
+	return stock
+end
+
+-- A hero's own stock: kept while it's of the restock now; else the restock's own stock when nobody
+-- has taken it yet, else one rolled for it now.
+function vendor.stockOf(h: any): { any }
+	local mine = h.stock
+	if mine and mine.restock == restocks then
+		return mine.list
+	end
+	local list = fresh or rollStock()
+	fresh = nil
+	h.stock = { restock = restocks, list = list }
+	return list
+end
+
+-- A restock at the area level: one stock rolled now (as it always was), every hero's own to be
+-- rolled again as they look.
+function vendor.restock(level: number)
+	stockLevel = math.max(1, level)
+	restocks += 1
+	fresh = rollStock()
+	-- (anyone looking at the vendor sees their new stock)
 	for _, h in hero.all() do
 		if windows.isOpen(h, "vendor") then
 			vendor.view(h)
@@ -89,6 +116,7 @@ end
 
 -- The stock shown.
 function vendor.view(h: any)
+	local stock = vendor.stockOf(h)
 	local list = {}
 	for i, s in stock do
 		local e = if s.potion then windows.entry({ type = s.type, rarity = "normal" }) else windows.entry(s.rec)
@@ -121,6 +149,7 @@ function vendor.buy(h: any, i: number): (boolean, string?)
 	if not ok then
 		return false, why
 	end
+	local stock = vendor.stockOf(h)
 	local s = stock[math.floor(i)]
 	if not s then
 		return false, "not for sale"
@@ -234,10 +263,10 @@ function vendor.message(h: any, v: any)
 	end
 end
 
--- The stock as lines, "index type rarity price" (for "dd vendor").
-function vendor.lines(): { string }
+-- A hero's stock as lines, "index type rarity price" (for "dd vendor").
+function vendor.lines(h: any): { string }
 	local out = { "level " .. stockLevel }
-	for i, s in stock do
+	for i, s in vendor.stockOf(h) do
 		if s.potion then
 			table.insert(out, tostring(i) .. " " .. tostring(s.type) .. " potion " .. tostring(s.price))
 		else

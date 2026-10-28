@@ -8,16 +8,25 @@
 -- name over its head now and then (nox.unitSay). Engine ask A7 (a coloured name plate, speed and
 -- damage multipliers) replaces the stand-ins in `present` below, and nothing else.
 
+--
+-- Party scaling (scale.luau, design 7): a monster's most health is its own times the party's
+-- health factor, changed on every live one as players come and go (rescale); the damage it deals
+-- and the experience it gives are multiplied by the party's factors when they're used; an area
+-- entered with more players gets extra packs at the generator's spots.
+
 local data = require("data/monsters")
 local numbers = require("data/numbers")
+local scale = require("scale")
 
 local monsters = {}
 
--- Each live monster the mod made: id -> { type, tier, name?, level, damage, experience }.
+-- Each live monster the mod made: id -> { type, tier, name?, level, damage, experience, base (its
+-- most health for one player) }.
 local known: { [number]: any } = {}
 -- The named ones (their names shown again now and then): a list of ids.
 local named: { number } = {}
 local nameTimer: number? = nil
+local packsMade = 0
 local NEAR_PLAYERS: any = { players = true, alive = true }
 
 function monsters.info(id: number): any
@@ -103,12 +112,18 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	local o = nox.object(id)
 	local most = if o then o.maxHealth else (if base then base.health else 10)
 	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health + 0.5), 1, 65535)
+	local alone = health
+	local party = scale.factor("health")
+	if party ~= 1 then
+		health = math.clamp(math.floor(alone * party + 0.5), 1, 65535)
+	end
 	nox.setHealth(id, health, health)
 	nox.touch(id)
 	local entry: any = {
 		type = thingType,
 		tier = tierName,
 		level = level,
+		base = alone,
 		damage = tier.damage * (1 + a.damagePerLevel * (level - 1)),
 		-- (monster.bin's experience is the stock game's, thousands a kill: scaled to Deep Delve's
 		-- own curve, at least 1)
@@ -166,7 +181,17 @@ monsters.spawn = spawn
 function monsters.populate(spots: any, area: any)
 	local roster = (data.rosters :: any)[area.biome] or data.rosters.Crypt
 	local f = numbers.areas.followers
-	for _, spot in spots.packs or {} do
+	-- (a party: extra packs at spots drawn from the generator's, beside the pack there)
+	local at: { any } = table.clone(spots.packs or {})
+	local extra = math.floor(#at * (scale.factor("packs") - 1) + 0.5)
+	local count = #at
+	if count > 0 then
+		for _ = 1, extra do
+			table.insert(at, at[nox.random(count)])
+		end
+	end
+	packsMade = #at
+	for _, spot in at do
 		local leaderType = pickType(roster, area.level)
 		if leaderType then
 			local tier = rollTier(area.level)
@@ -212,10 +237,66 @@ function monsters.killed(id: number): any
 	return e
 end
 
--- The damage multiplier of a monster dealing a hit (1 for anything the mod didn't make).
+-- The damage multiplier of a monster dealing a hit (1 for anything the mod didn't make), the
+-- party's factor in it.
 function monsters.damageOf(id: number): number
 	local e = known[id]
-	return if e then e.damage else 1
+	return if e then e.damage * scale.factor("damage") else 1
+end
+
+-- The experience a monster's death gives (before it's split), the party's factor in it.
+function monsters.experienceOf(e: any): number
+	local f = scale.factor("experience")
+	if f == 1 then
+		return e.experience
+	end
+	return math.max(1, math.floor(e.experience * f + 0.5))
+end
+
+-- Every live monster's most health for the party now (its share of health kept), as players come
+-- and go. A walk of the mod's own monsters, only when the count changes.
+function monsters.rescale()
+	local f = scale.factor("health")
+	for id, e in known do
+		local o = nox.object(id)
+		if o and o.alive and o.maxHealth > 0 then
+			local most = math.clamp(math.floor(e.base * f + 0.5), 1, 65535)
+			if most ~= o.maxHealth then
+				local health = math.clamp(math.floor(o.health * most / o.maxHealth + 0.5), 1, most)
+				nox.setHealth(id, health, most)
+				nox.touch(id)
+			end
+		end
+	end
+end
+
+-- The mod's monster with the lowest id and its numbers, for "dd scale": { id, health, most, base,
+-- damage (with the party's factor), experience (likewise) }, or nil.
+function monsters.sample(): any
+	local best = nil
+	for id in known do
+		if (not best or id < best) and nox.living(id) then
+			best = id
+		end
+	end
+	if not best then
+		return nil
+	end
+	local o = nox.object(best)
+	local e = known[best]
+	return {
+		id = best,
+		health = if o then o.health else 0,
+		most = if o then o.maxHealth else 0,
+		base = e.base,
+		damage = monsters.damageOf(best),
+		experience = monsters.experienceOf(e),
+	}
+end
+
+-- How many packs the last area entered was given (its spots' and a party's extra).
+function monsters.packsMade(): number
+	return packsMade
 end
 
 -- A new map: the old monsters are gone with it.

@@ -16,7 +16,10 @@ namespace st = nox::gui::status;
 
 // Options.wnd
 constexpr std::int32_t kWindow65 = 311, kWindow75 = 312, kWindow85 = 313, kWindow100 = 314;
-constexpr std::int32_t kRes640 = 321, kRes800 = 322, kRes1024 = 323, kRes1024Wide = 324;
+constexpr std::int32_t kRes640 = 321, kRes1024Wide = 324; // (800x600 and 1024x768 between)
+// noxsdl's resolution drop-down in their place (five rows don't fit the panel's box): its button and
+// first choice.
+constexpr std::int32_t kResBox = 326, kResItem = 3260;
 constexpr std::int32_t kDepth8 = 331, kDepth16 = 332;
 constexpr std::int32_t kInputConfig = 341;
 constexpr std::int32_t kFxVolume = 351, kDialogVolume = 352, kMusicVolume = 353;
@@ -77,11 +80,16 @@ int pageOf(std::int32_t id)
 }
 
 struct Resolution {
-    std::int32_t id;
     int width, height;
+    const char* name;
 };
-constexpr std::array<Resolution, 4> kResolutions{{
-    {kRes640, 640, 480}, {kRes800, 800, 600}, {kRes1024, 1024, 768}, {kRes1024Wide, 1024, 576}}};
+// The game's four (1024 x 576 only in some installs) and noxsdl's ultra widescreen 1376 x 576
+// (3440 x 1440 screens' shape; 576 high as 1024 x 576, about the area of 1024 x 768).
+constexpr std::array<Resolution, 5> kResolutions{{{640, 480, "640 X 480"},
+                                                   {800, 600, "800 X 600"},
+                                                   {1024, 768, "1024 X 768"},
+                                                   {1024, 576, "1024 X 576 (16:9)"},
+                                                   {1376, 576, "1376 X 576 (21:9)"}}};
 constexpr std::array<std::pair<std::int32_t, int>, 4> kWindowSizes{
     {{kWindow65, 65}, {kWindow75, 75}, {kWindow85, 85}, {kWindow100, 100}}};
 
@@ -292,6 +300,20 @@ void OptionsWindow::showDrop(const DropDown& d, bool open)
     }
 }
 
+void OptionsWindow::showResolutions(int inUse, bool open)
+{
+    resolution_ = inUse;
+    for (int i = 0; i < static_cast<int>(kResolutions.size()); ++i) {
+        if (gui::Window* w = window_ ? window_->find(kResItem + i) : nullptr) {
+            w->show(open);
+            w->state = i == inUse ? (w->state | gui::kPressed) : (w->state & ~gui::kPressed); // the one in use lit
+        }
+    }
+    if (gui::Window* box = window_ ? window_->find(kResBox) : nullptr) {
+        box->text = inUse >= 0 ? kResolutions[static_cast<std::size_t>(inUse)].name : "";
+    }
+}
+
 void OptionsWindow::setDropText(const DropDown& d)
 {
     if (gui::Window* w = advanced_ ? advanced_->find(d.box) : nullptr) {
@@ -316,24 +338,53 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     open_ = true;
     const auto proc = [this](gui::Window&, int message, gui::Window& from) { return onMessage(message, from); };
     auto optionsDef = nox::gui::loadWindowFile(windowDir_ / "Options.wnd");
-    // The widescreen 1024x576 button is only in some installs' Options.wnd (and its label only in
-    // their string table): without it, a copy of the 1024x768 button a row below that one.
-    bool addedWide = false;
-    if (!optionsDef.find(kRes1024Wide)) {
-        const auto& kids = optionsDef.children;
-        const auto r1024 = std::ranges::find(kids, kRes1024, &nox::gui::WindowDef::id);
-        const auto r800 = std::ranges::find(kids, kRes800, &nox::gui::WindowDef::id);
-        if (r1024 != kids.end()) {
-            nox::gui::WindowDef wide = *r1024;
-            wide.id = kRes1024Wide;
-            wide.y += r800 != kids.end() && r800->y < r1024->y ? r1024->y - r800->y : r1024->height;
-            optionsDef.children.insert(r1024 + 1, std::move(wide));
-            addedWide = true;
+    // The resolutions: the game's radio buttons (1024x576 only in some installs) replaced by a
+    // drop-down on the first one's row, as the advanced panel's: five rows don't fit the panel's
+    // box. Its choices go first (drawn last, over the rows below) and start hidden.
+    if (const auto first = std::ranges::find(optionsDef.children, kRes640, &nox::gui::WindowDef::id);
+        first != optionsDef.children.end()) {
+        nox::gui::WindowDef box = *first;
+        box.id = kResBox;
+        box.type = nox::gui::WindowType::PushButton;
+        box.typeName = "PUSHBUTTON";
+        box.status = st::Enabled | st::NoFocus;
+        box.style = nox::gui::style::PushButton | nox::gui::style::MouseTrack;
+        box.backgroundImage.clear();
+        box.enabledImage.clear();
+        box.disabledImage.clear();
+        box.hiliteImage.clear();
+        box.selectedImage.clear();
+        box.text.clear();
+        box.tooltip.clear();
+        box.data = {};
+        box.group = 0;
+        box.height = 17;
+        box.enabledColor = {150, 110, 40};
+        box.hiliteColor = {240, 180, 42};
+        box.backgroundColor = {16, 12, 8};
+        box.selectedColor = {70, 52, 20};
+        box.disabledColor = {24, 24, 24};
+        std::erase_if(optionsDef.children, [](const nox::gui::WindowDef& d) { return d.id >= kRes640 && d.id <= kRes1024Wide; });
+        std::vector<nox::gui::WindowDef> items;
+        for (int i = 0; i < static_cast<int>(kResolutions.size()); ++i) {
+            nox::gui::WindowDef item = box;
+            item.id = kResItem + i;
+            item.y = box.y + 17 * (i + 1);
+            item.status |= st::Hidden;
+            items.push_back(std::move(item));
         }
+        optionsDef.children.push_back(std::move(box));
+        optionsDef.children.insert(optionsDef.children.begin(), std::make_move_iterator(items.begin()),
+                                   std::make_move_iterator(items.end()));
     }
     window_ = gui_.load(optionsDef, proc);
-    if (gui::Window* wide = window_->find(kRes1024Wide); wide && (addedWide || wide->text.empty())) {
-        wide->text = "1024 X 576"; // (as the string table that has it writes it)
+    if (gui::Window* box = window_->find(kResBox)) {
+        box->dropArrow = true;
+    }
+    for (int i = 0; i < static_cast<int>(kResolutions.size()); ++i) {
+        if (gui::Window* w = window_->find(kResItem + i)) {
+            w->text = kResolutions[static_cast<std::size_t>(i)].name;
+        }
     }
     // The advanced options: the old renderer's switches for low-end hardware (surfaces, shading,
     // interlacing, front walls...) don't apply to noxsdl's and are left out; the ones it acts
@@ -521,14 +572,10 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
             height = static_cast<int>(h);
         }
     }
-    for (const auto& r : kResolutions) {
-        gui::Window* w = window_->find(r.id);
-        const bool current = r.width == width && r.height == height;
-        gui::setChecked(w, current);
-        // (game_initOptionsInGame leaves only the resolution in use on in a game; ours can be changed in a
-        // game too, a deliberate deviation.)
-        gui::setEnabled(w, true);
-    }
+    // (game_initOptionsInGame leaves only the resolution in use on in a game; ours can be changed in a
+    // game too, a deliberate deviation.)
+    const auto inUse = std::ranges::find_if(kResolutions, [&](const Resolution& r) { return r.width == width && r.height == height; });
+    showResolutions(inUse != kResolutions.end() ? static_cast<int>(inUse - kResolutions.begin()) : -1, false);
     const int size = number(config_.setting("VideoSize"), 100);
     for (const auto& [id, percent] : kWindowSizes) {
         gui::setChecked(window_->find(id), percent == size);
@@ -735,6 +782,20 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
     for (const DropDown& d : drops()) {
         showDrop(d, false);
     }
+    // The resolution drop-down: its button opens and shuts the list, a choice is written to the
+    // config at once, a click anywhere else shuts it.
+    if (from.id == kResBox) {
+        const gui::Window* first = window_->find(kResItem);
+        showResolutions(resolution_, first && (first->status & st::Hidden));
+        return true;
+    }
+    if (from.id >= kResItem && from.id < kResItem + static_cast<std::int32_t>(kResolutions.size())) {
+        const Resolution& r = kResolutions[static_cast<std::size_t>(from.id - kResItem)];
+        showResolutions(from.id - kResItem, false);
+        setting("VideoMode", std::to_string(r.width) + " " + std::to_string(r.height) + " 16");
+        return true;
+    }
+    showResolutions(resolution_, false);
     // The sound switches (FX, dialog, music: ids in that order, like sound_).
     if (from.id == kFxOn || from.id == kDialogOn || from.id == kMusicOn) {
         sound_[static_cast<std::size_t>(from.id - kFxOn)] = (from.state & gui::kPressed) != 0;
@@ -747,12 +808,6 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
     for (const auto& [id, percent] : kWindowSizes) {
         if (from.id == id) {
             setting("VideoSize", std::to_string(percent));
-            return true;
-        }
-    }
-    for (const auto& r : kResolutions) {
-        if (from.id == r.id) {
-            setting("VideoMode", std::to_string(r.width) + " " + std::to_string(r.height) + " 16");
             return true;
         }
     }

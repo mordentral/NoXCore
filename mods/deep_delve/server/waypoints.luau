@@ -8,10 +8,10 @@
 --     the town's receiving pentagram; the game itself sends whoever stands on it (a pentagram
 --     links places in one map, and the town is in every map).
 --   * Town -> a waypoint: the town's waypoints pentagram (cyan) offers the waypoints its
---     toucher has found (nox.choice). This area's: a step across the map, at once. Another
---     area's: the whole game goes there (a map change, that area generated into the other map
---     tag), arriving beside its waypoint. A party's players must all be in town for that (a party
---     vote comes with party play); alone, it's at once.
+--     toucher has found (nox.choice). This area's: a step across the map, at once, for that
+--     player alone (no vote). Another area's: the whole game goes there (a map change, that area
+--     generated into the other map tag), arriving beside its waypoint; with anyone else in the
+--     game that's the party's vote (votes.luau), else (alone) it's at once.
 --   * The town's receiving pentagram watches what lands on it: a monster that followed a player
 --     through is sent back to the waypoint it came by.
 --
@@ -21,9 +21,11 @@
 local hero = require("hero")
 local hud = require("hud")
 local monsters = require("monsters")
+local offers = require("offers")
 local progress = require("progress")
 local town = require("town")
 local touch = require("touch")
+local votes = require("votes")
 local numbers = require("data/numbers")
 
 local waypoints = {}
@@ -31,8 +33,6 @@ local waypoints = {}
 -- This map's waypoint: { act, index, title, x, y, arrive }, or nil.
 local here: any = nil
 local beat: number? = nil
--- What each peer was offered: peer -> { list = area indices, frame }.
-local offered: { [number]: any } = {}
 -- areas.luau's own (handed in by place: it requires this module).
 local areas: any = nil
 
@@ -67,8 +67,9 @@ local function look()
 	end
 end
 
--- A hero to an area's waypoint (one it has found): this area's at once, another's by a map
--- change. Whether it went (else why).
+-- A hero to an area's waypoint (one it has found): this area's at once (that hero alone);
+-- another's by a map change, the party's vote when anyone else is in the game. Whether it
+-- went or a vote started ("vote"), else why.
 function waypoints.go(h: any, index: number): (boolean, string?)
 	local current = areas.current()
 	if index == current.index then
@@ -81,17 +82,7 @@ function waypoints.go(h: any, index: number): (boolean, string?)
 		nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
 		return true, nil
 	end
-	-- Another area: the game goes, so everyone else must be in town.
-	for _, other in hero.all() do
-		if other ~= h and other.ready and nox.present(other.unit) then
-			local x, y = nox.position(other.unit)
-			if not town.contains(x, y) then
-				nox.tell(h.unit, "Everyone must be in town to travel to another area.")
-				return false, "party out"
-			end
-		end
-	end
-	return areas.travel(index, "waypoint")
+	return votes.ask(h, index, "waypoint", "waypoint")
 end
 
 -- The town's waypoints pentagram touched: the waypoints its toucher has found offered.
@@ -106,8 +97,8 @@ local function padTouched(unit: number)
 		town.say(unit, "You've found no waypoint yet. Look for one out in the areas.")
 		return
 	end
-	local o = offered[h.peer]
-	if o and nox.frame() - o.frame < OFFER_AGAIN then
+	local since = offers.since(h.peer)
+	if since and nox.frame() - since < OFFER_AGAIN then
 		return
 	end
 	local now = areas.current().index
@@ -120,23 +111,14 @@ local function padTouched(unit: number)
 			table.insert(shown, index)
 		end
 	end
-	offered[h.peer] = { list = shown, frame = nox.frame() }
-	nox.choice(h.peer, "Waypoints", answers)
-end
-
--- onChoice: whether it was an answer to the waypoints' offer (and went where it said).
-function waypoints.chosen(peer: number, index: number): boolean
-	local o = offered[peer]
-	if not o then
-		return false
-	end
-	offered[peer] = nil
-	local h = hero.byPeer(peer)
-	local area = o.list[index]
-	if h and area then
-		waypoints.go(h, area)
-	end
-	return true
+	local peer = h.peer
+	offers.make(peer, "Waypoints", answers, function(i: number)
+		local who = hero.byPeer(peer)
+		local area = shown[i]
+		if who and area then
+			waypoints.go(who, area)
+		end
+	end)
 end
 
 -- Something landed on the town's receiving pentagram: a hero came home by this map's waypoint
@@ -182,7 +164,7 @@ end
 -- A new map: the old one's waypoint is gone with it.
 function waypoints.reset()
 	here = nil
-	table.clear(offered)
+	offers.forget()
 	if beat then
 		nox.cancelTimer(beat)
 		beat = nil
