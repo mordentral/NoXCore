@@ -129,8 +129,23 @@ void SpellLimits::update(const nox::client::World& world, std::uint16_t us, std:
     known_.swap(now_);
 }
 
+int SpellLimits::hintPower(std::uint32_t worldFlags, bool modeOwnsBook, int level)
+{
+    // Power 3 in multiplayer games (flags 0x570) but in a mode's book, else the spell's level
+    // (3 when it isn't known).
+    if ((worldFlags & 0x570) && !modeOwnsBook) {
+        return 3;
+    }
+    return level > 0 ? level : 3;
+}
+
+void SpellLimits::claimForTest(std::uint16_t netCode, std::uint32_t spell)
+{
+    owned_[netCode] = {spell, 0};
+}
+
 std::set<std::uint32_t> SpellLimits::limited(const nox::client::World& world, const nox::things::GameData& gameData,
-                                              std::uint32_t gameFlags) const
+                                              std::uint32_t gameFlags, bool modeOwnsBook) const
 {
     std::map<std::uint32_t, int> count;
     for (const auto& [netCode, o] : owned_) {
@@ -142,13 +157,9 @@ std::set<std::uint32_t> SpellLimits::limited(const nox::client::World& world, co
             out.insert(spell);
         }
     }
-    // Power 3 in multiplayer games (flags 0x570), else the spell's level.
     const auto power = [&](std::uint32_t spell) -> int {
-        if (world.game().gameFlags & 0x570) {
-            return 3;
-        }
         const auto it = world.self().spellLevels.find(static_cast<std::uint8_t>(spell));
-        return it != world.self().spellLevels.end() && it->second > 0 ? it->second : 3;
+        return hintPower(world.game().gameFlags, modeOwnsBook, it != world.self().spellLevels.end() ? it->second : 0);
     };
     const auto cap = [&](std::string_view table, std::uint32_t spell) {
         const auto index = static_cast<std::size_t>(std::clamp(power(spell), 1, 5) - 1);

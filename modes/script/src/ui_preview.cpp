@@ -250,6 +250,38 @@ void UiPreview::setMouse(std::optional<std::pair<float, float>> at)
     }
 }
 
+bool UiPreview::drag(std::string_view windowId, UiDrag phase, float x, float y, int button)
+{
+    return ui_ && ui_->drag(windowId, phase, x, y, button);
+}
+
+bool UiPreview::mouseUp(std::string_view windowId, float x, float y, int button)
+{
+    return ui_ && ui_->mouseUp(windowId, x, y, button);
+}
+
+bool UiPreview::wheel(std::string_view windowId, float x, float y, int steps)
+{
+    return ui_ && ui_->wheel(windowId, x, y, steps);
+}
+
+const UiWindow* UiPreview::windowAt(float x, float y) const
+{
+    return ui_ ? ui_->windowAt(x, y) : nullptr;
+}
+
+const std::vector<UiTooltipLine>& UiPreview::tooltip() const noexcept
+{
+    static const std::vector<UiTooltipLine> none;
+    return ui_ ? ui_->tooltip() : none;
+}
+
+const std::vector<UiLabel>& UiPreview::labels() const noexcept
+{
+    static const std::vector<UiLabel> none;
+    return ui_ ? ui_->labels() : none;
+}
+
 int UiPreview::api() const noexcept
 {
     return ui_ ? ui_->api() : 0;

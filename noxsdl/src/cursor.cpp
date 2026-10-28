@@ -20,39 +20,24 @@ constexpr SDL_Color kYellow{255, 255, 0, 255};
 
 } // namespace
 
+pick::Shape pickShape(const TypeArt& art)
+{
+    return pick::Shape{art.extentBox, art.extentRadius, art.extentWidth, art.extentHeight, art.zSizeMin, art.zSizeMax};
+}
+
 bool underCursor(const TypeArt& art, float x, float y, float z, float cx, float cy)
 {
-    // clientOnCursorHover: the footprint at the bottom (y - ZSIZE bottom - z) and at the top (y - ZSIZE
-    // top - z), and what's between.
-    const float top = std::floor(y - art.zSizeMax - z);
-    const float bottom = std::floor(y - art.zSizeMin - z);
-    const float dx = cx - x;
-    if (!art.extentBox) {
-        const float r = art.extentRadius;
-        if (r <= 0) {
-            return false;
-        }
-        // Between the two levels: within the radius sideways.
-        if (cy >= top && cy <= bottom) {
-            return std::fabs(dx) < r;
-        }
-        // Above or below: inside the circle at the nearer level.
-        const float dy = cy - (cy < top ? top : bottom);
-        return dx * dx + dy * dy < r * r;
-    }
-    // A box turned 45 degrees: square along the diagonals (map).
-    const float u = art.extentWidth / std::numbers::sqrt2_v<float>;
-    const float v = art.extentHeight / std::numbers::sqrt2_v<float>;
-    const auto inBox = [&](float level) {
-        const float dy = cy - level;
-        return std::fabs(dx + dy) < u && std::fabs(dx - dy) < v;
-    };
-    if (inBox(bottom) || inBox(top)) {
-        return true;
-    }
-    // Between the levels: within the box's half span sideways.
-    const float halfSpan = (u + v) / 2;
-    return std::fabs(dx) < halfSpan && cy > top && cy < bottom;
+    const auto ix = static_cast<int>(std::lround(x));
+    const auto iy = static_cast<int>(std::lround(y));
+    const auto icx = static_cast<int>(std::floor(cx));
+    const auto icy = static_cast<int>(std::floor(cy));
+    return pick::nearCursor(ix, iy, icx, icy) &&
+           pick::under(pickShape(art), ix, iy, static_cast<int>(std::lround(z)), icx, icy);
+}
+
+float hoverDepth(const TypeArt& art, float y, float z)
+{
+    return static_cast<float>(pick::depth(pickShape(art), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z))));
 }
 
 Cursor::Cursor(const nox::things::ThingDb& things, SpriteCache& sprites, Font* font,

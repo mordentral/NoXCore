@@ -611,6 +611,13 @@ void World::apply(std::span<const std::uint8_t> m, std::uint32_t frame)
         ++game_.wallsVersion;
         game_.flags.clear();
         game_.over = false; // (CliNet_OnPacket case 0x2B: Game_ClearFlags(8))
+        // (noxcpp: a new map's players are alive, so a death heard before it is forgotten. A
+        // solo game's death loads its save without a MSG_PLAYER_RESPAWN, and noxsdl, which reads
+        // this flag for "in play", kept every spell dark and offered no pickup, use or talk hand.
+        // The game's own client reads only the drawables, which a map load makes anew.)
+        for (auto& [nc, p] : players_) {
+            p.dead = false;
+        }
         mapFrame_ = frame;
         settingsAcquired_ = false; // (CliNet_SetConnected(0): Cli_SetGameSettingsAcquired(0))
         break;
@@ -1276,10 +1283,11 @@ void World::apply(std::span<const std::uint8_t> m, std::uint32_t frame)
         queueBook({frame, BookEvent::Kind::Spell, m[1], (m[3] & 0x7F) != 0, (m[3] & 0x80) != 0});
         break;
     case Op::ReportGuideAward:
-        // Cli_AwardGuideCreature: the creature and its group; a level opens the book.
-        self_.guideLevels[m[1]] = m[2] & 0x7F;
+        // Cli_AwardGuideCreature: the creature and its group known (1, whatever the byte, which only
+        // opens the book: a quiet award is known too).
+        self_.guideLevels[m[1]] = 1;
         for (const int linked : things::guideGroup(m[1])) {
-            self_.guideLevels[static_cast<std::uint8_t>(linked)] = m[2] & 0x7F;
+            self_.guideLevels[static_cast<std::uint8_t>(linked)] = 1;
         }
         queueBook({frame, BookEvent::Kind::Creature, m[1], (m[2] & 0x7F) != 0, false});
         break;

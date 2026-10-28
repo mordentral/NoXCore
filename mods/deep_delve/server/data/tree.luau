@@ -8,17 +8,25 @@
 --       the warrior's to the west (rows y = -3, 0, 3, running west from x = -6),
 --       the wizard's to the north (columns x = 0, 3, 6, running north from y = -6),
 --       the conjurer's to the south (columns x = 0, 3, 6, running south from y = 6);
+--     and the conjurer a fourth, Beasts, of 12 nodes (column x = 9, south from y = 6): its
+--     summons;
 --     a branch's notables joined to the next branch's, so a region is a web, not three lines.
 --
 -- Node kinds: root (a class's start, free for that class), small (+a stat), notable (a bundle),
 -- keystone (a trade: a big gain for a loss), spell (a wizard's or conjurer's spell), ability (a
--- warrior's ability).
+-- warrior's ability), summon (a creature a conjurer can summon).
 --
 -- Spells come from the tree (by decision 2026-10-27). Each branch holds its own: the first node
--- of a spell along the branch unlocks it at level 1, each further one raises it a level, up to 5.
--- A branch's 13 nodes in order: A small A B small notable A B small A B A keystone, so spell A
--- has five nodes and spell B three. A spell or ability node gives its spell only to its region's
--- class (another class may take it on its way through, for nothing but the way).
+-- of a spell along the branch unlocks it (at its start level, data.rises), each further
+-- one raises it a level, up to 5; a node past what the spell's level is worth gives its mastery
+-- (stats) too. A branch's 13 nodes in order: A small A B small notable A B small A B A keystone,
+-- so spell A has five nodes and spell B three. A spell or ability node gives its spell and
+-- mastery only to its region's class (another class may take it on its way through, for nothing
+-- but the way).
+--
+-- Summons come from the tree too. The Beasts branch's 12 nodes in order: C small C C small
+-- notable C C small C C keystone, each C the next of its creatures, weaker to stronger. A summon
+-- node gives a conjurer the creature in its field guide and the summon spell that calls it.
 --
 -- Stats (as items' affixes are applied): health, mana, strength (flat), healthPct, manaPct (% of
 -- the most), damage (% more dealt), resist (% less taken).
@@ -28,24 +36,8 @@
 
 local data = {}
 
--- The game's spells the tree gives, by name with their numbers (the game's spell table; "dd
--- check" proves every pair, and that each is its class's and in no linked group).
-data.spells = {
-	SPELL_FIREBALL = 27,
-	SPELL_BURN = 5,
-	SPELL_LIGHTNING = 24,
-	SPELL_SHOCK = 71,
-	SPELL_MAGIC_MISSILE = 50,
-	SPELL_DEATH_RAY = 16,
-	SPELL_PIXIE_SWARM = 58,
-	SPELL_TOXIC_CLOUD = 128,
-	SPELL_FIST = 29,
-	SPELL_METEOR = 52,
-	SPELL_LESSER_HEAL = 41,
-	SPELL_SLOW = 72,
-}
-
--- How the tree names them.
+-- The game's spells the tree gives, by name (their numbers from nox.spellId; "dd check" proves
+-- each is the game's, its class's and in no linked group), and how the tree names them.
 data.spellTitles = {
 	SPELL_FIREBALL = "Fireball",
 	SPELL_BURN = "Burn",
@@ -61,14 +53,90 @@ data.spellTitles = {
 	SPELL_SLOW = "Slow",
 }
 
--- A warrior's abilities by number (the game's: 1-5).
-data.abilities = {
-	{ id = 1, key = "BerserkerCharge", title = "Berserker Charge" },
-	{ id = 2, key = "WarCry", title = "War Cry" },
-	{ id = 3, key = "Harpoon", title = "Harpoon" },
-	{ id = 4, key = "TreadLightly", title = "Tread Lightly" },
-	{ id = 5, key = "EyeOfTheWolf", title = "Eye of the Wolf" },
+-- The creatures the tree's summon nodes give, by their field guide type (nox.grantCreature's and
+-- nox.guideNumber's name): the summon spell that calls each, and how the tree names it. With the
+-- book the mod's, a summoning wants both: the creature in the field guide and its summon spell in
+-- the book, so a summon node gives both. Each is a creature of its own: none of the guide's
+-- groups (the spiders come together), so a node gives one creature. "dd check" proves each, with
+-- no player needed: its name the guide's, its spell the game's, a conjurer's summon and the one
+-- that calls that guide entry.
+data.creatures = {
+	Bat = { spell = "SPELL_SUMMON_BAT", title = "Bat" },
+	Wolf = { spell = "SPELL_SUMMON_WOLF", title = "Wolf" },
+	BlackWolf = { spell = "SPELL_SUMMON_BLACK_WOLF", title = "Black Wolf" },
+	Bear = { spell = "SPELL_SUMMON_BEAR", title = "Bear" },
+	BlackBear = { spell = "SPELL_SUMMON_BLACK_BEAR", title = "Black Bear" },
+	OgreWarlord = { spell = "SPELL_SUMMON_OGRE_WARLORD", title = "Ogre Warlord" },
+	StoneGolem = { spell = "SPELL_SUMMON_STONE_GOLEM", title = "Stone Golem" },
 }
+-- The guide's first creature's summon spell: creature n of the guide (1-40) is called by the
+-- spell n - 1 after it ("dd check" proves each creature's spell by it).
+data.firstSummon = "SPELL_SUMMON_BAT"
+data.guideSize = 40
+
+-- A warrior's abilities by number (the game's: 1-5). An ability's level changes nothing in the
+-- game once it is known (top 1, below), so each further node of one gives its mastery.
+data.abilities = {
+	{ id = 1, key = "BerserkerCharge", title = "Berserker Charge", mastery = { damage = 4 } },
+	{ id = 2, key = "WarCry", title = "War Cry", mastery = { health = 10 } },
+	{ id = 3, key = "Harpoon", title = "Harpoon", mastery = { damage = 3, strength = 2 } },
+	{ id = 4, key = "TreadLightly", title = "Tread Lightly", mastery = { resist = 3 } },
+	{ id = 5, key = "EyeOfTheWolf", title = "Eye of the Wolf", mastery = { strength = 4 } },
+}
+
+-- How the tree's spells rise with their nodes. The book is the mod's, so a spell is cast at the
+-- level its nodes grant (not the network game's flat 3), and the game's own numbers set what a
+-- level is worth (measured against a held foe; at levels 1-5, flat 3 being level 3):
+--   Fireball      64 96 127 127 127 (its missile is the same from level 3; 4 and 5 only fly faster)
+--   Energy Bolt   38 48 60 68 77 a second
+--   Magic Missile 16 24 32 40 48 (2-6 missiles of 8)
+--   Pixie Swarm   16 24 32 40 48 (2-6 pixies of 8)
+--   Fist          50 100 200 300 400
+--   Meteor        45 65 85 105 125
+--   Shock         15 30 45 60 75 a touch
+--   Burn, Death Ray, Toxic Cloud, Lesser Heal, Slow: the same at every level.
+-- Each spell's
+--   start    the level its first node gives (1 when not named);
+--   top      the highest level that adds anything worth a node (5 when not named);
+--   mastery  what each of its nodes past `top` (or past 5) gives its class: still the spell's
+--            level up to 5, and these stats;
+--   own      % more damage the spell's own hits deal (those of the things in `hits`, its
+--            missiles), given to its class by its first node and kept while the spell is.
+-- An ability rises as a spell with top 1 and its own mastery.
+--
+-- Magic Missile and Pixie Swarm start at 1 with own +60%: a missile's or pixie's 8 is 13, so two
+-- casts kill an area-1 Skeleton (50): Magic Missile for Fireball's mana (2 x 15 against 30), Pixie
+-- Swarm in Meteor's two casts. +57% is the least that does (8 x 1.57 rounds to 13); a damage stat
+-- that size for everything would beat any keystone, so it is the spell's alone.
+data.rises = {
+	SPELL_FIREBALL = { top = 3, mastery = { damage = 5 } },
+	SPELL_BURN = { top = 1, mastery = { damage = 4 } },
+	SPELL_LIGHTNING = {},
+	SPELL_SHOCK = {},
+	SPELL_MAGIC_MISSILE = { own = 60, hits = { "MagicMissile" } },
+	SPELL_DEATH_RAY = { top = 1, mastery = { damage = 4 } },
+	SPELL_PIXIE_SWARM = { own = 60, hits = { "Pixie" } },
+	SPELL_TOXIC_CLOUD = { top = 1, mastery = { damage = 4 } },
+	SPELL_METEOR = {},
+	SPELL_FIST = { start = 2 },
+	SPELL_LESSER_HEAL = { top = 1, mastery = { health = 8 } },
+	SPELL_SLOW = { top = 1, mastery = { resist = 3 } },
+}
+
+-- Each spell's (by name) and ability's (by number) rise, filled in, as an index.
+local riseOf: { [any]: any } = {}
+for name, r in (data.rises :: any) do
+	riseOf[name] = { start = r.start or 1, top = math.min(r.top or 5, 5), mastery = r.mastery or {}, own = r.own or 0, hits = r.hits or {} }
+end
+for _, a in data.abilities do
+	riseOf[a.id] = { start = 1, top = 1, mastery = a.mastery, own = 0, hits = {} }
+end
+local PLAIN = { start = 1, top = 5, mastery = {}, own = 0, hits = {} }
+
+-- A spell's (by name) or ability's (by number) rise: { start, top, mastery, own, hits }.
+function data.rise(give: string | number): any
+	return riseOf[give] or PLAIN
+end
 
 -- The class flags a spell of each class carries (thing.bin's: 0x1000000 any caster).
 data.classFlags = { wizard = 0x2000000, conjurer = 0x4000000 }
@@ -120,9 +188,11 @@ link(m7, m8)
 link(m3, m7)
 link(m4, m7)
 
--- A region: its root at (rx, ry) joined to the middle node `join`; its branches, each 13 nodes
--- from (x0, y0) stepping (dx, dy), joined to the root.
+-- A region: its root at (rx, ry) joined to the middle node `join`; its branches, each from
+-- (x0, y0) stepping (dx, dy), joined to the root: a spell branch's 13 nodes in ORDER, a summon
+-- branch's 12 in SUMMON_ORDER (its creatures in turn at the C's).
 local ORDER = { "A", "small", "A", "B", "small", "notable", "A", "B", "small", "A", "B", "A", "keystone" }
+local SUMMON_ORDER = { "C", "small", "C", "C", "small", "notable", "C", "C", "small", "C", "C", "keystone" }
 
 local function region(class: string, title: string, rx: number, ry: number, join: number, branches: { any })
 	local root = add({ x = rx, y = ry, kind = "root", region = class, name = title, stats = {} })
@@ -132,15 +202,20 @@ local function region(class: string, title: string, rx: number, ry: number, join
 	for _, b in branches do
 		local prev = root
 		local smallAt = 0
+		local creatureAt = 0
 		local level: { [string]: number } = { A = 0, B = 0 }
-		for k, what in ORDER do
+		for k, what in if b.summons then SUMMON_ORDER else ORDER do
 			local x, y = b.x0 + b.dx * (k - 1), b.y0 + b.dy * (k - 1)
 			local n: any = { x = x, y = y, region = class, branch = b.name }
 			local give = if what == "A" then b.A elseif what == "B" then b.B else nil
 			if (what == "A" or what == "B") and give == nil then
 				what = "small" -- (a branch without a second spell: a small stat there)
 			end
-			if what == "A" or what == "B" then
+			if what == "C" then
+				creatureAt += 1
+				n.kind = "summon"
+				n.creature = b.summons[creatureAt]
+			elseif what == "A" or what == "B" then
 				level[what] += 1
 				if type(give) == "number" then
 					n.kind = "ability"
@@ -149,7 +224,14 @@ local function region(class: string, title: string, rx: number, ry: number, join
 					n.kind = "spell"
 					n.spell = give
 				end
-				n.level = level[what]
+				-- (as the node shows it, taken along its branch: the level it brings the spell to,
+				-- whether it's the first, gives the mastery, or the mastery alone, past level 5)
+				local r = data.rise(give)
+				local raw = r.start + level[what] - 1
+				n.level = math.min(5, raw)
+				n.first = level[what] == 1
+				n.mastery = raw > r.top
+				n.beyond = raw > 5
 			elseif what == "small" then
 				smallAt += 1
 				local s = b.small[(smallAt - 1) % #b.small + 1]
@@ -294,8 +376,10 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		y0 = 6,
 		dx = 0,
 		dy = 1,
-		A = "SPELL_FIST",
-		B = "SPELL_METEOR",
+		-- (Meteor first, to level 5; Fist from level 2 to 4: Fist's 400 at level 5 was the tree's
+		-- one outlier, and its 50 at level 1 a poor first spell)
+		A = "SPELL_METEOR",
+		B = "SPELL_FIST",
 		small = { CONJURER_SMALL[4], CONJURER_SMALL[2] },
 		notable = { name = "Stone Skin", stats = { resist = 5, health = 10 } },
 		keystone = { name = "Rooted", stats = { resist = 20, damage = -10 } },
@@ -311,6 +395,18 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		small = { CONJURER_SMALL[2], CONJURER_SMALL[1] },
 		notable = { name = "Gentle Hands", stats = { health = 12, mana = 8 } },
 		keystone = { name = "Lifebinder", stats = { healthPct = 25, damage = -15 } },
+	},
+	-- (added after the first three: its nodes' ids follow theirs, 129-140)
+	{
+		name = "Beasts",
+		x0 = 9,
+		y0 = 6,
+		dx = 0,
+		dy = 1,
+		summons = { "Bat", "Wolf", "BlackWolf", "Bear", "BlackBear", "OgreWarlord", "StoneGolem" },
+		small = { CONJURER_SMALL[1], CONJURER_SMALL[4] },
+		notable = { name = "Pack Leader", stats = { mana = 12, health = 8 } },
+		keystone = { name = "Beastmaster", stats = { manaPct = 20, resist = 10, damage = -15 } },
 	},
 })
 

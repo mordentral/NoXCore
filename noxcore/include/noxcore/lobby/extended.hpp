@@ -66,10 +66,16 @@ inline constexpr std::uint16_t kExtendedLevelVersion = 4;
 
 /// What this build's client takes, as one number: raised by 1 in each release that adds something
 /// a server may send only to a client that takes it (a feature keyed "level N or above", where a
-/// ClientFeature bit would one day run out). The releases before levels count as level 0.
+/// ClientFeature bit would one day run out). A level means the release understands all of it
+/// (every level at or below its own). The releases before levels count as level 0.
 ///   1  a script mode's weather (MSG_NOXCPP_MODEUI's kWeather, nox.weather: modes/script's
 ///      weather.hpp), sent only to a client of level 1 or above that also named ClientFeature::ModeUi
-inline constexpr std::uint16_t kClientLevel = 1;
+///   2  a script mode's book (MSG_NOXCPP_MODEUI's kBook, configure's bookIsTheMod), sent only to a
+///      client of level 2 or above that named ModeUi
+///   3  UI API 3 (mode.json's "uiApi": 3: lines, tooltips, world labels, HUD windows, drags, the
+///      wheel; modes/script's script_ui.hpp), a UI of it sent only to a client of level 3 or above
+///      that named ModeUi and ModeUi2 (ui_proto.hpp's kUiApi3Level)
+inline constexpr std::uint16_t kClientLevel = 3;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.
 inline constexpr std::string_view kClientTooOldNotice = "Your NoX Core is too out of date for this game.";
 

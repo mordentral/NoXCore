@@ -58,10 +58,43 @@ public:
         (void)hudScale;
         return false;
     }
+    /// Every mouse button's release, first (after the bindings' release, before any window): true
+    /// when it's the end of a press the mode's windows took (nothing else saw that press), and so
+    /// goes no further.
+    virtual bool release(App& app, const SDL_Event& event)
+    {
+        (void)app;
+        (void)event;
+        return false;
+    }
+    /// The window's focus lost (its releases go to another program): a press it holds let go.
+    virtual void inputLost(App& app) { (void)app; }
     /// Each frame with the game's windows' updates (before anything's drawn).
     virtual void update(App& app) { (void)app; }
+    /// Each frame in the 2D view, over the world and what's drawn over it (names, bars, bubbles),
+    /// under the HUD: a mode's labels over things.
+    virtual void drawWorld(App& app, SDL_Renderer* renderer)
+    {
+        (void)app;
+        (void)renderer;
+    }
+    /// Each frame in a game, right over the HUD's bars and under the game's windows, before
+    /// drawHud: its HUD pieces (its windows updated here when it has any).
+    virtual void drawUnderWindows(App& app, SDL_Renderer* renderer, const HudFrame& hud)
+    {
+        (void)app;
+        (void)renderer;
+        (void)hud;
+    }
     /// Each frame, over the HUD: its windows updated, and drawn when the GUI is.
     virtual void drawHud(App& app, SDL_Renderer* renderer, const HudFrame& hud)
+    {
+        (void)app;
+        (void)renderer;
+        (void)hud;
+    }
+    /// Each frame the GUI is drawn, over everything but the pointer: a tooltip of its own.
+    virtual void drawOver(App& app, SDL_Renderer* renderer, const HudFrame& hud)
     {
         (void)app;
         (void)renderer;

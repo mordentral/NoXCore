@@ -56,10 +56,10 @@ void pickupTest(App& app)
     const Anchor& target = app.anchors.at(*app.pickupTarget);
     app.testMouse = SDL_FPoint{(target.x - app.camera.left()) * app.camera.zoom,
                                (target.y - 4 - target.z - app.camera.top()) * app.camera.zoom};
-    if ((app.cursorType == CursorType::Pickup || app.cursorType == CursorType::Caution) && app.hovered == app.pickupTarget) {
+    if ((app.cursorType == CursorType::Pickup || app.cursorType == CursorType::Caution) && app.cursorHovered == app.pickupTarget) {
         SDL_Log("pickup test: the pickup hand is on it; clicking");
         client.walkTo(static_cast<int>(self->second.x), static_cast<int>(self->second.y)); // stop
-        client.pickup(*app.hovered);
+        client.pickup(*app.cursorHovered);
         app.pickupSentMs = SDL_GetTicks();
     }
 }

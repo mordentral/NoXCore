@@ -30,6 +30,62 @@ for _, a in data.abilities do
 	abilityById[a.id] = a
 end
 
+-- The tree's spells' numbers by name (nox.spellId), worked out once: its spells, its creatures'
+-- summon spells and the guide's first summon.
+local spellIds: { [string]: number }? = nil
+local function idIndex(): { [string]: number }
+	if spellIds then
+		return spellIds
+	end
+	local ids: { [string]: number } = {}
+	local function put(name: string)
+		local id = nox.spellId(name)
+		if id then
+			ids[name] = id
+		end
+	end
+	for name in (data.spellTitles :: any) do
+		put(name)
+	end
+	for _, c in (data.creatures :: any) do
+		put(c.spell)
+	end
+	put(data.firstSummon)
+	spellIds = ids
+	return ids
+end
+
+-- A spell's number by its name (one the tree names), nil when the game has no such spell.
+function tree.spellId(name: string): number?
+	return idIndex()[name]
+end
+
+-- The tree's creatures' places in the field guide (1-40) by name (nox.guideNumber), worked out
+-- once.
+local guideNumbers: { [string]: number }? = nil
+
+-- A creature's place in the field guide (1-40), the engine's for its type's name; nil when it has
+-- none or the tree names no such creature.
+function tree.guideNumber(creature: string): number?
+	if not guideNumbers then
+		local n: { [string]: number } = {}
+		for name in (data.creatures :: any) do
+			local g = nox.guideNumber(name)
+			if g then
+				n[name] = g
+			end
+		end
+		guideNumbers = n
+	end
+	return (guideNumbers :: { [string]: number })[creature]
+end
+
+-- A creature's summon spell's number, nil when unknown.
+function tree.summonSpell(creature: string): number?
+	local c = (data.creatures :: any)[creature]
+	return c and tree.spellId(c.spell)
+end
+
 function tree.node(id: number): any
 	return nodes[id]
 end
@@ -135,40 +191,95 @@ function tree.bossPoint(rec: any)
 	tree.of(rec).bossPoints += 1
 end
 
--- What the taken nodes add up to: { health, mana, strength, healthPct, manaPct, damage, resist }.
+-- How many nodes of each of the class's own spells and abilities are taken (by name; by number),
+-- and the creatures its summon nodes give.
+local function counted(rec: any): ({ [string]: number }, { [number]: number }, { [string]: boolean })
+	local class = classOf(rec)
+	local spells: { [string]: number } = {}
+	local abilities: { [number]: number } = {}
+	local creatures: { [string]: boolean } = {}
+	for id in tree.taken(rec) do
+		local n = nodes[id]
+		if n and n.region == class then
+			if n.kind == "spell" then
+				spells[n.spell] = (spells[n.spell] or 0) + 1
+			elseif n.kind == "ability" then
+				abilities[n.ability] = (abilities[n.ability] or 0) + 1
+			elseif n.kind == "summon" then
+				creatures[n.creature] = true
+			end
+		end
+	end
+	return spells, abilities, creatures
+end
+
+-- A spell's or ability's level from its nodes taken: its start level, one more for each further
+-- node, at most 5; and how many of those nodes give its mastery (each past its top level).
+local function levelOf(give: string | number, count: number): (number, number)
+	local r = data.rise(give)
+	local raw = r.start + count - 1
+	return math.min(5, raw), math.max(0, raw - r.top)
+end
+
+local function addStats(sum: any, stats: any, times: number)
+	for k, v in stats do
+		local was = sum[k]
+		if was ~= nil then
+			sum[k] = was + v * times
+		end
+	end
+end
+
+-- What the taken nodes add up to: { health, mana, strength, healthPct, manaPct, damage, resist,
+-- own }: each node's stats, and the masteries of the class's own spells and abilities; own: the
+-- % more damage a hit by a thing of each type deals (its spell's own bonus, data.rises), by type.
 function tree.totals(rec: any): any
-	local sum = { health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, damage = 0, resist = 0 }
+	local own: { [string]: number } = {}
+	local sum = { health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, damage = 0, resist = 0, own = own }
 	for id in tree.taken(rec) do
 		local n = nodes[id]
 		if n then
-			for k, v in n.stats do
-				local was = (sum :: any)[k]
-				if was ~= nil then
-					(sum :: any)[k] = was + v
-				end
+			addStats(sum, n.stats, 1)
+		end
+	end
+	local spells, abilities = counted(rec)
+	for name, count in spells do
+		local r = data.rise(name)
+		local _, past = levelOf(name, count)
+		addStats(sum, r.mastery, past)
+		if r.own ~= 0 then
+			for _, kind in r.hits do
+				own[kind] = (own[kind] or 0) + r.own
 			end
 		end
+	end
+	for a, count in abilities do
+		local _, past = levelOf(a, count)
+		addStats(sum, data.rise(a).mastery, past)
 	end
 	return sum
 end
 
 -- What the taken nodes give the character's class: { spells = { [name] = level },
--- abilities = { [id] = level } }. A spell's level is the count of its nodes taken (at most 5).
+-- abilities = { [id] = level }, creatures = { [creature] = true } }. A spell's level is its start
+-- level (data.rises) and one more for each further node of it taken, at most 5.
 function tree.wanted(rec: any): any
-	local class = classOf(rec)
+	local counts, abilityCounts, creatures = counted(rec)
 	local spells: { [string]: number } = {}
 	local abilities: { [number]: number } = {}
-	for id in tree.taken(rec) do
-		local n = nodes[id]
-		if n and n.region == class then
-			if n.kind == "spell" then
-				spells[n.spell] = math.min(5, (spells[n.spell] or 0) + 1)
-			elseif n.kind == "ability" then
-				abilities[n.ability] = math.min(5, (abilities[n.ability] or 0) + 1)
-			end
-		end
+	for name, count in counts do
+		spells[name] = levelOf(name, count)
 	end
-	return { spells = spells, abilities = abilities }
+	for a, count in abilityCounts do
+		abilities[a] = levelOf(a, count)
+	end
+	return { spells = spells, abilities = abilities, creatures = creatures }
+end
+
+-- A creature's name as the tree shows it.
+function tree.creatureTitle(creature: string): string
+	local c = (data.creatures :: any)[creature]
+	return if c then c.title else creature
 end
 
 -- ---- Words
@@ -199,15 +310,29 @@ local CLASS_TITLES: { [string]: string } = { warrior = "Warrior", wizard = "Wiza
 
 -- A node's name and what it does, as the tree window shows them.
 function tree.describe(n: any): (string, string)
-	if n.kind == "spell" then
-		local title = (data.spellTitles :: any)[n.spell] or n.spell
-		local what = if n.level == 1 then "Unlocks " .. title .. " at level 1" else title .. " to level " .. n.level
-		return title .. (if n.level > 1 then " " .. tostring(n.level) else ""), what .. " (" .. CLASS_TITLES[n.region] .. " only)"
-	elseif n.kind == "ability" then
-		local a = abilityById[n.ability]
-		local title = if a then a.title else "Ability " .. n.ability
-		local what = if n.level == 1 then "Unlocks " .. title .. " at level 1" else title .. " to level " .. n.level
-		return title .. (if n.level > 1 then " " .. tostring(n.level) else ""), what .. " (Warrior only)"
+	if n.kind == "spell" or n.kind == "ability" then
+		local title: string
+		if n.kind == "spell" then
+			title = (data.spellTitles :: any)[n.spell] or n.spell
+		else
+			local a = abilityById[n.ability]
+			title = if a then a.title else "Ability " .. n.ability
+		end
+		local only = " (" .. CLASS_TITLES[n.region] .. " only)"
+		local r = data.rise(n.spell or n.ability)
+		local mastery = tree.statText(r.mastery)
+		if n.first then
+			local own = if r.own ~= 0 then string.format(", and %+d%% %s damage", r.own, title) else ""
+			return title, "Unlocks " .. title .. " at level " .. n.level .. own .. only
+		elseif n.beyond then
+			return title .. " mastery", mastery .. only
+		elseif n.mastery and mastery ~= "" then
+			return title .. " " .. n.level, title .. " to level " .. n.level .. ", and " .. mastery .. only
+		end
+		return title .. " " .. n.level, title .. " to level " .. n.level .. only
+	elseif n.kind == "summon" then
+		local title = tree.creatureTitle(n.creature)
+		return "Summon " .. title, "The " .. title .. " in your field guide, to summon (" .. CLASS_TITLES[n.region] .. " only)"
 	elseif n.kind == "root" then
 		return n.name, "Where the " .. CLASS_TITLES[n.region] .. " starts (free for a " .. CLASS_TITLES[n.region] .. ")"
 	end

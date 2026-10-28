@@ -156,6 +156,7 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
                        .multiclass = options_.multiclass,
                        .monstersAlert = options_.monstersAlert,
                        .keepThingsOnDeath = options_.keepThingsOnDeath,
+                       .modeOwnsBook = options_.modeOwnsBook,
                        .playersCantDie = options_.playersCantDie,
                        .noScoring = options_.sandboxNoScoring,
                        .modeOwnsLimits = options_.modeOwnsLimits,
@@ -2246,6 +2247,14 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     if (options_.multiclass && transport_.identified(peer)) {
         unit.player->multiclass = true;
         readVals(server_.world(), unit, false);
+    }
+    // noxcpp: a mode's book (World::modeBook) starts with nothing: no network game's every spell
+    // at 3 (makePlayer's), only what the mode grants. Nothing told: no client is told a network
+    // game's book either.
+    if (server_.world().modeBook()) {
+        unit.player->spellLevels.fill(0);
+        unit.player->abilityLevels.fill(0);
+        unit.player->fieldGuide.fill(false);
     }
     unit.player->serial.assign(reinterpret_cast<const char*>(accept.serial.data()), strnlen(reinterpret_cast<const char*>(accept.serial.data()), accept.serial.size()));
     // Where it starts (Map_FindPlayerStart; joining a quest, by the soul gate touched last).

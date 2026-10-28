@@ -6,22 +6,39 @@
 // the set changes or the game goes) and thing types' pictures from our own art, plays sounds, is
 // told of right clicks, and of a fixed set of keys while the mouse is over one of its windows and
 // no chat or console line is open.
+// A UI of API 3 also draws lines, a tooltip over everything (drawOver), labels over things in the
+// world (drawWorld: only over what the scene drew, nudged apart, under the HUD), and windows with
+// no frame, click-through ones (the game keeps the mouse there) and HUD pieces (drawUnderWindows:
+// under every window, hidden while the game hides its HUD); it's told of drags, buttons let go
+// and the wheel over its windows. Its input follows the draw order: framed windows over HUD
+// pieces, and never a point the inventory, the summon cage or (over HUD pieces) the book holds; a
+// press it took ends at its release whoever has the pointer then (release), or at a focus loss
+// (mode_ui_pointer.hpp).
 #include "app.hpp"
 #include "audio.hpp"
 #include "chat_entry.hpp"
+#include "cinematics.hpp"
 #include "console.hpp"
 #include "draw_box.hpp"
+#include "inventory.hpp"
+#include "minimap.hpp"
 #include "mode_ui.hpp"
+#include "mode_ui_pointer.hpp"
+#include "spellbook.hpp"
 #include "sprite_cache.hpp"
+#include "summon_window.hpp"
 #include "thing_art.hpp"
+#include "trade_screens.hpp"
 
 #include "noxcore/modes/script/script_ui.hpp"
 
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace noxsdl {
@@ -32,9 +49,10 @@ using nox::modes::script::ModAsset;
 using nox::modes::script::ModAssets;
 using nox::modes::script::ScriptUiClient;
 using nox::modes::script::UiDraw;
+using nox::modes::script::UiLabel;
 using nox::modes::script::UiWindow;
 
-constexpr float kTitleH = 13; ///< a window's title bar (UI units)
+using modeui::kTitleH;
 constexpr float kTextLine = 10;
 
 /// The keys an API 2 UI is told of (script_ui.hpp's names); none: not one of them.
@@ -66,6 +84,52 @@ const char* keyName(SDL_Keycode k)
     }
 }
 
+/// Whether the game hides its HUD now: the GUI off (F11, a cutscene), a shop or a dialog up, the
+/// full map, the console, a briefing.
+bool gameHudHidden(const App& app)
+{
+    return !app.renderGui || (app.tradeScreens && app.tradeScreens->hidesHud()) || (app.minimap && app.minimap->shown()) ||
+           (app.console && app.console->isOpen()) || (app.cinematics && app.cinematics->screenUp());
+}
+
+/// (API 3) Whether a game window drawn over a mod window of that kind (`hud`: a HUD piece) holds
+/// the screen point (x, y): the open inventory and the summon cage are drawn over every mod window,
+/// the book over the HUD pieces. (The shop and dialog windows take the mouse before the mod's.)
+bool gameWindowOver(const App& app, float x, float y, bool hud)
+{
+    const int w = app.camera.viewWidth;
+    const int h = app.camera.viewHeight;
+    return (app.inventory && app.inventory->isOpen() && app.inventory->contains(x, y, w, h)) ||
+           (app.summon && app.summon->contains(x, y, w, h)) || (hud && app.book && app.book->contains(x, y, w, h));
+}
+
+/// A window, the game's own or one it opens, that the mod's tooltip and a release's mouseUp give
+/// way to: the in-game menu and what it opens, a briefing.
+bool menuUp(const App& app)
+{
+    return menuWindowUp(app) || (app.cinematics && app.cinematics->screenUp());
+}
+
+/// A line from (x1, y1) to (x2, y2), `width` pixels wide, in screen pixels.
+void drawLine(SDL_Renderer* renderer, float x1, float y1, float x2, float y2, float width, SDL_Color c)
+{
+    const float dx = x2 - x1;
+    const float dy = y2 - y1;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (width < 1.5f || len < 0.01f) {
+        SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
+        SDL_RenderLine(renderer, x1, y1, x2, y2);
+        return;
+    }
+    // (A quad: the line's two ends pushed half its width either side.)
+    const float nx = -dy / len * width / 2;
+    const float ny = dx / len * width / 2;
+    const SDL_FColor fc{c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f};
+    const SDL_Vertex v[4] = {{{x1 + nx, y1 + ny}, fc, {}}, {{x2 + nx, y2 + ny}, fc, {}}, {{x2 - nx, y2 - ny}, fc, {}}, {{x1 - nx, y1 - ny}, fc, {}}};
+    static constexpr int kQuad[6] = {0, 1, 2, 0, 2, 3};
+    SDL_RenderGeometry(renderer, nullptr, v, 4, kQuad, 6);
+}
+
 class ScriptModeUi final : public ModeUi {
 public:
     explicit ScriptModeUi(App& app) : app_(app) {}
@@ -75,6 +139,7 @@ public:
     {
         ui_ = dynamic_cast<ScriptUiClient*>(side);
         freeTextures(); // (the last game's pictures: gone with it)
+        pointer_.reset();
         if (ui_) {
             ui_->setTextWidth([this](std::string_view text) {
                 if (!app_.font || scale_ <= 0) {
@@ -85,23 +150,171 @@ public:
         }
     }
 
+    bool release(App& app, const SDL_Event& event) override
+    {
+        // (API 3) The release of a press the windows took, whoever has the pointer now: the drag's
+        // end, then mouseUp over the window there unless a menu is up; it goes no further.
+        if (!ui_) {
+            pointer_.reset();
+            return false;
+        }
+        const int button = event.button.button == SDL_BUTTON_RIGHT ? 2 : event.button.button == SDL_BUTTON_LEFT ? 1 : 0;
+        const SDL_FPoint at = toUi(event.button.x, event.button.y);
+        const std::optional<modeui::Hit> over = menuUp(app) ? std::nullopt : hit(app, event.button.x, event.button.y, false);
+        return pointer_.release(*ui_, button, at.x, at.y, over);
+    }
+
+    void inputLost(App&) override
+    {
+        pointer_.lost(ui_); // (a drag's end where the mouse last was)
+    }
+
+    void update(App& app) override
+    {
+        // (API 3) A drag's latest move, once a frame; then the labels' objects for the scene
+        // (liveSprites), by net code: after the drag hook, which may change the labels.
+        app.modeLabels.clear();
+        if (!ui_ || ui_->api() < 3) {
+            pointer_.reset(); // (a UI stopped or replaced mid-press)
+            return;
+        }
+        pointer_.frame(*ui_);
+        if (!ui_ || ui_->api() < 3) {
+            return;
+        }
+        const auto& labels = ui_->labels();
+        for (std::size_t i = 0; i < labels.size(); ++i) {
+            app.modeLabels.emplace_back(labels[i].object, static_cast<std::uint16_t>(i));
+        }
+        std::ranges::sort(app.modeLabels);
+    }
+
+    void drawWorld(App& app, SDL_Renderer* renderer) override
+    {
+        if (!ui_ || ui_->api() < 3 || app.modeLabelSpots.empty() || !app.font || gameHudHidden(app)) {
+            return;
+        }
+        drawLabels(app, renderer);
+    }
+
+    void drawUnderWindows(App& app, SDL_Renderer* renderer, const HudFrame& hud) override
+    {
+        if (!ui_) {
+            return;
+        }
+        step(app, hud);
+        if (!hud.renderGui || !app.font || !ui_->hudShown()) {
+            return;
+        }
+        // The HUD pieces, under every window (and the game's own windows drawn after them).
+        drawWindows(app, renderer, true);
+    }
+
     void drawHud(App& app, SDL_Renderer* renderer, const HudFrame& hud) override
     {
         if (!ui_) {
             return;
         }
+        if (!stepped_) {
+            step(app, hud); // (drawUnderWindows not called this frame)
+        }
+        stepped_ = false;
+        if (!hud.renderGui || !app.font || ui_->windows().empty()) {
+            return;
+        }
+        drawWindows(app, renderer, false);
+    }
+
+    void drawOver(App& app, SDL_Renderer* renderer, const HudFrame& hud) override
+    {
+        // (Only in a frame the UI's frame ran, at Stage::InGame: not over a map's load. For API 3,
+        // not where a game window drawn over the mod's has the pointer.)
+        if (!ui_ || stepFrame_ != app.frames || ui_->tooltip().empty() || !app.font || menuUp(app) ||
+            (ui_->api() >= 3 && gameWindowOver(app, hud.mouse.x, hud.mouse.y, false))) {
+            return;
+        }
+        place(hud);
+        drawTooltip(app, renderer);
+    }
+
+    bool handleEvent(App& app, const SDL_Event& event, int, int, float) override
+    {
+        if (!ui_ || ui_->api() < 3) {
+            pointer_.reset(); // (none of API 3 runs: no press of its)
+        }
+        if (!ui_) {
+            return false;
+        }
+        if (ui_->api() >= 3) {
+            // (API 3) Moves and the wheel (releases come through release, first).
+            switch (event.type) {
+            case SDL_EVENT_MOUSE_MOTION: {
+                const SDL_FPoint at = toUi(event.motion.x, event.motion.y);
+                pointer_.moved(at.x, at.y);
+                return false; // (the mouse is the game's too: told to a drag once a frame, update)
+            }
+            case SDL_EVENT_MOUSE_WHEEL: return wheel(app, event);
+            default: break;
+            }
+        }
+        if (ui_->windows().empty()) {
+            return false;
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN) {
+            return keyDown(app, event);
+        }
+        // Left clicks; and right ones for a UI of API 2.
+        if (event.type != SDL_EVENT_MOUSE_BUTTON_DOWN ||
+            !(event.button.button == SDL_BUTTON_LEFT || (event.button.button == SDL_BUTTON_RIGHT && ui_->api() >= 2))) {
+            return false;
+        }
+        // The window there, framed ones and their frames over the HUD pieces (an API 1 or 2 UI's
+        // windows: newest first, frame and title included, as always).
+        const std::optional<modeui::Hit> h = hit(app, event.button.x, event.button.y, true);
+        if (!h) {
+            return false;
+        }
+        if (h->inside) {
+            const SDL_FPoint at = toUi(event.button.x, event.button.y);
+            const int button = event.button.button == SDL_BUTTON_RIGHT ? 2 : 1;
+            if (ui_->api() >= 3) {
+                pointer_.press(*ui_, h->window, button, at.x, at.y, h->x, h->y);
+            }
+            ui_->click(h->window, at.x - h->x, at.y - h->y, button);
+        }
+        return true; // (a click on a window is the UI's, taken or not)
+    }
+
+private:
+    /// The window the screen point (sx, sy) goes to (mode_ui_pointer.hpp's hitWindow): for API 3
+    /// never where a game window drawn over it has the point. `frame`: frames and titles count.
+    std::optional<modeui::Hit> hit(const App& app, float sx, float sy, bool frame) const
+    {
+        const SDL_FPoint at = toUi(sx, sy);
+        return modeui::hitWindow(*ui_, at.x, at.y, frame, [&](bool hud) { return gameWindowOver(app, sx, sy, hud); });
+    }
+
+    /// Once a frame: the UI's place, the mouse, the HUD's state; the UI's frame run; its sounds.
+    void step(App& app, const HudFrame& hud)
+    {
+        stepFrame_ = app.frames;
+        mouseScreen_ = hud.mouse;
         place(hud);
         mouse_ = {(hud.mouse.x - originX_) / scale_, (hud.mouse.y - originY_) / scale_};
         ui_->setMouse(std::pair{mouse_.x, mouse_.y});
+        ui_->setHudShown(!gameHudHidden(app));
         ui_->frame(hud.nowMs);
         if (ui_->assets() != texturesOf_) {
             freeTextures(); // (a new set: its pictures made as they're drawn)
             texturesOf_ = ui_->assets();
         }
         playSounds(app);
-        if (!hud.renderGui || !app.font || ui_->windows().empty()) {
-            return;
-        }
+        stepped_ = true;
+    }
+
+    /// The windows that are HUD pieces (`hud`) or the others, bottom to top.
+    void drawWindows(App& app, SDL_Renderer* renderer, bool hud)
+    {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         SDL_Rect oldClip{};
         const bool clipped = SDL_RenderClipEnabled(renderer);
@@ -110,14 +323,19 @@ public:
         }
         const int px = textSize();
         for (const UiWindow& w : ui_->windows()) {
-            const SDL_FRect outer = toScreen(static_cast<float>(w.x) - 2, static_cast<float>(w.y) - kTitleH - 2, static_cast<float>(w.w) + 4,
-                                             static_cast<float>(w.h) + kTitleH + 4);
+            if (w.hud != hud) {
+                continue;
+            }
             const SDL_FRect inner = toScreen(static_cast<float>(w.x), static_cast<float>(w.y), static_cast<float>(w.w), static_cast<float>(w.h));
-            // The frame and its label: the server's mode, then the window's own title.
-            box::fill(renderer, outer, {10, 8, 6, 225});
-            box::outline(renderer, outer, {160, 120, 40, 255});
-            const std::string label = ui_->modeName() + ": " + w.title;
-            app.font->draw(fitted(label, inner.w - 6 * scale_, px), outer.x + 4 * scale_, outer.y + 2 * scale_, px, SDL_Color{240, 180, 42, 255});
+            if (w.frame) {
+                // The frame and its label: the server's mode, then the window's own title.
+                const SDL_FRect outer = toScreen(static_cast<float>(w.x) - 2, static_cast<float>(w.y) - kTitleH - 2, static_cast<float>(w.w) + 4,
+                                                 static_cast<float>(w.h) + kTitleH + 4);
+                box::fill(renderer, outer, {10, 8, 6, 225});
+                box::outline(renderer, outer, {160, 120, 40, 255});
+                const std::string label = ui_->modeName() + ": " + w.title;
+                app.font->draw(fitted(label, inner.w - 6 * scale_, px), outer.x + 4 * scale_, outer.y + 2 * scale_, px, SDL_Color{240, 180, 42, 255});
+            }
             // Its draws, inside it alone.
             const SDL_Rect clip{static_cast<int>(inner.x), static_cast<int>(inner.y), static_cast<int>(inner.w), static_cast<int>(inner.h)};
             SDL_SetRenderClipRect(renderer, &clip);
@@ -130,44 +348,123 @@ public:
                 case UiDraw::Kind::Text: app.font->draw(d.text, r.x, r.y, px, c); break;
                 case UiDraw::Kind::Image: drawImage(renderer, d, r); break;
                 case UiDraw::Kind::Thing: drawThing(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
+                case UiDraw::Kind::Line: {
+                    const SDL_FRect to = toScreen(static_cast<float>(w.x) + d.w, static_cast<float>(w.y) + d.h, 0, 0);
+                    drawLine(renderer, r.x, r.y, to.x, to.y, d.width * scale_, c);
+                    break;
+                }
                 }
             }
             SDL_SetRenderClipRect(renderer, clipped ? &oldClip : nullptr);
         }
     }
 
-    bool handleEvent(App& app, const SDL_Event& event, int, int, float) override
+    /// (API 3) The tooltip at the mouse, whole on the screen.
+    void drawTooltip(App& app, SDL_Renderer* renderer)
     {
-        if (!ui_ || ui_->windows().empty()) {
-            return false;
+        const auto& lines = ui_->tooltip();
+        const int px = textSize();
+        const float lineH = app.font->lineHeight(px) / scale_; // (UI units)
+        float widest = 0;
+        for (const auto& l : lines) {
+            widest = std::max(widest, app.font->measure(l.text, px) / scale_);
         }
-        if (event.type == SDL_EVENT_KEY_DOWN) {
-            return keyDown(app, event);
+        const float w = widest + 8;
+        const float h = lineH * static_cast<float>(lines.size()) + 6;
+        const auto [x, y] = nox::modes::script::placeTooltip(mouse_.x, mouse_.y, w, h);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        const SDL_FRect r = toScreen(x, y, w, h);
+        box::fill(renderer, r, {10, 8, 6, 235});
+        box::outline(renderer, r, {160, 120, 40, 255});
+        float ty = y + 3;
+        for (const auto& l : lines) {
+            const SDL_FRect at = toScreen(x + 4, ty, 0, 0);
+            app.font->draw(l.text, at.x, at.y, px, SDL_Color{l.color.r, l.color.g, l.color.b, l.color.a});
+            ty += lineH;
         }
-        // Left clicks; and right ones for a UI of API 2.
-        if (event.type != SDL_EVENT_MOUSE_BUTTON_DOWN ||
-            !(event.button.button == SDL_BUTTON_LEFT || (event.button.button == SDL_BUTTON_RIGHT && ui_->api() >= 2))) {
-            return false;
-        }
-        const float ux = (event.button.x - originX_) / scale_;
-        const float uy = (event.button.y - originY_) / scale_;
-        // (Copied: the click may open or shut windows.)
-        const std::vector<UiWindow> windows = ui_->windows();
-        for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
-            const UiWindow& w = *it;
-            const bool inFrame = ux >= w.x - 2 && ux < w.x + w.w + 2 && uy >= w.y - kTitleH - 2 && uy < w.y + w.h + 2;
-            if (!inFrame) {
-                continue;
-            }
-            if (ux >= w.x && ux < w.x + w.w && uy >= w.y && uy < w.y + w.h) {
-                ui_->click(w.id, ux - static_cast<float>(w.x), uy - static_cast<float>(w.y), event.button.button == SDL_BUTTON_RIGHT ? 2 : 1);
-            }
-            return true; // (a click on a window is the UI's, taken or not)
-        }
-        return false;
     }
 
-private:
+    /// (API 3) The labels over what the scene drew this frame (App::modeLabelSpots): those shown
+    /// now (Alt held, our player near), on the screen, stacked upwards where they'd overlap.
+    void drawLabels(App& app, SDL_Renderer* renderer)
+    {
+        const auto& labels = ui_->labels();
+        const Camera& cam = app.camera;
+        const auto& client = app.live->client();
+        const bool alt = (SDL_GetModState() & SDL_KMOD_ALT) != 0;
+        std::optional<SDL_FPoint> self;
+        if (const auto it = client.world().drawables().find(client.netCode()); it != client.world().drawables().end()) {
+            const auto p = app.interpolator.position(it->first, it->second);
+            self = SDL_FPoint{p.x, p.y};
+        }
+        const int px = std::clamp(static_cast<int>(std::lround(10 * cam.zoom)), 9, 48);
+        const float lineH = app.font->lineHeight(px);
+        placed_.clear();
+        for (const App::ModeLabelSpot& spot : app.modeLabelSpots) {
+            if (spot.index >= labels.size()) {
+                continue;
+            }
+            const UiLabel& l = labels[spot.index];
+            if ((l.show == UiLabel::Show::Alt && !alt) ||
+                (l.show == UiLabel::Show::Near && (!self || std::hypot(self->x - spot.x, self->y - spot.y) > l.near))) {
+                continue;
+            }
+            const float w = app.font->measure(l.text, px) + 6;
+            const float h = lineH + 2;
+            const float cx = (spot.x - cam.left()) * cam.zoom;
+            const float bottom = (spot.top - l.offset - cam.top()) * cam.zoom;
+            const SDL_FRect r{std::round(cx - w / 2), std::round(bottom - h), w, h};
+            if (r.x + r.w < 0 || r.x > static_cast<float>(cam.viewWidth) || r.y + r.h < 0 || r.y > static_cast<float>(cam.viewHeight)) {
+                continue; // (off the screen: not laid out)
+            }
+            placed_.push_back({r, spot.index});
+        }
+        // The nearest the bottom first; each later one moved up above any it overlaps (a few
+        // passes at most: n is the labels on the screen, at most kUiMaxLabels).
+        std::ranges::sort(placed_, [](const LabelBox& a, const LabelBox& b) { return a.r.y + a.r.h > b.r.y + b.r.h; });
+        for (std::size_t i = 1; i < placed_.size(); ++i) {
+            SDL_FRect& r = placed_[i].r;
+            for (int pass = 0; pass < 8; ++pass) {
+                bool moved = false;
+                for (std::size_t j = 0; j < i; ++j) {
+                    const SDL_FRect& o = placed_[j].r;
+                    if (r.x < o.x + o.w && o.x < r.x + r.w && r.y < o.y + o.h && o.y < r.y + r.h) {
+                        r.y = o.y - r.h - 1;
+                        moved = true;
+                    }
+                }
+                if (!moved) {
+                    break;
+                }
+            }
+        }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        for (const LabelBox& b : placed_) {
+            const UiLabel& l = labels[b.index];
+            box::fill(renderer, b.r, {0, 0, 0, 160});
+            app.font->draw(l.text, b.r.x + 3, b.r.y + 1, px, SDL_Color{l.color.r, l.color.g, l.color.b, l.color.a});
+        }
+    }
+
+    /// (API 3) The wheel over one of the windows (its frame and title bar too, as a click there):
+    /// the UI's, in whole steps.
+    bool wheel(const App& app, const SDL_Event& event)
+    {
+        const std::optional<modeui::Hit> h = hit(app, event.wheel.mouse_x, event.wheel.mouse_y, true);
+        if (!h) {
+            wheelLeft_ = 0;
+            return false;
+        }
+        wheelLeft_ += event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -event.wheel.y : event.wheel.y;
+        const int steps = static_cast<int>(std::trunc(wheelLeft_)); // (a fine wheel's parts add up)
+        wheelLeft_ -= static_cast<float>(steps);
+        if (steps != 0) {
+            const SDL_FPoint at = toUi(event.wheel.mouse_x, event.wheel.mouse_y);
+            ui_->wheel(h->window, at.x - h->x, at.y - h->y, steps);
+        }
+        return true;
+    }
+
     /// (API 2) A key of the fixed set, the mouse over one of its windows, no line being typed:
     /// the UI's when it takes it, else the game's.
     bool keyDown(App& app, const SDL_Event& event)
@@ -179,13 +476,8 @@ private:
         if (!name) {
             return false;
         }
-        const std::vector<UiWindow>& windows = ui_->windows();
-        for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
-            if (mouse_.x >= static_cast<float>(it->x) && mouse_.x < static_cast<float>(it->x + it->w) && mouse_.y >= static_cast<float>(it->y) &&
-                mouse_.y < static_cast<float>(it->y + it->h)) {
-                const std::string id = it->id; // (the key may open or shut windows)
-                return ui_->key(id, name);
-            }
+        if (const std::optional<modeui::Hit> h = hit(app, mouseScreen_.x, mouseScreen_.y, false)) {
+            return ui_->key(h->window, name);
         }
         return false;
     }
@@ -276,6 +568,7 @@ private:
         originY_ = (static_cast<float>(hud.height) - 480.0f * scale_) / 2;
     }
     SDL_FRect toScreen(float x, float y, float w, float h) const { return {originX_ + x * scale_, originY_ + y * scale_, w * scale_, h * scale_}; }
+    SDL_FPoint toUi(float x, float y) const { return {(x - originX_) / scale_, (y - originY_) / scale_}; }
     int textSize() const { return app_.font ? app_.font->lineSize(kTextLine, scale_) : 12; }
     std::string fitted(std::string s, float width, int px) const
     {
@@ -290,12 +583,24 @@ private:
         return s;
     }
 
+    /// (A label laid out this frame: its box on the screen and its index among the labels.)
+    struct LabelBox {
+        SDL_FRect r;
+        std::size_t index;
+    };
+
     App& app_;
     ScriptUiClient* ui_ = nullptr;
     float scale_ = 1;
     float originX_ = 0;
     float originY_ = 0;
     SDL_FPoint mouse_{-1, -1}; ///< (in the UI's units)
+    SDL_FPoint mouseScreen_{-100000, -100000}; ///< (the same, on the screen)
+    bool stepped_ = false;     ///< (the UI's frame run this frame, in drawUnderWindows)
+    long stepFrame_ = -1;      ///< (App::frames when it last ran)
+    modeui::Pointer pointer_;  ///< (API 3: a press in a window and its drag)
+    float wheelLeft_ = 0;      ///< (a fine wheel's part of a step)
+    std::vector<LabelBox> placed_; ///< (kept: no allocation a frame)
     /// The mod's pictures as textures (by asset index), of the set `texturesOf_` (held: never
     /// another set at its address).
     std::map<int, SDL_Texture*> textures_;

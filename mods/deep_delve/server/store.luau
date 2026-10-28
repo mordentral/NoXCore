@@ -20,7 +20,9 @@ local store = {}
 --   3  tree = { nodes = { passive node ids taken }, bossPoints (a point for each act cleared the
 --      first time at a tier), respecs }; stash = { tabs = { [tab] = { [slot] = item record } } }
 --      with every tab there; spells = { spells = { [spell name] = level }, abilities =
---      { [ability] = level } } (what the tree gives, written by book.luau); an item record may
+--      { [ability] = level }, creatures = { creature names } } (what the tree gives, written by
+--      book.luau at every set-up and tree change, so `creatures`, added later in version 3, is
+--      there from a record's next set-up; a reader takes none for missing); an item record may
 --      carry its level. Version 2's tree list became tree.nodes, and each act it had cleared a
 --      boss point.
 store.VERSION = 3
@@ -62,7 +64,7 @@ function store.new(player: any): any
 		-- act: the act it's in; deepest: the deepest area index reached in any act; progress and
 		-- bosses: see VERSION (progress.luau reads and writes them).
 		world = { act = 1, deepest = 0, progress = {}, bosses = {} },
-		spells = { spells = {}, abilities = {} }, -- what its passive tree gives (book.luau)
+		spells = { spells = {}, abilities = {}, creatures = {} }, -- what its passive tree gives (book.luau)
 		records = { kills = 0, deaths = 0, frames = 0 }, -- frames: time played, in game frames
 	}
 	for t = 1, STASH_TABS do
@@ -143,7 +145,7 @@ local function toVersion3(rec: any)
 		end
 	end
 	rec.stash = { tabs = tabs }
-	rec.spells = { spells = {}, abilities = {} }
+	rec.spells = { spells = {}, abilities = {}, creatures = {} }
 	if type(rec.gold) ~= "table" then
 		rec.gold = { carried = 0, stashed = 0 }
 	end

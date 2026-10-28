@@ -43,6 +43,15 @@ inline constexpr std::array<const char*, 6> kAbilityNames{"ABILITY_INVALID",    
 /// the aimed attack spells' bit and the untargeted ones').
 std::uint32_t spellFlags(const things::ThingDb& things, std::uint32_t spell);
 
+/// Whether the book shows every spell, ability and creature whatever was granted
+/// (guiSpellSortList's and quickBarCreate's test): a network game that isn't a quest (game flag
+/// 0x2000 without 0x1000; a solo game, 0x800 alone, isn't one), unless the server's mode owns the
+/// book (`modeOwnsBook`, HeadlessClient::modeOwnsBook: noxcpp's), when it shows what was granted.
+inline constexpr bool bookListsEverything(std::uint32_t gameFlags, bool modeOwnsBook)
+{
+    return (gameFlags & 0x2000u) && !(gameFlags & 0x1000u) && !modeOwnsBook;
+}
+
 /// SPELL_GLYPH: the trap (a conjurer's: the bomber) a trap set's spells are cast into.
 inline constexpr std::uint32_t kGlyph = 0x22;
 

@@ -2,8 +2,8 @@
 -- The character sheet: what the mod makes of a character, in one value to its UI while the sheet
 -- is open (sent again only when it changes) and as lines for "dd sheet": name, class, level and
 -- experience, health, mana and strength, damage dealt and taken, resistance, gold carried and
--- stashed, passive points, the act's progress, its spells (a warrior: its abilities) and its
--- records.
+-- stashed, passive points, the act's progress, its spells (a warrior: its abilities; a conjurer
+-- also its summons) and its records.
 
 local acts = require("data/acts")
 local classes = require("data/classes")
@@ -48,6 +48,14 @@ function sheet.numbers(h: any): any
 	end
 	table.sort(skills)
 	local skillText = table.concat(skills, ", ")
+	-- (a conjurer's summons after them)
+	local summons = {}
+	for _, name in (r.spells and r.spells.creatures) or {} do
+		table.insert(summons, tree.creatureTitle(name))
+	end
+	if #summons > 0 then
+		skillText = (if skillText ~= "" then skillText .. "; " else "") .. "summons " .. table.concat(summons, ", ")
+	end
 	if #skillText > 180 then
 		skillText = string.sub(skillText, 1, 177) .. "..."
 	end

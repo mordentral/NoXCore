@@ -12,7 +12,8 @@
 //     "levels": "mapFiles",              or "generated"
 //     "server": "server/main.luau",      its server script (this is the default)
 //     "ui": "ui/main.luau",              its UI script, sent to NoX Core players (none: text only)
-//     "uiApi": 1,                        the UI API it's written for (1, or 2: images, sounds, keys...;
+//     "uiApi": 1,                        the UI API it's written for (1, 2: images, sounds, keys...,
+//                                        or 3: lines, tooltips, labels, HUD windows, drags...;
 //                                        script_ui.hpp), sent only to clients that give it
 //     "looksLike": "arena",              a stock mode it plays as, its own rules the script's
 //                                        ("arena" or "ctf": scripted_mode.hpp)
@@ -41,7 +42,7 @@ namespace nox::modes::script {
 /// The script API this build gives (a mode.json's "api"; another's is refused, with its reason).
 inline constexpr int kScriptApi = 1;
 /// The newest UI API this build gives (a mode.json's "uiApi", 1 to this; script_ui.hpp).
-inline constexpr int kUiApi = 2;
+inline constexpr int kUiApi = 3;
 
 struct Manifest {
     ModeInfo info;

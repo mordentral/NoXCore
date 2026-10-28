@@ -39,8 +39,8 @@ struct Parts {
 void addPartsToolbox(lua_State* L, bool store);
 
 /// configure's returned table (at `t`): its quest keys onto the host's options (13.7: quest,
-/// questScreens, questMaps, forceClass, multiclass, monstersAlert, keepThingsOnDeath, serverName; absent: as they
-/// were). `firstMap` the map it plays first (the quest's first). Quest saves are never turned on.
+/// questScreens, questMaps, forceClass, multiclass, monstersAlert, keepThingsOnDeath, bookIsTheMod (the host's
+/// modeOwnsBook), serverName; absent: as they were). `firstMap` the map it plays first (the quest's first). Quest saves are never turned on.
 void applyHostOptions(lua_State* L, int t, server::GameHost::Options& o, const Generation& gen, const std::string& firstMap);
 
 } // namespace nox::modes::script

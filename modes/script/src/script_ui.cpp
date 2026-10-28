@@ -77,6 +77,7 @@ struct ScriptUiClient::Impl {
     int uiRef = 0;
     int runningApi = 0;
     bool hasDraw = false, hasClick = false, hasMessage = false, hasView = false, hasKey = false;
+    bool hasDrag = false, hasMouseUp = false, hasWheel = false; ///< (API 3's hooks)
     std::vector<UiWindow> windows;
     UiWindow* drawing = nullptr; ///< (the window whose draw is running: draws go to it)
     std::deque<std::pair<std::uint8_t, std::vector<std::uint8_t>>> inbox; ///< data and views, oldest first
@@ -87,6 +88,14 @@ struct ScriptUiClient::Impl {
     std::optional<UiPlayer> player;
     const things::ThingDb* thingsOverride = nullptr;
     std::vector<UiSound> sounds;
+    // API 3's.
+    bool hudShown = true;
+    std::vector<UiTooltipLine> tooltip; ///< (this frame's, or the last one's when a frame ran out of time first)
+    bool tooltipSet = false;            ///< (nox.tooltip called in this frame)
+    std::vector<UiLabel> labels;
+    std::uint32_t labelsLoad = 0; ///< (the client's map load the labels were set in)
+    std::uint32_t runs = 0;       ///< (UIs started)
+    std::function<std::optional<std::uint16_t>(std::uint16_t)> objectLookup;
     // The weather the server last told (kWeather: with no UI too), and the client's map load it
     // came in (another load since: none, till the server tells it again).
     wx::Told told;
@@ -131,7 +140,48 @@ struct ScriptUiClient::Impl {
         windows.clear();
         inbox.clear();
         sounds.clear();
+        tooltip.clear();
+        labels.clear();
         drawing = nullptr;
+    }
+
+    /// (API 3) A map loaded since the labels were set: they all go (the new map's objects are
+    /// numbered afresh: a code may come back on another object of the same type).
+    void labelsOfThisMap()
+    {
+        if (client && client->mapLoads() != labelsLoad) {
+            labelsLoad = client->mapLoads();
+            labels.clear();
+        }
+    }
+    /// (API 3) Labels whose object left the client's world (or never came) let go.
+    void pruneLabels()
+    {
+        labelsOfThisMap();
+        if (labels.empty() || (!objectLookup && !client)) {
+            return; // (a preview: labels stay as set)
+        }
+        std::erase_if(labels, [&](UiLabel& l) {
+            const std::optional<std::uint16_t> type = objectType(l.object);
+            if (!type) {
+                return l.seen || nowMs > l.setMs + kUiLabelWaitMs;
+            }
+            if (!l.seen) {
+                l.seen = true;
+                l.typeId = *type;
+                return false;
+            }
+            return *type != l.typeId; // (another object at its net code)
+        });
+    }
+    std::optional<std::uint16_t> objectType(std::uint16_t object) const
+    {
+        if (objectLookup) {
+            return objectLookup(object);
+        }
+        const auto& drawables = client->world().drawables();
+        const auto it = drawables.find(object);
+        return it == drawables.end() ? std::nullopt : std::optional<std::uint16_t>(it->second.typeId);
     }
     /// A UI that can't run, the server told why (its views stay text).
     void refuse(const std::string& why, std::string mine)
@@ -241,11 +291,32 @@ int uiWindow(lua_State* L)
     UiWindow w;
     w.id = id.substr(0, 32);
     w.title = title;
-    // (On the screen whole, and no smaller than its frame's title needs.)
-    w.w = std::clamp(field("w", 160), 32, 600);
-    w.h = std::clamp(field("h", 100), 16, 440);
-    w.x = std::clamp(field("x", 20), 4, 636 - w.w);
-    w.y = std::clamp(field("y", 40), 20, 476 - w.h);
+    if (impl.runningApi >= 3) {
+        // (API 3's fields: an older UI's windows are framed, take clicks, and aren't HUD pieces.)
+        const auto flag = [&](const char* name, bool fallback) {
+            lua_getfield(L, 2, name);
+            luaL_argcheck(L, lua_isnil(L, -1) || lua_isboolean(L, -1), 2, "frame, clickThrough and hud are booleans");
+            const bool v = lua_isnil(L, -1) ? fallback : lua_toboolean(L, -1) != 0;
+            lua_pop(L, 1);
+            return v;
+        };
+        w.frame = flag("frame", true);
+        w.clickThrough = flag("clickThrough", false);
+        w.hud = flag("hud", false);
+    }
+    if (w.frame) {
+        // (On the screen whole, and no smaller than its frame's title needs.)
+        w.w = std::clamp(field("w", 160), 32, 600);
+        w.h = std::clamp(field("h", 100), 16, 440);
+        w.x = std::clamp(field("x", 20), 4, 636 - w.w);
+        w.y = std::clamp(field("y", 40), 20, 476 - w.h);
+    } else {
+        // (No frame: anywhere on the screen, whole.)
+        w.w = std::clamp(field("w", 160), 1, 640);
+        w.h = std::clamp(field("h", 100), 1, 480);
+        w.x = std::clamp(field("x", 20), 0, 640 - w.w);
+        w.y = std::clamp(field("y", 40), 0, 480 - w.h);
+    }
     const auto it = std::ranges::find(impl.windows, w.id, &UiWindow::id);
     if (it != impl.windows.end()) {
         it->title = w.title;
@@ -253,6 +324,9 @@ int uiWindow(lua_State* L)
         it->y = w.y;
         it->w = w.w;
         it->h = w.h;
+        it->frame = w.frame;
+        it->clickThrough = w.clickThrough;
+        it->hud = w.hud;
     } else {
         luaL_argcheck(L, static_cast<int>(impl.windows.size()) < kMaxWindows, 1, "at most 8 windows");
         impl.windows.push_back(std::move(w));
@@ -420,6 +494,26 @@ int uiGameSound(lua_State* L)
     return 0;
 }
 
+/// The topmost window at (x, y) the mouse may be over (ScriptUiClient::windowAt's), as they're
+/// drawn: the others newest first, then the HUD pieces (drawn under them) newest first. (An API 1
+/// or 2 UI has no HUD pieces: newest first, as it always was.)
+const UiWindow* windowUnder(const Impl& impl, float x, float y)
+{
+    for (const bool hud : {false, true}) {
+        for (auto it = impl.windows.rbegin(); it != impl.windows.rend(); ++it) {
+            const UiWindow& w = *it;
+            if (w.hud != hud || w.clickThrough || (w.hud && !impl.hudShown)) {
+                continue;
+            }
+            if (x >= static_cast<float>(w.x) && x < static_cast<float>(w.x + w.w) && y >= static_cast<float>(w.y) &&
+                y < static_cast<float>(w.y + w.h)) {
+                return &w;
+            }
+        }
+    }
+    return nullptr;
+}
+
 int uiMouse(lua_State* L)
 {
     const Impl& impl = implOf(L);
@@ -427,18 +521,15 @@ int uiMouse(lua_State* L)
         return 0;
     }
     const auto [x, y] = *impl.mouse;
-    // (The top window under it: the last one opened.)
-    for (auto it = impl.windows.rbegin(); it != impl.windows.rend(); ++it) {
-        const UiWindow& w = *it;
-        if (x >= static_cast<float>(w.x) && x < static_cast<float>(w.x + w.w) && y >= static_cast<float>(w.y) &&
-            y < static_cast<float>(w.y + w.h)) {
-            lua_pushlstring(L, w.id.data(), w.id.size());
-            lua_pushnumber(L, x - static_cast<float>(w.x));
-            lua_pushnumber(L, y - static_cast<float>(w.y));
-            return 3;
-        }
+    // (The top window under it: the last one opened; never a clickThrough one.)
+    const UiWindow* w = windowUnder(impl, x, y);
+    if (!w) {
+        return 0;
     }
-    return 0;
+    lua_pushlstring(L, w->id.data(), w->id.size());
+    lua_pushnumber(L, x - static_cast<float>(w->x));
+    lua_pushnumber(L, y - static_cast<float>(w->y));
+    return 3;
 }
 
 int uiPlayer(lua_State* L)
@@ -460,6 +551,178 @@ int uiPlayer(lua_State* L)
         lua_setfield(L, -2, key);
     }
     return 1;
+}
+
+// ---- UI API 3
+
+/// `s` (n bytes) cut to `cap` bytes, at a whole letter.
+std::string cutText(const char* s, std::size_t n, std::size_t cap)
+{
+    if (n <= cap) {
+        return std::string(s, n);
+    }
+    // (The first byte left out inside a letter: the cut goes back to that letter's start.)
+    std::size_t end = cap;
+    while (end > 0 && (static_cast<unsigned char>(s[end]) & 0xC0) == 0x80) {
+        --end;
+    }
+    return std::string(s, end);
+}
+
+/// A script's number as a float in [lo, hi] (NaN: `fallback`).
+float clampedFloat(double v, float lo, float hi, float fallback)
+{
+    if (v != v) {
+        return fallback;
+    }
+    return static_cast<float>(std::clamp(v, static_cast<double>(lo), static_cast<double>(hi)));
+}
+
+int uiLine(lua_State* L)
+{
+    UiWindow& w = drawingWindow(L);
+    constexpr float kFar = 100000;
+    UiDraw d;
+    d.kind = UiDraw::Kind::Line;
+    d.x = clampedFloat(luaL_checknumber(L, 1), -kFar, kFar, 0);
+    d.y = clampedFloat(luaL_checknumber(L, 2), -kFar, kFar, 0);
+    d.w = clampedFloat(luaL_checknumber(L, 3), -kFar, kFar, 0);
+    d.h = clampedFloat(luaL_checknumber(L, 4), -kFar, kFar, 0);
+    d.color = colourArg(L, 5);
+    d.width = clampedFloat(luaL_optnumber(L, 6, 1), 1, 8, 1);
+    w.draws.push_back(std::move(d));
+    return 0;
+}
+
+int uiTooltip(lua_State* L)
+{
+    Impl& impl = implOf(L);
+    if (!impl.drawing) {
+        luaL_error(L, "a tooltip only in ui.draw");
+    }
+    luaL_checktype(L, 1, LUA_TTABLE);
+    // (Each call this frame replaces the last: one tooltip a frame.)
+    impl.tooltip.clear();
+    impl.tooltipSet = true;
+    const int n = std::min(lua_objlen(L, 1), static_cast<int>(kUiMaxTooltipLines));
+    for (int i = 1; i <= n; ++i) {
+        lua_rawgeti(L, 1, i);
+        const int line = lua_gettop(L);
+        UiTooltipLine t;
+        t.color = {255, 255, 255, 255};
+        if (lua_istable(L, line)) {
+            lua_rawgeti(L, line, 1);
+            size_t len = 0;
+            const char* s = lua_isstring(L, -1) ? lua_tolstring(L, -1, &len) : nullptr;
+            luaL_argcheck(L, s != nullptr, 1, "a tooltip's line is { text, colour? }");
+            t.text = cutText(s, len, kUiMaxTooltipText);
+            lua_rawgeti(L, line, 2);
+            if (!lua_isnil(L, -1)) {
+                t.color = colourArg(L, lua_gettop(L));
+            }
+            lua_pop(L, 2);
+        } else if (lua_isstring(L, line)) {
+            size_t len = 0;
+            const char* s = lua_tolstring(L, line, &len);
+            t.text = cutText(s, len, kUiMaxTooltipText);
+        } else {
+            luaL_argerror(L, 1, "a tooltip's line is { text, colour? }");
+        }
+        lua_pop(L, 1);
+        impl.tooltip.push_back(std::move(t));
+    }
+    return 0;
+}
+
+std::uint16_t objectArg(lua_State* L, int idx)
+{
+    const double v = luaL_checknumber(L, idx);
+    luaL_argcheck(L, v >= 1 && v <= 0xFFFF && v == static_cast<double>(static_cast<int>(v)), idx, "an object's net code, 1-65535");
+    return static_cast<std::uint16_t>(v);
+}
+
+int uiLabel(lua_State* L)
+{
+    Impl& impl = implOf(L);
+    UiLabel l;
+    l.object = objectArg(L, 1);
+    size_t n = 0;
+    const char* s = luaL_checklstring(L, 2, &n);
+    l.text = cutText(s, n, kUiMaxLabelText);
+    l.color = colourArg(L, 3);
+    if (!lua_isnoneornil(L, 4)) {
+        luaL_checktype(L, 4, LUA_TTABLE);
+        lua_getfield(L, 4, "show");
+        if (!lua_isnil(L, -1)) {
+            const char* show = lua_isstring(L, -1) ? lua_tostring(L, -1) : "";
+            const std::string_view v(show);
+            luaL_argcheck(L, v == "always" || v == "alt" || v == "near", 4, "show is \"always\", \"alt\" or \"near\"");
+            l.show = v == "alt" ? UiLabel::Show::Alt : v == "near" ? UiLabel::Show::Near : UiLabel::Show::Always;
+        }
+        lua_pop(L, 1);
+        lua_getfield(L, 4, "near");
+        if (lua_isnumber(L, -1)) {
+            l.near = clampedFloat(lua_tonumber(L, -1), 0, 2000, 150);
+        }
+        lua_pop(L, 1);
+        lua_getfield(L, 4, "offset");
+        if (lua_isnumber(L, -1)) {
+            l.offset = clampedFloat(lua_tonumber(L, -1), -64, 256, 4);
+        }
+        lua_pop(L, 1);
+    }
+    impl.labelsOfThisMap(); // (a map loaded since the last frame: the old map's labels gone first)
+    const auto it = std::ranges::find(impl.labels, l.object, &UiLabel::object);
+    if (it != impl.labels.end()) {
+        // (Its object as it was: a label waiting for one waits afresh.)
+        l.seen = it->seen;
+        l.typeId = it->typeId;
+        l.setMs = it->seen ? it->setMs : impl.nowMs;
+        *it = std::move(l);
+    } else if (impl.labels.size() >= kUiMaxLabels) {
+        lua_pushboolean(L, 0);
+        return 1;
+    } else {
+        l.setMs = impl.nowMs;
+        impl.labels.push_back(std::move(l));
+    }
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+int uiClearLabel(lua_State* L)
+{
+    const std::uint16_t object = objectArg(L, 1);
+    std::erase_if(implOf(L).labels, [&](const UiLabel& l) { return l.object == object; });
+    return 0;
+}
+
+int uiClearLabels(lua_State* L)
+{
+    implOf(L).labels.clear();
+    return 0;
+}
+
+/// An API 3 hook that may take what it's told: `push` its arguments (`nargs` of them).
+template <class Push>
+bool callTaking(Impl& impl, const char* hook, int nargs, Push&& push)
+{
+    try {
+        if (!impl.vm || !impl.begin(hook)) {
+            return false;
+        }
+        lua_State* L = impl.vm->thread();
+        push(L);
+        if (!impl.finish(hook, nargs, 1)) {
+            return false;
+        }
+        const bool taken = lua_toboolean(L, -1) != 0;
+        lua_pop(L, 1);
+        return taken;
+    } catch (const std::exception& e) {
+        impl.stop(std::string("the UI failed: ") + e.what());
+        return false;
+    }
 }
 
 } // namespace
@@ -518,6 +781,10 @@ void Impl::start()
     windows.clear();
     error.clear();
     sounds.clear();
+    tooltip.clear();
+    labels.clear();
+    labelsLoad = client ? client->mapLoads() : 0;
+    ++runs;
     vm = std::make_unique<LuauVm>(limits);
     vm->setOwner(this);
     lua_State* L = vm->thread();
@@ -529,13 +796,22 @@ void Impl::start()
     static constexpr std::pair<const char*, lua_CFunction> kToolbox2[] = {
         {"image", uiImage}, {"thing", uiThing}, {"sound", uiSound}, {"gameSound", uiGameSound}, {"mouse", uiMouse}, {"player", uiPlayer},
     };
-    lua_createtable(L, 0, static_cast<int>(std::size(kToolbox) + std::size(kToolbox2)) + 1);
+    static constexpr std::pair<const char*, lua_CFunction> kToolbox3[] = {
+        {"line", uiLine}, {"tooltip", uiTooltip}, {"label", uiLabel}, {"clearLabel", uiClearLabel}, {"clearLabels", uiClearLabels},
+    };
+    lua_createtable(L, 0, static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3)) + 1);
     for (const auto& [name, fn] : kToolbox) {
         lua_pushcfunction(L, fn, name);
         lua_setfield(L, -2, name);
     }
     if (uiApi >= 2) {
         for (const auto& [name, fn] : kToolbox2) {
+            lua_pushcfunction(L, fn, name);
+            lua_setfield(L, -2, name);
+        }
+    }
+    if (uiApi >= 3) {
+        for (const auto& [name, fn] : kToolbox3) {
             lua_pushcfunction(L, fn, name);
             lua_setfield(L, -2, name);
         }
@@ -567,6 +843,9 @@ void Impl::start()
     hasMessage = has("onMessage");
     hasView = has("onView");
     hasKey = uiApi >= 2 && has("key");
+    hasDrag = uiApi >= 3 && has("drag");
+    hasMouseUp = uiApi >= 3 && has("mouseUp");
+    hasWheel = uiApi >= 3 && has("wheel");
     lua_pop(L, 1);
     if (begin("start") && !finish("start", 0, 0)) {
         return;
@@ -734,17 +1013,8 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
         }
         stop({});
         // (The label on its windows: 32 bytes at most, whole letters.)
-        if (name.size() > 32) {
-            name.resize(32);
-            while (!name.empty() && (static_cast<unsigned char>(name.back()) & 0xC0) == 0x80) {
-                name.pop_back();
-            }
-            if (!name.empty() && (static_cast<unsigned char>(name.back()) & 0x80) != 0) {
-                name.pop_back(); // (a lead byte whose letter was cut)
-            }
-        }
         modeId = std::move(id).substr(0, 32);
-        modeName = std::move(name);
+        modeName = cutText(name.data(), name.size(), 32);
         source.clear();
         expected = size;
         receiving = true;
@@ -807,6 +1077,12 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             ++told.serial;
         }
         break;
+    case uimsg::kBook:
+        // (Whatever the UI's state: the client's book lists only what was granted.)
+        if (const std::uint8_t on = r.u8(); r.ok && client) {
+            client->setModeOwnsBook(on != 0);
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -856,6 +1132,10 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
     // have gone (the rest next frame; a window not drawn keeps last frame's draws).
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(30);
     const auto inTime = [&] { return std::chrono::steady_clock::now() < deadline; };
+    // (A tooltip lasts the frame that drew it; through a frame whose time ran out before every
+    // window was drawn, the last one's is kept, as those windows keep their draws.)
+    impl.tooltipSet = false;
+    impl.pruneLabels();
     try {
         for (int n = 0; impl.vm && !impl.inbox.empty() && n < 32 && inTime(); ++n) {
             auto [sub, bytes] = std::move(impl.inbox.front());
@@ -870,9 +1150,10 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
             }
             impl.finish(hook, 1, 0);
         }
-        for (std::size_t i = 0; impl.vm && i < impl.windows.size() && inTime(); ++i) {
+        std::size_t i = 0;
+        for (; impl.vm && i < impl.windows.size() && inTime(); ++i) {
             UiWindow& w = impl.windows[i];
-            if (!impl.hasDraw || !impl.begin("draw")) {
+            if (!impl.hasDraw || (w.hud && !impl.hudShown) || !impl.begin("draw")) {
                 w.draws.clear();
                 continue;
             }
@@ -881,6 +1162,9 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
             impl.drawing = &w; // (windows open and shut only outside draw: it stays put)
             impl.finish("draw", 1, 0);
             impl.drawing = nullptr;
+        }
+        if (!impl.tooltipSet && (!impl.vm || i >= impl.windows.size())) {
+            impl.tooltip.clear();
         }
     } catch (const std::exception& e) {
         // (A Lua error outside a protected call: the host's own pushes, out of memory.)
@@ -967,6 +1251,121 @@ std::vector<UiSound> ScriptUiClient::takeSounds()
     return std::exchange(impl_->sounds, {});
 }
 
+namespace {
+
+const char* dragPhase(UiDrag phase)
+{
+    switch (phase) {
+    case UiDrag::Start: return "start";
+    case UiDrag::Move: return "move";
+    case UiDrag::End: return "end";
+    }
+    return "move";
+}
+
+/// A hook's window, place and button pushed (the click hook's first arguments).
+void pushAt(lua_State* L, std::string_view windowId, float x, float y)
+{
+    lua_pushlstring(L, windowId.data(), windowId.size());
+    lua_pushnumber(L, x);
+    lua_pushnumber(L, y);
+}
+
+} // namespace
+
+bool ScriptUiClient::drag(std::string_view windowId, UiDrag phase, float x, float y, int button)
+{
+    Impl& impl = *impl_;
+    if (!impl.hasDrag) {
+        return false;
+    }
+    return callTaking(impl, "drag", 5, [&](lua_State* L) {
+        lua_pushlstring(L, windowId.data(), windowId.size());
+        lua_pushstring(L, dragPhase(phase));
+        lua_pushnumber(L, x);
+        lua_pushnumber(L, y);
+        lua_pushinteger(L, button == 2 ? 2 : 1);
+    });
+}
+
+bool ScriptUiClient::mouseUp(std::string_view windowId, float x, float y, int button)
+{
+    Impl& impl = *impl_;
+    if (!impl.hasMouseUp) {
+        return false;
+    }
+    return callTaking(impl, "mouseUp", 4, [&](lua_State* L) {
+        pushAt(L, windowId, x, y);
+        lua_pushinteger(L, button == 2 ? 2 : 1);
+    });
+}
+
+bool ScriptUiClient::wheel(std::string_view windowId, float x, float y, int steps)
+{
+    Impl& impl = *impl_;
+    steps = std::clamp(steps, -10, 10);
+    if (!impl.hasWheel || steps == 0) {
+        return false;
+    }
+    return callTaking(impl, "wheel", 4, [&](lua_State* L) {
+        pushAt(L, windowId, x, y);
+        lua_pushinteger(L, steps);
+    });
+}
+
+const UiWindow* ScriptUiClient::windowAt(float x, float y) const
+{
+    return windowUnder(*impl_, x, y);
+}
+
+void ScriptUiClient::setHudShown(bool shown)
+{
+    impl_->hudShown = shown;
+}
+
+bool ScriptUiClient::hudShown() const noexcept
+{
+    return impl_->hudShown;
+}
+
+const std::vector<UiTooltipLine>& ScriptUiClient::tooltip() const noexcept
+{
+    return impl_->tooltip;
+}
+
+const std::vector<UiLabel>& ScriptUiClient::labels() const noexcept
+{
+    return impl_->labels;
+}
+
+void ScriptUiClient::setObjectLookup(std::function<std::optional<std::uint16_t>(std::uint16_t)> lookup)
+{
+    impl_->objectLookup = std::move(lookup);
+}
+
+std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h)
+{
+    constexpr float kScreenW = 640, kScreenH = 480;
+    if (!(mouseX == mouseX) || !(mouseY == mouseY)) {
+        mouseX = mouseY = 0; // (NaN)
+    }
+    if (!(w > 0)) {
+        w = 0;
+    }
+    if (!(h > 0)) {
+        h = 0;
+    }
+    float x = mouseX + 12; // (clear of the pointer's arrow)
+    float y = mouseY + 16;
+    if (x + w > kScreenW) {
+        x = mouseX - 4 - w;
+    }
+    if (y + h > kScreenH) {
+        y = mouseY - 4 - h;
+    }
+    return {std::clamp(x, 0.0f, std::max(0.0f, kScreenW - w)), std::clamp(y, 0.0f, std::max(0.0f, kScreenH - h))};
+}
+
 bool ScriptUiClient::running() const noexcept
 {
     return impl_->vm != nullptr;
@@ -985,6 +1384,11 @@ const std::string& ScriptUiClient::error() const noexcept
 int ScriptUiClient::api() const noexcept
 {
     return impl_->runningApi;
+}
+
+std::uint32_t ScriptUiClient::runs() const noexcept
+{
+    return impl_->runs;
 }
 
 const std::shared_ptr<const ModAssets>& ScriptUiClient::assets() const noexcept

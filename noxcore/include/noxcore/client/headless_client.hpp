@@ -243,6 +243,12 @@ public:
     bool multiclass() const noexcept { return multiclass_; }
     void setMulticlass(bool on) { multiclass_ = on; }
     void setMulticlassForTest(bool on) { multiclass_ = on; }
+    /// The book is the server's mode's (a script mode's bookIsTheMod, told by MSG_NOXCPP_MODEUI's
+    /// kBook, sent only to a client of level 2 or above that named ModeUi): a network game's book
+    /// lists only what was granted, not every spell, ability and creature (bookListsEverything).
+    /// Never on a stock server.
+    bool modeOwnsBook() const noexcept { return modeOwnsBook_; }
+    void setModeOwnsBook(bool on) { modeOwnsBook_ = on; }
     /// noxcpp's map editor session (MSG_NOXCPP_EDIT 0xF6, mapedit/session_proto.hpp): each message
     /// from the server handed to `handler` whole (a stock server never sends one); ours sent,
     /// reliable or not (presence: latest wins).
@@ -608,6 +614,7 @@ private:
     bool freshInput_ = false;
     MapVoteState mapVote_;
     bool multiclass_ = false;
+    bool modeOwnsBook_ = false;
     std::uint8_t sentFacing_ = 64;
     bool sentMoving_ = false;
     std::uint32_t freshAt_ = 0;

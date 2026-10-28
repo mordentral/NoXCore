@@ -424,11 +424,12 @@ const std::optional<TypeArt>& ThingArt::entry(std::string_view name)
                         a.extentHeight = static_cast<float>(size[1]);
                     }
                 }
-                // ZSIZE min max: the height the thing spans (the cursor's hover test).
+                // ZSIZE min max: the height the thing spans (the cursor's hover test); a top under
+                // the bottom is read as the bottom.
                 if (const auto zsize = def->lastAttribute("ZSIZE")) {
                     const auto mm = readInts<2>(*zsize);
                     a.zSizeMin = static_cast<float>(mm[0]);
-                    a.zSizeMax = static_cast<float>(mm[1]);
+                    a.zSizeMax = static_cast<float>(std::max(mm[0], mm[1]));
                 }
                 if (const auto li = def->lastAttribute("LIGHTINTENSITY")) {
                     a.lightIntensity = std::strtof(std::string(*li).c_str(), nullptr);

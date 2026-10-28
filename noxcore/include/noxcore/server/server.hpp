@@ -77,6 +77,8 @@ public:
         bool monstersAlert = false;
         /// A dead player keeping its things outside a quest (World::keepThingsOnDeath).
         bool keepThingsOnDeath = false;
+        /// A mode's book outside a quest: only what it grants (World::modeOwnsBook).
+        bool modeOwnsBook = false;
         /// The map editor's play-test sandbox: players can't die (World::sandboxPlayersCantDie).
         bool playersCantDie = false;
         /// A map editor session's sandbox: nothing scores (World::sandboxNoScoring).

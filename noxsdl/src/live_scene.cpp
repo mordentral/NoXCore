@@ -2,6 +2,7 @@
 // their poses, name plates and the things over them, what's under the mouse), the sight
 // blockers, the lights, the looping sounds, the walls' state, and the viewer's effects demo.
 #include "app.hpp"
+#include "friend_dot.hpp"
 #include "player_art.hpp"
 #include "team_colors.hpp"
 
@@ -13,6 +14,7 @@
 #include <cmath>
 #include <numbers>
 #include <utility>
+#include <variant>
 
 namespace noxsdl {
 
@@ -251,8 +253,8 @@ void overheadIcons(App& app, std::uint16_t netCode, std::uint32_t buffs, double 
 
 /// Live: the world's drawables as scene sprites.
 /// `unsprited` gets the players drawn without an image, `bars` other players' health bars (as the
-/// scene's sort draws them). Also finds what's under the mouse (hovered, hoveredUseable) and
-/// refreshes the effects' anchors.
+/// scene's sort draws them). Also finds what's under the mouse (the front pick: hovered,
+/// hoveredUseable; the cursor's: cursorHovered, cursorUseable) and refreshes the effects' anchors.
 std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>& unsprited, std::vector<HealthBar>& bars)
 {
     std::vector<MapView::SceneSprite> out;
@@ -265,6 +267,7 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
     app.minionDots.clear();
     app.flagLabels.clear();
     app.damageShown.clear();
+    app.modeLabelSpots.clear();
     // The drawables with damage numbers up (a few at most).
     std::vector<std::uint16_t> floaters;
     for (const auto& f : client.world().healthFloaters()) {
@@ -275,7 +278,16 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
     const float cursorX = app.camera.left() + mouse.x / app.camera.zoom;
     const float cursorY = app.camera.top() + mouse.y / app.camera.zoom;
     app.hovered.reset();
-    app.hoveredDepth = 0;
+    app.hoveredUseable.reset();
+    app.cursorHovered.reset();
+    app.cursorUseable.reset();
+    // The front pick and the cursor's (cursor_pick.hpp): a Glyph is the cursor's only for a
+    // wizard, and then only while nothing else is under it.
+    pick::Picks<std::variant<std::uint16_t, MapView::Useable>> hover;
+    const TypeArt* glyphArt = app.art->get("Glyph");
+    const auto* ownRecord = ownPlayer(client);
+    const pick::CursorRole glyphRole =
+        ownRecord && ownRecord->playerClass == 1 ? pick::CursorRole::LastResort : pick::CursorRole::None;
     // The creatures the summon cage points at (guiDrawSummonBox).
     const std::set<std::uint16_t> caged =
         app.summon && app.renderGui
@@ -466,11 +478,9 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
         // (Drawn lingering is no matter: the hover makes the sight test itself.)
         if (hoverable(netCode, d, *a) && under &&
             (!sight || sight->drawableSeen(*a, SightMap::liveKey(netCode), p.x, p.y, p.z, d.special.value_or(0), d.drawn))) {
-            const float depth = look3d ? -fromFoot : hoverDepth(*a, p.y, p.z);
-            if (!app.hovered || depth > app.hoveredDepth) {  // the one furthest forward wins
-                app.hovered = netCode;
-                app.hoveredDepth = depth;
-            }
+            // The one furthest forward wins (in the mouse look, the one nearest its foot).
+            const float depth = look3d ? 10 - fromFoot : hoverDepth(*a, p.y, p.z);
+            hover.offer(netCode, depth, a == glyphArt ? glyphRole : pick::CursorRole::Any);
         }
 
         if (a->drawFn == DrawFn::NPC) {
@@ -761,6 +771,14 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
             if (p.z < 0) {
                 out.back().clipBottom = y + s->offsetY + s->height + p.z; // sunk into the floor (client_drawImg_bbb)
             }
+            // A mode UI's label on it (App::modeLabels), drawn when it is: its top noted.
+            if (!app.modeLabels.empty()) {
+                const auto l = std::ranges::lower_bound(app.modeLabels, netCode, {}, &std::pair<std::uint16_t, std::uint16_t>::first);
+                if (l != app.modeLabels.end() && l->first == netCode) {
+                    const App::ModeLabelSpot spot{l->second, p.x, p.y, p.y - p.z - a->zSizeMax};
+                    overlay(netCode, d, *a, p.x, p.y, p.z, [&app, spot](SDL_Renderer*, const Camera&) { app.modeLabelSpots.push_back(spot); });
+                }
+            }
             // What its DRAW draws over that image through the same generic draw (MonsterGeneratorDraw's
             // fifth animation): the same marks, coloured alike.
             if (const auto over = overImage(*a, pose)) {
@@ -781,15 +799,15 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
         // MonsterDraw's (and so MaidenDraw's) last, once its state has frames, even for a far
         // ghost or an invisible creature it didn't draw: the column beside a creature we watch,
         // and the dot over a creature on our friends list (our summons), of radius 3 in our team's
-        // colour, twice its height over its feet, when we're on a team (not a quest game's (0x1000)
-        // creatures of SUBCLASS bit 8).
+        // colour, twice its height over its feet, when we're on a team (friend_dot.hpp: not a
+        // quest's shopkeepers, nothing in a campaign game).
         if (drawn && (a->drawFn == DrawFn::Monster || a->drawFn == DrawFn::Maiden)) {
             const std::size_t from = out.size();
             pushCreatureBar(client, *a, netCode, p.x, p.y, p.z, out);
             enchantFollow(from, netCode, d, *a, p.z);
-            if (client.world().isFriend(netCode) && !((client.world().game().gameFlags & 0x1000) && creature && (a->subclasses & 8))) {
-                const auto* me = ownPlayer(client);
-                if (const auto c = teamColor(client.world(), me ? me->team : 0)) {
+            const auto* me = ownPlayer(client);
+            if (const std::uint32_t team = friendDotTeam(client.world(), netCode, a->classes, a->subclasses, me ? me->team : 0)) {
+                if (const auto c = teamColor(client.world(), team)) {
                     const MinionDot dot{p.x, p.y - p.z - 2 * a->zSizeMax, *c};
                     overlay(netCode, d, *a, p.x, p.y, p.z, [&app, dot](SDL_Renderer*, const Camera&) { app.minionDots.push_back(dot); });
                 }
@@ -822,18 +840,29 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
     app.boulderRolls = std::move(rolls);
     // The map's useable objects (levers, switches, buttons) are under the mouse too; the one
     // furthest forward wins against the drawables (clientOnCursorHover goes through both alike).
-    app.hoveredUseable.reset();
     if (app.view) {
         // (In the 3D view's mouse look: the one the crosshair is on, at its foot, before a drawable.)
         const bool look3d = app.view3d.looking();
-        if (const auto u = app.view->useableAt(cursorX, cursorY, sight);
-            u &&
-            (look3d ? app.view3d.onThing() && std::hypot(u->x - cursorX, u->y - cursorY) < 4
-                    : !app.hovered || u->depth > app.hoveredDepth)) {
-            app.hoveredUseable = u;
-            app.hovered.reset();
+        if (const auto u = app.view->useableAt(cursorX, cursorY, sight)) {
+            if (!look3d) {
+                hover.offer(*u, u->depth, pick::CursorRole::Any);
+            } else if (app.view3d.onThing() && std::hypot(u->x - cursorX, u->y - cursorY) < 4) {
+                hover.offer(*u, 1e9f, pick::CursorRole::Any);
+            }
         }
     }
+    const auto keep = [](const auto& thing, std::optional<std::uint16_t>& drawable, std::optional<MapView::Useable>& useable) {
+        if (!thing) {
+            return;
+        }
+        if (const auto* nc = std::get_if<std::uint16_t>(&*thing)) {
+            drawable = *nc;
+        } else {
+            useable = std::get<MapView::Useable>(*thing);
+        }
+    };
+    keep(hover.front, app.hovered, app.hoveredUseable);
+    keep(hover.cursor, app.cursorHovered, app.cursorUseable);
     return out;
 }
 

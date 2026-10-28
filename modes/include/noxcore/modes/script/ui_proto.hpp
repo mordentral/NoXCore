@@ -17,11 +17,18 @@
 //   kAssetChunk u16 index, u32 offset, the coded bytes there                   (in order)
 // (decoded: an image RGBA8, rows top first; a sound PCM16, interleaved). A reload's UI that
 // keeps the same set sends none; a kDrop leaves the set where it is.
+// A UI of API 3 (kBegin's api byte 3) and everything of it above go only to a client at client
+// level 3 or above (kUiApi3Level) that named ModeUi and ModeUi2; the bytes are API 2's.
 // and, only to a client at client level 1 or above that named ModeUi (any script mode, UI or none:
 // nox.weather; weather.hpp), the weather it draws:
 //   kWeather    u8 kind (0 none, 1 rain, 2 snow, 3 storm; another: none), u8 strength, u16 the
 //               wind's angle (1/65536 of a turn, clockwise on screen, 0 up), u8 its speed,
 //               u16 fade (server frames)                                    (7 bytes)
+// and, only to a client at client level 2 or above (kBookLevel) that named ModeUi, from a script
+// mode whose configure set bookIsTheMod (the host's modeOwnsBook), at each client's ready:
+//   kBook       u8 1: the book is the mode's (the client's book lists only what it was granted,
+//               not a network game's every spell, ability and creature); 0: the stock book
+//               (bytes past the first are left for later versions)
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -56,6 +63,7 @@ enum Sub : std::uint8_t {
     kAsset = 7,
     kAssetChunk = 8,
     kWeather = 9,
+    kBook = 10,
     kReady = 16,
     kSend = 17,
     kAnswer = 18,
@@ -74,6 +82,19 @@ inline constexpr std::size_t kMaxValue = 900;
 inline std::vector<std::uint8_t> message(Sub sub, std::span<const std::uint8_t> payload = {})
 {
     return modes::framed(kOp, sub, payload);
+}
+
+/// The lowest client level (lobby::kClientLevel's list) a server sends kBook to.
+inline constexpr std::uint16_t kBookLevel = 2;
+/// The lowest client level a server sends a UI of API 3 to (with ModeUi and ModeUi2 named): every
+/// sub of it (its assets, kBegin, chunks, data, views). Below it the client gets the views as text.
+inline constexpr std::uint16_t kUiApi3Level = 3;
+
+/// kBook's message: `modes` 1, the book is the mode's; 0, the stock book.
+inline std::vector<std::uint8_t> bookMessage(bool modes)
+{
+    const std::uint8_t payload[1] = {static_cast<std::uint8_t>(modes ? 1 : 0)};
+    return message(kBook, payload);
 }
 
 /// A message's sub and payload; none: not one (or cut short).

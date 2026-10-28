@@ -174,6 +174,22 @@ std::unique_ptr<LocalHost> makeHost(App& app, const HostSettings& settings)
                                        app.strings.get(), app.gameDir, s);
 }
 
+/// The port the host asked for was another program's here (LocalHost::portMoved): said on the
+/// console and in the log, with the port the game is on (noxcpp's: whoever joins from elsewhere
+/// needs it).
+void notePortMoved(App& app)
+{
+    if (!app.host || !app.host->portMoved()) {
+        return;
+    }
+    const std::string text = "Port " + std::to_string(app.host->askedPort()) +
+                             " is in use on this computer (another game or server): this game is on port " + std::to_string(app.host->port()) + ".";
+    SDL_Log("hosting: %s", text.c_str());
+    if (app.console) {
+        app.console->print(text, Red);
+    }
+}
+
 /// The Host button's game as the exe hosts it, from nox.cfg's server settings (as the exe reads them):
 /// ServerName, MaxPlayers, SysopPassword, LessonLimit and TimeLimit (by mode:
 /// arena, elimination, CTF, flagball, KotR, lessons at most 999),

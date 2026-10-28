@@ -1670,6 +1670,12 @@ public:
     /// outfit, MSG_PLAYER_RESPAWN's flag 0). Read on the death path only. In a quest: nothing (the
     /// quest's own rules). Stock: off.
     bool keepThingsOnDeath = false;
+    /// noxcpp (Server::Options::modeOwnsBook; a script mode's configure key bookIsTheMod): outside
+    /// a quest, a network game's book is the mode's, not the whole one the stock network game
+    /// gives (modeBook()): a player starts with nothing and has only what the mode grants,
+    /// checked as a quest checks it. Read on a join, a use, a cast and a grant only. In a quest or
+    /// a solo game it does nothing (their own rules). Stock: off.
+    bool modeOwnsBook = false;
     /// noxcpp (Server::Options::playersCantDie): the map editor's play-test sandbox: a player's
     /// health never drops below 1 (Fight::takeHealth); monsters still die. Stock and every ordinary
     /// game: off.
@@ -2020,6 +2026,9 @@ public:
     bool quest() const noexcept { return (gameFlags & GameFlag::Quest) != 0; }
     bool network() const noexcept { return (gameFlags & GameFlag::Network) != 0; }
     bool versus() const noexcept { return (gameFlags & GameFlag::Versus) != 0; }
+    /// noxcpp: modeOwnsBook in force: on, in a network game that isn't a quest nor one waiting for
+    /// its quest to begin (questChosen).
+    bool modeBook() const noexcept { return modeOwnsBook && network() && !quest() && !questChosen; }
 
     /// Loads the map's objects, walls, waypoints and groups, made as a game with `gameFlags`
     /// and `gameData` makes them; the items' modifiers by `modifiers`' names (none without).

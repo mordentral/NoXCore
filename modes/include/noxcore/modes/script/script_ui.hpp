@@ -41,6 +41,31 @@
 //                                    "enter", "escape", "tab", "space", "f1"-"f12" (true: taken)
 // Its draws count against the same caps as the others.
 //
+// UI API 3 (mode.json's "uiApi": 3; sent only to a client at client level 3 or above that names
+// ModeUi and ModeUi2: ui_proto.hpp's kUiApi3Level) adds, beside nox.api being 3:
+//   nox.line(x1, y1, x2, y2, colour [, width])   a line in the window being drawn (width 1-8)
+//   nox.tooltip(lines)               (inside draw) { { text, colour? }, ... } drawn at the mouse
+//                                    over everything this frame, kept on the screen; the last call
+//                                    of a frame wins (at most kUiMaxTooltipLines lines)
+//   nox.label(object, text, colour [, opts])     a label over an object in the world: `object` its
+//                                    net code (the server script's nox.object(id).netCode); opts
+//                                    { show = "always" | "alt" (while Alt is held) | "near",
+//                                    near = world units from our player (150), offset = pixels
+//                                    above its top (4) }; false: over kUiMaxLabels. It goes when
+//                                    the object leaves the client's world or a map loads (one never
+//                                    there within kUiLabelWaitMs of the call, too); drawn only
+//                                    where the object itself is
+//   nox.clearLabel(object), nox.clearLabels()
+//   NoxWindowSpec's frame (false: no frame, title or background, and any y on the screen),
+//   clickThrough (true: clicks, the wheel and the mouse over it are the game's) and hud (true:
+//   hidden while the game hides its HUD, and drawn under the framed windows)
+//   ui.drag(window, phase, x, y, button)  a press in a window that moves 3 units or more: phase
+//                                    "start" (at the press), "move", "end" (let go); x, y in the
+//                                    pressed window's units (outside it too)
+//   ui.mouseUp(window, x, y, button) a button let go over a window, pressed in one of them
+//   ui.wheel(window, x, y, steps)    the wheel over a window: steps > 0 away from the player
+//                                    (up), < 0 towards; over a window it's the UI's, taken or not
+//
 // The program calls frame() once a frame and draws windows(); a click in one goes to click().
 // Without a server (the map editor's UI preview), runLocal starts a UI from its source, useAssets
 // hands it a mod's assets, receive() feeds it messages as a server would, setSender takes what it
@@ -52,6 +77,7 @@
 #include "noxcore/modes/script/mod_assets.hpp"
 #include "noxcore/modes/script/weather.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -76,6 +102,14 @@ struct UiColor {
     std::uint8_t r = 255, g = 255, b = 255, a = 255;
 };
 
+/// (API 3) The most labels a UI keeps, a label's text, a tooltip's lines and a line's text (bytes),
+/// and how long a label waits for an object the client hasn't been sent yet.
+inline constexpr std::size_t kUiMaxLabels = 128;
+inline constexpr std::size_t kUiMaxLabelText = 64;
+inline constexpr std::size_t kUiMaxTooltipLines = 16;
+inline constexpr std::size_t kUiMaxTooltipText = 128;
+inline constexpr std::uint64_t kUiLabelWaitMs = 3000;
+
 struct UiDraw {
     enum class Kind : std::uint8_t {
         Box,
@@ -83,13 +117,49 @@ struct UiDraw {
         Text,
         Image, ///< (API 2) assets()->list[index], at (x, y), w x h
         Thing, ///< (API 2) thing type `index` (its THNG index + 1: a net type id), centred on (x, y)
+        Line,  ///< (API 3) from (x, y) to (w, h) (w, h: its end), `width` wide
     };
     Kind kind = Kind::Box;
     float x = 0, y = 0, w = 0, h = 0; ///< (Text: its top left)
     UiColor color;
     std::string text;
-    int index = -1; ///< (Image, Thing)
+    int index = -1;    ///< (Image, Thing)
+    float width = 1;   ///< (Line) 1-8 UI units
 };
+
+/// (API 3) A line of a tooltip (nox.tooltip).
+struct UiTooltipLine {
+    std::string text;
+    UiColor color;
+};
+
+/// (API 3) Where a tooltip of w x h goes for the mouse at (mouseX, mouseY), all in the UI's 640 x
+/// 480 units: below and right of the pointer, flipped to its other side where it would run off,
+/// and always whole on the screen (a tooltip bigger than it: its top left at 0).
+std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h);
+
+/// (API 3) A label over an object in the world (nox.label).
+struct UiLabel {
+    enum class Show : std::uint8_t {
+        Always,
+        Alt,  ///< while the player holds Alt
+        Near, ///< while our player is within `near` world units of it
+    };
+    std::uint16_t object = 0; ///< its net code
+    std::string text;         ///< (at most kUiMaxLabelText bytes, whole letters)
+    UiColor color;
+    Show show = Show::Always;
+    float near = 150;  ///< (Near) world units
+    float offset = 4;  ///< game pixels above the object's top
+    // (The client's: whether its object has been in the client's world, its type then, and when
+    // it was set.)
+    bool seen = false;
+    std::uint16_t typeId = 0;
+    std::uint64_t setMs = 0;
+};
+
+/// (API 3) A drag's phase (ui.drag).
+enum class UiDrag : std::uint8_t { Start, Move, End };
 
 /// A sound a UI asked for this frame (API 2): the program plays it and lets it go (takeSounds).
 struct UiSound {
@@ -113,6 +183,10 @@ struct UiWindow {
     std::string title;
     int x = 0, y = 0, w = 0, h = 0; ///< its inside, in the game's 640 x 480 units
     std::vector<UiDraw> draws;      ///< this frame's, in its own coordinates
+    // (API 3's; an API 1 or 2 UI's windows keep these defaults.)
+    bool frame = true;         ///< framed and labelled as the server's (false: bare, any y)
+    bool clickThrough = false; ///< clicks, the wheel and the mouse over it are the game's
+    bool hud = false;          ///< hidden while the game hides its HUD; under the framed windows
 };
 
 class ScriptUiClient final : public ClientMode {
@@ -148,12 +222,39 @@ public:
     /// (API 2) The sounds the UI asked for since the last call.
     std::vector<UiSound> takeSounds();
 
+    /// (API 3) A drag of `button`, pressed in window `id`, at (x, y) in its units: whether the UI
+    /// took it (no ui.drag: false).
+    bool drag(std::string_view windowId, UiDrag phase, float x, float y, int button);
+    /// (API 3) `button` let go over window `id`: whether the UI took it.
+    bool mouseUp(std::string_view windowId, float x, float y, int button);
+    /// (API 3) The wheel over window `id` (steps > 0 up): whether the UI took it.
+    bool wheel(std::string_view windowId, float x, float y, int steps);
+    /// The window the mouse at (x, y) (the 640 x 480 units) is over, the topmost as drawn (the
+    /// others, then the hud ones): none over a clickThrough window or a hud one while the HUD is
+    /// hidden.
+    const UiWindow* windowAt(float x, float y) const;
+    /// (API 3) Whether the game shows its HUD (false: hud windows aren't drawn, nor told of the
+    /// mouse); true until told.
+    void setHudShown(bool shown);
+    bool hudShown() const noexcept;
+    /// (API 3) This frame's tooltip (empty: none).
+    const std::vector<UiTooltipLine>& tooltip() const noexcept;
+    /// (API 3) The labels, in the order set.
+    const std::vector<UiLabel>& labels() const noexcept;
+    /// (API 3) What a label asks of the client's world: the type id of the object with net code
+    /// `object` there (none: not there). Unset: the client's own world; without a client (a
+    /// preview) labels stay as they're set.
+    void setObjectLookup(std::function<std::optional<std::uint16_t>(std::uint16_t object)> lookup);
+
     /// Whether a UI is running, the mode's name (its windows' label), and why the last one stopped.
     bool running() const noexcept;
     const std::string& modeName() const noexcept;
     const std::string& error() const noexcept;
-    /// The running UI's API (1 or 2; 0: none running).
+    /// The running UI's API (1 to 3; 0: none running).
     int api() const noexcept;
+    /// How many UIs have started (each start one more): a UI running now that isn't the one that
+    /// ran before (a stop and a start between two looks) has another number.
+    std::uint32_t runs() const noexcept;
     /// The mod's assets as they came (or useAssets gave them); null: none.
     const std::shared_ptr<const ModAssets>& assets() const noexcept;
     /// The weather the server last told (ui_proto.hpp's kWeather: nox.weather), for the program

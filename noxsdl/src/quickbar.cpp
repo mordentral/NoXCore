@@ -56,10 +56,11 @@ namespace {
 
 /// A network game that isn't a quest (game flag 0x2000 without 0x1000), where everyone has every
 /// spell: guiSpellSortList's and quickBarCreate's test (a solo game, 0x800 alone, isn't one).
+/// (noxcpp: not where the server's mode owns the book, HeadlessClient::modeOwnsBook.)
 bool everySpellKnown(const App& app)
 {
-    const std::uint32_t flags = app.live->client().world().game().gameFlags;
-    return (flags & 0x2000u) && !(flags & 0x1000u);
+    const auto& client = app.live->client();
+    return nox::client::bookListsEverything(client.world().game().gameFlags, client.modeOwnsBook());
 }
 
 } // namespace
@@ -75,6 +76,7 @@ BookContext bookContext(const App& app)
     c.allKnown = everySpellKnown(app);
     c.frame = gameFrame(app);
     c.multiclass = multiclass(app);
+    c.modeOwnsBook = client.modeOwnsBook();
     return c;
 }
 

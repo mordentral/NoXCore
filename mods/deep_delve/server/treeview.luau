@@ -11,7 +11,7 @@ local windows = require("windows")
 
 local treeview = {}
 
-local KIND: { [string]: string } = { root = "r", small = "s", notable = "n", keystone = "k", spell = "p", ability = "a" }
+local KIND: { [string]: string } = { root = "r", small = "s", notable = "n", keystone = "k", spell = "p", ability = "a", summon = "c" }
 local REGION: { [string]: number } = { middle = 0, warrior = 1, wizard = 2, conjurer = 3 }
 
 -- The nodes as the UI takes them, worked out once.

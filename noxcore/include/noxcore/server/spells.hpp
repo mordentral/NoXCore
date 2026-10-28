@@ -136,7 +136,7 @@ struct Spells {
     ServerObject* cursorTarget(const ServerObject& caster);
     /// The power it casts `spell` at (spellGetPower): 3 in a versus game, else a
     /// player's level of it in its book (an ImaginaryCaster's 1; a monster's own power: not
-    /// yet, 3).
+    /// yet, 3). (noxcpp: a player's level in a mode's book, World::modeBook, versus or not.)
     int power(const ServerObject& caster, std::uint32_t spell) const;
 
     /// A spell that lasts begun: one of the same spell by the same caster ends

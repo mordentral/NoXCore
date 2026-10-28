@@ -44,7 +44,15 @@ public:
         });
     }
 
-    void bind(nox::modes::ClientMode* side) override { delve_ = dynamic_cast<nox::client::DelveClient*>(side); }
+    void bind(nox::modes::ClientMode* side) override
+    {
+        delve_ = dynamic_cast<nox::client::DelveClient*>(side);
+        // The map's records and objective are the side's: pointed at the new one's at once (or
+        // none), never left on the last game's side, gone with its client (a mouse event before
+        // the next update read them: the Load of a saved game after a game crashed in the map's
+        // handleEvent).
+        refreshMap();
+    }
 
     bool handleEvent(App&, const SDL_Event& event, int viewWidth, int viewHeight, float hudScale) override
     {
@@ -82,8 +90,7 @@ public:
         if (!delve_) {
             return;
         }
-        map_.setRecords(&delve_->records());
-        map_.setObjective(&delve_->objective(), delve_->objectiveVersion());
+        refreshMap();
         map_.update(delve_->run());
     }
 
@@ -145,6 +152,13 @@ public:
     }
 
 private:
+    /// The map's records and objective from the bound side (none: cleared).
+    void refreshMap()
+    {
+        map_.setRecords(delve_ ? &delve_->records() : nullptr);
+        map_.setObjective(delve_ ? &delve_->objective() : nullptr, delve_ ? delve_->objectiveVersion() : 0u);
+    }
+
     DelveMapWindow map_;
     CampfireWindow campfire_;
     BlessingWindow blessing_;

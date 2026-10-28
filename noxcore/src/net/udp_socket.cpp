@@ -61,11 +61,46 @@ UdpSocket UdpSocket::open(std::uint16_t port, bool loopbackOnly)
     a.sin_family = AF_INET;
     a.sin_port = htons(port);
     a.sin_addr.s_addr = htonl(loopbackOnly ? INADDR_LOOPBACK : INADDR_ANY);
+#ifdef _WIN32
+    if (port != 0) {
+        // (Linux already refuses a port another socket has on any of the same addresses.)
+        const int on = 1;
+        if (::setsockopt(raw(s), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&on), sizeof(on)) != 0) {
+            throw std::system_error(lastError(), std::system_category(), "setsockopt(SO_EXCLUSIVEADDRUSE)");
+        }
+    }
+#endif
     if (::bind(raw(s), reinterpret_cast<const sockaddr*>(&a), sizeof(a)) != 0) {
         throw std::system_error(lastError(), std::system_category(), "bind");
     }
     setNonBlocking(s);
     return sock;
+}
+
+UdpSocket UdpSocket::openHosting(std::uint16_t port, bool loopbackOnly)
+{
+    for (std::uint32_t p = port;; ++p) {
+        try {
+            return open(static_cast<std::uint16_t>(p), loopbackOnly);
+        } catch (const std::system_error& e) {
+            if (port == 0 || p >= 0xFFFF || !addressInUse(e.code())) {
+                throw;
+            }
+        }
+    }
+}
+
+bool UdpSocket::addressInUse(const std::error_code& error) noexcept
+{
+    if (error.category() != std::system_category()) {
+        return false;
+    }
+#ifdef _WIN32
+    // (WSAEACCES: held by a socket bound with SO_EXCLUSIVEADDRUSE)
+    return error.value() == WSAEADDRINUSE || error.value() == WSAEACCES;
+#else
+    return error.value() == EADDRINUSE;
+#endif
 }
 
 UdpSocket::UdpSocket(UdpSocket&& other) noexcept

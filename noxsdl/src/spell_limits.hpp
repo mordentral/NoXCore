@@ -6,7 +6,8 @@
 //   Magic Missile       while it owns MagicMissileCount[power - 1] MagicMissiles
 //   Pixie Swarm         while it owns PixieCount[power - 1] Pixies
 // (gamedata.bin's ARENA tables; power is 3 in multiplayer games, flags 0x570, else the spell's
-// level: spellGetPower.)
+// level: spellGetPower. Where the server's mode owns the book, HeadlessClient::modeOwnsBook, the
+// spell's level in those games too, as the server casts it.)
 //
 // The client isn't told who owns a missile, so this guesses: objects of those types that appear
 // within a couple of seconds of our casting the spell, near us (missiles, pixies, the death ball
@@ -33,10 +34,16 @@ public:
     /// Claims new objects for recent casts and forgets those gone. `us` is our net code.
     void update(const nox::client::World& world, std::uint16_t us, std::uint32_t frame);
     /// The spells the server would refuse now: the counts from `gameData` as a game with
-    /// `gameFlags` reads them (a solo game its SOLO lines).
+    /// `gameFlags` reads them (a solo game its SOLO lines); `modeOwnsBook` the server's mode owns
+    /// the book (its power then the spell's level in a multiplayer game too).
     std::set<std::uint32_t> limited(const nox::client::World& world, const nox::things::GameData& gameData,
-                                    std::uint32_t gameFlags) const;
+                                    std::uint32_t gameFlags, bool modeOwnsBook = false) const;
     void clear();
+    /// The power the server casts a spell of ours at (spellGetPower): 3 under game flags 0x570
+    /// unless `modeOwnsBook`, else `level` (3 for 0: one it doesn't know).
+    static int hintPower(std::uint32_t worldFlags, bool modeOwnsBook, int level);
+    /// Tests: the object `netCode` taken as ours, of `spell`.
+    void claimForTest(std::uint16_t netCode, std::uint32_t spell);
 
 private:
     struct Pending {

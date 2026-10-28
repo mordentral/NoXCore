@@ -287,6 +287,10 @@ public:
     void sweepModeMaps();
     std::string address() const { return "127.0.0.1:" + std::to_string(port_); }
     std::uint16_t port() const { return port_; }
+    /// The port the settings asked for was another program's here: the game is on port() instead
+    /// (UdpSocket::openHosting).
+    bool portMoved() const { return askedPort_ != 0 && port_ != askedPort_; }
+    std::uint16_t askedPort() const { return askedPort_; }
     /// The game itself: only on the server thread, or inside withGame on the main thread.
     nox::server::GameHost& game();
     /// Hosting a mode whose director picks the maps (a NoX Core mode or a map editor session): no
@@ -440,4 +444,5 @@ private:
     std::unique_ptr<nox::server::GameHost> game_;
     std::optional<nox::net::UdpSocket> socket_;
     std::uint16_t port_ = 0;
+    std::uint16_t askedPort_ = 0; ///< HostSettings::port (0: any free one)
 };

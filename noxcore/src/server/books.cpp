@@ -75,6 +75,10 @@ void useSpellReward(Items& items, ServerObject& user, ServerObject& book)
     const std::uint32_t spell = book.bookEntry; // (a byte)
     // (noxcpp: a multiclass player, a NoX Core mode's, learns any class's.)
     if (user.player->multiclass || ((classId == 1 || classId == 2) && spellClassCheck(items.things, classId, spell) == 0)) {
+        if (world.modeBook()) {
+            refuse(world, user); // (noxcpp: a mode's book has only what the mode grants; the book kept)
+            return;
+        }
         const bool show = (world.gameFlags & (GameFlag::Solo | GameFlag::Quest)) && spell < user.player->spellLevels.size() &&
                           user.player->spellLevels[spell] == 0;
         if (!grantSpell(world, items.things, user, static_cast<int>(spell), true, show, 0)) { // (Spell_GrantToPlayer)
@@ -100,6 +104,10 @@ void useAbilityReward(Items& items, ServerObject& user, ServerObject& book)
         refuse(world, user);
         return;
     }
+    if (world.modeBook()) {
+        refuse(world, user); // (noxcpp: a mode's book has only what the mode grants; the book kept)
+        return;
+    }
     const std::uint32_t ability = book.bookEntry;
     // (Its level read from the spell book's slot of that number: where abilities live
     // in a player; a multiclass player's own book.)
@@ -116,6 +124,10 @@ void useFieldGuide(Items& items, ServerObject& user, ServerObject& guide)
 {
     World& world = items.world;
     if (!(user.classes & oc::Player) || !user.player) {
+        return;
+    }
+    if (world.modeBook()) {
+        refuse(world, user); // (noxcpp: a mode's book has only what the mode grants; the guide kept)
         return;
     }
     const int creature = guideCreatureIndex(guide.guideCreature);
@@ -240,7 +252,8 @@ void oblivionPickedUp(Items& items, ServerObject& who, ServerObject& item)
 
 void awardSpellCollide(Fight& fight, ServerObject& pedestal, ServerObject* other)
 {
-    if (other && fight.things) {
+    // (noxcpp: a mode's book, World::modeBook, has only what the mode grants.)
+    if (other && fight.things && !fight.world.modeBook()) {
         // (Spell_GrantToPlayer(other, its CollideData's spell, 1, 0, 0))
         grantSpell(fight.world, *fight.things, *other, pedestal.collideArg, true, false, 0);
     }

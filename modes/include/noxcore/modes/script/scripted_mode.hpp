@@ -51,7 +51,8 @@
 // goes as text too. The UI is sent only after the player's map loads, so what onJoin says goes as
 // text: say a UI's views once nox.hasUi(peer) is true. A UI of API 2 (mode.json's "uiApi": 2) goes
 // only to clients that name ClientFeature::ModeUi2, the mod's assets\ (mod_assets.hpp) sent before
-// it; any other client gets the views as text, the UI never sent. A mode.json with "stockClients":
+// it; any other client gets the views as text, the UI never sent. A UI of API 3 goes only to those
+// clients at client level 3 or above (ui_proto.hpp's kUiApi3Level). A mode.json with "stockClients":
 // false turns stock GAME.EXE players away with a notice (GameHost::Options::stockRefusal).
 //
 // Reload: "mode reload" on the host's console runs the scripts afresh (their state lost),

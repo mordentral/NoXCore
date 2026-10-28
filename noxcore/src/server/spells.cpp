@@ -106,7 +106,9 @@ int Spells::power(const ServerObject& caster, std::uint32_t spell) const
     if (caster.typeName == "ImaginaryCaster") {
         return 1;
     }
-    if (world.versus() || world.versusSpells) { // (noxcpp: versusSpells, a mode's)
+    // (noxcpp: versusSpells, a mode's; a mode's book, World::modeBook, casts a player's spells at
+    // the levels it granted, as a quest does.)
+    if ((world.versus() || world.versusSpells) && !(caster.player && world.modeBook())) {
         return 3;
     }
     if (caster.player) {
@@ -334,6 +336,12 @@ bool Spells::start(ServerObject& caster, const std::array<std::uint32_t, 5>& spe
     }
     for (const std::uint32_t s : spells) {
         if (s != 0 && p.spellLevels[s] == 0) {
+            // (noxcpp: in a mode's book, World::modeBook, where a client's book may still list a
+            // spell that wasn't granted, its player is told as a spell spoken by hand that it
+            // doesn't know is: Plr_FinishSpellCast's line.)
+            if (world.modeBook()) {
+                world.textTo(caster, "plyrspel.c:SpellUnknown");
+            }
             return false;
         }
     }
@@ -1867,7 +1875,8 @@ int Spells::lastingStart(DurationSpell& s)
             return 1;
         }
         if (caster->player) {
-            if ((world.gameFlags & (GameFlag::Coop | GameFlag::Quest)) && !caster->player->fieldGuide[static_cast<std::size_t>(index)]) {
+            // (noxcpp: a mode's book, World::modeBook, asks for the guide as a quest does.)
+            if (((world.gameFlags & (GameFlag::Coop | GameFlag::Quest)) || world.modeBook()) && !caster->player->fieldGuide[static_cast<std::size_t>(index)]) {
                 inform(*caster, "Summon.c:NeedGuideToSummon");
                 return 1;
             }

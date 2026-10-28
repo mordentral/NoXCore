@@ -113,6 +113,11 @@ bool Spellbook::canSummon(const BookContext& ctx) const
     if (ctx.playerClass != 2 && !ctx.multiclass) {
         return false;
     }
+    // (noxcpp: where the server's mode owns the book, its granted creatures are summoned from the
+    // guide without Summon Creature known: the guide lists only those.)
+    if (ctx.modeOwnsBook) {
+        return true;
+    }
     const auto& levels = ctx.world->self().spellLevels;
     const auto it = levels.find(static_cast<std::uint8_t>(kSummonCreature));
     return ctx.allKnown || (it != levels.end() && it->second != 0);

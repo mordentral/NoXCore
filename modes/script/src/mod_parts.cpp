@@ -244,6 +244,9 @@ void applyHostOptions(lua_State* L, int t, server::GameHost::Options& o, const G
     if (const auto m = flag("keepThingsOnDeath")) {
         o.keepThingsOnDeath = *m; // (in a quest it does nothing: the quest's own rules)
     }
+    if (const auto m = flag("bookIsTheMod")) {
+        o.modeOwnsBook = *m; // (in a quest it does nothing: the quest's own rules)
+    }
     lua_rawgetfield(L, t, "serverName");
     if (lua_isstring(L, -1)) {
         size_t n = 0;

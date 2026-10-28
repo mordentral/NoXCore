@@ -148,6 +148,17 @@ private:
     void freePreviewTextures();
     /// (UI API 2) A key of the fixed set pressed over the preview's screen: to the window under the mouse.
     void previewKeys(float ux, float uy);
+    /// (UI API 3) A press in one of the preview's windows (a drag's), as the game tells it.
+    struct PreviewPress {
+        std::string window;
+        int button = 1;
+        float fromX = 0, fromY = 0, toldX = 0, toldY = 0, wx = 0, wy = 0;
+        bool dragging = false;
+    };
+    std::optional<PreviewPress> previewPress_;
+    float previewWheel_ = 0; ///< (a fine wheel's part of a step)
+    /// (UI API 3) The mouse over the preview's screen: drags, buttons let go, the wheel.
+    void previewMouse(bool hovered, int clicked, float ux, float uy);
 
     // Play.
     bool playing_ = false;          ///< a test of this mod we started (the hooks say if it's still up)

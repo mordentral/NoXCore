@@ -5,7 +5,8 @@
 --     is scaled by the monster's tier and area level.
 --     The player's resistance (worn affixes, its passive tree) takes its share off.
 --   * A hit on one of the mod's monsters from a player (or something it owns: a missile, a
---     summoned creature) is scaled by the player's worn "damage" affixes and its passive tree.
+--     summoned creature) is scaled by the player's worn "damage" affixes and its passive tree
+--     (and a spell's own bonus when the hit came by that spell's missile: hero.dealt).
 --
 -- The watches: every player's unit and every monster the mod makes carry nox.events.damage (set
 -- in hero.luau and monsters.luau), so the hook hears only the hits that matter.
@@ -28,7 +29,7 @@ local function behind(source: number?): number?
 	return if o and o.owner ~= 0 then o.owner else source
 end
 
-function combat.onDamage(target: number, source: number?, _weapon: number?, amount: number, _kind: number): number?
+function combat.onDamage(target: number, source: number?, weapon: number?, amount: number, _kind: number): number?
 	local who = behind(source)
 	if not who then
 		return nil
@@ -40,7 +41,7 @@ function combat.onDamage(target: number, source: number?, _weapon: number?, amou
 	elseif monsters.info(target) then
 		local h = hero.byUnit(who)
 		if h then
-			factor = hero.dealt(h)
+			factor = hero.dealt(h, weapon)
 		end
 	end
 	if factor == 1 then

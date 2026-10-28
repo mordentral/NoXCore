@@ -524,12 +524,12 @@ std::vector<std::string> readServerLists(const fs::path& gameDir)
 }
 
 /// Live: this frame's cursor (cursorUpdate): the pointer over the in-game
-/// menu; else the arrow, unless we're playing and the mouse is on an item (the pickup hand
-/// within 75, the far one beyond) or a shopkeeper within 125.
+/// menu; else the arrow, unless we're playing and the cursor's pick is an item (the pickup hand
+/// within 75, the far one beyond), a creature to talk to or a shopkeeper within 125, or a useable
+/// thing within 75.
 void chooseCursor(App& app, bool inGame)
 {
     namespace oc = nox::things::ObjectClass;
-    namespace os = nox::things::ObjectSubclass;
     // The Escape menu, and the windows it opens over the game (Options, the key bindings): the
     // still pointer anywhere (cursorUpdate: a modal window up sets cursor 0).
     if (menuWindowUp(app)) {
@@ -583,68 +583,77 @@ void chooseCursor(App& app, bool inGame)
         }
     }
     const auto* me = ownPlayer(client);
-    const bool inPlay = inGame && playing(client);
-    if (inPlay && app.hoveredUseable) {
-        // cursorUpdate: the Use hand over a useable object within 75 of us (a click works it).
-        if (const auto self = app.anchors.find(client.netCode()); self != app.anchors.end()) {
-            const float dx = app.hoveredUseable->x - self->second.x;
-            const float dy = app.hoveredUseable->y - self->second.y;
-            if (dx * dx + dy * dy <= 0x15F8) {  // 0x15F8: within 75 (75 squared is 5625)
-                app.cursorType = CursorType::Use;
-            }
-        }
+    if (!inGame || !playing(client) || (!app.cursorHovered && !app.cursorUseable)) {
         return;
     }
-    if (!inPlay || !app.hovered) {
-        return;
-    }
-    const auto* d = client.world().drawable(*app.hovered);
-    const TypeArt* a = d ? app.art->get(d->typeId) : nullptr;
     const auto self = app.anchors.find(client.netCode());
-    const auto there = app.anchors.find(*app.hovered);
-    if (!a || self == app.anchors.end() || there == app.anchors.end()) {
+    if (self == app.anchors.end()) {
         return;
     }
-    const float dx = there->second.x - self->second.x;
-    const float dy = there->second.y - self->second.y;
-    const float dist2 = dx * dx + dy * dy;
-    // cursorUpdate: within 125 (0x3D08), not in a dialog or a shop, a creature with something to
-    // say (REPORT_X_STATUS 0x10) gets the Talk hand, else a shopkeeper the Trade one.
-    const bool busy = client.world().dialog().open || (app.tradeScreens && app.tradeScreens->shopOpen());
-    const bool talker = (a->classes & oc::Monster) && (d->xStatus & 0x10);
-    const bool shopkeeper = (a->classes & oc::Monster) && (a->subclasses & os::Shopkeeper);
-    if ((a->classes & (oc::Immobile | oc::Monster | oc::Player)) && !shopkeeper && !talker) {
-        return;
-    }
-    if (!(a->classes & oc::Pickup)) {
-        if (!busy && dist2 <= 0x3D08) {
-            app.cursorType = talker ? CursorType::Talk : shopkeeper ? CursorType::Trade : app.cursorType;
+    // cursorUpdate, on the cursor's pick (cursor_pick.hpp's worldCursor): how far it is from us
+    // in whole units, what it is, whether we're in a dialog or a shop or dragging an item.
+    const auto dist2 = [&](float x, float y) {
+        const std::int64_t dx = std::lround(x) - std::lround(self->second.x);
+        const std::int64_t dy = std::lround(y) - std::lround(self->second.y);
+        return dx * dx + dy * dy;
+    };
+    pick::Situation situation;
+    situation.busy = client.world().dialog().open || (app.tradeScreens && app.tradeScreens->shopOpen());
+    situation.dragging = app.inventory && app.inventory->dragging();
+    pick::Target target;
+    if (app.cursorUseable) {
+        // A useable map object (enabled: useableAt takes no other).
+        const TypeArt* a = app.cursorUseable->art;
+        if (!a) {
+            return;
         }
-        return;
+        target.classes = a->classes;
+        target.subclasses = a->subclasses;
+        target.dist2 = dist2(app.cursorUseable->x, app.cursorUseable->y);
+    } else {
+        const auto* d = client.world().drawable(*app.cursorHovered);
+        const TypeArt* a = d ? app.art->get(d->typeId) : nullptr;
+        const auto there = app.anchors.find(*app.cursorHovered);
+        if (!a || there == app.anchors.end()) {
+            return;
+        }
+        target.classes = a->classes;
+        target.subclasses = a->subclasses;
+        target.xStatus = d->xStatus;
+        target.enabled = d->enabled;
+        target.mimicAsleep = a == app.art->get("Mimic") && d->animState == 0;
+        target.dist2 = dist2(there->second.x, there->second.y);
+        if (a->classes & oc::Pickup) {
+            // An item our class can't use gets Caution (not in solo or quest games): weapons and
+            // armour by modifier.bin's CLASSUSE, mana potions for a warrior (FOOD SUBCLASS bit 5),
+            // a glyph for anyone but a wizard.
+            const int cls = me ? me->playerClass : 0;
+            std::uint8_t usable = 0xFF;
+            if (a->classes & (oc::Weapon | oc::Wand)) {
+                const auto* def = app.modifiers.findWeapon(a->name);
+                usable = def ? def->classUse.value_or(0xFF) : 0;
+            } else if (a->classes & oc::Armor) {
+                const auto* def = app.modifiers.findArmor(a->name);
+                usable = def ? def->classUse.value_or(0xFF) : 0;
+            } else if (a->classes & oc::Food) {
+                usable = static_cast<std::uint8_t>(~((a->subclasses >> 5) & 7) | 0xFE);  // only bit 0 (the warrior) can drop out
+            }
+            if (a->name == "Glyph" && cls != 1) {
+                usable = 0;
+            }
+            const bool soloOrQuest = (client.world().game().gameFlags & 0x1800) != 0;  // 0x800 solo, 0x1000 quest
+            situation.canUse = soloOrQuest || (usable & (1u << cls));
+        }
     }
-    if (dist2 >= 5625.0f) {  // 75 squared
-        app.cursorType = CursorType::PickupFar;
-        return;
+    switch (pick::worldCursor(target, situation)) {
+    case pick::WorldCursor::Pickup: app.cursorType = CursorType::Pickup; break;
+    case pick::WorldCursor::PickupFar: app.cursorType = CursorType::PickupFar; break;
+    case pick::WorldCursor::Caution: app.cursorType = CursorType::Caution; break;
+    case pick::WorldCursor::Talk: app.cursorType = CursorType::Talk; break;
+    case pick::WorldCursor::Trade: app.cursorType = CursorType::Trade; break;
+    case pick::WorldCursor::Use: app.cursorType = CursorType::Use; break;
+    case pick::WorldCursor::None: break;
     }
-    // Within reach: the pickup hand, or Caution for what our class can't use (not in
-    // solo or quest games): weapons and armour by modifier.bin's CLASSUSE, mana potions for a
-    // warrior (FOOD SUBCLASS bit 5), a glyph for anyone but a wizard.
-    const int cls = me ? me->playerClass : 0;
-    std::uint8_t usable = 0xFF;
-    if (a->classes & (oc::Weapon | oc::Wand)) {
-        const auto* def = app.modifiers.findWeapon(a->name);
-        usable = def ? def->classUse.value_or(0xFF) : 0;
-    } else if (a->classes & oc::Armor) {
-        const auto* def = app.modifiers.findArmor(a->name);
-        usable = def ? def->classUse.value_or(0xFF) : 0;
-    } else if (a->classes & oc::Food) {
-        usable = static_cast<std::uint8_t>(~((a->subclasses >> 5) & 7) | 0xFE);  // only bit 0 (the warrior) can drop out
-    }
-    if (a->name == "Glyph" && cls != 1) {
-        usable = 0;
-    }
-    const bool soloOrQuest = (client.world().game().gameFlags & 0x1800) != 0;  // 0x800 solo, 0x1000 quest
-    app.cursorType = soloOrQuest || (usable & (1u << cls)) ? CursorType::Pickup : CursorType::Caution;
 }
 
 /// Draws the game's cursor at the mouse (not when the mouse is outside the window).
@@ -1342,6 +1351,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             app->host = makeHost(*app, *opts.hostSettings);
             opts.connect = app->host->address();
             SDL_Log("hosting %s at %s", opts.hostSettings->map.c_str(), opts.connect.c_str());
+            notePortMoved(*app);
             startPortMapping(*app, !opts.hostSettings->solo && !app->privateTestRun); // (a session's private test: unlisted)
             if (opts.hostBots > 0 && !opts.hostSettings->solo) {
                 // (Tests and timing runs: as the Bots tab's choice, warriors, wizards and conjurers in turn.)
@@ -1458,6 +1468,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 }
                 SDL_Log("joining %s, account: %s", address.c_str(), app->profile.account.empty() ? "(none)" : app->profile.account.c_str());
                 startLive(*app, address);
+                notePortMoved(*app);
             };
             callbacks.solo = [app](const Menus::SoloStart& start) {
                 // The main menu's Solo: our own solo game (as --solo), its character the one the
@@ -1474,6 +1485,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 settings.saveRoot = app->saveRoot;
                 settings.continueSlot = start.continueSlot;
                 settings.characterFile = start.characterFile;
+                // The exe's solo game opens no network socket at all (its server's listening
+                // socket only without game flag 0x800); ours is joined by our own client alone:
+                // on the loopback, any free port, so another program's game here (a server on
+                // 18590, say) is never the one joined.
+                settings.loopbackOnly = true;
+                settings.port = 0;
                 try {
                     app->host = makeHost(*app, settings);
                 } catch (const std::exception& ex) {
@@ -1541,6 +1558,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                         settings.map.c_str(), start.continueSlot.empty() ? "" : (", continuing " + start.continueSlot).c_str());
                 SDL_Log("%s", hostListingLog(menusHostListing(*app, !app->hostLoopback), how.logTag, app->host->port()).c_str());
                 startLive(*app, app->host->address());
+                notePortMoved(*app);
             };
             callbacks.music = [app] { return soloMusic(*app); };
             callbacks.introAvailable = [app] { return app->movie && app->movie->available("Intro.vqa"); };
@@ -2896,6 +2914,19 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
             }
         }
     }
+    // A mode's window's press ends at its release whoever has the pointer now (its press went to
+    // no one else), and is let go when the focus goes.
+    if (event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        for (auto& [id, ui] : app->modeUis) {
+            if (ui->release(*app, *event)) {
+                return SDL_APP_CONTINUE;
+            }
+        }
+    } else if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+        for (auto& [id, ui] : app->modeUis) {
+            ui->inputLost(*app);
+        }
+    }
     // A briefing or the load menu (cinematics.hpp) has the mouse and keys.
     if (live && app->cinematics && app->cinematics->screenUp() &&
         app->cinematics->handleEvent(*event, cam.viewWidth, cam.viewHeight)) {
@@ -3123,32 +3154,44 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         if (!down || !code || !app->input) {
             break; // (releases reached the bindings above)
         }
-        if (app->cursorType == CursorType::Use && app->hoveredUseable) {
+        if (app->cursorType == CursorType::Use && (app->cursorUseable || app->cursorHovered)) {
             // Action with the Use hand (Cli_ProcessControlEvents, cursor 0xD): MSG_TRY_COLLIDE for
-            // the object, a map object's net code being its extent with bit 15 (CliNet_SendTryCollide).
+            // the cursor's pick, a map object's net code being its extent with bit 15, a drawable's
+            // its own, with bit 15 for an IMMOBILE or CLIENT_PERSIST one (CliNet_SendTryCollide).
             pressWithHand(*app, *code, [app] {
-                app->live->client().collide(static_cast<std::uint16_t>(app->hoveredUseable->extent | 0x8000));
+                if (app->cursorUseable) {
+                    app->live->client().collide(static_cast<std::uint16_t>(app->cursorUseable->extent | 0x8000));
+                } else if (app->cursorHovered) {
+                    const auto* d = app->live->client().world().drawable(*app->cursorHovered);
+                    const TypeArt* a = d ? app->art->get(d->typeId) : nullptr;
+                    constexpr std::uint32_t kStatic = nox::things::ObjectClass::Immobile | nox::things::ObjectClass::ClientPersist;
+                    const bool fixed = a && (a->classes & kStatic);
+                    app->live->client().collide(static_cast<std::uint16_t>(*app->cursorHovered | (fixed ? 0x8000 : 0)));
+                }
             });
             break;
         }
-        if ((app->cursorType == CursorType::Talk || app->cursorType == CursorType::Trade) && app->hovered) {
+        if ((app->cursorType == CursorType::Talk || app->cursorType == CursorType::Trade) && app->cursorHovered) {
             // Action with the Talk or Trade hand (Cli_ProcessControlEvents' cursor 4 / 3):
             // MSG_DIALOG start (CliNet_SendDialogStart) or MSG_TRADE open shop (CliNet_SendOpenShop).
             pressWithHand(*app, *code, [app] {
+                if (!app->cursorHovered) {
+                    return;
+                }
                 if (app->cursorType == CursorType::Talk) {
-                    app->live->client().dialogStart(*app->hovered);
+                    app->live->client().dialogStart(*app->cursorHovered);
                 } else {
-                    app->live->client().openShop(*app->hovered);
+                    app->live->client().openShop(*app->cursorHovered);
                 }
             });
             break;
         }
         if (*code == app->input->pickupButton() &&
-            (app->cursorType == CursorType::Pickup || app->cursorType == CursorType::Caution) && app->hovered) {
+            (app->cursorType == CursorType::Pickup || app->cursorType == CursorType::Caution) && app->cursorHovered) {
             // The pickup hand: the MousePickup button picks it up instead (CliNet_SendPickup).
             // Caution too (what our class can't use): cursorUpdate sends it all the same, and the
             // server refuses it with its line and NoCanDo.
-            tryPickup(*app, *app->hovered);
+            tryPickup(*app, *app->cursorHovered);
             break;
         }
         // Its bindings: MoveForward and Action act while held (SDL_AppIterate), others now.
@@ -3776,12 +3819,21 @@ void drawGameHud(App& app)
                           gameFrame(app));
     }
     app.spellLimits.update(client.world(), client.netCode(), clockFrame());
-    app.hud->setLimited(app.spellLimits.limited(client.world(), app.gameData, gameFlags(app)));
+    app.hud->setLimited(app.spellLimits.limited(client.world(), app.gameData, gameFlags(app), client.modeOwnsBook()));
     app.hud->setGameFlags(gameFlags(app)); // (the cooldowns and trap prices: the game's own gamedata lines)
     if (app.renderGui && !(app.tradeScreens && app.tradeScreens->hidesHud())) {
         app.hud->draw(app.renderer, app.font.get(), *app.sprites, client.world(), client.netCode(),
                        quickbarState(app), app.camera.viewWidth, app.camera.viewHeight,
                        gameFrame(app));
+    }
+    // The windows over the HUD below: at the HUD's scale, with the mouse.
+    const int hudW = app.camera.viewWidth;
+    const int hudH = app.camera.viewHeight;
+    const float hudScale = Hud::scale(hudW, hudH);
+    const SDL_FPoint hudMouse = mousePos(app);
+    const HudFrame modeHud{.width = hudW, .height = hudH, .scale = hudScale, .mouse = hudMouse, .nowMs = SDL_GetTicks(), .renderGui = app.renderGui};
+    for (auto& [id, ui] : app.modeUis) {
+        ui->drawUnderWindows(app, app.renderer, modeHud); // (a mode's HUD pieces, under every window)
     }
     if (app.book && app.renderGui) {
         app.book->draw(app.renderer, bookContext(app), app.camera.viewWidth, app.camera.viewHeight);
@@ -3794,20 +3846,14 @@ void drawGameHud(App& app)
         app.rankBoard->draw(app.renderer, client.world(), client.netCode(), app.camera.viewWidth,
                              app.camera.viewHeight);
     }
-    // The windows over the HUD below: at the HUD's scale, with the mouse.
-    const int hudW = app.camera.viewWidth;
-    const int hudH = app.camera.viewHeight;
-    const float hudScale = Hud::scale(hudW, hudH);
-    const SDL_FPoint hudMouse = mousePos(app);
     if (app.mapVote && app.renderGui) {
         // (Over the scoreboard a match's end opens.)
         app.mapVote->draw(app.renderer, client.mapVote(), hudW, hudH, hudScale, hudMouse);
     }
     if (!app.modeUis.empty()) {
         // (The modes' own: updated each frame, drawn with the GUI.)
-        const HudFrame hud{.width = hudW, .height = hudH, .scale = hudScale, .mouse = hudMouse, .nowMs = SDL_GetTicks(), .renderGui = app.renderGui};
         for (auto& [id, ui] : app.modeUis) {
-            ui->drawHud(app, app.renderer, hud);
+            ui->drawHud(app, app.renderer, modeHud);
         }
     }
     if (app.inventory && app.renderGui) {
@@ -4220,6 +4266,11 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         if (app->renderBubbles) {
             drawChatBubbles(*app, gameFrame(*app));
         }
+        if (app->live) {
+            for (auto& [id, ui] : app->modeUis) {
+                ui->drawWorld(*app, app->renderer); // (a mode's labels over things, under the HUD)
+            }
+        }
     }
     if (app->live && app->cinematics) {
         // The fades and bars under the GUI, at the world's end (the fades' draw with 0).
@@ -4302,6 +4353,22 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     } else if (app->live && app->renderGui && !briefing) {
         app->tooltip = liveTooltip(*app);
         drawTooltip(*app);
+        // A mode's tooltip over everything this frame: as the game's own is, never over a menu or
+        // the game's windows drawn over the mode's, and not beside the game's own.
+        const bool windowUp = menuWindowUp(*app) || (app->console && app->console->isOpen()) ||
+                              (app->discon && (app->discon->windowShown() || app->discon->noticeShown())) ||
+                              (app->motdWindow && app->motdWindow->isOpen()) ||
+                              (app->questWindows && (app->questWindows->gameOverShown() || app->questWindows->keysShown())) ||
+                              (app->serverOptions && app->serverOptions->isOpen());
+        const bool gameTipShown = !app->tooltip.empty() && app->tooltipStill > 9; // (drawTooltip's own test)
+        if (!gameTipShown && !windowUp) {
+            const int w = app->camera.viewWidth;
+            const int h = app->camera.viewHeight;
+            const HudFrame over{.width = w, .height = h, .scale = Hud::scale(w, h), .mouse = mousePos(*app), .nowMs = SDL_GetTicks()};
+            for (auto& [id, ui] : app->modeUis) {
+                ui->drawOver(*app, app->renderer, over);
+            }
+        }
     }
     drawFps(*app);
     drawKillFeed(*app);

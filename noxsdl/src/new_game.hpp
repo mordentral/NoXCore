@@ -46,6 +46,8 @@ void freshGameState(App& app)
     app.muted.clear();
     app.hovered.reset();
     app.hoveredUseable.reset();
+    app.cursorHovered.reset();
+    app.cursorUseable.reset();
     app.pickupTarget.reset();
     app.pickupSentMs = 0;
     app.lastSlot = -1;

@@ -349,12 +349,9 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
         edit_.emplace(things, std::move(eo));
         path = nox::server::setUpEditSession(*edit_, o, settings.name);
     }
-    try {
-        socket_ = nox::net::UdpSocket::open(settings.port, settings.loopbackOnly);
-    } catch (const std::exception&) {
-        socket_ = nox::net::UdpSocket::open(0, settings.loopbackOnly); // (taken, e.g. by another server here: any free one)
-    }
+    socket_ = nox::net::UdpSocket::openHosting(settings.port, settings.loopbackOnly);
     port_ = socket_->localPort();
+    askedPort_ = settings.port;
     if (serverMode_) {
         serverMode_->setServerPort(port_); // (a mode's own bots join here: a boss, say)
     }

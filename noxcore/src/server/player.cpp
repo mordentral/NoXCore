@@ -376,9 +376,12 @@ void makePlayer(ServerObject& unit, std::uint8_t classId, const things::GameData
     if (classId == 0 && !(gameFlags & GameFlag::Network)) {
         giveLevelAbilities(nullptr, gameFlags, unit, std::min<int>(static_cast<std::int8_t>(level), 10), false);
     }
-    // Its spells (spellAwardAll2): a network game but a quest's all at 3.
+    // Its spells (spellAwardAll2): a network game but a quest's all at 3. Its field guide
+    // (spellAwardAll1, under the same engine flag, which the character screen sets for a network
+    // game and a quest's start clears): every creature, 1-0x28, nothing told.
     if ((gameFlags & GameFlag::Network) && !(gameFlags & GameFlag::Quest)) {
         std::fill(p.spellLevels.begin() + 1, p.spellLevels.end(), std::uint8_t{3});
+        std::fill(p.fieldGuide.begin() + 1, p.fieldGuide.begin() + 0x29, true);
     } else if (gameFlags & GameFlag::Quest) {
         if (classId == 1) {
             p.spellLevels[0x1B] = 1; // Fireball
@@ -512,7 +515,7 @@ void readVals(World& world, ServerObject& unit, bool notify)
     if (p.classId == 0) {
         if (!world.network()) {
             giveLevelAbilities(&world, world.gameFlags, unit, std::min<int>(static_cast<std::int8_t>(p.level), 10), notify);
-        } else if (!world.quest()) {
+        } else if (!world.quest() && !world.modeBook()) { // (noxcpp: a mode's book, World::modeBook, has only what it grants)
             giveLevelAbilities(&world, world.gameFlags, unit, 10, false);
         }
     }

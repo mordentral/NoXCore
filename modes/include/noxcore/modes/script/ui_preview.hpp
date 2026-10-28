@@ -68,6 +68,15 @@ public:
     bool key(std::string_view windowId, std::string_view keyName);
     /// (API 2) Where the mouse is, in the UI's units (none: off the screen).
     void setMouse(std::optional<std::pair<float, float>> at);
+    /// (API 3) A drag, a button let go and the wheel, as ScriptUiClient's.
+    bool drag(std::string_view windowId, UiDrag phase, float x, float y, int button);
+    bool mouseUp(std::string_view windowId, float x, float y, int button);
+    bool wheel(std::string_view windowId, float x, float y, int steps);
+    /// The window the mouse at (x, y) is over (ScriptUiClient::windowAt); none: none.
+    const UiWindow* windowAt(float x, float y) const;
+    /// (API 3) This frame's tooltip, and the labels (drawn at stand-in spots: there's no world).
+    const std::vector<UiTooltipLine>& tooltip() const noexcept;
+    const std::vector<UiLabel>& labels() const noexcept;
     bool running() const noexcept;
     /// Why the UI stopped (a compile or run error), or "" while it runs.
     const std::string& error() const noexcept;

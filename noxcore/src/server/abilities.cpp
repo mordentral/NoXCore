@@ -149,6 +149,21 @@ void releaseHarpoon(World& world, ServerObject& warrior, bool broken)
     warrior.player->harpoonBolt = 0;
 }
 
+bool abilityKnown(const World& world, const PlayerControl& p, int ability)
+{
+    // A networked game other than a quest knows them all; otherwise its level must be non-zero.
+    // (noxcpp: a mode's book, World::modeBook, is asked as a quest's: only what it granted.)
+    // (noxcpp: an id outside the abilities' table, 1-5, is never known: a non-multiclass player's
+    // levels are the spell book's slots 1-5, so a later skill needs a table of its own.)
+    if (ability < 1 || static_cast<std::size_t>(ability) >= p.abilityLevels.size()) {
+        return false;
+    }
+    if (world.network() && !world.quest() && !world.modeBook()) {
+        return true;
+    }
+    return p.abilityLevel(static_cast<std::size_t>(ability)) != 0;
+}
+
 void Abilities::tell(const ServerObject& unit, std::vector<std::uint8_t> bytes)
 {
     fight.world.broadcasts().push_back({std::move(bytes), true, unit.extent});
@@ -195,9 +210,7 @@ void Abilities::tryExecute(ServerObject& unit, int ability)
         refuse(6);
         return;
     }
-    // A networked game other than a quest knows them all; otherwise its level must be non-zero.
-    const bool known = (world.network() && !world.quest()) || p.abilityLevel(static_cast<std::size_t>(ability)) != 0;
-    if (!known) {
+    if (!abilityKnown(world, p, ability)) {
         refuse(3);
         return;
     }

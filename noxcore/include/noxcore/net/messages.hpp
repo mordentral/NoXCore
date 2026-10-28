@@ -293,8 +293,8 @@ enum class Op : std::uint8_t {
     /// query named ClientFeature::ModeUi: modes/script ui_proto.hpp): the mode's UI script in
     /// blocks, its data and views, and what the UI sends back; a UI of API 2 and its mod's
     /// assets (subs 6-8: decoded pictures and sounds, NXZ-packed) only with a client that also
-    /// named ClientFeature::ModeUi2; a script mode's weather (sub 9, nox.weather). u8 sub, u16 the
-    /// rest's length, the rest.
+    /// named ClientFeature::ModeUi2; a script mode's weather (sub 9, nox.weather) and its book
+    /// (sub 10, configure's bookIsTheMod). u8 sub, u16 the rest's length, the rest.
     NoxcppModeUi = 0xF8,
 };
 

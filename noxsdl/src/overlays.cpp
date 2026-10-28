@@ -1018,11 +1018,11 @@ std::string liveTooltip(App& app)
     if (auto t = app.hud->tooltip(world, client.netCode(), quickbarState(app), m.x, m.y, w, h); !t.empty()) {
         return t;
     }
-    if (app.hovered) {
-        if (const auto* d = world.drawable(*app.hovered)) {
+    if (app.cursorHovered && !(app.inventory && app.inventory->dragging())) {
+        if (const auto* d = world.drawable(*app.cursorHovered)) {
             const TypeArt* a = app.art->get(d->typeId);
             if (a && (a->classes & nox::things::ObjectClass::Pickup)) {
-                return itemName(*app.hovered); // (cursorUpdate for an item under the cursor)
+                return itemName(*app.cursorHovered); // (cursorUpdate for an item the cursor's on)
             }
         }
     }

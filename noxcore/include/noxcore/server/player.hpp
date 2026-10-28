@@ -60,7 +60,8 @@ struct PlayerAnimations {
 /// MaxSpeed), a solo game's from the Base numbers to them by `level` (1-10, a ninth of the way a
 /// level). Its spells (spellAwardAll2): a versus game's all at level 3, a quest's
 /// the class's first at 1 (a wizard's Fireball, a conjurer's Charm and Lesser Heal), a solo
-/// game's none (its saved book, the mode layer's to fill). A solo game's warrior has the
+/// game's none (its saved book, the mode layer's to fill); a network game's but a quest's field
+/// guide every creature (spellAwardAll1). A solo game's warrior has the
 /// abilities of its level (Berserker at 2, War Cry 3, Tread Lightly 4, Eye of the Wolf 5,
 /// Harpoon 6).
 void makePlayer(ServerObject& unit, std::uint8_t classId, const things::GameData* gameData,

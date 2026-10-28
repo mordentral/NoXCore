@@ -8,7 +8,7 @@
 --   ready  the unit carries the record's state (set up, not dead, not between maps): only then is
 --          the unit read back into the record;
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
---          mana, strength, healthPct, manaPct };
+--          mana, strength, healthPct, manaPct, own (% more by a hit's thing type: a spell's own) };
 --   open   its windows open (windows.luau);
 --   told   what its client was told of its book (book.luau);
 --   need   the experience to its next level;
@@ -92,6 +92,7 @@ local function bonusOf(unit: number, rec: any)
 		healthPct = t.healthPct,
 		manaPct = t.manaPct,
 		resist = t.resist,
+		own = t.own,
 	}
 	for _, it in nox.inventory(unit) do
 		local m = items.meta(it.id)
@@ -143,9 +144,17 @@ function hero.taken(h: any): number
 	return 1 - math.clamp(h.bonus.resist, treeData.resist.least, treeData.resist.most) / 100
 end
 
--- The share of damage a hero deals (1: as the game has it).
-function hero.dealt(h: any): number
-	return math.max(0.1, 1 + h.bonus.damage / 100)
+-- The share of damage a hero deals (1: as the game has it); `weapon`: what the hit came by (a
+-- missile, a pixie), whose type may carry its spell's own bonus too (bonus.own).
+function hero.dealt(h: any, weapon: number?): number
+	local pct = h.bonus.damage
+	if weapon and next(h.bonus.own) ~= nil then
+		local w = nox.object(weapon)
+		if w then
+			pct += h.bonus.own[w.type] or 0
+		end
+	end
+	return math.max(0.1, 1 + pct / 100)
 end
 
 -- The unit's health, mana and strength from its level, worn affixes and tree; `fill`: health and
@@ -363,7 +372,7 @@ function hero.join(p: any)
 		key = key,
 		record = record,
 		ready = false,
-		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0 },
+		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, own = {} },
 		open = {},
 		need = hero.needFor(record.level.level),
 		since = nox.frame(),

@@ -12,6 +12,25 @@ don't change the wire format, what the noxsdl client draws and plays, and noxcpp
 and game modes. If something odd shows up against vanilla clients or servers, check here first;
 each entry says what the original does, what we do and why, and how to revert.
 
+## How NoX Core hosts: a separate server and client
+
+The biggest structural difference, behind several entries below. In the original, the game you
+host (including the solo campaign) and the player you play are one and the same: your player is the
+server's own player inside the one program, and never connects to its own game. NoX Core always runs
+them as separate instances: the game you host (Host Custom, Game Modes, the solo campaign, co-op) is
+a server, and your own client joins it over the network like any other player, on the local machine.
+
+What follows from it:
+
+- Hosting, even the solo campaign, uses a network port; your client's join goes through the same
+  lobby and join steps as anyone else's (and can be refused the same way).
+- Your client learns about the game only from what the server sends, as a remote player's would:
+  anything the original's host knows without being told (its own team in the solo game, its state
+  after a saved game is loaded) has to come in a message, or be worked out on the client.
+- The server and the client run on their own threads, so a busy game doesn't slow the drawing.
+- The result for play is meant to be the same as the original's; where it isn't, the entry here
+  says so.
+
 ## Conventions for entries
 
 - Each entry heading has a stable id, `VD-nn`. A new entry takes the next unused number,
@@ -68,6 +87,33 @@ each entry says what the original does, what we do and why, and how to revert.
 - **Why:** it avoids a pointless duplicate and a refusal message that vanilla has to ignore.
 - **Risk:** none known; the server gets one packet fewer.
 - **Revert:** remove the `forget(0)` call.
+
+### VD-44: A solo game's socket is on the loopback alone, any free port; a hosted game's port is its own
+
+- **Vanilla:** a solo game opens no network socket at all: the server's start makes its
+  listening socket only when the game isn't a solo one (game flag 0x800), its own player being
+  the server's in the same program. A hosted game binds its port (18590 unless set) on every
+  interface; when the bind fails because the port is in use it tries the next port up, again
+  and again, until one binds. The bind isn't exclusive, so on Windows another program can still
+  bind 127.0.0.1 on the same port afterwards and take what this computer sends there.
+- **noxcpp:** a solo game from the menus (a new campaign, Continue, Load: noxsdl's main.cpp,
+  the solo callback) is a GameHost that our own client joins over UDP, so it has a socket: on
+  127.0.0.1 alone, on a port the system picks. Every port given to `UdpSocket::open`
+  (noxcore/src/net/udp_socket.cpp) is bound exclusively on Windows (`SO_EXCLUSIVEADDRUSE`):
+  Windows otherwise lets a socket on every interface share a port with one already on
+  127.0.0.1, and the more specific one gets what's sent to it. A hosted game's socket
+  (`UdpSocket::openHosting`, from LocalHost) takes the next free port up when its own is in use,
+  as vanilla's does, and the console and the log say which port it took (`notePortMoved`).
+- **Why:** a solo game hosted on 18590 while another program had 127.0.0.1:18590 (a game or a
+  server run on the same computer) bound without error, but our client's join reached the other
+  program, which refused it as full: the save never loaded. A solo game on the loopback and
+  a free port can't meet another program's game, and nothing outside the computer reaches it,
+  as nothing reaches vanilla's.
+- **Risk:** a hosted game whose port was taken is on another port, as vanilla's would be; the
+  LAN list's broadcast asks 18590 only (vanilla's too). The `--solo` test switch still takes
+  `--host-port` and `--host-loopback` as given.
+- **Revert:** drop the two `settings.loopbackOnly` / `settings.port` lines in the solo callback,
+  and the `SO_EXCLUSIVEADDRUSE` block in `UdpSocket::open`.
 
 ## Headless client
 
@@ -1054,6 +1100,11 @@ The engine's logic is the exe's; these are where the output differs.
     (MSG_TEAM_MSG 0x0C, its share, whenever it changes): stock guests (under the quest's flags) and
     NoX Core clients draw the bar over each other player, as the quest does, while their own
     bars are up.
+  - The friend dot (the small dot in our team's colour over a creature on our friends list) is
+    drawn as in the solo game: never. Team 1 is the party's here, and the friends list holds the
+    story's NPCs, the fish and the party's summons alike, so noxsdl draws no dot in a campaign
+    game (game flag 0x800), host or guest; outside the campaign the dot is unchanged. A stock
+    guest, told the quest's flags, draws its quest's dot (every friend but a shopkeeper).
   - Only a party wipe loses. A player who falls while another lives keeps what it holds (nothing
     dropped), the pending save stands, the map's PlayerDeath functions don't run, and it's back on
     its feet 10 s on (the game's respawn, its things kept) by the party's checkpoint: where the host
@@ -1110,6 +1161,36 @@ The engine's logic is the exe's; these are where the output differs.
   Its respawn sends MSG_PLAYER_RESPAWN flag 0 and gives nothing. In a quest it does nothing. Gold
   is untouched either way (Plr_Die never takes it). A match's end still drops and re-dresses
   everyone. So does a map change outside a quest (everyone's outfit made anew, as always).
+- **Revert:** don't set it (off in every game unless a mode turns it on).
+
+### VD-43: A mode's book (World::modeOwnsBook)
+
+- **Vanilla:** outside a quest a network game's player knows everything from its join
+  (unitInitPlayer's spellAwardAll1 / 2 / 3): every spell at 3, every creature in its field guide,
+  every ability usable whatever its level (Abil_TryExecute's network-game test), and a warrior's
+  values read again give all five at 5. Reward books, field guides and spell pedestals add to it,
+  and a summoning doesn't ask for the field guide (Spell_SummonStart asks only in a quest or
+  co-op). The client's book lists every spell, ability and creature (guiSpellSortList's same
+  test). A spell not in the book, cast from the bar or the book, is refused without a word.
+- **Ours (only a mode that asks: GameHost::Options::modeOwnsBook, a script's configure key
+  `bookIsTheMod = true`):** outside a quest the book is the mode's. A player joins with no
+  spells, abilities or field guide creatures and has only what the mode grants (its spells,
+  abilities and field guide creatures: nox.grantSpell, nox.raiseSpell, nox.setAbility,
+  nox.grantCreature).
+  - An ability whose level is 0 is refused as in a quest (MSG_INFORM 2, 3 and the "can't"
+    sound); reading a warrior's values gives none.
+  - Which casts are taken is as before (they always asked for the spell's level), but a player's
+    spell is cast at its level in a versus game too (spellGetPower's 3 for every spell there is
+    the stock book's). A spell not granted, cast from the bar or the book, gets the line a spell
+    spoken by hand that isn't known gets ("plyrspel.c:SpellUnknown", no sound).
+  - Reward books and field guides are refused (the refusal sound, the book kept) and a pedestal
+    grants nothing; a summoning wants the creature in the field guide, as a quest's. A map's own
+    scripts still grant spells. Wands, staves and other items that cast are as before.
+  - NoX Core clients of level 2 that named ModeUi are told (MSG_NOXCPP_MODEUI's kBook) and list
+    only what was granted. Stock clients, older NoX Core clients and the bots are sent nothing
+    and still list everything, but can use only what was granted (bots: a known limit; the bot
+    manager never hosts a mode with the key).
+  - In a quest (or a quest game before its quest begins) or a solo game it does nothing.
 - **Revert:** don't set it (off in every game unless a mode turns it on).
 
 ## Menus: Westwood Online (no effect on the wire)

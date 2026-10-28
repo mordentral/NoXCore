@@ -403,11 +403,18 @@ struct ScriptedMode::Impl {
     {
         return lobby::ClientFeature::ModeUi | (package->manifest.uiApi >= 2 ? lobby::ClientFeature::ModeUi2 : 0u);
     }
+    /// Whether `peer` takes this UI: it named what the UI needs, and for a UI of API 3 its client
+    /// is at uimsg::kUiApi3Level or above (asked each time: a slot may change hands).
+    bool uiReaches(std::uint8_t peer) const
+    {
+        return host && (host->clientFeatures(peer) & uiNeeds()) == uiNeeds() &&
+               (package->manifest.uiApi < 3 || host->clientLevel(peer) >= uimsg::kUiApi3Level);
+    }
     void sendUi(std::uint8_t peer, uimsg::Sub sub, std::span<const std::uint8_t> payload = {})
     {
         // (Only ever to a client whose query named what the UI needs: a peer slot taken since by
         // another client never gets one.)
-        if (host && (host->clientFeatures(peer) & uiNeeds()) == uiNeeds()) {
+        if (uiReaches(peer)) {
             host->sendToIdentified(peer, uimsg::message(sub, payload));
         }
     }
@@ -2445,16 +2452,62 @@ int noxAbilityLevel(lua_State* L)
 
 int noxSetAbility(lua_State* L)
 {
-    // nox.setAbility(unit, ability, level, report): its level (its own book's for a multiclass
-    // player); with report, MSG_REPORT_ABILITY_AWARD (0xCD) to it.
+    // nox.setAbility(unit, ability, level, report, show): its level (its own book's for a multiclass
+    // player); with report, MSG_REPORT_ABILITY_AWARD (0xCD) to it, its level with 0x80 when show (the
+    // award's flight to the bar, as the engine's grant sends it).
     server::ServerObject& u = unitArg(L, 1);
     const int a = wholeArg(L, 2, 1, 5, "an ability 1-5");
     const int level = wholeArg(L, 3, 0, 5, "a level 0-5");
     u.player->abilityLevel(static_cast<std::size_t>(a)) = static_cast<std::uint8_t>(level);
     if (lua_toboolean(L, 4)) {
-        worldOf(L).broadcasts().push_back({{0xCD, static_cast<std::uint8_t>(a), static_cast<std::uint8_t>(level)}, true, u.extent});
+        const auto told = static_cast<std::uint8_t>(level | (lua_toboolean(L, 5) ? 0x80 : 0));
+        worldOf(L).broadcasts().push_back({{0xCD, static_cast<std::uint8_t>(a), told}, true, u.extent});
     }
     return 0;
+}
+
+int noxGrantCreature(lua_State* L)
+{
+    // nox.grantCreature(unit, creature, notify): Plr_AwardFieldGuide, as a found field guide gives
+    // it (its group with it; with notify, it and the others told); whether it was put in.
+    server::ServerObject& u = unitArg(L, 1);
+    int creature = 0;
+    if (lua_isnumber(L, 2)) {
+        creature = wholeArg(L, 2, 1, 40, "a guide creature 1-40");
+    } else {
+        creature = server::guideIndex(luaL_checkstring(L, 2));
+        luaL_argcheck(L, creature != 0, 2, "a field guide creature's type (or its number 1-40)");
+    }
+    if (u.player->fieldGuide[static_cast<std::size_t>(creature)]) {
+        lua_pushboolean(L, 0); // (known: Plr_AwardFieldGuide would tell nothing and give nothing)
+        return 1;
+    }
+    lua_pushboolean(L, server::awardFieldGuide(worldOf(L), u, creature, lua_toboolean(L, 3) != 0) ? 1 : 0);
+    return 1;
+}
+
+int noxSpellId(lua_State* L)
+{
+    // nox.spellId(name): a spell's number from its name; nil for none.
+    if (const auto id = things::spellId(luaL_checkstring(L, 1))) {
+        lua_pushnumber(L, *id);
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
+int noxGuideNumber(lua_State* L)
+{
+    // nox.guideNumber(name): a creature's number in the field guide (1-40) from its type's name,
+    // as nox.grantCreature reads one; nil for none.
+    const int creature = server::guideIndex(luaL_checkstring(L, 1));
+    if (creature >= 1 && creature <= 40) {
+        lua_pushnumber(L, creature);
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
 }
 
 int noxFieldGuide(lua_State* L)
@@ -3274,7 +3327,7 @@ void Impl::clientReady(std::uint8_t peer)
 {
     // A NoX Core player that asked for mode UIs (of this UI's API): the UI sent (pumpUi), once a
     // game.
-    if (uiSource.empty() || !host || (host->clientFeatures(peer) & uiNeeds()) != uiNeeds() || ui.contains(peer)) {
+    if (uiSource.empty() || !uiReaches(peer) || ui.contains(peer)) {
         return;
     }
     ui[peer] = UiPeer{};
@@ -3458,6 +3511,7 @@ void Impl::installToolbox()
         {"setPlayerHealth", noxSetPlayerHealth}, {"strength", noxStrength}, {"setStrength", noxSetStrength},
         {"spellLevel", noxSpellLevel}, {"spells", noxSpells}, {"raiseSpell", noxRaiseSpell}, {"grantSpell", noxGrantSpell},
         {"abilityLevel", noxAbilityLevel}, {"setAbility", noxSetAbility}, {"fieldGuide", noxFieldGuide}, {"clearBook", noxClearBook},
+        {"grantCreature", noxGrantCreature}, {"spellId", noxSpellId}, {"guideNumber", noxGuideNumber},
         {"revoke", noxRevoke}, {"sendRevokes", noxSendRevokes}, {"status", noxStatus}, {"gameOverAt", noxGameOverAt},
         {"setGameOverAt", noxSetGameOverAt}, {"exitGate", noxExitGate}, {"rewards", noxRewards}, {"rewardAt", noxRewardAt},
         {"setOnOff", noxSetOnOff}, {"unitSay", noxUnitSay}, {"setServerName", noxSetServerName}, {"questStage", noxQuestStage},
@@ -4130,6 +4184,12 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
         }
         impl.clientReady(peer);
         impl.parts.weather.ready(h, peer); // (its join, or a map's load: its weather again, when the mode has any)
+        // A mode's book (configure's bookIsTheMod, World::modeOwnsBook): its NoX Core client told
+        // (kBook: a client of level 2 or above that named ModeUi), before the script's playerReady
+        // grants. In a quest: not told (a quest's book lists only what was granted anyway).
+        if (h.server().world().modeBook() && Weather::reaches(h, peer) && h.clientLevel(peer) >= uimsg::kBookLevel) {
+            h.sendToIdentified(peer, uimsg::bookMessage(true));
+        }
         // (A stock player held out: the host doesn't call us for one; asked again so the script
         // never hears of it, as with onJoin.)
         if (impl.has.playerReady && !h.refused(peer)) {

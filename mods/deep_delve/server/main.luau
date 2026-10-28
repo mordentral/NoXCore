@@ -30,7 +30,8 @@
 -- character that's kept with its passive tree, its spells from the tree, and its stash.
 --
 -- The game is a plain game, not a quest; a dead player keeps everything it carries and wears
--- (keepThingsOnDeath), so a death costs nothing.
+-- (keepThingsOnDeath), so a death costs nothing. The book is the mod's (bookIsTheMod): what the
+-- passive tree grants is all a character can cast or use, and a spell is cast at its tree level.
 
 local areas = require("areas")
 local boss = require("boss")
@@ -54,9 +55,12 @@ local mode = {}
 
 -- ---- The game
 
--- Before the game: the first area's map, generated now; a dead player keeps its things.
+-- Before the game: the first area's map, generated now; a dead player keeps its things; the book
+-- is the mod's (bookIsTheMod: a player starts with no spell, ability or field guide creature, may
+-- use only what the tree grants, at the level granted, and the engine's own books and pedestals
+-- give nothing).
 function mode.configure(ctx: any)
-	return { generate = areas.configure(ctx), keepThingsOnDeath = true }
+	return { generate = areas.configure(ctx), keepThingsOnDeath = true, bookIsTheMod = true }
 end
 
 function mode.start()

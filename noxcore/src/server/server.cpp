@@ -191,6 +191,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     world_.multiclass = options_.multiclass;
     world_.monstersAlert = options_.monstersAlert;
     world_.keepThingsOnDeath = options_.keepThingsOnDeath;
+    world_.modeOwnsBook = options_.modeOwnsBook;
     world_.sandboxPlayersCantDie = options_.playersCantDie;
     world_.sandboxNoScoring = options_.noScoring;
     world_.modeOwnsLimits = options_.modeOwnsLimits;

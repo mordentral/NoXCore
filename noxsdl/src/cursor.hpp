@@ -8,17 +8,20 @@
 //              centre in 32 steps, the running arrows (+32) beyond 100 units or while running.
 //   labels     some carry a word in yellow (guicursor.c's PICKUP, SHOPKEEPER, ...).
 //   hover      the drawable under the mouse: its footprint (EXTENT circle, or a box turned 45
-//              degrees) stood up from ZSIZE's bottom to its top, as a capsule or prism; the one
-//              furthest forward (y + z + ZSIZE bottom) wins. Only items, monsters, players and
-//              immobile things count, not us, observers, the dead or the unseen invisible.
+//              degrees) stood up from ZSIZE's bottom to its top, as a capsule or prism, in whole
+//              world units; the one furthest forward (y + z + ZSIZE bottom) wins (cursor_pick.hpp).
+//              Only items, monsters, players and immobile things count, not us, observers, the
+//              dead or the unseen invisible. The cursor's own pick takes a Glyph only for a wizard.
 //   in game    the arrow; over an item within 75 of us the pickup hand (a click picks it up,
-//              MSG_TRY_GET, instead of attacking), further away the far one; over a
-//              shopkeeper within 125 the trade cursor; over a useable map object (levers,
-//              switches, buttons, chain pulls: IMMOBILE, SUBCLASS USEABLE, enabled) within 75 the
-//              Use hand, Action then working it with MSG_TRY_COLLIDE (CliNet_SendTryCollide). Over
-//              windows, and in the menus, the pointer.
+//              MSG_TRY_GET, instead of attacking), further away the far one; over a creature with
+//              something to say within 125 the Talk hand, a shopkeeper the trade cursor; over a
+//              useable map object (levers, switches, buttons, chain pulls: IMMOBILE, SUBCLASS
+//              USEABLE, enabled) or a Mimic still a chest within 75 the Use hand, Action then
+//              working it with MSG_TRY_COLLIDE (CliNet_SendTryCollide). Over windows, and in the
+//              menus, the pointer.
 #pragma once
 
+#include "cursor_pick.hpp"
 #include "sprite_cache.hpp"
 #include "text.hpp"
 #include "thing_art.hpp"
@@ -56,15 +59,16 @@ enum class CursorType : int {
     Caution = 16,
 };
 
+/// A thing type's hover shape: its EXTENT and ZSIZE.
+pick::Shape pickShape(const TypeArt& art);
+
 /// Whether a drawable at ground (x, y), height z, with this art, is under the world point
-/// (cx, cy) (clientOnCursorHover's shape test).
+/// (cx, cy) (clientOnCursorHover's shape test, pick::under): its spot to the nearest whole unit,
+/// the point down to the unit it's in.
 bool underCursor(const TypeArt& art, float x, float y, float z, float cx, float cy);
 
-/// The hover rule's ordering key: bigger is further forward.
-inline float hoverDepth(const TypeArt& art, float y, float z)
-{
-    return y + z + art.zSizeMin;
-}
+/// The hover rule's ordering key (pick::depth): bigger is further forward.
+float hoverDepth(const TypeArt& art, float y, float z);
 
 class Cursor {
 public:

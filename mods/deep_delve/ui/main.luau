@@ -390,7 +390,7 @@ local REGION_COLOUR: { [number]: { number } } = {
 	[3] = { 95, 205, 115 },
 }
 local CLASS_REGION: { [string]: number } = { warrior = 1, wizard = 2, conjurer = 3 }
-local SIZE: { [string]: number } = { r = 14, s = 8, n = 12, k = 16, p = 12, a = 12 }
+local SIZE: { [string]: number } = { r = 14, s = 8, n = 12, k = 16, p = 12, a = 12, c = 12 }
 
 local nodeIndex: any = nil -- id -> node, made when a new tree comes
 local nodeNear: { [number]: { number } } = {} -- id -> its neighbours, both ways
@@ -518,6 +518,9 @@ local function drawTree()
 				nox.outline(bx, by, s, s, edge)
 				if n.k == "p" or n.k == "a" then
 					nox.outline(bx + 3, by + 3, s - 6, s - 6, if have then { 120, 60, 20 } else rc)
+				elseif n.k == "c" then
+					-- (a summon: a solid heart where a spell has a ring)
+					clipBox(bx + 4, by + 4, s - 8, s - 8, if have then { 120, 60, 20 } else rc)
 				elseif n.k == "k" then
 					nox.outline(bx - 2, by - 2, s + 4, s + 4, if have then "gold" else { 160, 60, 50 })
 				end
@@ -542,7 +545,7 @@ local function drawTree()
 		nox.text(status, 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
 		drawWords(hot.d, 4, CANVAS_H + 16, TW - 8, 2, "bright")
 	else
-		nox.text("A node next to one you have can be taken with a point. Spells come from their branch's nodes.", 4, CANVAS_H + 4, "dim")
+		nox.text("A node next to one you have takes a point. Spells and summons come from their branch's nodes.", 4, CANVAS_H + 4, "dim")
 	end
 	nox.text(string.format("Points left: %d of %d", state.points or 0, state.total or 0), 4, CANVAS_H + 42, "gold")
 	local cost = state.cost or 0

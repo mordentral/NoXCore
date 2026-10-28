@@ -576,6 +576,16 @@ struct App {
     std::vector<MinionDot> minionDots;
     std::vector<std::uint16_t> flagLabels;
     std::vector<std::uint16_t> damageShown;
+    /// Live: a script mode UI's world labels (UI API 3): the net codes it labels with each one's
+    /// index among its labels, sorted by net code, set each frame before the scene
+    /// (ModeUi::update); and those the scene's sort drew this frame (liveSprites' overlay), each
+    /// with the label's index, the drawable's place and its top in world units.
+    std::vector<std::pair<std::uint16_t, std::uint16_t>> modeLabels;
+    struct ModeLabelSpot {
+        std::uint16_t index = 0;
+        float x = 0, y = 0, top = 0;
+    };
+    std::vector<ModeLabelSpot> modeLabelSpots;
     std::unique_ptr<Font> font;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game
@@ -587,11 +597,16 @@ struct App {
 
     std::unique_ptr<Cursor> cursor;            ///< the game's cursor (the system one is hidden)
     CursorType cursorType = CursorType::Select; ///< live: this frame's
-    std::optional<std::uint16_t> hovered;      ///< live: the drawable under the mouse
+    /// Live: the drawable under the mouse furthest forward (the front pick: its ring, the arrow's
+    /// colour, the aim and the spells' target).
+    std::optional<std::uint16_t> hovered;
     /// Live: a useable map object under the mouse (a lever, switch, button), when no drawable is
     /// in front of it.
     std::optional<MapView::Useable> hoveredUseable;
-    float hoveredDepth = 0;
+    /// Live: the cursor's pick, the same but for Glyphs (only a wizard's, and only alone): what
+    /// talking, trading, picking up and using go by. A drawable, or a useable map object.
+    std::optional<std::uint16_t> cursorHovered;
+    std::optional<MapView::Useable> cursorUseable;
     std::optional<SDL_FPoint> testMouse;       ///< --mouse X Y: the mouse there (tests; window pixels)
     bool pickupTest = false;                   ///< --pickup-test: walk to the nearest item, pick it up
     std::uint32_t castTest = 0;                ///< --cast-test N: cast spell N once, 2.5 s in
@@ -720,6 +735,7 @@ HostListing menusHostListing(const App& app, bool listed);
 void setLocalBots(App& app, const std::array<int, 3>& wanted, int minTier, int maxTier);
 ServerOptions::BotsView localBotsView(App& app);
 std::unique_ptr<LocalHost> makeHost(App& app, const HostSettings& settings);
+void notePortMoved(App& app);
 void hostSettingsFromConfig(const App& app, HostSettings& s);
 void startPortMapping(App& app, bool network);
 void tickPortMapping(App& app);

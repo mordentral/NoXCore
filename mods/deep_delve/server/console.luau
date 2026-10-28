@@ -23,7 +23,9 @@
 --   dd boss              the boss of this map: id, type, health, name
 --   dd smite             the boss killed by the first player
 --   dd check             every name in the data tables checked against thing.bin, every spell
---                        against the game's spells (its number, its class, no linked group)
+--                        against the game's spells (its number, its class, no linked group),
+--                        every creature the tree gives (its name the field guide's, its summon
+--                        spell the one that calls it; no player needed)
 --   dd gold [N]          the first player's gold (set to N)
 --   dd carried           what it carries: "n id type rarity worn" (n: the stash's and vendor's N)
 --   dd stash [open | put N | take TAB SLOT | deposit | withdraw]   its stash (as its window
@@ -32,8 +34,8 @@
 --                        alone, its stock "index type rarity price"
 --   dd tree [take ID... | respec | nodes [REGION]]   its passive tree; alone, its points and
 --                        the nodes taken
---   dd book              the spells and abilities its tree gives, and whether its unit's book
---                        is exactly that ("server ok")
+--   dd book              the spells, abilities and creatures its tree gives, and whether its
+--                        unit's book and field guide are exactly that ("server ok")
 --   dd sheet             its character sheet, "key value" lines
 --   dd ui WINDOW         a window opened on its UI (stash, vendor: it's moved by the station)
 
@@ -363,47 +365,98 @@ function commands.check(_args: { string }): { string }
 	for _, p in vendorData.potions do
 		thing(p.type, "vendor")
 	end
-	-- The tree's spells: each name the game's, its number that name's (the same spell record and
-	-- sounds by either), a spell of its region's class, in no linked group.
+	-- The tree's spells: each name the game's (nox.spellId; its record and sounds the same by name
+	-- and by that number), a spell of its region's class, in no linked group.
 	local regionOf: { [string]: string } = {}
+	local creatureOf: { [string]: string } = {}
 	for _, n in treeData.nodes do
 		if n.kind == "spell" then
 			regionOf[n.spell] = n.region
 		elseif n.kind == "ability" and not tree.ability(n.ability) then
 			table.insert(bad, "tree: no ability " .. tostring(n.ability))
+		elseif n.kind == "summon" then
+			creatureOf[n.creature] = n.region
 		end
 	end
-	for name, id in (treeData.spells :: any) do
+	-- A spell by name: its number, and whether its record and sounds are that number's.
+	local function spellOf(name: string): (number?, any)
+		local id = nox.spellId(name)
 		local byName = nox.spellInfo(name)
-		local byId = nox.spellInfo(id)
-		if not byName then
+		if not id or not byName then
 			table.insert(bad, "tree: no spell " .. name)
-		elseif not byId or byId.flags ~= byName.flags or nox.spellSound(name, 0) ~= nox.spellSound(id, 0) or nox.spellSound(name, 1) ~= nox.spellSound(id, 1) then
+			return nil, nil
+		end
+		local byId = nox.spellInfo(id)
+		if not byId or byId.flags ~= byName.flags or nox.spellSound(name, 0) ~= nox.spellSound(id, 0) or nox.spellSound(name, 1) ~= nox.spellSound(id, 1) then
 			table.insert(bad, "tree: " .. name .. " isn't spell " .. tostring(id))
-		else
-			local class = regionOf[name]
-			local bits = class and (treeData.classFlags :: any)[class]
-			if not class then
-				table.insert(bad, "tree: " .. name .. " is on no node")
-			elseif not bits or bit32.band(byName.flags, bits + treeData.anyCaster) == 0 then
-				table.insert(bad, "tree: " .. name .. " isn't a " .. class .. "'s spell")
-			end
-			if bit32.band(byName.flags, treeData.groupFlags) ~= 0 then
+			return nil, nil
+		end
+		if tree.spellId(name) ~= id then
+			table.insert(bad, "tree: " .. name .. " isn't in the tree's numbers")
+		end
+		return id, byName
+	end
+	local function ofClass(name: string, flags: number, class: string?)
+		local bits = class and (treeData.classFlags :: any)[class]
+		if not class then
+			table.insert(bad, "tree: " .. name .. " is on no node")
+		elseif not bits or bit32.band(flags, bits + treeData.anyCaster) == 0 then
+			table.insert(bad, "tree: " .. name .. " isn't a " .. class .. "'s spell")
+		end
+	end
+	for name in (treeData.spellTitles :: any) do
+		local id, info = spellOf(name)
+		if id and info then
+			ofClass(name, info.flags, regionOf[name])
+			if bit32.band(info.flags, treeData.groupFlags) ~= 0 then
 				table.insert(bad, "tree: " .. name .. " is in a linked group")
 			end
 		end
-		if not (treeData.spellTitles :: any)[name] then
-			table.insert(bad, "tree: " .. name .. " has no title")
-		end
 	end
 	for name in regionOf do
-		if not (treeData.spells :: any)[name] then
-			table.insert(bad, "tree: " .. name .. " has no number")
+		if not (treeData.spellTitles :: any)[name] then
+			table.insert(bad, "tree: " .. name .. " has no title")
 		end
 	end
 	for _, a in treeData.abilities do
 		if not nox.abilitySound(a.id, 0) then
 			table.insert(bad, "tree: ability " .. a.id .. " has no sound (no such ability?)")
+		end
+	end
+	-- The tree's creatures, with no player needed: each a thing, its name the field guide's
+	-- (nox.guideNumber, 1-40), its summon spell the game's and a conjurer's, one of the linked
+	-- summons (its grant moves no other spell), and the one that calls that guide entry (the
+	-- guide's creature n by the summon n - 1 after the first).
+	local first = spellOf(treeData.firstSummon)
+	for name, region in creatureOf do
+		local c = (treeData.creatures :: any)[name]
+		thing(name, "tree's creatures")
+		if not c then
+			table.insert(bad, "tree: creature " .. name .. " has no summon spell")
+			continue
+		end
+		local n = nox.guideNumber(name)
+		if not n or n < 1 or n > treeData.guideSize then
+			table.insert(bad, "tree: creature " .. name .. " isn't in the field guide")
+		elseif tree.guideNumber(name) ~= n then
+			table.insert(bad, "tree: creature " .. name .. " isn't in the tree's guide numbers")
+		end
+		local id, info = spellOf(c.spell)
+		if id and info then
+			ofClass(c.spell, info.flags, region)
+			if bit32.band(info.flags, 0x2000) == 0 or bit32.band(info.flags, 0x1000 + 0x4000 + 0x10000) ~= 0 then
+				table.insert(bad, "tree: " .. c.spell .. " isn't a summon")
+			end
+			local want: number = tonumber(n) or 0
+			local start: number = tonumber(first) or 0
+			if n and first and id ~= start + want - 1 then
+				table.insert(bad, string.format("tree: %s calls guide %d, not the %s's %d", tostring(c.spell), id - start + 1, tostring(name), want))
+			end
+		end
+	end
+	for name in (treeData.creatures :: any) do
+		if not creatureOf[name] then
+			table.insert(bad, "tree: creature " .. name .. " is on no node")
 		end
 	end
 	if #bad == 0 then
@@ -525,7 +578,7 @@ function commands.tree(args: { string }): { string }
 					table.insert(links, tostring(other))
 				end
 				table.insert(out, string.format("%d %d %d %s %s %s %s %s %s", id, n.x, n.y, n.kind, n.region, tostring(n.branch or "-"),
-					tostring(n.spell or n.ability or "-"), tostring(n.level or "-"), table.concat(links, ",")))
+					tostring(n.spell or n.ability or n.creature or "-"), tostring(n.level or "-"), table.concat(links, ",")))
 			end
 		end
 		return out
@@ -550,13 +603,26 @@ function commands.book(_args: { string }): { string }
 	end
 	local want = tree.wanted(h.record)
 	local out = {}
-	local names = {}
+	local names: { string } = {}
 	for name in want.spells do
 		table.insert(names, name)
 	end
 	table.sort(names)
 	for _, name in names do
-		table.insert(out, string.format("spell %s %d %d", name, (treeData.spells :: any)[name] or 0, want.spells[name]))
+		local id: number = tree.spellId(name) or 0
+		local level: number = want.spells[name]
+		table.insert(out, string.format("spell %s %d %d", name, id, level))
+	end
+	-- (a creature: its guide number and its summon spell's)
+	local creatures: { string } = {}
+	for name in want.creatures do
+		table.insert(creatures, name)
+	end
+	table.sort(creatures)
+	for _, name in creatures do
+		local n: number = tree.guideNumber(name) or 0
+		local spell: number = tree.summonSpell(name) or 0
+		table.insert(out, string.format("creature %s %d %d", name, n, spell))
 	end
 	for a = 1, 5 do
 		if want.abilities[a] then

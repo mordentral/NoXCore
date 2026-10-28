@@ -4,7 +4,7 @@
 //     (INFORM 2: 5); War Cry not while charging, Berserker Charge and Harpoon not while War
 //     Cry's shout is under way (nor Harpoon while charging), and none twice at once (2); not
 //     jumping or (out of the campaign) in the air (6); known (a network game but a quest knows
-//     them all; 3); Berserker Charge not carrying too much (7); not cooling down (2). Then its
+//     them all, unless the book is the mode's (World::modeBook); 3); Berserker Charge not carrying too much (7); not cooling down (2). Then its
 //     cool-down (its *Delay frames; MSG_REPORT_ABILITY_STATE 0xCE: not ready), its record for
 //     its *Duration frames (if any), its work, its sound. Refused: MSG_INFORM 2 and the "can't"
 //     sound.
@@ -51,6 +51,12 @@ void cancelAbilities(World& world, ServerObject& unit);
 /// records of it dropped (told off). A kill by Berserker Charge (the victim's last blow of damage
 /// type 2 noted as such: a monster's out of a solo game, a player's in a network game).
 void resetAbility(World& world, ServerObject& unit, int ability);
+/// Whether `p` may use `ability` (Abil_TryExecute's "known"): in a network game that isn't a
+/// quest every one; otherwise, or when the book is the mode's (World::modeBook), only one whose
+/// granted level (PlayerControl::abilityLevel) isn't 0. Asked on a use only. An id outside 1-5
+/// (PlayerControl::abilityLevels' size) is never known: abilities past the stock five need a
+/// table of their own for every player (a warrior's five share the spell book's slots 1-5).
+bool abilityKnown(const World& world, const PlayerControl& p, int ability);
 /// A harpoon let go: the bolt gone, the ability ended. `broken`: it snapped
 /// (harpoonBreakForPlr), with 0x3E6.
 void releaseHarpoon(World& world, ServerObject& warrior, bool broken);

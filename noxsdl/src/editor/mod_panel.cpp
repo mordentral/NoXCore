@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <set>
@@ -1128,9 +1129,11 @@ void ModPanel::formWindow()
     inputText("##server", form_.serverScript, 128);
     editor::labelRow("UI script", fieldX, "The UI sent to NoX Core players (empty: none; everyone gets the views as text).");
     inputText("##ui", form_.uiScript, 128);
-    editor::labelRow("UI API", fieldX, "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more (sent only to clients that run it; the rest get text).");
-    int api = std::clamp(form_.uiApi, 1, 2) - 1;
-    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0")) form_.uiApi = api + 1;
+    editor::labelRow("UI API", fieldX,
+                     "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more. 3: lines, tooltips, labels over things, HUD strips, "
+                     "drags and the wheel (each sent only to clients that run it; the rest get text).");
+    int api = std::clamp(form_.uiApi, 1, 3) - 1;
+    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0")) form_.uiApi = api + 1;
 
     ImGui::SeparatorText("Options");
     help("Settings shown under the mode's row in Host Custom; a script reads them with nox.option(key).");
@@ -1509,15 +1512,44 @@ void ModPanel::previewWindow()
     ImFont* font = ImGui::GetFont();
     constexpr float kTitleH = 13;
     const float textPx = 10 * scale;
+    // (UI API 3) The labels, at stand-in spots along the screen's lower part (there's no world):
+    // a dot for the object, its label over it; "alt" ones while Alt is held.
+    {
+        const auto& labels = preview_.labels();
+        for (std::size_t i = 0; i < labels.size(); ++i) {
+            const auto& l = labels[i];
+            if (l.show == nox::modes::script::UiLabel::Show::Alt && !ImGui::GetIO().KeyAlt) {
+                continue;
+            }
+            const float sx = 60 + static_cast<float>(i % 6) * 100;
+            const float sy = 330 + static_cast<float>(i / 6 % 6) * 24;
+            dl->AddCircleFilled(pt(sx, sy), 2 * scale, IM_COL32(200, 200, 200, 255));
+            const ImVec2 size = font->CalcTextSizeA(textPx, FLT_MAX, 0, l.text.c_str());
+            const ImVec2 t0(pt(sx, sy).x - size.x / 2 - 3, pt(sx, sy - l.offset).y - size.y - 2);
+            dl->AddRectFilled(t0, ImVec2(t0.x + size.x + 6, t0.y + size.y + 2), IM_COL32(0, 0, 0, 160));
+            dl->AddText(font, textPx, ImVec2(t0.x + 3, t0.y + 1), IM_COL32(l.color.r, l.color.g, l.color.b, l.color.a), l.text.c_str());
+        }
+    }
+    // The HUD pieces (UI API 3) under the other windows.
+    std::vector<const nox::modes::script::UiWindow*> order;
     for (const auto& w : preview_.windows()) {
-        const ImVec2 o0 = pt(static_cast<float>(w.x) - 2, static_cast<float>(w.y) - kTitleH - 2);
-        const ImVec2 o1 = pt(static_cast<float>(w.x + w.w) + 2, static_cast<float>(w.y + w.h) + 2);
-        dl->AddRectFilled(o0, o1, IM_COL32(10, 8, 6, 225));
-        dl->AddRect(o0, o1, IM_COL32(160, 120, 40, 255));
-        const std::string label = preview_.modeName() + ": " + w.title;
-        dl->PushClipRect(o0, ImVec2(o1.x - 2 * scale, o1.y), true);
-        dl->AddText(font, textPx, ImVec2(o0.x + 4 * scale, o0.y + 2 * scale), IM_COL32(240, 180, 42, 255), label.c_str());
-        dl->PopClipRect();
+        if (w.hud) order.push_back(&w);
+    }
+    for (const auto& w : preview_.windows()) {
+        if (!w.hud) order.push_back(&w);
+    }
+    for (const auto* wp : order) {
+        const auto& w = *wp;
+        if (w.frame) {
+            const ImVec2 o0 = pt(static_cast<float>(w.x) - 2, static_cast<float>(w.y) - kTitleH - 2);
+            const ImVec2 o1 = pt(static_cast<float>(w.x + w.w) + 2, static_cast<float>(w.y + w.h) + 2);
+            dl->AddRectFilled(o0, o1, IM_COL32(10, 8, 6, 225));
+            dl->AddRect(o0, o1, IM_COL32(160, 120, 40, 255));
+            const std::string label = preview_.modeName() + ": " + w.title;
+            dl->PushClipRect(o0, ImVec2(o1.x - 2 * scale, o1.y), true);
+            dl->AddText(font, textPx, ImVec2(o0.x + 4 * scale, o0.y + 2 * scale), IM_COL32(240, 180, 42, 255), label.c_str());
+            dl->PopClipRect();
+        }
         dl->PushClipRect(pt(static_cast<float>(w.x), static_cast<float>(w.y)), pt(static_cast<float>(w.x + w.w), static_cast<float>(w.y + w.h)), true);
         for (const auto& d : w.draws) {
             const ImU32 c = IM_COL32(d.color.r, d.color.g, d.color.b, d.color.a);
@@ -1526,6 +1558,9 @@ void ModPanel::previewWindow()
             case nox::modes::script::UiDraw::Kind::Box: dl->AddRectFilled(a, ImVec2(a.x + d.w * scale, a.y + d.h * scale), c); break;
             case nox::modes::script::UiDraw::Kind::Outline: dl->AddRect(a, ImVec2(a.x + d.w * scale, a.y + d.h * scale), c); break;
             case nox::modes::script::UiDraw::Kind::Text: dl->AddText(font, textPx, a, c, d.text.c_str()); break;
+            case nox::modes::script::UiDraw::Kind::Line:
+                dl->AddLine(a, pt(static_cast<float>(w.x) + d.w, static_cast<float>(w.y) + d.h), c, std::max(1.0f, d.width * scale));
+                break;
             case nox::modes::script::UiDraw::Kind::Image: {
                 // A mod picture, as a texture made once per set.
                 const auto* set = texturesOf_.get();
@@ -1555,19 +1590,91 @@ void ModPanel::previewWindow()
         }
         dl->PopClipRect();
     }
-    if (clicked == 1 || (clicked == 2 && preview_.api() >= 2)) {
-        // A click in a window goes to the UI, in its own units (topmost first); a right one to an
-        // API 2 UI alone, as in the game.
-        const auto windows = preview_.windows();
-        for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
-            if (ux >= it->x && ux < it->x + it->w && uy >= it->y && uy < it->y + it->h) {
-                preview_.click(it->id, ux - static_cast<float>(it->x), uy - static_cast<float>(it->y), clicked);
-                break;
-            }
+    // (UI API 3) This frame's tooltip at the mouse, whole on the screen.
+    if (const auto& tip = preview_.tooltip(); hovered && !tip.empty()) {
+        float widest = 0;
+        for (const auto& l : tip) {
+            widest = std::max(widest, font->CalcTextSizeA(textPx, FLT_MAX, 0, l.text.c_str()).x / scale);
         }
+        const float lineH = 11;
+        const float w = widest + 8, h = lineH * static_cast<float>(tip.size()) + 6;
+        const auto [tx, ty] = nox::modes::script::placeTooltip(ux, uy, w, h);
+        dl->AddRectFilled(pt(tx, ty), pt(tx + w, ty + h), IM_COL32(10, 8, 6, 235));
+        dl->AddRect(pt(tx, ty), pt(tx + w, ty + h), IM_COL32(160, 120, 40, 255));
+        for (std::size_t i = 0; i < tip.size(); ++i) {
+            const auto& c = tip[i].color;
+            dl->AddText(font, textPx, pt(tx + 4, ty + 3 + lineH * static_cast<float>(i)), IM_COL32(c.r, c.g, c.b, c.a), tip[i].text.c_str());
+        }
+    }
+    if (clicked == 1 || (clicked == 2 && preview_.api() >= 2)) {
+        // A click in a window goes to the UI, in its own units (topmost first, never a
+        // click-through one); a right one to an API 2 UI alone, as in the game.
+        if (const auto* w = preview_.windowAt(ux, uy)) {
+            const std::string id = w->id;
+            const float wx = static_cast<float>(w->x), wy = static_cast<float>(w->y);
+            if (preview_.api() >= 3) {
+                previewPress_ = PreviewPress{id, clicked, ux, uy, ux, uy, wx, wy};
+            }
+            preview_.click(id, ux - wx, uy - wy, clicked);
+        }
+    }
+    if (preview_.api() >= 3) {
+        previewMouse(hovered, clicked, ux, uy);
     }
     ImGui::EndChild();
     ImGui::End();
+}
+
+void ModPanel::previewMouse(bool hovered, int clicked, float ux, float uy)
+{
+    using nox::modes::script::UiDrag;
+    ImGuiIO& io = ImGui::GetIO();
+    // The wheel over a window, in whole steps (a fine wheel's parts add up, as in the game).
+    if (hovered && io.MouseWheel != 0) {
+        if (const auto* w = preview_.windowAt(ux, uy)) {
+            previewWheel_ += io.MouseWheel;
+            const int steps = static_cast<int>(std::trunc(previewWheel_));
+            previewWheel_ -= static_cast<float>(steps);
+            if (steps != 0) {
+                const std::string id = w->id;
+                preview_.wheel(id, ux - static_cast<float>(w->x), uy - static_cast<float>(w->y), steps);
+            }
+        } else {
+            previewWheel_ = 0;
+        }
+    }
+    if (!previewPress_ || clicked != 0) {
+        return;
+    }
+    PreviewPress& p = *previewPress_;
+    const ImGuiMouseButton button = p.button == 2 ? ImGuiMouseButton_Right : ImGuiMouseButton_Left;
+    if (ImGui::IsMouseReleased(button)) {
+        const PreviewPress done = p;
+        previewPress_.reset();
+        if (done.dragging) {
+            preview_.drag(done.window, UiDrag::End, ux - done.wx, uy - done.wy, done.button);
+        }
+        if (const auto* w = preview_.windowAt(ux, uy)) {
+            const std::string id = w->id;
+            preview_.mouseUp(id, ux - static_cast<float>(w->x), uy - static_cast<float>(w->y), done.button);
+        }
+        return;
+    }
+    if (ux == p.toldX && uy == p.toldY) {
+        return;
+    }
+    if (!p.dragging) {
+        if (std::hypot(ux - p.fromX, uy - p.fromY) < 3) {
+            return;
+        }
+        p.dragging = true;
+        preview_.drag(p.window, UiDrag::Start, p.fromX - p.wx, p.fromY - p.wy, p.button);
+    }
+    if (previewPress_) {
+        previewPress_->toldX = ux;
+        previewPress_->toldY = uy;
+        preview_.drag(previewPress_->window, UiDrag::Move, ux - previewPress_->wx, uy - previewPress_->wy, previewPress_->button);
+    }
 }
 
 void ModPanel::previewKeys(float ux, float uy)

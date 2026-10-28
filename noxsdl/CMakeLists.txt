@@ -47,6 +47,7 @@ add_executable(noxsdl WIN32
     src/console.cpp
     src/console_commands.cpp
     src/cursor.cpp
+    src/cursor_pick.cpp
     src/editor/builtin_list.cpp
     src/editor/chat_log.cpp
     src/editor/chat_panel.cpp

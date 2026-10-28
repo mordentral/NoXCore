@@ -155,6 +155,9 @@ public:
     /// Whether the map is up (the special column's map square lights, guiDrawInventoryTray).
     void setMapShown(bool shown) { mapShown_ = shown; }
     bool identifying() const { return identify_; }
+    /// Whether a thing is on the cursor, dragged from a cell or the doll (the world's items then
+    /// get no pickup hand).
+    bool dragging() const { return drag_.has_value(); }
     /// Whether output pixel (x, y) is on the secondary weapon's box (the doll page's, open):
     /// the right button there swaps weapons (its handler's case 7).
     bool onSecondaryBox(float x, float y, int w, int h) const;

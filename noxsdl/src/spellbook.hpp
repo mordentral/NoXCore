@@ -63,6 +63,9 @@ struct BookContext {
     /// noxcpp's multiclass, a mode's: every class's spells and the abilities in one book, an
     /// ability's entry tagged (nox::client::kAbilityTag); the guide whatever the class.
     bool multiclass = false;
+    /// noxcpp: the server's mode owns the book (HeadlessClient::modeOwnsBook; allKnown is off
+    /// then): the guide's creatures, all granted, are summoned from it without Summon Creature.
+    bool modeOwnsBook = false;
 };
 
 class Spellbook {

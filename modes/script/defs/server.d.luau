@@ -207,10 +207,16 @@ declare nox: {
     grantSpell: (unit: number, spell: string | number, level: number, notify: boolean?, show: boolean?) -> boolean,
     --- A player's level of an ability 1-5.
     abilityLevel: (unit: number, ability: number) -> number,
-    --- Sets a player's level (0-5) of an ability 1-5; with report, its client told.
-    setAbility: (unit: number, ability: number, level: number, report: boolean?) -> (),
+    --- Sets a player's level (0-5) of an ability 1-5; with report, its client told, and with show it flies to its bar.
+    setAbility: (unit: number, ability: number, level: number, report: boolean?, show: boolean?) -> (),
     --- A player's field guide: for each creature 1-40, whether it has it.
     fieldGuide: (unit: number) -> { boolean },
+    --- Puts a creature (its guide number 1-40 or its type's name) in a player's field guide as a found guide does; with notify, the player and the others told. Whether it was put in (false: already known, or no such creature).
+    grantCreature: (unit: number, creature: string | number, notify: boolean?) -> boolean,
+    --- A spell's number (1-136 in a player's book) from its name (SPELL_...); nil when there's no such spell.
+    spellId: (name: string) -> number?,
+    --- A creature's number in the field guide (1-40) from its type's name (as grantCreature reads it); nil when it has none.
+    guideNumber: (name: string) -> number?,
     --- Clears a player's spells, abilities and field guide (no messages: nox.revoke tells its client).
     clearBook: (unit: number) -> (),
     --- Queues a spell (0x11), ability (0x12) or field guide creature (0x13) taken off a player's client.
@@ -366,7 +372,7 @@ declare function require(name: string): any
 
 -- The hooks the script's table may have (the server calls each one it has), for the Mod
 -- Reference: "--- @hook <call> | <doc>".
---- @hook configure(ctx) | Before the game (ctx.options, seed, slot, maxPlayers): may return { map, maxPlayers }.
+--- @hook configure(ctx) | Before the game (ctx.options, seed, slot, maxPlayers): may return { map, maxPlayers }, a map to generate (generate) and host options: quest, questScreens, questMaps, forceClass, multiclass, monstersAlert, keepThingsOnDeath, serverName, and bookIsTheMod (true: outside a quest a player starts with no spells, abilities or field guide creatures and may use only those the mode grants (nox.grantSpell, nox.raiseSpell, nox.setAbility, creatures with nox.grantCreature), at their levels, as in a quest; the books of NoX Core clients of level 2 list only those; reward books, guides and pedestals give nothing).
 --- @hook start() | The game is made.
 --- @hook onJoin(player) | A player came in ({ peer, name, unit, identified }).
 --- @hook playerReady(player) | A player's game has the map loaded and is in play: after its join, and again after each map change.

@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace nox::net {
 
@@ -27,7 +28,18 @@ class UdpSocket {
 public:
     /// Binds to `port` on all interfaces (0 = any free port), or on the loopback alone (a local
     /// test's host: nothing outside this computer reaches it). Throws std::system_error.
+    /// A given port is bound for this socket alone: on Windows a socket on 127.0.0.1 and one on
+    /// all interfaces could otherwise share a port, the more specific one taking what's sent to
+    /// it (a game hosted on 18590 while another program held 127.0.0.1:18590 never heard its
+    /// own client, who joined the other program instead). Taken: addressInUse.
     static UdpSocket open(std::uint16_t port = 0, bool loopbackOnly = false);
+    /// Whether open's error says its port is another socket's (taken, or held exclusively).
+    static bool addressInUse(const std::error_code& error) noexcept;
+    /// A hosted game's socket: `port` (0: any free one), or, when another program has it here (a
+    /// game, a server, a test), the next one up that's free, as the exe's server's listening
+    /// socket does (a bind failing for the address in use tried again a port higher). Throws
+    /// std::system_error for any other failure (or no port left).
+    static UdpSocket openHosting(std::uint16_t port, bool loopbackOnly);
 
     UdpSocket(UdpSocket&& other) noexcept;
     UdpSocket& operator=(UdpSocket&& other) noexcept;

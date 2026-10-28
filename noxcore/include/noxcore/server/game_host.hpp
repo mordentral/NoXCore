@@ -363,6 +363,11 @@ public:
         /// noxcpp: a mode's dead players keep their things outside a quest, as a quest's do
         /// (World::keepThingsOnDeath).
         bool keepThingsOnDeath = false;
+        /// noxcpp: outside a quest a network game's book is the mode's: a player starts with no
+        /// spells, abilities or field guide creatures and has only what the mode grants, checked as
+        /// a quest checks them (World::modeOwnsBook). A script mode tells its NoX Core clients
+        /// (MSG_NOXCPP_MODEUI kBook), whose books then list only what was granted.
+        bool modeOwnsBook = false;
         /// noxcpp: the map editor's play-test sandbox, players can't die (World::sandboxPlayersCantDie).
         bool playersCantDie = false;
         /// noxcpp: a map editor session's sandbox, nothing scores (World::sandboxNoScoring).
