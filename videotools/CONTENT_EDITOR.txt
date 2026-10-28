@@ -1,0 +1,185 @@
+NoX Content Editor (noxcontent.exe)
+===================================
+
+Opens the files Nox reads and shows what is in them: the object types (thing.bin), weapons,
+armour and enchantments (modifier.bin), the tuning numbers (gamedata.bin), the monsters
+(monster.bin), their sound sets (soundset.bin), every text the game shows (nox.csf), the
+pictures (video.bag and the HD image pack, video_hd.nxp), the sounds (Audio.bag) and the
+spoken dialog, the menus' window files, the maps, characters and mods. It was the NoX Image
+Editor (noxvideo.exe) before: everything that did is still here, in the Images and Sprites
+panels.
+
+Starting it
+-----------
+Put noxcontent.exe beside noxcore.exe and run it. It finds the game the way NoX Core does (its
+own folder, the current folder, then the installed game) and opens video_hd.nxp from beside it.
+Use Browse / Open at the top for another game folder, and Open... for another HD pack (New makes
+an empty one). Settings and the window layout are kept in %APPDATA%\noxcpp\noxcontent, never in
+the game folder (the image editor's settings are carried over the first time).
+
+The window
+----------
+- Content (left): every file as a list of records, grouped the way the file groups them (things
+  by class, strings by the window or file they belong to...). The box at the top searches all
+  of them at once.
+- Record (middle): the picked record's fields, as its file holds them. Text-format records also
+  have a Text tab with the record as written.
+- Preview (right): what it looks like (a thing plays its animation; pick another animation or
+  direction above it), its sounds (Play), or its text.
+- References (right): what the record names and what names it: a monster's thing and sound set,
+  a spell's strings and sounds. Click one to go there.
+- Changes, Problems, Log (bottom): every change against the game's own files, anything missing
+  or broken, and what the editor has done.
+Panels can be moved, docked together as tabs, or dragged out of the window (onto another
+monitor). View > Theme picks Dark, Medium or Light, as in the map editor; View > Reset layout
+puts the panels back.
+
+Changing the game's numbers: content packs
+------------------------------------------
+Monsters (monster.bin), their sound sets (soundset.bin), weapons, armour and enchantments
+(modifier.bin) and the tuning numbers (gamedata.bin) can be changed in the Record panel: type a
+value (Enter or click away to keep it), pick one from a list, or tick flags. A changed field is
+marked with *; Revert puts back the game's own value (hover a value to see it). Monsters and
+tuning numbers have two columns: a solo game's value and a network (arena) game's.
+
+Changes never go into the game's files. They go into a content pack: a folder in the mods folder
+beside noxcore.exe, mods\<name>\content\, holding small text files of only what changed
+(monster.patch, soundset.patch, modifier.patch, gamedata.patch, thing.patch, strings.patch, and
+.wav files in audio\ and dialog\). Pick a pack at the top (Pack), or make one (New pack...), and
+press Save pack (Ctrl+S). NoX Core finds the installed packs when it starts; changed
+monster.patch and soundset.patch files take effect with the next game you host, the others the
+next time NoX Core starts. To share a pack, copy its folder; to remove it, delete the folder.
+Packs are never downloaded: each player installs the ones they want by hand.
+
+Object types (thing.bin) are changed the same way: pick one under Things and change its lines
+(HEALTH, SPEED...), remove one, or add one with "Add a line...". Its pictures (MENUICON,
+PRETTYIMAGE) are video.bag image numbers. Types are never moved: a type's number is its place in
+thing.bin, which maps and the network use. Its animations (DRAW) are shown, not changed.
+References lists the maps that use it. The changes go into the pack's thing.patch.
+
+New object types: "New type like this..." on a type's page adds a new type to the pack, a copy
+of that one (its lines, its animations, its pictures) under a name of your own, which you then
+change like any other. A new type also chooses its own CLASS, XFER, FLAGS and COLLIDE, and
+whether it has a MENUICON. New types go after all of thing.bin's types, in the order the pack
+adds them, and are listed under Things in "New types (this pack)"; "Remove this new type" takes
+one out again. In thing.patch a new type is a record headed NEW <name> LIKE <type>.
+  Because games send each other types by number, a pack that adds types changes what every
+player's game must have: a game hosted with it lets in only NoX Core games with the same pack
+(the same new types, in the same order). Players with the original game, an older NoX Core, or
+without the pack can't join it, and the host's log says why. A NoX Core game with such a pack can
+still join any host whose packs add no types. A saved character carrying an item of a new type
+can only be loaded where that type exists.
+
+Every line is checked so the original game reads it the same way (in case the files are exported
+for it): keys are written as the game spells them (health becomes HEALTH), CLASS, SUBCLASS, FLAGS
+and MATERIAL are names the game knows joined with + and no spaces, SPEED, HEALTH and WEIGHT are
+whole numbers, and no value holds '='. A type's MENUICON can be changed but not added or taken
+away: saved games keep only the types that have one. CLASS, XFER, FLAGS and COLLIDE are shown
+but locked (see below). A key the game doesn't read is kept, with a warning in the Log. When a pack's file has a line NoX Core can't use, that whole file is left
+out (the Log says which lines), never half applied.
+
+Texts and sounds
+----------------
+Strings (nox.csf) holds every text the game shows, by label (QuitMenu.wnd:Quit). Pick one to
+change its text; a label with several texts (the game picks one at random) shows each, with Add
+text / Remove. A text much longer than the game's own may not fit where it's shown. Remove takes
+the label away (the game then shows its name). The changes go into the pack's strings.patch.
+Who sees them: texts the host sends as text (a map script's Print, PrintToAll and Chat, the
+server's own messages) come from the host's game, so a host with the pack shows them to everyone;
+everything else (menus, the HUD, names, lines sent by their label) comes from each player's own
+game, so only players who installed the pack see those. A text keeps its printf codes (%s, %d...)
+as the game's own has them, since the game fills them in; a new label has none.
+
+Sounds (Audio.bag) and Dialog (the spoken lines) play with Play. "Replace with a .wav..." puts
+your own .wav (PCM, IMA ADPCM or MP3 in a WAV) into the pack's audio or dialog folder under the
+sound's name; NoX Core plays it instead of the original (one it can't play is passed over for
+the original). A spoken line's References show the text label that speaks it, and a label's show
+its spoken line. (The original game also takes loose .wav files from its own audio folder, but
+plays only plain PCM ones properly; Export whole files writes sounds into Audio.bag the way the
+game keeps its own, at most about 94 seconds a sound.)
+
+Who sees a change ("Read by", and Reach at the top):
+- server: takes effect for everyone in a game hosted by someone who has the pack, players with
+  the original game included.
+- client: only players who installed the pack see it (colours, names); nobody else is affected.
+- both: the host's pack decides the game; players without it may see the old figure where their
+  game shows it (a cooldown, an identify page).
+- both! (red; Reach "structural"): what every player's game reads a type's objects by (its CLASS,
+  FLAGS, COLLIDE, XFER). These are locked on the game's own types: a pack can't change them,
+  since players without the same pack would see objects twice, not at all, or out of step. Only
+  a new type chooses its own, and a new type's every line is structural (see New object types).
+Problems lists values the game would misread (a name it doesn't know, a number out of range).
+File > Export whole files... writes the changed files whole, in the game's own format, into a
+folder you pick, for use outside NoX Core.
+
+Characters
+----------
+Characters lists the .plr files in the game's Save folder. Pick one to see it as the character
+creator draws it, and change its name or colours. Hair, skin, mustache, goatee and beard take any
+colour (type the numbers or use the picker; "Game's..." offers the creator's own 32); untick hair
+or facial hair to take it off (bald, clean shaven). The clothes are the 32 colours modifier.bin
+names UserColor1-32: a .plr stores only which of them, so those are all it can hold (a content
+pack can change what the 32 look like, for everyone who has it). Save as... writes a new .plr,
+never over the one you opened and never into the game's folder: put it in a copy of the game's
+Save folder to play it. Everything else in the file (inventory, spells, progress) stays as it was.
+
+The host's files: rules, the map cycle, the message of the day, windows
+----------------------------------------------------------------------
+Rule sets (.rul), mapcycle.txt, motd.txt and the menus' window files (.wnd) are edited as text.
+Under the text, "What the game reads" shows what NoX Core's own readers make of it as you type:
+for a rule set, what each game mode turns off (and a section header the game doesn't know, whose
+lines still count for the section before it); for the map cycle, the maps each mode will play and
+why any other line is dropped (no such map, not a map for that mode, more than 25); for the
+message of the day, how it's sent; for a window file, a window type the game doesn't make or a
+text label nox.csf lacks. Save as... writes a new file, never into the game's folder.
+
+Fonts and the palette
+---------------------
+Fonts shows the original game's bitmap fonts (default, small, large, number): every glyph, and
+any text you type drawn in the font. NoX Core draws its own text with a TrueType font; these are
+what the original game shows. Palette shows default.pal: its 256 colours (hover for the numbers),
+the shade map (each colour at 32 light levels) and the blend table (each pair's mix). The
+original game uses it only in its 8-bit mode.
+
+Mods
+----
+Mods lists the mods folder's mods. A mod's page shows its content pack, if it has one, and its
+game mode, if it has one (mode.json, edited as text and checked as NoX Core reads it: its id,
+players, scripts, and what's wrong if NoX Core wouldn't list it). Test launch starts noxcore.exe
+(from beside this program) hosting the map you pick, as the mod's game mode or as a deathmatch,
+with every installed pack and mod, on this computer only: no router port, not listed online.
+noxcore.exe reads the mods folder beside it, so the mod has to be there.
+
+Pictures: the Images and Sprites panels
+---------------------------------------
+Images lists every picture by number. Type part of a name, or a number (#123, or 100-200) to
+find one. The original and the HD picture are shown side by side with their size, draw offset
+and type. Sprites shows them by monster, item, floor and so on, playing their animations. Both
+show the original and the HD picture side by side, or one at a time (the video.bag / HD buttons;
+Tab switches between them). "Fill from video.bag" shows the original where there is no HD
+picture yet, as NoX Core does.
+
+Taking pictures out: select pictures (Ctrl-click, Shift-click, Select all) and press Extract
+video.bag, Extract HD or Extract both, then pick a folder. Each picture becomes a PNG with a
+.json file beside it (which picture it is and where it's drawn) and, for some, grey .mask.png /
+.edge.png files. Keep them together.
+
+Putting pictures in:
+- Replace video.bag image...: a PNG for the selected picture. It's converted to the game's own
+  format (16-bit colour); floor tiles must stay 46 x 46.
+- Add / Replace HD image...: a bigger PNG (2x or 4x the original is best) for the selected
+  picture; NoX Core draws it over the original's place and size.
+- Put in a folder of PNGs...: every extracted PNG in a folder goes back where it came from.
+- Remove HD takes pictures out of the pack; Revert undoes changes (also in the Changes panel).
+Nothing is written until you save.
+
+Saving
+------
+Save video.bag as... and Save pack as... always write NEW files that you name. The editor will
+not write over the files it has open or into the game's folder (or any folder with GAME.EXE),
+and it asks before replacing a file. To play with a changed video.bag, make a copy of the game
+folder and put your video.bag and video.idx in the copy. NoX Core uses a pack only with the
+video.idx it was made for: when you save a pack, pick the video.idx to stamp it for.
+
+Never overwrite the game's own files or your only video_hd.nxp: keep the originals so you can go
+back.

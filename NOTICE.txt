@@ -1,0 +1,28 @@
+NoX Core
+
+NoX Core is a modern client for Nox (Westwood Studios, 2000): the game as you know it, cleaned
+up, plus new features, for today's hardware. The bugs bad actors can use (crashes, cheats,
+exploits against players and hosts) are fixed; the quirks that have become part of how the game
+is played are kept. It is written from scratch,
+from our own analysis of how the game behaves; no code from the original game is included. With
+it come the core library it is built on (which also hosts games) and the NoX Content Editor
+(noxcontent) for viewing and changing the game's files.
+
+Unofficial fan project. Not affiliated with, endorsed by or sponsored by Electronic Arts or
+Westwood Studios. Nox is a trademark of Electronic Arts Inc. The game's content (art, sound,
+music, maps and text) belongs to its owners and is not included, apart from small tables of
+functional values and names needed to read the game's files and speak its network protocol:
+NoX Core needs your own installed copy of the game (GOG, Origin or the original CD) and reads
+its files at run time.
+
+Copyright (C) 2025-2026 the NoX Core authors.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+the GNU General Public License (LICENSE) for more details.
+
+Third-party code and its licences: THIRD_PARTY_NOTICES.txt.

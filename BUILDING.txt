@@ -1,0 +1,136 @@
+NoX Core - building from source
+===============================
+
+What this is
+------------
+NoX Core is a modern client for Nox 1.2b (Westwood Studios, 2000), in C++20: the game cleaned up,
+with new features, for today's hardware; the bugs bad actors can use are fixed, the quirks that
+have become part of how the game is played are kept. It is written from scratch, from our
+own analysis of how the game behaves; no code from the original game is included. It is a
+playable client (noxsdl, built as noxcore.exe) on an engine library (noxcore), and the NoX
+Content Editor (noxcontent) for the game's files. The client speaks the original game's network
+protocol, so it can join and host games alongside the original program.
+
+It contains none of the game's content. You need your own installed copy of Nox (GOG, Origin
+or the original CD); NoX Core reads its files at run time.
+
+Not affiliated with, endorsed by or sponsored by Electronic Arts or Westwood Studios. Nox is a
+trademark of Electronic Arts Inc.
+
+Licence: GNU General Public License v3.0 or later (LICENSE, NOTICE.txt). Third-party code and
+its licences: THIRD_PARTY_NOTICES.txt.
+
+Prerequisites
+-------------
+Windows: Visual Studio 2022 (the "Desktop development with C++" workload), CMake 3.25+ and
+Ninja (both come with Visual Studio). The shaders are compiled with dxc from the Windows SDK;
+without it the client still runs, shading on the CPU.
+
+Linux: GCC 13 or newer, CMake 3.25+, Ninja, git and pkg-config, plus the development packages
+SDL3 builds its back ends from (X11/Wayland, EGL/GL/Vulkan, ALSA/PulseAudio, udev, dbus) and
+glslang for the shaders. On Ubuntu 24.04:
+
+  sudo apt install build-essential cmake ninja-build git pkg-config \
+    libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+    libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev \
+    libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libvulkan-dev libdrm-dev libgbm-dev \
+    libasound2-dev libpulse-dev libudev-dev libdbus-1-dev glslang-tools
+
+The first configure downloads the pinned third-party libraries (SDL3, zstd, Dear ImGui, a few
+single headers and, on Windows, FFmpeg's LGPL build for the optional HD movies; see
+cmake/NoxDependencies.cmake and videotools/CMakeLists.txt), so it needs a network connection.
+
+Configure and build
+-------------------
+Windows, from a "Developer PowerShell for VS 2022" (or "x64 Native Tools Command Prompt"), or
+by opening the folder in Visual Studio with its CMake support:
+
+  cmake --preset msvc-release
+  cmake --build --preset msvc-release
+
+Presets: msvc-debug and msvc-release (RelWithDebInfo); the build goes to build\<preset>. The
+client is build\<preset>\noxsdl\noxcore.exe.
+
+Linux:
+
+  cmake --preset linux-release
+  cmake --build --preset linux-release
+
+Presets: linux-debug and linux-release (GCC, RelWithDebInfo); the build goes to
+build/<preset>, the client to build/<preset>/noxsdl/noxcore. Without the presets:
+
+  cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+  ninja -C build
+
+Useful options (-DNAME=VALUE on the first cmake line):
+  NOX_GAME_DIR          empty by default. Set it to your own install (for example
+                        -DNOX_GAME_DIR="C:/GOG Games/Nox") to make it the programs' last-resort
+                        game folder, tried after their own search (below). It is compiled into
+                        the programs, so leave it empty for builds you give to others
+  NOX_BUILD_VIDEOTOOLS  the NoX Content Editor, noxcontent (ON by default; needs NOX_BUILD_SDL)
+  NOX_BUILD_SDL         the client and everything on SDL (ON by default)
+  NOX_TEST_COMMANDS     the "nx" test commands on a host's console (spawn, give, god...), and
+                        noxsdl's debug switches that show more than a game does (lighting and
+                        line of sight off, the ambient light, --trace-fade). OFF by default, which
+                        leaves them out of the program entirely, as release builds must: with
+                        them in, a player hosting a game could cheat
+  NOX_BUILD_TESTS       the unit tests. OFF by default: the published source has none (see Tests)
+  NOX_MODES             the game modes built in, folders of modes/ separated by ';' (default
+                        "delve;tide;coop": Delving, Undead Tide and the co-op campaign)
+  NOXSDL_HD_VIDEO       Windows: play HDVideo\*.mkv movies through FFmpeg's DLLs, loaded only when
+                        present (ON by default; skipped if the FFmpeg build can't be fetched)
+  NOX_WARNINGS_AS_ERRORS  treat compiler warnings as errors in NoX Core's own targets (OFF)
+
+The game folder
+---------------
+noxsdl looks for the game in this order: --game-dir DIR on its command line, the NOX_DATA
+environment variable, noxsdl's own folder, the current folder, then (Windows) the registry
+entries of the original, GOG, Nox Reloaded and Origin installs and their usual folders, or
+(Linux) the usual Wine, Lutris, Heroic and ~/.local/share/Nox prefixes, and last NOX_GAME_DIR
+if the build set one. A folder counts if it holds gamedata.bin, modifier.bin, monster.bin and
+thing.bin. The folder it chose, and why, is written to noxcore-log.txt beside the executable.
+
+On Windows noxsdl is a GUI program and opens no console window. Start it with -cmd to see the
+log in a console (the terminal it was started from, else a new window); a redirected stderr
+(2> file) gets the log either way.
+
+On Linux a game folder copied from Windows works as it is: game files are matched ignoring case.
+
+The content editor
+------------------
+noxcontent, the NoX Content Editor, opens and edits the game's files: the object types
+(thing.bin), the text tables, the texts (nox.csf), the sounds, characters, rules and the map
+cycle, mods, and the pictures (video.bag and the HD image pack, video_hd.nxp). Changes go into
+content packs (mods\<id>\content\) or new files, never over the game's own. It is built with the
+client unless NOX_BUILD_VIDEOTOOLS is OFF, to build\<preset>\videotools\noxcontent.exe (Linux:
+build/<preset>/videotools/noxcontent). To build it alone:
+
+  cmake --build --preset msvc-release --target noxcontent
+
+Put it beside noxcore.exe; it finds the game the way the client does. How to use it:
+videotools/CONTENT_EDITOR.txt.
+
+Tests
+-----
+The published source carries no unit tests, so NOX_BUILD_TESTS and NOX_TEST_COMMANDS are OFF by
+default. (A development tree that carries the tests turns both on by default; -D values always
+win. NOX_TEST_COMMANDS=OFF needs NOX_BUILD_TESTS=OFF, since the tests use the nx commands.)
+
+Automatic builds
+----------------
+.github/workflows/ci.yml builds on Windows (MSVC) and Linux (GCC) on every push. The comments at
+the top of the file give the same steps to run by hand.
+
+Layout
+------
+  noxcore/     the engine library: file formats, crypto, network protocol and transport, client
+               state, the game simulation a hosted game runs on, map scripts. No SDL.
+  noxsdl/      the playable client on SDL3 (noxcore.exe; Linux: noxcore): menus, HUD, rendering
+               (GPU shaders), audio, console, the map editor.
+  videotools/  the NoX Content Editor (noxcontent) on SDL3 and Dear ImGui.
+  cmake/       warning flags, pinned dependencies and the patches applied to them.
+  docs/        original_bugs.md (the original game's bugs, and which are fixed or kept) and
+               vanilla_deviations.md (where NoX Core deliberately differs from it).
+  packaging/   DebugRun.bat: starts noxcore.exe with its log in a console window, for tracking
+               down a problem.
+  .github/     the automatic build (a GitHub Actions workflow).

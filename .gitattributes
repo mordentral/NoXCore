@@ -1,0 +1,9 @@
+* text=auto
+*.ps1 text eol=crlf
+BUILDING.txt text eol=lf
+*.bat text eol=crlf
+# Luau sources (built into the program as they are) and mods' mode.json: LF on every platform.
+*.luau text eol=lf
+mods/**/*.json text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf

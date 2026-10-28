@@ -1,0 +1,81 @@
+# NoX Core's automatic builds: the client, the core and the Content Editor built on Windows (MSVC,
+# the msvc-release preset) and Linux (GCC, Ninja, the linux-release preset), with whatever tests
+# the tree registers with ctest run.
+#
+# What it needs: nothing but this repository and the pinned downloads cmake/NoxDependencies.cmake
+# names (SDL3, zstd, Luau, a few single headers; on Windows FFmpeg's LGPL build for the optional HD
+# movies, never fatal). The game's files are never downloaded or needed: nothing here runs the
+# game. The private developer tools stay off (NOX_PRIVATE_TOOLS=OFF, the default).
+#
+# The same steps by hand:
+#   Windows, a "Developer PowerShell for VS 2022":
+#     cmake --preset msvc-release -DNOX_PRIVATE_TOOLS=OFF
+#     cmake --build --preset msvc-release
+#     ctest --preset msvc-release
+#   Linux (Ubuntu 24.04, the packages below):
+#     cmake --preset linux-release -DNOX_PRIVATE_TOOLS=OFF
+#     cmake --build --preset linux-release -j 4
+#     ctest --preset linux-release
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows (MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Visual Studio's x64 tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      # (The pinned downloads and their builds, keyed by the file that pins them.)
+      - name: Cache the dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/msvc-release/_deps
+          key: deps-windows-${{ hashFiles('cmake/NoxDependencies.cmake', 'cmake/patches/**') }}
+      - name: Configure
+        run: cmake --preset msvc-release -DNOX_PRIVATE_TOOLS=OFF -DNOX_WARNINGS_AS_ERRORS=OFF
+      - name: Build
+        run: cmake --build --preset msvc-release
+      - name: Test
+        run: ctest --preset msvc-release --output-on-failure
+
+  linux:
+    name: Linux (GCC)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build git pkg-config \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libvulkan-dev libdrm-dev libgbm-dev \
+            libasound2-dev libpulse-dev libudev-dev libdbus-1-dev glslang-tools
+      - name: Cache the dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/linux-release/_deps
+          key: deps-linux-${{ hashFiles('cmake/NoxDependencies.cmake', 'cmake/patches/**') }}
+      - name: Configure
+        run: cmake --preset linux-release -DNOX_PRIVATE_TOOLS=OFF
+      - name: Build
+        run: cmake --build --preset linux-release -j 4
+      - name: Test
+        run: ctest --preset linux-release --output-on-failure

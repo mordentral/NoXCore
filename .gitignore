@@ -1,0 +1,28 @@
+# Build output (the CMake presets build into build/<preset>)
+/build/
+/build-*/
+/out/
+CMakeUserPresets.json
+compile_commands.json
+
+# Editors and IDEs
+/.vs/
+/.vscode/
+/.idea/
+/.cache/
+*.user
+*.suo
+*.swp
+*~
+
+# Operating systems
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Running the programs from the source tree: their logs, settings and saves
+noxcore-log.txt
+noxcontent-log.txt
+*.log
+/Save/
+/HDVideo/

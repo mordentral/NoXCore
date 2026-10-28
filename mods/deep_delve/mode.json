@@ -1,0 +1,14 @@
+{
+  "api": 1,
+  "id": "deep_delve",
+  "name": "Deep Delve - WIP",
+  "description": "A town with stash and vendor, generated areas, loot by rarity, a passive tree for your spells, a character that's kept.",
+  "order": 50,
+  "players": [1, 6],
+  "stockClients": false,
+  "levels": "generated",
+  "mapPrefix": "DD",
+  "ui": "ui/main.luau",
+  "uiApi": 2,
+  "reference": true
+}
