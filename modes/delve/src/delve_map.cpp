@@ -4,6 +4,7 @@
 #include "noxcore/server/delve_map.hpp"
 
 #include "noxcore/modes/mode_frame.hpp"
+#include "noxcore/net/transport.hpp"
 
 #include "delve_data.hpp"
 
@@ -73,18 +74,40 @@ bool getAct(std::span<const std::uint8_t> in, std::size_t& at, Act& a)
 std::vector<std::uint8_t> runMessage(const Run& run)
 {
     // u16 depth, u8 room, u8 mystery, u8 past count, the past acts, the act, u8 fork (0 / 1),
-    // the fork's two acts; an act: u8 length, its biome's name, its six rows (each u8 count, the
-    // rooms), u8 count, its path, u8 the gate taken.
-    std::vector<std::uint8_t> rest = {static_cast<std::uint8_t>(run.depth), static_cast<std::uint8_t>(run.depth >> 8), run.room, run.mystery,
-                                      static_cast<std::uint8_t>(std::min<std::size_t>(run.past.size(), 255))};
-    for (std::size_t i = 0; i < run.past.size() && i < 255; ++i) {
-        putAct(rest, run.past[i]);
-    }
-    putAct(rest, run.act);
-    rest.push_back(run.fork ? 1 : 0);
+    // the fork's two acts, and only when acts done were left out, u16 how many; an act: u8
+    // length, its biome's name, its six rows (each u8 count, the rooms), u8 count, its path, u8
+    // the gate taken.
+    std::vector<std::uint8_t> ahead;
+    putAct(ahead, run.act);
+    ahead.push_back(run.fork ? 1 : 0);
     if (run.fork) {
-        putAct(rest, (*run.fork)[0]);
-        putAct(rest, (*run.fork)[1]);
+        putAct(ahead, (*run.fork)[0]);
+        putAct(ahead, (*run.fork)[1]);
+    }
+    // The acts done from the last back, as many as fit in the message (the frame's 4 bytes, the
+    // 5 before them, what's ahead and the count of those left out, when any are).
+    std::vector<std::vector<std::uint8_t>> done(run.past.size());
+    std::size_t size = 4 + 5 + ahead.size();
+    for (std::size_t i = 0; i < run.past.size(); ++i) {
+        putAct(done[i], run.past[i]);
+        size += done[i].size();
+    }
+    std::size_t first = run.past.size() > 255 ? run.past.size() - 255 : 0;
+    for (std::size_t i = 0; i < first; ++i) {
+        size -= done[i].size();
+    }
+    while (first < done.size() && size + (run.earlier + first > 0 ? 2 : 0) > net::kMaxReliablePayload) {
+        size -= done[first++].size();
+    }
+    std::vector<std::uint8_t> rest = {static_cast<std::uint8_t>(run.depth), static_cast<std::uint8_t>(run.depth >> 8), run.room, run.mystery,
+                                      static_cast<std::uint8_t>(done.size() - first)};
+    for (std::size_t i = first; i < done.size(); ++i) {
+        rest.insert(rest.end(), done[i].begin(), done[i].end());
+    }
+    rest.insert(rest.end(), ahead.begin(), ahead.end());
+    if (const std::size_t earlier = std::min<std::size_t>(run.earlier + first, 0xFFFF); earlier > 0) {
+        rest.push_back(static_cast<std::uint8_t>(earlier));
+        rest.push_back(static_cast<std::uint8_t>(earlier >> 8));
     }
     return framed(kRun, rest);
 }
@@ -204,29 +227,50 @@ std::optional<Objective> parseObjective(std::span<const std::uint8_t> rest)
     return o;
 }
 
-std::vector<std::uint8_t> recordsMessage(std::span<const Record> records)
+std::vector<std::vector<std::uint8_t>> recordsMessages(std::span<const Record> records)
 {
-    // At most 10 records sent, and at most 16 of each party.
-    std::vector<std::uint8_t> rest = {static_cast<std::uint8_t>(std::min<std::size_t>(records.size(), 10))};
-    const auto text = [&](const std::string& s) {
-        const std::size_t n = std::min<std::size_t>(s.size(), 255);
-        rest.push_back(static_cast<std::uint8_t>(n));
-        rest.insert(rest.end(), s.begin(), s.begin() + static_cast<std::ptrdiff_t>(n));
-    };
-    for (std::size_t i = 0; i < records.size() && i < 10; ++i) {
-        const Record& r = records[i];
-        rest.push_back(static_cast<std::uint8_t>(r.depth));
-        rest.push_back(static_cast<std::uint8_t>(r.depth >> 8));
-        rest.push_back(r.act);
+    // At most 10 records sent, and at most 16 of each party; whole records to a message while they
+    // fit (each message's rest: u8 its count, its records).
+    const auto recordBytes = [](const Record& r, std::size_t members) {
+        std::vector<std::uint8_t> out;
+        const auto text = [&](const std::string& s) {
+            const std::size_t n = std::min<std::size_t>(s.size(), 255);
+            out.push_back(static_cast<std::uint8_t>(n));
+            out.insert(out.end(), s.begin(), s.begin() + static_cast<std::ptrdiff_t>(n));
+        };
+        out.push_back(static_cast<std::uint8_t>(r.depth));
+        out.push_back(static_cast<std::uint8_t>(r.depth >> 8));
+        out.push_back(r.act);
         text(r.date);
         text(r.difficulty);
-        rest.push_back(static_cast<std::uint8_t>(std::min<std::size_t>(r.party.size(), 16)));
-        for (std::size_t k = 0; k < r.party.size() && k < 16; ++k) {
+        out.push_back(static_cast<std::uint8_t>(members));
+        for (std::size_t k = 0; k < members; ++k) {
             text(r.party[k].first);
-            rest.push_back(r.party[k].second);
+            out.push_back(r.party[k].second);
         }
+        return out;
+    };
+    const std::size_t room = net::kMaxReliablePayload - 4; // (a message's rest: the frame's 4 bytes off)
+    std::vector<std::vector<std::uint8_t>> out;
+    std::vector<std::uint8_t> rest = {0};
+    const auto send = [&] {
+        out.push_back(framed(out.empty() ? kRecords : kRecordsMore, rest));
+        rest = {0};
+    };
+    for (std::size_t i = 0; i < records.size() && i < 10; ++i) {
+        std::size_t members = std::min<std::size_t>(records[i].party.size(), 16);
+        std::vector<std::uint8_t> bytes = recordBytes(records[i], members);
+        while (1 + bytes.size() > room && members > 0) { // (a party too big for a message alone: its last left out)
+            bytes = recordBytes(records[i], --members);
+        }
+        if (rest.size() + bytes.size() > room) {
+            send();
+        }
+        rest.insert(rest.end(), bytes.begin(), bytes.end());
+        ++rest[0];
     }
-    return framed(kRecords, rest);
+    send();
+    return out;
 }
 
 std::optional<std::vector<Record>> parseRecords(std::span<const std::uint8_t> rest)
@@ -305,6 +349,9 @@ std::optional<Run> parseRun(std::span<const std::uint8_t> rest)
             return std::nullopt;
         }
         run.fork = std::move(fork);
+    }
+    if (rest.size() >= at + 2) { // (the acts done left out, when any were)
+        run.earlier = static_cast<std::uint16_t>(rest[at] | rest[at + 1] << 8);
     }
     return run;
 }

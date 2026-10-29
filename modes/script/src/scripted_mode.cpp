@@ -49,6 +49,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <deque>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -157,19 +158,24 @@ struct ScriptedMode::Impl {
         /// The set it has (the hash of the last one sent it whole): kept through a reload, so a
         /// set that didn't change isn't sent again.
         std::optional<std::uint64_t> hasSet;
+        /// Views held while it had no reliable room (GameHost::reliableRoom), each its bytes and
+        /// its text: pumpUi sends them first as room comes; past kHeldViews the oldest goes as
+        /// text. (nox.send says false while any is held: a value never overtakes a view.)
+        std::deque<std::pair<std::vector<std::uint8_t>, std::string>> heldViews;
     };
+    static constexpr std::size_t kHeldViews = 16;
     /// A mod asset as the wire carries it (ui_proto.hpp's kAsset and kAssetChunk): its header's
     /// payload and its bytes, NXZ-packed when that's smaller (each peer's copy is this one).
     struct WireAsset {
         std::vector<std::uint8_t> header;
         std::vector<std::uint8_t> coded;
     };
-    /// Assets' chunks a frame to a player at most (the UI's are 4), under the same reliable-queue
-    /// ceiling (pumpUi): the game's own messages keep their place.
+    /// Assets' chunks a frame to a player at most (the UI's are 4), each while the player has bulk
+    /// room for it (GameHost::reliableBulkRoom, as pumpUi): the game's own messages, and the mode's
+    /// values, views and weather, keep their place.
     static constexpr int kAssetChunksPerFrame = 16;
-    /// A player's reliable queue past this: no more data for its UI (nox.send says false, views go
-    /// as text) till it drains.
-    static constexpr std::size_t kUiQueueLimit = 100;
+    // (A player with no reliable room, GameHost::reliableRoom: no more data for its UI (nox.send
+    // says false, views go as text) till its acknowledgements catch up.)
 
     std::shared_ptr<const ModPackage> package;
     ServerContext ctx;
@@ -404,11 +410,13 @@ struct ScriptedMode::Impl {
         return lobby::ClientFeature::ModeUi | (package->manifest.uiApi >= 2 ? lobby::ClientFeature::ModeUi2 : 0u);
     }
     /// Whether `peer` takes this UI: it named what the UI needs, and for a UI of API 3 its client
-    /// is at uimsg::kUiApi3Level or above (asked each time: a slot may change hands).
+    /// is at uimsg::kUiApi3Level or above, for API 4 at kUiApi4Level (asked each time: a slot may
+    /// change hands).
     bool uiReaches(std::uint8_t peer) const
     {
+        const int api = package->manifest.uiApi;
         return host && (host->clientFeatures(peer) & uiNeeds()) == uiNeeds() &&
-               (package->manifest.uiApi < 3 || host->clientLevel(peer) >= uimsg::kUiApi3Level);
+               (api < 3 || host->clientLevel(peer) >= (api >= 4 ? uimsg::kUiApi4Level : uimsg::kUiApi3Level));
     }
     void sendUi(std::uint8_t peer, uimsg::Sub sub, std::span<const std::uint8_t> payload = {})
     {
@@ -633,12 +641,13 @@ int noxTable(lua_State* L)
 
 int noxSend(lua_State* L)
 {
-    // A value to a player's UI (its onMessage); whether it went (no UI there: false).
+    // A value to a player's UI (its onMessage); whether it went (no UI there, or its link behind:
+    // no reliable room, or views held for it: false).
     Impl& impl = implOf(L);
     const auto peer = peerArg(L, 1);
     luaL_argcheck(L, peer.has_value(), 1, "send: a player's peer");
     const auto u = impl.ui.find(*peer);
-    if (u == impl.ui.end() || !u->second.ready || !impl.host || impl.host->queuedReliable(*peer) > Impl::kUiQueueLimit) {
+    if (u == impl.ui.end() || !u->second.ready || !impl.host || impl.host->reliableRoom(*peer) == 0 || !u->second.heldViews.empty()) {
         lua_pushboolean(L, 0);
         return 1;
     }
@@ -2069,6 +2078,50 @@ int noxSetNoCollide(lua_State* L)
     return 0;
 }
 
+/// A missile (class MISSILE): the only things nox.setHitRadius and nox.setBurstScale size.
+server::ServerObject& missileArg(lua_State* L, int idx)
+{
+    server::ServerObject& o = objectArg(L, idx);
+    luaL_argcheck(L, (o.classes & things::ObjectClass::Missile) != 0, idx, "not a missile");
+    return o;
+}
+
+int noxSetHitRadius(lua_State* L)
+{
+    toolbox::refuseInsideAsked(L, "nox.setHitRadius"); // (not inside onDamage or onExit)
+    // nox.setHitRadius(id, radius): a missile's hit shape, in world units: a point made a circle
+    // of 1-32, a circle's radius 1 to 4 x its type's, a box's sides scaled alike (its larger
+    // side's half 1 to 4 x its type's); what its flight meets is what that shape touches (several
+    // in one piece: the grid walk's last, not the nearest), and nox.object(id).radius reads it.
+    // Its type's own flight meets only what holds its centre, so only nil gives the stock hit
+    // back: its type's radius set again is a hit circle of that size. It stays with the missile
+    // when it's reflected or turned. Walls are still met by its centre's path. It may be set in the
+    // frame the missile is made (onSpellCast's `made`): until it has first flown clear of its owner,
+    // the owner is met only as the stock missile would meet it (a new owner, a new grace).
+    server::ServerObject& m = missileArg(L, 1);
+    if (lua_isnoneornil(L, 2)) {
+        server::restoreHitShape(worldOf(L), m);
+        return 0;
+    }
+    const auto [lo, hi] = server::hitRadiusRange(m);
+    const float r = floatArg(L, 2, lo, hi, "a radius from 1 to 32 for a point, to 4 x its type's for a circle or a box");
+    server::setHitRadius(worldOf(L), m, r);
+    return 0;
+}
+
+int noxSetBurstScale(lua_State* L)
+{
+    toolbox::refuseInsideAsked(L, "nox.setBurstScale"); // (not inside onDamage or onExit)
+    // nox.setBurstScale(id, scale): a missile's burst (a fireball's, a magic missile's) reaching
+    // `scale` x its type's, 0.5-3: its harm's reach and its push's, read as it bursts. Its damage,
+    // its hit and the burst the clients draw stay its type's. nil: 1. One that never bursts
+    // ignores it; one reflected or turned keeps it.
+    server::ServerObject& m = missileArg(L, 1);
+    const float s = lua_isnoneornil(L, 2) ? 1.0f : floatArg(L, 2, 0.5, 3, "a scale from 0.5 to 3");
+    server::setBurstScale(m, s);
+    return 0;
+}
+
 int noxDamageAt(lua_State* L)
 {
     toolbox::refuseInsideAsked(L, "nox.damageAt"); // (not inside onDamage or onExit)
@@ -3279,7 +3332,7 @@ void Impl::deliver(lua_State* L, int viewIdx, std::optional<std::uint8_t> peer, 
     bool encoded = false;
     const auto one = [&](std::uint8_t p) {
         const auto u = ui.find(p);
-        if (u != ui.end() && u->second.ready && u->second.views && host->queuedReliable(p) <= kUiQueueLimit) {
+        if (u != ui.end() && u->second.ready && u->second.views) {
             if (!encoded) {
                 std::string why;
                 encoded = true;
@@ -3288,11 +3341,21 @@ void Impl::deliver(lua_State* L, int viewIdx, std::optional<std::uint8_t> peer, 
                 }
             }
             if (!view.empty()) {
+                // (No reliable room, or views already held: held, in order, for pumpUi.)
+                auto& held = u->second.heldViews;
+                if (!held.empty() || host->reliableRoom(p) == 0) {
+                    held.emplace_back(view, std::string(text));
+                    if (held.size() > kHeldViews) {
+                        tell(p, held.front().second);
+                        held.pop_front();
+                    }
+                    return;
+                }
                 sendUi(p, uimsg::kView, view);
                 return;
             }
         }
-        tell(p, text);
+        tell(p, text); // (a client without the UI, or a view that can't be encoded)
     };
     if (peer) {
         one(*peer);
@@ -3347,9 +3410,9 @@ bool Impl::pumpAssets(std::uint8_t peer, UiPeer& u)
         u.assetsBegun = true;
         u.hasSet.reset();
     }
-    // (More a frame than the UI's chunks, assets being bigger, and none while its reliable queue
-    // is long.)
-    for (int k = 0; k < kAssetChunksPerFrame && u.asset < wireAssets.size() && host->queuedReliable(peer) < 24; ++k) {
+    // (More a frame than the UI's chunks, assets being bigger, and none while it has no reliable
+    // room.)
+    for (int k = 0; k < kAssetChunksPerFrame && u.asset < wireAssets.size() && host->reliableBulkRoom(peer) > 0; ++k) {
         const WireAsset& a = wireAssets[u.asset];
         if (!u.assetHeaderSent) {
             sendUi(peer, uimsg::kAsset, a.header);
@@ -3384,6 +3447,11 @@ void Impl::pumpUi()
         return;
     }
     for (auto& [peer, u] : ui) {
+        // Views held for want of room first, in order, as room comes.
+        while (!u.heldViews.empty() && host->reliableRoom(peer) > 0) {
+            sendUi(peer, uimsg::kView, u.heldViews.front().first);
+            u.heldViews.pop_front();
+        }
         if (!u.begun) {
             // (A UI of API 2: its mod's assets first, all of them queued before it.)
             if (assetsHash && !pumpAssets(peer, u)) {
@@ -3397,9 +3465,9 @@ void Impl::pumpUi()
             sendUi(peer, uimsg::kBegin, w.out);
             u.begun = true;
         }
-        // (A few blocks a frame, and no more while its reliable queue is long: the game's own
-        // messages keep their place.)
-        for (int k = 0; k < 4 && u.sent < uiSource.size() && host->queuedReliable(peer) < 24; ++k) {
+        // (A few blocks a frame, and none while it has no reliable room: the game's own messages
+        // keep their place.)
+        for (int k = 0; k < 4 && u.sent < uiSource.size() && host->reliableBulkRoom(peer) > 0; ++k) {
             const std::size_t n = std::min(uimsg::kChunkBytes, uiSource.size() - u.sent);
             uimsg::Writer w;
             w.u32(static_cast<std::uint32_t>(u.sent));
@@ -3501,6 +3569,7 @@ void Impl::installToolbox()
         {"spellInfo", noxSpellInfo}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
         {"shoot", noxShoot},   {"summon", noxSummon},   {"abilitySound", noxAbilitySound}, {"setPosition", noxSetPosition},
         {"setVelocity", noxSetVelocity}, {"setOwner", noxSetOwner}, {"setTeam", noxSetTeam}, {"setNoCollide", noxSetNoCollide},
+        {"setHitRadius", noxSetHitRadius}, {"setBurstScale", noxSetBurstScale},
         {"damageAt", noxDamageAt}, {"delete", noxDelete},
         {"thingType", noxThingType}, {"present", noxPresent}, {"living", noxLiving}, {"setCollide", noxSetCollide},
         {"backIntoPlay", noxBackIntoPlay}, {"nearSoulGate", noxNearSoulGate},
@@ -3784,6 +3853,7 @@ void Impl::onLeave(std::uint8_t peer)
     choices.erase(peer);
     ui.erase(peer);
     parts.weather.left(peer);
+    parts.drawScales.left(peer);
     if (has.onLeave && begin("onLeave")) {
         pushPlayer(vm->thread(), peer);
         finish("onLeave", 1, 0);
@@ -3930,10 +4000,11 @@ public:
             impl_.parts.events.equipped(player, item, worn);
         }
     }
-    void spellCast(server::World&, server::ServerObject& caster, std::uint32_t spell, server::ServerObject* target, float x, float y) override
+    void spellCast(server::World&, server::ServerObject& caster, std::uint32_t spell, server::ServerObject* target, float x, float y,
+                   std::span<const std::uint32_t> made) override
     {
         if (!impl_.hidden(caster)) {
-            impl_.parts.events.spellCast(caster, spell, target && !impl_.hidden(*target) ? target : nullptr, x, y);
+            impl_.parts.events.spellCast(caster, spell, target && !impl_.hidden(*target) ? target : nullptr, x, y, made);
         }
     }
     bool damage(server::Fight&, server::ServerObject& target, server::ServerObject* source, server::ServerObject* weapon, int& amount,
@@ -4153,6 +4224,9 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
                 "). Get the free NoX Core client from noxhub.net and join again.",
             15000};
     }
+    // A mod that needs a newer NoX Core (mode.json's "minClientLevel"): an older one refused at its
+    // join with the too-old notice, as the host's own --min-client-level (the higher of the two).
+    o.minClientLevel = std::max(o.minClientLevel, impl.package->manifest.minClientLevel);
     // The host's callbacks: each the script's when it has the hook (looked up as it's called, so a
     // reload's new hooks count). None of them runs per frame.
     o.onJoin = [&impl, prev = std::move(o.onJoin)](server::GameHost& h, std::uint8_t peer, server::ServerObject& unit) {
@@ -4198,6 +4272,14 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
     };
     o.noxcppMessages[uimsg::kOp] = [&impl](server::GameHost&, std::uint8_t peer, std::span<const std::uint8_t> m) {
         impl.guarded("onUiMessage", [&] { impl.onUiMessage(peer, m); });
+    };
+    // A thing nox.setDrawScale sized, first sent to a player: its scale to that player's client
+    // (asked only for things with a scale; nothing runs per frame).
+    o.onScaledSeen = [&impl, prev = std::move(o.onScaledSeen)](server::GameHost& h, std::uint8_t peer, server::ServerObject& thing) {
+        if (prev) {
+            prev(h, peer, thing);
+        }
+        impl.parts.drawScales.seen(h, peer, thing);
     };
     return map;
 }
@@ -4259,6 +4341,9 @@ void ScriptedMode::tick(server::GameHost& host, std::uint32_t)
     if (impl.parts.weather.used()) {
         impl.parts.weather.flush(host); // (nox.weather's changes, once a frame)
     }
+    if (impl.parts.drawScales.owing()) {
+        impl.parts.drawScales.flush(host); // (draw scales that waited for room)
+    }
     // Between games (nobody in), a changed script reloads by itself: looked at every 60 frames.
     if (++impl.sinceCheck >= 60) {
         impl.sinceCheck = 0;
@@ -4296,6 +4381,7 @@ void ScriptedMode::detach(server::GameHost& host)
         parts.store->unlockAll(parts.storeOwner);
     }
     parts.weather.reset(&host); // (none to every player it was sent to)
+    parts.drawScales.reset();   // (the things keep theirs; nothing owed is sent)
     impl_->host = nullptr;
     impl_->dropAssets(); // (the mod's assets kept only while it's hosted)
 }

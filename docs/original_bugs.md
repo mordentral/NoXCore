@@ -44,6 +44,22 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   one packet (vanilla_deviations.md, VD-02 "Reliable messages packed per frame"), which keeps it
   out of reach as the exe's netlist does.
 
+### OB-410: An ack in 0x20-0xE0 takes packets far ahead of it, past the wrap, as acknowledged
+- **Where:** the reliable stream's ack handler, mode 1 (as OB-001): with the ack in 0x20-0xE0 it
+  compares unsigned (`seq < ack`), so a queued packet whose number wrapped past 0xFF counts as
+  before it.
+- **Effect:** with more than 0x100 - ack packets unacknowledged (33 at the least, with the ack at
+  0xE0), the newest ones, past the wrap, leave the queue and are never sent again. The peer takes
+  reliable packets in order only and waits for the first of them for good: no reliable message
+  reaches it again (no USE_MAP, no informs). The exe's game sends one netlist packet a frame and
+  rarely has that many out.
+- **Ours:** Stream::applyAck compares the same. NoX Core's own paced senders (the fast map send, a
+  mode's UI, assets, values, views and weather, an edit session's messages, live view and mod
+  files) add a packet only while the client has fewer than 24 out unacknowledged
+  (`GameHost::reliableRoom`), so they alone never take a stream there; the game's own messages are
+  sent as the exe sends them, so while those senders hold 24, a wait for an acknowledgement that
+  spans more than 8 of the game's reliable packets still can.
+
 ### OB-002: The join's ping test says JOIN_OK after refusing
 - **Where:** the host's ping test, a join's ten pings done: too many lost, or the average under
   the host's lowest ping or over its highest, sends SERVER_ERROR (13 00 / 13 01), then falls
@@ -2340,3 +2356,54 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   The map generator's writer refuses anything placed outside the map's square, 0 to 5888: every
   object and waypoint, an exit's way out, a glyph's target and a hole's fall point. Walls and floor
   tiles must be in cells 0 to 255 (`MapWriter`). Stock maps place nothing there, so they are unchanged.
+
+### OB-411: A missile passes a door's leaf near its tip when the piece's end is in another cell
+- **Where:** a missile's flight is searched piece by piece (at most 6 units each); for each piece
+  the game walks only the bodies listed in the map grid cell that the piece's end lies in, and
+  tests a door there by whether the piece crosses its leaf. A door is listed in the cells its box
+  covers, and its leaf reaches the edge of that box.
+- **Effect:** when a piece crosses a leaf near its tip and ends past the door's box in a grid
+  cell the door isn't listed in (the box's edge within 6 units of a cell boundary), the door is
+  never tested: the missile flies through the leaf's tip. Closed doors standing in their wall
+  cells are also met by the flight's wall ray, so this is seen mostly on doors standing open or
+  swinging.
+- **Ours:** the same (`Missiles::bodyAt` in `noxcore/src/server/missiles.cpp`). A missile a mode
+  gave a hit shape searches the box its shape sweeps over the whole piece (`Missiles::bodyNear`),
+  so it tests every leaf it crosses.
+
+### OB-412: A thing put on the map takes over a map object's number
+- **Where:** a map object's number (the one its map record gives it) isn't unique: a thing a
+  player brings from another map, a thing from a saved player, or a thing a creature or chest of
+  the map held, keeps its own map's number when it's dropped. The lookups by number (a script
+  group's members, the movers a `Move` sets off and the thing a mover finds when it starts, a
+  client's code for a map object) walk the object list from its head, where the dropped thing
+  now is, and take the first thing of that number.
+- **Effect:** once such a thing lies on the map, a group whose member has its number acts on it
+  instead of the member (a lamp stays dark, a spike stays down), and a lever, sign or other map
+  object with that number can't be worked by the cursor: the click names the dropped thing. A
+  save lists the dropped thing ahead of the map's own, so after a load it keeps the number until
+  it's picked up.
+- **Ours:** deviated by decision (VD-47): the thing on the map longest, the map's own, is taken
+  (`World::byMapNumber` in `noxcore/src/server/world.cpp`), so a dropped thing never takes a map
+  object's number; a held thing is never taken, as here.
+
+### OB-413: Some maps give a held thing the same number as a placed one
+- **Where:** in 22 of the shipped maps (63 numbers) a thing in a creature's or chest's inventory
+  has the same map number as a thing placed on the map. While held it isn't on the object list, so the lookups
+  by number find the placed thing; dropped (its holder killed, the chest opened), it takes over
+  the number (OB-412).
+- **Effect:** in Wiz10a three pit spikes of a group the map's script toggles share their numbers
+  with a cloak, pants and a shirt; in War06a and Con06a two street lamps of a group the script
+  toggles share theirs with pants and boots. With those things dropped, the script toggles them
+  and not the spikes or the lamps.
+- **Ours:** deviated with OB-412 (VD-47): the placed thing has been on the map since the load, so
+  the lookups keep finding it after its namesake is dropped; the scripts toggle the spikes and
+  the lamps.
+
+### OB-414: Moving a thing made in play sets off the movers a script made
+- **Where:** the script's `Move` on a thing that isn't a mover sets off every mover whose
+  number for the thing it carries is that thing's map number. A thing made in play has none (0),
+  and a mover made by `CreateMover` never gets its number either (0).
+- **Effect:** `Move` on any thing made in play turns on and starts every such mover; each leaves
+  the update list at its next turn having moved nothing, but stays on.
+- **Ours:** the same (`scriptMoveTo` in `noxcore/src/server/objects.cpp`).

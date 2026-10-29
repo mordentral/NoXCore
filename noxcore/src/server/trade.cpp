@@ -432,11 +432,11 @@ ServerObject* heldByCode(World& world, const ServerObject& unit, std::uint32_t c
     return nullptr;
 }
 
-/// packetDynamicUnitCode: a code with bit 15 a map object's by its extent.
+/// packetDynamicUnitCode: a code with bit 15 a map object's by its map number (netGetUnitByExtent).
 std::uint32_t dynamicCode(World& world, std::uint32_t code)
 {
     if ((code & 0x8000u) == 0x8000u) {
-        const ServerObject* o = world.byExtent(code & 0x7FFFu);
+        const ServerObject* o = world.byMapNumber(code & 0x7FFFu);
         return o ? o->extent : 0;
     }
     return code;

@@ -341,10 +341,12 @@ function loot.bossDrop(x: number, y: number, level: number, d: any): { number }
 	return made
 end
 
--- An item picked up (by anyone): its sparks stop, its label goes.
-function loot.pickedUp(item: number)
+-- An item picked up (by anyone): its sparks stop, its label goes; whether it was ground loot.
+function loot.pickedUp(item: number): boolean
 	hide(item)
+	local was = ground[item] ~= nil
 	ground[item] = nil
+	return was
 end
 
 -- The items sparking on the ground now, as "id effect" lines (for "dd ground").

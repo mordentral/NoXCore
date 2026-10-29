@@ -7,9 +7,24 @@
 // player with more than 2 map messages unacknowledged waits. The client says when
 // it has the map (MSG_RECEIVED_MAP 0xBF) or gives up (MSG_CANCEL_MAP 0xB7). A map load asked for
 // aborts every send (MSG_MAP_SEND_ABORT 0xBA, reason 0).
+//
+// noxcpp's fast send (a NoX Core client of lobby::kFastMapSendLevel or above, its level taken when
+// it asks, for its first kFastMapRequestsPerMap requests after each map load): the same messages
+// and the same file, but blocks of kFastMapBlock bytes, sent every frame, up to
+// kFastMapBlocksPerFrame of them (kFastMapBlocksPerFrameAll to all fast senders together, round
+// robin), while the client has fewer reliable packets out unacknowledged than the window:
+// kFastMapStartWindow at first, kFastMapWindow at most, halved (to kFastMapMinWindow at least)
+// when a frame's blocks go unacknowledged past kFastMapLateMs and twice the quickest a frame's
+// first packet was (kFastMapFirstLateMs before any was), opened again as frames' blocks are
+// acknowledged in time (by as many packets till the first late frame, by one a round trip after),
+// and within GameHost::reliableBulkRoom. The transport's resends stand as they are (an
+// unacknowledged packet again after 2 s, the one an acknowledgement names at once). Every other
+// client (stock, or a NoX Core one below that level) and every later request gets the stock stream
+// above, byte for byte.
 #include "noxcore/server/game_host.hpp"
 
 #include "noxcore/io/file.hpp"
+#include "noxcore/lobby/extended.hpp"
 #include "noxcore/server/modes.hpp"
 #include "noxcore/strings/string_table.hpp"
 
@@ -80,15 +95,47 @@ void GameHost::onRequestMap(std::uint8_t peer)
         s.blockSize = 0x200;
         s.size = static_cast<std::uint32_t>(mapSendData_.size());
         s.startMs = nowMs_;
+        // (noxcpp's fast send, for a NoX Core client that takes it: its first few requests after
+        // the map's load.)
+        if (transport_.clientLevel(peer) >= lobby::kFastMapSendLevel && fastMapRequests_[peer] < kFastMapRequestsPerMap) {
+            ++fastMapRequests_[peer];
+            s.fast = true;
+            s.blockSize = kFastMapBlock;
+            ++mapSendsFast_;
+        }
         return;
     }
     mapSendPrint(s.state == 1 ? "mapsend.c:Sending" : "mapsend.c:BadState");
 }
 
+void GameHost::mapSendReset(MapSender& s)
+{
+    if (s.fast && s.state == 1 && mapSendsFast_ != 0) {
+        --mapSendsFast_;
+    }
+    s = MapSender{};
+}
+
+void GameHost::mapSendPeerGone(std::uint8_t peer)
+{
+    // (noxcpp's) A fast send to a player who left ends with it: nothing more to its closed
+    // stream, the count down, the sender free for whoever takes the slot next. A stock send goes
+    // on as the exe's does (OB-163).
+    fastMapRequests_.erase(peer);
+    const auto it = mapSenders_.find(peer);
+    if (it == mapSenders_.end() || !it->second.fast || it->second.state != 1) {
+        return;
+    }
+    if (mapSendsInProgress_ != 0) {
+        --mapSendsInProgress_;
+    }
+    mapSendReset(it->second);
+}
+
 void GameHost::onCancelMap(std::uint8_t peer)
 {
     // SrvNet_OnCancelMap: its sender reset (its own copy freed).
-    mapSenders_[peer] = MapSender{};
+    mapSendReset(mapSenders_[peer]);
     if (mapSendsInProgress_ != 0) {
         --mapSendsInProgress_;
     }
@@ -156,21 +203,22 @@ void GameHost::forgetObjects(std::uint8_t slot)
     }
 }
 
-void GameHost::mapSendFrame()
+void GameHost::mapSendFrame(bool even)
 {
     // Each even frame (the caller's): with sends under way (nothing loaded yet:
     // loaded now), each sending sender sends its next block unless more than `window` map messages
     // are unacknowledged on its "stream": the unacknowledged count (index + 1) reads the stream from the next
     // sender's first byte (its index, so the player's own stream, index + 1), and for sender 30
     // from the byte past the last, g_mapSendsStarted's low byte (an original bug).
-    if (mapSendsInProgress_ == 0) {
+    // (noxcpp's fast senders send every frame, odd ones too, after the stock ones: mapSendFast.)
+    if (mapSendsInProgress_ == 0 || (!even && mapSendsFast_ == 0)) {
         return;
     }
-    if (mapSendData_.empty()) {
+    if (even && mapSendData_.empty()) {
         mapSendLoadMap();
     }
     for (auto& [peer, s] : mapSenders_) {
-        if (s.state != 1) {
+        if (!even || s.state != 1 || s.fast) {
             continue;
         }
         // (A sender's index is its peer - 1; index 30 reads the stream number off g_mapSendsStarted.)
@@ -183,6 +231,82 @@ void GameHost::mapSendFrame()
         } else {
             mapSendNextBlock(peer, s);
         }
+    }
+    if (mapSendsFast_ == 0) {
+        return;
+    }
+    // The fast senders, kFastMapBlocksPerFrameAll blocks among them, each frame's turn starting
+    // after the one the last frame served last.
+    int budget = kFastMapBlocksPerFrameAll;
+    auto it = mapSenders_.upper_bound(mapSendFastLast_);
+    for (std::size_t n = mapSenders_.size(); n != 0 && budget > 0; --n, ++it) {
+        if (it == mapSenders_.end()) {
+            it = mapSenders_.begin();
+        }
+        if (it->second.state == 1 && it->second.fast) {
+            mapSendFastLast_ = it->first;
+            mapSendFast(it->first, it->second, budget);
+        }
+    }
+}
+
+void GameHost::mapSendFast(std::uint8_t peer, MapSender& s, int& budget)
+{
+    // (noxcpp's) Blocks while the client's reliable packets out are fewer than the window, at most
+    // kFastMapBlocksPerFrame this frame and the frame's `budget`; the last one resets the sender.
+    const auto seqs = transport_.reliableSeqs(peer);
+    if (!seqs) {
+        mapSendPeerGone(peer); // (its stream gone before its leave, or with no player to leave)
+        return;
+    }
+    // A frame's blocks are late when not acknowledged within kFastMapLateMs and twice the round
+    // trip (timed by this send alone: a fresh connection's latency is unknown, a reused slot's its
+    // last client's), and before any is timed, within kFastMapFirstLateMs: lost or out of order.
+    // Those acknowledged in time open the window, by as many packets till the first late one, by
+    // one a round trip after; the oldest late halves it (what's in flight is the transport's to
+    // resend). (The client acknowledges all before the next it expects; sequence numbers wrap,
+    // compared within the window's span.)
+    const auto acked = [&](std::uint8_t seqEnd) { return static_cast<std::int8_t>(static_cast<std::uint8_t>(seqs->ack - seqEnd)) >= 0; };
+    // (The round trip: the quickest a frame's first packet was acknowledged. A whole frame's can
+    // wait on an earlier loss's mending, its first seldom: the first frame's has nothing before it.)
+    for (MapSender::Flight& f : s.flights) {
+        if (!f.timed && acked(static_cast<std::uint8_t>(f.seqBegin + 1))) {
+            f.timed = true;
+            const std::uint32_t age = std::max<std::uint32_t>(nowMs_ - f.at, 1);
+            s.ackMs = s.ackMs == 0 ? age : std::min(s.ackMs, age);
+        }
+    }
+    const std::uint32_t late = s.ackMs == 0 ? kFastMapFirstLateMs : kFastMapLateMs + 2 * s.ackMs;
+    std::size_t done = 0;
+    for (; done < s.flights.size() && acked(s.flights[done].seqEnd); ++done) {
+        const std::uint32_t age = nowMs_ - s.flights[done].at;
+        if (age <= late && (!s.lateSeen || nowMs_ - s.grownAt >= s.ackMs)) {
+            s.fastWindow = std::min(s.fastWindow + (s.lateSeen ? 1u : s.flights[done].packets), kFastMapWindow);
+            s.grownAt = nowMs_;
+        }
+    }
+    s.flights.erase(s.flights.begin(), s.flights.begin() + static_cast<std::ptrdiff_t>(done));
+    if (!s.flights.empty() && nowMs_ - s.flights.front().at > late) {
+        s.fastWindow = std::max(kFastMapMinWindow, s.fastWindow / 2);
+        s.lateSeen = true;
+        s.flights.clear();
+    }
+    std::uint8_t blocks = 0;
+    const std::uint8_t seqBegin = seqs->next; // (unchanged since the frame's start: nothing sent yet)
+    for (int n = 0; n < kFastMapBlocksPerFrame && budget > 0 && s.state == 1; ++n) {
+        // (Its own window, within kReliableSpan for every paced sender together: reliableBulkRoom.
+        // The first block goes with MSG_MAP_SEND_START, a packet of its own.)
+        const std::size_t need = s.sent == 0 ? 2 : 1;
+        if (transport_.reliableOutstanding(peer) + need > s.fastWindow || reliableBulkRoom(peer) < need) {
+            ++s.waits;
+            break;
+        }
+        mapSendNextBlock(peer, s);
+        ++blocks;
+        --budget;
+    }
+    if (blocks != 0 && s.state == 1) {
+        s.flights.push_back({nowMs_, seqBegin, transport_.reliableSeqs(peer)->next, blocks, false});
     }
 }
 
@@ -230,7 +354,7 @@ void GameHost::mapSendNextBlock(std::uint8_t peer, MapSender& s)
             --mapSendsInProgress_;
         }
         mapSendPrint("mapsend.c:InProgress", {std::to_string(mapSendsInProgress_)});
-        s = MapSender{};
+        mapSendReset(s);
     }
 }
 
@@ -248,7 +372,7 @@ void GameHost::mapSendAbortAll(std::uint8_t reason)
         }
         // (the sender's index, its player's, whether it's still in)
         mapSendPrint("MapSend.c:downloadaborted", {std::to_string((peer - 1) & 31), std::to_string(reason)});
-        s = MapSender{};
+        mapSendReset(s);
     }
 }
 

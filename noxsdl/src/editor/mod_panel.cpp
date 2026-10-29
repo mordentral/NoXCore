@@ -10,6 +10,9 @@
 #include "editor/theme_colours.hpp"
 #include "editor/ui_helpers.hpp"
 
+#include "sprite_cache.hpp"
+
+#include "noxcore/client/spell_bars.hpp"
 #include "noxcore/io/file.hpp"
 #include "noxcore/io/zip.hpp"
 #include "noxcore/mapedit/mod_files.hpp"
@@ -119,6 +122,39 @@ void ModPanel::freePreviewTextures()
     }
     previewTextures_.clear();
     texturesOf_.reset();
+}
+
+SDL_Texture* ModPanel::spellIconTexture(int index, float& w, float& h)
+{
+    if (index <= 0 || !ed_.ctx_.sprites) {
+        return nullptr;
+    }
+    const auto id = static_cast<std::uint32_t>(index);
+    std::optional<nox::things::ImageRef> ref;
+    if (nox::client::isTaggedAbility(id)) {
+        const std::uint32_t a = nox::client::untagged(id);
+        if (a >= 1 && a <= ed_.things_.abilities.size()) {
+            ref = ed_.things_.abilities[a - 1].icons[0];
+        }
+    } else if (const auto* s = ed_.things_.findSpell(id)) {
+        ref = s->icon;
+    }
+    if (!ref) {
+        return nullptr;
+    }
+    SDL_Texture* t = ed_.thumb("spellicon" + std::to_string(index), [&](int& tw, int& th) -> std::vector<std::uint8_t> {
+        const auto* d = ed_.ctx_.sprites->decoded(ed_.ctx_.sprites->indexOf(*ref));
+        if (!d) {
+            return {};
+        }
+        tw = d->width;
+        th = d->height;
+        return d->rgba;
+    });
+    if (t) {
+        SDL_GetTextureSize(t, &w, &h);
+    }
+    return t;
 }
 
 // --- Commands ----------------------------------------------------------------------------------
@@ -1131,9 +1167,10 @@ void ModPanel::formWindow()
     inputText("##ui", form_.uiScript, 128);
     editor::labelRow("UI API", fieldX,
                      "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more. 3: lines, tooltips, labels over things, HUD strips, "
-                     "drags and the wheel (each sent only to clients that run it; the rest get text).");
-    int api = std::clamp(form_.uiApi, 1, 3) - 1;
-    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0")) form_.uiApi = api + 1;
+                     "drags and the wheel. 4: the game's spell icons, hit areas, a tick, kept labels (each sent only to clients that run it; "
+                     "the rest get text).");
+    int api = std::clamp(form_.uiApi, 1, 4) - 1;
+    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0" "4\0")) form_.uiApi = api + 1;
 
     ImGui::SeparatorText("Options");
     help("Settings shown under the mode's row in Host Custom; a script reads them with nox.option(key).");
@@ -1586,6 +1623,23 @@ void ModPanel::previewWindow()
                 ed_.objects_->drawThumbnailAt(dl, ed_.things_.things[static_cast<std::size_t>(d.index) - 1].name, ImVec2(a.x - size / 2, a.y - size / 2), size);
                 break;
             }
+            case nox::modes::script::UiDraw::Kind::SpellIcon: {
+                // (UI API 4) The game's own icon for a spell or an ability (the book's), its size
+                // or w x h.
+                float iw = 0, ih = 0;
+                if (SDL_Texture* t = spellIconTexture(d.index, iw, ih)) {
+                    const float dw = d.w > 0 ? d.w : iw, dh = d.h > 0 ? d.h : ih;
+                    dl->AddImage(editor::texId(t), a, ImVec2(a.x + dw * scale, a.y + dh * scale));
+                }
+                break;
+            }
+            }
+        }
+        // (UI API 4) A frameless window's hit areas, faintly: where it takes the mouse.
+        if (!w.frame) {
+            for (const auto& r : w.hitAreas) {
+                dl->AddRect(pt(static_cast<float>(w.x) + r.x, static_cast<float>(w.y) + r.y),
+                            pt(static_cast<float>(w.x) + r.x + r.w, static_cast<float>(w.y) + r.y + r.h), IM_COL32(120, 200, 255, 90));
             }
         }
         dl->PopClipRect();

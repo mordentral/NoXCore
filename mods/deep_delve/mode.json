@@ -6,9 +6,10 @@
   "order": 50,
   "players": [1, 6],
   "stockClients": false,
+  "minClientLevel": 5,
   "levels": "generated",
   "mapPrefix": "DD",
   "ui": "ui/main.luau",
-  "uiApi": 3,
+  "uiApi": 4,
   "reference": true
 }

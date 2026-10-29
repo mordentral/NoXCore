@@ -3,6 +3,7 @@
 // (Internal to the script modes' sources.)
 #pragma once
 
+#include "mod_draw_scale.hpp"
 #include "mod_events.hpp"
 #include "mod_generate.hpp"
 #include "mod_scheduler.hpp"
@@ -25,6 +26,8 @@ struct Parts {
     Generation generation;
     /// nox.weather's: nothing kept or sent till the mode first calls it.
     Weather weather;
+    /// nox.setDrawScale's: nothing sent till the mode first calls it.
+    DrawScales drawScales;
     /// nox.store's (opened at the first call; none while the host keeps no store).
     std::shared_ptr<ModStore> store;
     /// This game's locks' token (nox.store.lock).
@@ -35,7 +38,7 @@ struct Parts {
 
 /// The parts' toolbox functions set in the `nox` table on top of L's stack: the scheduler's, the
 /// events', the store's (nox.store when the host keeps one), the items', the players', the
-/// generator's, the weather's.
+/// generator's, the weather's, the draw scales'.
 void addPartsToolbox(lua_State* L, bool store);
 
 /// configure's returned table (at `t`): its quest keys onto the host's options (13.7: quest,

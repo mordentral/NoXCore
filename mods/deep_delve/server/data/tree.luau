@@ -33,6 +33,14 @@
 --
 -- Node ids are their places in `nodes` and are kept in records: new nodes go at the end, never
 -- between.
+--
+-- Pictures: a root, small, notable or keystone names its icon (`icon`, the mod's picture
+-- assets\tree\<icon>.png, sent to the UI as "ic"): a root "root_<class>", a notable "n_<name>", a
+-- keystone "k_<name>", a small by its stats ("s_health", "s_damage_resist"...). A new node of those
+-- kinds names one that is there (a test checks every one). A spell, ability or summon node is drawn
+-- with the game's own icon instead (`spellIcon`, sent to the UI as "si", drawn by nox.spellIcon):
+-- a spell's its SPELL_* name, an ability's its ABILITY_* name (data.abilities' `icon`), a summon's
+-- its creature's summon spell ("dd check" and a test prove each is a name the client knows).
 
 local data = {}
 
@@ -75,19 +83,21 @@ data.firstSummon = "SPELL_SUMMON_BAT"
 data.guideSize = 40
 
 -- A warrior's abilities by number (the game's: 1-5). An ability's level changes nothing in the
--- game once it is known (top 1, below), so each further node of one gives its mastery.
+-- game once it is known (top 1, below), so each further node of one gives its mastery. `icon`:
+-- the game's name for it, as nox.spellIcon takes it (the client's own icon).
 data.abilities = {
-	{ id = 1, key = "BerserkerCharge", title = "Berserker Charge", mastery = { damage = 4 } },
-	{ id = 2, key = "WarCry", title = "War Cry", mastery = { health = 10 } },
-	{ id = 3, key = "Harpoon", title = "Harpoon", mastery = { damage = 3, strength = 2 } },
-	{ id = 4, key = "TreadLightly", title = "Tread Lightly", mastery = { resist = 3 } },
-	{ id = 5, key = "EyeOfTheWolf", title = "Eye of the Wolf", mastery = { strength = 4 } },
+	{ id = 1, key = "BerserkerCharge", title = "Berserker Charge", icon = "ABILITY_BERSERKER_CHARGE", mastery = { damage = 4 } },
+	{ id = 2, key = "WarCry", title = "War Cry", icon = "ABILITY_WARCRY", mastery = { health = 10 } },
+	{ id = 3, key = "Harpoon", title = "Harpoon", icon = "ABILITY_HARPOON", mastery = { damage = 3, strength = 2 } },
+	{ id = 4, key = "TreadLightly", title = "Tread Lightly", icon = "ABILITY_TREAD_LIGHTLY", mastery = { resist = 3 } },
+	{ id = 5, key = "EyeOfTheWolf", title = "Eye of the Wolf", icon = "ABILITY_EYE_OF_THE_WOLF", mastery = { strength = 4 } },
 }
 
 -- How the tree's spells rise with their nodes. The book is the mod's, so a spell is cast at the
 -- level its nodes grant (not the network game's flat 3), and the game's own numbers set what a
 -- level is worth (measured against a held foe; at levels 1-5, flat 3 being level 3):
---   Fireball      64 96 127 127 127 (its missile is the same from level 3; 4 and 5 only fly faster)
+--   Fireball      64 96 127 127 127 (its missile is a TitanFireball from level 3; 4 and 5 fly
+--                 faster, and are larger: `size`, below)
 --   Energy Bolt   38 48 60 68 77 a second
 --   Magic Missile 16 24 32 40 48 (2-6 missiles of 8)
 --   Pixie Swarm   16 24 32 40 48 (2-6 pixies of 8)
@@ -101,15 +111,35 @@ data.abilities = {
 --   mastery  what each of its nodes past `top` (or past 5) gives its class: still the spell's
 --            level up to 5, and these stats;
 --   own      % more damage the spell's own hits deal (those of the things in `hits`, its
---            missiles), given to its class by its first node and kept while the spell is.
+--            missiles), given to its class by its first node and kept while the spell is;
+--   size     its missile made larger at some levels: { missile = the type sized, byLevel =
+--            { [level] = { hit, burst, draw } } }: a hero's cast at that level (its book's level)
+--            gives each such missile it makes a hit circle of `hit` (nox.setHitRadius: a point
+--            made a circle, so it meets what passes within `hit` of its path), its burst's
+--            reach and push times `burst` (nox.setBurstScale), and its drawing times `draw`
+--            (nox.setDrawScale: NoX Core clients at client level 5 draw the missile, and its
+--            burst, that much larger; older and stock clients draw the stock ones). Walls still
+--            meet its centre's path.
 -- An ability rises as a spell with top 1 and its own mastery.
+--
+-- Fireball 4 and 5 (by decision 2026-10-28): larger and easier to hit with. A TitanFireball's
+-- hit is its centre (a point) and its burst reaches 85 (a third of its 255), pushing to 170;
+-- at 4 a hit circle of 8 and the burst x 1.25 (106), at 5 a circle of 16 and x 1.5 (127). The
+-- masteries' +5% stay. It is drawn as large as its burst reaches: x 1.25 at 4, x 1.5 at 5.
 --
 -- Magic Missile and Pixie Swarm start at 1 with own +60%: a missile's or pixie's 8 is 13, so two
 -- casts kill an area-1 Skeleton (50): Magic Missile for Fireball's mana (2 x 15 against 30), Pixie
 -- Swarm in Meteor's two casts. +57% is the least that does (8 x 1.57 rounds to 13); a damage stat
 -- that size for everything would beat any keystone, so it is the spell's alone.
 data.rises = {
-	SPELL_FIREBALL = { top = 3, mastery = { damage = 5 } },
+	SPELL_FIREBALL = {
+		top = 3,
+		mastery = { damage = 5 },
+		size = {
+			missile = "TitanFireball",
+			byLevel = { [4] = { hit = 8, burst = 1.25, draw = 1.25 }, [5] = { hit = 16, burst = 1.5, draw = 1.5 } },
+		},
+	},
 	SPELL_BURN = { top = 1, mastery = { damage = 4 } },
 	SPELL_LIGHTNING = {},
 	SPELL_SHOCK = {},
@@ -126,14 +156,21 @@ data.rises = {
 -- Each spell's (by name) and ability's (by number) rise, filled in, as an index.
 local riseOf: { [any]: any } = {}
 for name, r in (data.rises :: any) do
-	riseOf[name] = { start = r.start or 1, top = math.min(r.top or 5, 5), mastery = r.mastery or {}, own = r.own or 0, hits = r.hits or {} }
+	riseOf[name] = {
+		start = r.start or 1,
+		top = math.min(r.top or 5, 5),
+		mastery = r.mastery or {},
+		own = r.own or 0,
+		hits = r.hits or {},
+		size = r.size,
+	}
 end
 for _, a in data.abilities do
 	riseOf[a.id] = { start = 1, top = 1, mastery = a.mastery, own = 0, hits = {} }
 end
 local PLAIN = { start = 1, top = 5, mastery = {}, own = 0, hits = {} }
 
--- A spell's (by name) or ability's (by number) rise: { start, top, mastery, own, hits }.
+-- A spell's (by name) or ability's (by number) rise: { start, top, mastery, own, hits, size? }.
 function data.rise(give: string | number): any
 	return riseOf[give] or PLAIN
 end
@@ -170,14 +207,14 @@ local function link(a: number, b: number)
 end
 
 -- The middle: a crossroads and the ways out to the three roots.
-local m1 = add({ x = 0, y = 0, kind = "notable", region = "middle", name = "Crossroads", stats = { damage = 4, resist = 4 } })
-local m2 = add({ x = -2, y = 0, kind = "small", region = "middle", name = "Vigour", stats = { health = 8 } })
-local m3 = add({ x = 1, y = -2, kind = "small", region = "middle", name = "Insight", stats = { mana = 8 } })
-local m4 = add({ x = 1, y = 2, kind = "small", region = "middle", name = "Sinew", stats = { strength = 3 } })
-local m5 = add({ x = -2, y = -2, kind = "small", region = "middle", name = "Edge", stats = { damage = 3 } })
-local m6 = add({ x = -2, y = 2, kind = "small", region = "middle", name = "Hardiness", stats = { resist = 3 } })
-local m7 = add({ x = 2, y = 0, kind = "small", region = "middle", name = "Breath", stats = { health = 6, mana = 6 } })
-local m8 = add({ x = 4, y = 0, kind = "small", region = "middle", name = "Poise", stats = { damage = 2, resist = 2 } })
+local m1 = add({ x = 0, y = 0, kind = "notable", region = "middle", name = "Crossroads", icon = "n_crossroads", stats = { damage = 4, resist = 4 } })
+local m2 = add({ x = -2, y = 0, kind = "small", region = "middle", name = "Vigour", icon = "s_health", stats = { health = 8 } })
+local m3 = add({ x = 1, y = -2, kind = "small", region = "middle", name = "Insight", icon = "s_mana", stats = { mana = 8 } })
+local m4 = add({ x = 1, y = 2, kind = "small", region = "middle", name = "Sinew", icon = "s_strength", stats = { strength = 3 } })
+local m5 = add({ x = -2, y = -2, kind = "small", region = "middle", name = "Edge", icon = "s_damage", stats = { damage = 3 } })
+local m6 = add({ x = -2, y = 2, kind = "small", region = "middle", name = "Hardiness", icon = "s_resist", stats = { resist = 3 } })
+local m7 = add({ x = 2, y = 0, kind = "small", region = "middle", name = "Breath", icon = "s_health_mana", stats = { health = 6, mana = 6 } })
+local m8 = add({ x = 4, y = 0, kind = "small", region = "middle", name = "Poise", icon = "s_damage_resist", stats = { damage = 2, resist = 2 } })
 link(m1, m2)
 link(m1, m3)
 link(m1, m4)
@@ -195,7 +232,7 @@ local ORDER = { "A", "small", "A", "B", "small", "notable", "A", "B", "small", "
 local SUMMON_ORDER = { "C", "small", "C", "C", "small", "notable", "C", "C", "small", "C", "C", "keystone" }
 
 local function region(class: string, title: string, rx: number, ry: number, join: number, branches: { any })
-	local root = add({ x = rx, y = ry, kind = "root", region = class, name = title, stats = {} })
+	local root = add({ x = rx, y = ry, kind = "root", region = class, name = title, icon = "root_" .. class, stats = {} })
 	data.roots[class] = root
 	link(join, root)
 	local notables = {}
@@ -215,14 +252,22 @@ local function region(class: string, title: string, rx: number, ry: number, join
 				creatureAt += 1
 				n.kind = "summon"
 				n.creature = b.summons[creatureAt]
+				local c = (data.creatures :: any)[n.creature]
+				n.spellIcon = c and c.spell
 			elseif what == "A" or what == "B" then
 				level[what] += 1
 				if type(give) == "number" then
 					n.kind = "ability"
 					n.ability = give
+					for _, a in data.abilities do
+						if a.id == give then
+							n.spellIcon = a.icon
+						end
+					end
 				else
 					n.kind = "spell"
 					n.spell = give
+					n.spellIcon = give
 				end
 				-- (as the node shows it, taken along its branch: the level it brings the spell to,
 				-- whether it's the first, gives the mastery, or the mastery alone, past level 5)
@@ -237,14 +282,17 @@ local function region(class: string, title: string, rx: number, ry: number, join
 				local s = b.small[(smallAt - 1) % #b.small + 1]
 				n.kind = "small"
 				n.name = s.name
+				n.icon = s.icon
 				n.stats = s.stats
 			elseif what == "notable" then
 				n.kind = "notable"
 				n.name = b.notable.name
+				n.icon = b.notable.icon
 				n.stats = b.notable.stats
 			else
 				n.kind = "keystone"
 				n.name = b.keystone.name
+				n.icon = b.keystone.icon
 				n.stats = b.keystone.stats
 			end
 			local id = add(n)
@@ -262,21 +310,21 @@ local function region(class: string, title: string, rx: number, ry: number, join
 end
 
 local WARRIOR_SMALL = {
-	{ name = "Brawn", stats = { health = 8 } },
-	{ name = "Might", stats = { strength = 3 } },
-	{ name = "Ferocity", stats = { damage = 3 } },
-	{ name = "Grit", stats = { resist = 2 } },
+	{ name = "Brawn", icon = "s_health", stats = { health = 8 } },
+	{ name = "Might", icon = "s_strength", stats = { strength = 3 } },
+	{ name = "Ferocity", icon = "s_damage", stats = { damage = 3 } },
+	{ name = "Grit", icon = "s_resist", stats = { resist = 2 } },
 }
 local WIZARD_SMALL = {
-	{ name = "Lore", stats = { mana = 8 } },
-	{ name = "Spark", stats = { damage = 3 } },
-	{ name = "Ward", stats = { health = 5 } },
+	{ name = "Lore", icon = "s_mana", stats = { mana = 8 } },
+	{ name = "Spark", icon = "s_damage", stats = { damage = 3 } },
+	{ name = "Ward", icon = "s_health", stats = { health = 5 } },
 }
 local CONJURER_SMALL = {
-	{ name = "Kinship", stats = { mana = 6 } },
-	{ name = "Bark", stats = { health = 6 } },
-	{ name = "Thorn", stats = { damage = 3 } },
-	{ name = "Moss", stats = { resist = 2 } },
+	{ name = "Kinship", icon = "s_mana", stats = { mana = 6 } },
+	{ name = "Bark", icon = "s_health", stats = { health = 6 } },
+	{ name = "Thorn", icon = "s_damage", stats = { damage = 3 } },
+	{ name = "Moss", icon = "s_resist", stats = { resist = 2 } },
 }
 
 region("warrior", "The Warrior's Path", -4, 0, m2, {
@@ -289,8 +337,8 @@ region("warrior", "The Warrior's Path", -4, 0, m2, {
 		A = 1, -- Berserker Charge
 		B = 2, -- War Cry
 		small = WARRIOR_SMALL,
-		notable = { name = "Bloodlust", stats = { damage = 6, strength = 3 } },
-		keystone = { name = "Bloodrage", stats = { damage = 25, resist = -10 } },
+		notable = { name = "Bloodlust", icon = "n_bloodlust", stats = { damage = 6, strength = 3 } },
+		keystone = { name = "Bloodrage", icon = "k_bloodrage", stats = { damage = 25, resist = -10 } },
 	},
 	{
 		name = "Guard",
@@ -301,8 +349,8 @@ region("warrior", "The Warrior's Path", -4, 0, m2, {
 		A = 4, -- Tread Lightly
 		B = nil,
 		small = { WARRIOR_SMALL[4], WARRIOR_SMALL[1] },
-		notable = { name = "Ironhide", stats = { resist = 5, health = 15 } },
-		keystone = { name = "Unbowed", stats = { resist = 15, healthPct = 15, damage = -10 } },
+		notable = { name = "Ironhide", icon = "n_ironhide", stats = { resist = 5, health = 15 } },
+		keystone = { name = "Unbowed", icon = "k_unbowed", stats = { resist = 15, healthPct = 15, damage = -10 } },
 	},
 	{
 		name = "Hunt",
@@ -313,8 +361,8 @@ region("warrior", "The Warrior's Path", -4, 0, m2, {
 		A = 3, -- Harpoon
 		B = 5, -- Eye of the Wolf
 		small = { WARRIOR_SMALL[3], WARRIOR_SMALL[2] },
-		notable = { name = "Keen Eye", stats = { damage = 5, health = 8 } },
-		keystone = { name = "Predator", stats = { damage = 15, strength = 10, healthPct = -10 } },
+		notable = { name = "Keen Eye", icon = "n_keen_eye", stats = { damage = 5, health = 8 } },
+		keystone = { name = "Predator", icon = "k_predator", stats = { damage = 15, strength = 10, healthPct = -10 } },
 	},
 })
 
@@ -328,8 +376,8 @@ region("wizard", "The Wizard's Path", 3, -4, m3, {
 		A = "SPELL_FIREBALL",
 		B = "SPELL_BURN",
 		small = WIZARD_SMALL,
-		notable = { name = "Kindling", stats = { damage = 6, mana = 8 } },
-		keystone = { name = "Pyre Heart", stats = { damage = 25, healthPct = -15 } },
+		notable = { name = "Kindling", icon = "n_kindling", stats = { damage = 6, mana = 8 } },
+		keystone = { name = "Pyre Heart", icon = "k_pyre_heart", stats = { damage = 25, healthPct = -15 } },
 	},
 	{
 		name = "Storm",
@@ -340,8 +388,8 @@ region("wizard", "The Wizard's Path", 3, -4, m3, {
 		A = "SPELL_LIGHTNING",
 		B = "SPELL_SHOCK",
 		small = { WIZARD_SMALL[2], WIZARD_SMALL[1] },
-		notable = { name = "Static Mind", stats = { mana = 15, damage = 3 } },
-		keystone = { name = "Overcharge", stats = { manaPct = 25, damage = 10, resist = -10 } },
+		notable = { name = "Static Mind", icon = "n_static_mind", stats = { mana = 15, damage = 3 } },
+		keystone = { name = "Overcharge", icon = "k_overcharge", stats = { manaPct = 25, damage = 10, resist = -10 } },
 	},
 	{
 		name = "Arcana",
@@ -352,8 +400,8 @@ region("wizard", "The Wizard's Path", 3, -4, m3, {
 		A = "SPELL_MAGIC_MISSILE",
 		B = "SPELL_DEATH_RAY",
 		small = { WIZARD_SMALL[3], WIZARD_SMALL[1] },
-		notable = { name = "Focus", stats = { mana = 10, resist = 3 } },
-		keystone = { name = "Mind over Body", stats = { manaPct = 40, healthPct = -20 } },
+		notable = { name = "Focus", icon = "n_focus", stats = { mana = 10, resist = 3 } },
+		keystone = { name = "Mind over Body", icon = "k_mind_over_body", stats = { manaPct = 40, healthPct = -20 } },
 	},
 })
 
@@ -367,8 +415,8 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		A = "SPELL_PIXIE_SWARM",
 		B = "SPELL_TOXIC_CLOUD",
 		small = { CONJURER_SMALL[3], CONJURER_SMALL[1] },
-		notable = { name = "Brood", stats = { damage = 5, mana = 8 } },
-		keystone = { name = "Swarmcaller", stats = { damage = 15, manaPct = 15, resist = -10 } },
+		notable = { name = "Brood", icon = "n_brood", stats = { damage = 5, mana = 8 } },
+		keystone = { name = "Swarmcaller", icon = "k_swarmcaller", stats = { damage = 15, manaPct = 15, resist = -10 } },
 	},
 	{
 		name = "Earth",
@@ -381,8 +429,8 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		A = "SPELL_METEOR",
 		B = "SPELL_FIST",
 		small = { CONJURER_SMALL[4], CONJURER_SMALL[2] },
-		notable = { name = "Stone Skin", stats = { resist = 5, health = 10 } },
-		keystone = { name = "Rooted", stats = { resist = 20, damage = -10 } },
+		notable = { name = "Stone Skin", icon = "n_stone_skin", stats = { resist = 5, health = 10 } },
+		keystone = { name = "Rooted", icon = "k_rooted", stats = { resist = 20, damage = -10 } },
 	},
 	{
 		name = "Grace",
@@ -393,8 +441,8 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		A = "SPELL_LESSER_HEAL",
 		B = "SPELL_SLOW",
 		small = { CONJURER_SMALL[2], CONJURER_SMALL[1] },
-		notable = { name = "Gentle Hands", stats = { health = 12, mana = 8 } },
-		keystone = { name = "Lifebinder", stats = { healthPct = 25, damage = -15 } },
+		notable = { name = "Gentle Hands", icon = "n_gentle_hands", stats = { health = 12, mana = 8 } },
+		keystone = { name = "Lifebinder", icon = "k_lifebinder", stats = { healthPct = 25, damage = -15 } },
 	},
 	-- (added after the first three: its nodes' ids follow theirs, 129-140)
 	{
@@ -405,8 +453,8 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		dy = 1,
 		summons = { "Bat", "Wolf", "BlackWolf", "Bear", "BlackBear", "OgreWarlord", "StoneGolem" },
 		small = { CONJURER_SMALL[1], CONJURER_SMALL[4] },
-		notable = { name = "Pack Leader", stats = { mana = 12, health = 8 } },
-		keystone = { name = "Beastmaster", stats = { manaPct = 20, resist = 10, damage = -15 } },
+		notable = { name = "Pack Leader", icon = "n_pack_leader", stats = { mana = 12, health = 8 } },
+		keystone = { name = "Beastmaster", icon = "k_beastmaster", stats = { manaPct = 20, resist = 10, damage = -15 } },
 	},
 })
 

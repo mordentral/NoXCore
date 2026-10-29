@@ -2,6 +2,7 @@
 #include "noxcore/modes/script/manifest.hpp"
 
 #include "json.hpp"
+#include "noxcore/lobby/extended.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -141,6 +142,12 @@ ManifestResult readManifest(std::string_view text_)
         }
         m.info.stockClients = flag(doc, "stockClients", true);
         m.refuseStock = !m.info.stockClients;
+        // (Above this build's level: no client it knows of has it.)
+        m.minClientLevel = static_cast<std::uint16_t>(whole(doc, "minClientLevel", 0, 0, 1000));
+        if (m.minClientLevel > lobby::kClientLevel) {
+            throw Bad{"asks for client level " + std::to_string(m.minClientLevel) + "; this build's clients are level " +
+                      std::to_string(lobby::kClientLevel)};
+        }
         const std::string levels = text(doc, "levels", "mapFiles", 16);
         if (levels != "mapFiles" && levels != "generated") {
             throw Bad{"\"levels\" is \"mapFiles\" or \"generated\""};

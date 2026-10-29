@@ -87,6 +87,9 @@ public:
     /// Links it (the caller tests its flags): `box` its CollideP about its NewPos
     /// (x, y), a missile in the point list only.
     void link(ServerObject& o, const Rect& box, float x, float y, bool missile);
+    /// noxcpp: a linked missile's box replaced where it is (its shape changed by a mode: in the
+    /// point list alone, so no cell changes and no list's order); anything else is left alone.
+    void setMissileBox(ServerObject& o, const Rect& box) noexcept;
     /// Unlinks it.
     void unlink(ServerObject& o);
     /// Off the grid and the lists, its entry given back (servFinalizeDelObject, or

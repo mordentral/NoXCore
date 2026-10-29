@@ -18,6 +18,8 @@
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/spell_ids.hpp"
 
+#include "noxcore/util/bytes.hpp"
+
 #include "../map/ai_actions.hpp"
 
 #include <algorithm>
@@ -369,14 +371,26 @@ xf::Data Saver::data(const ServerObject& o, const TypeFacts& f, const map::Objec
                         p.delay};
     }
     if (x == "TransporterXfer") { // (its partner's number, 0 unlinked)
+        // The exe's: 0 when the load linked it to nothing, else the number its record named (the
+        // u32 the record starts with, any version); one made in play, its partner's extent.
         const auto* r = decoded<xf::Transporter>(old);
-        return xf::Transporter{o.transport ? o.transport->link : (r ? r->targetExtent : 0u)};
+        if (!o.transport) {
+            return xf::Transporter{r ? r->targetExtent : 0u};
+        }
+        if (o.transport->link == 0) {
+            return xf::Transporter{0u};
+        }
+        return xf::Transporter{rec && rec->extra.size() >= 4 ? util::u32At(rec->extra, 0) : o.transport->link};
     }
+    // An elevator's or shaft's partner as its record named it (the u32 each starts with, any
+    // version: the exe writes back the number it read, its partner being a pointer the load
+    // linked); one made in play, its partner's extent.
+    const auto named = [&] { return rec && rec->extra.size() >= 4 ? util::u32At(rec->extra, 0) : o.elevatorLink; };
     if (x == "ElevatorXfer") { // (its link, level and state)
-        return xf::Elevator{o.elevatorLink, static_cast<std::uint32_t>(o.elevatorLevel), o.elevatorState};
+        return xf::Elevator{named(), static_cast<std::uint32_t>(o.elevatorLevel), o.elevatorState};
     }
     if (x == "ElevatorShaftXfer") {
-        return xf::ElevatorShaft{o.elevatorLink};
+        return xf::ElevatorShaft{named()};
     }
     if (x == "MoverXfer") {
         if (!o.mover) {

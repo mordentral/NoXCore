@@ -180,9 +180,7 @@ bool EditSessionDirector::isOwner(GameHost& host, std::uint8_t peer) const
 
 void EditSessionDirector::send(GameHost& host, std::uint8_t peer, std::uint8_t sub, std::span<const std::uint8_t> body)
 {
-    for (auto& m : ss::frame(sub, body, transfer_)) {
-        host.sendToIdentified(peer, std::move(m));
-    }
+    enqueue(host, peer, ss::frame(sub, body, transfer_));
 }
 
 void EditSessionDirector::sendJoined(GameHost& host, std::uint8_t sub, std::span<const std::uint8_t> body, std::optional<std::uint8_t> except,
@@ -193,9 +191,29 @@ void EditSessionDirector::sendJoined(GameHost& host, std::uint8_t sub, std::span
         if (!p.joined || (except && peer == *except) || (editorsOnly && p.role < ss::Role::Editor)) {
             continue;
         }
-        for (const auto& m : frames) {
+        enqueue(host, peer, frames);
+    }
+}
+
+void EditSessionDirector::enqueue(GameHost& host, std::uint8_t peer, std::span<const std::vector<std::uint8_t>> frames)
+{
+    const auto it = peers_.find(peer);
+    if (it == peers_.end()) {
+        for (const auto& m : frames) { // (not a member: as it comes, as before)
             host.sendToIdentified(peer, m);
         }
+        return;
+    }
+    it->second.outbox.insert(it->second.outbox.end(), frames.begin(), frames.end());
+    drainOutbox(host, peer, it->second);
+}
+
+void EditSessionDirector::drainOutbox(GameHost& host, std::uint8_t peer, Peer& p)
+{
+    // (In order, a frame for each packet of room: nothing waits when there's room, as before.)
+    while (!p.outbox.empty() && host.reliableBulkRoom(peer) > 0) {
+        host.sendToIdentified(peer, std::move(p.outbox.front()));
+        p.outbox.pop_front();
     }
 }
 
@@ -287,6 +305,9 @@ bool EditSessionDirector::tick(GameHost& host, std::uint32_t nowMs)
         }
     }
     retryWaiting(host);
+    for (auto& [peer, p] : peers_) {
+        drainOutbox(host, peer, p); // (the session's messages owed, first: they came first)
+    }
     if (hasMod()) {
         pumpMod(host); // (the mod's file transfers, as each member's queue has room)
     }
@@ -1318,6 +1339,9 @@ void EditSessionDirector::sendLive(GameHost& host)
     World& w = host.server().world();
     const auto coord = [](float v) { return static_cast<std::int16_t>(std::clamp(v, -32000.0f, 32000.0f)); };
     std::vector<ss::LiveEntry> live;
+    // (Its encoded size as it grows: 12 bytes an entry, the name's with its length, a player's 9
+    // more. The creatures stop at kLiveMostBytes, so a Live is never more frames than that.)
+    std::size_t bytes = 2;
     for (const auto& [peer, hp] : host.players()) {
         const ServerObject* u = w.byExtent(hp.extent);
         if (!u || u->gone()) continue;
@@ -1339,6 +1363,7 @@ void EditSessionDirector::sendLive(GameHost& host)
             e.weapon = u->player->weaponEquip;
             e.observer = (u->player->statusFlags & 1u) != 0;
         }
+        bytes += 14 + e.name.size() + 9;
         live.push_back(std::move(e));
     }
     if (options_.liveCreatures) {
@@ -1347,6 +1372,10 @@ void EditSessionDirector::sendLive(GameHost& host)
             if (!(o.classes & things::ObjectClass::Monster) || o.holder != 0 || o.gone() || o.pendingDelete || (o.flags & ObjFlag::Dead)) {
                 continue;
             }
+            if (bytes + 14 + o.typeName.size() > kLiveMostBytes) {
+                break;
+            }
+            bytes += 14 + o.typeName.size();
             ss::LiveEntry e;
             e.id = static_cast<std::uint16_t>(extent);
             e.player = false;
@@ -1365,11 +1394,14 @@ void EditSessionDirector::sendLive(GameHost& host)
     }
     // To each viewer whose link keeps up: one behind on its acks gets the next.
     const auto frames = ss::frame(ss::kLive, ss::encode(live), transfer_);
+    liveFrames_ = frames.size();
     for (const auto& [peer, p] : peers_) {
         if (!p.joined) {
             continue;
         }
-        if (host.queuedReliable(peer) > options_.liveQueueLimit) {
+        // (And only with reliable room for all of it, GameHost::reliableBulkRoom, which pumpMod
+        // leaves it; and none while the session's own messages wait: they go first.)
+        if (host.queuedReliable(peer) > options_.liveQueueLimit || host.reliableBulkRoom(peer) < frames.size() || !p.outbox.empty()) {
             ++stats_.liveSkipped;
             continue;
         }
@@ -1715,14 +1747,25 @@ void EditSessionDirector::pumpMod(GameHost& host)
             continue;
         }
         ModOut& o = p.mod;
-        while (host.queuedReliable(peer) < options_.modQueueLimit) {
-            if (o.listDirty) {
-                // The list first (its files' contents are checked against it on arrival).
+        if (!p.outbox.empty()) {
+            continue; // (the session's own messages go first: the join's Base before the list)
+        }
+        // (The live view's room left it: the files fill what's left.)
+        const std::size_t keep = options_.liveView ? liveFrames_ : 0;
+        while (host.queuedReliable(peer) < options_.modQueueLimit && host.reliableBulkRoom(peer) > keep) {
+            if (o.listAt >= o.listFrames.size() && o.listDirty) {
+                // The list first (its files' contents are checked against it on arrival), framed
+                // and sent a frame for each packet of room as the files are; owed again while it
+                // goes, the next goes once it's out.
                 if (modListBody_.empty()) {
                     modListBody_ = ss::encode(modProject());
                 }
-                send(host, peer, ss::kModProject, modListBody_);
+                o.listFrames = ss::frame(ss::kModProject, modListBody_, transfer_);
+                o.listAt = 0;
                 o.listDirty = false;
+            }
+            if (o.listAt < o.listFrames.size()) {
+                host.sendToIdentified(peer, std::move(o.listFrames[o.listAt++]));
                 continue;
             }
             if (o.frameAt < o.frames.size()) {
@@ -1744,6 +1787,10 @@ void EditSessionDirector::pumpMod(GameHost& host)
         if (o.frameAt >= o.frames.size() && !o.frames.empty()) {
             o.frames.clear();
             o.frameAt = 0;
+        }
+        if (o.listAt >= o.listFrames.size() && !o.listFrames.empty()) {
+            o.listFrames.clear();
+            o.listAt = 0;
         }
     }
     // Idle holds let go (as the lock table's); nothing to look at when nothing is held.

@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 struct lua_State;
@@ -37,7 +38,9 @@ public:
     void pickedUp(const server::ServerObject& taker, const server::ServerObject& item, float x, float y);
     void dropped(const server::ServerObject& holder, const server::ServerObject& item);
     void equipped(const server::ServerObject& unit, const server::ServerObject& item, bool worn);
-    void spellCast(const server::ServerObject& caster, std::uint32_t spell, const server::ServerObject* target, float x, float y);
+    /// `made`: what the cast made (onSpellCast's sixth argument; kept only when the hook is there).
+    void spellCast(const server::ServerObject& caster, std::uint32_t spell, const server::ServerObject* target, float x, float y,
+                   std::span<const std::uint32_t> made);
 
     // ---- asked: the script's answer, at once
     /// onDamage(target, source, weapon, amount, kind) -> amount (nil: kept; 0: the hit cancelled).
@@ -62,6 +65,7 @@ private:
         float x = 0, y = 0;
         std::int32_t n = 0;          ///< an amount, a spell, worn
         server::Name type;           ///< (a death's or a deletion's thing type)
+        std::uint32_t madeFrom = 0, madeCount = 0; ///< a cast's: what it made, in made_
     };
     bool room();
     /// An asked hook's call with Parts::asked set (the world's changes refused in it).
@@ -69,6 +73,7 @@ private:
 
     Has has_;
     std::vector<Event> queue_;
+    std::vector<std::uint32_t> made_; ///< the queued casts' made ids, each a run of them
     std::size_t overflow_ = 0;
 };
 

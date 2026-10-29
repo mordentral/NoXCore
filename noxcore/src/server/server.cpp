@@ -1451,9 +1451,13 @@ void Server::substep(int k, int m)
         const float dy = y - o.frameStartY;
         const float along = std::sqrt(dx * dx + dy * dy);
         if (along > 0) {
-            const float size = o.shape == ShapeKind::Circle ? o.radius
-                               : o.shape == ShapeKind::Box  ? std::max(o.boxWidth, o.boxHeight) * 0.5f
-                                                            : 0.0f;
+            // (A missile a mode gave a hit shape meets walls by its type's: ModSize keeps it.)
+            const ServerObject::ModSize* own = o.modSize && o.modSize->hit ? &*o.modSize : nullptr;
+            const ShapeKind shape = own ? own->typeShape : o.shape;
+            const float size = shape == ShapeKind::Circle ? (own ? own->typeRadius : o.radius)
+                               : shape == ShapeKind::Box  ? (own ? std::max(own->typeBoxWidth, own->typeBoxHeight)
+                                                                 : std::max(o.boxWidth, o.boxHeight)) * 0.5f
+                                                          : 0.0f;
             const float reachX = x + dx / along * size;
             const float reachY = y + dy / along * size;
             auto flags = static_cast<std::uint8_t>(((o.flags >> 12) & Trace::ThroughWindows) | Trace::Doors);

@@ -2,6 +2,7 @@
 #include "noxcore/client/delve_client.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 namespace nox::client {
 
@@ -82,6 +83,11 @@ void DelveClient::onMessage(std::span<const std::uint8_t> m)
     case server::delvemap::kRecords:
         if (auto records = server::delvemap::parseRecords(rest)) {
             records_ = std::move(*records);
+        }
+        break;
+    case server::delvemap::kRecordsMore: // (the rest of the table, after its kRecords)
+        if (auto records = server::delvemap::parseRecords(rest)) {
+            records_.insert(records_.end(), std::make_move_iterator(records->begin()), std::make_move_iterator(records->end()));
         }
         break;
     default:

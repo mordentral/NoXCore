@@ -25,7 +25,9 @@
 --   dd check             every name in the data tables checked against thing.bin, every spell
 --                        against the game's spells (its number, its class, no linked group),
 --                        every creature the tree gives (its name the field guide's, its summon
---                        spell the one that calls it; no player needed)
+--                        spell the one that calls it), every spell, ability and summon node's
+--                        icon name (its spell's, its ability's ABILITY_* name, its creature's
+--                        summon spell), the draw scales within 0.5-3 (no player needed)
 --   dd gold [N]          the first player's gold (set to N)
 --   dd carried           what it carries: "n id type rarity worn" (n: the stash's and vendor's N)
 --   dd stash [open | put N | take TAB SLOT | deposit | withdraw]   its stash (as its window
@@ -34,7 +36,11 @@
 --                        alone, its stock "index type rarity price"
 --   dd tree [take ID... | respec | nodes [REGION]]   its passive tree; alone, its points and
 --                        the nodes taken
---   dd book              the spells, abilities and creatures its tree gives, and whether its
+--   dd tree describe ID  a node's name and what it gives, as the tree window shows them (no
+--                        player needed)
+--   dd icons             each tree node's picture, "id kind icon": the mod's picture, or the
+--                        game's icon's name for a spell, ability or summon (no player needed)
+--   dd book             the spells, abilities and creatures its tree gives, and whether its
 --                        unit's book and field guide are exactly that ("server ok")
 --   dd sheet             its character sheet, "key value" lines
 --   dd ui WINDOW         a window opened on its UI (stash, vendor: it's moved by the station)
@@ -483,6 +489,13 @@ function commands.check(_args: { string }): { string }
 	for _, p in vendorData.potions do
 		thing(p.type, "vendor")
 	end
+	-- The missiles the tree's spells size (data/tree.luau's size).
+	for name in (treeData.rises :: any) do
+		local size = treeData.rise(name).size
+		if size then
+			thing(size.missile, "tree size " .. name)
+		end
+	end
 	-- The tree's spells: each name the game's (nox.spellId; its record and sounds the same by name
 	-- and by that number), a spell of its region's class, in no linked group.
 	local regionOf: { [string]: string } = {}
@@ -577,6 +590,44 @@ function commands.check(_args: { string }): { string }
 			table.insert(bad, "tree: creature " .. name .. " is on no node")
 		end
 	end
+	-- Each spell, ability and summon node's icon (nox.spellIcon's name): a spell node's its spell,
+	-- a summon's its creature's summon spell (each a SPELL_* name the game knows), an ability's its
+	-- ABILITY_* name, the five each its own.
+	local abilityIcons: { [string]: number } = {}
+	for _, a in treeData.abilities do
+		local icon = (a :: any).icon
+		if type(icon) ~= "string" or string.sub(icon, 1, 8) ~= "ABILITY_" then
+			table.insert(bad, "tree: ability " .. a.id .. " has no ABILITY_ icon name")
+		elseif abilityIcons[icon] then
+			table.insert(bad, "tree: abilities " .. abilityIcons[icon] .. " and " .. a.id .. " share the icon " .. icon)
+		else
+			abilityIcons[icon] = a.id
+		end
+	end
+	for _, n in treeData.nodes do
+		local icon = n.spellIcon
+		if n.kind == "spell" or n.kind == "summon" then
+			local want = if n.kind == "spell" then n.spell else ((treeData.creatures :: any)[n.creature] or {}).spell
+			if icon ~= want or type(icon) ~= "string" or string.sub(icon, 1, 6) ~= "SPELL_" or not nox.spellId(icon) then
+				table.insert(bad, "tree: node " .. n.id .. "'s icon " .. tostring(icon) .. " isn't its spell's")
+			end
+		elseif n.kind == "ability" then
+			if type(icon) ~= "string" or abilityIcons[icon] ~= n.ability then
+				table.insert(bad, "tree: node " .. n.id .. "'s icon " .. tostring(icon) .. " isn't its ability's")
+			end
+		elseif icon ~= nil then
+			table.insert(bad, "tree: node " .. n.id .. " (" .. tostring(n.kind) .. ") has a game icon")
+		end
+	end
+	-- The draw scales (nox.setDrawScale's 0.5-3).
+	for name in (treeData.rises :: any) do
+		local size = treeData.rise(name).size
+		for level, at in (size and size.byLevel or {}) :: any do
+			if at.draw ~= nil and (type(at.draw) ~= "number" or at.draw < 0.5 or at.draw > 3) then
+				table.insert(bad, "tree: " .. name .. " " .. tostring(level) .. "'s draw scale " .. tostring(at.draw) .. " isn't 0.5-3")
+			end
+		end
+	end
 	if #bad == 0 then
 		return { "ok" }
 	end
@@ -668,6 +719,14 @@ function commands.vendor(args: { string }): { string }
 end
 
 function commands.tree(args: { string }): { string }
+	if args[2] == "describe" then
+		local n = tree.node(tonumber(args[3]) or 0)
+		if not n then
+			return { "no such node" }
+		end
+		local name, what = tree.describe(n)
+		return { name, what }
+	end
 	local h = firstHero()
 	if not h then
 		return { "no player" }
@@ -708,6 +767,18 @@ function commands.tree(args: { string }): { string }
 			t.respecs),
 		"taken " .. (if #taken > 0 then table.concat(taken, " ") else "none"),
 	}
+end
+
+-- Each tree node's picture as the UI is sent it: "id kind icon", the icon the mod's picture's
+-- name for a root, small, notable or keystone, the game's icon's (nox.spellIcon's) for a spell,
+-- ability or summon ("-": none).
+function commands.icons(_args: { string }): { string }
+	local out = {}
+	for id = 1, tree.count() do
+		local n = tree.node(id)
+		table.insert(out, string.format("%d %s %s", id, tostring(n.kind), tostring(n.icon or n.spellIcon or "-")))
+	end
+	return out
 end
 
 function commands.book(_args: { string }): { string }
@@ -786,7 +857,7 @@ function commands.help(_args: { string }): { string }
 		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|pack [N] | area N [waypoint] | portal | waypoint N",
 		"dd progress | boss | smite | trial SEED N",
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L]",
-		"dd tree [take ID...|respec|nodes [REGION]] | book | sheet | ui stash|vendor|tree|sheet",
+		"dd tree [take ID...|respec|nodes [REGION]|describe ID] | icons | book | sheet | ui stash|vendor|tree|sheet",
 		"dd as NAME COMMAND | party | scale | exit | vote [yes|no|cancel|seconds N] | labels | portals | portal take | hud",
 		"dd option [lootNames alt|always]",
 	}

@@ -41,6 +41,7 @@ target_sources(noxmodes PRIVATE
     script/src/luau_vm.cpp
     script/src/manifest.cpp
     script/src/mod_assets.cpp
+    script/src/mod_draw_scale.cpp
     script/src/mod_events.cpp
     script/src/mod_generate.cpp
     script/src/mod_items.cpp

@@ -2,6 +2,7 @@
 // their poses, name plates and the things over them, what's under the mouse), the sight
 // blockers, the lights, the looping sounds, the walls' state, and the viewer's effects demo.
 #include "app.hpp"
+#include "draw_scale.hpp"
 #include "friend_dot.hpp"
 #include "player_art.hpp"
 #include "team_colors.hpp"
@@ -462,12 +463,38 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
         pose.enabled = d.enabled;
         pose.xStatus = d.xStatus;
         auto p = app.interpolator.position(netCode, d);
+        // A script mode's draw scale on it (App::modeDrawScales: nox.setDrawScale), for its body's
+        // images; looked up only while a mode has given any.
+        float drawScale = 1.0f;
+        if (!app.modeDrawScales.empty()) {
+            const auto ds = std::ranges::lower_bound(app.modeDrawScales, netCode, {}, &App::ModeDrawScale::object);
+            if (ds != app.modeDrawScales.end() && ds->object == netCode && ds->type == d.typeId) {
+                drawScale = ds->scale;
+            }
+        }
         if (const auto z = app.effects->drawableZ(netCode, d.typeId)) {
             p.z = *z; // a falling fist or meteor: its client update sets the height
         }
         pose.direction = app.view3d.seenDirection(pose.direction, p.x, p.y); // (the 3D view: as its eye sees it)
         const float x = p.x - a->halfWidth;
         const float y = p.y - a->halfHeight - a->z - p.z;
+        // Its draw scale on each of its body's images, all about one pivot (draw_scale.hpp): a
+        // missile's first image's middle, anything else's ground point, so its layers stay
+        // together and what stands stays on the floor.
+        std::optional<drawscale::Point> scalePivot;
+        const auto scaled = [&](MapView::SceneSprite& e) {
+            if (drawScale == 1.0f || !e.sprite) {
+                return;
+            }
+            if (!scalePivot) {
+                scalePivot = drawscale::pivotOf((a->classes & nox::things::ObjectClass::Missile) != 0, {p.x, p.y - p.z},
+                                                {e.x + e.sprite->offsetX, e.y + e.sprite->offsetY, static_cast<float>(e.sprite->width),
+                                                 static_cast<float>(e.sprite->height)});
+            }
+            e.scale = drawScale;
+            e.pivotX = scalePivot->x;
+            e.pivotY = scalePivot->y;
+        };
         // In the 3D view's mouse look, only the thing its crosshair is on (the cursor is at its
         // foot, as it was a frame ago: the nearest within a creature's step of it): not whatever
         // else covers that spot in 2D, and nothing while it aims at the ground.
@@ -537,6 +564,7 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
                     }
                     out.push_back({p.y, x, y, s, p.x, p.y});
                     out.back().clipBottom = clipBottom;
+                    scaled(out.back());
                     out.back().light = light;
                     fadeTag(out.back(), netCode, d, *a, ghost.has_value(), p.z);
                     out.back().notesImage = a->fades;
@@ -654,6 +682,7 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
                     }
                     out.push_back({p.y, x, y, s, p.x, p.y, bodyAlpha});
                     out.back().clipBottom = clipBottom;
+                    scaled(out.back());
                     fadeTag(out.back(), netCode, d, *a, ghost.has_value() || bodyAlpha != 255, p.z);
                     out.back().notesImage = a->fades;
                     if (ghost && ghost->green) {
@@ -748,6 +777,7 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
         if (s && !(ghost && ghost->alpha == 0)) {
             // BELOW things (scorch marks, blood, plates) lie under what stands on the floor.
             out.push_back({a->below ? p.y - MapView::kBelow : p.y, x, y, s, p.x, p.y});
+            scaled(out.back()); // (and the image drawn over it, below: a copy of this one, its pivot too)
             out.back().bloom = (a->classes & nox::things::ObjectClass::Light) != 0; // light sources bloom
             out.back().light = light;
             fadeTag(out.back(), netCode, d, *a, ghost.has_value(), p.z);
@@ -775,7 +805,11 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
             if (!app.modeLabels.empty()) {
                 const auto l = std::ranges::lower_bound(app.modeLabels, netCode, {}, &std::pair<std::uint16_t, std::uint16_t>::first);
                 if (l != app.modeLabels.end() && l->first == netCode) {
-                    const App::ModeLabelSpot spot{l->second, p.x, p.y, p.y - p.z - a->zSizeMax};
+                    App::ModeLabelSpot spot{l->second, p.x, p.y, p.y - p.z - a->zSizeMax};
+                    if (scalePivot) {
+                        // (Drawn at a scale: the label goes up as far as its image's top does.)
+                        spot.top -= drawscale::rise(drawScale, *scalePivot, y + s->offsetY);
+                    }
                     overlay(netCode, d, *a, p.x, p.y, p.z, [&app, spot](SDL_Renderer*, const Camera&) { app.modeLabelSpots.push_back(spot); });
                 }
             }

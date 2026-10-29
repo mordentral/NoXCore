@@ -29,6 +29,13 @@
 //   kBook       u8 1: the book is the mode's (the client's book lists only what it was granted,
 //               not a network game's every spell, ability and creature); 0: the stock book
 //               (bytes past the first are left for later versions)
+// and, only to a client at client level 5 or above (kDrawScaleLevel) that named ModeUi, from a
+// script mode that called nox.setDrawScale: a thing's draw scale, when it's set (to the clients
+// that know the thing then) and when a client is first sent the thing (its record new to it):
+//   kDrawScale  u16 the thing's net code, u16 its type (its net type id), u16 the scale in 1/256
+//               (128-768: 0.5-3; 256: as its type's, the scale let go)    (6 bytes)
+// A UI of API 4 (kBegin's api byte 4) and everything of it go only to a client at client level 5
+// or above (kUiApi4Level) that named ModeUi and ModeUi2; the bytes are API 2's.
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -64,6 +71,7 @@ enum Sub : std::uint8_t {
     kAssetChunk = 8,
     kWeather = 9,
     kBook = 10,
+    kDrawScale = 11,
     kReady = 16,
     kSend = 17,
     kAnswer = 18,
@@ -89,12 +97,58 @@ inline constexpr std::uint16_t kBookLevel = 2;
 /// The lowest client level a server sends a UI of API 3 to (with ModeUi and ModeUi2 named): every
 /// sub of it (its assets, kBegin, chunks, data, views). Below it the client gets the views as text.
 inline constexpr std::uint16_t kUiApi3Level = 3;
+/// The lowest client level a server sends a UI of API 4 to (as kUiApi3Level's for API 3).
+inline constexpr std::uint16_t kUiApi4Level = 5;
+/// The lowest client level a server sends kDrawScale to (with ModeUi named).
+inline constexpr std::uint16_t kDrawScaleLevel = 5;
 
 /// kBook's message: `modes` 1, the book is the mode's; 0, the stock book.
 inline std::vector<std::uint8_t> bookMessage(bool modes)
 {
     const std::uint8_t payload[1] = {static_cast<std::uint8_t>(modes ? 1 : 0)};
     return message(kBook, payload);
+}
+
+/// The draw scales a mode may give (nox.setDrawScale), and kDrawScale's unit (1/256).
+inline constexpr float kMinDrawScale = 0.5f;
+inline constexpr float kMaxDrawScale = 3.0f;
+inline constexpr int kDrawScaleUnit = 256;
+
+/// kDrawScale's payload.
+struct DrawScale {
+    std::uint16_t object = 0; ///< its net code
+    std::uint16_t type = 0;   ///< its net type id
+    float scale = 1;          ///< (1: let go)
+    bool operator==(const DrawScale&) const = default;
+};
+
+/// kDrawScale's message: `scale` kept to 0.5-3 (1: as its type's), in 1/256.
+inline std::vector<std::uint8_t> drawScaleMessage(std::uint16_t object, std::uint16_t type, float scale)
+{
+    const float s = scale == scale ? std::clamp(scale, kMinDrawScale, kMaxDrawScale) : 1.0f;
+    const auto units = static_cast<std::uint16_t>(static_cast<int>(s * kDrawScaleUnit + 0.5f));
+    const std::uint8_t payload[6] = {static_cast<std::uint8_t>(object), static_cast<std::uint8_t>(object >> 8),
+                                     static_cast<std::uint8_t>(type),   static_cast<std::uint8_t>(type >> 8),
+                                     static_cast<std::uint8_t>(units),  static_cast<std::uint8_t>(units >> 8)};
+    return message(kDrawScale, payload);
+}
+
+/// A kDrawScale payload read (bytes past the 6 left for later versions); none: cut short, or no
+/// object. A scale out of 0.5-3 is kept to it (a server's numbers are untrusted).
+inline std::optional<DrawScale> decodeDrawScale(std::span<const std::uint8_t> payload)
+{
+    if (payload.size() < 6) {
+        return std::nullopt;
+    }
+    DrawScale d;
+    d.object = static_cast<std::uint16_t>(payload[0] | payload[1] << 8);
+    d.type = static_cast<std::uint16_t>(payload[2] | payload[3] << 8);
+    const int units = payload[4] | payload[5] << 8;
+    d.scale = std::clamp(static_cast<float>(units) / kDrawScaleUnit, kMinDrawScale, kMaxDrawScale);
+    if (d.object == 0) {
+        return std::nullopt;
+    }
+    return d;
 }
 
 /// A message's sub and payload; none: not one (or cut short).

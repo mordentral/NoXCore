@@ -85,6 +85,32 @@ void turnSpellMissile(World& world, ServerObject& m, const ServerObject& to, std
 /// table hasn't (none reported, the move undone all the same).
 bool projectileWallNormal(const World& world, const RayHit& hit, float fromX, float fromY, float& nx, float& ny);
 
+// noxcpp: a mode's own size for one missile (ServerObject::ModSize; a script's nox.setHitRadius and
+// nox.setBurstScale). Nothing here is the game's: a missile no mode sizes is as its type made it.
+
+/// The radii a missile's hit shape may be given, by its type's extent: a point's (or none's) 1 to
+/// 32, a circle's 1 to 4 x its radius, a box's 1 to 4 x its size (the larger side's half).
+std::pair<float, float> hitRadiusRange(const ServerObject& m);
+/// Its hit shape at `radius` (within hitRadiusRange): a point (or none) made a circle of it, a
+/// circle's radius it, a box's two sides scaled by radius / its size. Its type's shape is kept to
+/// give back (only that gives the stock hit back: the type's own flight meets only what holds its
+/// centre); its box on the grid is refreshed where it is (no cell or list changes). That box is
+/// what the out-of-sight notice reads, so for a sized missile alone the notice comes up to its
+/// radius of travel later. Walls, and the substeps' wall test, stay its type's. Set in the frame
+/// it's made (onSpellCast's `made`), it doesn't meet its owner by the growth until it has first
+/// flown clear of it (Missiles::bodyNear).
+void setHitRadius(World& world, ServerObject& m, float radius);
+/// Its type's shape back (nothing when it has none of a mode's).
+void restoreHitShape(World& world, ServerObject& m);
+/// Its burst's reach and push reach times `scale` (1: its type's), read when it bursts.
+void setBurstScale(ServerObject& m, float scale);
+/// A thing's draw scale (nox.setDrawScale; any thing, not only a missile): what NoX Core clients
+/// draw its sprite and its burst at (1: as its type's; the part let go when nothing else holds
+/// it). Nothing on the server reads it but the host's onScaledSeen.
+void setDrawScale(ServerObject& o, float scale);
+/// Its draw scale (1: none).
+float drawScaleOf(const ServerObject& o);
+
 struct Missiles {
     World& world;
     const things::ThingDb& things;
@@ -141,7 +167,14 @@ private:
     /// cell (x, y) is in (its extent list from the head), the last that holds the
     /// piece's end or a door's leaf the piece crosses (a leaf crossed puts the end
     /// back at the start for those after it).
-    ServerObject* bodyAt(const ServerObject& missile, float fromX, float fromY, float x, float y);
+    ServerObject* bodyAt(ServerObject& missile, float fromX, float fromY, float x, float y);
+    /// noxcpp: bodyAt for a missile a mode gave a hit shape (ServerObject::ModSize): the same
+    /// rule over the bodies whose boxes meet the box its shape sweeps over the piece (the grid's
+    /// search, each once), a body met when its shape grown by the missile's radius holds the end;
+    /// its owner, until first cleared, only as the stock test meets it (ModSize::ownerCleared).
+    ServerObject* bodyNear(ServerObject& missile, float fromX, float fromY, float x, float y);
+    /// The path search's filter: whether `missile` may meet the body `o` at all.
+    bool mayMeet(const ServerObject& missile, const ServerObject& o);
     /// One missile's turn in fly().
     void flyOne(ServerObject* m);
     /// ArrowCollide: an arrow's or bolt's hit (the list above).

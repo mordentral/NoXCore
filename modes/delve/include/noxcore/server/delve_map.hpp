@@ -7,6 +7,10 @@
 // kEnd when the run is over (the lobby again). At a campfire, kCampfire offers the player its
 // spells to strengthen one (an empty list puts the offer away); the client's pick comes back
 // as kUpgrade (the one message the client sends; a stock player answers by chat instead).
+//
+// Each message is kept within one reliable packet (net::kMaxReliablePayload, 1024 bytes): a
+// longer one would never be sent. A long run's kRun leaves out its oldest acts done; a big
+// records table goes as kRecords and then kRecordsMore.
 #pragma once
 
 #include <array>
@@ -23,7 +27,8 @@ inline constexpr std::uint8_t kOp = 0xF4;
 inline constexpr std::uint8_t kEnd = 1; ///< no run any more: the map put away
 inline constexpr std::uint8_t kMulticlass = 2; ///< u8 1: we play multiclass (PlayerControl::multiclass)
 /// The run as it stands (Run). (0 was the first map's, its acts six rooms in a line: retired, so
-/// a client from before the rows ignores this one.)
+/// a client from before the rows ignores this one.) When its oldest acts done were left out (to
+/// fit), a u16 after the fork counts them (Run::earlier); a client from before that ignores it.
 inline constexpr std::uint8_t kRun = 3;
 /// S->C: the campfire's offer: u8 count, then each spell's u8 number and u8 level now (count 0:
 /// the offer put away: used, or the player walked off).
@@ -34,6 +39,9 @@ inline constexpr std::uint8_t kUpgrade = 5;
 /// lobby as in a run: u8 count, then each {u16 depth, u8 act, u8 date length, its date, u8
 /// difficulty length, its name, u8 party size, each {u8 name length, the name, u8 class}}.
 inline constexpr std::uint8_t kRecords = 6;
+/// S->C: the records that didn't fit in kRecords, as kRecords lays them out, added after them
+/// (a client from before it shows the first part only).
+inline constexpr std::uint8_t kRecordsMore = 10;
 /// S->C: a blessing room's altar's offer: u8 count, then each blessing's u8 number (Blessing)
 /// and u8 how many of it the player holds now (count 0: the offer put away).
 inline constexpr std::uint8_t kBlessing = 7;
@@ -83,7 +91,10 @@ struct Record {
     std::vector<std::pair<std::string, std::uint8_t>> party;
     bool operator==(const Record&) const = default;
 };
-std::vector<std::uint8_t> recordsMessage(std::span<const Record> records);
+/// The table as kRecords and, past what fits, kRecordsMore messages (one message when it fits;
+/// a party too big for a message alone cut short).
+std::vector<std::vector<std::uint8_t>> recordsMessages(std::span<const Record> records);
+/// A kRecords' or kRecordsMore's rest.
 std::optional<std::vector<Record>> parseRecords(std::span<const std::uint8_t> rest);
 
 /// A spell the campfire may strengthen, and its level now.
@@ -113,12 +124,14 @@ struct Run {
     std::uint16_t depth = 0;
     std::uint8_t room = 0;       ///< the row the party is at in `act` (0-5); its room act.path's last
     std::uint8_t mystery = 0xFF; ///< this room's mystery once entered (DelveMystery's), else 0xFF
-    std::vector<Act> past;       ///< the acts done, first first (the act's number: their count + 1)
+    std::vector<Act> past;       ///< the acts done, first first (the act's number: earlier + their count + 1)
     Act act;
     std::optional<std::array<Act, 2>> fork; ///< the two next acts its guardian opens onto
+    std::uint16_t earlier = 0;   ///< the acts done before past's first, left out
     bool operator==(const Run&) const = default;
 };
 
+/// The run as kRun; its oldest acts done left out (counted in earlier) while it wouldn't fit.
 std::vector<std::uint8_t> runMessage(const Run& run);
 std::vector<std::uint8_t> endMessage();
 std::vector<std::uint8_t> multiclassMessage(bool on);

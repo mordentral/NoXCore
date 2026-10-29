@@ -146,6 +146,9 @@ private:
     std::map<int, SDL_Texture*> previewTextures_;
     std::shared_ptr<const nox::modes::script::ModAssets> texturesOf_;
     void freePreviewTextures();
+    /// (UI API 4) The game's icon for spell `index` (or an ability, tagged as the bars keep it) as
+    /// a texture made once (the map editor's thumbnails), and its size; null: none.
+    SDL_Texture* spellIconTexture(int index, float& w, float& h);
     /// (UI API 2) A key of the fixed set pressed over the preview's screen: to the window under the mouse.
     void previewKeys(float ux, float uy);
     /// (UI API 3) A press in one of the preview's windows (a drag's), as the game tells it.

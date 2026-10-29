@@ -366,7 +366,7 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
     // lanes above (the left gate's) and below (the right's), a half step on, smaller; each room
     // wandering a little.
     const std::size_t past = std::min(run->past.size(), kPastShown);
-    const int actNumber = static_cast<int>(run->past.size()) + 1;
+    const int actNumber = static_cast<int>(run->earlier + run->past.size()) + 1; // (a long run's oldest acts left out of its message)
     const auto roomAt = [&](int side, int row, int i, const std::string& biome) {
         const float scale = side == 0 ? 1.0f : kForkScale;
         const float column = side == 0 ? static_cast<float>(row) : static_cast<float>(kRooms + row) + 0.5f;
@@ -518,7 +518,7 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
     for (std::size_t i = first; i < run->past.size(); ++i) {
         const auto& a = run->past[i];
         const std::string gate = a.taken == 0 ? " - left gate" : a.taken == 1 ? " - right gate" : "";
-        font_->draw("Act " + std::to_string(i + 1) + ": " + titleOf(a.biome) + gate, x0, y, l.text, grey);
+        font_->draw("Act " + std::to_string(run->earlier + i + 1) + ": " + titleOf(a.biome) + gate, x0, y, l.text, grey);
         y += l.line;
     }
 

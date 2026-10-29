@@ -458,9 +458,8 @@ void GameHost::frameClients()
     // a match, held past the stock 10 s, keeps them: a client joining or loading meanwhile gets in
     // rather than waiting in the dark for the next map.)
     if (server_.ranUpdate() || endVoteHolds()) {
-        if ((server_.clock().frame() & 1u) == 0) {
-            mapSendFrame(); // (just before the transfers: skipped on odd frames)
-        }
+        // (just before the transfers: skipped on odd frames, but for noxcpp's fast sends)
+        mapSendFrame((server_.clock().frame() & 1u) == 0);
         xfers_.frame(server_.clock().frame());
         ProfileScope timed(ProfileSection::HostAfterFrame);
         afterFrame();
@@ -1411,10 +1410,15 @@ void GameHost::updatePlayer(HostedPlayer& p)
     // creature's last records were lost for good once it lay dead: off the updatable list nothing
     // owes it again, and the client kept it mid-death.)
     for (std::size_t i = 0; i < recordOf.size(); ++i) {
+        auto& [o, wasKnown] = recordOf[i];
         if (written[i]) {
+            // noxcpp: a thing a mode gave a draw scale, new to this player: the mode told
+            // (Options::onScaledSeen), so its NoX Core client can draw it so. Nothing else asks.
+            if (!wasKnown && o->modSize && o->modSize->drawScale != 1.0f && options_.onScaledSeen) {
+                options_.onScaledSeen(*this, p.peer, *o);
+            }
             continue;
         }
-        auto& [o, wasKnown] = recordOf[i];
         o->syncMask |= bit;
         if (!wasKnown) {
             p.knows.erase(o->extent);
@@ -1487,7 +1491,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // (An original bug, kept: no reach check, so a modified client can pick up items
             // anywhere. Not to be fixed without the project's say.)
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byExtent(static_cast<std::uint32_t>(m[1] | m[2] << 8));
+            ServerObject* item = server_.world().byPacketCode(static_cast<std::uint32_t>(m[1] | m[2] << 8)); // (packetDynamicUnitCode)
             // Not while a save's asked for (Game_IsSavePending), observing (status & 3),
             // trading (PlayerControl::trade), talking to an NPC (DialogWith, dialog.hpp) or frozen.
             if (unit && unit->player && item && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) &&
@@ -1515,8 +1519,8 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // bug). Not an observer's (status & 3), one trading (PlayerControl::trade)
             // nor one talking to an NPC (DialogWith, dialog.hpp).
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            // (packetDynamicUnitCode: a map object's code is its extent with bit 15.)
-            ServerObject* o = server_.world().byExtent(static_cast<std::uint32_t>(m[1] | m[2] << 8) & 0x7FFFu);
+            // (packetDynamicUnitCode: a map object's code is its map number with bit 15.)
+            ServerObject* o = server_.world().byPacketCode(static_cast<std::uint32_t>(m[1] | m[2] << 8));
             if (unit && unit->player && players_[peer].ready && !(unit->player->statusFlags & 3u) && !trading(*unit) && unit->player->dialogWith == 0 && o &&
                 !o->gone() && o->collides) {
                 Fight f = server_.fight();
@@ -1553,7 +1557,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // Not while a save's asked for (Game_IsSavePending) nor an observer (status 1
             // or 2); the item in its inventory.
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byExtent(static_cast<std::uint32_t>(m[1] | m[2] << 8) & 0x7FFFu);
+            ServerObject* item = server_.world().byPacketCode(static_cast<std::uint32_t>(m[1] | m[2] << 8));
             if (unit && unit->player && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) && item &&
                 item->holder == unit->extent) {
                 server_.items().use(*unit, *item);
@@ -1568,7 +1572,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
                 const std::uint32_t code = static_cast<std::uint32_t>(m[1] | m[2] << 8);
                 ServerObject* creature = nullptr;
                 if (code != 0) {
-                    creature = server_.world().byExtent(code & 0x7FFFu);
+                    creature = server_.world().byPacketCode(code);
                     if (!creature) {
                         break;
                     }
@@ -1601,7 +1605,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // (Kept in the exe's player record: what reads it, the saves, takes the host's window.)
             if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() >= 3) {
                 const std::uint16_t code = static_cast<std::uint16_t>(m[1] | (m[2] << 8));
-                if (const ServerObject* item = code != 0 ? server_.world().byExtent(code) : nullptr) {
+                if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(code) : nullptr) {
                     if (!server_.items().classMay(*unit, *item) || !server_.items().strongEnough(*unit, *item)) {
                         sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportSecondaryWeapon), 0, 0, 1});
                     }
@@ -1615,9 +1619,9 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // index in the guide (Game_GetCreatureGuideIndex, 0 unknown), else a spell's or an
             // ability's number (its UseData's first byte), important (Net_QueueImportant).
             if (m.size() >= 4) {
-                const std::uint32_t code = static_cast<std::uint32_t>(m[1] | (m[2] << 8)) & 0x7FFFu;
-                const ServerObject* book = server_.world().byExtent(code);
-                if (!book) { // (a shop's stock: in its trade's keeping, out of the world)
+                const std::uint32_t code = static_cast<std::uint32_t>(m[1] | (m[2] << 8));
+                const ServerObject* book = server_.world().byPacketCode(code);
+                if (!book && !(code & 0x8000u)) { // (a shop's stock: in its trade's keeping, out of the world)
                     const auto kept = server_.world().tradeObjects.find(code);
                     book = kept != server_.world().tradeObjects.end() ? &kept->second : nullptr;
                 }
@@ -1711,7 +1715,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // bug).
             World& world = server_.world();
             const std::uint32_t teamId = m[2] | m[3] << 8 | m[4] << 16 | static_cast<std::uint32_t>(m[5]) << 24;
-            ServerObject* o = world.byExtent(static_cast<std::uint32_t>(m[6] | m[7] << 8) & 0x7FFFu);
+            ServerObject* o = world.byNetCode(static_cast<std::uint32_t>(m[6] | m[7] << 8)); // (Obj_GetByNetCode)
             ServerTeam* team = teamId < 256 ? teamById(world, static_cast<std::uint8_t>(teamId)) : nullptr;
             Fight f = server_.fight();
             if (m[1] == 10) {
@@ -2576,7 +2580,8 @@ void GameHost::leave(std::uint8_t peer)
     xfers_.peerGone(peer);
     // Then, by its index, every object owed to its slot afresh, known only of the always-sent
     // kinds (the next player in the slot starts clean). Its map sender isn't touched: a send under
-    // way goes on into the closed stream (an original bug).
+    // way goes on into the closed stream (an original bug). (noxcpp's fast send is let go.)
+    mapSendPeerGone(peer);
     forgetObjects(it->second.slot);
     if (ServerObject* unit = server_.world().byExtent(it->second.extent)) {
         // MSG_OUTGOING_CLIENT {its code} to the others (the first of the two notices: 0xAE here,
@@ -3749,6 +3754,7 @@ void GameHost::loadNextMap()
     mapLoadedSettings(); // (its mode set)
     settingsChanged_ = true; // (Map_SetCurrentPath: server_gameSettingsUpdated)
     loadRules(); // (the new map's user.rul into the settings' slot 0)
+    fastMapRequests_.clear(); // (noxcpp's fast map send: each client's first requests of this map)
     if (!(server_.world().gameFlags & GameFlag::Solo)) {
         mapSendLoadMap(); // (and, not in a solo game, its .nxz for downloads)
     }
@@ -4423,8 +4429,7 @@ bool GameHost::sendToIdentified(std::uint8_t peer, std::vector<std::uint8_t> byt
     if (!players_.contains(peer) || !transport_.identified(peer)) {
         return false;
     }
-    transport_.sendReliable(peer, std::move(bytes));
-    return true;
+    return transport_.sendReliable(peer, std::move(bytes)); // (false: refused, past a packet's payload or a full queue)
 }
 
 bool GameHost::sendToIdentifiedUnreliable(std::uint8_t peer, std::vector<std::uint8_t> bytes)
@@ -4454,6 +4459,7 @@ void GameHost::refreshMapFile()
     // its CRC what USE_MAP tells a joining client, its .nxz what a download sends.
     map::MapFile file = map::loadMapFile(mapPath_);
     mapCrc_ = file.crc;
+    fastMapRequests_.clear(); // (a new file: each client's first requests of it go fast)
     mapSendLoadMap();
 }
 

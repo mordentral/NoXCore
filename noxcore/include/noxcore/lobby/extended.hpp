@@ -75,7 +75,18 @@ inline constexpr std::uint16_t kExtendedLevelVersion = 4;
 ///   3  UI API 3 (mode.json's "uiApi": 3: lines, tooltips, world labels, HUD windows, drags, the
 ///      wheel; modes/script's script_ui.hpp), a UI of it sent only to a client of level 3 or above
 ///      that named ModeUi and ModeUi2 (ui_proto.hpp's kUiApi3Level)
-inline constexpr std::uint16_t kClientLevel = 3;
+///   4  the fast map send (kFastMapSendLevel: server/map_send.cpp): MSG_MAP_SEND_PACKET blocks of
+///      up to 1018 bytes, several a frame, every frame, to a client of level 4 or above, for its
+///      first two requests after each map load (a lower one, a stock one and a later request get
+///      the stock stream: 512 bytes a block, one each even frame)
+///   5  a script mode's draw scales (MSG_NOXCPP_MODEUI's kDrawScale, nox.setDrawScale: a thing's
+///      sprite and its burst drawn larger or smaller), sent only to a client of level 5 or above
+///      that named ClientFeature::ModeUi; and UI API 4 (mode.json's "uiApi": 4: nox.spellIcon,
+///      nox.hitArea, ui.tick, nox.label's keep), a UI of it sent only to a client of level 5 or
+///      above that named ModeUi and ModeUi2 (ui_proto.hpp's kDrawScaleLevel and kUiApi4Level)
+inline constexpr std::uint16_t kClientLevel = 5;
+/// The client level whose map downloads take the fast send (kClientLevel's list, 4).
+inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.
 inline constexpr std::string_view kClientTooOldNotice = "Your NoX Core is too out of date for this game.";
 

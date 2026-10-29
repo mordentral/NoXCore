@@ -1189,6 +1189,8 @@ void HeadlessClient::handleMessage(std::span<const std::uint8_t> m, std::uint32_
             download_.data.reserve(std::min<std::size_t>(download_.size, kMaxDownloadedMap));
             download_.nextBlock = 1;
             download_.pending.clear();
+            download_.pendingBytes = 0;
+            download_.started = true;
             event(ClientEvent::Kind::Log, "downloading " + readAscii(m.subspan(8, 80)) + ", " +
                                               std::to_string(download_.size) + " bytes");
         }
@@ -1589,18 +1591,37 @@ void HeadlessClient::syncLiveWalls()
 void HeadlessClient::onMapBlock(std::span<const std::uint8_t> m)
 {
     // Cli_MapDownload_OnBlock: u16 block at +2, u16 size at +4, data at +6. Blocks are
-    // written in order; early ones wait in a list.
+    // written in order; early ones wait in a list. An empty block is nothing (the exe's too).
+    // (Ours, bounded whatever a server sends: nothing before MAP_SEND_START; what's written and
+    // what waits never past the size it named; at most kMaxPendingBlocks waiting.)
     const std::uint16_t block = u16At(m, 2);
     const auto data = m.subspan(6);
+    if (!download_.started || data.empty()) {
+        return;
+    }
     if (block == download_.nextBlock) {
+        if (download_.data.size() + data.size() > download_.size) {
+            stage_ = Stage::Failed;
+            event(ClientEvent::Kind::Disconnected, "map download failed: the server sent more than the map's " +
+                                                       std::to_string(download_.size) + " bytes");
+            return;
+        }
         download_.data.insert(download_.data.end(), data.begin(), data.end());
         ++download_.nextBlock;
     } else if (block > download_.nextBlock) {
-        download_.pending[block].assign(data.begin(), data.end());
+        // (Held, or a repeat's bytes in place of the last ones; no room: dropped, as if it never came.)
+        const auto held = download_.pending.find(block);
+        const bool counted = held != download_.pending.end();
+        const std::size_t others = download_.pendingBytes - (counted ? held->second.size() : 0);
+        if ((counted || download_.pending.size() < kMaxPendingBlocks) && download_.data.size() + others + data.size() <= download_.size) {
+            download_.pending[block].assign(data.begin(), data.end());
+            download_.pendingBytes = others + data.size();
+        }
     }
     for (auto it = download_.pending.find(download_.nextBlock); it != download_.pending.end();
          it = download_.pending.find(download_.nextBlock)) {
         download_.data.insert(download_.data.end(), it->second.begin(), it->second.end());
+        download_.pendingBytes -= it->second.size();
         download_.pending.erase(it);
         ++download_.nextBlock;
     }

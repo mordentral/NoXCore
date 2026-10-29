@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -212,8 +213,11 @@ struct ModeHooks {
         return 0;
     }
     /// Told: a player's spell cast (Plr_FinishSpellCast's success: its mana spent), at `target`
-    /// (null: none) and the cursor (x, y).
-    virtual void spellCast(World& world, ServerObject& caster, std::uint32_t spell, ServerObject* target, float x, float y)
+    /// (null: none) and the cursor (x, y). `made`: what the cast put on the world's new list (its
+    /// missiles, a summoned creature..., and anything its kills made at once; not what comes on
+    /// later frames), oldest first; valid only during the call.
+    virtual void spellCast(World& world, ServerObject& caster, std::uint32_t spell, ServerObject* target, float x, float y,
+                           std::span<const std::uint32_t> made)
     {
         (void)world;
         (void)caster;
@@ -221,6 +225,7 @@ struct ModeHooks {
         (void)target;
         (void)x;
         (void)y;
+        (void)made;
     }
 
     // ---- Contacts, hits and items

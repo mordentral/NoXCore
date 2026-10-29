@@ -43,9 +43,9 @@ void raise(ServerObject& o, float z)
     o.raise(z); // (unitRaise)
 }
 
-/// A teleport pentagram's partner: the object of its link's number, and only a TRANSPORTER one, as
-/// the game's map load links them (any other object of that number leaves the pentagram unlinked).
-/// Looked up each time, so a deleted partner is never found.
+/// A teleport pentagram's partner: the pad its map load linked (World::linkTransporters: the first
+/// TRANSPORTER of the number its record named), by extent, and still a TRANSPORTER. Looked up each
+/// time, so a deleted partner is never found.
 ServerObject* partnerOf(World& world, const ServerObject& o)
 {
     if (!o.transport || o.transport->link == 0) {
@@ -1209,8 +1209,10 @@ void scriptMoveTo(World& world, ServerObject& o, std::int32_t waypoint)
         goTo(o);
         return;
     }
+    // (Its movers by the map number each carries: the thing's Extent, its map number, 0 for one made
+    // in play.)
     for (auto& [extent, m] : world.objects()) {
-        if (m.typeName == "Mover" && m.mover && m.mover->carried == o.extent) {
+        if (m.typeName == "Mover" && m.mover && m.mover->carried == o.fileExtent) {
             goTo(m);
         }
     }
@@ -1260,13 +1262,24 @@ void Objects::moverUpdate(ServerObject& o)
         o.updates = false;
         world.removeUpdatable(o); // (unitRemoveFromUpdatable)
     };
-    ServerObject* carried = m.carried ? world.byExtent(m.carried) : nullptr;
-    if (!carried) {
+    // Its thing by its map number, at an update that has none (netGetUnitByExtent: the first on
+    // the map of that number), kept; one no longer ACTIVE, or destroyed, let go (its number kept,
+    // so the next start finds the thing of that number again).
+    if (m.carried == 0) {
         stop();
         return;
     }
-    if (!(carried->flags & ObjFlag::Active) || carried->gone()) {
-        m.carried = 0;
+    if (m.carriedObject == 0) {
+        const ServerObject* found = world.byMapNumber(m.carried);
+        if (!found) {
+            stop();
+            return;
+        }
+        m.carriedObject = found->extent;
+    }
+    ServerObject* carried = world.byExtent(m.carriedObject);
+    if (!carried || !(carried->flags & ObjFlag::Active) || carried->pendingDelete) {
+        m.carriedObject = 0;
         stop();
         return;
     }

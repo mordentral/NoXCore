@@ -1382,6 +1382,7 @@ std::vector<std::uint32_t> World::placeRecords(World& w, const map::ObjectTOC& t
             if (o.extent == 0 || w.objects_.contains(o.extent) || (kDynamicExtents <= o.extent && std::ranges::find(w.reservedExtents, o.extent) != w.reservedExtents.end())) {
                 // (0: one made in play, saved; one of the numbers made in play the kept things have)
                 o.extent = w.newExtent();
+                w.noteRenumbered(o); // (its map number still names it: byMapNumber)
             }
             extent = o.extent;
             if (holder == 0) {
@@ -1390,6 +1391,9 @@ std::vector<std::uint32_t> World::placeRecords(World& w, const map::ObjectTOC& t
                 // network game not a quest, gold and items (0x3001110, no missile) NO_COLLIDE.
                 o.flags = (o.flags & 0x35E9FEDBu) | ObjFlag::Active;
                 o.born = o.timer = frame;
+                if (o.classes & things::ObjectClass::Elevator) {
+                    o.elevatorStopped = frame; // (that timer is the exe's elevator's stop frame: at rest, it waits a second from here)
+                }
                 o.homeX = o.x;
                 o.homeY = o.y;
                 if (w.network() && !w.quest() && (o.typeName == "Gold" || (o.classes & 0x3001110u)) && !(o.classes & things::ObjectClass::Missile)) {
@@ -1666,10 +1670,81 @@ World World::load(const map::MapFile& map, const things::ThingDb& things, std::u
             w.groups_.push_back(std::move(sg));
         }
     }
+    // Each elevator and its shaft linked, and each teleport pad to its partner, as the parse's end
+    // does before the new things' pass.
+    linkElevators(w, placed);
+    linkTransporters(w, placed);
     // The load's new things' pass (serverParseEntireMap's unitsNewAddToList):
     // each made in the grid and the lists, newest first.
     queueNewObjects(w);
     return w;
+}
+
+void World::linkElevators(World& w, const std::vector<std::uint32_t>& placed)
+{
+    // (serverParseEntireMap, after the objects, before unitsNewAddToList) The new things, newest
+    // first (createAt puts each at the new list's head): each elevator takes the first shaft whose
+    // map number (its Extent as the record gave it) is the one its record named, and the shaft
+    // takes the elevator. A shaft's own record's number isn't read; one no elevator names, and an
+    // elevator that finds none, have no partner. Ours are extents kept here, so that a number the
+    // load gave twice (a save's thing brought from another map, with that map's number, listed
+    // ahead of the map's own) doesn't send either to the other thing.
+    std::vector<ServerObject*> shafts;
+    std::vector<ServerObject*> elevators;
+    for (auto it = placed.rbegin(); it != placed.rend(); ++it) {
+        if (ServerObject* o = w.byExtent(*it)) {
+            if (o->classes & things::ObjectClass::ElevatorShaft) {
+                shafts.push_back(o);
+            } else if (o->classes & things::ObjectClass::Elevator) {
+                elevators.push_back(o);
+            }
+        }
+    }
+    for (ServerObject* s : shafts) {
+        s->elevatorLink = 0;
+    }
+    for (ServerObject* e : elevators) {
+        const std::uint32_t named = e->elevatorLink; // (the record's: the shaft's map number)
+        e->elevatorLink = 0;
+        for (ServerObject* s : shafts) {
+            if (s->fileExtent == named) {
+                e->elevatorLink = s->extent;
+                s->elevatorLink = e->extent;
+                break;
+            }
+        }
+    }
+}
+
+void World::linkTransporters(World& w, const std::vector<std::uint32_t>& placed)
+{
+    // (serverParseEntireMap's same pass, its other half) Each new teleport pad, on its own: its
+    // partner none, then (when its record named one) the first new pad, newest first, itself
+    // included, whose map number is the one named. One way only: the partner's own link is its
+    // own record's. Ours is the partner's extent, so a number the load gave twice can't send it
+    // to another thing.
+    std::vector<ServerObject*> pads;
+    for (auto it = placed.rbegin(); it != placed.rend(); ++it) {
+        if (ServerObject* o = w.byExtent(*it); o && (o->classes & things::ObjectClass::Transporter) && o->transport) {
+            pads.push_back(o);
+        }
+    }
+    std::vector<std::uint32_t> named(pads.size());
+    for (std::size_t i = 0; i < pads.size(); ++i) {
+        named[i] = pads[i]->transport->link; // (the record's: the partner's map number)
+    }
+    for (std::size_t i = 0; i < pads.size(); ++i) {
+        pads[i]->transport->link = 0;
+        if (named[i] == 0) {
+            continue;
+        }
+        for (const ServerObject* p : pads) {
+            if (p->fileExtent == named[i]) {
+                pads[i]->transport->link = p->extent;
+                break;
+            }
+        }
+    }
 }
 
 ServerObject* World::byExtent(std::uint32_t extent)
@@ -1680,6 +1755,74 @@ ServerObject* World::byExtent(std::uint32_t extent)
     }
     const auto it = objects_.find(extent);
     return it != objects_.end() && !it->second.gone() ? &it->second : nullptr;
+}
+
+void World::noteRenumbered(const ServerObject& o)
+{
+    if (o.fileExtent != 0 && o.fileExtent != o.extent) {
+        renumbered_[o.fileExtent].push_back(o.extent);
+    }
+}
+
+void World::setMapNumber(ServerObject& o, std::uint32_t number)
+{
+    o.fileExtent = number;
+    noteRenumbered(o);
+}
+
+ServerObject* World::byMapNumber(std::uint32_t number)
+{
+    // (netGetUnitByExtent) The object list from its head: the first not destroyed (0x20) whose
+    // Extent it is, so of two things on the map with one number the newest (each pass puts its
+    // things at the head): a thing put down later with a map object's number (brought from another
+    // map, a .plr's, dropped by its holder; a save lists such things first) takes the map object's
+    // place, OB-412. Ours, by decision (VD-47): the one on the list longest, the map's own thing:
+    // the oldest (born); of one load's, the later record (a save lists the newer things first).
+    // The candidates: the thing under that extent (of a load, the first record of the number),
+    // then those numbered afresh as they came.
+    if (number == 0) {
+        return nullptr;
+    }
+    const auto listed = [&](ServerObject* o) {
+        if (!o || o->fileExtent != number || o->pendingDelete || o->holder != 0 || (o->classes & things::ObjectClass::Missile) || o->fresh) {
+            return false;
+        }
+        // (one put back in the world this frame, still on the new list: Items::place)
+        return o->born != frameNow || std::ranges::find(fresh_, o->extent) == fresh_.end();
+    };
+    ServerObject* best = byExtent(number);
+    if (!listed(best)) {
+        best = nullptr;
+    }
+    if (const auto it = renumbered_.find(number); it != renumbered_.end()) {
+        for (const std::uint32_t e : it->second) {
+            ServerObject* o = byExtent(e);
+            if (o != best && listed(o) && (!best || o->born <= best->born)) {
+                best = o;
+            }
+        }
+    }
+    return best;
+}
+
+ServerObject* World::byPacketCode(std::uint32_t code)
+{
+    // (packetDynamicUnitCode: bit 15 a map object's, netGetUnitByExtent's NetCode; then
+    // Obj_GetByNetCode)
+    if ((code & 0x8000u) == 0x8000u) {
+        return byMapNumber(code & 0x7FFFu);
+    }
+    return byNetCode(code);
+}
+
+ServerObject* World::byNetCode(std::uint32_t code)
+{
+    // (Obj_GetByNetCode: none destroyed. A map object's NetCode is its own, under 0x8000: a code
+    // with bit 15 is nobody's.)
+    if (code == 0 || (code & 0x8000u) != 0) {
+        return nullptr;
+    }
+    return byExtent(code);
 }
 
 ServerObject* World::byScriptId(std::int32_t id)
@@ -2550,6 +2693,7 @@ void World::adopt(ServerObject o, bool asNew)
     }
     nextExtent_ = std::max(nextExtent_, o.extent + 1);
     const std::uint32_t e = o.extent;
+    noteRenumbered(o); // (a map's thing brought from another, a .plr's: by its map number too)
     ServerObject& placed = objects_.emplace(e, std::move(o)).first->second;
     if (asNew) {
         noteNew(placed);

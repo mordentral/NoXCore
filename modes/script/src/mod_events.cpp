@@ -105,11 +105,14 @@ void Events::equipped(const server::ServerObject& unit, const server::ServerObje
     }
 }
 
-void Events::spellCast(const server::ServerObject& caster, std::uint32_t spell, const server::ServerObject* target, float x, float y)
+void Events::spellCast(const server::ServerObject& caster, std::uint32_t spell, const server::ServerObject* target, float x, float y,
+                       std::span<const std::uint32_t> made)
 {
     if (has_.onSpellCast && room()) {
         queue_.push_back({.kind = Kind::SpellCast, .a = caster.extent, .b = target ? target->extent : 0, .x = x, .y = y,
-                          .n = static_cast<std::int32_t>(spell)});
+                          .n = static_cast<std::int32_t>(spell), .madeFrom = static_cast<std::uint32_t>(made_.size()),
+                          .madeCount = static_cast<std::uint32_t>(made.size())});
+        made_.insert(made_.end(), made.begin(), made.end());
     }
 }
 
@@ -179,6 +182,8 @@ void Events::deliver(lua_State* L)
     // (Events the script's own calls set off now are the next frame's.)
     std::vector<Event> now;
     now.swap(queue_);
+    std::vector<std::uint32_t> made;
+    made.swap(made_);
     for (const Event& e : now) {
         switch (e.kind) {
         case Kind::Killed:
@@ -239,7 +244,17 @@ void Events::deliver(lua_State* L)
                 pushId(L, e.b);
                 lua_pushnumber(L, e.x);
                 lua_pushnumber(L, e.y);
-                toolbox::callHook(L, "onSpellCast", 5, 0);
+                // What the cast made, oldest first (nil: nothing); each may be gone by now.
+                if (e.madeCount == 0) {
+                    lua_pushnil(L);
+                } else {
+                    lua_createtable(L, static_cast<int>(e.madeCount), 0);
+                    for (std::uint32_t i = 0; i < e.madeCount; ++i) {
+                        lua_pushnumber(L, made[e.madeFrom + i]);
+                        lua_rawseti(L, -2, static_cast<int>(i) + 1);
+                    }
+                }
+                toolbox::callHook(L, "onSpellCast", 6, 0);
             }
             break;
         }
@@ -249,6 +264,7 @@ void Events::deliver(lua_State* L)
 void Events::clear() noexcept
 {
     queue_.clear();
+    made_.clear();
     overflow_ = 0;
 }
 

@@ -143,8 +143,11 @@ void turnSpellMissile(World& world, ServerObject& m, const ServerObject& to, std
     }
 }
 
-ServerObject* Missiles::bodyAt(const ServerObject& m, float fromX, float fromY, float px, float py)
+ServerObject* Missiles::bodyAt(ServerObject& m, float fromX, float fromY, float px, float py)
 {
+    if (m.modSize && m.modSize->hit) {
+        return bodyNear(m, fromX, fromY, px, py); // (noxcpp: a mode's hit shape)
+    }
     // (the extent list of the cell the piece's end is in, from its
     // head, each through the body test; what it finds overwrites what was found before.)
     ServerObject* found = nullptr;
@@ -162,31 +165,194 @@ ServerObject* Missiles::bodyAt(const ServerObject& m, float fromX, float fromY, 
             }
             return;
         }
-        // (neither DESTROYED, 0x20)
-        if ((o.classes & oc::Missile) || m.pendingDelete || m.gone() || o.pendingDelete || o.gone() || !m.collides ||
-            !o.collides || (o.flags & ObjFlag::NoCollide)) {
-            return;
-        }
-        bool may = false;
-        if (o.flags & 0x80u) { // MISSILE_HIT
-            may = true;
-        } else if (((m.flags & 0x11u) && (o.flags & ObjFlag::Airborne)) || ((o.flags & 0x11u) && (m.flags & ObjFlag::Airborne))) {
-            // BELOW or SHORT (0x11) things and airborne ones pass over each other.
-            may = false;
-        } else if (((m.flags | o.flags) & 0x400u) && sameSide(world, o, m)) {
-            may = false; // (NO_COLLIDE_OWNER: unitsHaveSameTeam, the team or either's owner chain)
-        } else {
-            // Otherwise a monster's ordinary missile hits another monster only when that one is its
-            // owner's enemy and not of its side.
-            const ServerObject* owner = world.byExtent(m.owner);
-            may = !owner || !(m.classes & oc::Missile) || (m.subclasses & 2) || !(owner->classes & oc::Monster) ||
-                  !(o.classes & oc::Monster) || (isEnemy(world, *owner, o) && !sameSide(world, o, *owner));
-        }
-        if (may && holds(o, px, py)) {
+        if (mayMeet(m, o) && holds(o, px, py)) {
             found = &o;
         }
     });
     return found;
+}
+
+bool Missiles::mayMeet(const ServerObject& m, const ServerObject& o)
+{
+    // (neither DESTROYED, 0x20)
+    if ((o.classes & oc::Missile) || m.pendingDelete || m.gone() || o.pendingDelete || o.gone() || !m.collides ||
+        !o.collides || (o.flags & ObjFlag::NoCollide)) {
+        return false;
+    }
+    if (o.flags & 0x80u) { // MISSILE_HIT
+        return true;
+    }
+    if (((m.flags & 0x11u) && (o.flags & ObjFlag::Airborne)) || ((o.flags & 0x11u) && (m.flags & ObjFlag::Airborne))) {
+        // BELOW or SHORT (0x11) things and airborne ones pass over each other.
+        return false;
+    }
+    if (((m.flags | o.flags) & 0x400u) && sameSide(world, o, m)) {
+        return false; // (NO_COLLIDE_OWNER: unitsHaveSameTeam, the team or either's owner chain)
+    }
+    // Otherwise a monster's ordinary missile hits another monster only when that one is its
+    // owner's enemy and not of its side.
+    const ServerObject* owner = world.byExtent(m.owner);
+    return !owner || !(m.classes & oc::Missile) || (m.subclasses & 2) || !(owner->classes & oc::Monster) ||
+           !(o.classes & oc::Monster) || (isEnemy(world, *owner, o) && !sameSide(world, o, *owner));
+}
+
+ServerObject* Missiles::bodyNear(ServerObject& m, float fromX, float fromY, float px, float py)
+{
+    // noxcpp's, for a missile a mode gave a hit shape: the stock search widened by its radius. The
+    // bodies whose boxes meet the box its shape sweeps over the piece (its shape's box about the
+    // piece's start and about its end, together: the grid's search, each once, row by row), each
+    // through the same filter; a door's leaf as the stock search has it (the path's centre line
+    // crossing it: the swept box holds the crossing, so every leaf crossed is tested, whatever
+    // the radius); a body met when its shape grown by the missile's radius holds the piece's end
+    // (a circle within its radius + the missile's, a box within the missile's radius of its
+    // sides: at radius 0, the stock test; a box-shaped missile counts as a circle of its larger
+    // side's half). What it finds overwrites what was found before, as the stock search's: when
+    // several are met in one piece, the walk's last (by the cells' order), not the nearest. Walls
+    // stay the stock ray's (the centre's path).
+    //
+    // Its owner's grace: a missile starts just past its owner's edge (a fireball twice its
+    // caster's radius ahead), where a grown shape can still reach the owner. Until a piece's end
+    // first lies outside the owner's shape grown by the radius, the owner is met only as the stock
+    // test meets it (its own shape holding the end: a fireball put at its caster because a wall
+    // was too close still bursts on it, as stock). From then on, as any body. The owner cleared is
+    // kept by its extent, so a new owner (turned by a shield, changed hands) has its own grace.
+    const float r = m.shape == ShapeKind::Box ? std::max(m.boxWidth, m.boxHeight) * 0.5f : m.radius;
+    std::minstd_rand unused; // (boxDepth's way out of a box's dead centre: never asked, insideBox having it)
+    const auto grownHolds = [&](const ServerObject& o) {
+        if (o.shape == ShapeKind::Circle) {
+            const X87 dx = X87(o.newX) - px;
+            const X87 dy = X87(o.newY) - py;
+            const float reach = (X87(o.radius) + r).f();
+            return dx * dx + dy * dy <= X87((X87(reach) * reach).f());
+        }
+        if (o.shape == ShapeKind::Box) {
+            float nx = 0;
+            float ny = 0;
+            return insideBox(o, o.newX, o.newY, px, py) || 0.0f <= boxDepth(o, px, py, r, nx, ny, unused);
+        }
+        return false;
+    };
+    const ServerObject* graced = nullptr;
+    if (m.owner != 0 && m.modSize->ownerCleared != m.owner) {
+        const ServerObject* owner = world.byExtent(m.owner);
+        if (owner && grownHolds(*owner)) {
+            graced = owner;
+        } else {
+            m.modSize->ownerCleared = m.owner;
+        }
+    }
+    const MapGrid::Rect atStart = World::collideBoxAt(m, fromX, fromY);
+    const MapGrid::Rect atEnd = World::collideBoxAt(m, px, py);
+    const MapGrid::Rect box{std::min(atStart.left, atEnd.left), std::min(atStart.top, atEnd.top), std::max(atStart.right, atEnd.right),
+                            std::max(atStart.bottom, atEnd.bottom)};
+    ServerObject* found = nullptr;
+    world.unitsInRect(box.left, box.top, box.right, box.bottom, [&](ServerObject& o) {
+        if (o.classes & oc::Door) {
+            if (!(o.subclasses & 4u)) {
+                const auto [lx, ly] = doorLeaf(o.doorDirection);
+                if (segmentsCross(fromX, fromY, px, py, o.x, o.y, static_cast<float>(lx) + o.x, static_cast<float>(ly) + o.y)) {
+                    px = fromX;
+                    py = fromY;
+                    found = &o;
+                }
+            }
+            return;
+        }
+        if (!mayMeet(m, o)) {
+            return;
+        }
+        if (&o == graced ? holds(o, px, py) : grownHolds(o)) {
+            found = &o;
+        }
+    });
+    return found;
+}
+
+std::pair<float, float> hitRadiusRange(const ServerObject& m)
+{
+    const bool kept = m.modSize && m.modSize->hit;
+    const ShapeKind type = kept ? m.modSize->typeShape : m.shape;
+    if (type == ShapeKind::Circle) {
+        return {1.0f, 4.0f * (kept ? m.modSize->typeRadius : m.radius)};
+    }
+    if (type == ShapeKind::Box) {
+        const float w = kept ? m.modSize->typeBoxWidth : m.boxWidth;
+        const float h = kept ? m.modSize->typeBoxHeight : m.boxHeight;
+        return {1.0f, 4.0f * std::max(w, h) * 0.5f};
+    }
+    return {1.0f, 32.0f};
+}
+
+void setHitRadius(World& world, ServerObject& m, float radius)
+{
+    ServerObject::ModSize& s = m.modSize ? *m.modSize : m.modSize.emplace();
+    if (!s.hit) {
+        s.typeShape = m.shape;
+        s.typeRadius = m.radius;
+        s.typeBoxWidth = m.boxWidth;
+        s.typeBoxHeight = m.boxHeight;
+        s.hit = true;
+    }
+    if (s.typeShape == ShapeKind::Box) {
+        const float k = radius / (std::max(s.typeBoxWidth, s.typeBoxHeight) * 0.5f);
+        m.shape = ShapeKind::Box;
+        m.boxWidth = s.typeBoxWidth * k;
+        m.boxHeight = s.typeBoxHeight * k;
+    } else {
+        m.shape = ShapeKind::Circle;
+        m.radius = radius;
+    }
+    world.grid().setMissileBox(m, World::collideBoxAt(m, m.x, m.y));
+}
+
+void restoreHitShape(World& world, ServerObject& m)
+{
+    if (!m.modSize || !m.modSize->hit) {
+        return;
+    }
+    ServerObject::ModSize& s = *m.modSize;
+    m.shape = s.typeShape;
+    m.radius = s.typeRadius;
+    m.boxWidth = s.typeBoxWidth;
+    m.boxHeight = s.typeBoxHeight;
+    s.hit = false;
+    if (s.idle()) {
+        m.modSize.reset();
+    }
+    world.grid().setMissileBox(m, World::collideBoxAt(m, m.x, m.y));
+}
+
+void setBurstScale(ServerObject& m, float scale)
+{
+    if (scale == 1.0f) {
+        if (m.modSize) {
+            m.modSize->burstScale = 1.0f;
+            if (m.modSize->idle()) {
+                m.modSize.reset();
+            }
+        }
+        return;
+    }
+    (m.modSize ? *m.modSize : m.modSize.emplace()).burstScale = scale;
+}
+
+void setDrawScale(ServerObject& o, float scale)
+{
+    if (scale == 1.0f) {
+        if (o.modSize) {
+            o.modSize->drawScale = 1.0f;
+            if (o.modSize->idle()) {
+                o.modSize.reset();
+            }
+        }
+        return;
+    }
+    (o.modSize ? *o.modSize : o.modSize.emplace()).drawScale = scale;
+}
+
+float drawScaleOf(const ServerObject& o)
+{
+    return o.modSize ? o.modSize->drawScale : 1.0f;
 }
 
 bool Missiles::shoot(ServerObject& shooter, ServerObject& weapon)
@@ -768,15 +934,23 @@ void Missiles::sparkExplosion(ServerObject& m, ServerObject* other)
     const int size = m.collideArg;
     const float cx = m.x;
     const float cy = m.y;
-    // The push: 50, out to 2/3 of its size (each reach stored as the float argument it is).
-    pushAround(cx, cy, (X87::fromDouble(size) * 0.6666667f).f(), 0.0f, 50.0f, &m);
+    // The push's reach and the harm's (each stored as the float argument it is): times a mode's
+    // burst scale (noxcpp's, ServerObject::ModSize; none for the game's), the product stored.
+    float pushReach = (X87::fromDouble(size) * 0.6666667f).f();
+    float reach = (X87::fromDouble(size) * 0.33333334f).f();
+    if (m.modSize && m.modSize->burstScale != 1.0f) {
+        pushReach = (X87(pushReach) * m.modSize->burstScale).f();
+        reach = (X87(reach) * m.modSize->burstScale).f();
+    }
+    // The push: 50, out to 2/3 of its size.
+    pushAround(cx, cy, pushReach, 0.0f, 50.0f, &m);
     const int damage = size >> 1;
     if (other) {
         Fight{world, rng, frame, &things, modifiers}.damage(*other, shooterPlayer(m), m.extent, damage, 1);
     }
     // Around it: a third of its size, full within 15 (a solo game's: 0), from the
     // fireball itself.
-    damageAround(cx, cy, (X87::fromDouble(size) * 0.33333334f).f(), (world.gameFlags & GameFlag::Solo) ? 0.0f : 15.0f, damage, 1, &m, other);
+    damageAround(cx, cy, reach, (world.gameFlags & GameFlag::Solo) ? 0.0f : 15.0f, damage, 1, &m, other);
     // The burst for the clients (netSparkExplosionFx: MSG 0x93 x, y, size).
     const auto ix = static_cast<std::uint32_t>(std::clamp(cx, 0.0f, 65535.0f));
     const auto iy = static_cast<std::uint32_t>(std::clamp(cy, 0.0f, 65535.0f));
@@ -1065,8 +1239,13 @@ void Missiles::boom(ServerObject& m, ServerObject* other, float nx, float ny)
         kRangeKey{"MagicMissileRange"}, kPushRangeKey{"MagicMissilePushRange"}, kForceKey{"MagicMissileForce"};
     const int kDamage = static_cast<int>(world.number(kDamageKey));
     const int kSplash = static_cast<int>(world.number(kSplashKey));
-    const float kRange = world.number(kRangeKey);
-    const float kPushRange = world.number(kPushRangeKey);
+    float kRange = world.number(kRangeKey);
+    float kPushRange = world.number(kPushRangeKey);
+    if (m.modSize && m.modSize->burstScale != 1.0f) {
+        // (noxcpp: a mode's burst scale, ServerObject::ModSize; none for the game's.)
+        kRange = (X87(kRange) * m.modSize->burstScale).f();
+        kPushRange = (X87(kPushRange) * m.modSize->burstScale).f();
+    }
     const float kForce = world.number(kForceKey);
     const auto fx = [&] {
         const auto ix = static_cast<std::uint32_t>(std::clamp(m.x, 0.0f, 65535.0f));

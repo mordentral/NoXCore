@@ -70,7 +70,8 @@ bool isMonster(const ServerObject& o) { return (o.classes & oc::Monster) != 0 &&
 bool aliveMonster(const ServerObject& o) { return isMonster(o) && !(o.flags & ObjFlag::Dead); }
 
 /// server_scriptExecuteFnForEachGroupObj with kind 0: an object group's members by
-/// extent, a group of groups (kind 3) each of its groups in turn; any other kind nothing. (A
+/// map number (netGetUnitByExtent: World::byMapNumber), a group of groups (kind 3) each of its
+/// groups in turn; any other kind nothing. (A
 /// group met again on the way: the exe recurses till its stack runs out; ours goes no further,
 /// as script_host.cpp's walk.)
 template <class F>
@@ -83,7 +84,7 @@ void eachObjectOf(World& world, std::int32_t group, F&& fn, std::vector<std::int
     const std::vector<std::int32_t> members = g->members;
     if (g->kind == ServerGroup::Kind::Objects) {
         for (const std::int32_t m : members) {
-            if (ServerObject* o = world.byExtent(static_cast<std::uint32_t>(m))) {
+            if (ServerObject* o = world.byMapNumber(static_cast<std::uint32_t>(m))) {
                 fn(*o);
             }
         }
@@ -102,13 +103,13 @@ void eachObjectOf(World& world, std::int32_t group, F&& fn, std::vector<std::int
 }
 
 /// The builtins that walk a group's list themselves (server_scriptGetGroup, then its
-/// entries by extent): its members whatever its kind.
+/// entries by map number, netGetUnitByExtent): its members whatever its kind.
 template <class F>
 void eachMemberOf(World& world, const ServerGroup& g, F&& fn)
 {
     const std::vector<std::int32_t> members = g.members;
     for (const std::int32_t m : members) {
-        if (ServerObject* o = world.byExtent(static_cast<std::uint32_t>(m))) {
+        if (ServerObject* o = world.byMapNumber(static_cast<std::uint32_t>(m))) {
             fn(*o);
         }
     }
@@ -837,7 +838,7 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
                 return;
             }
             for (const std::int32_t m : first->members) {
-                ServerObject* u = world_.byExtent(static_cast<std::uint32_t>(m));
+                ServerObject* u = world_.byMapNumber(static_cast<std::uint32_t>(m));
                 if (u && !hasParent(world_, u, &owner)) {
                     all = false;
                     break;

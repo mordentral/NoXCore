@@ -42,6 +42,7 @@
 #include <array>
 #include <bitset>
 #include <functional>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -137,6 +138,12 @@ public:
         /// and its video.bag image for the CPU's copy when there's no pending shader.
         std::uint8_t pendingLook = 0;
         std::int32_t pendingImage = -1;
+        /// A mode's draw scale (nox.setDrawScale: a thing's body and its burst): drawn that much
+        /// larger about (pivotX, pivotY) (world units; NaN: the image's own middle), one pivot for
+        /// all of a drawable's images (draw_scale.hpp); its sort key and sight test as ever.
+        float scale = 1.0f;
+        float pivotX = std::numeric_limits<float>::quiet_NaN();
+        float pivotY = std::numeric_limits<float>::quiet_NaN();
     };
 
     /// A sprite drawn this frame that matters to the bloom (bloomSprites), as it was drawn: a light
@@ -468,10 +475,13 @@ private:
     void drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCache& sprites, bool hd = true) const;
     /// Draws a sprite whose origin (before its own offset) is at world (x, y), clipped to world
     /// columns [clipLeft, clipRight]. `look`: a session's pending look (its alpha, and the pending
-    /// shader or, without it, the CPU's copy of video.bag image `image`).
+    /// shader or, without it, the CPU's copy of video.bag image `image`). `scale`: drawn that much
+    /// larger about world (pivotX, pivotY) (NaN: the image's middle; a mode's draw scale; 1 as it is).
     void drawSprite(SDL_Renderer* renderer, SpriteCache& sprites, const Camera& camera, const Sprite& s, float x,
                     float y, Rgb light, float clipLeft = -1e9f, float clipRight = 1e9f, std::uint8_t alpha = 255,
-                    bool bloom = false, float clipBottom = 1e9f, std::uint8_t look = 0, std::int32_t image = -1) const;
+                    bool bloom = false, float clipBottom = 1e9f, std::uint8_t look = 0, std::int32_t image = -1,
+                    float scale = 1.0f, float pivotX = std::numeric_limits<float>::quiet_NaN(),
+                    float pivotY = std::numeric_limits<float>::quiet_NaN()) const;
     /// Without line of sight: whether a wall is a front wall seen from (eyeX, eyeY), drawn last and
     /// translucent (drawBlack's rule, for every wall in view). With it, the sight says.
     bool frontWall(const nox::map::Wall& w, float eyeX, float eyeY) const;

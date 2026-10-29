@@ -230,6 +230,11 @@ public:
         /// noxcpp (a NoX Core mode's): a player's CLIENT_READY (its map loaded, at its join and at
         /// each map's), after what the game sends it then.
         std::function<void(GameHost&, std::uint8_t peer)> onClientReady;
+        /// noxcpp (a NoX Core mode's): an object a mode gave a draw scale (ServerObject::ModSize's
+        /// drawScale, not 1) went to a player that didn't know it: its record written in this
+        /// player's update, the first since it came into its view (or since its client forgot
+        /// it). Asked of no other object; it may only send (nox.setDrawScale's message).
+        std::function<void(GameHost&, std::uint8_t peer, ServerObject& o)> onScaledSeen;
         /// noxcpp (a NoX Core mode's): a reliable message the frame tells one player (and the walls
         /// broken told at its join), put another way for it; none: as it is (what that client
         /// draws differs from the world's numbering, e.g. a solo game's guest on the map's own file).
@@ -464,6 +469,68 @@ public:
     /// The client level an identified client named (lobby::kClientLevel: a feature keyed "level N
     /// or above" goes only to one at N or above); 0 for any other.
     std::uint16_t clientLevel(std::uint8_t peer) const { return transport_.clientLevel(peer); }
+    /// (noxcpp's) The reliable packets `peer` has out and not yet acknowledged (the sequence
+    /// numbers from its last acknowledgement to the next we'd send).
+    std::size_t reliableOutstanding(std::uint8_t peer) const { return transport_.reliableOutstanding(peer); }
+    /// (Tests) A peer's stream: our next reliable sequence number, its last acknowledgement.
+    std::optional<net::ServerTransport::ReliableSeqs> reliableSeqs(std::uint8_t peer) const { return transport_.reliableSeqs(peer); }
+    /// (noxcpp's) The most reliable packets a client may have out before NoX Core's own paced
+    /// senders hold back (the fast map send, a mode's UI, assets, values and views, its weather, an
+    /// edit session's live view and mod files). The transport's acknowledgement compares sequence
+    /// numbers safely only within 32 of each other (transport.cpp's acknowledged; OB-001, OB-410):
+    /// past that a packet can be taken as acknowledged and dropped unsent, or kept a lap. These
+    /// senders together stay under this, leaving the rest of the 32 to the game's own messages,
+    /// which are never held (the game's own may still pass 32 in a long wait for an
+    /// acknowledgement). (The session's messages, edit_session.hpp, wait the same way.)
+    static constexpr std::size_t kReliableSpan = 24;
+    /// How many more reliable packets one of those senders may put out to `peer` now (0: wait).
+    /// Each asks before each packet it adds. (A small one, latest wins: a mode's values, views and
+    /// weather.)
+    std::size_t reliableRoom(std::uint8_t peer) const
+    {
+        const std::size_t out = reliableOutstanding(peer);
+        return out < kReliableSpan ? kReliableSpan - out : 0;
+    }
+    /// The span's last packets the bulk senders (the fast map send, a mode's assets and UI, an edit
+    /// session's messages, live view and mod files) leave to the small ones, so a value or the
+    /// weather never waits on a big transfer.
+    static constexpr std::size_t kReliableBulkReserve = 4;
+    /// reliableRoom for a bulk sender: less kReliableBulkReserve.
+    std::size_t reliableBulkRoom(std::uint8_t peer) const
+    {
+        const std::size_t room = reliableRoom(peer);
+        return room > kReliableBulkReserve ? room - kReliableBulkReserve : 0;
+    }
+    /// The fast map send's block (map_send.cpp, to a client of lobby::kFastMapSendLevel or above):
+    /// the most a reliable packet carries (net::kMaxReliablePayload) less MSG_MAP_SEND_PACKET's
+    /// 6-byte head (a 1026-byte datagram: under the usual 1500-byte MTU).
+    static constexpr std::uint16_t kFastMapBlock = static_cast<std::uint16_t>(net::kMaxReliablePayload - 6);
+    /// The fast send's most blocks in a frame to one client (30 Hz: about 240 KB/s).
+    static constexpr int kFastMapBlocksPerFrame = 8;
+    /// The fast sends' most blocks in a frame to all clients together, shared round robin (about
+    /// 2 MB/s: a burst a socket's send buffer takes). The stock stream's blocks don't count.
+    static constexpr int kFastMapBlocksPerFrameAll = 64;
+    /// The client's unacknowledged reliable packets the fast send stops at, at most: it keeps the
+    /// map's own packets in flight under the 32 numbers the transport's acknowledgement compares
+    /// safely (transport.cpp's acknowledged); other reliable traffic to the client counts in the
+    /// window but isn't held by it. (A bulk sender: reliableBulkRoom stops it there.)
+    static constexpr std::size_t kFastMapWindow = kReliableSpan - kReliableBulkReserve;
+    /// The window a send starts with, and the least it falls to. A client takes reliable packets in
+    /// order only, so one lost drops all sent after it, and they come again one round trip at a
+    /// time (an acknowledgement's resend) or after 2-3 s (the resend timer): a frame's blocks not
+    /// acknowledged within kFastMapLateMs and twice the round trip (the quickest a frame's first
+    /// packet was acknowledged; nothing late before one is, till kFastMapFirstLateMs) halve the
+    /// window, and each frame's acknowledged in time opens it (by as many packets till the first
+    /// late, by one a round trip after), so a lossy link keeps few in flight, as the stock stream
+    /// does.
+    static constexpr std::size_t kFastMapStartWindow = 8;
+    static constexpr std::size_t kFastMapMinWindow = 2;
+    static constexpr std::uint32_t kFastMapLateMs = 100;
+    static constexpr std::uint32_t kFastMapFirstLateMs = 1000;
+    /// A client's requests after each map load that get the fast send (a retry after a bad CRC
+    /// too); its later ones in the same map get the stock stream, so a client that asks again and
+    /// again can't have the host send at the fast rate for good.
+    static constexpr std::uint8_t kFastMapRequestsPerMap = 2;
     /// (noxcpp's) The reliable packets `peer` hasn't acknowledged yet (its queue holds
     /// net::kMaxQueuedReliable; past that a reliable send is lost): what a "latest wins" sender
     /// looks at before adding more.
@@ -1028,6 +1095,13 @@ private:
     // Map downloads (Server\Network\mapsend.c): the map's own maps\<map>\<map>.nxz sent as it is
     // to a client that asked for it (MSG_REQUEST_MAP), 512 bytes a block, a block a frame while
     // the client has at most 2 of them unacknowledged.
+    // noxcpp's fast send, to a NoX Core client of lobby::kFastMapSendLevel or above, for its first
+    // kFastMapRequestsPerMap requests after each map load (the same messages): blocks of
+    // kFastMapBlock bytes, up to kFastMapBlocksPerFrame of them every frame (kFastMapBlocksPerFrameAll
+    // to all of them together)
+    // while the client's unacknowledged reliable packets (all of them, not only the map's) number
+    // fewer than its window (kFastMapStartWindow-kFastMapWindow, halved when late); a fast sender
+    // whose player leaves is let go.
     struct MapSender {                   ///< (g_mapSenders[i])
         std::uint16_t state = 0;         ///< 1 sending
         bool privateCopy = false;        ///< its own copy of an older map's file
@@ -1039,6 +1113,20 @@ private:
         std::uint8_t window = 2;         ///< map packets left unacknowledged before it waits
         std::uint32_t waits = 0;         ///< times it waited on the client
         std::uint64_t startMs = 0;       ///< when the send began
+        bool fast = false;               ///< (noxcpp's fast send)
+        // (The fast send's own:)
+        std::size_t fastWindow = kFastMapStartWindow; ///< its window now (kFastMapMinWindow-kFastMapWindow)
+        bool lateSeen = false;           ///< a frame's blocks went late (the window grows by one since)
+        std::uint32_t ackMs = 0;         ///< the quickest a frame's first packet was acknowledged (0: none yet)
+        std::uint32_t grownAt = 0;       ///< when the window last opened (after a late frame: once a round trip)
+        struct Flight {
+            std::uint32_t at = 0;        ///< when a frame's blocks went
+            std::uint8_t seqBegin = 0;   ///< the stream's next sequence number before them
+            std::uint8_t seqEnd = 0;     ///< and after them
+            std::uint8_t packets = 0;    ///< how many
+            bool timed = false;          ///< its first packet's acknowledgement timed (ackMs)
+        };
+        std::vector<Flight> flights;     ///< frames' blocks not yet acknowledged, oldest first
     };
     std::map<std::uint8_t, MapSender> mapSenders_; ///< by peer
     std::vector<std::uint8_t> mapSendData_;        ///< (g_mapSendData / g_mapSendSize)
@@ -1052,7 +1140,18 @@ private:
     /// `slot` afresh, not known to it but the always-sent kinds (0x20400000), what was owed it of
     /// them dropped and those kinds' standing state owed.
     void forgetObjects(std::uint8_t slot);
-    void mapSendFrame();                   ///< (each even frame, before the transfers)
+    /// (each frame, before the transfers) The stock senders on even frames only (`even`); the fast
+    /// ones every frame.
+    void mapSendFrame(bool even);
+    /// A player gone (leave): its fast sender let go and counted down (a stock one goes on: OB-163).
+    void mapSendPeerGone(std::uint8_t peer);
+    /// A sender reset (the exe's sender reset; a fast one sending counted off mapSendsFast_).
+    void mapSendReset(MapSender& s);
+    int mapSendsFast_ = 0; ///< fast senders sending (none: odd frames skip the senders)
+    std::uint8_t mapSendFastLast_ = 0; ///< the peer the fast sends' last frame served last (round robin)
+    std::map<std::uint8_t, std::uint8_t> fastMapRequests_; ///< by peer: fast sends since the map's load
+    /// A fast sender's frame: up to `budget` blocks (the frame's share left, taken from it).
+    void mapSendFast(std::uint8_t peer, MapSender& s, int& budget);
     void mapSendNextBlock(std::uint8_t peer, MapSender& s); ///< SrvNet_MapSendNextBlock
     void mapSendAbortAll(std::uint8_t reason); ///< (SrvNet_MapSendAbort each)
     bool mapSendLoadMap();                 ///< SrvNet_MapSendLoadMap

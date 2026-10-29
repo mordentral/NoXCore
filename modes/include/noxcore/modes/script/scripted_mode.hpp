@@ -31,7 +31,8 @@
 // monsterInfo, setHealth, touch, sightRange, textToAll; nearestFoes, applyForce, attack,
 // direction, directionOf, directionVector, newMark, madeSince, spellInfo, enchantTime, gameNumber,
 // traceRay, shoot, summon, abilitySound, setPosition, setVelocity, setOwner, setTeam, setNoCollide,
-// damageAt, delete: each the engine's own function, its input checked; thingType, present, living,
+// damageAt, delete: each the engine's own function, its input checked; setHitRadius, setBurstScale:
+// one missile's own size (ServerObject::ModSize); thingType, present, living,
 // setCollide, backIntoPlay, nearSoulGate; and batches that save a frame's calls: position,
 // keepPresent, keepLiving, circle, damageAtEach; tell: a line to one player; a player's own numbers
 // and book: gold, setGold, mana, setMana, setPlayerHealth, strength, setStrength, spellLevel,

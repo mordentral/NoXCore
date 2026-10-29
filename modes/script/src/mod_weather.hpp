@@ -24,9 +24,8 @@ namespace nox::modes::script {
 
 class Weather {
 public:
-    /// A player's reliable queue past this: its weather waits till it drains (the game's own
-    /// messages keep their place).
-    static constexpr std::size_t kQueueLimit = 100;
+    // (A player with no reliable room, GameHost::reliableRoom: its weather waits till its
+    // acknowledgements catch up; the game's own messages keep their place.)
 
     /// Whether `peer` may be sent the weather: a player in the game, not a held-out stock one,
     /// whose client named ClientFeature::ModeUi and is at client level 1 or above (asked each

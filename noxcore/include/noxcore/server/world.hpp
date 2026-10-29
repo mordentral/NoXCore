@@ -513,6 +513,29 @@ struct ServerObject {
     float radius = 0;    ///< a circle's
     float boxWidth = 0;  ///< a box's
     float boxHeight = 0;
+    /// noxcpp: a mode's own size for a missile (a script's nox.setHitRadius and
+    /// nox.setBurstScale); none for every thing of the game's. While `hit` is set its shape above
+    /// is the mode's (its type's kept here to give back), and its flight meets what that shape
+    /// touches (Missiles::bodyAt), not only what holds its centre. Its burst's reach and push
+    /// reach are its type's times `burstScale`. Kept when it's reflected or turned (the same
+    /// object, now another's); dies with it. `ownerCleared`: the owner (by extent) its flight has
+    /// first come clear of; until then that owner is met only as the stock test meets it.
+    /// `drawScale` (nox.setDrawScale, any thing the stream sends, not only a missile) changes
+    /// nothing on the server: it's what NoX Core clients of client level 5 are told to draw it at
+    /// (GameHost::Options::onScaledSeen).
+    struct ModSize {
+        ShapeKind typeShape = ShapeKind::None;
+        float typeRadius = 0;
+        float typeBoxWidth = 0;
+        float typeBoxHeight = 0;
+        bool hit = false;
+        float burstScale = 1;
+        std::uint32_t ownerCleared = 0;
+        float drawScale = 1;
+        /// Nothing of a mode's left (the part let go; `ownerCleared` matters only with `hit`).
+        bool idle() const noexcept { return !hit && burstScale == 1.0f && drawScale == 1.0f; }
+    };
+    Boxed<ModSize> modSize;
     float speedBase = 0;   ///< SPEED / 32, a player's from its class
     float speedBonus = 0;
     float speedCur = 0;    ///< this frame's: (5 - slowed) x (base + bonus) / 5, doubled running
@@ -684,7 +707,8 @@ struct ServerObject {
     };
     Boxed<Trigger> trigger;
     /// A teleport pentagram's (TeleportPentagram / InvisiblePentagram, TransporterXfer):
-    /// its partner (by extent), its state (0 at rest, 1 sending, 2
+    /// its partner (by extent: a map load links it, World::linkTransporters; the record's number
+    /// for it is what a save writes), its state (0 at rest, 1 sending, 2
     /// receiving), its frame and the counts that pace it (the cycle, the frames
     /// into one), and whether something touched it this frame.
     struct Transport {
@@ -755,7 +779,11 @@ struct ServerObject {
         std::int32_t start = 0;
         std::int32_t target = 0;
         std::int32_t previous = 0;
+        /// The map number of the thing it carries (its record's; the save writes it) and the
+        /// thing it found by it (its extent, 0 none yet): the exe finds it at an update that has
+        /// none (netGetUnitByExtent: World::byMapNumber) and keeps it till it's off the map.
         std::uint32_t carried = 0;
+        std::uint32_t carriedObject = 0;
     };
     Boxed<Mover> mover;
     /// A CTF flag's (FlagUpdate's UpdateData): its home (where TeamXfer put it) and the
@@ -1077,8 +1105,9 @@ struct ServerObject {
     float doorSwing = 0;             ///< doors: this step's swing from pushes
     bool doorSwinging = false;       ///< doors: in the step's swing list
     std::uint32_t doorTouched = 0;   ///< doors: the frame something last touched it
-    /// Elevators and their shafts (ElevatorUpdateData): the other of the pair,
-    /// an elevator's state (0 down, 3 rising, 2 up, 1 sinking; a shaft's
+    /// Elevators and their shafts (ElevatorUpdateData): the other of the pair (its extent: a
+    /// map load links them, World::linkElevators; the record's number for it is what a save
+    /// writes), an elevator's state (0 down, 3 rising, 2 up, 1 sinking; a shaft's
     /// copy of its elevator's), its height (0-64) and the frame it stopped.
     std::uint32_t elevatorLink = 0;
     std::uint8_t elevatorState = 0;
@@ -2211,6 +2240,27 @@ public:
     /// destroyed one: flag 0x20, set as delayedDeleteObject marks it, ours
     /// pendingDelete). -1 and -2 (caller, trigger) are the script host's.
     ServerObject* byScriptId(std::int32_t id);
+    /// By map number (the exe's Extent: the number its map or .plr record gave it, fileExtent), as
+    /// netGetUnitByExtent looks: a thing on the exe's object list whose number it is. That list is
+    /// the world's things (none held, no missile, none new since the last pass, none with 0x20: ours
+    /// gone or pendingDelete), each pass's at its head (a load's in its file's order). The exe's
+    /// numbers aren't unique: a map may give a held thing and a placed one the same, a thing brought
+    /// from another map keeps that map's, a save holds both. The exe takes the list's first (the
+    /// newest: a thing put down later takes a map object's place, OB-412); ours, by decision
+    /// (VD-47), the one on it longest (the oldest; of one load's, the later record), the map's own.
+    /// Ours are keys, so a load numbers such a thing afresh (placeRecords, Server::loadMapKeeping, a
+    /// .plr's things), and those are kept by number for this. 0 names none. (A group's members, a
+    /// mover's thing, a map object's net code: bit 15 and the number.)
+    ServerObject* byMapNumber(std::uint32_t number);
+    /// Its map number given after it was put in the world (kept for byMapNumber).
+    void setMapNumber(ServerObject& o, std::uint32_t number);
+    /// A client's code for a thing as packetDynamicUnitCode, then Obj_GetByNetCode, take it: with
+    /// bit 15 a map object's, by its map number (byMapNumber); else the thing it's the code of.
+    ServerObject* byPacketCode(std::uint32_t code);
+    /// A client's code for a thing as Obj_GetByNetCode alone takes it: one with bit 15 names
+    /// nothing (a map object's own NetCode is under 0x8000; its clients know it only by its map
+    /// number with bit 15); else the thing it's the code of.
+    ServerObject* byNetCode(std::uint32_t code);
     /// By script name (the map editor's), as getObjectByScrName: with no 0x20 test,
     /// so a deleted thing still in the exe's lists is found (one on the map, ACTIVE, or held by
     /// one; a held thing deleted left its holder at once) till the next tick's frees
@@ -2372,6 +2422,12 @@ private:
     /// with `live`: not on the load order). The top-level ones placed.
     static std::vector<std::uint32_t> placeRecords(World& w, const map::ObjectTOC& toc, const map::ObjectData& data, const things::ThingDb& things,
                                                    const things::ModifierDb* modifiers, std::uint32_t gameFlags, std::uint32_t frame, bool live);
+    /// The map load's elevators and shafts among `placed` (the top-level ones placed, in record
+    /// order) linked to each other by extent, from each elevator's record's number for its shaft.
+    static void linkElevators(World& w, const std::vector<std::uint32_t>& placed);
+    /// The map load's teleport pads among `placed` each linked to its partner by extent, from its
+    /// record's number for it (one way).
+    static void linkTransporters(World& w, const std::vector<std::uint32_t>& placed);
     /// A door's leaf takes the cell half its shut swing reaches (XFerDoor -> doorAttachWall).
     void attachDoorWall(const ServerObject& o);
     /// How many of the cell's wall segments the ray crosses within its span,
@@ -2379,6 +2435,12 @@ private:
     int rayCell(int x, int y, const float ray[4], float hit[4], std::uint8_t flags) const;
 
     ObjectMap objects_;
+    /// The things put in the world under an extent that isn't their map number, by that number
+    /// (byMapNumber's other candidates, in the order they came; one gone, or the extent another's
+    /// since, is passed over there). Few: a load's clashes, the things a map change or a .plr brings.
+    std::map<std::uint32_t, std::vector<std::uint32_t>> renumbered_;
+    /// Notes `o` in renumbered_ when its map number isn't 0 nor its extent.
+    void noteRenumbered(const ServerObject& o);
     /// playerUnits' (sentryUnits') list as last gathered, and the counts it was gathered at
     /// (ExtentTable's, the record watch's): gathered again when either has moved on. Not carried by
     /// a move (gathered afresh).

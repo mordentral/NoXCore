@@ -1,6 +1,6 @@
 --!strict
 -- The passive tree's window: its nodes sent once to each player's UI (in parts: id, place, kind,
--- region, name, what it does, its links), then the hero's state whenever it changes (the nodes
+-- region, name, what it does, its links, its picture or the game's icon's name), then the hero's state whenever it changes (the nodes
 -- taken, points, the respec's cost and whether the hero stands by the fountain to pay it). A
 -- click on a node takes it; the Respec button, by the fountain, gives every node back for gold.
 
@@ -28,7 +28,10 @@ local function nodeEntries(): { any }
 		for _, other in n.links do
 			table.insert(links, other)
 		end
-		table.insert(list, { i = id, x = n.x, y = n.y, k = KIND[n.kind] or "s", c = REGION[n.region] or 0, n = name, d = what, l = links })
+		-- (ic: its picture's short name, the asset "tree/<ic>", for a root, small, notable or
+		-- keystone; si: the game's icon's name for a spell, ability or summon, for nox.spellIcon)
+		table.insert(list, { i = id, x = n.x, y = n.y, k = KIND[n.kind] or "s", c = REGION[n.region] or 0, n = name, d = what, l = links, ic = n.icon,
+			si = n.spellIcon })
 	end
 	entries = list
 	return list

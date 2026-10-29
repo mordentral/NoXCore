@@ -321,15 +321,19 @@ function tree.describe(n: any): (string, string)
 		local only = " (" .. CLASS_TITLES[n.region] .. " only)"
 		local r = data.rise(n.spell or n.ability)
 		local mastery = tree.statText(r.mastery)
+		-- (a level that makes its missile larger says so: data.rises' size)
+		local larger = if r.size and r.size.byLevel[n.level] and not n.beyond
+			then ": a larger, wider " .. title .. " (easier to hit with, a wider burst)"
+			else ""
 		if n.first then
 			local own = if r.own ~= 0 then string.format(", and %+d%% %s damage", r.own, title) else ""
-			return title, "Unlocks " .. title .. " at level " .. n.level .. own .. only
+			return title, "Unlocks " .. title .. " at level " .. n.level .. larger .. own .. only
 		elseif n.beyond then
 			return title .. " mastery", mastery .. only
 		elseif n.mastery and mastery ~= "" then
-			return title .. " " .. n.level, title .. " to level " .. n.level .. ", and " .. mastery .. only
+			return title .. " " .. n.level, title .. " to level " .. n.level .. larger .. ", and " .. mastery .. only
 		end
-		return title .. " " .. n.level, title .. " to level " .. n.level .. only
+		return title .. " " .. n.level, title .. " to level " .. n.level .. larger .. only
 	elseif n.kind == "summon" then
 		local title = tree.creatureTitle(n.creature)
 		return "Summon " .. title, "The " .. title .. " in your field guide, to summon (" .. CLASS_TITLES[n.region] .. " only)"

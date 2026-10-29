@@ -554,10 +554,14 @@ void Spells::finishCast(ServerObject& caster)
                     if (world.quest() && (flags & kHostile) && target && !isEnemy(world, caster, *target)) {
                         target = nullptr;
                     }
+                    // (noxcpp: where the new list stood, for a mode told of the cast: what it made.)
+                    const std::size_t madeFrom = world.modeHooks ? world.newList().size() : 0;
                     if (castByUser(spell, caster, target, p.cursorX, p.cursorY)) {
                         tell(caster, {0xA9, 1, lo(spell), hi(spell), 0, 0}); // MSG_INFORM 1: cast
                         if (world.modeHooks) {
-                            world.modeHooks->spellCast(world, caster, spell, target, p.cursorX, p.cursorY); // (noxcpp: told a mode)
+                            const std::span<const std::uint32_t> fresh = world.newList();
+                            world.modeHooks->spellCast(world, caster, spell, target, p.cursorX, p.cursorY,
+                                                       fresh.subspan(std::min(madeFrom, fresh.size()))); // (noxcpp: told a mode)
                         }
                     } else {
                         p.mana = static_cast<std::uint16_t>(std::min<int>(p.mana + cost, p.maxMana));

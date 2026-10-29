@@ -92,8 +92,8 @@ void Weather::flush(server::GameHost& host)
         if (r.want == r.has || !reaches(host, p)) {
             continue;
         }
-        if (host.queuedReliable(p) > kQueueLimit) {
-            dirty_ = true; // (next frame, or once it drains)
+        if (host.reliableRoom(p) == 0) {
+            dirty_ = true; // (next frame, or once its acknowledgements catch up)
             continue;
         }
         if (host.sendToIdentified(p, weather::message(r.want, r.instant ? 0 : r.fade))) {

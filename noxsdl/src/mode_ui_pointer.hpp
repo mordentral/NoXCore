@@ -1,8 +1,9 @@
 // A script mode UI's pointer in noxcore.exe (script_mode_ui.cpp), with no SDL in it so the tests
 // drive it:
 //  - which of the UI's windows a point goes to, as they're drawn: the others newest first, then
-//    the HUD pieces (drawn under them); never a click-through window or a hidden HUD piece; and for
-//    a UI of API 3 never a point a game window drawn over that kind of window holds (`covered`);
+//    the HUD pieces (drawn under them); never a click-through window or a hidden HUD piece, nor a
+//    frameless window's point outside the hit areas it declared (API 4); and for a UI of API 3
+//    never a point a game window drawn over that kind of window holds (`covered`);
 //  - a press's life (UI API 3): a drag once it has moved kDragStart units, its moves told once a
 //    frame, its end at the button's release whoever has the pointer then (the program hands every
 //    release here first: ModeUi::release), or when the pointer is lost (focus) or the UI stops.
@@ -48,6 +49,9 @@ std::optional<Hit> hitWindow(const nox::modes::script::ScriptUiClient& ui, float
             const float wx = static_cast<float>(w.x), wy = static_cast<float>(w.y);
             if (!(x >= wx - edge && x < wx + static_cast<float>(w.w) + edge && y >= wy - title - edge && y < wy + static_cast<float>(w.h) + edge)) {
                 continue;
+            }
+            if (!w.frame && !w.hitAreas.empty() && !nox::modes::script::windowTakes(w, x, y)) {
+                continue; // (API 4: a frameless window with hit areas, outside them: click-through)
             }
             if (api3 && covered(w.hud)) {
                 return std::nullopt; // (a game window over it has the point: the game's)

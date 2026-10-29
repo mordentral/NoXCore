@@ -108,7 +108,8 @@ public:
         /// Live is "latest wins": a viewer with more reliable packets than this
         /// still unacknowledged (a slow or stalled link) is skipped that time, so the live view
         /// never fills its queue (net::kMaxQueuedReliable, shared with the game's own reliable
-        /// messages and the session's ops: past it they'd be lost).
+        /// messages and the session's ops: past it they'd be lost). It's also skipped without
+        /// reliable room for all its packets (GameHost::reliableBulkRoom).
         std::size_t liveQueueLimit = 32;
         std::uint32_t autoPublishQuietMs = 2'000;
         std::uint32_t autoPublishMaxMs = 10'000;
@@ -122,7 +123,8 @@ public:
         /// they're ever written on the host). Empty: none.
         std::filesystem::path modFolder;
         /// A member's file transfers go out while it has at most this many reliable packets
-        /// unacknowledged (a mod's files are big: the game's own reliable messages never wait on them).
+        /// unacknowledged, and reliable room (GameHost::reliableBulkRoom) (a mod's files are big: the
+        /// game's own reliable messages never wait on them).
         std::size_t modQueueLimit = 24;
     };
 
@@ -233,6 +235,15 @@ public:
     bool publishMod(GameHost& host);
     /// (Tests) A member's mod files waiting to go out: the paths wanted, and the transfer under way.
     std::size_t modWanted(std::uint8_t peer) const;
+    /// (Tests) A member's session messages waiting for reliable room (its outbox).
+    std::size_t outboxSize(std::uint8_t peer) const
+    {
+        const auto it = peers_.find(peer);
+        return it == peers_.end() ? 0 : it->second.outbox.size();
+    }
+    /// A Live's body at most: its creatures stop there, so it's never more than 12 frames and always
+    /// fits the reliable room pumpMod leaves it.
+    static constexpr std::size_t kLiveMostBytes = 12 * mapedit::session::kChunkBytes;
 
 private:
     /// A member's mod transfers: the list owed (latest wins), the files wanted (each path once), and
@@ -240,6 +251,9 @@ private:
     struct ModOut {
         bool sent = false;      ///< the project was sent to it (a Join again wants the list alone)
         bool listDirty = false;
+        /// The list's frames under way (a list owed again goes once these are out).
+        std::vector<std::vector<std::uint8_t>> listFrames;
+        std::size_t listAt = 0;
         std::deque<std::string> want;
         std::set<std::string> wanted;
         std::vector<std::vector<std::uint8_t>> frames;
@@ -275,7 +289,17 @@ private:
         bool modFiles = false;
         /// What of the mod waits for room in its reliable queue (Options::modQueueLimit).
         ModOut mod;
+        /// The session's messages owed it (send, sendJoined: the join's Base and catch-up among
+        /// them), in order, each out as its reliable room allows (GameHost::reliableBulkRoom), so a
+        /// big document never goes in one burst past the span the acknowledgement compares safely.
+        std::deque<std::vector<std::uint8_t>> outbox;
     };
+    /// The frames `peer` is owed appended to its outbox, then as many sent as its room takes.
+    void enqueue(GameHost& host, std::uint8_t peer, std::span<const std::vector<std::uint8_t>> frames);
+    /// A member's outbox sent as its reliable room takes, first in, first out.
+    void drainOutbox(GameHost& host, std::uint8_t peer, Peer& p);
+    /// The last live view's frames (pumpMod leaves them room).
+    std::size_t liveFrames_ = 0;
 
     void handle(GameHost& host, std::uint8_t peer, const mapedit::session::Message& m);
     void join(GameHost& host, std::uint8_t peer);

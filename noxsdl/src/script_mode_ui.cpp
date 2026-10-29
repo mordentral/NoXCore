@@ -14,12 +14,18 @@
 // pieces, and never a point the inventory, the summon cage or (over HUD pieces) the book holds; a
 // press it took ends at its release whoever has the pointer then (release), or at a focus loss
 // (mode_ui_pointer.hpp).
+// A UI of API 4 also draws the game's own spell and ability icons (Hud::icon), and a frameless
+// window that declares hit areas takes the mouse only inside them. With any script mode, a client
+// of level 5 draws the things the server gave a draw scale (App::modeDrawScales, the scene) and
+// their bursts (Effects::setBurstScale) at that scale.
 #include "app.hpp"
 #include "audio.hpp"
 #include "chat_entry.hpp"
 #include "cinematics.hpp"
 #include "console.hpp"
 #include "draw_box.hpp"
+#include "effects.hpp"
+#include "hud.hpp"
 #include "inventory.hpp"
 #include "minimap.hpp"
 #include "mode_ui.hpp"
@@ -140,6 +146,17 @@ public:
         ui_ = dynamic_cast<ScriptUiClient*>(side);
         freeTextures(); // (the last game's pictures: gone with it)
         pointer_.reset();
+        app_.modeDrawScales.clear();
+        if (app_.effects) {
+            // (Client level 5) A burst near a missile the server drew at a scale: drawn so too.
+            if (ui_) {
+                app_.effects->setBurstScale([this](int x, int y, std::optional<int> size) -> std::optional<float> {
+                    return ui_ ? ui_->burstScaleAt(static_cast<float>(x), static_cast<float>(y), size) : std::nullopt;
+                });
+            } else {
+                app_.effects->setBurstScale({});
+            }
+        }
         if (ui_) {
             ui_->setTextWidth([this](std::string_view text) {
                 if (!app_.font || scale_ <= 0) {
@@ -174,6 +191,17 @@ public:
         // (API 3) A drag's latest move, once a frame; then the labels' objects for the scene
         // (liveSprites), by net code: after the drag hook, which may change the labels.
         app.modeLabels.clear();
+        // (Client level 5) The draw scales the server told, by net code for the scene: whether a
+        // UI runs or not (any script mode's things).
+        app.modeDrawScales.clear();
+        if (ui_) {
+            for (const nox::modes::script::UiDrawScale& s : ui_->drawScales()) {
+                if (!s.gone) {
+                    app.modeDrawScales.push_back({s.object, s.type, s.scale});
+                }
+            }
+            std::ranges::sort(app.modeDrawScales, {}, &App::ModeDrawScale::object);
+        }
         if (!ui_ || ui_->api() < 3) {
             pointer_.reset(); // (a UI stopped or replaced mid-press)
             return;
@@ -348,6 +376,7 @@ private:
                 case UiDraw::Kind::Text: app.font->draw(d.text, r.x, r.y, px, c); break;
                 case UiDraw::Kind::Image: drawImage(renderer, d, r); break;
                 case UiDraw::Kind::Thing: drawThing(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
+                case UiDraw::Kind::SpellIcon: drawSpellIcon(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
                 case UiDraw::Kind::Line: {
                     const SDL_FRect to = toScreen(static_cast<float>(w.x) + d.w, static_cast<float>(w.y) + d.h, 0, 0);
                     drawLine(renderer, r.x, r.y, to.x, to.y, d.width * scale_, c);
@@ -547,6 +576,24 @@ private:
         const SDL_FRect dst = toScreen(wx + d.x - sp->width / 2, wy + d.y - sp->height / 2, sp->width, sp->height);
         sp->scale = SDL_SCALEMODE_LINEAR;
         drawSprite(renderer, *sp, nullptr, dst);
+    }
+
+    /// (API 4) A spell's or an ability's icon as the book and the bars draw it (Hud::icon: the HD
+    /// one when the HD pack has it), its top left at (x, y), its size or w x h.
+    void drawSpellIcon(App& app, SDL_Renderer* renderer, const UiDraw& d, float wx, float wy)
+    {
+        if (!app.hud || !app.sprites || d.index <= 0) {
+            return;
+        }
+        const auto icon = app.hud->icon(static_cast<std::uint32_t>(d.index), false);
+        const Sprite* sp = icon ? app.sprites->get(*icon) : nullptr;
+        if (!sp) {
+            return;
+        }
+        const float w = d.w > 0 ? d.w : sp->width;
+        const float h = d.h > 0 ? d.h : sp->height;
+        sp->scale = SDL_SCALEMODE_LINEAR;
+        drawSprite(renderer, *sp, nullptr, toScreen(wx + d.x, wy + d.y, w, h));
     }
 
     void freeTextures()

@@ -9,6 +9,8 @@
 --   monsters.luau  packs, tiers, champions
 --   boss.luau      the act boss: its fight, its drop, the act cleared
 --   combat.luau    the damage tiers and affixes change (onDamage)
+--   casts.luau     a hero's casts: its missiles larger at the tree levels that say so
+--                  (onSpellCast; Fireball 4 and 5)
 --   areas.luau     the act's chain of generated areas, the next built ahead, the ways between
 --   waypoints.luau waypoints: found, kept, travelled
 --   votes.luau     the party's vote to change area (the whole game moves)
@@ -43,6 +45,7 @@
 
 local areas = require("areas")
 local boss = require("boss")
+local casts = require("casts")
 local combat = require("combat")
 local hero = require("hero")
 local labels = require("labels")
@@ -222,8 +225,17 @@ function mode.onDamage(target: number, source: number?, weapon: number?, amount:
 	return combat.onDamage(target, source, weapon, amount, kind)
 end
 
+-- A spell cast (a player's; `made` what it made this frame): a hero's missiles sized by its tree
+-- level (casts.luau).
+function mode.onSpellCast(caster: number, spell: any, _target: number?, _x: number, _y: number, made: { number }?)
+	casts.cast(caster, spell, made)
+end
+
+-- An item picked up: out of the ground's index, its label cleared on every UI at once.
 function mode.onPickup(taker: number, item: number, _x: number, _y: number)
-	loot.pickedUp(item)
+	if loot.pickedUp(item) then
+		labels.changed()
+	end
 	hero.pickedUp(taker, item)
 end
 

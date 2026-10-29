@@ -92,6 +92,14 @@ public:
     /// Where a map object the client loaded itself is, by extent: what a net code with bit 15
     /// names (an obelisk at a Drain Mana ray's end), as it has no drawable in the anchors.
     void setStaticPoint(std::function<std::optional<SDL_FPoint>(std::uint16_t)> point) { staticPoint_ = std::move(point); }
+    /// A script mode's burst scale at (x, y) (nox.setDrawScale: the burst of a missile drawn at a
+    /// scale), asked as a spark explosion (with its size) or a lesser explosion (none) is spawned
+    /// there: its sparks reach and its fire boom drawn that much larger. Unset, or none there: as
+    /// the game draws them.
+    void setBurstScale(std::function<std::optional<float>(int x, int y, std::optional<int> size)> scaleAt)
+    {
+        burstScaleAt_ = std::move(scaleAt);
+    }
     /// Drops everything (a new map).
     void clear();
     /// The view this frame: rains start at its top, and vortex orbs go when they leave it.
@@ -196,6 +204,7 @@ private:
         nox::client::FadeState fade;
         nox::client::DrawnImage drawn;
         bool sightDestroy = false; ///< the client makes it SIGHT_DESTROY (a toxic cloud's puffs)
+        float scale = 1;           ///< a mode's burst scale (setBurstScale): drawn that much larger
     };
     /// A creature being summoned (Cli_StartSummonEffect, SummonEffectDraw):
     /// the SummonEffect animation at the spot and in a ring round it, and the creature's ghost
@@ -550,6 +559,16 @@ private:
     std::optional<std::uint32_t> whiteFlash_;
     const Anchors* anchors_ = nullptr; ///< the latest update()'s (owned by the caller)
     std::function<std::optional<SDL_FPoint>(std::uint16_t)> staticPoint_;
+    std::function<std::optional<float>(int, int, std::optional<int>)> burstScaleAt_; ///< (setBurstScale's)
+    /// The burst scale at (x, y) of a spark burst of `size` (none: a lesser explosion): 1 unless a
+    /// mode's draw scale has one there.
+    float burstScale(int x, int y, std::optional<int> size) const
+    {
+        if (!burstScaleAt_) {
+            return 1.0f;
+        }
+        return burstScaleAt_(x, y, size).value_or(1.0f);
+    }
     SpriteCache* sprites_ = nullptr;
     std::unordered_map<std::uint16_t, std::pair<float, float>> anchorsAtStep_; ///< for attached motion
     std::map<std::string, std::optional<SparkType>, std::less<>> sparkTypes_; ///< by thing name

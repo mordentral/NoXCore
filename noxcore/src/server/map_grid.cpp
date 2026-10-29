@@ -103,6 +103,13 @@ void MapGrid::link(ServerObject& o, const Rect& box, float x, float y, bool miss
     pool_[ei].linked = true;
 }
 
+void MapGrid::setMissileBox(ServerObject& o, const Rect& box) noexcept
+{
+    if (o.grid.v_ != 0 && pool_[o.grid.v_ - 1].linked && pool_[o.grid.v_ - 1].missile) {
+        pool_[o.grid.v_ - 1].box = box;
+    }
+}
+
 void MapGrid::unlink(ServerObject& o)
 {
     if (o.grid.v_ == 0 || !pool_[o.grid.v_ - 1].linked) {

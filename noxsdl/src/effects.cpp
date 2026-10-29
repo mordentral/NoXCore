@@ -445,7 +445,11 @@ void Effects::spawn(const nox::client::FxEvent& fx, std::uint32_t frame)
         break;
     case Op::FxLesserExplosion:
         if (const auto* m = std::get_if<msg::FxLesserExplosion>(&fx.fx)) {
+            const std::size_t before = animations_.size();
             addAnimation("MediumFireBoom", m->x, m->y, 0, frame);
+            if (animations_.size() > before) {
+                animations_.back().scale = burstScale(m->x, m->y, std::nullopt); // (a magic missile a mode drew larger)
+            }
         }
         break;
     case Op::FxCounterspellExplosion:
@@ -484,9 +488,16 @@ void Effects::spawn(const nox::client::FxEvent& fx, std::uint32_t frame)
         break;
     case Op::FxSparkExplosion:
         if (const auto* m = std::get_if<msg::FxSparkExplosion>(&fx.fx)) {
-            // The sparks, then the fireball.
-            explosionSparks("Spark", m->x, m->y, m->size, frame);
+            // The sparks, then the fireball. (A fireball a mode drew larger, of this burst's size:
+            // its burst too, the sparks' count and reach by its size times the scale, the boom
+            // drawn that much larger.)
+            const float k = burstScale(m->x, m->y, static_cast<int>(m->size));
+            explosionSparks("Spark", m->x, m->y, k == 1.0f ? m->size : static_cast<int>(static_cast<float>(m->size) * k), frame);
+            const std::size_t before = animations_.size();
             addAnimation(m->size > 170 ? "FireBoom" : "MediumFireBoom", m->x, m->y, 0, frame);
+            if (animations_.size() > before) {
+                animations_.back().scale = k;
+            }
         }
         break;
     case Op::Gauntlet:
@@ -1178,6 +1189,7 @@ void Effects::sceneSprites(SpriteCache& sprites, std::vector<MapView::SceneSprit
             }
         }
         out.push_back({y, x - a.art->halfWidth, y - a.art->halfHeight - a.art->z - a.z, s, x, y});
+        out.back().scale = a.scale; // (a mode's burst scale: 1 for the game's)
         if (const auto alpha = fadeAlpha(*a.art, pose)) {
             out.back().alpha = *alpha; // smoke and the cloud's puffs (LoopAndFade)
         }

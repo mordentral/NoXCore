@@ -542,9 +542,14 @@ private:
         std::uint32_t expectedCrc = 0;  ///< from USE_MAP
         std::uint32_t size = 0;         ///< of the .nxz, from MAP_SEND_START
         std::uint16_t nextBlock = 1;    ///< Cli_MapDownload_Start starts at 1
+        bool started = false;           ///< MAP_SEND_START came (blocks before it are dropped)
         std::vector<std::uint8_t> data;
         std::map<std::uint16_t, std::vector<std::uint8_t>> pending; ///< blocks that came early
+        std::size_t pendingBytes = 0;   ///< theirs together (with data, never past size)
     } download_;
+    /// The most blocks held early at once (a server sends them in order over the reliable stream:
+    /// none ever come early from ours or the exe's).
+    static constexpr std::size_t kMaxPendingBlocks = 1024;
     net::ClientConnection conn_;
     Stage stage_ = Stage::Idle;
     net::AliasTable aliases_;

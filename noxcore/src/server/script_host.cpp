@@ -656,8 +656,9 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         walk(walk, world_.group(vm.popInt()));
     };
     const auto eachGroupObject = [&](auto fn) {
-        forGroup(ServerGroup::Kind::Objects, [&](std::uint32_t extent) {
-            if (ServerObject* o = world_.byExtent(extent)) {
+        // (each member by its map number, netGetUnitByExtent: one on the map)
+        forGroup(ServerGroup::Kind::Objects, [&](std::uint32_t number) {
+            if (ServerObject* o = world_.byMapNumber(number)) {
                 fn(*o);
             }
         });
@@ -758,7 +759,7 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
     // The owners (their builtins, script_MakeFriendly /
     // MakeEnemy): unitSetOwner / unitClearOwner, so a
     // creature its player controls is lost to it (monsters.hpp). A group's members are taken
-    // whatever its kind (server_scriptGetGroup), each by its extent.
+    // whatever its kind (server_scriptGetGroup), each by its map number (netGetUnitByExtent).
     case SetOwner:        // SetOwner(owner, unit)
     case GroupSetOwner:   // GroupSetOwner(owner, group): the group's members are the owner's
     case SetOwners:       // SetOwners(group, unit): each of the group in turn owns it (the last's)
@@ -769,7 +770,7 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
             std::vector<ServerObject*> out;
             if (ServerGroup* g = world_.group(group)) {
                 for (const auto m : g->members) {
-                    if (ServerObject* o = world_.byExtent(static_cast<std::uint32_t>(m))) {
+                    if (ServerObject* o = world_.byMapNumber(static_cast<std::uint32_t>(m))) {
                         out.push_back(o);
                     }
                 }
@@ -848,12 +849,12 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
-    case GroupMove: { // GroupMove(group, waypoint): its members by extent, whatever its kind
+    case GroupMove: { // GroupMove(group, waypoint): its members by map number, whatever its kind
         const std::int32_t wp = vm.popInt();
         const ServerGroup* g = world_.group(vm.popInt());
         if (g && world_.waypoint(wp)) {
             for (const auto m : g->members) {
-                if (ServerObject* o = world_.byExtent(static_cast<std::uint32_t>(m))) {
+                if (ServerObject* o = world_.byMapNumber(static_cast<std::uint32_t>(m))) {
                     moveObject(world_, things_, frame_, *o, wp);
                 }
             }

@@ -3,6 +3,7 @@
 #include "map_view.hpp"
 
 #include "cursor.hpp"
+#include "draw_scale.hpp"
 
 #include "pending_look.hpp"
 #include "player_art.hpp"
@@ -878,9 +879,20 @@ void MapView::listDoors()
 
 void MapView::drawSprite(SDL_Renderer* renderer, SpriteCache& sprites, const Camera& camera, const Sprite& s,
                          float x, float y, Rgb light, float clipLeft, float clipRight, std::uint8_t alpha,
-                         bool bloom, float clipBottom, std::uint8_t look, std::int32_t image) const
+                         bool bloom, float clipBottom, std::uint8_t look, std::int32_t image, float drawScale, float pivotX,
+                         float pivotY) const
 {
     SDL_FRect dst = camera.toScreen(x + s.offsetX, y + s.offsetY, s.width, s.height);
+    if (drawScale != 1.0f) {
+        // (A mode's draw scale: about its drawable's pivot, or without one the image's middle.)
+        drawscale::Point pivot{dst.x + dst.w / 2, dst.y + dst.h / 2};
+        if (pivotX == pivotX && pivotY == pivotY) {
+            const SDL_FRect p = camera.toScreen(pivotX, pivotY, 0, 0);
+            pivot = {p.x, p.y};
+        }
+        const drawscale::Rect r = drawscale::scaledAbout({dst.x, dst.y, dst.w, dst.h}, drawScale, pivot);
+        dst = {r.x, r.y, r.w, r.h};
+    }
     // A session's pending look: its alpha, and the pending shader, or the CPU's greyed copy (the
     // same logical size and offsets) when there's none for this sprite.
     const Sprite* drawn = &s;
@@ -1314,7 +1326,7 @@ void MapView::drawScene(SDL_Renderer* renderer, const Camera& camera, SpriteCach
                 drawSprite(renderer, sprites, camera, *e.sprite, e.x, e.y,
                            e.light ? *e.light : lightAt(e.lightX, e.lightY), -1e9f, 1e9f,
                            item.alpha >= 0 ? static_cast<std::uint8_t>(item.alpha) : e.alpha, e.bloom, e.clipBottom,
-                           e.pendingLook, e.pendingImage);
+                           e.pendingLook, e.pendingImage, e.scale, e.pivotX, e.pivotY);
                 if (e.notesImage && e.drawnImage) {
                     noteImage(*e.drawnImage, *e.sprite, e.sightZ);
                 }

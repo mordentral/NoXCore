@@ -1641,7 +1641,7 @@ bool events(ServerObject& unit, std::uint32_t frame, Fight& fight)
             if (!(fight.world.gameFlags & GameFlag::Chat) && fight.things) {
                 Spells spells{fight.world, *fight.things, fight.modifiers, fight.rng, frame};
                 if (p.castStart == 0) {
-                    spells.castQueued(unit, e.data ? fight.world.byExtent(e.data & 0x7FFFu) : nullptr, false);
+                    spells.castQueued(unit, fight.world.byNetCode(e.data), false); // (Obj_GetByNetCode)
                 } else {
                     spells.finishCast(unit);
                     p.castStart = 0;
@@ -1662,7 +1662,7 @@ bool events(ServerObject& unit, std::uint32_t frame, Fight& fight)
                 }
                 p.castX = p.cursorX;
                 p.castY = p.cursorY;
-                spells.castQueued(unit, e.data ? fight.world.byExtent(e.data & 0x7FFFu) : nullptr, e.code == 0x1E);
+                spells.castQueued(unit, fight.world.byNetCode(e.data), e.code == 0x1E); // (Obj_GetByNetCode)
             }
             break;
         default:

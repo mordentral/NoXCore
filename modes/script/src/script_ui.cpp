@@ -2,9 +2,12 @@
 #include "noxcore/modes/script/script_ui.hpp"
 
 #include "noxcore/client/headless_client.hpp"
+#include "noxcore/client/spell_bars.hpp"
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/modes/script/ui_proto.hpp"
 #include "noxcore/modes/script/weather.hpp"
+#include "noxcore/things/object_class.hpp"
+#include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/video/nxz.hpp"
 
@@ -16,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <deque>
 #include <map>
 #include <utility>
@@ -36,6 +40,20 @@ constexpr std::array<std::string_view, 30> kKeys = {
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "up", "down", "left", "right", "enter",
     "escape", "tab", "space", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
 };
+
+/// A missile type's spark burst size, as MSG 0x93 carries it: its COLLIDE argument when its
+/// COLLIDE is SparkExplosionCollide ("SparkExplosionCollide 255"), as the server reads it (the
+/// message's one byte); 0: it makes no spark burst.
+int sparkBurstSize(const ::nox::things::ThingDef& def)
+{
+    const auto c = def.attribute("COLLIDE");
+    constexpr std::string_view kSpark = "SparkExplosionCollide";
+    if (!c || !c->starts_with(kSpark) || c->size() <= kSpark.size() || (*c)[kSpark.size()] != ' ') {
+        return 0;
+    }
+    const std::string arg(c->substr(kSpark.size() + 1));
+    return std::atoi(arg.c_str()) & 0xFF;
+}
 
 } // namespace
 
@@ -78,6 +96,7 @@ struct ScriptUiClient::Impl {
     int runningApi = 0;
     bool hasDraw = false, hasClick = false, hasMessage = false, hasView = false, hasKey = false;
     bool hasDrag = false, hasMouseUp = false, hasWheel = false; ///< (API 3's hooks)
+    bool hasTick = false;                                        ///< (API 4's)
     std::vector<UiWindow> windows;
     UiWindow* drawing = nullptr; ///< (the window whose draw is running: draws go to it)
     std::deque<std::pair<std::uint8_t, std::vector<std::uint8_t>>> inbox; ///< data and views, oldest first
@@ -96,6 +115,11 @@ struct ScriptUiClient::Impl {
     std::uint32_t labelsLoad = 0; ///< (the client's map load the labels were set in)
     std::uint32_t runs = 0;       ///< (UIs started)
     std::function<std::optional<std::uint16_t>(std::uint16_t)> objectLookup;
+    std::function<std::optional<UiObjectAt>(std::uint16_t)> objectAt;
+    // The draw scales the server told (kDrawScale: with no UI too), and the client's map load
+    // they came in (another load since: none).
+    std::vector<UiDrawScale> drawScales;
+    std::uint32_t drawScalesLoad = 0;
     // The weather the server last told (kWeather: with no UI too), and the client's map load it
     // came in (another load since: none, till the server tells it again).
     wx::Told told;
@@ -158,13 +182,14 @@ struct ScriptUiClient::Impl {
     void pruneLabels()
     {
         labelsOfThisMap();
-        if (labels.empty() || (!objectLookup && !client)) {
+        if (labels.empty() || (!objectLookup && !objectAt && !client)) {
             return; // (a preview: labels stay as set)
         }
         std::erase_if(labels, [&](UiLabel& l) {
             const std::optional<std::uint16_t> type = objectType(l.object);
             if (!type) {
-                return l.seen || nowMs > l.setMs + kUiLabelWaitMs;
+                // (API 4's keep: away, or not come yet, it waits for its object.)
+                return !l.keep && (l.seen || nowMs > l.setMs + kUiLabelWaitMs);
             }
             if (!l.seen) {
                 l.seen = true;
@@ -179,9 +204,102 @@ struct ScriptUiClient::Impl {
         if (objectLookup) {
             return objectLookup(object);
         }
+        const auto at = objectPlace(object);
+        return at ? std::optional<std::uint16_t>(at->type) : std::nullopt;
+    }
+    /// The object at net code `object` in the client's world (objectAt's, or the client's).
+    std::optional<UiObjectAt> objectPlace(std::uint16_t object) const
+    {
+        if (objectAt) {
+            return objectAt(object);
+        }
+        if (!client) {
+            return std::nullopt;
+        }
         const auto& drawables = client->world().drawables();
         const auto it = drawables.find(object);
-        return it == drawables.end() ? std::nullopt : std::optional<std::uint16_t>(it->second.typeId);
+        if (it == drawables.end()) {
+            return std::nullopt;
+        }
+        return UiObjectAt{it->second.typeId, static_cast<float>(it->second.x), static_cast<float>(it->second.y)};
+    }
+
+    /// The draw scales of another map let go (the new map numbers its objects afresh).
+    void drawScalesOfThisMap()
+    {
+        if (client && client->mapLoads() != drawScalesLoad) {
+            drawScalesLoad = client->mapLoads();
+            drawScales.clear();
+        }
+    }
+    /// kDrawScale: a thing's scale kept (1: let go).
+    void tellDrawScale(const uimsg::DrawScale& d)
+    {
+        drawScalesOfThisMap();
+        const auto it = std::ranges::find(drawScales, d.object, &UiDrawScale::object);
+        if (d.scale == 1.0f) {
+            if (it != drawScales.end()) {
+                drawScales.erase(it);
+            }
+            return;
+        }
+        UiDrawScale s;
+        s.object = d.object;
+        s.type = d.type;
+        s.scale = d.scale;
+        s.setMs = nowMs;
+        if (const ::nox::things::ThingDb* db = things(); db) {
+            // (Its type a missile's, by the client's own thing.bin; another type: no burst of its.)
+            s.missile = d.type >= 1 && d.type <= db->things.size() &&
+                        (::nox::things::thingClasses(db->things[d.type - 1u]) & ::nox::things::ObjectClass::Missile) != 0;
+            if (s.missile) {
+                s.burstSize = sparkBurstSize(db->things[d.type - 1u]); // (read once, as it comes)
+            }
+        }
+        if (it != drawScales.end()) {
+            if (it->type == d.type) {
+                s.seen = it->seen; // (the same thing: where it was kept)
+                s.gone = it->gone;
+                s.x = it->x;
+                s.y = it->y;
+                s.goneMs = it->goneMs;
+            }
+            *it = s;
+        } else if (drawScales.size() < kUiMaxDrawScales) {
+            drawScales.push_back(s);
+        }
+    }
+    /// Once a frame: each draw scale's thing looked for (where it is; gone a while, or never come,
+    /// or another type at its code: let go).
+    void pruneDrawScales()
+    {
+        drawScalesOfThisMap();
+        if (drawScales.empty() || (!objectAt && !objectLookup && !client)) {
+            return; // (a preview: kept as told)
+        }
+        std::erase_if(drawScales, [&](UiDrawScale& d) {
+            std::optional<UiObjectAt> at = objectPlace(d.object);
+            if (!at && objectLookup && !objectAt) {
+                if (const auto type = objectLookup(d.object)) {
+                    at = UiObjectAt{*type, d.x, d.y}; // (a test's world of types alone)
+                }
+            }
+            if (!at || at->type != d.type) {
+                if (!d.seen) {
+                    return nowMs > d.setMs + kUiDrawScaleWaitMs;
+                }
+                if (!d.gone) {
+                    d.gone = true;
+                    d.goneMs = nowMs;
+                }
+                return nowMs > d.goneMs + kUiBurstGraceMs;
+            }
+            d.seen = true;
+            d.gone = false;
+            d.x = at->x;
+            d.y = at->y;
+            return false;
+        });
     }
     /// A UI that can't run, the server told why (its views stay text).
     void refuse(const std::string& why, std::string mine)
@@ -505,8 +623,7 @@ const UiWindow* windowUnder(const Impl& impl, float x, float y)
             if (w.hud != hud || w.clickThrough || (w.hud && !impl.hudShown)) {
                 continue;
             }
-            if (x >= static_cast<float>(w.x) && x < static_cast<float>(w.x + w.w) && y >= static_cast<float>(w.y) &&
-                y < static_cast<float>(w.y + w.h)) {
+            if (windowTakes(w, x, y)) {
                 return &w;
             }
         }
@@ -670,6 +787,13 @@ int uiLabel(lua_State* L)
             l.offset = clampedFloat(lua_tonumber(L, -1), -64, 256, 4);
         }
         lua_pop(L, 1);
+        if (impl.runningApi >= 4) {
+            // (API 4's keep; an API 3 UI's opts are read as they always were.)
+            lua_getfield(L, 4, "keep");
+            luaL_argcheck(L, lua_isnil(L, -1) || lua_isboolean(L, -1), 4, "keep is a boolean");
+            l.keep = lua_toboolean(L, -1) != 0;
+            lua_pop(L, 1);
+        }
     }
     impl.labelsOfThisMap(); // (a map loaded since the last frame: the old map's labels gone first)
     const auto it = std::ranges::find(impl.labels, l.object, &UiLabel::object);
@@ -700,6 +824,67 @@ int uiClearLabel(lua_State* L)
 int uiClearLabels(lua_State* L)
 {
     implOf(L).labels.clear();
+    return 0;
+}
+
+// ---- UI API 4
+
+int uiSpellIcon(lua_State* L)
+{
+    UiWindow& w = drawingWindow(L);
+    size_t n = 0;
+    const char* s = luaL_checklstring(L, 1, &n);
+    const std::string_view name(s, n);
+    constexpr float kFar = 100000; // (as a line's ends: NaN 0, the infinities kept to it)
+    const float x = clampedFloat(luaL_checknumber(L, 2), -kFar, kFar, 0);
+    const float y = clampedFloat(luaL_checknumber(L, 3), -kFar, kFar, 0);
+    const float dw = clampedFloat(luaL_optnumber(L, 4, 0), 0, 640, 0);
+    const float dh = clampedFloat(luaL_optnumber(L, 5, 0), 0, 640, 0);
+    // A spell by the game's name, or a warrior's ability by its (tagged, as the bars keep them in
+    // a multiclass book); any other name draws nothing.
+    int index = -1;
+    if (name.starts_with("SPELL_")) {
+        if (const auto id = ::nox::things::spellId(name); id && *id != 0) {
+            index = static_cast<int>(*id);
+        }
+    } else if (name.starts_with("ABILITY_")) {
+        for (std::size_t i = 1; i < ::nox::client::kAbilityNames.size(); ++i) {
+            if (name == ::nox::client::kAbilityNames[i]) {
+                index = static_cast<int>(::nox::client::kAbilityTag | i);
+            }
+        }
+    }
+    if (index < 0) {
+        return 0;
+    }
+    UiDraw d;
+    d.kind = UiDraw::Kind::SpellIcon;
+    d.index = index;
+    d.x = x;
+    d.y = y;
+    d.w = dw;
+    d.h = dh;
+    w.draws.push_back(std::move(d));
+    return 0;
+}
+
+int uiHitArea(lua_State* L)
+{
+    Impl& impl = implOf(L);
+    if (!impl.drawing) {
+        luaL_error(L, "hit areas only in ui.draw");
+    }
+    UiWindow& w = *impl.drawing;
+    constexpr float kFar = 100000;
+    UiRect r;
+    r.x = clampedFloat(luaL_checknumber(L, 1), -kFar, kFar, 0);
+    r.y = clampedFloat(luaL_checknumber(L, 2), -kFar, kFar, 0);
+    r.w = clampedFloat(luaL_checknumber(L, 3), 0, kFar, 0);
+    r.h = clampedFloat(luaL_checknumber(L, 4), 0, kFar, 0);
+    // (Past the cap, or empty: let go. A framed window's are kept but never read.)
+    if (r.w > 0 && r.h > 0 && w.hitAreas.size() < kUiMaxHitAreas) {
+        w.hitAreas.push_back(r);
+    }
     return 0;
 }
 
@@ -799,7 +984,10 @@ void Impl::start()
     static constexpr std::pair<const char*, lua_CFunction> kToolbox3[] = {
         {"line", uiLine}, {"tooltip", uiTooltip}, {"label", uiLabel}, {"clearLabel", uiClearLabel}, {"clearLabels", uiClearLabels},
     };
-    lua_createtable(L, 0, static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3)) + 1);
+    static constexpr std::pair<const char*, lua_CFunction> kToolbox4[] = {
+        {"spellIcon", uiSpellIcon}, {"hitArea", uiHitArea},
+    };
+    lua_createtable(L, 0, static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3) + std::size(kToolbox4)) + 1);
     for (const auto& [name, fn] : kToolbox) {
         lua_pushcfunction(L, fn, name);
         lua_setfield(L, -2, name);
@@ -812,6 +1000,12 @@ void Impl::start()
     }
     if (uiApi >= 3) {
         for (const auto& [name, fn] : kToolbox3) {
+            lua_pushcfunction(L, fn, name);
+            lua_setfield(L, -2, name);
+        }
+    }
+    if (uiApi >= 4) {
+        for (const auto& [name, fn] : kToolbox4) {
             lua_pushcfunction(L, fn, name);
             lua_setfield(L, -2, name);
         }
@@ -846,6 +1040,7 @@ void Impl::start()
     hasDrag = uiApi >= 3 && has("drag");
     hasMouseUp = uiApi >= 3 && has("mouseUp");
     hasWheel = uiApi >= 3 && has("wheel");
+    hasTick = uiApi >= 4 && has("tick");
     lua_pop(L, 1);
     if (begin("start") && !finish("start", 0, 0)) {
         return;
@@ -1083,6 +1278,12 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             client->setModeOwnsBook(on != 0);
         }
         break;
+    case uimsg::kDrawScale:
+        // (Whatever the UI's state: any script mode's things.)
+        if (const auto d = uimsg::decodeDrawScale(rest)) {
+            tellDrawScale(*d);
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -1125,6 +1326,7 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
 {
     Impl& impl = *impl_;
     impl.nowMs = nowMs;
+    impl.pruneDrawScales(); // (a UI running or not: the server's draw scales are any script mode's)
     if (!impl.vm) {
         return;
     }
@@ -1137,6 +1339,12 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
     impl.tooltipSet = false;
     impl.pruneLabels();
     try {
+        // (API 4) The UI's beat, first: once a frame, the HUD shown or not; outside draw, so its
+        // windows may open, move and close. Its call has the budget any hook has.
+        if (impl.hasTick && inTime() && impl.begin("tick")) {
+            lua_pushnumber(impl.vm->thread(), static_cast<double>(nowMs));
+            impl.finish("tick", 1, 0);
+        }
         for (int n = 0; impl.vm && !impl.inbox.empty() && n < 32 && inTime(); ++n) {
             auto [sub, bytes] = std::move(impl.inbox.front());
             impl.inbox.pop_front();
@@ -1155,9 +1363,11 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
             UiWindow& w = impl.windows[i];
             if (!impl.hasDraw || (w.hud && !impl.hudShown) || !impl.begin("draw")) {
                 w.draws.clear();
+                w.hitAreas.clear();
                 continue;
             }
             w.draws.clear();
+            w.hitAreas.clear();
             lua_pushlstring(impl.vm->thread(), w.id.data(), w.id.size());
             impl.drawing = &w; // (windows open and shut only outside draw: it stays put)
             impl.finish("draw", 1, 0);
@@ -1341,6 +1551,60 @@ const std::vector<UiLabel>& ScriptUiClient::labels() const noexcept
 void ScriptUiClient::setObjectLookup(std::function<std::optional<std::uint16_t>(std::uint16_t)> lookup)
 {
     impl_->objectLookup = std::move(lookup);
+}
+
+void ScriptUiClient::setObjectAt(std::function<std::optional<UiObjectAt>(std::uint16_t)> lookup)
+{
+    impl_->objectAt = std::move(lookup);
+}
+
+const std::vector<UiDrawScale>& ScriptUiClient::drawScales() const noexcept
+{
+    return impl_->drawScales;
+}
+
+std::optional<float> ScriptUiClient::burstScaleAt(float x, float y, std::optional<int> size)
+{
+    Impl& impl = *impl_;
+    // The nearest scaled missile's last place (at most kUiMaxDrawScales of them; none: nothing
+    // looked at). A spark burst only from a missile whose own burst is its size, and that missile
+    // lends its scale once (it bursts once, in the world still or gone); a lesser explosion (a
+    // magic missile's, which bursts off walls too) from any, a gone one once.
+    auto best = impl.drawScales.end();
+    float bestDist = kUiBurstReach;
+    for (auto it = impl.drawScales.begin(); it != impl.drawScales.end(); ++it) {
+        if (!it->seen || !it->missile || (it->gone && impl.nowMs > it->goneMs + kUiBurstGraceMs) || (size && it->burstSize != *size)) {
+            continue;
+        }
+        const float d = std::hypot(it->x - x, it->y - y);
+        if (d <= bestDist) {
+            bestDist = d;
+            best = it;
+        }
+    }
+    if (best == impl.drawScales.end()) {
+        return std::nullopt;
+    }
+    const float scale = best->scale;
+    if (best->gone || size) {
+        impl.drawScales.erase(best);
+    }
+    return scale;
+}
+
+bool windowTakes(const UiWindow& w, float x, float y)
+{
+    const auto inside = [&](float left, float top, float width, float height) {
+        return x >= left && x < left + width && y >= top && y < top + height;
+    };
+    const auto wx = static_cast<float>(w.x), wy = static_cast<float>(w.y);
+    if (!inside(wx, wy, static_cast<float>(w.w), static_cast<float>(w.h))) {
+        return false;
+    }
+    if (w.frame || w.hitAreas.empty()) {
+        return true; // (as API 3: its whole rectangle)
+    }
+    return std::ranges::any_of(w.hitAreas, [&](const UiRect& r) { return inside(wx + r.x, wy + r.y, r.w, r.h); });
 }
 
 std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h)

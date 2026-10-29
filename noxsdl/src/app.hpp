@@ -586,6 +586,15 @@ struct App {
         float x = 0, y = 0, top = 0;
     };
     std::vector<ModeLabelSpot> modeLabelSpots;
+    /// Live: a script mode's draw scales (nox.setDrawScale, client level 5), sorted by net code,
+    /// set each frame before the scene (ModeUi::update): a drawable of that code and type has
+    /// its body drawn that much larger (liveSprites). Empty: nothing looked up.
+    struct ModeDrawScale {
+        std::uint16_t object = 0;
+        std::uint16_t type = 0;
+        float scale = 1;
+    };
+    std::vector<ModeDrawScale> modeDrawScales;
     std::unique_ptr<Font> font;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game

@@ -1598,19 +1598,21 @@ void DelveDirector::sendMaps(GameHost& host)
     if (options_.records) {
         // The players' sent versions are kept as the table's version plus one, so a fresh entry (0) always sends.
         const std::uint64_t version = options_.records->version() + 1; // (0 never: none sent yet)
-        std::optional<std::vector<std::uint8_t>> message;
+        std::optional<std::vector<std::vector<std::uint8_t>>> messages; // (kRecords, then kRecordsMore past what fits)
         for (const auto& [peer, p] : host.players()) {
             if (!p.ready || recordsSent_[peer] == version) {
                 continue;
             }
-            if (!message) {
+            if (!messages) {
                 std::vector<delvemap::Record> table;
                 for (const DelveRecord& r : options_.records->top(data().recordsSent)) {
                     table.push_back({static_cast<std::uint16_t>(r.depth), static_cast<std::uint8_t>(r.act), r.date, r.difficulty, r.party});
                 }
-                message = delvemap::recordsMessage(table);
+                messages = delvemap::recordsMessages(table);
             }
-            host.sendToIdentified(peer, *message);
+            for (const auto& m : *messages) {
+                host.sendToIdentified(peer, m);
+            }
             recordsSent_[peer] = version; // (a stock player's too: it's never sent one)
         }
     }

@@ -21,6 +21,7 @@
 #include "noxcore/net/transport.hpp"
 #include "noxcore/net/udp_socket.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -200,6 +201,32 @@ public:
     {
         const auto it = peers_.find(peer);
         return it == peers_.end() ? 0 : it->second.stream.queuedReliableOf(op, op2);
+    }
+    /// A peer's stream: the sequence number our next reliable packet takes, and the peer's last
+    /// acknowledgement (the next it expects; 0xFF before its first); nullopt: no peer.
+    struct ReliableSeqs {
+        std::uint8_t next = 0;
+        std::uint8_t ack = 0xFF;
+    };
+    std::optional<ReliableSeqs> reliableSeqs(std::uint8_t peer) const
+    {
+        const auto it = peers_.find(peer);
+        if (it == peers_.end()) {
+            return std::nullopt;
+        }
+        return ReliableSeqs{it->second.stream.nextSeq(), it->second.stream.lastAck()};
+    }
+    /// A peer's reliable packets out and not yet acknowledged: the sequence numbers from its last
+    /// acknowledgement to our next, or the queue's packets if more (some acknowledged across the
+    /// wrap and kept, OB-001); 0: no peer.
+    std::size_t reliableOutstanding(std::uint8_t peer) const
+    {
+        const auto it = peers_.find(peer);
+        if (it == peers_.end()) {
+            return 0;
+        }
+        const Stream& s = it->second.stream;
+        return std::max<std::size_t>(s.queuedReliable(), static_cast<std::uint8_t>(s.nextSeq() - s.lastAck()));
     }
     std::optional<Endpoint> endpointOf(std::uint8_t peer) const;
     /// A stream's latency (ms): the average of the client's last five round trips (cases 6 / 9:

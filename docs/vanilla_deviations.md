@@ -466,6 +466,56 @@ server's frame taking it becomes 19 (test). The server's frames read them as GAM
 client's (only the newest of each move stands, the last facing wins); a stock server is never
 sent them.
 
+### VD-45: Hosting: map downloads to NoX Core clients of level 4 (server/map_send.cpp)
+
+- **Vanilla:** a client without the map is sent its .nxz in 512-byte blocks
+  (MSG_MAP_SEND_PACKET), one each even server frame while it has at most 2 of them
+  unacknowledged (SrvNet_MapSendNextBlock and the map send pass): about 7.5 KB/s, so a generated
+  area of 15 KB takes 2 s and a 300 KB map 40 s.
+- **Ours:** a client that identified at client level 4 or above (lobby::kFastMapSendLevel) is sent,
+  for its first two requests after each map load (later ones get the stock stream), the same file
+  in the same messages, but in blocks of 1018 bytes (the most a reliable packet carries), up to 8
+  of them every frame, odd ones too (64 a frame to all such clients together, round robin), while
+  it has fewer reliable packets out unacknowledged than its window: 8 at the start, 20 at most
+  (keeping its own packets in flight under the 32 sequence numbers its acknowledgement compares
+  safely, as every NoX Core-only paced sender does: GameHost::reliableRoom, 24 for them all; a
+  bulk sender such as this one leaves the last 4 to the small ones), halved to 2 at least when a frame's blocks go
+  unacknowledged past 100 ms and twice the round trip (the quickest a frame's first packet was
+  acknowledged, timed by the send itself; 1 s before one is), opened again as they're acknowledged
+  in time (the client takes reliable packets in order only, so on a lossy link few in flight cost
+  least). The transport's resends are unchanged. Measured: Estate's 49 KB over loopback between
+  two noxcore.exe in 0.24 s instead of 6.5 s (a Deep Delve area's 14 KB in 36 ms); in the tests'
+  pretend network 0.53 s instead of 6.6 at a 100 ms round trip, 1.33 s instead of 11.6 at
+  300 ms, and quicker than the stock stream through loss and reordering too (8.1 s against 9.3
+  with a seventh of the datagrams lost and a fifth reordered). A fast send whose player leaves
+  stops there (a stock one goes on into the closed stream, OB-163). Stock clients and NoX Core
+  clients below level 4 get the stock stream, byte for byte and frame for frame.
+- **Why:** generated maps download at every area change; the party waits for its slowest.
+- **Risk:** none for stock clients, but a stock player in slot 30, whose download waits on another
+  stream's map packets (OB-162), waits on a fast send's up to its length (only in a 31-player
+  game; a hold of up to a second). A level 4 client on a slow link is sent at most 20 KB ahead,
+  2 KB at the window's least, after losses.
+- **Revert:** take out the `fast` branch in `GameHost::onRequestMap`.
+
+### VD-46: Hosting: NoX Core's own messages paced within the acknowledgement's span (GameHost::reliableRoom)
+
+- **Vanilla:** no such messages. The reliable stream's acknowledgement compares sequence numbers
+  safely only within 32 of each other (OB-001, OB-410).
+- **Ours:** NoX Core's paced senders add a reliable packet only while the client has fewer than 24
+  out unacknowledged (`GameHost::reliableRoom`; the bulk ones fewer than 20,
+  `reliableBulkRoom`), the game's own messages never held. For NoX Core clients (released ones
+  too) that paces, with the same bytes: a mode's UI source and assets (to 20 out; a queue of 24
+  before), nox.send (false at 24 out: send it again later) and its views (held, in order, past
+  24; a client without the UI still gets them as text), its weather (waits at 24; 100 before), an
+  edit session's messages (each member's outbox: a join's document goes over a few round trips,
+  not in one burst), its mod files and list (to 20, leaving the live view its room; the list
+  framed as a file) and its live view (at most 12 frames, its creatures cut by size).
+- **Why:** past 32 out, a packet can be taken as acknowledged and dropped unsent, and the client's
+  stream stops for good.
+- **Risk:** on a long round trip these go somewhat slower than before. Stock clients get none of
+  them.
+- **Revert:** the senders' room checks.
+
 ### VD-13: Hosting: the port opened by UPnP (noxsdl/src/port_mapper.cpp)
 
 A network game noxsdl hosts asks the router to forward its UDP port to this computer (UPnP,
@@ -1199,6 +1249,26 @@ The engine's logic is the exe's; these are where the output differs.
     manager never hosts a mode with the key).
   - In a quest (or a quest game before its quest begins) or a solo game it does nothing.
 - **Revert:** don't set it (off in every game unless a mode turns it on).
+
+### VD-47: A map object keeps its number when a thing put down later shares it
+
+- **Vanilla:** a map object's number isn't unique: a thing brought from another map, a saved
+  player's thing, or a thing a creature or chest of the map held keeps its own number when it's
+  dropped. The lookups by number (a script group's members, the movers `Move` sets off and the
+  thing a mover finds when it starts, a client's code for a map object) take the thing put on the
+  map last, so the dropped thing takes the map object's place (OB-412, OB-413). A save lists such
+  things ahead of the map's own, so after a load they keep it.
+- **Ours:** the thing that has been on the map longest is taken, the map's own: of things with one
+  number, the one put in the world first, and of one load's, the later record (a save lists the
+  newer things first) (`World::byMapNumber` in `noxcore/src/server/world.cpp`). A dropped thing
+  never takes a group, a mover, a lever or a sign from the map's own thing. A held thing is still
+  never taken, as in the original.
+- **Why:** by decision: it is what NoX Core did before it followed the original's lookup, and an
+  edited saved player's things, dropped in a network game, could otherwise turn a map's levers,
+  signs and scripted groups off for everyone.
+- **Revert:** in `World::byMapNumber`, take the newest instead: replace the comparison
+  `o->born <= best->born` with `o->born > best->born` (the original's order, the list's head
+  first).
 
 ## Menus: Westwood Online (no effect on the wire)
 

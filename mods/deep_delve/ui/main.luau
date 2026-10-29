@@ -1,14 +1,16 @@
 --!strict
--- Deep Delve's UI on a NoX Core client (UI API 3). The server sends the numbers (server/hud.luau
--- and the modules it names) when they change; this draws them and sends the clicks back. Its
--- windows:
+-- Deep Delve's UI on a NoX Core client (UI API 4: client level 5). The server sends the numbers
+-- (server/hud.luau and the modules it names) when they change; this draws them and sends the
+-- clicks back. Its windows:
 --
 --   party   the party strip across the top of the screen (no frame, a HUD piece): a card for each
 --           member (name, class, level, health and mana, where they are, dead or not); during a
 --           vote to change area, its row under the cards (who asks, where to, the time left, Yes /
---           No, or Cancel for its asker) and each member's answer under their card. It lets the
---           game have the mouse except during a vote. A player alone in the game has none: it
---           opens when a second player joins and closes when they leave;
+--           No, or Cancel for its asker) and each member's answer under their card, and the
+--           finished vote's line for a few seconds after. It takes the mouse only over its cards
+--           and, during a vote, its row (nox.hitArea); a click anywhere else is the game's. A
+--           player alone in the game has none: it opens when a second player joins and closes
+--           when they leave;
 --   hero    (the Character window) the character's name, level and experience, the area, the Town
 --           portal, Tree and Sheet buttons, the loot names option (shown while Alt is held, or
 --           always; kept with the character), the act (cleared or not);
@@ -22,17 +24,29 @@
 --           by the fountain;
 --   sheet   the character sheet.
 --
--- An item's or a node's words are a tooltip at the mouse. The loot lying near the player is named
--- over each item in its rarity's colour while Alt is held, or always as the character's option
--- has it (nox.label by the item's net code; the server sends the list as it changes, and the
--- labels are set again now and then, as a client lets a label go when its item leaves its world).
+-- The pictures are the mod's own (assets\tree\): the tree's backdrop under its links and nodes; a
+-- root's, small's, notable's or keystone's picture as that node (the server names it, "ic"), framed
+-- by its state (taken, open, locked); the class's root picture on each party card; the town
+-- portal's, the stash's, the vendor's and the fountain's (by Respec) beside their buttons. A
+-- spell, ability or summon node is the game's own icon for it (nox.spellIcon; the server names
+-- it, "si": a SPELL_* or ABILITY_* name, a summon's spell), framed the same way.
+--
+-- An item's words are a tooltip at the mouse; a tree node's are drawn in the tree's window,
+-- beside its picture. The loot lying near the player is named over each item in its rarity's
+-- colour while Alt is held, or always as the character's option has it (nox.label by the item's
+-- net code; the server sends the list as it changes). Each label is set once, as its item comes
+-- into the list, kept while the item is out of the client's world (keep), and cleared as it
+-- leaves the list (picked up, gone, or out of reach) or another map's list comes.
+--
+-- ui.tick (once a frame, the HUD shown or not) keeps what time alone changes: the strip sized back
+-- to its cards once a finished vote's line is over, and a label the client refused tried again.
 --
 -- A list too long for one value comes in parts with a serial (hud.parts); the newest whole list
 -- is drawn, the one before it until the next is whole.
 
 local ui = {}
 
-local W, H = 168, 100
+local W, H = 168, 104
 local BOSS_W, BOSS_H = 220, 26
 -- The framed windows start below the party strip.
 local TOP = 84
@@ -82,6 +96,10 @@ local RARITY: { [string]: { number } } = {
 	rare = { 240, 205, 70 },
 	unique = { 195, 120, 255 },
 }
+
+-- How a picture is dimmed (a tree node that can't be taken yet, a button that can't be used): a
+-- dark see-through box over it.
+local LOCKED_SHADE = { 4, 3, 2, 140 }
 
 -- Clickable places drawn this frame, by window: { x, y, w, h, fn(button) }.
 local zones: { [string]: { any } } = {}
@@ -200,6 +218,9 @@ local CLASS_COLOUR: { [string]: { number } } = {
 	conjurer = { 95, 205, 115 },
 }
 local CLASS_TITLE: { [string]: string } = { warrior = "Warrior", wizard = "Wizard", conjurer = "Conjurer" }
+-- Each class's picture: its root's on the passive tree.
+local CLASS_ICON: { [string]: string } = { warrior = "tree/root_warrior", wizard = "tree/root_wizard", conjurer = "tree/root_conjurer" }
+local CARD_ICON = 24
 local CARD_H = 40
 local GAP = 4
 local VOTE_Y, VOTE_H = 46, 18
@@ -210,34 +231,49 @@ local party: { any } = {}
 local vote: any = nil -- the vote's value ({ active, by, to, how, left, yes, of, mine, asker, done })
 local voteEnds = 0 -- (the client's clock when it runs out)
 local doneUntil = 0 -- (a finished vote's line shown till then)
--- How the strip's window was last opened ("hidden": closed, the player alone in the game).
+-- How the strip's window was last opened ("hidden": closed, the player alone in the game), its
+-- width, and whether it had the vote's row.
 local stripSpec: string = "hidden"
+local stripW = 0
+local stripRow = false
 
 local function cardWidth(n: number): number
 	return math.min(124, (640 + GAP) // math.max(1, n) - GAP)
 end
 
--- The strip's window as the party and the vote want it (opened again only when that changes): none
--- while the player is alone in the game (the server's list of one card, or none yet).
+-- Whether the strip shows the vote's row: a vote under way, or a finished one's line, for a while.
+local function rowShown(): boolean
+	return vote ~= nil and (vote.active == true or (vote.done ~= nil and nox.time() < doneUntil))
+end
+
+-- The strip's window as the party and the vote want it (opened again only when that changes): the
+-- cards (and the answer line under them), with the vote's row below while it shows; none while the
+-- player is alone in the game (the server's list of one card, or none yet). Called as the party or
+-- the vote comes, and from the beat once a finished vote's line is over. It takes the mouse only
+-- where drawParty marks it (nox.hitArea): the cards, and a vote's row.
 local function placeStrip()
 	local n = #party
 	if n < 2 then
+		stripRow = false
 		if stripSpec ~= "hidden" then
 			stripSpec = "hidden"
 			nox.closeWindow("party")
 		end
 		return
 	end
-	local cw = cardWidth(n)
-	local w = math.max(n * (cw + GAP) - GAP, VOTE_W)
-	local voting = vote ~= nil and vote.active == true
-	local spec = string.format("%d/%s", w, tostring(voting))
+	local cardsW = n * (cardWidth(n) + GAP) - GAP
+	local row = rowShown()
+	local w = if row then math.max(cardsW, VOTE_W) else cardsW
+	local h = if row then STRIP_H else CARD_H + 4
+	stripRow = row
+	stripW = w
+	local spec = string.format("%d/%d", w, h)
 	if spec == stripSpec then
 		return
 	end
 	stripSpec = spec
-	-- (the game's clicks pass through it except during a vote, whose buttons are its own)
-	nox.window("party", { frame = false, hud = true, clickThrough = not voting, x = (640 - w) // 2, y = 2, w = w, h = STRIP_H })
+	-- (placed so the cards stay where they are as the row comes and goes)
+	nox.window("party", { frame = false, hud = true, x = (640 - cardsW) // 2 - (w - cardsW) // 2, y = 2, w = w, h = h })
 end
 
 -- Text cut to `width` (an ellipsis where it was cut).
@@ -261,13 +297,20 @@ local function drawCard(m: any, x: number, w: number, me: boolean)
 	local cc = CLASS_COLOUR[m.c] or { 180, 170, 150 }
 	nox.box(x, 0, w, CARD_H, { 14, 11, 8, 205 })
 	nox.outline(x, 0, w, CARD_H, if me then { 220, 180, 80 } else { cc[1] // 2 + 40, cc[2] // 2 + 40, cc[3] // 2 + 40 })
+	-- (the class's picture at the card's left, the words beside it)
+	local icon = CLASS_ICON[m.c]
+	local tx = x + 4
+	if icon then
+		nox.image(icon, x + 2, 2, CARD_ICON, CARD_ICON)
+		tx = x + CARD_ICON + 5
+	end
 	local level = "L" .. tostring(m.l)
 	local lw = nox.textWidth(level)
-	nox.text(fit(tostring(m.n), w - lw - 12), x + 4, 2, if me then "gold" else "bright")
+	nox.text(fit(tostring(m.n), x + w - tx - lw - 8), tx, 2, if me then "gold" else "bright")
 	nox.text(level, x + w - 4 - lw, 2, "dim")
 	local where = if m.d then "Dead" else tostring(m.w)
 	local ww = nox.textWidth(where)
-	nox.text(fit(CLASS_TITLE[m.c] or tostring(m.c), w - ww - 12), x + 4, 14, cc)
+	nox.text(fit(CLASS_TITLE[m.c] or tostring(m.c), x + w - tx - ww - 8), tx, 14, cc)
 	nox.text(where, x + w - 4 - ww, 14, if m.d then "red" else "dim")
 	bar(x + 4, 27, w - 8, m.h or 0, { 200, 40, 36 }, { 50, 16, 14 })
 	if (m.m or -1) >= 0 then
@@ -289,6 +332,8 @@ local function drawVote(w: number)
 	local x0 = (w - VOTE_W) // 2
 	if v and v.active then
 		local left = math.max(0, math.ceil((voteEnds - now) / 1000))
+		-- (the row takes the mouse, its buttons with it)
+		nox.hitArea(x0, VOTE_Y, VOTE_W, VOTE_H)
 		nox.box(x0, VOTE_Y, VOTE_W, VOTE_H, { 20, 16, 10, 225 })
 		nox.outline(x0, VOTE_Y, VOTE_W, VOTE_H, { 200, 160, 70 })
 		local line = tostring(v.by) .. ": on to " .. tostring(v.to) .. (if v.how == "waypoint" then " (waypoint)" else "") .. "? "
@@ -307,7 +352,8 @@ local function drawVote(w: number)
 				nox.send({ kind = "vote", answer = "cancel" })
 			end)
 		end
-	elseif v and v.done and now < doneUntil then
+	elseif v and v.done and now < doneUntil and stripRow then
+		-- (a finished vote's line: shown, but the game's to click through)
 		nox.box(x0, VOTE_Y, VOTE_W, VOTE_H, { 20, 16, 10, 200 })
 		nox.text(fit(tostring(v.done), VOTE_W - 8), x0 + 4, VOTE_Y + 4, "dim")
 	end
@@ -322,51 +368,71 @@ local LABEL_COLOUR: { [string]: { number } } = {
 	unique = { 200, 130, 255 },
 	gold = { 225, 175, 60 },
 }
--- The labels set now: net code -> { text, rarity }; set again every RELABEL ms.
+-- The newest list (net code -> { t = text, r = rarity }), and the labels set on the client now
+-- (each a kept one: it waits while its item is out of the client's world). The server's list is
+-- at most 96 (well under the client's 128), so every label it names fits.
+local wanted: { [number]: any } = {}
 local labelled: { [number]: any } = {}
 local labelSerial = -1
-local nextRelabel = 0
-local RELABEL = 1500
+-- The map the labels are of (the list's `map`: another means the client let them all go).
+local labelMap: any = nil
+-- A label the client refused (its 128 set): tried again from the beat, RETRY ms apart.
+local labelsShort = false
+local labelRetryAt = 0
+local RETRY = 1000
 -- The character's option: "alt" (shown while Alt is held) or "always".
 local lootNames = "alt"
 
-local function setLabel(code: number, l: any)
-	nox.label(code, l.t, LABEL_COLOUR[l.r] or LABEL_COLOUR.normal, { show = if lootNames == "always" then "always" else "alt" })
+local function setLabel(code: number, l: any): boolean
+	return nox.label(code, l.t, LABEL_COLOUR[l.r] or LABEL_COLOUR.normal, { show = if lootNames == "always" then "always" else "alt", keep = true })
 end
 
--- The newest whole list of labels: the ones gone cleared, the rest set.
+-- The labels wanted and not set yet, set.
+local function setMissing()
+	labelsShort = false
+	for code, l in wanted do
+		if not labelled[code] then
+			if setLabel(code, l) then
+				labelled[code] = l
+			else
+				labelsShort = true
+			end
+		end
+	end
+	labelRetryAt = nox.time() + RETRY
+end
+
+-- The newest whole list of labels: the ones no longer in it cleared (picked up, gone, out of
+-- reach), the new ones set; another map's list starts afresh.
 local function takeLabels()
 	local w = whole.labels
 	if not w or w.serial == labelSerial then
 		return
 	end
 	labelSerial = w.serial
-	local now: { [number]: any } = {}
+	if w.header.map ~= labelMap then
+		-- (the client let the old map's labels go as it loaded the new one)
+		labelMap = w.header.map
+		nox.clearLabels()
+		labelled = {}
+	end
+	wanted = {}
 	for _, l in w.items do
 		if type(l.o) == "number" then
-			now[l.o] = l
+			wanted[l.o] = l
 		end
 	end
 	for code in labelled do
-		if not now[code] then
+		if not wanted[code] then
 			nox.clearLabel(code)
+			labelled[code] = nil
 		end
 	end
-	labelled = now
-	for code, l in labelled do
-		setLabel(code, l)
-	end
-	nextRelabel = nox.time() + RELABEL
+	setMissing()
 end
 
--- (a label whose item left the client's world for a while is let go there: set again; `now`: at
--- once, as the option changed)
-local function relabel(now: boolean?)
-	local t = nox.time()
-	if t < nextRelabel and not now then
-		return
-	end
-	nextRelabel = t + RELABEL
+-- Every label set again with the option's show (the option changed).
+local function relabel()
 	for code, l in labelled do
 		setLabel(code, l)
 	end
@@ -379,11 +445,16 @@ local function drawParty()
 	end
 	local cw = cardWidth(n)
 	local cardsW = n * (cw + GAP) - GAP
-	local w = math.max(cardsW, VOTE_W)
+	local w = stripW
 	local me = nox.player()
 	local myName = me and string.sub(me.name, 1, 16)
+	-- (each card takes the mouse, its answer line under it during a vote; the gaps between are the
+	-- game's)
+	local cardH = if vote and vote.active then CARD_H + 4 else CARD_H
 	for i, m in party do
-		drawCard(m, (w - cardsW) // 2 + (i - 1) * (cw + GAP), cw, m.n == myName)
+		local x = (w - cardsW) // 2 + (i - 1) * (cw + GAP)
+		nox.hitArea(x, 0, cw, cardH)
+		drawCard(m, x, cw, m.n == myName)
 	end
 	drawVote(w)
 end
@@ -412,32 +483,37 @@ local function drawHero()
 	nox.box(4, 15, fill, 6, { 200, 160, 60 })
 	nox.outline(4, 15, W - 8, 6, "dim")
 	nox.text(string.format("%s, area level %d", shown.area, shown.areaLevel), 4, 25, "bright")
-	-- The Town portal button (an open portal: the way back is the town's violet pentagram).
+	-- The Town portal button, its picture at its left (an open portal: the way back is the town's
+	-- violet pentagram).
 	local open = shown.portal == true
-	nox.box(4, 38, W - 8, 13, if open then { 50, 30, 70 } else { 60, 40, 90 })
-	nox.outline(4, 38, W - 8, 13, if open then "dim" else { 190, 120, 255 })
+	nox.box(4, 37, W - 8, 18, if open then { 50, 30, 70 } else { 60, 40, 90 })
+	nox.image("tree/ui_portal", 5, 38, 16, 16)
+	if open then
+		nox.box(5, 38, 16, 16, LOCKED_SHADE)
+	end
+	nox.outline(4, 37, W - 8, 18, if open then "dim" else { 190, 120, 255 })
 	local label = if open then "Portal open" else "Town portal"
-	nox.text(label, 4 + (W - 8 - nox.textWidth(label)) // 2, 40, if open then "dim" else "bright")
+	nox.text(label, 22 + (W - 26 - nox.textWidth(label)) // 2, 41, if open then "dim" else "bright")
 	if not open then
-		zone("hero", 4, 38, W - 8, 13, function()
+		zone("hero", 4, 37, W - 8, 18, function()
 			nox.send({ kind = "portal" })
 		end)
 	end
 	local points = shown.points or 0
-	button("hero", 4, 54, 78, 13, if points > 0 then "Tree (" .. points .. ")" else "Tree", true, function()
+	button("hero", 4, 58, 78, 13, if points > 0 then "Tree (" .. points .. ")" else "Tree", true, function()
 		openTreeOrSheet("tree")
 	end)
-	button("hero", 86, 54, 78, 13, "Sheet", true, function()
+	button("hero", 86, 58, 78, 13, "Sheet", true, function()
 		openTreeOrSheet("sheet")
 	end)
 	-- The loot names option: a click changes it (the server keeps it with the character and sends
 	-- it back).
 	local always = lootNames == "always"
-	button("hero", 4, 70, W - 8, 13, if always then "Loot names: always" else "Loot names: with Alt", true, function()
+	button("hero", 4, 74, W - 8, 13, if always then "Loot names: always" else "Loot names: with Alt", true, function()
 		nox.send({ kind = "option", name = "lootNames", value = if always then "alt" else "always" })
 	end)
 	local mx, my = mouseIn("hero")
-	if over(mx, my, 4, 70, W - 8, 13) then
+	if over(mx, my, 4, 74, W - 8, 13) then
 		nox.tooltip({
 			{ "Names over the loot on the ground", "bright" },
 			{ if always then "Shown always." else "Shown while Alt is held.", { 230, 190, 80 } },
@@ -446,7 +522,7 @@ local function drawHero()
 	end
 	if shown.act then
 		local line: string = "Act " .. tostring(shown.act) .. (if shown.cleared then " cleared" else "")
-		nox.text(line, 4, 86, if shown.cleared then "gold" else "dim")
+		nox.text(line, 4, 90, if shown.cleared then "gold" else "dim")
 	end
 end
 
@@ -512,7 +588,9 @@ local function drawStash()
 		end)
 	end
 	local carriedGold = whole.carried and whole.carried.header.gold or 0
-	nox.text(string.format("Gold: %d carried, %d stashed", carriedGold, header.stashed or 0), 4, 21, "gold")
+	-- (the chest's picture by the gold line)
+	nox.image("tree/ui_stash", 4, 18, 18, 18)
+	nox.text(string.format("Gold: %d carried, %d stashed", carriedGold, header.stashed or 0), 26, 21, "gold")
 	button(w, 300, 19, 74, 14, "Deposit", carriedGold > 0, function()
 		nox.send({ kind = "stash", op = "deposit" })
 	end)
@@ -566,7 +644,9 @@ local function drawVendor()
 	local w = "vendor"
 	closeBox(w, SW)
 	local st = whole.stock
-	nox.text(string.format("For sale (area level %d)", st and st.header.level or 1), 4, 4, "gold")
+	-- (the vendor's picture by its heading)
+	nox.image("tree/ui_vendor", 4, 1, 16, 16)
+	nox.text(string.format("For sale (area level %d)", st and st.header.level or 1), 24, 4, "gold")
 	local mx, my = mouseIn(w)
 	local hotStock: any = nil
 	local list = st and st.items or {}
@@ -631,10 +711,30 @@ local REGION_COLOUR: { [number]: { number } } = {
 	[3] = { 95, 205, 115 },
 }
 local CLASS_REGION: { [string]: number } = { warrior = 1, wizard = 2, conjurer = 3 }
-local SIZE: { [string]: number } = { r = 14, s = 8, n = 12, k = 16, p = 12, a = 12, c = 12 }
+-- A node's size by its kind and the zoom: at the biggest zoom a keystone 30, a root or notable 26,
+-- a spell, ability or summon 22, a small 18; smaller with the zoom's unit at the others, never
+-- below the flat sizes the nodes had before they had pictures; even, so a node sits whole on its
+-- place (where its lines meet).
+local SIZE_TOP: { [string]: number } = { k = 30, r = 26, n = 26, p = 22, a = 22, c = 22, s = 18 }
+local SIZE_LEAST: { [string]: number } = { k = 16, r = 14, n = 12, p = 12, a = 12, c = 12, s = 8 }
+local SIZES: { { [string]: number } } = {}
+for z, unit in ZOOMS do
+	local t: { [string]: number } = {}
+	for k, top in SIZE_TOP do
+		t[k] = math.max(SIZE_LEAST[k], 2 * math.round(top * unit / ZOOMS[#ZOOMS] / 2))
+	end
+	SIZES[z] = t
+end
+local TAKEN_EDGE = { 255, 214, 96 }
+local TAKEN_INNER = { 255, 248, 226 }
+local LOCKED_EDGE = { 64, 58, 48 }
+-- A node's tooltip picture's size.
+local TIP_ICON = 48
 
 local nodeIndex: any = nil -- id -> node, made when a new tree comes
 local nodeNear: { [number]: { number } } = {} -- id -> its neighbours, both ways
+local nodeIcon: { [number]: string } = {} -- id -> its picture's asset name ("tree/..."), if any
+local nodeSpell: { [number]: string } = {} -- id -> the game's icon's name (nox.spellIcon), if any
 local nodeIndexOf: number = -1
 
 local function treeNodes(): any
@@ -645,8 +745,15 @@ local function treeNodes(): any
 	if nodeIndexOf ~= d.serial then
 		nodeIndex = {}
 		nodeNear = {}
+		nodeIcon = {}
+		nodeSpell = {}
 		for _, n in d.items do
 			nodeIndex[n.i] = n
+			if type(n.ic) == "string" then
+				nodeIcon[n.i] = "tree/" .. n.ic
+			elseif type(n.si) == "string" then
+				nodeSpell[n.i] = n.si
+			end
 			nodeNear[n.i] = nodeNear[n.i] or {}
 			for _, id in n.l or {} do
 				nodeNear[id] = nodeNear[id] or {}
@@ -727,6 +834,36 @@ local function clipLine(x1: number, y1: number, x2: number, y2: number, colour: 
 	nox.line(x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy, colour, width)
 end
 
+-- A tree node's tooltip, drawn in the tree's window (nox.tooltip carries words alone): its
+-- picture (the mod's `img`, or the game's icon `spell`) at TIP_ICON beside its words, by the
+-- mouse, kept inside the window.
+local function tipNode(lines: { any }, img: string?, spell: string?, mx: number, my: number)
+	local lineH = 11
+	local widest = 0
+	for _, l in lines do
+		widest = math.max(widest, nox.textWidth(l[1]))
+	end
+	local pictured = img ~= nil or spell ~= nil
+	local left = if pictured then TIP_ICON + 8 else 0
+	local w = 4 + left + widest + 6
+	local h = math.max(#lines * lineH + 6, if pictured then TIP_ICON + 8 else 0)
+	local x: number = math.clamp(if mx + 14 + w <= TW then mx + 14 else mx - 8 - w, 0, math.max(0, TW - w))
+	local y: number = math.clamp(if my + 14 + h <= TH then my + 14 else my - 8 - h, 0, math.max(0, TH - h))
+	nox.box(x, y, w, h, { 10, 8, 6, 240 })
+	nox.outline(x, y, w, h, { 160, 120, 40 })
+	if img then
+		nox.image(img, x + 4, y + 4, TIP_ICON, TIP_ICON)
+	elseif spell then
+		nox.spellIcon(spell, x + 4, y + 4, TIP_ICON, TIP_ICON)
+	end
+	if pictured then
+		nox.outline(x + 4, y + 4, TIP_ICON, TIP_ICON, { 90, 70, 40 })
+	end
+	for i, l in lines do
+		nox.text(l[1], x + 4 + left, y + 3 + (i - 1) * lineH, l[2])
+	end
+end
+
 local function drawTree()
 	local w = "tree"
 	local nodes = treeNodes()
@@ -741,8 +878,10 @@ local function drawTree()
 		centre()
 	end
 	local unit = ZOOMS[zoom]
+	local sizes = SIZES[zoom]
 	local ox, oy = TW / 2 + panX, CANVAS_H / 2 + panY
-	nox.box(0, 0, TW, CANVAS_H, { 9, 7, 5, 215 })
+	-- The canvas: the engraved floor, fixed while the tree pans over it.
+	nox.image("tree/backdrop", 0, 0, TW, CANVAS_H)
 	local taken = state.taken or ""
 	local function isTaken(id: number): boolean
 		return string.sub(taken, id, id) == "1"
@@ -765,9 +904,11 @@ local function drawTree()
 	-- The nodes.
 	local mx, my = mouseIn(w)
 	local hot: any = nil
+	-- (a node reaching past the canvas: the window cuts it at the sides and the top, the foot drawn
+	-- after covers it below)
 	for _, n in nodes do
 		local x, y = at(n)
-		local s = SIZE[n.k] or 8
+		local s = sizes[n.k] or sizes.s
 		if x > -s and x < TW + s and y > -s and y < CANVAS_H + s then
 			local have = isTaken(n.i)
 			local open = false
@@ -777,29 +918,58 @@ local function drawTree()
 				end
 			end
 			local rc = REGION_COLOUR[n.c] or REGION_COLOUR[0]
-			local fillC = if have then { 235, 195, 90 } elseif open then { rc[1] // 2, rc[2] // 2, rc[3] // 2 } else { 34, 30, 26 }
-			local edge = if have then "white" elseif open then rc else { 90, 80, 66 }
 			local bx, by = x - s / 2, y - s / 2
-			clipBox(bx, by, s, s, fillC)
-			if by >= 0 and by + s <= CANVAS_H then
-				nox.outline(bx, by, s, s, edge)
-				if n.k == "p" or n.k == "a" then
-					nox.outline(bx + 3, by + 3, s - 6, s - 6, if have then { 120, 60, 20 } else rc)
-				elseif n.k == "c" then
-					-- (a summon: a solid heart where a spell has a ring)
-					clipBox(bx + 4, by + 4, s - 8, s - 8, if have then { 120, 60, 20 } else rc)
-				elseif n.k == "k" then
-					nox.outline(bx - 2, by - 2, s + 4, s + 4, if have then "gold" else { 160, 60, 50 })
+			local img = nodeIcon[n.i]
+			local spell = nodeSpell[n.i]
+			if img or spell then
+				-- A root, small, notable or keystone: its picture; a spell, ability or summon: the
+				-- game's icon for it. Taken, a bright frame; open (next to a taken one), its region's
+				-- colour; else dimmed.
+				if img then
+					nox.image(img, bx, by, s, s)
+				else
+					nox.spellIcon(spell :: string, bx, by, s, s)
+				end
+				if have then
+					nox.outline(bx - 1, by - 1, s + 2, s + 2, TAKEN_EDGE)
+					nox.outline(bx, by, s, s, TAKEN_INNER)
+				elseif open then
+					nox.outline(bx - 1, by - 1, s + 2, s + 2, rc)
+					nox.outline(bx, by, s, s, rc)
+				else
+					nox.box(bx, by, s, s, LOCKED_SHADE)
+					nox.outline(bx, by, s, s, LOCKED_EDGE)
+				end
+			else
+				-- A node with neither (a server sending no names): a box with a ring (a summon: a
+				-- heart) in its region's colour.
+				local fillC = if have then { 235, 195, 90 } elseif open then { rc[1] // 2, rc[2] // 2, rc[3] // 2 } else { 34, 30, 26 }
+				local edge = if have then "white" elseif open then rc else { 90, 80, 66 }
+				clipBox(bx, by, s, s, fillC)
+				if by >= 0 and by + s <= CANVAS_H then
+					nox.outline(bx, by, s, s, edge)
+					local inset = math.max(3, s // 4)
+					if n.k == "p" or n.k == "a" then
+						nox.outline(bx + inset, by + inset, s - 2 * inset, s - 2 * inset, if have then { 120, 60, 20 } else rc)
+					elseif n.k == "c" then
+						-- (a summon: a solid heart where a spell has a ring)
+						clipBox(bx + inset + 1, by + inset + 1, s - 2 * inset - 2, s - 2 * inset - 2, if have then { 120, 60, 20 } else rc)
+					end
 				end
 			end
 			if over(mx, my, bx - 2, by - 2, s + 4, s + 4) and (my or 0) < CANVAS_H then
 				hot = n
 				nox.outline(bx - 3, by - 3, s + 6, s + 6, "bright")
 			end
-			if (not have) and by >= 0 and by + s <= CANVAS_H then
-				zone(w, bx - 2, by - 2, s + 4, s + 4, function()
-					nox.send({ kind = "tree", op = "take", id = n.i })
-				end)
+			if not have then
+				-- (its click kept to the canvas: the foot's own below)
+				local zy = math.max(by - 2, 0)
+				local zh = math.min(by + s + 2, CANVAS_H) - zy
+				if zh > 0 then
+					zone(w, bx - 2, zy, s + 4, zh, function()
+						nox.send({ kind = "tree", op = "take", id = n.i })
+					end)
+				end
 			end
 		end
 	end
@@ -808,13 +978,6 @@ local function drawTree()
 	nox.box(0, CANVAS_H, TW, 1, { 110, 84, 44 })
 	if hot then
 		local status = if isTaken(hot.i) then "(yours)" else "(click to take: 1 point)"
-		local tip: { any } = { { tostring(hot.n), RARITY.rare }, { status, { 160, 150, 130 } } }
-		for _, l in wrap(hot.d or "", 260) do
-			if #tip < 14 then
-				table.insert(tip, { l, { 235, 230, 215 } })
-			end
-		end
-		nox.tooltip(tip)
 		nox.text(hot.n, 4, CANVAS_H + 4, RARITY.rare)
 		nox.text(status, 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
 	else
@@ -822,11 +985,17 @@ local function drawTree()
 	end
 	nox.text(string.format("Points left: %d of %d", state.points or 0, state.total or 0), 4, CANVAS_H + 42, "gold")
 	local cost = state.cost or 0
-	button(w, 150, CANVAS_H + 40, 150, 14, "Respec (" .. cost .. " gold)", state.near == true and (state.spent or 0) > 0, function()
+	local canRespec = state.near == true and (state.spent or 0) > 0
+	-- (the fountain's picture beside its button)
+	nox.image("tree/ui_respec", 152, CANVAS_H + 39, 16, 16)
+	if not canRespec then
+		nox.box(152, CANVAS_H + 39, 16, 16, LOCKED_SHADE)
+	end
+	button(w, 172, CANVAS_H + 40, 150, 14, "Respec (" .. cost .. " gold)", canRespec, function()
 		nox.send({ kind = "tree", op = "respec" })
 	end)
 	if state.near ~= true then
-		nox.text("(at the fountain)", 304, CANVAS_H + 42, "dim")
+		nox.text("(at the fountain)", 326, CANVAS_H + 42, "dim")
 	end
 	local bx = TW - 196
 	button(w, bx, CANVAS_H + 58, 22, 14, "<", true, function() pan(1, 0) end)
@@ -839,6 +1008,17 @@ local function drawTree()
 	nox.text("Drag or arrows pan, wheel or 1-3 zoom, 0 home", 4, CANVAS_H + 60, "dim")
 	drawNote(w, 300, CANVAS_H + 60)
 	closeBox(w, TW)
+	-- The node under the mouse: its tooltip over everything in the window.
+	if hot and mx and my then
+		local status = if isTaken(hot.i) then "(yours)" else "(click to take: 1 point)"
+		local tip: { any } = { { tostring(hot.n), RARITY.rare }, { status, { 160, 150, 130 } } }
+		for _, l in wrap(hot.d or "", 260) do
+			if #tip < 14 then
+				table.insert(tip, { l, { 235, 230, 215 } })
+			end
+		end
+		tipNode(tip, nodeIcon[hot.i], nodeSpell[hot.i], mx, my)
+	end
 end
 
 -- ---- The character sheet
@@ -907,7 +1087,7 @@ function ui.onMessage(value: any)
 		if want ~= lootNames then
 			-- (the option changed: every label set again with it)
 			lootNames = want
-			relabel(true)
+			relabel()
 		end
 	elseif kind == "boss" then
 		if value.most and value.most > 0 then
@@ -953,10 +1133,20 @@ function ui.onMessage(value: any)
 	end
 end
 
+-- The beat, once a frame (the HUD shown or hidden, any window drawn or none): what time alone
+-- changes. Two number compares unless one of them is due.
+function ui.tick(now: number)
+	-- (a finished vote's line over: the strip back to its cards)
+	if stripRow and now >= doneUntil and not (vote and vote.active) then
+		placeStrip()
+	end
+	if labelsShort and now >= labelRetryAt then
+		setMissing()
+	end
+end
+
 function ui.draw(window: string)
 	zones[window] = {}
-	-- (the labels kept set: whichever window is drawn, the Character window at least)
-	relabel()
 	if window == "party" then
 		drawParty()
 	elseif window == "hero" then

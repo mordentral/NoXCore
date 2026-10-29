@@ -9,7 +9,8 @@ type NoxColour = string | { number }
 -- game; hud = true hides it whenever the game hides its HUD and draws it under the framed windows.
 type NoxWindowSpec = { title: string?, x: number?, y: number?, w: number?, h: number?, frame: boolean?, clickThrough: boolean?, hud: boolean? }
 type NoxTooltipLine = { any } | string -- { text, colour? }, or a white line's text
-type NoxLabelOptions = { show: string?, near: number?, offset: number? }
+-- keep is UI API 4's: true keeps the label while its object is out of the client's world.
+type NoxLabelOptions = { show: string?, near: number?, offset: number?, keep: boolean? }
 
 declare nox: {
     --- # Windows
@@ -30,8 +31,12 @@ declare nox: {
     line: (x1: number, y1: number, x2: number, y2: number, colour: NoxColour?, width: number?) -> (),
     --- Shows { { text, colour? }, ... } (16 lines, 128 bytes each) at the mouse over everything this frame, kept on the screen (inside ui.draw; UI API 3).
     tooltip: (lines: { NoxTooltipLine }) -> (),
+    --- Draws the game's own icon for a spell ("SPELL_FIREBALL") or a warrior's ability ("ABILITY_WARCRY") at its top left, its size or w x h; an unknown name draws nothing (UI API 4).
+    spellIcon: (name: string, x: number, y: number, w: number?, h: number?) -> (),
+    --- Marks a part of a frameless window that takes the mouse this frame; with any, the rest of it is click-through (inside ui.draw; 32 a window; UI API 4).
+    hitArea: (x: number, y: number, w: number, h: number) -> (),
     --- # World labels (UI API 3)
-    --- Labels an object (its net code: the server's nox.object(id).netCode) with up to 64 bytes; opts { show = "always" | "alt" | "near", near = 150, offset = 4 }; false over 128 labels (UI API 3).
+    --- Labels an object (its net code: the server's nox.object(id).netCode) with up to 64 bytes; opts { show = "always" | "alt" | "near", near = 150, offset = 4, keep = false (UI API 4: kept while it's away, till nox.clearLabel or a map's load: clear it when your server says its object is gone) }; false over 128 labels (UI API 3).
     label: (object: number, text: string, colour: NoxColour?, opts: NoxLabelOptions?) -> boolean,
     --- Takes the label off an object (UI API 3).
     clearLabel: (object: number) -> (),
@@ -67,6 +72,7 @@ declare nox: {
 -- The hooks the script's table may have (the client calls each one it has), for the Mod
 -- Reference: "--- @hook <call> | <doc>".
 --- @hook start() | The UI is in: open its windows.
+--- @hook tick(nowMs) | (UI API 4) Once a frame before the draws, the HUD shown or hidden: windows may open, move and close here.
 --- @hook draw(window) | Each frame, each window: draw it (box, outline, text).
 --- @hook click(window, x, y, button) | A click inside a window (its own units; button 1 left, 2 right with UI API 2): true takes it.
 --- @hook key(window, key) | (UI API 2) A key ("0"-"9", arrows, "enter", "escape", "tab", "space", "f1"-"f12") with the mouse over a window: true takes it.

@@ -41,7 +41,7 @@ declare nox: {
     option: (key: string) -> string?,
     --- The game frame now (30 a second); 0 before the game is made.
     frame: () -> number,
-    --- Sends a value to a player's UI (its onMessage); false when it has no UI ready or is too far behind.
+    --- Sends a value to a player's UI (its onMessage); false when it has no UI ready or its link is behind (nothing sent: send it again later).
     send: (peer: number, value: any) -> boolean,
     --- Whether a player's client runs the mode's UI (and so draws views as data).
     hasUi: (peer: number) -> boolean,
@@ -156,6 +156,12 @@ declare nox: {
     setTeam: (id: number, team: number) -> (),
     --- Sets or clears a thing's NO_COLLIDE flag: nothing touches it, it pushes nothing.
     setNoCollide: (id: number, on: boolean?) -> (),
+    --- A missile's hit shape: a point made a circle of 1-32, a circle's radius up to 4x its type's (its owner spared by the growth until it's clear; only nil gives the stock hit back).
+    setHitRadius: (id: number, radius: number?) -> (),
+    --- A missile's burst reach and push reach times 0.5-3, read as it bursts (nil: 1).
+    setBurstScale: (id: number, scale: number?) -> (),
+    --- A thing drawn 0.5-3 x its size by NoX Core clients of client level 5 (its sprite and, a missile's, its burst); nil: as its type; nothing changes on the server.
+    setDrawScale: (id: number, scale: number?) -> (),
     --- The engine's area damage about (x, y): whole within `full`, less towards `reach`; then the walls.
     damageAt: (x: number, y: number, reach: number, full: number, damage: number, damageType: number, source: number?, except: number?, spareSource: boolean?) -> (),
     --- Deletes a thing as the engine does (gone at the frame's end); never a player's unit.
@@ -396,6 +402,6 @@ declare function require(name: string): any
 --- @hook onPickup(taker, item, x, y) | Something picked an item up from (x, y).
 --- @hook onDrop(holder, item) | A holder dropped a watched item.
 --- @hook onEquip(unit, item, worn) | A watched item was put on (true) or taken off.
---- @hook onSpellCast(caster, spell, target, x, y) | A spell was cast (its name; target nil: none).
+--- @hook onSpellCast(caster, spell, target, x, y, made) | A spell was cast (its name; target nil: none; made: what was made while it went off, its missiles or creature and anything its kills made at once, not what comes on later frames, oldest first, nil: none; normally heard before its missiles first fly, but after a host stall they may have flown a frame at their type's size).
 --- @hook onExit(exit, player) | A player touched an exit: return false to hold them; changes nothing in the world.
 --- @hook onGenerated(tag, ok, result) | A map nox.generate built ahead is written (ok), or failed (result: why).
