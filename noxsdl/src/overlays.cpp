@@ -1018,7 +1018,9 @@ std::string liveTooltip(App& app)
     if (auto t = app.hud->tooltip(world, client.netCode(), quickbarState(app), m.x, m.y, w, h); !t.empty()) {
         return t;
     }
-    if (app.cursorHovered && !(app.inventory && app.inventory->dragging())) {
+    // (Not under a cinematic's widescreen: cursorUpdate skips the world there.)
+    if (app.cursorHovered && !(app.inventory && app.inventory->dragging()) &&
+        !(app.cinematics && app.cinematics->wideScreen())) {
         if (const auto* d = world.drawable(*app.cursorHovered)) {
             const TypeArt* a = app.art->get(d->typeId);
             if (a && (a->classes & nox::things::ObjectClass::Pickup)) {

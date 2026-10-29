@@ -216,6 +216,57 @@ void Menus::notice(const std::string& titleId, const std::string& textId)
     dialog(gui_.text(titleId), gui_.text(textId), 0x21, {});
 }
 
+void Menus::askJoinPassword(const std::string& host, const nox::client::PlayerProfile& profile, bool wrong)
+{
+    // The client's lobby wait on PASSWORD_REQUIRED: Gui_Dialog_Create's title noxworld.c:Password,
+    // its text PasswordRequired, 7 (OK, Cancel, the entry), OK on only with the entry not empty;
+    // its OK sends SERVER_PASSWORD. (noxsdl's join gives up at the request and is made again
+    // here with the password; a refused one, the dialog again with the game's ErrWrongPassword.)
+    if (host.empty() || host.front() == '@') {
+        return; // (our own game: never asked)
+    }
+    pendingHost_ = host;
+    constexpr std::int32_t kDlgEntry = 4003; // (dlg.wnd's short entry: Gui_Dialog_Create's 4)
+    closeDialog();
+    dialog_ = gui_.load(windowDir_ / "dlg.wnd", [this, profile](gui::Window&, int message, gui::Window& from) {
+        const bool ok = (message == gui::Clicked && from.id == kDlgOk) || (message == gui::EntryEntered && from.id == kDlgEntry);
+        const bool cancel = message == gui::Clicked && from.id == kDlgCancel;
+        if (!ok && !cancel) {
+            return false;
+        }
+        const gui::Window* entry = dialog_ ? dialog_->find(kDlgEntry) : nullptr;
+        const std::string typed = entry ? nox::strings::toUtf8(entry->entry) : std::string();
+        if (ok && typed.empty()) {
+            return true; // (OK only with something typed)
+        }
+        gui_.resources().sound(0x399);
+        deferred_.push_back([this, ok, typed, profile] {
+            closeDialog();
+            if (ok) {
+                nox::client::PlayerProfile joining = profile;
+                joining.password = typed;
+                join(joining);
+            }
+        });
+        return true;
+    });
+    gui::centreOnScreen(*dialog_);
+    dialog_->status |= st::Above;
+    if (gui::Window* t = dialog_->find(kDlgTitle)) {
+        t->text = gui_.text("Noxworld.c:Password");
+    }
+    if (gui::Window* t = dialog_->find(kDlgText)) {
+        t->text = gui_.text(wrong ? "Noxworld.c:ErrWrongPassword" : "Noxworld.c:PasswordRequired");
+    }
+    for (const auto id : {kDlgOk, kDlgCancel, kDlgEntry}) {
+        if (gui::Window* w = dialog_->find(id)) {
+            w->show(true);
+        }
+    }
+    gui_.setModal(dialog_);
+    gui_.setFocus(dialog_->find(kDlgEntry));
+}
+
 void Menus::tooOldNotice()
 {
     dialog(gui_.text("Noxworld.c:Notification"), std::string(nox::lobby::kClientTooOldNotice), 0x21, {});

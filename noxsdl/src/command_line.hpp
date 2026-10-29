@@ -42,7 +42,7 @@ struct StartOptions {
     std::filesystem::path saveDir; ///< --save-dir
     bool useGpu = true;       ///< SDL's GPU renderer and our shaders (--no-gpu: SDL's usual renderer)
     std::string gpuDriver;    ///< --gpu-driver: its API (direct3d12 by default on Windows; SDL's choice, Vulkan, elsewhere)
-    bool stockEffects = false; ///< --stock-effects: the effects' pixel shapes instead of smooth drawing
+    bool stockEffects = false; ///< --stock-effects: the effects' pixel shapes and sprites (Smooth FX and HD Spell FX off)
     bool noBloom = false;      ///< --no-bloom: no halo round the bright effects
     std::optional<int> smoothing; ///< --smoothing off|movement|network|lock30
     std::optional<int> display;   ///< --display windowed|borderless|fullscreen

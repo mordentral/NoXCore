@@ -520,6 +520,20 @@ private:
     std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> toldAt_;
     coopmsg::Roster lastRoster_;
     bool rosterDirty_ = true;
+    /// The party's creatures (kCreatures, the friend dot over them): each party member's
+    /// summons and charmed creatures, looked for again only when the party changes, a map loads,
+    /// a creature report goes out (World::creatureReports) or one of them is no longer the party's;
+    /// the whole list to each NoX Core player whose last differs, while it has reliable room.
+    struct PartyCreature {
+        std::uint32_t extent = 0;
+        std::uint32_t owner = 0;
+    };
+    std::vector<PartyCreature> partyCreatures_;
+    std::vector<std::uint16_t> partyCreatureCodes_; ///< (their net codes, sorted: the message's)
+    std::map<std::uint8_t, std::vector<std::uint16_t>> creaturesTold_; ///< by peer: the list it was last sent
+    bool creaturesDirty_ = true;
+    std::uint32_t creatureReportsSeen_ = 0;
+    void tellCreatures(server::GameHost& host);
 };
 
 } // namespace nox::coop

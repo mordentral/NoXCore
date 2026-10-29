@@ -3,7 +3,8 @@
 -- area's exit, or a waypoint in another area) moves the whole game. With anyone else in the game,
 -- wherever they are (out in the field, in town, dead), that is the party's vote:
 --
---   * Asked by stepping on the exit or picking another area's waypoint; the asker's yes is counted.
+--   * Asked by stepping on the exit, into a lair's open gate to the next act, or picking another
+--     area's waypoint; the asker's yes is counted.
 --   * Every player in the game when it's asked answers it (on the party strip, or by saying yes or
 --     no); every yes moves the game. A no, the asker calling it off, the asker leaving, or no answer
 --     within numbers.vote.seconds ends it, and the asker may ask again after numbers.vote.again.
@@ -140,8 +141,9 @@ local function check()
 	end
 end
 
--- A hero asks for the game to go to area `index` of the act, arriving at `arrive` ("start",
--- "waypoint"); `how` is how it asked ("exit", "waypoint"). With anyone else in the game a vote
+-- A hero asks for the game to go to the area at `index` (areas.luau's place: numbered on through
+-- the acts), arriving at `arrive` ("start", "waypoint"); `how` is how it asked ("exit",
+-- "waypoint", "gate": the lair's gate to the next act). With anyone else in the game a vote
 -- starts; alone, the game goes at once. Whether it went or a vote started ("vote"), else why.
 function votes.ask(h: any, index: number, arrive: string, how: string): (boolean, string?)
 	if not areas then
@@ -182,7 +184,7 @@ function votes.ask(h: any, index: number, arrive: string, how: string): (boolean
 	current = c
 	lastResult = nil
 	nox.textToAll(string.format("Deep Delve: %s asks to go on to %s%s. Answer on the party strip, or say yes or no (%d s).", name, tostring(c.title),
-		if how == "waypoint" then " by a waypoint" else "", seconds))
+		if how == "waypoint" then " by a waypoint" elseif how == "gate" then " through the gate" else "", seconds))
 	tellUis()
 	return true, "vote"
 end

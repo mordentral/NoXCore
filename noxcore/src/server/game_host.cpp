@@ -160,6 +160,8 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
                        .playersCantDie = options_.playersCantDie,
                        .noScoring = options_.sandboxNoScoring,
                        .modeOwnsLimits = options_.modeOwnsLimits,
+                       .pickupAnyClass = options_.pickupAnyClass,
+                       .pickupDuplicates = options_.pickupDuplicates,
                        .exactMaths = options_.exactMaths})
     , transport_({.maxPlayers = options_.solo ? 1 + options_.soloGuests : options_.maxPlayers, .password = options_.password})
 {
@@ -351,7 +353,8 @@ void GameHost::syncAccess()
         a.maxPing = static_cast<std::uint16_t>(*access_.maxPing);
     }
     transport_.setAccess(std::move(a));
-    transport_.setMaxPlayers(options_.solo ? 1 + options_.soloGuests : options_.maxPlayers);
+    // (A solo game with guests: the player limit as set, its room at most.)
+    transport_.setMaxPlayers(options_.solo ? std::min(1 + options_.soloGuests, std::max(1, options_.maxPlayers)) : options_.maxPlayers);
     refreshServerInfo();
 }
 
@@ -3290,7 +3293,9 @@ void GameHost::setAccessSettings(const AccessSettings& a)
     access_.limitResolution = a.limitResolution; // (0x278C)
     access_.restrictedClasses = a.restrictedClasses & 7u; // (0x278B)
     access_.allowed = a.allowed;
-    const int limit = std::clamp(a.maxPlayers, 1, 32); // (0x2795: Game_SetMaxPlayers)
+    // (0x2795: Game_SetMaxPlayers.) (noxcpp: a solo game with guests, Options::soloGuests: its
+    // host and its guests' room at most.)
+    const int limit = std::clamp(a.maxPlayers, 1, options_.solo && options_.soloGuests > 0 ? 1 + options_.soloGuests : 32);
     if (limit != options_.maxPlayers) {
         options_.maxPlayers = limit;
         settingsChanged_ = true;
@@ -3445,6 +3450,7 @@ GameHost::TeamsView GameHost::teamsView()
     v.autoAssign = (world.gameplayFlags & 2u) != 0;
     v.teamDamage = (world.gameplayFlags & 1u) != 0;
     v.chat = (world.gameFlags & GameFlag::Chat) != 0;
+    v.pinned = options_.gameplayPinned;
     for (const ServerTeam& t : world.teams) {
         if (t.active) {
             v.list.push_back({t.id, strings::toUtf8(t.name), t.color});
@@ -3459,9 +3465,9 @@ GameHost::TeamsView GameHost::teamsView()
 
 void GameHost::setUseTeams(bool on)
 {
-    // 0x285A.
+    // 0x285A. (noxcpp: not with team play a mode's pin.)
     World& world = server_.world();
-    if (on == ((world.gameplayFlags & 4u) != 0)) {
+    if (on == ((world.gameplayFlags & 4u) != 0) || (options_.gameplayPinned & 4u)) {
         return;
     }
     Fight f = server_.fight();
@@ -3480,9 +3486,9 @@ void GameHost::setUseTeams(bool on)
 
 void GameHost::setAutoAssign(bool on)
 {
-    // 0x285B.
+    // 0x285B. (noxcpp: not with auto-assign a mode's pin.)
     World& world = server_.world();
-    if (on == ((world.gameplayFlags & 2u) != 0)) {
+    if (on == ((world.gameplayFlags & 2u) != 0) || (options_.gameplayPinned & 2u)) {
         return;
     }
     if (on) {
@@ -3501,14 +3507,20 @@ void GameHost::setAutoAssign(bool on)
 
 void GameHost::setTeamDamage(bool on)
 {
-    // 0x285D.
+    // 0x285D. (noxcpp: not with team damage a mode's pin.)
+    if (options_.gameplayPinned & 1u) {
+        return;
+    }
     World& world = server_.world();
     world.gameplayFlags = on ? (world.gameplayFlags | 1u) : (world.gameplayFlags & ~1u);
 }
 
 void GameHost::shuffleTeams()
 {
-    // 0x285C.
+    // 0x285C. (noxcpp: not with team play a mode's pin: its teams are the mode's.)
+    if (options_.gameplayPinned & 4u) {
+        return;
+    }
     Fight f = server_.fight();
     shareOutPlayers(f, true);
 }
@@ -3580,7 +3592,8 @@ void GameHost::applyServerSettings(const ServerSettings& s)
     settingsSlots_[0][0x39] = 0;
     // with Capture the Flag or Flag Ball chosen (the settings' 0x60), teams made
     // till there are two, and team play on (the host was asked first, ServOpts.c's NeedTeams).
-    if ((s.mode & 0x60u) || s.flagTeams) {
+    // (noxcpp: not with team play a mode's pin.)
+    if (((s.mode & 0x60u) || s.flagTeams) && !(options_.gameplayPinned & 4u)) {
         flagGameTeams(world);
     }
     setServerName(s.name); // (gameSetServername)

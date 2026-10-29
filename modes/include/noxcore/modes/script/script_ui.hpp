@@ -59,6 +59,13 @@
 //   NoxWindowSpec's frame (false: no frame, title or background, and any y on the screen),
 //   clickThrough (true: clicks, the wheel and the mouse over it are the game's) and hud (true:
 //   hidden while the game hides its HUD, and drawn under the framed windows)
+//   NoxWindowSpec's anchor ("topleft", "top", "topright", "left", "right", "bottomleft",
+//                                    "bottom", "bottomright"; none or "center": as before): x, y
+//                                    stay its place in the 640 x 480, and on a view wider or taller
+//                                    than that the window keeps its distance to that edge or corner
+//                                    of the whole view instead (moved by the view's margin:
+//                                    setViewMargins). A client before it ignores the field and
+//                                    puts the window at x, y, as it was
 //   ui.drag(window, phase, x, y, button)  a press in a window that moves 3 units or more: phase
 //                                    "start" (at the press), "move", "end" (let go); x, y in the
 //                                    pressed window's units (outside it too)
@@ -170,8 +177,9 @@ struct UiTooltipLine {
 
 /// (API 3) Where a tooltip of w x h goes for the mouse at (mouseX, mouseY), all in the UI's 640 x
 /// 480 units: below and right of the pointer, flipped to its other side where it would run off,
-/// and always whole on the screen (a tooltip bigger than it: its top left at 0).
-std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h);
+/// and always whole on the screen (a tooltip bigger than it: its top left at the screen's). The
+/// screen: the 640 x 480 and `marginX`, `marginY` past it on each side (the view's margins).
+std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h, float marginX = 0, float marginY = 0);
 
 /// (API 3) A label over an object in the world (nox.label).
 struct UiLabel {
@@ -252,6 +260,11 @@ struct UiWindow {
     bool frame = true;         ///< framed and labelled as the server's (false: bare, any y)
     bool clickThrough = false; ///< clicks, the wheel and the mouse over it are the game's
     bool hud = false;          ///< hidden while the game hides its HUD; under the framed windows
+    /// (API 3: NoxWindowSpec's anchor) Which edge it keeps its distance to on each axis: -1 the
+    /// left or top, 0 none (centred with the 640 x 480, as before), 1 the right or bottom; and its
+    /// place as nox.window gave it. x, y are that place moved by the view's margins (whole units).
+    std::int8_t anchorX = 0, anchorY = 0;
+    int specX = 0, specY = 0;
     /// (API 4) This frame's hit areas (nox.hitArea, in its own units): a frameless window with any
     /// takes the mouse only inside them (windowTakes).
     std::vector<UiRect> hitAreas;
@@ -311,6 +324,9 @@ public:
     /// mouse); true until told.
     void setHudShown(bool shown);
     bool hudShown() const noexcept;
+    /// How far the view reaches past the 640 x 480 on each side, in its units (the program's fit:
+    /// 0, 0 until told, as in a 4:3 view); anchored windows (UiWindow::anchorX/Y) moved by them.
+    void setViewMargins(float x, float y);
     /// (API 3) This frame's tooltip (empty: none).
     const std::vector<UiTooltipLine>& tooltip() const noexcept;
     /// (API 3) The labels, in the order set.

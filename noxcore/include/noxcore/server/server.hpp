@@ -85,6 +85,9 @@ public:
         bool noScoring = false;
         /// A mode that keeps its stock look-alike's limits itself (World::modeOwnsLimits).
         bool modeOwnsLimits = false;
+        /// A mode's pickup rules (World::pickupAnyClass, World::pickupDuplicates).
+        bool pickupAnyClass = false;
+        bool pickupDuplicates = false;
         /// The game's own float rounding for the server's figuring: towards zero, as its x87 chops
         /// (util::RoundingScope at each entry: the map loads and the frames); off, to nearest
         /// (VD-37): the same code, the old last bits.

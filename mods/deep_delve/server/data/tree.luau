@@ -20,16 +20,32 @@
 -- of a spell along the branch unlocks it (at its start level, data.rises), each further
 -- one raises it a level, up to 5; a node past what the spell's level is worth gives its mastery
 -- (stats) too. A branch's 13 nodes in order: A small A B small notable A B small A B A keystone,
--- so spell A has five nodes and spell B three. A spell or ability node gives its spell and
--- mastery only to its region's class (another class may take it on its way through, for nothing
--- but the way).
+-- so spell A has five nodes and spell B three.
+--
+-- Another class's nodes count for whoever takes them (by decision 2026-10-29). A spell node gives
+-- its spell (and mastery) to any class the game lets cast it (the spell's class flags: its own
+-- class's or any caster's, tree.usable); a summon node its creature to a class that may cast its
+-- summon spell (a conjurer); an ability node its ability to a warrior alone (the game keeps a caster's spells 1-5 where a
+-- warrior's abilities are, and only a warrior uses abilities). Any other taker gets the node's
+-- stats' worth in place of it: `crossWorth`, by the taker's class.
 --
 -- Summons come from the tree too. The Beasts branch's 12 nodes in order: C small C C small
 -- notable C C small C C keystone, each C the next of its creatures, weaker to stronger. A summon
 -- node gives a conjurer the creature in its field guide and the summon spell that calls it.
 --
 -- Stats (as items' affixes are applied): health, mana, strength (flat), healthPct, manaPct (% of
--- the most), damage (% more dealt), resist (% less taken).
+-- the most), damage (% more dealt), resist (% less taken), healthRegen, manaRegen (a second, on top
+-- of the class's base regeneration: regen.luau). Each class also has a short Renewal run of
+-- regeneration nodes beside its root (at the end of `nodes`).
+--
+-- Cast-cost stats (keystones only; casts.luau and summons.luau): spellCost (% of a spell's mana
+-- price given back as the cast goes off; summonings aside), summonCost (the same for a summoning),
+-- summonHealth (% more or less most health for each creature summoned). A cast still needs its
+-- whole price in mana to start: the game asks for it before any hook hears the cast.
+--
+-- Added after the Renewal nodes (ids 153 on): Charm Creature (the conjurer's, off the Beasts
+-- notable) and two cast-cost keystones, Measured Words (the wizard's, off Arcana's last Magic
+-- Missile) and Thin Bonds (the conjurer's, off Beasts' Stone Golem).
 --
 -- Node ids are their places in `nodes` and are kept in records: new nodes go at the end, never
 -- between.
@@ -59,6 +75,17 @@ data.spellTitles = {
 	SPELL_METEOR = "Meteor",
 	SPELL_LESSER_HEAL = "Lesser Heal",
 	SPELL_SLOW = "Slow",
+	SPELL_CHARM = "Charm Creature",
+}
+
+-- What a spell, ability or summon node of another class's region gives a taker whose class can't
+-- use it (a warrior taking a spell, a caster an ability, a wizard a summon or a spell only a
+-- conjurer casts): about a small node's worth, in the stats that class uses (a warrior has no
+-- mana).
+data.crossWorth = {
+	warrior = { damage = 3 },
+	wizard = { damage = 2, mana = 5 },
+	conjurer = { damage = 2, mana = 5 },
 }
 
 -- The creatures the tree's summon nodes give, by their field guide type (nox.grantCreature's and
@@ -112,6 +139,7 @@ data.abilities = {
 --            level up to 5, and these stats;
 --   own      % more damage the spell's own hits deal (those of the things in `hits`, its
 --            missiles), given to its class by its first node and kept while the spell is;
+--   note     words its first node adds to what it says;
 --   size     its missile made larger at some levels: { missile = the type sized, byLevel =
 --            { [level] = { hit, burst, draw } } }: a hero's cast at that level (its book's level)
 --            gives each such missile it makes a hit circle of `hit` (nox.setHitRadius: a point
@@ -151,6 +179,8 @@ data.rises = {
 	SPELL_FIST = { start = 2 },
 	SPELL_LESSER_HEAL = { top = 1, mastery = { health = 8 } },
 	SPELL_SLOW = { top = 1, mastery = { resist = 3 } },
+	-- (the game charms only a creature in its caster's field guide: the Beasts it has taken)
+	SPELL_CHARM = { note = "make a creature your field guide knows your own" },
 }
 
 -- Each spell's (by name) and ability's (by number) rise, filled in, as an index.
@@ -163,6 +193,7 @@ for name, r in (data.rises :: any) do
 		own = r.own or 0,
 		hits = r.hits or {},
 		size = r.size,
+		note = r.note,
 	}
 end
 for _, a in data.abilities do
@@ -184,6 +215,13 @@ data.groupFlags = 0x1000 + 0x2000 + 0x4000 + 0x8000 + 0x10000 + 0x20000
 
 -- A respec at the town's fountain: base + perNode x the nodes taken, in gold.
 data.respec = { base = 50, perNode = 15 }
+-- One node given back, anywhere (by decision 2026-10-29): base + perLevel x the character's
+-- level, in gold, never more than a whole respec would cost then. Only a node whose going leaves
+-- every other node taken joined to the root (tree.canRefund).
+data.refund = { base = 20, perLevel = 5 }
+-- The points a level-1 character has: its first spell and a first passive (by decision
+-- 2026-10-29); one more for each level after it.
+data.points = { atOne = 2 }
 -- Resistance is held within these (% less taken).
 data.resist = { least = -50, most = 75 }
 
@@ -457,5 +495,81 @@ region("conjurer", "The Conjurer's Path", 3, 4, m4, {
 		keystone = { name = "Beastmaster", icon = "k_beastmaster", stats = { manaPct = 20, resist = 10, damage = -15 } },
 	},
 })
+
+-- Regeneration (by decision 2026-10-29; added after the Beasts branch: ids 141-152). Beside each
+-- class's root, so a new character can take one with its first passive point: a run of three off
+-- the root (a small, a small of both, the notable) and a small leaf on the root's other side. The
+-- stats are per second, on top of the class's base (data/numbers.luau's regen). The pictures are
+-- the small stat ones (the notables' too).
+local REGEN_HEALTH = { healthRegen = 0.5 }
+local REGEN_MANA = { manaRegen = 0.5 }
+local REGEN_BOTH = { healthRegen = 0.3, manaRegen = 0.3 }
+
+local function regenNodes(class: string, spur: { any }, leaf: any)
+	local root = data.roots[class]
+	local prev = root
+	for _, n in spur do
+		n.region = class
+		n.branch = "Renewal"
+		local id = add(n)
+		link(prev, id)
+		prev = id
+	end
+	leaf.region = class
+	leaf.branch = "Renewal"
+	link(root, add(leaf))
+end
+
+regenNodes("warrior", {
+	{ x = -4, y = -2, kind = "small", name = "Mending", icon = "s_health", stats = REGEN_HEALTH },
+	{ x = -4, y = -4, kind = "small", name = "Steady Breath", icon = "s_health_mana", stats = REGEN_BOTH },
+	{ x = -4, y = -6, kind = "notable", name = "Second Wind", icon = "s_health", stats = { healthRegen = 1.5, health = 10 } },
+}, { x = -4, y = 2, kind = "small", name = "Scar Tissue", icon = "s_health", stats = REGEN_HEALTH })
+
+regenNodes("wizard", {
+	{ x = 5, y = -4, kind = "small", name = "Trickle", icon = "s_mana", stats = REGEN_MANA },
+	{ x = 7, y = -4, kind = "small", name = "Calm", icon = "s_health_mana", stats = REGEN_BOTH },
+	{ x = 9, y = -4, kind = "notable", name = "Wellspring", icon = "s_mana", stats = { manaRegen = 1.5, mana = 8 } },
+}, { x = 1, y = -4, kind = "small", name = "Warm Blood", icon = "s_health", stats = REGEN_HEALTH })
+
+regenNodes("conjurer", {
+	{ x = 1, y = 4, kind = "small", name = "Sap", icon = "s_health_mana", stats = REGEN_BOTH },
+	{ x = -1, y = 4, kind = "small", name = "Dew", icon = "s_mana", stats = REGEN_MANA },
+	{ x = -3, y = 4, kind = "notable", name = "Verdant Pulse", icon = "s_health_mana", stats = { healthRegen = 1, manaRegen = 1 } },
+}, { x = 5, y = 3, kind = "small", name = "Bloom", icon = "s_health", stats = REGEN_HEALTH })
+
+-- The k-th node of a branch (in the order it was laid), by id.
+local function branchNode(class: string, branch: string, k: number): number
+	local i, found = 0, 0
+	for _, n in nodes do
+		if n.region == class and n.branch == branch then
+			i += 1
+			if i == k then
+				found = n.id
+				break
+			end
+		end
+	end
+	assert(found ~= 0, "no such node of the branch")
+	return found
+end
+
+-- Charm Creature (by decision 2026-10-29; id 153): the conjurer's, a side node off the Beasts
+-- notable (Pack Leader), so a conjurer reaching it already knows the Bat, the Wolf and the Black
+-- Wolf. The game charms only a creature in the caster's field guide, which holds the Beasts'
+-- creatures it has taken: those are the ones it can charm.
+do
+	local r = data.rise("SPELL_CHARM")
+	local charm = add({ x = 11, y = 11, kind = "spell", region = "conjurer", branch = "Beasts", spell = "SPELL_CHARM", spellIcon = "SPELL_CHARM",
+		level = r.start, first = true, mastery = false, beyond = false })
+	link(branchNode("conjurer", "Beasts", 6), charm)
+end
+
+-- The cast-cost keystones (by decision 2026-10-29; ids 154-155), each a second keystone at its
+-- branch's end, beside the first, each with its own picture.
+link(branchNode("wizard", "Arcana", 12), add({ x = 8, y = -17, kind = "keystone", region = "wizard", branch = "Arcana", name = "Measured Words",
+	icon = "k_measured_words", stats = { spellCost = -30, damage = -15 } }))
+link(branchNode("conjurer", "Beasts", 11), add({ x = 11, y = 16, kind = "keystone", region = "conjurer", branch = "Beasts", name = "Thin Bonds",
+	icon = "k_thin_bonds", stats = { summonCost = -50, summonHealth = -30 } }))
 
 return data

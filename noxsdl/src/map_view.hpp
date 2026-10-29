@@ -26,6 +26,7 @@
 #include "camera.hpp"
 #include "lighting.hpp"
 #include "polygon_ambient.hpp"
+#include "scene_order.hpp"
 #include "sight.hpp"
 #include "sprite_cache.hpp"
 #include "thing_art.hpp"
@@ -83,7 +84,13 @@ public:
                    SightMap* sight = nullptr);
     /// Subtracted from a BELOW thing's sort key (FLAGS BELOW: fire pits, plates, scorch marks), so
     /// it's drawn under everything standing on the floor, in its own y order.
-    static constexpr float kBelow = 100000.0f;
+    static constexpr float kBelow = scene::kBelow;
+    /// Subtracted from a floor decal's sort key (TypeArt::floorDecal: the scene's second list,
+    /// which the game draws with the floor), so it's under every other BELOW thing whatever their
+    /// y (a cave lift's stone ring under its pit), in its own y order (scene_order.hpp).
+    static constexpr float kFloorDecal = scene::kFloorDecal;
+    /// What a drawable of `art` at world y sorts by in the scene (scene::sortKey).
+    static float sortKey(const TypeArt& art, float y, bool plate) { return scene::sortKey(art.hanging, art.floorDecal, art.below, plate, y); }
 
     /// A sprite to sort into the scene; (x, y) is its origin before the image's own offset, and
     /// (lightX, lightY) the point its light is sampled at (its base).

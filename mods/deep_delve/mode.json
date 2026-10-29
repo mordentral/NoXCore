@@ -11,5 +11,7 @@
   "mapPrefix": "DD",
   "ui": "ui/main.luau",
   "uiApi": 4,
+  "gameplay": { "teamDamage": false, "autoAssign": false, "teamPlay": false },
+  "pickup": { "anyClass": true, "duplicates": true },
   "reference": true
 }

@@ -8,6 +8,9 @@
 //             animation over the head (blue for anti-magic); vampirism (13): ten magenta dots;
 //             the near half of the protection orbits; shield (26): SphericalShieldAnim at half
 //             alpha; the reflective shield otherwise
+//
+// With HD Spell FX the Force Field (shield) is the fx_barrier sphere and the reflective shield the
+// fx_ripple water disc, each in its sprite's place.
 //   orbits    protection from fire, poison and electricity (17, 18, 20; client_drawXxxProtect): two glowing
 //             dots with tails, opposite each other, circling 32 units out; poison's and
 //             electricity's circles are smaller (x 0.707) and tilted opposite ways
@@ -18,6 +21,7 @@
 // Nothing shows on an invisible drawable unless it's us, a teammate, or we see the invisible.
 #include "effects.hpp"
 #include "effects_draw.hpp"
+#include "reflect_ripple.hpp"
 
 #include "noxcore/util/random.hpp"
 
@@ -306,10 +310,48 @@ void Effects::enchantSprites(const Anchor& a, std::uint16_t netCode, bool front,
     const auto reflect = [&] {
         const std::size_t dir = std::min<std::size_t>(a.direction, kReflectType.size() - 1);
         const std::string_view type = kReflectType[dir];
-        if (const TypeArt* t = type.empty() ? nullptr : art_.get(reflectArts_[dir], type)) {
-            const SDL_Point off = offsetFor(kReflectOffset, a.direction);
-            sprite(*t, a.x + static_cast<float>(off.x), a.y + static_cast<float>(off.y) + a.z);
+        const TypeArt* t = type.empty() ? nullptr : art_.get(reflectArts_[dir], type);
+        if (!t) {
+            return;
         }
+        const SDL_Point off = offsetFor(kReflectOffset, a.direction);
+        const float x = a.x + static_cast<float>(off.x);
+        const float y = a.y + static_cast<float>(off.y) + a.z;
+        // HD Spell FX: the fx_ripple water disc of the facing's shape (reflect_ripple.hpp) about
+        // the middle of the art's first image, where the game draws it: in the sprite's place in
+        // the scene, for as long and wherever the sprite would be.
+        // (Off for now by decision, 2026-10-29: the front's ripples came out too large and too 3D
+        // against the original's; the original sprite until it's reworked.)
+        constexpr bool kRippleShield = false;
+        const auto shape = kRippleShield && fxdraw::rippleOn() ? shieldfx::rippleShape(a.direction) : std::nullopt;
+        const nox::things::ImageRef* first = shape ? pickImage(*t, Pose{}) : nullptr;
+        const Sprite* firstSprite = first ? sprites.get(*first) : nullptr;
+        if (!firstSprite) {
+            sprite(*t, x, y);
+            return;
+        }
+        const float left = x - t->halfWidth;
+        const float top = y - t->halfHeight - t->z;
+        const float cx = left + firstSprite->offsetX + firstSprite->width / 2;
+        const float cy = top + firstSprite->offsetY + firstSprite->height / 2;
+        // The frame the game would show stays on the item for the 3D view, which draws sprites
+        // (the 2D scene draws `draw`).
+        Pose pose;
+        pose.netCode = netCode;
+        pose.time = time_;
+        const nox::things::ImageRef* image = pickImage(*t, pose);
+        MapView::SceneSprite item{a.y, left, top, image ? sprites.get(*image) : nullptr, a.x, a.y};
+        item.draw = [this, cx, cy, s = *shape, netCode, lx = a.x, ly = a.y](SDL_Renderer* renderer, const Camera& camera) {
+            // Lit as the sprite is, by the light at the unit's feet.
+            SDL_Color light{255, 255, 255, 255};
+            if (light_) {
+                const Rgb l = light_->sample(lx, ly);
+                light = {l[0], l[1], l[2], 255};
+            }
+            fxdraw::ripple(renderer, camera, cx, cy, s.major, s.minor, s.tiltDegrees, light,
+                           shieldfx::rippleLoop(time_, netCode), time_ / 30, s.back);
+        };
+        out.push_back(std::move(item));
     };
     const bool facingAway = a.direction <= 2;  // AnimDir 0-2: NW, N, NE
 
@@ -413,7 +455,7 @@ void Effects::enchantSprites(const Anchor& a, std::uint16_t netCode, bool front,
     if (a.buffs & kShield) {
         const auto* anim = fxdraw::barrierOn() ? namedAnimation(shieldAnim_, "SphericalShieldAnim") : nullptr;
         if (const Sprite* s = anim ? sprites.get(anim->frames.front()) : nullptr) {
-            // Smooth: the fx_barrier sphere, the animation's frames' size, straight over the feet
+            // HD Spell FX: the fx_barrier sphere, the animation's frames' size, straight over the feet
             // (the drawn position the body's sprite is drawn from), whatever the facing or pose:
             // none of the old art's running offset by direction, which jumps it about as a runner
             // turns. Its height over the feet is the old art's standing centre's, kBarrierDrop lower

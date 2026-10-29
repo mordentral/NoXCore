@@ -60,6 +60,10 @@ public:
     /// The host's talk as last told (open or closed), and a count of those told.
     const coopmsg::DialogMirror& dialog() const noexcept { return dialog_; }
     std::uint32_t dialogVersion() const noexcept { return dialogVersion_; }
+    /// The party's creatures as last told (kCreatures: every member's summons and charmed
+    /// creatures, by net code, sorted), and a count of the lists told.
+    const std::vector<std::uint16_t>& partyCreatures() const noexcept { return partyCreatures_; }
+    std::uint32_t partyCreaturesVersion() const noexcept { return partyCreaturesVersion_; }
 
 private:
     client::HeadlessClient& client_;
@@ -75,6 +79,8 @@ private:
     std::pair<std::uint8_t, std::uint8_t> ready_{0, 0};
     coopmsg::DialogMirror dialog_;
     std::uint32_t dialogVersion_ = 0;
+    std::vector<std::uint16_t> partyCreatures_;
+    std::uint32_t partyCreaturesVersion_ = 0;
     std::vector<std::uint8_t> partial_;
     std::optional<std::vector<std::uint8_t>> character_;
 };

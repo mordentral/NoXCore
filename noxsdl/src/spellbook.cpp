@@ -2,6 +2,7 @@
 // are game pixels from the book's corner (origin), as the exe lays it out.
 #include "spellbook.hpp"
 
+#include "book_award.hpp"
 #include "hud.hpp"
 
 #include "noxcore/client/spell_bars.hpp"
@@ -313,19 +314,21 @@ std::optional<std::uint32_t> Spellbook::event(const nox::client::BookEvent& e, c
         return std::nullopt;
     }
     // (noxcpp's multiclass: an ability's entry, and what flies to the bars, tagged.)
-    const std::uint32_t entry = ctx.multiclass && e.kind == Kind::Ability ? nox::client::kAbilityTag | static_cast<std::uint32_t>(e.id)
-                                                                          : static_cast<std::uint32_t>(e.id);
+    const std::uint32_t entry = bookaward::awardEntry(e.kind, e.id, ctx.multiclass);
     const auto it = std::find(entries_.begin(), entries_.end(), entry);
     if (it == entries_.end()) {
         return std::nullopt;
     }
-    // Shut, turned to its page, opened a third of the way down with sparks off its edges.
-    hide();
-    moveToPage(static_cast<int>(it - entries_.begin()), ctx);
+    // Shown (BookOpen, even if it was open already), moved a third of the way down, turned to its
+    // page (PageTurn), sparks off its edges (bookSetForward, then bookRewardCli's bursts).
+    drag_ = 0;
+    pressed_.reset();
+    iconPressed_ = false;
     open_ = true;
     sound(0x312); // BookOpen
     raised_ = true;
     moved_.reset(); // (window_setPos: the award puts it there whatever it was dragged to)
+    moveToPage(static_cast<int>(it - entries_.begin()), ctx);
     burst(e.kind == Kind::Spell ? 0 : e.kind == Kind::Ability ? 3 : 2, lastHeight_);
     if (!e.fill || e.kind == Kind::Creature) {
         return std::nullopt;
@@ -613,21 +616,25 @@ void Spellbook::draw(SDL_Renderer* renderer, const BookContext& ctx, int w, int 
     // bookDrawList: the book, its lit tab, then the page, or the turning page over it.
     drawNamed("BookOfKnowledge", o.x - 0x18, o.y - 0x4C);
     drawNamed(guide_ ? "GuideTabLit" : "SpellTabLit", o.x - 0x18, o.y - 0x4C);
+    bool turning = false;
     if (anim_ != Anim::None) {
         const auto* def = image(anim_ == Anim::Forward ? "BookPageForward" : "BookPageBackward");
         const std::size_t frames = def && def->animation ? def->animation->frames.size() : 0;
-        const std::uint32_t delay = def && def->animation ? std::max<std::uint32_t>(def->animation->frameDelay, 1) : 1;
-        // The turning page's frame from the frames since it began; once past the last, the page shows again.
-        const std::size_t f = (ctx.frame - animStart_) / delay;
-        if (f >= frames) {
-            anim_ = Anim::None; // its callback: the page shows again (bookClickSpell)
-        } else {
-            drawNamed(anim_ == Anim::Forward ? "BookPageForward" : "BookPageBackward", o.x - 0x18, o.y - 0x4C, f);
+        const std::uint8_t delay = def && def->animation ? def->animation->frameDelay : 0;
+        // The turning page's frame from the client frames since it began; its last drawn once, then
+        // its callback: the page shows again from the next frame (bookClickSpell).
+        const auto step = bookaward::turnStep(ctx.frame, animStart_, frames, delay);
+        if (frames != 0) {
+            drawNamed(anim_ == Anim::Forward ? "BookPageForward" : "BookPageBackward", o.x - 0x18, o.y - 0x4C, step.frame);
+            turning = true;
+        }
+        if (step.over) {
+            anim_ = Anim::None;
         }
     }
     const int n = static_cast<int>(entries_.size());
     const std::uint8_t cls = ctx.playerClass;
-    if (anim_ == Anim::None && listMode_) {
+    if (!turning && listMode_) {
         const int lines = linesPerColumn();
         float x = o.x + 0x4E;
         float y = o.y + 0x13;
@@ -656,7 +663,7 @@ void Spellbook::draw(SDL_Renderer* renderer, const BookContext& ctx, int w, int 
         }
     // One entry's page: its heading, then the spell's details or the creature's picture, and
     // the description on the facing page.
-    } else if (anim_ == Anim::None && entry_ < n) {
+    } else if (!turning && entry_ < n) {
         const auto tagged = entries_[static_cast<std::size_t>(entry_)];
         const auto e = nox::client::untagged(tagged); // (a multiclass ability's entry: its id)
         const std::uint8_t ecls = guide_ ? cls : entryClass(tagged, ctx);

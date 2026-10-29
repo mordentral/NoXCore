@@ -11,7 +11,7 @@ namespace noxsdl {
 
 /// Every embedded shader: the fragment shaders by name, view3d_scene_vert the 3D view's vertex shader.
 #define NOXSDL_SHADER_LIST(X)                                                                              \
-    X(material) X(material_split) X(fx_disc) X(fx_rect) X(fx_glow) X(fx_glowline) X(fx_puff) X(fx_barrier) \
+    X(material) X(material_split) X(fx_disc) X(fx_rect) X(fx_glow) X(fx_glowline) X(fx_puff) X(fx_barrier) X(fx_ripple) \
     X(bloom_blur) X(bloom_bright) X(fx_light) X(gamma) X(pending) X(weather) X(view3d_scene) X(view3d_material) X(view3d_particle) \
     X(view3d_scene_vert)
 

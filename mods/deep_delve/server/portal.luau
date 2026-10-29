@@ -205,9 +205,10 @@ function portal.lines(): { string }
 end
 
 -- A new map: every portal closed (hero.mapChanging forgets them on the heroes; the ones whose
--- owners left go here).
+-- owners left go here), and every offer of them with it.
 function portal.reset()
 	left = {}
+	offers.forget()
 	if beat then
 		nox.cancelTimer(beat)
 		beat = nil

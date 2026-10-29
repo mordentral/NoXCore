@@ -379,6 +379,9 @@ public:
     Stage stage() const noexcept { return stage_; }
     /// The lobby's refusal (SERVER_ERROR's code: net::JoinError), or -1.
     int joinError() const noexcept { return conn_.joinError(); }
+    /// The lobby asked for the game's password (PASSWORD_REQUIRED) and the profile had none to
+    /// send: the join gave up there (a program asks its player for one, then joins again with it).
+    bool passwordAsked() const noexcept { return passwordAsked_; }
     std::uint16_t netCode() const noexcept { return netCode_; }
     std::uint32_t frame() const noexcept { return frame_; }
     const std::string& mapName() const noexcept { return mapName_; }
@@ -526,7 +529,8 @@ private:
     bool classCanUse(std::uint16_t typeId) const;
     const things::ModifierDb* modifiers_ = nullptr;
     std::uint64_t datagramsReceived_ = 0;
-    std::uint16_t swappingOut_ = 0;  ///< g_guiInvEquippedWeaponDrawable: the weapon being taken off
+    bool passwordAsked_ = false; ///< (passwordAsked)
+    std::uint16_t swappingOut_ = 0; ///< g_guiInvEquippedWeaponDrawable: the weapon being taken off
     std::uint16_t pendingSecondary_ = 0; ///< it, to become the secondary once the other is on
     std::uint16_t lastQuiver_ = 0;       ///< g_guiInvLastQuiverNetCode: put back on with a bow
     std::uint16_t previousSecondary_ = 0; ///< restored if the server refuses a new one

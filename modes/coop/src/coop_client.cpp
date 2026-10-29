@@ -76,6 +76,12 @@ void CoopClient::onMessage(std::span<const std::uint8_t> m)
             ++dialogVersion_;
         }
         break;
+    case coopmsg::kCreatures:
+        if (auto c = coopmsg::parseCreatures(rest)) {
+            partyCreatures_ = std::move(*c);
+            ++partyCreaturesVersion_;
+        }
+        break;
     case coopmsg::kCharacter:
         // Our campaign character in parts, in order (reliable): whole once the last is in.
         if (auto c = coopmsg::parseCharacter(rest)) {

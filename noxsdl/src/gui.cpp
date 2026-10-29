@@ -261,6 +261,22 @@ void Painter::image(const std::string& name, int x, int y)
     drawSprite(ref ? res_.sprites.get(*ref) : nullptr, x, y);
 }
 
+void Painter::image(const std::string& name, int x, int y, bool dim)
+{
+    const auto ref = namedImage(res_.things, name);
+    const Sprite* s = ref ? res_.sprites.get(*ref) : nullptr;
+    if (!dim || !s || !s->texture) {
+        drawSprite(s, x, y);
+        return;
+    }
+    // (the texture's colour scaled down for this draw, then put back: an atlas page others share)
+    Uint8 r = 255, g = 255, b = 255;
+    SDL_GetTextureColorMod(s->texture, &r, &g, &b);
+    SDL_SetTextureColorMod(s->texture, static_cast<Uint8>(r * 2 / 5), static_cast<Uint8>(g * 2 / 5), static_cast<Uint8>(b * 2 / 5));
+    drawSprite(s, x, y);
+    SDL_SetTextureColorMod(s->texture, r, g, b);
+}
+
 void Painter::image(const std::string& name, int x, int y, const SpriteCache::Materials& materials)
 {
     const auto ref = namedImage(res_.things, name);
@@ -601,6 +617,13 @@ void Gui::drawByType(Window& w, Painter& p)
     const bool pressed = (w.state & kPressed) != 0;
     const int ix = x + w.imageOffset.x;
     const int iy = y + w.imageOffset.y;
+    // (noxcpp) Greyed out (Window::dimDisabled, disabled): the texts and outlines dim, the images
+    // darkened. Otherwise the stock colours, whatever the state.
+    const bool dim = !on && w.dimDisabled;
+    const Color kDimText{112, 106, 96};
+    const Color kDimEdge{70, 66, 60};
+    const Color textColor = dim ? kDimText : w.textColor;
+    const Color edgeColor = dim && !w.enabledColor.transparent ? kDimEdge : w.enabledColor; // (none stays none)
 
     // Text centred in the window (the buttons' wndButtonDrawNoImg), or in its first `across` units.
     const auto centredText = [&](int across) {
@@ -609,7 +632,7 @@ void Gui::drawByType(Window& w, Painter& p)
         }
         const int tw = p.textWidth(w.text, w.largeFont);
         p.text(w.text, x + across / 2 - tw / 2, y + height / 2 - p.fontHeight(w.largeFont) / 2, w.largeFont,
-               w.textColor, across);
+               textColor, across);
     };
 
     switch (w.type) {
@@ -624,10 +647,10 @@ void Gui::drawByType(Window& w, Painter& p)
             } else if (on && lit) {
                 over = w.hiliteImage;
             }
-            p.image(base, ix, iy);
-            p.image(over, ix, iy);
+            p.image(base, ix, iy, dim);
+            p.image(over, ix, iy, dim);
         } else {
-            Color border = w.enabledColor;
+            Color border = edgeColor;
             Color fillColor = w.backgroundColor;
             if (!on) {
                 fillColor = w.disabledColor;
@@ -661,7 +684,7 @@ void Gui::drawByType(Window& w, Painter& p)
                 const bool large = w.largeFont && p.textWidth(w.text, true) <= across - 4;
                 const int tw = p.textWidth(w.text, large);
                 p.text(w.text, x + std::max(2, (across - tw) / 2), y + height / 2 - p.fontHeight(large) / 2, large,
-                       w.textColor);
+                       textColor);
             }
             return;
         }
@@ -680,20 +703,20 @@ void Gui::drawByType(Window& w, Painter& p)
         const int bx = check ? ix + 4 : ix;
         const int by = check ? w.imageOffset.y + y + height / 2 - 5 : iy;
         if (withImage) {
-            p.image(base, bx, by);
-            p.image(over, bx, by);
+            p.image(base, bx, by, dim);
+            p.image(over, bx, by, dim);
         } else {
-            p.outline(x, y, height, height, lit ? w.hiliteColor : w.enabledColor);
+            p.outline(x, y, height, height, lit && !dim ? w.hiliteColor : edgeColor);
             if (pressed) {
-                p.fill(x + 3, y + 3, height - 6, height - 6, w.selectedColor);
+                p.fill(x + 3, y + 3, height - 6, height - 6, dim ? kDimEdge : w.selectedColor);
             }
         }
         if (!w.text.empty()) {
             const int fh = p.fontHeight(w.largeFont);
             if (check) {
-                p.text(w.text, x + 20, y + height / 2 - fh / 2, w.largeFont, w.textColor, width);
+                p.text(w.text, x + 20, y + height / 2 - fh / 2, w.largeFont, textColor, width);
             } else if (w.radioValue == 0) {
-                p.text(w.text, x + 28, y + (height - fh) / 2, w.largeFont, w.textColor, width);
+                p.text(w.text, x + 28, y + (height - fh) / 2, w.largeFont, textColor, width);
             } else {
                 centredText(width);
             }
@@ -710,8 +733,9 @@ void Gui::drawByType(Window& w, Painter& p)
             p.image(w.backgroundImage, ix, iy);
             p.image(on ? w.enabledImage : w.disabledImage, ix, iy);
         } else {
-            p.fill(x + 1, y + 1, width - 2, height - 2, on ? w.backgroundColor : w.disabledColor);
-            p.outline(x, y, width, height, on && lit ? w.hiliteColor : w.enabledColor);
+            // (greyed: a label keeps its own fill, only its words dimmed)
+            p.fill(x + 1, y + 1, width - 2, height - 2, on || dim ? w.backgroundColor : w.disabledColor);
+            p.outline(x, y, width, height, on && lit ? w.hiliteColor : edgeColor);
         }
         const auto* data = std::get_if<nox::gui::StaticTextData>(&w.data);
         if (w.text.empty()) {
@@ -723,12 +747,12 @@ void Gui::drawByType(Window& w, Painter& p)
         const int tw = p.textWidth(w.text, w.largeFont);
         const int tx = centre ? x + (width - std::min(tw, width)) / 2 : x + 2;
         const int ty = y + height / 2 - p.textHeight(w.text, w.largeFont, width) / 2;
-        if (glow) {
+        if (glow && !dim) {
             for (const auto& [dx, dy] : {std::pair{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}) {
                 p.text(w.text, tx + dx, ty + dy, w.largeFont, w.selectedColor, width);
             }
         }
-        p.text(w.text, tx, ty, w.largeFont, w.textColor, width);
+        p.text(w.text, tx, ty, w.largeFont, textColor, width);
         return;
     }
 
@@ -739,17 +763,17 @@ void Gui::drawByType(Window& w, Painter& p)
         int h = height;
         const int fh = p.fontHeight(w.largeFont);
         if (withImage) {
-            p.image(on ? w.backgroundImage : w.disabledImage, x, y);
+            p.image(on ? w.backgroundImage : w.disabledImage, x, y, dim);
         }
         if (!w.text.empty()) {
-            p.text(w.text, x + 1, top, w.largeFont, w.textColor, width);
+            p.text(w.text, x + 1, top, w.largeFont, textColor, width);
             top += 1 + fh;
             h -= 1 + fh;
         }
         if (!withImage) {
             p.fill(x, top, width, h, on ? w.backgroundColor : w.disabledColor);
         }
-        p.outline(x, top, width, h, on && lit ? w.hiliteColor : w.enabledColor);
+        p.outline(x, top, width, h, on && lit ? w.hiliteColor : edgeColor);
         int ly = top;
         // A line too wide for the box wraps there (7 in from its width), as tall as its lines
         // (wndListBoxAddLine's height, wndListboxDrawNoImage's drawStringWrap).
@@ -768,15 +792,16 @@ void Gui::drawByType(Window& w, Painter& p)
                 break;
             }
             if (static_cast<int>(i) == w.selectedLine || w.lines[i].marked) {
-                p.fill(x, ly, width, step, w.selectedColor);
+                p.fill(x, ly, width, step, dim ? kDimEdge : w.selectedColor);
             }
             // (a tab: the rest at the tab stop, draw_setTabWidth's)
             const std::string& line = w.lines[i].text;
+            const Color lineColor = dim ? kDimText : w.lines[i].color;
             if (const auto tab = line.find('\t'); tab != std::string::npos) {
-                p.text(line.substr(0, tab), x + 5, ly + 2, w.largeFont, w.lines[i].color);
-                p.text(line.substr(tab + 1), x + 5 + w.tabWidth, ly + 2, w.largeFont, w.lines[i].color);
+                p.text(line.substr(0, tab), x + 5, ly + 2, w.largeFont, lineColor);
+                p.text(line.substr(tab + 1), x + 5 + w.tabWidth, ly + 2, w.largeFont, lineColor);
             } else {
-                p.text(line, x + 5, ly + 2, w.largeFont, w.lines[i].color,
+                p.text(line, x + 5, ly + 2, w.largeFont, lineColor,
                        w.lines[i].height > lineHeight(w) ? wrapWidth : 0);
             }
             ly += step;
@@ -795,7 +820,7 @@ void Gui::drawByType(Window& w, Painter& p)
             const int at = sl ? (vertical ? sl->max - w.sliderValue : w.sliderValue - sl->min) : 0;
             const int tx = vertical ? x : x + (width - w.thumbLength) * at / range;
             const int ty = vertical ? y + (height - w.thumbLength) * at / range : y;
-            p.image(lit ? w.hiliteImage : w.enabledImage, tx + w.imageOffset.x, ty + w.imageOffset.y);
+            p.image(lit ? w.hiliteImage : w.enabledImage, tx + w.imageOffset.x, ty + w.imageOffset.y, dim);
             return;
         }
         Color fillColor = on ? w.backgroundColor : w.disabledColor;
@@ -830,7 +855,7 @@ void Gui::drawByType(Window& w, Painter& p)
         const int ty = y + height / 2 - fh / 2;
         if (!w.text.empty()) {
             const int lw = p.textWidth(w.text, w.largeFont);
-            p.text(w.text, x + 2, ty, w.largeFont, w.textColor);
+            p.text(w.text, x + 2, ty, w.largeFont, textColor);
             bx += 6 + lw;
             bw -= 6 + lw;
         }
@@ -840,7 +865,7 @@ void Gui::drawByType(Window& w, Painter& p)
             bw = ef->width;
         }
         p.fill(bx + 1, y + 1, bw - 2, height - 2, on ? w.backgroundColor : w.disabledColor);
-        p.outline(bx, y, bw, height, on && lit ? w.hiliteColor : w.enabledColor);
+        p.outline(bx, y, bw, height, on && lit ? w.hiliteColor : edgeColor);
         std::u16string shown = ef && ef->password ? std::u16string(w.entry.size(), u'*') : w.entry;
         std::string utf8 = nox::strings::toUtf8(shown);
         int tw = p.textWidth(utf8, w.largeFont);
@@ -851,7 +876,7 @@ void Gui::drawByType(Window& w, Painter& p)
                 tw = p.textWidth(utf8, w.largeFont);
             }
         }
-        p.text(utf8, bx + 5, ty, w.largeFont, w.textColor);
+        p.text(utf8, bx + 5, ty, w.largeFont, textColor);
         if (focus_ == &w && (SDL_GetTicks() / 267) % 2 == 0) { // every 8 frames at 30 a second
             p.fill(bx + 5 + tw, ty, 2, fh, w.textColor);
         }

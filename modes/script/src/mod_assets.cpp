@@ -232,7 +232,9 @@ bool decodeAssetWav(std::span<const std::uint8_t> file, ModAsset& out, std::stri
 
 fs::file_time_type newestAsset(const fs::path& assetsDir)
 {
-    fs::file_time_type t{};
+    // (From the clock's least, not its epoch: libstdc++'s file clock counts from 2174, so a real
+    // file's time is below file_time_type{} there and a max from it would never move.)
+    fs::file_time_type t = fs::file_time_type::min();
     std::error_code ec;
     for (fs::recursive_directory_iterator it(assetsDir, ec), end; !ec && it != end; it.increment(ec)) {
         if (it.depth() > kMaxDepth) {

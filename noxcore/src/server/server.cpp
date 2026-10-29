@@ -195,6 +195,8 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     world_.sandboxPlayersCantDie = options_.playersCantDie;
     world_.sandboxNoScoring = options_.noScoring;
     world_.modeOwnsLimits = options_.modeOwnsLimits;
+    world_.pickupAnyClass = options_.pickupAnyClass;
+    world_.pickupDuplicates = options_.pickupDuplicates;
     world_.soundSets = options_.soundSets;
     world_.soundTable = &soundTable_;
     world_.soundLimit = options_.frameSounds;

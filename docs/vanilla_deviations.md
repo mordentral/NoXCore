@@ -143,7 +143,8 @@ Options switch unless noted.
   the eye sees its ground point (Effects::drawParticles; 2026-10-14). Always on.
 - **Spell-limit marker:** the quickbar dims a spell red while the server would refuse it because
   our last one is still out (spell_limits.cpp). Vanilla fails the cast silently. Always on.
-- **Soft puffs:** toxic clouds and smoke blasts as particle puffs (Smooth FX).
+- **Soft puffs:** smoke blasts as particle puffs (Smooth FX); toxic clouds likewise, with HD Spell
+  FX (VD-48).
 - **Per-pixel lighting, smooth effects, glows and bloom:** noxsdl's own (Options' Pixel Light,
   Smooth FX and Bloom); the original draws none of them.
 - **Escape closes an open inventory** first (as it does the all-sets bar and the spell book),
@@ -186,8 +187,9 @@ Options switch unless noted.
     the drawables' own glows) are sight-tested where they're drawn, blended between game frames,
     each rendered frame (the exe once a game frame, before the spark draws move them); a
     SIGHT_DESTROY one goes when the first rendered frame of a later game frame begins;
-  - Smooth FX's soft puffs are seen as the drawable each stands in for (a toxic cloud's GreenPuff,
-    SIGHT_DESTROY; a smoke blast's Smoke, lingering and fading), each at its own spot;
+  - the soft puffs (Smooth FX, HD Spell FX) are seen as the drawable each stands in for (a toxic
+    cloud's GreenPuff, SIGHT_DESTROY; a smoke blast's Smoke, lingering and fading), each at its own
+    spot;
   - the sentry rays (their own pass) are cut to the sight by nine samples along them where the
     exe clips them exactly at the polygon's edges (left open);
   - SightMap::visible (a point up to 2 units past an edge counting, one off the view where its
@@ -582,6 +584,42 @@ frames and sound are its decoder's (noxcore video/vqa.hpp). Where noxsdl differs
 - **Why:** a deliberate, approved deviation (2026-10-20): the original's behaviour is an unhelpful
   bug, the slot looking castable while the server refuses the cast for want of mana.
 - **Revert:** drop the isSummonSpell branch in slotManaCost (the slot then reads thing.bin's 0).
+
+### VD-48: HD Spell FX: the poison cloud, Force Field and Reflective Shield drawn anew
+
+- **Vanilla:** the spells' looks are sprites. A toxic cloud puts a GreenPuff or GreenSmoke
+  animation within its reach every other frame, rising and fading. The Force Field (the Shield
+  enchantment) is SphericalShieldAnim over the unit at half alpha. The Reflective Shield (its
+  enchantment) is the ReflectiveShield* type of the unit's facing, an eight-frame looping animation
+  of a disc of water (rings of ripples seen from the front, water seen through from behind, a
+  sliver edge on), drawn at the facing's offset from the unit, behind it while it faces away (NW,
+  N, NE) and in front otherwise, for as long as the enchantment lasts.
+- **Ours:** Options' HD Spell FX (off by default since 2026-10-29, by decision; the More page;
+  noxcore.cfg `HDSpellFX`) draws
+  them as noxsdl's own shader effects instead (noxsdl/src/effects_draw.hpp, `fxdraw::spellFx`):
+  - the toxic cloud as soft, billowing puffs (noxsdl/src/effects_rain.cpp, effects_puffs.cpp; the
+    fx_puff shader), seen as the GreenPuffs they stand in for;
+  - the Force Field as a glassy honeycomb sphere straight over the unit (noxsdl/src/effects_enchant.cpp;
+    fx_barrier);
+  - the Reflective Shield as the same disc of water at the screen's resolution
+    (noxsdl/shaders/fx_ripple.frag.hlsl): rings of ripples running out from its middle a ring per
+    loop of the game's animation, the softer light of water seen through from behind, a bright
+    sliver edge on, lit by the light at the unit's feet as the sprite is. Its shape for each facing
+    is the art's (noxsdl/src/reflect_ripple.hpp), drawn about the middle of the art's first image
+    where the game draws it, in the sprite's place in the scene's order, so it follows the
+    shield's place, facing and life as the sprite does. The 3D view still draws the sprite.
+    **Off for now (by decision, 2026-10-29):** the front's ripples came out too large and too 3D
+    against the original's (the back view was close); the Reflective Shield draws the original
+    sprite whatever the switch (`kRippleShield` in effects_enchant.cpp) until it's reworked.
+    The shader and the shapes stay in the code.
+  Smooth FX keeps the rest (sparks, rays, glows, lines and dots, and the smoke blast's soft dust).
+  Both need the GPU renderer's shaders (greyed without). Purely what the client draws: nothing
+  changes in the game, on the wire or at the server.
+- **Why:** by decision (2026-10-29): the spells drawn anew get a switch of their own, apart from the
+  smoothing of the original's own shapes, and the Reflective Shield joins them.
+- **Revert:** switch HD Spell FX off (or `--stock-effects`, the console's `stockeffects on`): each
+  is drawn exactly as the original's sprites. In code, leave `fxdraw::spellFx` unset in
+  applyExtras (noxsdl/src/app_settings.cpp).
 
 ## Sound (no effect on the wire)
 
@@ -1158,10 +1196,19 @@ The engine's logic is the exe's; these are where the output differs.
     NoX Core clients draw the bar over each other player, as the quest does, while their own
     bars are up.
   - The friend dot (the small dot in our team's colour over a creature on our friends list) is
-    drawn as in the solo game: never. Team 1 is the party's here, and the friends list holds the
-    story's NPCs, the fish and the party's summons alike, so noxsdl draws no dot in a campaign
-    game (game flag 0x800), host or guest; outside the campaign the dot is unchanged. A stock
-    guest, told the quest's flags, draws its quest's dot (every friend but a shopkeeper).
+    drawn over the party's creatures alone, as a team game draws it over a team's (by decision):
+    team 1 is the party's here, and the friends list holds the story's NPCs, its allied creatures,
+    the fish and the party's summons alike. A NoX Core client the co-op campaign greeted
+    (MSG_NOXCPP_COOP kHello; host or guest) draws it over its own summons and charmed creatures
+    (its summon panel's: MSG_REPORT_ACQUIRE_CREATURE) and over every other member's, which the
+    host tells NoX Core clients (MSG_NOXCPP_COOP kCreatures: the party's creatures by net code, as
+    the list changes and as a player comes in), since the client isn't told whose a creature is
+    and the campaign's allies are of the summons' kinds. The story's NPCs, maidens, shopkeepers,
+    allies (Con05A's GruntAxes, War06B's wolves...) and wild friends (the fish) get none. The solo
+    campaign (game flag 0x800, no co-op greeting) still draws none, as the game; outside the
+    campaign the dot is unchanged. Players never had the dot (MonsterDraw's alone). A stock guest,
+    told the quest's flags, gets nothing new and draws its quest's dot (every friend but a
+    shopkeeper).
   - Only a party wipe loses. A player who falls while another lives keeps what it holds (nothing
     dropped), the pending save stands, the map's PlayerDeath functions don't run, and it's back on
     its feet 10 s on (the game's respawn, its things kept) by the party's checkpoint: where the host

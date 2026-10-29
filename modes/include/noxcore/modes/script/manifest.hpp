@@ -11,6 +11,12 @@
 //     "stockClients": true,              GAME.EXE players can join (false: NoX Core only)
 //     "minClientLevel": 5,               the lowest NoX Core client level let in (0, the default:
 //                                        any; at most this build's, lobby::kClientLevel)
+//     "gameplay": {"teamDamage": false}, the host's team options it pins for the game: any of
+//                                        "teamDamage", "autoAssign", "teamPlay" (gameplay flags
+//                                        1, 2, 4), each kept as given (none: the host's)
+//     "pickup": {"anyClass": true},      players pick up what their class can't use (carried, never
+//                                        worn: equipping still asks the class); "duplicates": true
+//                                        seconds of what they carry under the weapons-respawn option
 //     "levels": "mapFiles",              or "generated"
 //     "server": "server/main.luau",      its server script (this is the default)
 //     "ui": "ui/main.luau",              its UI script, sent to NoX Core players (none: text only)
@@ -58,6 +64,13 @@ struct Manifest {
     /// mode.json's "minClientLevel": a NoX Core client below it is refused at its join with the
     /// too-old notice (GameHost::Options::minClientLevel, raised to it). 0: any.
     std::uint16_t minClientLevel = 0;
+    /// mode.json's "pickup" (GameHost::Options::pickupAnyClass / pickupDuplicates).
+    bool pickupAnyClass = false;
+    bool pickupDuplicates = false;
+    /// mode.json's "gameplay": the gameplay flags it pins (1 team damage, 2 auto-assign, 4 team
+    /// play; GameHost::Options::gameplayPinned) and their values (of those bits). 0: none.
+    std::uint32_t gameplayPinned = 0;
+    std::uint32_t gameplayValues = 0;
     /// The stock mode it plays as (game flag 0x100 Arena, 0x20 CTF; 0: none). The world and every
     /// client have that mode's flags, so the engine and the stock HUD work as in it; its rules
     /// (scoring, flags taken and captured, the limits) are off, the script's instead.

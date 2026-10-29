@@ -137,6 +137,8 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
             e.perPixelLight = on;
         } else if (name == "SmoothEffects") {
             e.smoothEffects = on;
+        } else if (name == "HDSpellFX") {
+            e.hdSpellFx = on;
         } else if (name == "Smoothing") {
             e.smoothing = std::clamp(std::atoi(line.c_str() + eq + 1), 0, 3);
         } else if (name == "HDImages") {
@@ -177,7 +179,7 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
 {
     std::ofstream out(app.gameDir / "noxcore.cfg", std::ios::trunc);
     out << "FrameRate = " << e.frameRate << "\nBloom = " << e.bloom << "\nPerPixelLight = " << e.perPixelLight
-        << "\nSmoothEffects = " << e.smoothEffects << "\nSmoothing = " << e.smoothing
+        << "\nSmoothEffects = " << e.smoothEffects << "\nHDSpellFX = " << e.hdSpellFx << "\nSmoothing = " << e.smoothing
         << "\nHDImages = " << e.hdImages << "\nGamma = " << e.gamma << "\nMouseAccel = " << e.mouseAccel
         << "\nMouseSpeed = " << e.mouseSpeed << "\nMouseSpeed3D = " << e.mouseSpeed3D << "\nKillFeed = " << e.killFeed << "\nDisplay = " << e.display
         << "\nVSync = " << e.vsync << "\nServerUpdateRate = " << e.serverUpdateRate
@@ -196,6 +198,7 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.bloom = app.bloom != nullptr;
     e.perPixelLight = app.light.perPixel();
     e.smoothEffects = fxdraw::smoothOn();
+    e.hdSpellFx = fxdraw::spellFxOn();
     e.smoothing = app.smoothing;
     e.hdImages = app.sprites && app.sprites->usingPack();
     e.hdAvailable = !app.imagePack.empty();
@@ -438,8 +441,12 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     app.light.setPerPixel(e.perPixelLight ? app.shaders->light() : nullptr, app.white);
     fxdraw::smooth() = e.smoothEffects
                            ? fxdraw::Smooth{app.white, app.shaders->disc(), app.shaders->rect(), app.shaders->glow(),
-                                            app.shaders->puff(), app.shaders->glowLine(), app.shaders->barrier()}
+                                            app.shaders->puff(), app.shaders->glowLine()}
                            : fxdraw::Smooth{};
+    // HD Spell FX: the toxic cloud's puffs, the Force Field's sphere, the Reflective Shield's water.
+    fxdraw::spellFx() = e.hdSpellFx
+                            ? fxdraw::SpellFx{app.white, app.shaders->puff(), app.shaders->barrier(), app.shaders->ripple()}
+                            : fxdraw::SpellFx{};
 }
 
 /// Opens the Options window on the current settings (in a game the resolution stays).

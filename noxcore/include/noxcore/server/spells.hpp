@@ -40,6 +40,7 @@
 // (0xE7 / 0xE8).
 #pragma once
 
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/world.hpp"
 #include "noxcore/things/game_data.hpp"
 #include "noxcore/things/modifier.hpp"
@@ -64,6 +65,9 @@ struct Spells {
     /// The spell's own function called by itself (an item's effect: item_effects.hpp), not
     /// through spellAccept: no "can't" sound when it fails.
     bool direct = false;
+    /// (noxcpp) The price a player's cast paid while it runs (finishCast's): what a spell that
+    /// gives the caster its price back gives back (Cure Poison on itself unpoisoned).
+    std::optional<ModeHooks::CastPrice> paying;
 
     /// MSG_TRY_SPELL as the packet handler takes it (SrvNet_OnPacket): a lone hostile spell with
     /// a friend under the cursor (out of a quest) isn't begun at all; a lone spell that can't
@@ -114,6 +118,15 @@ struct Spells {
     /// player's only), in a trap (`trap`) Lightning, Chain Lightning and Mana Bomb their
     /// gamedata TrapCost, else the spell's.
     int manaCost(const ServerObject& caster, std::uint32_t spell, bool trap) const;
+    /// manaCost by whether the caster's a player (a summoning's price is a player's alone).
+    static int priceOf(const World& world, const things::ThingDb& things, std::uint32_t spell, bool player, bool trap);
+    /// (noxcpp) What it costs as paid: manaCost, or a mode's price (ModeHooks::castPrice: mana
+    /// and health) where the world has hooks. Whether `caster` can pay `price` (its health stays
+    /// at 1 or more), paying it, and having it back (a cast that did nothing).
+    ModeHooks::CastPrice castPrice(const ServerObject& caster, std::uint32_t spell, bool trap) const;
+    static bool canPay(const ServerObject& caster, const ModeHooks::CastPrice& price);
+    static void pay(ServerObject& caster, const ModeHooks::CastPrice& price);
+    static void refund(ServerObject& caster, const ModeHooks::CastPrice& price);
 
     /// A staff that casts used (WandCastUse, useWandCastSpell): not spent (a
     /// click), not within its wait (less twice its READINESS); its casting flag set, its spell at

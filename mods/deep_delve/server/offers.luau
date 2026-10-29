@@ -1,6 +1,7 @@
 --!strict
--- Offers (nox.choice) and their answers. A player has one offer open at a time: a newer one (the
--- town's waypoints, the open portals) replaces the older, whose answer then means nothing.
+-- Offers (nox.choice) and their answers: the open portals, when the town's portal pentagram has
+-- more than one to choose from (the waypoints have a window of their own). A player has one offer
+-- open at a time: a newer one replaces the older, whose answer then means nothing.
 
 local offers = {}
 

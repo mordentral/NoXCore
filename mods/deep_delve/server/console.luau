@@ -2,7 +2,8 @@
 -- The host's console commands ("dd ..."): what the game is doing, and a few levers for testing a
 -- build (the tests drive the mod through these too). Each returns its reply lines.
 --
---   dd status            the area, its map and monsters; each player's character
+--   dd status            the area (its act, its weather), its map and monsters; each player's
+--                        character
 --   dd spots             where the area's and the town's places are
 --   dd save              every character's record written now
 --   dd xp N              N experience to every character
@@ -11,14 +12,19 @@
 --   dd monster ID        a monster's tier, name and health
 --   dd ground            the items on the ground that spark (id, effect)
 --   dd go WHERE          the first player to: town, arrive, exit, guardian, boss, waypoint,
---                        wayArrive, portal, pad (the town's waypoints pentagram), wayIn, pack [N]
---   dd area N [HOW]      the game to area N of the act, arriving at its start (HOW "waypoint":
---                        beside its waypoint)
---   dd trial SEED N      area N of the act built now from game seed SEED (into a map never
---                        played); "ok", or why it was refused
+--                        wayArrive, portal, pad (the town's waypoints pentagram), wayIn, actGate
+--                        (a lair's gate spot), pack [N]
+--   dd area N [HOW]      the game to area N, arriving at its start (HOW "waypoint": beside its
+--                        waypoint). N: the area's number on through the acts (act 1's 1-7, act
+--                        2's from 8), or "A-N": area N of act A
+--   dd trial SEED N      area N (as dd area names it) built now from game seed SEED (into a map
+--                        never played); "ok", or why it was refused or what it lacks
+--   dd gate [take]       the lair's gate to the next act (its spot, open or shut, its swirl and
+--                        light); "take": the first player steps into it (the game on, or a vote)
 --   dd portal            the first player opens a town portal (as its UI's button does)
---   dd waypoint N        the first player to area N's waypoint (one it has found), as the town's
---                        waypoints pentagram sends it
+--   dd waypoint N        the first player to area N's waypoint of the act being played ("A-N":
+--                        of act A; one it has found), as a click in the town's waypoints window
+--                        sends it (wherever it stands)
 --   dd progress          the first player's record: its version, its act progress, boss kills
 --   dd boss              the boss of this map: id, type, health, name
 --   dd smite             the boss killed by the first player
@@ -36,17 +42,34 @@
 --                        alone, its stock "index type rarity price"
 --   dd tree [take ID... | respec | nodes [REGION]]   its passive tree; alone, its points and
 --                        the nodes taken
---   dd tree describe ID  a node's name and what it gives, as the tree window shows them (no
---                        player needed)
+--   dd tree refund [ID]  node ID given back alone (anywhere, for gold); alone, its price
+--                        and the nodes taken that may be given back ("leaves ...")
+--   dd tree describe ID [CLASS]   a node's name and what it gives, as the tree window shows
+--                        them (no player needed); with a class, the tooltip's "For you" line
+--   dd tree costs        the game's mana prices of the tree's spells (the cast-cost keystones' base)
 --   dd icons             each tree node's picture, "id kind icon": the mod's picture, or the
 --                        game's icon's name for a spell, ability or summon (no player needed)
 --   dd book             the spells, abilities and creatures its tree gives, and whether its
 --                        unit's book and field guide are exactly that ("server ok")
 --   dd sheet             its character sheet, "key value" lines
---   dd ui WINDOW         a window opened on its UI (stash, vendor: it's moved by the station)
+--   dd ui WINDOW [NAME]  a window opened on its UI (stash, vendor, waypoints: it's moved by the
+--                        station); "sheet NAME": party member NAME's sheet, as its card's click
+--   dd hits [clear]      the last hits cancelled (no damage within the party, no splash from a
+--                        hero's own Fireball): "why: target by source, weapon W, kind K, N
+--                        cancelled"; or the list emptied
+--   dd summons           the heroes' summoned creatures known (watched): "id type owner"
+--   dd team              the party's team ("team ID Party colour C score S", or "no team") and
+--                        each player on it or not ("NAME on", "NAME off")
 --   dd as NAME COMMAND   any command above as the player NAME instead of the first
 --   dd party             the party strip: "name class level health% mana% where alive|dead vote"
 --   dd scale             the party's size and its factors, and one monster's health (the lowest id)
+--   dd regen             its passive regeneration: "rates H M" (a second, the mod's), then its state:
+--                        running, waiting (health held after a hit), paused (dead or between
+--                        maps)
+--   dd packs             the packs the area was given: "packs N, monsters M, experience X" (and
+--                        the champion's group's), then each "index along size tier leader
+--                        experience rising" (along: how far along the route, 0-1; rising: its
+--                        monsters that rise again after death)
 --   dd exit              the first player steps on the area's exit (the game on, or a vote)
 --   dd vote [yes | no | cancel | seconds N]   answer the vote (as the first player), call it off,
 --                        or set its time; alone, the vote: its asker, where to, time, each answer
@@ -60,6 +83,8 @@
 
 local areas = require("areas")
 local boss = require("boss")
+local combat = require("combat")
+local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
 local labels = require("labels")
@@ -71,20 +96,25 @@ local scale = require("scale")
 local store = require("store")
 local votes = require("votes")
 local progress = require("progress")
+local regen = require("regen")
 local town = require("town")
 local waypoints = require("waypoints")
 local book = require("book")
 local sheet = require("sheet")
 local stash = require("stash")
+local summons = require("summons")
+local team = require("team")
 local tree = require("tree")
 local treeview = require("treeview")
 local vendor = require("vendor")
 local windows = require("windows")
+local acts = require("data/acts")
 local monsterData = require("data/monsters")
 local lootData = require("data/loot")
 local classes = require("data/classes")
 local treeData = require("data/tree")
 local vendorData = require("data/vendor")
+local numbers = require("data/numbers")
 
 local console = {}
 
@@ -118,11 +148,24 @@ end
 
 local commands: { [string]: (args: { string }) -> { string } } = {}
 
+-- An area named on the console: "N" (its place, numbered on through the acts: act 1's 1-7, act
+-- 2's from 8) or "A-N" (area N of act A); its place, or nil.
+local function placeNamed(text: string?): number?
+	if not text then
+		return nil
+	end
+	local a, n = string.match(text, "^(%d+)%-(%d+)$")
+	if a and n then
+		return areas.placeOf(tonumber(a) :: number, tonumber(n) :: number)
+	end
+	return tonumber(text)
+end
+
 function commands.status(_args: { string }): { string }
 	local s = areas.status()
 	local out = {
-		string.format("area %d (%s), level %d, map %s, %s; next: %s", s.index, s.title, s.level, s.map,
-			if s.entered then "entered" else "not entered", s.nextState),
+		string.format("area %d (%s), level %d, map %s, %s; next: %s; act %d, area %d of it, weather %s", s.place, s.title, s.level, s.map,
+			if s.entered then "entered" else "not entered", s.nextState, s.act, s.index, tostring(s.weather or "none")),
 		string.format("monsters alive: %d", monsters.count()),
 	}
 	for peer, h in hero.all() do
@@ -211,6 +254,8 @@ local function place(s: any, name: string): any
 		portal = t.portal,
 		pad = t.waypoints,
 		wayIn = t.wayIn,
+		-- (a lair's gate to the next act: its spot, whether or not it's open)
+		actGate = s.gate,
 	}
 	return byName[name]
 end
@@ -246,7 +291,7 @@ function commands.spots(_args: { string }): { string }
 	local out = {}
 	-- (one line a place: name, x, y, its thing's type or "-"; "none" for a place this area lacks)
 	local types: any = { portal = "TeleportPentagram", pad = "TeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram" }
-	for _, name in { "arrive", "back", "exit", "guardian", "boss", "waypoint", "wayArrive", "gate", "healer", "stash", "vendor", "portal", "pad", "wayIn" } do
+	for _, name in { "arrive", "back", "exit", "guardian", "boss", "waypoint", "wayArrive", "gate", "healer", "stash", "vendor", "portal", "pad", "wayIn", "actGate" } do
 		local p = place(s, name)
 		if p then
 			table.insert(out, string.format("%s %.1f %.1f %s", name, tonumber(p.x) or 0, tonumber(p.y) or 0, tostring(p.type or types[name] or "-")))
@@ -259,15 +304,63 @@ function commands.spots(_args: { string }): { string }
 end
 
 function commands.area(args: { string }): { string }
-	local n = tonumber(args[2]) or 0
+	local n = placeNamed(args[2]) or 0
 	local ok, why = areas.travel(n, if args[3] == "waypoint" then "waypoint" else "start")
 	return { if ok then "going to area " .. n else "not going: " .. tostring(why) }
 end
 
+-- "dd trial SEED N": the area built; "ok" when it built with every spot its kind needs (a waypoint
+-- area's waypoint, by the start chamber when its data says so; a lair's boss and, with an act
+-- after it, its gate spot; an area with a way on, its exit), else why.
 function commands.trial(args: { string }): { string }
-	local seed, index = tonumber(args[2]) or 1, tonumber(args[3]) or 1
-	local ok, why = areas.trial(index, seed)
-	return { if ok then "ok" else string.format("seed %d area %d: %s", seed, index, tostring(why)) }
+	local seed, place = tonumber(args[2]) or 1, placeNamed(args[3]) or 1
+	local ok, result = areas.trial(place, seed)
+	if not ok then
+		return { string.format("seed %d area %d: %s", seed, place, tostring(result)) }
+	end
+	local info = areas.info(place)
+	local s: any = result
+	local missing = nil
+	if info.waypoint and not s.waypoint then
+		missing = "waypoint"
+	elseif info.waypointAt == "start" and s.waypoint
+		and math.abs(s.waypoint.x - s.arrive.x) + math.abs(s.waypoint.y - s.arrive.y) > 8 * 23 then
+		missing = "waypoint by the start"
+	elseif info.lair and not s.boss then
+		missing = "boss"
+	elseif info.gate and not s.gate then
+		missing = "gate"
+	elseif not info.lair and not s.exit then
+		missing = "exit"
+	end
+	if missing then
+		return { string.format("seed %d area %d: no %s", seed, place, missing) }
+	end
+	return { "ok" }
+end
+
+-- "dd gate": the lair's gate to the next act: "gate act A at X Y open|shut swirl ID light ID", or
+-- "no gate" (not a lair with an act after it). "dd gate take": the first player steps into it (as
+-- standing in it does: the game on, or a vote).
+function commands.gate(args: { string }): { string }
+	local g = gate.state()
+	if not g then
+		return { "no gate" }
+	end
+	if args[2] == "take" then
+		local h = firstHero()
+		if not h then
+			return { "no player" }
+		end
+		if not g.open then
+			return { "not: shut" }
+		end
+		local ok, why = areas.gateTouched(h)
+		return { if ok then (if why == "vote" then "vote" else "going") else "not: " .. tostring(why) }
+	end
+	local open: string = if g.open then "open" else "shut"
+	local act: number, x: number, y: number = g.act, g.x, g.y
+	return { string.format("gate act %d at %.1f %.1f %s swirl %s light %s", act, x, y, open, tostring(g.swirl or "-"), tostring(g.light or "-")) }
 end
 
 function commands.portal(args: { string }): { string }
@@ -308,6 +401,33 @@ function commands.scale(_args: { string }): { string }
 		table.insert(out, "sample none")
 	end
 	table.insert(out, "packs " .. tostring(monsters.packsMade()))
+	return out
+end
+
+function commands.regen(_args: { string }): { string }
+	local h = firstHero()
+	if not h then
+		return { "no player" }
+	end
+	return regen.lines(h)
+end
+
+function commands.packs(_args: { string }): { string }
+	local list: { any } = monsters.packs()
+	local total, xp = 0, 0
+	local out: { string } = {}
+	for i = 1, #list do
+		local p = list[i]
+		total += p.size
+		xp += p.experience
+		table.insert(out, string.format("%d %.3f %d %s %s %d %d", i, p.along, p.size, tostring(p.tier), tostring(p.leader), p.experience, p.rising))
+	end
+	local g = monsters.guardians()
+	local head = string.format("packs %d, monsters %d, experience %d", #list, total, xp)
+	if g then
+		head ..= string.format("; champion's group %d, experience %d", g.size, g.experience)
+	end
+	table.insert(out, 1, head)
 	return out
 end
 
@@ -372,11 +492,16 @@ function commands.waypoint(args: { string }): { string }
 	if not h then
 		return { "no player" }
 	end
-	local n = tonumber(args[2]) or 0
-	if not progress.hasWaypoint(h.record, areas.current().act, n) then
+	-- ("N": area N of the act being played; "A-N": area N of act A)
+	local act, n = areas.current().act, tonumber(args[2]) or 0
+	local a, i = string.match(args[2] or "", "^(%d+)%-(%d+)$")
+	if a and i then
+		act, n = tonumber(a) :: number, tonumber(i) :: number
+	end
+	if not progress.hasWaypoint(h.record, act, n) then
 		return { "not found yet" }
 	end
-	local ok, why = waypoints.go(h, n)
+	local ok, why = waypoints.go(h, n, act)
 	return { if ok then "going" else "not going: " .. tostring(why) }
 end
 
@@ -400,7 +525,7 @@ function commands.progress(_args: { string }): { string }
 		end
 		local state: string = if p.cleared then "cleared" else "not cleared"
 		local found: string = if #list > 0 then table.concat(list, " ") else "none"
-		table.insert(out, key .. ": deepest " .. tostring(p.deepest) .. ", " .. state .. ", waypoints " .. found)
+		table.insert(out, key .. ": deepest " .. tostring(p.deepest) .. ", " .. state .. ", waypoints " .. found .. (if p.opened then ", open" else ", shut"))
 	end
 	local kills: { string } = {}
 	for act, n in r.world.bosses do
@@ -489,12 +614,38 @@ function commands.check(_args: { string }): { string }
 	for _, p in vendorData.potions do
 		thing(p.type, "vendor")
 	end
+	-- The acts: each act's boss in the bosses, each area's biome with a roster and its weather one
+	-- of the weathers (a known kind); the gate's swirl a thing.
+	local kinds = { rain = true, snow = true, storm = true, none = true }
+	for a, act in ipairs(acts) do
+		if not (monsterData.bosses :: any)[act.boss] then
+			table.insert(bad, "act " .. a .. ": no boss " .. tostring(act.boss))
+		end
+		for i, spec in act.areas do
+			local s: any = spec
+			local where = "act " .. tostring(a) .. " area " .. tostring(i)
+			if not (monsterData.rosters :: any)[s.biome] then
+				table.insert(bad, where .. ": no roster for " .. tostring(s.biome))
+			end
+			if s.weather ~= nil then
+				local w = (acts.weathers :: any)[s.weather]
+				if not w or not kinds[w.kind] then
+					table.insert(bad, where .. ": no weather " .. tostring(s.weather))
+				end
+			end
+		end
+	end
+	thing(acts.gate.swirl, "gate")
 	-- The missiles the tree's spells size (data/tree.luau's size).
 	for name in (treeData.rises :: any) do
 		local size = treeData.rise(name).size
 		if size then
 			thing(size.missile, "tree size " .. name)
 		end
+	end
+	-- The missiles whose hits on their own hero are cancelled (the Fireball's).
+	for name in (numbers.party.ownSpared :: any) do
+		thing(name, "own spared")
 	end
 	-- The tree's spells: each name the game's (nox.spellId; its record and sounds the same by name
 	-- and by that number), a spell of its region's class, in no linked group.
@@ -725,7 +876,26 @@ function commands.tree(args: { string }): { string }
 			return { "no such node" }
 		end
 		local name, what = tree.describe(n)
-		return { name, what }
+		-- (with a class: the tooltip's line for a hero of that class, when the node has one)
+		local forYou = if args[4] then tree.forClass(n, args[4]) else nil
+		return if forYou then { name, what, forYou } else { name, what }
+	elseif args[2] == "costs" then
+		-- The game's mana prices of the tree's spells and summonings (nox.spellInfo), "name price",
+		-- the ones the cast-cost keystones change.
+		local seen: { [string]: boolean } = {}
+		for name in (treeData.spellTitles :: any) do
+			seen[name] = true
+		end
+		for _, c in (treeData.creatures :: any) do
+			seen[c.spell] = true
+		end
+		local out = {}
+		for name in seen do
+			local info = nox.spellInfo(name)
+			table.insert(out, name .. " " .. (if info then tostring(info.manaCost) else "?"))
+		end
+		table.sort(out)
+		return out
 	end
 	local h = firstHero()
 	if not h then
@@ -741,6 +911,21 @@ function commands.tree(args: { string }): { string }
 		return out
 	elseif op == "respec" then
 		return reply(treeview.respec(h))
+	elseif op == "refund" then
+		if not args[3] then
+			-- (its price now, and each node taken that may be given back alone)
+			local ids = {}
+			for _, id in tree.of(h.record).nodes do
+				if tree.canRefund(h.record, id) then
+					table.insert(ids, tostring(id))
+				end
+			end
+			table.sort(ids, function(a, b)
+				return (tonumber(a) or 0) < (tonumber(b) or 0)
+			end)
+			return { "refund " .. tree.refundCost(h.record) .. " gold", "leaves " .. (if #ids > 0 then table.concat(ids, " ") else "none") }
+		end
+		return reply(treeview.refund(h, tonumber(args[3]) or 0))
 	elseif op == "nodes" then
 		local out = {}
 		for id = 1, tree.count() do
@@ -839,7 +1024,16 @@ function commands.ui(args: { string }): { string }
 		return { "no player" }
 	end
 	local name = args[2] or "sheet"
-	local spot = if name == "stash" then "stash" elseif name == "vendor" then "vendor" else nil
+	if name == "sheet" and args[3] then
+		-- (a party member's, as a click on its card asks for it)
+		for _, other in hero.all() do
+			if other.record.identity.name == args[3] then
+				return reply(sheet.show(h, other.peer), "not now")
+			end
+		end
+		return { "no player " .. args[3] }
+	end
+	local spot = if name == "stash" or name == "vendor" or name == "waypoints" then name else nil
 	if spot then
 		local at = town.spot(spot)
 		if at and nox.present(h.unit) then
@@ -848,18 +1042,39 @@ function commands.ui(args: { string }): { string }
 			nox.setPosition(h.unit, x, y)
 		end
 	end
+	if name == "sheet" then
+		return reply(sheet.show(h, nil), "not now")
+	end
 	return reply(windows.open(h, name), "no such window, or not now")
+end
+
+function commands.hits(args: { string }): { string }
+	if args[2] == "clear" then
+		combat.clear()
+		return { "cleared" }
+	end
+	local out = combat.lines()
+	return if #out > 0 then out else { "none" }
+end
+
+function commands.summons(_args: { string }): { string }
+	local out = summons.lines()
+	return if #out > 0 then out else { "none" }
+end
+
+function commands.team(_args: { string }): { string }
+	return team.lines(hero.all())
 end
 
 function commands.help(_args: { string }): { string }
 	return {
 		"dd status | spots | save | xp N | award N | loot RARITY [N] | ground | monster ID | check",
-		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|pack [N] | area N [waypoint] | portal | waypoint N",
-		"dd progress | boss | smite | trial SEED N",
+		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|actGate|pack [N] | area N|A-N [waypoint] | portal | waypoint N|A-N",
+		"dd progress | boss | smite | trial SEED N | gate [take]",
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L]",
-		"dd tree [take ID...|respec|nodes [REGION]|describe ID] | icons | book | sheet | ui stash|vendor|tree|sheet",
-		"dd as NAME COMMAND | party | scale | exit | vote [yes|no|cancel|seconds N] | labels | portals | portal take | hud",
-		"dd option [lootNames alt|always]",
+		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs] | icons | book | sheet | ui stash|vendor|waypoints|tree|sheet [NAME]",
+		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | portals | portal take | hud",
+		"dd option [lootNames alt|always] | hits [clear] | summons | team",
 	}
 end
 

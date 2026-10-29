@@ -71,6 +71,9 @@ ServerOptions::Callbacks serverOptionsCallbacks(App* app)
             g.setHostSwitches(s);
             return g.options().serverOptions; // (the flags themselves)
         });
+        if (hostedCampaign(*app)) {
+            return; // (a campaign's session: the files keep the normal games' settings)
+        }
         // (nox.cfg keeps them: its writer's server part)
         if (app->input) {
             auto c = app->input->config();
@@ -119,6 +122,9 @@ ServerOptions::Callbacks serverOptionsCallbacks(App* app)
             g.setAccessSettings(a);
             return g.options().maxPlayers;
         });
+        if (hostedCampaign(*app)) {
+            return; // (a campaign's session: nox.cfg keeps the normal games' limit and password)
+        }
         // (nox.cfg keeps the player limit and the sysop's password)
         if (app->input) {
             auto c = app->input->config();
@@ -167,6 +173,7 @@ ServerOptions::Callbacks serverOptionsCallbacks(App* app)
     serverCallbacks.deleteRuleSet = [inHost](const std::string& map, const std::string& name) {
         inHost([&](nox::server::GameHost& g) { g.deleteRuleSet(map, name); });
     };
+    serverCallbacks.campaign = [app] { return hostedCampaign(*app); };
     serverCallbacks.things = &app->things;
     serverCallbacks.bots = [app] { return localBotsView(*app); };
     serverCallbacks.setBots = [app](const std::array<int, 3>& wanted, int minTier, int maxTier) {
@@ -268,6 +275,7 @@ void makeGameWindows(App* app, const gui::Resources& res)
             app->serverOptions->toggle();
         }
     };
+    quitCallbacks.campaignHost = [app] { return app->live && hostedCampaign(*app).has_value(); };
     quitCallbacks.canVoteMap = [app] { return app->live && app->live->client().mapVote().available; };
     quitCallbacks.voteMap = [app] {
         if (app->live) {

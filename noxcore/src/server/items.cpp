@@ -241,7 +241,8 @@ bool Items::pickupFunction(ServerObject& player, ServerObject& item, bool everyo
         // the same (from the health's amount when both), poison cured (a player's); drunk, gone;
         // else no longer decaying and DefaultPickup. Sounds: 0x39D refused, 0x2F2 health, 0x2F3
         // mana, Cure Poison's on, 0x340 picked up.
-        if ((world.gameFlags & GameFlag::Network) && !world.quest() && player.player && !classMay(player, item)) {
+        // (noxcpp: a mode's pickupAnyClass takes any.)
+        if ((world.gameFlags & GameFlag::Network) && !world.quest() && player.player && !world.pickupAnyClass && !classMay(player, item)) {
             tellString(player, "pickup.c:ObjectEquipClassFail");
             playSound(world, 0x39D, player, 2, player.extent);
             return false;
@@ -324,7 +325,10 @@ bool Items::pickupFunction(ServerObject& player, ServerObject& item, bool everyo
             return o && o->type == item.type && (!(o->classes & kModifiable) || o->modifiers == item.modifiers);
         });
     };
-    if (item.pickup == "ArmorPickup" && !(world.gameFlags & (GameFlag::Solo | GameFlag::Quest)) && (world.serverOptions & 2u) && carriesSame()) {
+    // (noxcpp: a mode's pickupDuplicates lets a player have seconds.)
+    const bool seconds = world.pickupDuplicates && player.player;
+    if (item.pickup == "ArmorPickup" && !(world.gameFlags & (GameFlag::Solo | GameFlag::Quest)) && (world.serverOptions & 2u) && !seconds &&
+        carriesSame()) {
         // pickupArmor's first: under server option 2 no second of an armour it carries.
         tellString(player, "armor.c:CannotPickupDuplicateArmor");
         playSound(world, 0x39D, player, 2, player.extent);
@@ -350,7 +354,7 @@ bool Items::pickupFunction(ServerObject& player, ServerObject& item, bool everyo
         // subclass 0x82), nor a chakram (subclass 0x40) while one it owns is about:
         // "weapon.c:CannotPickupDuplicateWeapon", 0x39D to it alone (a creature: refused quietly).
         if (!(world.gameFlags & (GameFlag::Solo | GameFlag::Quest)) && (world.serverOptions & 2u)) {
-            bool duplicate = !(item.subclasses & 0x82u) && carriesSame();
+            bool duplicate = !(item.subclasses & 0x82u) && !seconds && carriesSame();
             if (!duplicate && (item.subclasses & 0x40u)) {
                 duplicate = std::ranges::any_of(world.objects(), [&](const auto& e) {
                     return e.second.owner == player.extent && (e.second.classes & oc::Weapon) && (e.second.subclasses & 0x40u);
@@ -366,8 +370,9 @@ bool Items::pickupFunction(ServerObject& player, ServerObject& item, bool everyo
             }
         }
     }
+    // (noxcpp: not with a mode's pickupAnyClass, for a player: carried, never worn.)
     if ((weaponPickup || item.pickup == "ArmorPickup") && !(world.gameFlags & (GameFlag::Solo | GameFlag::Quest)) &&
-        !classMay(player, item)) {
+        !(world.pickupAnyClass && player.player) && !classMay(player, item)) {
         tellString(player, weaponPickup ? "weapon.c:WeaponEquipClassFail" : "armor.c:ArmorEquipClassFail");
         playSound(world, 0x39D, player, 2, player.extent);
         return false;
@@ -587,14 +592,17 @@ void Items::put(ServerObject& player, ServerObject& item, bool everyone)
         return; // (a monster's: kept, not worn)
     }
     PlayerControl& p = *player.player;
+    // (noxcpp: with a mode's pickupAnyClass, what its class can't use is carried, not tried on:
+    // no refusal line at each pickup.)
+    const bool mayWear = !world.pickupAnyClass || classMay(player, item);
     if (item.classes & (oc::Weapon | oc::Wand)) {
         // (Not worn while its .plr is applied: Obj_WeaponPickup's.)
         const std::uint32_t bit = things::weaponBitOf(item.typeName);
         bool worn = false;
-        if (p.currentWeapon == 0 && !p.transfer && bit != 2) {
+        if (p.currentWeapon == 0 && !p.transfer && bit != 2 && mayWear) {
             worn = equipWeapon(player, item, everyone);
         }
-        if (bit == 2 && !p.transfer && (p.weaponEquip & 0xCu) && !(p.weaponEquip & 2u)) {
+        if (bit == 2 && !p.transfer && (p.weaponEquip & 0xCu) && !(p.weaponEquip & 2u) && mayWear) {
             worn = equipWeapon(player, item, everyone); // (a quiver for the bow or crossbow it holds)
         }
         // Not worn: its charges told all the same (worn, Obj_PlayerEquipWeapon told them), a
@@ -604,7 +612,7 @@ void Items::put(ServerObject& player, ServerObject& item, bool everyone)
                       ((item.classes & oc::Weapon) && (item.subclasses & 0x82u)))) {
             reportCharges(player, item);
         }
-    } else if (item.classes & oc::Armor && !p.transfer) {
+    } else if (item.classes & oc::Armor && !p.transfer && mayWear) {
         // ArmorPickup's end (pickupArmor; not while its .plr is applied): worn when
         // nothing of its kind is (armorHaveSameSubclass: worn, the same subclass),
         // or what is is the stock outfit's: sneakers, a plain wizard's robe, a plain wooden

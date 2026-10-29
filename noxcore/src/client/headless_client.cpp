@@ -205,6 +205,7 @@ void HeadlessClient::receiveLobby(std::span<const std::uint8_t> datagram)
     conn_.receiveLobby(datagram);
     if (conn_.state() == ClientConnection::State::PasswordRequired) {
         if (profile_.password.empty()) {
+            passwordAsked_ = true;
             stage_ = Stage::Failed;
             event(ClientEvent::Kind::Disconnected, "the server wants a password");
             return;

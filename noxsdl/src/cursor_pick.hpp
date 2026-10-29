@@ -15,7 +15,9 @@
 //            within 75 (Caution for what our class can't use), the far one beyond; a creature
 //            with something to say, the Talk hand within 125, a shopkeeper the Trade one (not in a
 //            dialog or a shop); a useable map object or a Mimic still a chest, the Use hand within
-//            75. While an inventory item is dragged an item gets none.
+//            75. While an inventory item is dragged an item gets none. Under a cinematic's
+//            widescreen (the letterbox bars) none at all: the arrow stays, so a click there
+//            talks, trades, picks up or uses nothing.
 #pragma once
 
 #include <cstdint>
@@ -102,6 +104,7 @@ struct Situation {
     bool busy = false;        ///< in a dialog or a shop
     bool dragging = false;    ///< an inventory item on the cursor
     bool canUse = true;       ///< our class may use the item (or a solo or quest game)
+    bool wideScreen = false;  ///< a cinematic's widescreen is on (cursorUpdate skips the world)
 };
 
 WorldCursor worldCursor(const Target& target, const Situation& situation);

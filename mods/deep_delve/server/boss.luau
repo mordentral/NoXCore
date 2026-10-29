@@ -9,11 +9,13 @@
 --   * its health shown on every player's UI (a bar under its name);
 --   * its death: a guaranteed better drop (rare gear above the area's level, and more rolls with
 --     better odds), the act marked cleared in every character's record (a passive point the first
---     time at a tier), and the vendor's stock rolled again.
+--     time at a tier; the next act opened), the vendor's stock rolled again, and the gate to the
+--     next act opened in the arena (gate.luau; none after the last act).
 
 local acts = require("data/acts")
 local data = require("data/monsters")
 local numbers = require("data/numbers")
+local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
 local loot = require("loot")
@@ -114,6 +116,8 @@ function boss.enter(spots: any, info: any)
 		return
 	end
 	monsters.info(id).boss = true
+	-- (never charmed: a charmed boss can't be hurt by the party, and the act would stall)
+	nox.setCharmable(id, false)
 	for _ = 1, def.guards do
 		monsters.spawn(def.adds[nox.random(#def.adds)], spots.boss.x, spots.boss.y, "magic", info.level)
 	end
@@ -147,10 +151,8 @@ function boss.killed(id: number, x: number, y: number)
 		if not progress.isCleared(h.record, c.info.act) then
 			tree.bossPoint(h.record)
 		end
+		-- (the next act opened with it, when there is one)
 		progress.cleared(h.record, c.info.act)
-		if h.record.world.act <= c.info.act and acts[c.info.act + 1] then
-			h.record.world.act = c.info.act + 1
-		end
 		hero.save(h, "act cleared")
 		hud.hero(h)
 		if nox.present(h.unit) then
@@ -162,6 +164,11 @@ function boss.killed(id: number, x: number, y: number)
 	-- (the vendor's stock rolled again, better)
 	vendor.restock(c.info.level + numbers.boss.drop.levelUp)
 	hud.boss({ kind = "boss", name = c.def.name, health = 0, most = 0 })
+	-- The gate to the next act, in the arena.
+	local nextAct: any = acts[c.info.act + 1]
+	if nextAct and gate.open() then
+		nox.textToAll("Deep Delve: a gate opens in the arena: the way to Act " .. tostring(c.info.act + 1) .. ", " .. tostring(nextAct.name) .. ".")
+	end
 end
 
 -- The boss now, for "dd boss": { id, name, type }, or nil.

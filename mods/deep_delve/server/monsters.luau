@@ -27,6 +27,12 @@ local known: { [number]: any } = {}
 local named: { number } = {}
 local nameTimer: number? = nil
 local packsMade = 0
+-- The packs the last area entered was given, in order (for "dd packs"): { along, size (its
+-- monsters, leader too), tier (its leader's), leader (its type), experience (its monsters' all
+-- told, for one player), rising (how many of them rise again after death) }.
+local packList: { any } = {}
+-- The end chamber's champion and its guards in the last area entered: { size, experience }, or nil.
+local guarded: any = nil
 local NEAR_PLAYERS: any = { players = true, alive = true }
 
 function monsters.info(id: number): any
@@ -63,13 +69,37 @@ monsters.present = present
 
 -- ---- Making them
 
-local function pickType(roster: any, level: number): string?
-	local list: { any }, total = {}, 0
+-- The types that rise again after their death (a roster entry's `rises`), as a set, built once.
+local risingTypes: { [string]: boolean } = {}
+for _, roster in (data.rosters :: any) do
 	for _, e in roster do
-		if e.from <= level then
-			table.insert(list, e)
-			total += e.weight
+		if e.rises then
+			risingTypes[e.type] = true
 		end
+	end
+end
+
+-- Whether a type rises again after its death (the rosters' `rises`).
+function monsters.rises(thingType: string): boolean
+	return risingTypes[thingType] == true
+end
+
+-- A type of the roster for an area (areas.info's: its level, and its index in its act for the
+-- entries that count from that), by weight; `noRising`: none that rises again after its death (a
+-- roster entry's `rises`); `lightOnly`: only light ones (`light`), when the roster has any there.
+local function pickType(roster: any, area: any, noRising: boolean?, lightOnly: boolean?): string?
+	local list: { any }, total = {}, 0
+	local function gather(light: boolean)
+		for _, e in roster do
+			if ((e.at and e.at <= area.index) or (e.from and e.from <= area.level)) and not (noRising and e.rises) and (not light or e.light) then
+				table.insert(list, e)
+				total += e.weight
+			end
+		end
+	end
+	gather(lightOnly == true)
+	if #list == 0 and lightOnly then
+		gather(false)
 	end
 	if #list == 0 then
 		return nil
@@ -111,7 +141,11 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	local base = nox.monsterInfo(thingType)
 	local o = nox.object(id)
 	local most = if o then o.maxHealth else (if base then base.health else 10)
-	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health + 0.5), 1, 65535)
+	-- (the opening's areas: their monsters weaker, numbers.areas.opening)
+	local opening: any = (a.opening :: any)[level]
+	local openHealth = if opening then opening.health else 1
+	local openDamage = if opening then opening.damage else 1
+	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health * openHealth + 0.5), 1, 65535)
 	local alone = health
 	local party = scale.factor("health")
 	if party ~= 1 then
@@ -124,7 +158,7 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 		tier = tierName,
 		level = level,
 		base = alone,
-		damage = tier.damage * (1 + a.damagePerLevel * (level - 1)),
+		damage = tier.damage * (1 + a.damagePerLevel * (level - 1)) * openDamage,
 		-- (monster.bin's experience is the stock game's, thousands a kill: scaled to Deep Delve's
 		-- own curve, at least 1)
 		experience = math.max(1, math.floor((if base then base.experience * a.experienceScale else 10) * tier.experience
@@ -177,10 +211,32 @@ monsters.spawn = spawn
 
 -- An area's monsters at the generator's spots: a pack at each (a leader of the pack's tier and
 -- its followers), the champion and its guards in the end chamber (a lair has no champion's spot:
--- its boss is boss.luau's). `area`: { biome, level }.
+-- its boss is boss.luau's). `area`: areas.info's ({ biome, level, index }).
 function monsters.populate(spots: any, area: any)
 	local roster = (data.rosters :: any)[area.biome] or data.rosters.Crypt
+	-- The opening's numbers at this level (numbers.areas.opening): smaller packs, the first stretch
+	-- of the route quieter still.
+	local opening: any = if area.lair then nil else (numbers.areas.opening :: any)[area.level]
 	local f = numbers.areas.followers
+	if opening then
+		f = { fewest = opening.followers[1], most = opening.followers[2] }
+	end
+	-- Where nothing that rises again may stand (data/monsters.luau's rising): the rooms players
+	-- arrive in (the start, a waypoint's arrival), and the route's first stretch in the first areas.
+	local rising = data.rising
+	local clearUntil: number = (rising.clearUntil :: any)[area.level] or 0
+	local arrivals = { spots.arrive, spots.wayArrive }
+	local function noRising(spot: any): boolean
+		if (tonumber(spot.along) or 0) < clearUntil then
+			return true
+		end
+		for _, p in arrivals do
+			if p and math.abs(p.x - spot.x) + math.abs(p.y - spot.y) <= rising.arrivalReach then
+				return true
+			end
+		end
+		return false
+	end
 	-- (a party: extra packs at spots drawn from the generator's, beside the pack there)
 	local at: { any } = table.clone(spots.packs or {})
 	local extra = math.floor(#at * (scale.factor("packs") - 1) + 0.5)
@@ -191,25 +247,55 @@ function monsters.populate(spots: any, area: any)
 		end
 	end
 	packsMade = #at
+	table.clear(packList)
 	for _, spot in at do
-		local leaderType = pickType(roster, area.level)
+		local plain = noRising(spot)
+		-- (the opening's first stretch: light monsters only, numbers.areas.opening's `light`)
+		local light = opening ~= nil and (tonumber(spot.along) or 0) < (opening.light or 0)
+		local leaderType = pickType(roster, area, plain, light)
 		if leaderType then
-			local tier = rollTier(area.level)
-			spawn(leaderType, spot.x, spot.y, tier, area.level)
-			-- Followers: the leader's kind or another of the roster's; a rare leader's are magic.
-			for _ = 1, nox.random(f.fewest, f.most) do
-				local t = if nox.random() < 0.5 then leaderType else (pickType(roster, area.level) or leaderType)
-				spawn(t, spot.x, spot.y, if tier == "rare" then "magic" else "normal", area.level)
+			local along = tonumber(spot.along) or 0
+			-- (the opening's quiet stretch: a normal leader and its fewest followers)
+			local quiet = opening ~= nil and along < opening.quiet
+			local tier = if quiet then "normal" else rollTier(area.level)
+			local followers = if quiet then f.fewest else nox.random(f.fewest, f.most)
+			local pack = { along = along, size = 0, tier = tier, leader = leaderType, experience = 0, rising = 0 }
+			local function made(id: number?)
+				local e = id and known[id]
+				if e then
+					pack.size += 1
+					pack.experience += e.experience
+					if risingTypes[e.type] then
+						pack.rising += 1
+					end
+				end
 			end
+			made(spawn(leaderType, spot.x, spot.y, tier, area.level))
+			-- Followers: the leader's kind or another of the roster's; a rare leader's are magic.
+			for _ = 1, followers do
+				local t = if nox.random() < 0.5 then leaderType else (pickType(roster, area, plain, light) or leaderType)
+				made(spawn(t, spot.x, spot.y, if tier == "rare" then "magic" else "normal", area.level))
+			end
+			table.insert(packList, pack)
 		end
 	end
 	local champ = (data.champions :: any)[area.biome]
+	guarded = nil
 	if champ and spots.guardian then
 		local g = spots.guardian
-		spawn(champ.type, g.x, g.y, "champion", area.level, champ)
-		for _ = 1, champ.guards do
-			spawn(pickType(roster, area.level) or champ.type, g.x, g.y, "magic", area.level)
+		local group = { size = 0, experience = 0 }
+		local function made(id: number?)
+			local e = id and known[id]
+			if e then
+				group.size += 1
+				group.experience += e.experience
+			end
 		end
+		made(spawn(champ.type, g.x, g.y, "champion", area.level, champ))
+		for _ = 1, if opening and opening.guards then opening.guards else champ.guards do
+			made(spawn(pickType(roster, area) or champ.type, g.x, g.y, "magic", area.level))
+		end
+		guarded = group
 	end
 	-- The named ones' names again now and then while a player is near (one timer for all of
 	-- them; a client shows a far one's words at the edge of its screen).
@@ -235,6 +321,12 @@ function monsters.killed(id: number): any
 	local e = known[id]
 	known[id] = nil
 	return e
+end
+
+-- A monster that's no longer the mod's (a hero charmed it: summons.luau): forgotten, so its death
+-- gives no experience or loot and the party's size no longer scales it; its entry, or nil.
+function monsters.forget(id: number): any
+	return monsters.killed(id)
 end
 
 -- The damage multiplier of a monster dealing a hit (1 for anything the mod didn't make), the
@@ -297,6 +389,17 @@ end
 -- How many packs the last area entered was given (its spots' and a party's extra).
 function monsters.packsMade(): number
 	return packsMade
+end
+
+-- The packs the last area entered was given, in order (each { along, size, tier, leader,
+-- experience }).
+function monsters.packs(): { any }
+	return packList
+end
+
+-- The champion's group in the last area entered ({ size, experience }), or nil.
+function monsters.guardians(): any
+	return guarded
 end
 
 -- A new map: the old monsters are gone with it.

@@ -34,6 +34,22 @@
 // BotSquad, joined to us over the loopback): how many of each class, - and +, at once; the
 // difficulty, from one to another (Easy to Hard, Hard to Hard...; each round on a click:
 // each bot gets a level in it); those in the game, kept up; All Leave.
+//
+// (noxcpp) In a campaign mode's game we host for guests (Callbacks::campaign: the co-op campaign,
+// a solo game opened from the in-game menu's Gameplay Controls) only what applies to it can be
+// changed; the rest is shown greyed (not clickable, drawn dimmed: gui::setGreyed), and the hint over
+// the maps says what to do here:
+//   live     the name (as the field's left: what the game lists show, XWIS and the LAN), the
+//            Access page (the player limit, the campaign's room at most; closed and its allowed
+//            list; private and its password; the ping limits; limit the resolution; the sysop's
+//            password; kick and ban), the General page's update rate. OK in Go's place closes it.
+//   greyed   the game type and "Form a new game", the map list (the campaign's map alone in it),
+//            the limits and Defaults, Advanced... (rule sets, spells, weapons, armour), the team
+//            options, the Teams page, the classes refused (the campaign's class is the only one let
+//            in), the General page's force respawn, message of the day, map cycle, items
+//            respawning, camper alarm and map vote, the Bots tab.
+// It writes no settings slot (no MSG_UPDATE_GUI_GAME_SETTINGS) and loads no map; nox.cfg and
+// noxcore.cfg keep the normal games' settings (game_windows.cpp).
 #pragma once
 
 #include "gui.hpp"
@@ -125,6 +141,9 @@ public:
         std::function<void()> windowClosed;
         std::function<void(const SettingsEdit&)> editSettings;
         std::function<void(const SettingsWindow&)> windowGo;
+        /// (noxcpp) The game we host is a campaign mode's for guests: its name ("Co-op Campaign"),
+        /// asked as the window opens; none (or empty): a network game's window, as always.
+        std::function<std::optional<std::string>()> campaign;
     };
 
     ServerOptions(gui::Resources res, std::filesystem::path windowDir, Callbacks callbacks);
@@ -133,6 +152,11 @@ public:
     /// guiServerOptsLoad: opens it, or (open) closes it.
     void toggle();
     void close();
+    /// (Tests: --server-options-page) A page shown as its tab's click would: 0 Game, 1 General,
+    /// 2 Access, 3 Teams, 4 Bots.
+    void showPageForTest(int page);
+    /// Opened for a campaign mode's game (Callbacks::campaign): its name.
+    const std::optional<std::string>& campaign() const { return campaign_; }
 
     void update(std::uint64_t nowMs)
     {
@@ -150,7 +174,7 @@ public:
             teamsAt_ = nowMs;
             fillAccessLists();
         }
-        if (window_ && callbacks_.windowState) { // (what the exe's reading would give now)
+        if (window_ && callbacks_.windowState && !campaign_) { // (what the exe's reading would give now)
             callbacks_.windowState(windowState());
         }
     }
@@ -231,6 +255,11 @@ private:
     /// The map list's chosen line's first word (strtok on a tab), empty with none chosen.
     std::string chosenMapWord() const;
     void closeNotice();
+    /// (noxcpp) A campaign's window: what doesn't apply to it greyed again (after each fill that
+    /// sets what's usable); the Server tab's part in server_options_server.cpp.
+    void greyForCampaign();
+    void greyServerForCampaign();
+    std::optional<std::string> campaign_; ///< (Callbacks::campaign as it opened)
     gui::Window* advanced_ = nullptr;
     gui::Window* notice_ = nullptr;
     int advancedPage_ = 0;

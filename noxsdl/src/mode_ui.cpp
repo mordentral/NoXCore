@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include "local_host.hpp"
 
+#include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/script_ui.hpp"
 
 #include <algorithm>
@@ -101,6 +102,19 @@ void endSoloScreensHost(App& app)
     if (!app.modeKeptRoot.empty()) {
         app.saveRoot = std::exchange(app.modeKeptRoot, {});
     }
+}
+
+std::optional<std::string> hostedCampaign(const App& app)
+{
+    if (!app.host || app.host->modeId().empty()) {
+        return std::nullopt;
+    }
+    const ModeUiEntry* e = modeUiEntry(app.host->modeId());
+    if (!e || !e->soloScreens) {
+        return std::nullopt;
+    }
+    const nox::modes::Mode* mode = nox::modes::registry().find(app.host->modeId());
+    return mode ? mode->info.name : app.host->modeId();
 }
 
 } // namespace noxsdl

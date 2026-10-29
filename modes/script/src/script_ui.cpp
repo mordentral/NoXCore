@@ -21,7 +21,9 @@
 #include <chrono>
 #include <cmath>
 #include <deque>
+#include <iterator>
 #include <map>
+#include <string_view>
 #include <utility>
 
 namespace nox::modes::script {
@@ -109,6 +111,15 @@ struct ScriptUiClient::Impl {
     std::vector<UiSound> sounds;
     // API 3's.
     bool hudShown = true;
+    /// The view's margins past the 640 x 480 (setViewMargins), in whole units: what an anchored
+    /// window is moved by.
+    int marginX = 0, marginY = 0;
+    /// `w` at its place: nox.window's, moved to its anchor's edges.
+    void anchor(UiWindow& w) const
+    {
+        w.x = w.specX + w.anchorX * marginX;
+        w.y = w.specY + w.anchorY * marginY;
+    }
     std::vector<UiTooltipLine> tooltip; ///< (this frame's, or the last one's when a frame ran out of time first)
     bool tooltipSet = false;            ///< (nox.tooltip called in this frame)
     std::vector<UiLabel> labels;
@@ -421,6 +432,22 @@ int uiWindow(lua_State* L)
         w.frame = flag("frame", true);
         w.clickThrough = flag("clickThrough", false);
         w.hud = flag("hud", false);
+        lua_getfield(L, 2, "anchor");
+        if (!lua_isnil(L, -1)) {
+            const char* a = lua_isstring(L, -1) ? lua_tostring(L, -1) : "";
+            struct Anchor {
+                std::string_view name;
+                std::int8_t x, y;
+            };
+            static constexpr Anchor kAnchors[] = {{"center", 0, 0},  {"topleft", -1, -1}, {"top", 0, -1},       {"topright", 1, -1}, {"left", -1, 0},
+                                                  {"right", 1, 0},   {"bottomleft", -1, 1}, {"bottom", 0, 1}, {"bottomright", 1, 1}};
+            const auto found = std::ranges::find(kAnchors, std::string_view(a), &Anchor::name);
+            luaL_argcheck(L, found != std::end(kAnchors), 2,
+                          "anchor is \"center\", \"topleft\", \"top\", \"topright\", \"left\", \"right\", \"bottomleft\", \"bottom\" or \"bottomright\"");
+            w.anchorX = found->x;
+            w.anchorY = found->y;
+        }
+        lua_pop(L, 1);
     }
     if (w.frame) {
         // (On the screen whole, and no smaller than its frame's title needs.)
@@ -435,6 +462,9 @@ int uiWindow(lua_State* L)
         w.x = std::clamp(field("x", 20), 0, 640 - w.w);
         w.y = std::clamp(field("y", 40), 0, 480 - w.h);
     }
+    w.specX = w.x;
+    w.specY = w.y;
+    impl.anchor(w);
     const auto it = std::ranges::find(impl.windows, w.id, &UiWindow::id);
     if (it != impl.windows.end()) {
         it->title = w.title;
@@ -445,6 +475,10 @@ int uiWindow(lua_State* L)
         it->frame = w.frame;
         it->clickThrough = w.clickThrough;
         it->hud = w.hud;
+        it->anchorX = w.anchorX;
+        it->anchorY = w.anchorY;
+        it->specX = w.specX;
+        it->specY = w.specY;
     } else {
         luaL_argcheck(L, static_cast<int>(impl.windows.size()) < kMaxWindows, 1, "at most 8 windows");
         impl.windows.push_back(std::move(w));
@@ -1538,6 +1572,21 @@ bool ScriptUiClient::hudShown() const noexcept
     return impl_->hudShown;
 }
 
+void ScriptUiClient::setViewMargins(float x, float y)
+{
+    // (Whole units: a window's place is; at most half a unit off at the view's edge.)
+    const auto whole = [](float v) { return v > 0 && v < 100000 ? static_cast<int>(std::lround(v)) : 0; };
+    const int mx = whole(x), my = whole(y);
+    if (mx == impl_->marginX && my == impl_->marginY) {
+        return;
+    }
+    impl_->marginX = mx;
+    impl_->marginY = my;
+    for (UiWindow& w : impl_->windows) {
+        impl_->anchor(w);
+    }
+}
+
 const std::vector<UiTooltipLine>& ScriptUiClient::tooltip() const noexcept
 {
     return impl_->tooltip;
@@ -1607,9 +1656,8 @@ bool windowTakes(const UiWindow& w, float x, float y)
     return std::ranges::any_of(w.hitAreas, [&](const UiRect& r) { return inside(wx + r.x, wy + r.y, r.w, r.h); });
 }
 
-std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h)
+std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float h, float marginX, float marginY)
 {
-    constexpr float kScreenW = 640, kScreenH = 480;
     if (!(mouseX == mouseX) || !(mouseY == mouseY)) {
         mouseX = mouseY = 0; // (NaN)
     }
@@ -1619,15 +1667,22 @@ std::pair<float, float> placeTooltip(float mouseX, float mouseY, float w, float 
     if (!(h > 0)) {
         h = 0;
     }
+    if (!(marginX > 0)) {
+        marginX = 0;
+    }
+    if (!(marginY > 0)) {
+        marginY = 0;
+    }
+    const float left = -marginX, top = -marginY, right = 640 + marginX, bottom = 480 + marginY;
     float x = mouseX + 12; // (clear of the pointer's arrow)
     float y = mouseY + 16;
-    if (x + w > kScreenW) {
+    if (x + w > right) {
         x = mouseX - 4 - w;
     }
-    if (y + h > kScreenH) {
+    if (y + h > bottom) {
         y = mouseY - 4 - h;
     }
-    return {std::clamp(x, 0.0f, std::max(0.0f, kScreenW - w)), std::clamp(y, 0.0f, std::max(0.0f, kScreenH - h))};
+    return {std::clamp(x, left, std::max(left, right - w)), std::clamp(y, top, std::max(top, bottom - h))};
 }
 
 bool ScriptUiClient::running() const noexcept

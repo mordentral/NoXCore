@@ -11,16 +11,24 @@
 --
 -- Two kinds of area take more:
 --   * a waypoint area: a teleport pentagram in a side room off the route (else half way along
---     it), lit, that sends whoever stands on it to the town's receiving pentagram;
+--     it; an act's first area: by its start chamber), lit, that sends whoever stands on it to the
+--     town's receiving pentagram;
 --   * the act's lair (its last area): no exit on; its end chamber is the boss's arena, braziers
---     and red light round its floor, the boss's spot in its middle.
+--     and red light round its floor, the boss's spot in its middle, and (with an act after it)
+--     the spot at the arena's back where the boss's death opens the gate on, its light written
+--     there.
+--
+-- An outdoor biome (grass, marsh: the built-in biomes' Open and Natural styles, their hedge,
+-- root or field-stone walls and blended floors) is built the same way: the game's outdoor maps
+-- are walled by their foliage and stones too.
 --
 -- params: biome (a built-in biome's name), corridor, segments, endRadius, packs (how many),
--- townFloor (a floor's name), waypoint (true: one here), lair (true: the act's lair), seed.
+-- townFloor (a floor's name), waypoint (true: one here), waypointAt ("start": by the start
+-- chamber), lair (true: the act's lair), gate (true: a lair's gate spot), seed.
 -- Returns the spots (world points), all plain numbers:
 --   { arrive, back (with its arch's type), exit (too; none in a lair), guardian (none in a lair),
---     boss (a lair's), waypoint and wayArrive (a waypoint area's: the pentagram, and where
---     travellers to it arrive), packs = { {x, y}... },
+--     boss (a lair's), gate (a lair's with an act after it), waypoint and wayArrive (a waypoint
+--     area's: the pentagram, and where travellers to it arrive), packs = { {x, y}... },
 --     town = { centre, healer, gate (with its type), stash, vendor, portal, waypoints, wayIn } }
 
 local util = require("util")
@@ -168,6 +176,24 @@ function area.build(p, w)
 			end
 		end
 		lights.put(w, "arena", spots.boss.x, spots.boss.y)
+		-- The gate's spot (a lair with an act after it): at the arena's back, away from its way
+		-- in, clear of the boss. Nothing stands there until the boss dies (the server makes the
+		-- gate then); only its light is written, which the server keeps off till then.
+		if p.gate then
+			local sx, sy = util.xy(start)
+			local dx, dy = fx - sx, fy - sy
+			local len = math.max(1, math.abs(dx), math.abs(dy))
+			local reach = math.max(3, lay.finish.radius - 4)
+			local back = util.cell(fx + util.idiv(dx * reach, len), fy + util.idiv(dy * reach, len))
+			local gc = gen.freeCell(rng, roomy, used, start, 10, back, 3, 200)
+				or gen.freeCell(rng, roomy, used, start, 10, finish, lay.finish.radius - 1, 400)
+			if not gc then
+				gen.refuse("deep_delve: no floor for the gate")
+			end
+			spots.gate = point(gc)
+			used:addSquare(gc, 2)
+			lights.put(w, "gate", spots.gate.x, spots.gate.y)
+		end
 	else
 		-- The champion in the end chamber's middle.
 		spots.guardian = point(finish)
@@ -188,6 +214,12 @@ function area.build(p, w)
 		-- (each place tried with room beside it for the arrivals: the side room, the route's
 		-- middle, anywhere)
 		local tries = {}
+		if p.waypointAt == "start" then
+			-- (an act's first area: by the start chamber, five cells from its middle at most, else
+			-- eight)
+			table.insert(tries, { start, 5, 400 })
+			table.insert(tries, { start, 8, 400 })
+		end
 		if best then
 			table.insert(tries, { centre(best), 2, 200 })
 		end
@@ -195,7 +227,8 @@ function area.build(p, w)
 		table.insert(tries, { mid, 30, 400 })
 		local wc, ac = nil, nil
 		for _, t in tries do
-			wc = gen.freeCell(rng, roomy, used, start, 10, t[1], t[2], t[3])
+			-- (at least 10 cells from the start; 3 for one by the start chamber)
+			wc = gen.freeCell(rng, roomy, used, start, if t[1] == start then 3 else 10, t[1], t[2], t[3])
 			if wc then
 				local around = used:clone()
 				around:addSquare(wc, 2)
@@ -219,7 +252,22 @@ function area.build(p, w)
 		spots.wayArrive = point(ac)
 	end
 	-- The packs: a quarter in the side rooms, the rest along the route past its first fifth; each
-	-- at least ten cells from the start, kept apart.
+	-- at least ten cells from the start, kept apart. `ramp` (0 or more) thins them out near the
+	-- start: a route pack's place along the way is drawn with a density rising as (place) ^ ramp,
+	-- 0 even all along. Each pack's spot says how far along the route it lies (`along`, 0 the
+	-- start, 1 the end: the share of the route to the route cell nearest it), so the server can make
+	-- the first ones smaller.
+	local ramp = math.max(0, tonumber(p.ramp) or 0)
+	local function alongOf(c: number): number
+		local best, bestD = 1, math.huge
+		for k, pc in path do
+			local d = util.manhattan(pc, c)
+			if d < bestD then
+				best, bestD = k, d
+			end
+		end
+		return (best - 1) / math.max(1, #path - 1)
+	end
 	spots.packs = {}
 	for i = 1, p.packs do
 		local c = nil
@@ -229,14 +277,21 @@ function area.build(p, w)
 		end
 		if not c and #path > 8 then
 			local from = #path // 5
-			local along = path[from + rng:next() % (#path - from) + 1]
-			c = gen.freeCell(rng, roomy, used, start, 10, along, 6, 400)
+			local span = #path - from
+			local k = rng:next() % span
+			if ramp > 0 then
+				-- (the same draw, its share of the way bent toward the end)
+				k = math.min(span - 1, math.floor(span * ((k + 0.5) / span) ^ (1 / (1 + ramp))))
+			end
+			c = gen.freeCell(rng, roomy, used, start, 10, path[from + k + 1], 6, 400)
 		end
 		if not c then
 			c = gen.freeCell(rng, roomy, used, start, 10, nil, 0, 400)
 		end
 		if c then
-			table.insert(spots.packs, point(c))
+			local at: any = point(c)
+			at.along = alongOf(c)
+			table.insert(spots.packs, at)
 			used:addSquare(c, 4)
 		end
 	end

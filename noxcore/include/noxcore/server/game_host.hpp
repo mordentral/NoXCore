@@ -310,6 +310,11 @@ public:
         const strings::StringTable* strings = nullptr;
         /// Gameplay switches (4 team play...) and each mode's limits (Server::Options').
         std::uint32_t gameplayFlags = 0;
+        /// noxcpp (a mode's: mode.json's "gameplay"): the gameplay flags of 1 team damage, 2
+        /// auto-assign and 4 team play that stay as `gameplayFlags` has them for the game. The
+        /// host's team options refuse a change to them (setUseTeams, setAutoAssign, setTeamDamage),
+        /// and with 4 pinned also Shuffle and a CTF or Flag Ball choice's teams. 0: none, as before.
+        std::uint32_t gameplayPinned = 0;
         std::array<std::uint16_t, 6> lessonLimits{};
         std::array<std::uint8_t, 6> timeLimits{};
         /// The server options (Server::Options'; MSG_GAME_SETTINGS +13): 2 weapons respawn.
@@ -380,6 +385,11 @@ public:
         /// noxcpp: a mode that plays as a stock one and keeps its limits itself: lessonLimits and
         /// timeLimits told to clients, not acted on by the game's checks (World::modeOwnsLimits).
         bool modeOwnsLimits = false;
+        /// noxcpp (a mode's: mode.json's "pickup"): players pick up what their class can't use
+        /// (never wearing it), and seconds under server option 2 (World::pickupAnyClass,
+        /// World::pickupDuplicates).
+        bool pickupAnyClass = false;
+        bool pickupDuplicates = false;
         /// The game's own float rounding (towards zero, as its x87 chops) for the server's figuring;
         /// off: to nearest (VD-37). Server::Options::exactMaths.
         bool exactMaths = true;
@@ -614,6 +624,9 @@ public:
         bool autoAssign = false;
         bool teamDamage = false;
         bool chat = false; ///< a chat game (0x80)
+        /// (noxcpp) Those of the three flags a mode pinned (Options::gameplayPinned): shown, not
+        /// changeable.
+        std::uint32_t pinned = 0;
         struct Team {
             std::uint8_t id = 0;
             std::string name;
@@ -630,7 +643,8 @@ public:
     TeamsView teamsView();
     /// The Server tab's Access page (access.wnd, windowAccessProc; the host's access
     /// settings): closed (only the allowed list joins), private (the password asked
-    /// for, 9 letters), the player limit (1-32, Game_SetMaxPlayers), the ping limits (none:
+    /// for, 9 letters), the player limit (1-32, Game_SetMaxPlayers; noxcpp: a solo game with
+    /// guests' at most its host and Options::soloGuests, the lobby's limit with it), the ping limits (none:
     /// nullopt), limit the resolution (the game list's video flag 0x80), the classes refused
     /// (1 warrior, 2 wizard, 4 conjurer), the sysop password; the allowed names. The lobby's checks
     /// follow (ServerTransport::Access).
@@ -677,7 +691,8 @@ public:
     /// The Game page's team options (ServOpts.c 0x285A-0x285D): Use Teams (on: createFlagTeams, then
     /// the players shared out with auto-assign, else the team flags on; off: the flags off and
     /// every team gone), Auto-Assign (on: the flags off, off: the flags on), Team
-    /// Damage (gameplay flag 1), Shuffle (the players shared out anew).
+    /// Damage (gameplay flag 1), Shuffle (the players shared out anew). (noxcpp: each refused, nothing
+    /// done, for a flag a mode pinned: Options::gameplayPinned.)
     void setUseTeams(bool on);
     void setAutoAssign(bool on);
     void setTeamDamage(bool on);

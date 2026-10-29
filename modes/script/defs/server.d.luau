@@ -25,7 +25,7 @@ type NoxUnitFilter = { monsters: boolean?, players: boolean?, alive: boolean?, n
 type NoxAttack = { damage: number?, type: number?, range: number?, area: boolean?, sides: number?, x: number?, y: number? }
 type NoxMark = { frame: number, n: number, last: number }
 type NoxMonsterInfo = { experience: number, health: number, questHealth: number, speed: number }
-type NoxSpellInfo = { flags: number, onceOnly: boolean }
+type NoxSpellInfo = { flags: number, onceOnly: boolean, manaCost: number, trapCost: number }
 type NoxTeam = { id: number, name: string, score: number, colour: number, players: number }
 type NoxStream = { next: (self: NoxStream) -> number }
 
@@ -132,8 +132,10 @@ declare nox: {
     newMark: () -> NoxMark,
     --- The ids of the things made since a mark (nox.newMark's), oldest first.
     madeSince: (mark: NoxMark) -> { number },
-    --- A spell's thing.bin record as { flags, onceOnly }; nil when none.
+    --- A spell's thing.bin record as { flags, onceOnly, manaCost, trapCost } (a player's prices as the game has them); nil when none.
     spellInfo: (spell: string | number) -> NoxSpellInfo?,
+    --- false: Charm refuses the creature as one not charmable (a charm on it now ends uncontrolled); true or nil: as the game has it.
+    setCharmable: (id: number, charmable: boolean?) -> (),
     --- An enchantment's frames left on a thing (0: on for good, or not on).
     enchantTime: (id: number, enchantment: string | number) -> number,
     --- A gamedata.bin number as this game reads it (index from 0); nil for a name it hasn't.
@@ -271,6 +273,8 @@ declare nox: {
     joinTeam: (id: number, team: number) -> (),
     --- Removes a team, its members left with none, every client told.
     removeTeam: (team: number) -> (),
+    --- The host's team options as they stand (gameplay flags 1, 2, 4); mode.json's "gameplay" pins them.
+    gameplay: () -> { teamDamage: boolean, autoAssign: boolean, teamPlay: boolean },
     --- Plays a sound (its number 0-1023 or name) at a point, from no thing.
     soundAt: (x: number, y: number, sound: string | number) -> (),
     --- # Streams and maths
@@ -404,4 +408,5 @@ declare function require(name: string): any
 --- @hook onEquip(unit, item, worn) | A watched item was put on (true) or taken off.
 --- @hook onSpellCast(caster, spell, target, x, y, made) | A spell was cast (its name; target nil: none; made: what was made while it went off, its missiles or creature and anything its kills made at once, not what comes on later frames, oldest first, nil: none; normally heard before its missiles first fly, but after a host stall they may have flown a frame at their type's size).
 --- @hook onExit(exit, player) | A player touched an exit: return false to hold them; changes nothing in the world.
+--- @hook castCost(caster, spell, cost, how) | A player's spell's price before it's paid (cost: the game's mana; how "cast", or "trap": into a glyph's trap, at its check and as it's paid): return mana, health (health a plain loss, never to below 1; short of either: refused, as short of mana; given back where the game gives a cast's price back) or nil for the game's; changes nothing in the world.
 --- @hook onGenerated(tag, ok, result) | A map nox.generate built ahead is written (ok), or failed (result: why).

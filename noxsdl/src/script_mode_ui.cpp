@@ -1,6 +1,7 @@
 // The script modes' UI in noxcore.exe (mode_ui.hpp's ModeUi for modes/script's ScriptUiClient): the
 // windows a server's UI script declares, each framed and labelled as the server's, its draws
-// clipped inside it. The UI's 640 x 480 units are scaled to fit the game view, centred. A click
+// clipped inside it. The UI's 640 x 480 units are scaled to fit the game view, centred (an
+// anchored window kept to its edge of the whole view: ScriptUiClient::setViewMargins). A click
 // inside a window goes to the UI (and never to the game); the rest of the screen is the game's.
 // A UI of API 2 also draws the mod's pictures (textures made as they're first drawn, let go when
 // the set changes or the game goes) and thing types' pictures from our own art, plays sounds, is
@@ -328,6 +329,7 @@ private:
         stepFrame_ = app.frames;
         mouseScreen_ = hud.mouse;
         place(hud);
+        ui_->setViewMargins(originX_ / scale_, originY_ / scale_); // (the anchored windows' edges)
         mouse_ = {(hud.mouse.x - originX_) / scale_, (hud.mouse.y - originY_) / scale_};
         ui_->setMouse(std::pair{mouse_.x, mouse_.y});
         ui_->setHudShown(!gameHudHidden(app));
@@ -400,7 +402,7 @@ private:
         }
         const float w = widest + 8;
         const float h = lineH * static_cast<float>(lines.size()) + 6;
-        const auto [x, y] = nox::modes::script::placeTooltip(mouse_.x, mouse_.y, w, h);
+        const auto [x, y] = nox::modes::script::placeTooltip(mouse_.x, mouse_.y, w, h, originX_ / scale_, originY_ / scale_);
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         const SDL_FRect r = toScreen(x, y, w, h);
         box::fill(renderer, r, {10, 8, 6, 235});

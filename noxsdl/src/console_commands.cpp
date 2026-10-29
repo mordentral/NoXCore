@@ -515,11 +515,14 @@ std::vector<Console::Command> consoleCommands(App& app)
              extras([grid](OptionsWindow::Extras& e) { e.perPixelLight = !grid; });
              says("gridlight", !app.light.perPixel());
          }},
-        {"stockeffects", Console::kNoxsdl, "[on|off]: the effects' pixel shapes (--stock-effects)",
+        {"stockeffects", Console::kNoxsdl, "[on|off]: the effects' pixel shapes and sprites: Smooth FX and HD Spell FX off (--stock-effects)",
          [onOff, says, extras](const Args& a) {
-             const bool stock = onOff(a, !fxdraw::smoothOn());
-             extras([stock](OptionsWindow::Extras& e) { e.smoothEffects = !stock; });
-             says("stockeffects", !fxdraw::smoothOn());
+             const bool stock = onOff(a, !fxdraw::smoothOn() && !fxdraw::spellFxOn());
+             extras([stock](OptionsWindow::Extras& e) {
+                 e.smoothEffects = !stock;
+                 e.hdSpellFx = !stock;
+             });
+             says("stockeffects", !fxdraw::smoothOn() && !fxdraw::spellFxOn());
          }},
 #ifndef NOX_NO_TEST_COMMANDS
         {"ambient", Console::kNoxsdl, "R G B | off: the ambient light instead of the map's (--ambient)",

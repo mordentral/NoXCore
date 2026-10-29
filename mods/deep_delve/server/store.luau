@@ -9,6 +9,7 @@
 -- Players' own .plr files are never written: the record is the character.
 
 local classes = require("data/classes")
+local progress = require("progress")
 
 local store = {}
 
@@ -27,7 +28,12 @@ local store = {}
 --      boss point.
 --   4  options = { lootNames = "alt" | "always" }: the player's choices for its character (ground
 --      loot's names shown while Alt is held, or always). Version 3's records get the defaults.
-store.VERSION = 4
+--   5  the acts: each act's progress gains `opened` (the act open to the character at that tier:
+--      act 1 always, a later act once the act before it is cleared or once it has been there),
+--      and world.act is the furthest act reached or opened at its tier (progress.luau). Version
+--      4 had one act, so an act 1 clear left world.act at 1; its step marks every act it has
+--      progress in opened, opens the act after each one it cleared, and moves world.act on.
+store.VERSION = 5
 
 -- The options' defaults, and the values each may take (the first: the default).
 store.OPTIONS = {
@@ -94,8 +100,9 @@ function store.new(player: any): any
 		inventory = {}, -- item records carried
 		stash = { tabs = {} }, -- see VERSION (stash.luau)
 		gold = { carried = 0, stashed = 0 },
-		-- act: the act it's in; deepest: the deepest area index reached in any act; progress and
-		-- bosses: see VERSION (progress.luau reads and writes them).
+		-- act: the furthest act reached or opened at its tier; deepest: the deepest area index
+		-- reached in any act; progress and bosses: see VERSION (progress.luau reads and writes
+		-- them).
 		world = { act = 1, deepest = 0, progress = {}, bosses = {} },
 		spells = { spells = {}, abilities = {}, creatures = {} }, -- what its passive tree gives (book.luau)
 		records = { kills = 0, deaths = 0, frames = 0 }, -- frames: time played, in game frames
@@ -196,6 +203,28 @@ local function toVersion4(rec: any)
 	rec.version = 4
 end
 
+-- Version 4 -> 5: every act it has progress in (in version 4, act 1 at its tiers) opened, the act
+-- after each one it cleared opened, world.act moved on to the furthest open at its tier.
+local function toVersion5(rec: any)
+	local world = rec.world
+	if type(world.progress) ~= "table" then
+		world.progress = {}
+	end
+	if type(world.bosses) ~= "table" then
+		world.bosses = {}
+	end
+	if type(world.act) ~= "number" then
+		world.act = 1
+	end
+	for _, p in world.progress do
+		if type(p) == "table" then
+			p.opened = true
+		end
+	end
+	progress.openAfterCleared(rec)
+	rec.version = 5
+end
+
 -- An older record brought up to date (each version's step in turn).
 local function migrate(rec: any): any
 	if rec.version < 2 then
@@ -206,6 +235,9 @@ local function migrate(rec: any): any
 	end
 	if rec.version < 4 then
 		toVersion4(rec)
+	end
+	if rec.version < 5 then
+		toVersion5(rec)
 	end
 	rec.version = store.VERSION
 	return rec

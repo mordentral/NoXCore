@@ -775,8 +775,9 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
             }
         }
         if (s && !(ghost && ghost->alpha == 0)) {
-            // BELOW things (scorch marks, blood, plates) lie under what stands on the floor.
-            out.push_back({a->below ? p.y - MapView::kBelow : p.y, x, y, s, p.x, p.y});
+            // BELOW things (scorch marks, blood, plates) lie under what stands on the floor; the
+            // floor's decals under the other BELOW things.
+            out.push_back({a->floorDecal ? p.y - MapView::kFloorDecal : a->below ? p.y - MapView::kBelow : p.y, x, y, s, p.x, p.y});
             scaled(out.back()); // (and the image drawn over it, below: a copy of this one, its pivot too)
             out.back().bloom = (a->classes & nox::things::ObjectClass::Light) != 0; // light sources bloom
             out.back().light = light;
@@ -834,13 +835,14 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
         // ghost or an invisible creature it didn't draw: the column beside a creature we watch,
         // and the dot over a creature on our friends list (our summons), of radius 3 in our team's
         // colour, twice its height over its feet, when we're on a team (friend_dot.hpp: not a
-        // quest's shopkeepers, nothing in a campaign game).
+        // quest's shopkeepers; in a campaign game only the co-op party's creatures).
         if (drawn && (a->drawFn == DrawFn::Monster || a->drawFn == DrawFn::Maiden)) {
             const std::size_t from = out.size();
             pushCreatureBar(client, *a, netCode, p.x, p.y, p.z, out);
             enchantFollow(from, netCode, d, *a, p.z);
             const auto* me = ownPlayer(client);
-            if (const std::uint32_t team = friendDotTeam(client.world(), netCode, a->classes, a->subclasses, me ? me->team : 0)) {
+            if (const std::uint32_t team = friendDotTeam(client.world(), netCode, a->classes, a->subclasses, me ? me->team : 0,
+                                                         app.partyDots, app.partyCreatures)) {
                 if (const auto c = teamColor(client.world(), team)) {
                     const MinionDot dot{p.x, p.y - p.z - 2 * a->zSizeMax, *c};
                     overlay(netCode, d, *a, p.x, p.y, p.z, [&app, dot](SDL_Renderer*, const Camera&) { app.minionDots.push_back(dot); });
@@ -932,6 +934,26 @@ void fxDemo(App& app, std::uint32_t frame, std::vector<MapView::SceneSprite>& ex
         anchor.typeId = static_cast<std::uint16_t>(app.things.findThing("Bear") - app.things.things.data() + 1);
         anchor.direction = 7;
         anchor.buffs = enchant ? kBearBuffs[static_cast<std::size_t>(i)] : 0;
+        app.anchors[netCode] = anchor;
+        app.effects->enchantSprites(anchor, netCode, false, *app.sprites, extra);
+        if (const Sprite* s = app.sprites->get(*bear->still)) {
+            extra.push_back({at.y, x, y, s, at.x, at.y});
+        }
+        app.effects->enchantSprites(anchor, netCode, true, *app.sprites, extra);
+    }
+    // "shields": eight bears in two rows, each facing one of the eight ways, with a reflective
+    // shield; the second row's last also with a Force Field.
+    constexpr std::array<std::uint8_t, 8> kFacings{0, 1, 2, 3, 5, 6, 7, 8};
+    for (std::size_t i = 0; app.fxDemoOnly == "shields" && bear && bear->still && i < kFacings.size(); ++i) {
+        const SDL_FPoint at{std::floor(app.camera.x) + (static_cast<float>(i % 4) - 1.5f) * 100,
+                            std::floor(app.camera.y) + static_cast<float>(i / 4) * 130 - 40};
+        const float x = at.x - bear->halfWidth;
+        const float y = at.y - bear->halfHeight - bear->z;
+        const auto netCode = static_cast<std::uint16_t>(kFirstBear - 16 + static_cast<int>(i));
+        Anchor anchor{at.x, at.y, x, y, app.sprites->indexOf(*bear->still)};
+        anchor.typeId = static_cast<std::uint16_t>(app.things.findThing("Bear") - app.things.things.data() + 1);
+        anchor.direction = kFacings[i];
+        anchor.buffs = (1u << 27) | (i == 7 ? 1u << 26 : 0u);
         app.anchors[netCode] = anchor;
         app.effects->enchantSprites(anchor, netCode, false, *app.sprites, extra);
         if (const Sprite* s = app.sprites->get(*bear->still)) {

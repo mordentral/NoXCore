@@ -29,7 +29,7 @@ constexpr std::int32_t kClose = 371;
 constexpr std::int32_t kAdvancedClose = 2099;
 constexpr std::int32_t kAdvancedTemplate = 2040; // Render GUI: the checkbox noxsdl's are copied from
 // noxsdl's switches, added below them
-constexpr std::int32_t kFrameRate = 2900, kBloom = 2901, kPerPixelLight = 2902, kSmoothEffects = 2903,
+constexpr std::int32_t kFrameRate = 2900, kBloom = 2901, kPerPixelLight = 2902, kSmoothEffects = 2903, kHdSpellFx = 2904,
                        kHdImages = 2905, kMouseAccel = 2906, kKillFeed = 2907, kVsync = 2908, kExactMaths = 2909;
 /// Those switches in the order they're stacked: their label (not a string-table id) and the
 /// Extras field each turns on and off.
@@ -39,11 +39,12 @@ struct Switch {
     const char* label;
     bool Extras::*field;
 };
-constexpr std::array<Switch, 9> kSwitches{{
+constexpr std::array<Switch, 10> kSwitches{{
     {kFrameRate, "Frame Rate", &Extras::frameRate},
     {kBloom, "Bloom", &Extras::bloom},
     {kPerPixelLight, "Pixel Light", &Extras::perPixelLight},
     {kSmoothEffects, "Smooth FX", &Extras::smoothEffects},
+    {kHdSpellFx, "HD Spell FX", &Extras::hdSpellFx},
     {kHdImages, "Use HD Images", &Extras::hdImages},
     {kKillFeed, "Kill Feed", &Extras::killFeed},
     {kMouseAccel, "Win Mouse Accel", &Extras::mouseAccel},
@@ -70,11 +71,13 @@ constexpr int kTabHeight = 20;
 constexpr int kTabGroup = 0x7A;
 constexpr int kPageTop = 3 + kTabHeight + 2; // the pages' first row, under the tabs
 
-/// The page a row of the panel is on: the rarely changed switches on the second (More).
+/// The page a row of the panel is on: the rarely changed switches on the second (More). HD Spell FX
+/// is there too: the first page is full (a row more and the Smoothing and Display lists open past
+/// the panel's foot).
 int pageOf(std::int32_t id)
 {
-    return id == 2012 || id == 2016 || id == kAdvancedTemplate || id == kFrameRate || id == kExactMaths || id == kWeatherLabel ||
-                   id == kWeatherBox
+    return id == 2012 || id == 2016 || id == kAdvancedTemplate || id == kFrameRate || id == kHdSpellFx || id == kExactMaths ||
+                   id == kWeatherLabel || id == kWeatherBox
                ? 1
                : 0;
 }
@@ -135,7 +138,19 @@ std::string_view extraTooltip(std::int32_t id)
     case kPerPixelLight:
         return "Lights shade every pixel, smoothly.\n+ Smooth lighting with no blocky edges.\n- Off: the original's coarser light grid.";
     case kSmoothEffects:
-        return "Effects drawn smooth at your screen's resolution,\nsmoke and poison as soft clouds, and Force Field as a\nglass barrier.\n+ Cleaner sparks, rays and clouds.\n- Off: the original's sprites.";
+        return "Sparks, rays, glows, lines and dots drawn smooth at\n"
+               "your screen's resolution, and a smoke blast as soft dust.\n"
+               "+ Cleaner sparks, rays and glows.\n"
+               "- Off: the original's pixel shapes.\n"
+               "The poison cloud and Force Field are HD Spell FX\n"
+               "(on the More page).";
+    case kHdSpellFx:
+        return "Spells drawn anew in place of the original's sprites:\n"
+               "the poison cloud as soft billowing clouds and Force Field\n"
+               "as a glass barrier, smooth at your screen's resolution.\n"
+               "+ Detailed spell effects at any zoom.\n"
+               "- Off: the original's sprites.\n"
+               "Sparks, rays and glows are Smooth FX (on the General page).";
     case kSmoothLabel:
     case kSmoothBox:
         return "How movement between the server's 30 updates a second is drawn.\n"
@@ -226,8 +241,8 @@ std::string_view extraTooltip(std::int32_t id)
         return "The everyday settings.";
     case kTabMore:
         return "Settings seldom changed: the line of sight's soft edge,\n"
-               "Fade Objects, the HUD, the frame-rate counter, the\n"
-               "original's exact maths for games you host and the\n"
+               "Fade Objects, the HUD, the frame-rate counter, HD Spell FX,\n"
+               "the original's exact maths for games you host and the\n"
                "weather effects.";
     default:
         return {};
@@ -625,7 +640,7 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     }
     setMouseText();
     setExtraEnabled(kHdImages, extras_.hdAvailable); // greyed without an image pack
-    for (const auto id : {kBloom, kPerPixelLight, kSmoothEffects, kWeatherBox}) {
+    for (const auto id : {kBloom, kPerPixelLight, kSmoothEffects, kHdSpellFx, kWeatherBox}) {
         if (!extras_.gpu) {
             setExtraEnabled(id, false); // they need the GPU renderer's shaders (off with --no-gpu)
         }

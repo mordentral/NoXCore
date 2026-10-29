@@ -48,8 +48,8 @@ void Effects::stepRain(const Anchor& a, const TypeArt& art, std::uint32_t frame)
 
     if (update == UpdateFn::Cloud || update == UpdateFn::SmallCloud) {
         const int reach = update == UpdateFn::Cloud ? 75 : 35;
-        if (fxdraw::puffsOn()) {
-            // Soft puffs instead (effects_puffs.cpp), two a frame.
+        if (fxdraw::cloudPuffsOn()) {
+            // Soft puffs instead (HD Spell FX: effects_puffs.cpp), two a frame.
             cloudPuff(x, y, reach, frame);
             cloudPuff(x, y, reach, frame);
         } else if (frame & 1) {

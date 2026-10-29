@@ -157,6 +157,10 @@ std::filesystem::path modeSaveRoot(const std::filesystem::path& soloRoot, std::s
 void beginSoloScreensHost(App& app, std::string_view modeId, std::uint8_t playerClass, HostSettings& settings);
 /// The game left, or its hosting failed: the solo saves' root back.
 void endSoloScreensHost(App& app);
+/// The game we host is a solo-screens mode's (a campaign mode hosted for guests, the co-op
+/// campaign): its name as the mode list shows it ("Co-op Campaign"). None: we host no such game.
+/// Its host's Server Settings take only what applies to a campaign (server_options.hpp).
+std::optional<std::string> hostedCampaign(const App& app);
 /// (builtin_mode_uis.cpp, made from the built-in modes: once; again does nothing.)
 void registerBuiltinModeUis();
 /// The script modes' UI (script_mode_ui.cpp): a server's UI script's windows, for any script mode.

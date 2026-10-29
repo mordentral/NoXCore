@@ -51,7 +51,7 @@ void Events::look(lua_State* L)
     };
     has_ = {.onObjectKilled = hasFn("onObjectKilled"), .onDestroyed = hasFn("onDestroyed"), .onDamage = hasFn("onDamage"),
             .onDamaged = hasFn("onDamaged"), .onPickup = hasFn("onPickup"), .onDrop = hasFn("onDrop"), .onEquip = hasFn("onEquip"),
-            .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit")};
+            .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost")};
 }
 
 bool Events::room()
@@ -168,6 +168,56 @@ bool Events::exitTouched(lua_State* L, const server::ServerObject& exit, const s
     const bool go = !(lua_isboolean(L, -1) && !lua_toboolean(L, -1));
     lua_pop(L, 1);
     return go;
+}
+
+bool Events::castCost(lua_State* L, const server::ServerObject& caster, std::uint32_t spell, int cost, bool trap, int& mana, int& health)
+{
+    if (!has_.castCost || !toolbox::beginHook(L, "castCost")) {
+        return false;
+    }
+    lua_pushnumber(L, caster.extent);
+    const std::string_view name = things::spellName(spell);
+    if (name.empty()) {
+        lua_pushnumber(L, spell);
+    } else {
+        lua_pushlstring(L, name.data(), name.size());
+    }
+    lua_pushnumber(L, cost);
+    lua_pushstring(L, trap ? "trap" : "cast");
+    if (!ask(L, "castCost", 4, 2)) {
+        return false; // (a failing hook: the game's price)
+    }
+    // (Results: -2 the mana, -1 the health.)
+    const auto whole = [](lua_State* L, int idx, int& out) {
+        if (lua_isnil(L, idx)) {
+            out = 0;
+            return true;
+        }
+        if (!lua_isnumber(L, idx)) {
+            return false;
+        }
+        const double n = lua_tonumber(L, idx);
+        if (!(n >= 0 && n <= 65535)) { // (NaN too)
+            return false;
+        }
+        out = static_cast<int>(std::floor(n));
+        return true;
+    };
+    bool priced = false;
+    if (!lua_isnil(L, -2)) {
+        int m = 0, h = 0;
+        if (whole(L, -2, m) && whole(L, -1, h)) {
+            mana = m;
+            health = h;
+            priced = true;
+        } else {
+            toolbox::report(L, "castCost: return nil, or mana and health 0-65535 (the game's price kept)");
+        }
+    } else if (!lua_isnil(L, -1)) {
+        toolbox::report(L, "castCost: return nil, or mana and health 0-65535 (the game's price kept)");
+    }
+    lua_pop(L, 2);
+    return priced;
 }
 
 void Events::deliver(lua_State* L)

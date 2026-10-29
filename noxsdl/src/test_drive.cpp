@@ -2,6 +2,7 @@
 // mouse of --mouse-script.
 #include "app.hpp"
 
+#include "noxcore/net/messages.hpp"
 #include "noxcore/things/object_class.hpp"
 
 #include <utility>
@@ -275,14 +276,15 @@ void runGameTests(App& app, bool inGame)
         }
     }
     if (inGame && app.awardTest && app.book && app.autoDone && SDL_GetTicks() - app.inGameSinceMs > 2000) {
-        // As MSG_REPORT_SPELL_AWARD with flags 0x81 would (World::takeBookEvents).
-        nox::client::BookEvent e;
-        e.kind = nox::client::BookEvent::Kind::Spell;
-        e.id = static_cast<std::uint8_t>(std::exchange(app.awardTest, 0));
-        e.show = e.fill = true;
-        if (const auto fill = app.book->event(e, bookContext(app))) {
-            fillBars(app, *fill, false);
-        }
+        // MSG_REPORT_SPELL_AWARD {spell, level, flags 0x81} as the server sends it, read as one
+        // (Cli_AwardSpell: the level known, then the book's event, taken with the others).
+        const auto id = static_cast<std::uint8_t>(std::exchange(app.awardTest, 0));
+        const auto& levels = client.world().self().spellLevels;
+        const auto known = levels.find(id);
+        const std::uint8_t level = known != levels.end() && known->second != 0 ? known->second : std::uint8_t{1};
+        const std::uint8_t m[] = {static_cast<std::uint8_t>(nox::net::Op::ReportSpellAward), id, level, 0x81};
+        client.injectForTest(m);
+        SDL_Log("award test: spell %u at level %u (the book's moment from client frame %u)", id, level, clockFrame());
     }
     while (inGame && app.autoDone && !app.mouseScript.empty() &&
            SDL_GetTicks() - app.inGameSinceMs >= app.mouseScript.front().atMs) {

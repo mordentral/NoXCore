@@ -182,6 +182,40 @@ ManifestResult readManifest(std::string_view text_)
         } else if (!looks.empty()) {
             throw Bad{"\"looksLike\" is \"arena\" or \"ctf\""};
         }
+        if (const json::Value* g = field(doc, "gameplay")) {
+            if (!g->isObject()) {
+                throw Bad{"\"gameplay\" must be an object of \"teamDamage\", \"autoAssign\" and \"teamPlay\" (true or false)"};
+            }
+            for (const auto& [key, v] : *g->object) {
+                const std::uint32_t bit = key == "teamDamage" ? 1u : key == "autoAssign" ? 2u : key == "teamPlay" ? 4u : 0u;
+                if (bit == 0) {
+                    throw Bad{"\"gameplay\": \"" + key + "\" isn't one (\"teamDamage\", \"autoAssign\" or \"teamPlay\")"};
+                }
+                if (!v.isBool()) {
+                    throw Bad{"\"gameplay\": \"" + key + "\" must be true or false"};
+                }
+                m.gameplayPinned |= bit;
+                m.gameplayValues |= v.boolean ? bit : 0u;
+            }
+            // (A CTF look turns team play on: configure's.)
+            if (m.looksLike == 0x20 && (m.gameplayPinned & 4u) && !(m.gameplayValues & 4u)) {
+                throw Bad{"\"gameplay\": a \"ctf\" look plays with teams (\"teamPlay\" can't be false)"};
+            }
+        }
+        if (const json::Value* p = field(doc, "pickup")) {
+            if (!p->isObject()) {
+                throw Bad{"\"pickup\" must be an object of \"anyClass\" and \"duplicates\" (true or false)"};
+            }
+            for (const auto& [key, v] : *p->object) {
+                if (key != "anyClass" && key != "duplicates") {
+                    throw Bad{"\"pickup\": \"" + key + "\" isn't one (\"anyClass\" or \"duplicates\")"};
+                }
+                if (!v.isBool()) {
+                    throw Bad{"\"pickup\": \"" + key + "\" must be true or false"};
+                }
+                (key == "anyClass" ? m.pickupAnyClass : m.pickupDuplicates) = v.boolean;
+            }
+        }
         if (const json::Value* opts = field(doc, "options")) {
             if (!opts->isArray() || opts->array->size() > 32) {
                 throw Bad{"\"options\" must be a list of at most 32"};

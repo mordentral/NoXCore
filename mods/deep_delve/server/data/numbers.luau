@@ -7,17 +7,34 @@ local numbers = {}
 
 numbers.levels = {
 	cap = 50,
-	-- The experience to go from level L to L + 1: base * L ^ growth, rounded down.
+	-- The experience to go from level L to L + 1: base * L ^ growth, rounded down; but from level
+	-- 1 to 2 `first` (a quick first level: a handful of the first area's kills).
 	base = 100,
 	growth = 1.5,
+	first = 60,
 }
 
 -- Health, mana and strength as shares of the class's stock maxima (classes.luau): `atOne` at
--- level 1, `perLevel` more for each level after it.
+-- level 1, `perLevel` more for each level after it. (Mana from 0.8: a level-1 wizard's 120 is
+-- four Fireballs.)
 numbers.stats = {
 	health = { atOne = 0.7, perLevel = 0.03 },
-	mana = { atOne = 0.7, perLevel = 0.03 },
+	mana = { atOne = 0.8, perLevel = 0.03 },
 	strength = { atOne = 0.8, perLevel = 0.02 },
+}
+
+-- Passive regeneration (regen.luau), on top of the game's own refill (health and mana each from
+-- empty in 300 s). Per second: each class's base, and what the passive tree's healthRegen and
+-- manaRegen stats add. Given every `every` frames; health not within `afterHurt` frames of a hit
+-- (as the game's own refill waits).
+numbers.regen = {
+	base = {
+		warrior = { health = 1.5, mana = 0 },
+		wizard = { health = 0.5, mana = 2.5 },
+		conjurer = { health = 0.8, mana = 2.0 },
+	},
+	every = 10,
+	afterHurt = 30,
 }
 
 -- ---- Areas
@@ -28,12 +45,30 @@ numbers.areas = {
 	damagePerLevel = 0.06,
 	experiencePerLevel = 0.10,
 	-- A monster's experience is monster.bin's (the stock game's: a zombie 30000) times this, so
-	-- a zombie at level 1 gives 15 of the 100 to level 2.
+	-- a zombie at level 1 gives 15 of the 60 to level 2.
 	experienceScale = 0.0005,
 	-- Packs in an area: base + perLevel x area level, at most `most`.
 	packs = { base = 12, perLevel = 1, most = 24 },
 	-- A pack's followers beside its leader.
 	followers = { fewest = 2, most = 4 },
+	-- The opening (by area level; a level not here takes the numbers above, as act 1's area 4 on
+	-- does): fewer and smaller packs, ramping up over the first areas.
+	--   packs      packs in the area (in place of the formula)
+	--   followers  { fewest, most } beside each leader
+	--   ramp       how the packs thin out toward the start: a route pack's place drawn with a
+	--              density rising as (place along the route) ^ ramp (0: even)
+	--   quiet      the share of the route from its start where packs are the smallest (fewest
+	--              followers) and led by a normal monster
+	--   light      the share of the route from its start where packs are only light monsters (the
+	--              rosters' `light`; by decision 2026-10-29, lighter monsters lead the first rooms)
+	--   health, damage  the monsters' health and the damage they deal, times this (champions
+	--              too; the act boss's lair is past the opening)
+	--   guards     the end chamber's champion's guards (in place of the champion's own count)
+	opening = {
+		[1] = { packs = 8, followers = { 1, 2 }, ramp = 1, quiet = 0.4, light = 0.4, health = 0.5, damage = 0.5, guards = 1 },
+		[2] = { packs = 10, followers = { 1, 3 }, ramp = 0.5, quiet = 0.25, light = 0.15, health = 0.7, damage = 0.7, guards = 2 },
+		[3] = { packs = 13, followers = { 2, 3 }, ramp = 0, quiet = 0, light = 0, health = 0.85, damage = 0.85, guards = 3 },
+	},
 	-- The route: diagonal runs (more: a longer area) and the end chamber's size.
 	segments = { base = 7, perLevel = 0.5, most = 12 },
 	endRadius = 9,
@@ -81,6 +116,9 @@ numbers.boss = {
 --   experience  a kill's experience, before it's split between the players in play
 --   packs       packs in an area (extra packs at the generator's spots, as the area is entered)
 --   loot        a death's loot rolls (a part roll is a chance of one more)
+--   ownSpared   the missiles whose hits on their own hero are cancelled (combat.luau): the
+--               Fireball's, as a cast at levels 1, 2 and 3-5 makes it (a hero's other spells
+--               hurt it as the game has them; no damage within the party is a rule of its own)
 numbers.party = {
 	health = 0.5,
 	damage = 0.2,
@@ -88,6 +126,7 @@ numbers.party = {
 	packs = 0.1,
 	loot = 0.15,
 	most = 6,
+	ownSpared = { Fireball = true, StrongFireball = true, TitanFireball = true },
 }
 
 -- The party strip: each member's numbers looked at every `every` frames, sent when changed.

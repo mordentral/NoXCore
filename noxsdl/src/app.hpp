@@ -312,6 +312,8 @@ struct App {
     std::unique_ptr<QuestWindows> questWindows;         ///< a quest's game over and shared keys (per game)
     bool openQuitMenu = false;                         ///< --quit-menu: open it once in the game
     bool openServerOptions = false;                     ///< --server-options: the host's, once in the game
+    int serverOptionsPage = 0;                          ///< --server-options-page N: on that page (ServerOptions::showPageForTest)
+    std::string askPasswordTest;                        ///< --ask-password HOST (with --browse): the join's password dialog for HOST
     bool openInventory = false;                         ///< --open-inventory: likewise (tests)
     std::optional<int> openBook;                        ///< --open-book [N]: the book, at entry N's page (tests)
     /// --mouse-script "MS down|up|rdown|rup|move|esc|goto X Y; ...": the left (or right: moving) button
@@ -574,6 +576,11 @@ struct App {
     /// the scene's sort draws the drawable (liveSprites' overlay): the friend dots, the flags whose
     /// team name is drawn, the drawables whose damage numbers are drawn.
     std::vector<MinionDot> minionDots;
+    /// Live: the game is a co-op campaign (its mode UI's client side was greeted, set each frame
+    /// by ModeUi::update): the friend dot over the party's creatures (friend_dot.hpp, VD-39), ours
+    /// and those the session lists (`partyCreatures`: net codes, sorted; copied as it changes).
+    bool partyDots = false;
+    std::vector<std::uint16_t> partyCreatures;
     std::vector<std::uint16_t> flagLabels;
     std::vector<std::uint16_t> damageShown;
     /// Live: a script mode UI's world labels (UI API 3): the net codes it labels with each one's

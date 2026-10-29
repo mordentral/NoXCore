@@ -1,5 +1,6 @@
 // Soft puffs of gas and smoke, drawn by the fx_puff shader: noxsdl's own look for what the game
-// draws with small hard-edged sprites (smooth effects only; --stock-effects keeps the sprites).
+// draws with small hard-edged sprites (the toxic cloud's with HD Spell FX, the smoke blast's with
+// Smooth FX; --stock-effects keeps the sprites).
 //
 //   toxic cloud    (CloudUpdateDraw / SmallCloudUpdateDraw) the game puts a GreenPuff or
 //                  GreenSmoke within 75 (35) of the cloud every other frame, rising 1-3 a frame
@@ -126,7 +127,7 @@ void Effects::stepPuffs(std::uint32_t frame)
 // and lit by the scene's light; a lingering smoke puff fades out as the game's Smoke would.
 void Effects::drawPuffs(SDL_Renderer* renderer, const Camera& camera, float t)
 {
-    if (puffs_.empty() || !fxdraw::puffsOn()) {
+    if (puffs_.empty() || !fxdraw::anyPuffsOn()) {
         return;
     }
     for (const Puff& p : puffs_) {

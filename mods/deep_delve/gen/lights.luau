@@ -21,6 +21,9 @@ local KINDS = {
 	waypoint = { intensity = 44, color = { 40, 220, 255 } },
 	-- The act boss's arena: red fire round its floor.
 	arena = { intensity = 46, color = { 255, 70, 35 }, intensityKeys = { 46, 40, 48, 42 }, intensityStep = 5 },
+	-- The gate to the next act (switched on by the server as the lair's boss dies): a pale blue
+	-- glow that swells slowly.
+	gate = { intensity = 52, color = { 120, 190, 255 }, intensityKeys = { 52, 46, 56, 48 }, intensityStep = 9 },
 }
 
 -- A light of `kind` written at (x, y); its extent.

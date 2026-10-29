@@ -82,7 +82,7 @@ ModAssetsResult loadModAssets(const std::filesystem::path& assetsDir);
 /// broken mods with their reasons. Empty: fine (a file whose data is bad shows at loadModAssets).
 std::string checkModAssets(const std::filesystem::path& assetsDir);
 
-/// The newest write time of the files under `assetsDir` (none: the epoch): a reload's test.
+/// The newest write time of the files under `assetsDir` (none: file_time_type::min()): a reload's test.
 std::filesystem::file_time_type newestAsset(const std::filesystem::path& assetsDir);
 
 /// A PNG decoded to RGBA8 (a mod asset's rules: at most kMaxAssetSide a side); false: why.

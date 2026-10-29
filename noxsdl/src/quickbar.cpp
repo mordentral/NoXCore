@@ -2,6 +2,7 @@
 // spells, the award flying from the book, the book's events, the bars loaded and saved with
 // the character, and the left button's way through the game's windows.
 #include "app.hpp"
+#include "book_award.hpp"
 
 #include "noxcore/server/solo.hpp"
 #include "noxcore/things/field_guide.hpp"
@@ -74,7 +75,7 @@ BookContext bookContext(const App& app)
     c.playerClass = ownClass(app);
     c.quest = (client.world().game().gameFlags & 0x1000) != 0;
     c.allKnown = everySpellKnown(app);
-    c.frame = gameFrame(app);
+    c.frame = clockFrame(); // (the exe's input sequence, not the game frame: book_award.hpp)
     c.multiclass = multiclass(app);
     c.modeOwnsBook = client.modeOwnsBook();
     return c;
@@ -717,8 +718,8 @@ void stepFlight(App& app)
     auto& f = *app.flight;
     auto& p = app.book->particles;
     const int kind = f.ability ? 3 : 0;
-    if (++f.frames < 60) {
-        return; // two seconds with the book open on it first
+    if (++f.frames < bookaward::kHoldFrames) {
+        return; // two seconds with the book open on its page first
     }
     if (!f.burst) {
         f.burst = true;
@@ -767,7 +768,7 @@ void stepFlight(App& app)
 /// The flying award's icon (bookDrawFn's image), in game pixels.
 void drawFlight(App& app)
 {
-    if (!app.flight || app.flight->frames < 60 || !app.hud) {
+    if (!app.flight || app.flight->frames < bookaward::kHoldFrames || !app.hud) {
         return;
     }
     const auto ic = app.hud->icon(app.flight->id, app.flight->ability);

@@ -40,6 +40,7 @@ QuitMenu::QuitMenu(gui::Resources res, std::filesystem::path windowDir, Callback
     saveText_[1] = gui_.text("SoloSaveLabel", "GUIQuit.c");
     if (gui::Window* gameplay = menu_->find(kGameplay)) {
         gameplayText_ = gameplay->text;
+        gameplayRect_ = gameplay->rect;
     }
     menu_->show(false);
 }
@@ -53,11 +54,17 @@ void QuitMenu::layout(bool solo)
             w->show(visible);
         }
     };
+    // (noxcpp) A campaign mode's game we host for guests: the solo layout with Gameplay Controls in
+    // Vote's place and Quit below it.
+    const bool campaign = solo && callbacks_.campaignHost && callbacks_.campaignHost();
     show(kAutoLoad, solo);
     show(kAutoSave, solo);
     show(kObserve, !solo);
-    show(kGameplay, !solo);
+    show(kGameplay, !solo || campaign);
     show(kVote, !solo);
+    if (gui::Window* gameplay = menu_->find(kGameplay)) {
+        gameplay->rect = campaign ? SDL_Rect{gameplayRect_.x, voteRect_.y, gameplayRect_.w, gameplayRect_.h} : gameplayRect_;
+    }
     if (gui::Window* save = menu_->find(kSave)) {
         save->text = saveText_[solo ? 1 : 0];
         if (solo) {
@@ -70,7 +77,7 @@ void QuitMenu::layout(bool solo)
     // Gameplay Controls: the host's Server Settings (server_options.hpp); off in a game we don't
     // host.
     if (gui::Window* gameplay = menu_->find(kGameplay)) {
-        const bool host = callbacks_.hosting && callbacks_.hosting();
+        const bool host = campaign || (callbacks_.hosting && callbacks_.hosting());
         gameplay->text = gameplayText_;
         if (host) {
             gameplay->status |= nox::gui::status::Enabled;
@@ -89,12 +96,13 @@ void QuitMenu::layout(bool solo)
             vote->status &= ~nox::gui::status::Enabled;
         }
     }
+    const bool below = !solo || campaign; // (Quit below Vote's place)
     if (gui::Window* quit = menu_->find(kQuit)) {
         quit->rect.x = voteRect_.x;
-        quit->rect.y = voteRect_.y + (solo ? 0 : 45);
+        quit->rect.y = voteRect_.y + (below ? 45 : 0);
     }
     menu_->rect.w = 220;
-    menu_->rect.h = solo ? 285 : 330;
+    menu_->rect.h = below ? 330 : 285;
 }
 
 void QuitMenu::newGame()

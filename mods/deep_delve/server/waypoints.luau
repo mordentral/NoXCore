@@ -7,11 +7,15 @@
 --   * Out in the area -> town: the waypoint is a real pentagram written into the map, leading to
 --     the town's receiving pentagram; the game itself sends whoever stands on it (a pentagram
 --     links places in one map, and the town is in every map).
---   * Town -> a waypoint: the town's waypoints pentagram (cyan) offers the waypoints its
---     toucher has found (nox.choice). This area's: a step across the map, at once, for that
---     player alone (no vote). Another area's: the whole game goes there (a map change, that area
---     generated into the other map tag), arriving beside its waypoint; with anyone else in the
---     game that's the party's vote (votes.luau), else (alone) it's at once.
+--   * Town -> a waypoint: stepping on the town's waypoints pentagram (cyan) opens the waypoints
+--     window on the toucher's UI (ui/main.luau): the areas that have a waypoint, by act (each
+--     act open to its character), the ones it has found to click, the area being played marked.
+--     This area's: a step across the map, at once, for that player alone (no vote). Another
+--     area's, in this act or another: the whole game goes there (a map change, that area
+--     generated into the other map tag), arriving beside its waypoint; with
+--     anyone else in the game that's the party's vote (votes.luau: the ones in town asked too),
+--     else (alone) it's at once. Walking away from the pentagram closes the window
+--     (windows.luau's station), and so does a step or a vote started from it.
 --   * The town's receiving pentagram watches what lands on it: a monster that followed a player
 --     through is sent back to the waypoint it came by.
 --
@@ -21,11 +25,11 @@
 local hero = require("hero")
 local hud = require("hud")
 local monsters = require("monsters")
-local offers = require("offers")
 local progress = require("progress")
-local town = require("town")
 local touch = require("touch")
 local votes = require("votes")
+local windows = require("windows")
+local acts = require("data/acts")
 local numbers = require("data/numbers")
 
 local waypoints = {}
@@ -36,7 +40,11 @@ local beat: number? = nil
 -- areas.luau's own (handed in by place: it requires this module).
 local areas: any = nil
 
-local OFFER_AGAIN = 30 * 10
+-- The pentagram's touches come every PAD_EVERY frames while a player stands on it; a gap longer
+-- than PAD_GAP is a new step onto it, which opens the window again (closed by its player, it
+-- stays closed while the player still stands there).
+local PAD_EVERY = 5
+local PAD_GAP = 15
 
 local function found(h: any)
 	if not here or not progress.addWaypoint(h.record, here.act, here.index) then
@@ -67,12 +75,17 @@ local function look()
 	end
 end
 
--- A hero to an area's waypoint (one it has found): this area's at once (that hero alone);
--- another's by a map change, the party's vote when anyone else is in the game. Whether it
--- went or a vote started ("vote"), else why.
-function waypoints.go(h: any, index: number): (boolean, string?)
+-- A hero to the waypoint of area `index` of act `act` (one it has found; the act being played's
+-- when `act` is nil): this area's at once (that hero alone); another's, in this act or another,
+-- by a map change, the party's vote when anyone else is in the game. Whether it went or a vote
+-- started ("vote"), else why.
+function waypoints.go(h: any, index: number, act: number?): (boolean, string?)
 	local current = areas.current()
-	if index == current.index then
+	local place = areas.placeOf(act or current.act, index)
+	if not place then
+		return false, "no such area"
+	end
+	if place == current.place then
 		local at = current.spots and current.spots.wayArrive
 		if not at then
 			return false, "no waypoint here"
@@ -82,44 +95,91 @@ function waypoints.go(h: any, index: number): (boolean, string?)
 		nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
 		return true, nil
 	end
-	return votes.ask(h, index, "waypoint", "waypoint")
+	return votes.ask(h, place, "waypoint", "waypoint")
 end
 
--- The town's waypoints pentagram touched: the waypoints its toucher has found offered.
+-- ---- The waypoints window
+
+-- The window's value for a hero: { kind = "waypoints", act (the one being played), here (the area
+-- being played), names (each act's name, by act), list = { { a = act, i = area, t = its title,
+-- l = its level, f = found } }, the areas that have a waypoint, by act and area, of each act open
+-- to the character (progress.isOpen) and the act being played }. (A few dozen bytes an area:
+-- about 300 for an act; inside one value for the acts there are.)
+local function valueFor(h: any): any
+	local cur = areas and areas.current() or { act = 1, index = 0 }
+	local list = {}
+	local names = {}
+	for a, act in ipairs(acts) do
+		names[a] = act.name
+		if a ~= cur.act and not progress.isOpen(h.record, a) then
+			continue
+		end
+		for i, s in act.areas do
+			local spec: any = s
+			if spec.waypoint then
+				table.insert(list, {
+					a = a,
+					i = i,
+					t = (spec.title or spec.biome) .. " " .. i,
+					l = act.base + i - 1,
+					f = progress.hasWaypoint(h.record, a, i),
+				})
+			end
+		end
+	end
+	return { kind = "waypoints", act = cur.act, here = cur.index, names = names, list = list }
+end
+
+-- The window's list to the hero's UI.
+function waypoints.view(h: any)
+	hud.send(h.peer, "waypoints", valueFor(h))
+end
+
+-- A message from the window: { op = "go", act, area } (a found waypoint clicked: of any act open
+-- to the character; `act` nil: the act being played's). Whatever went (a step, or a vote
+-- started) closes the window; a refusal is told in it.
+function waypoints.message(h: any, v: any)
+	if v.op ~= "go" or not windows.isOpen(h, "waypoints") or not areas then
+		return
+	end
+	local area = tonumber(v.area)
+	local act = tonumber(v.act) or areas.current().act
+	local why: string? = nil
+	if not area or not windows.near(h, "waypoints") then
+		why = "Stand on the waypoints' pentagram."
+	elseif not areas.placeOf(act, area) or (act ~= areas.current().act and not progress.isOpen(h.record, act))
+		or not progress.hasWaypoint(h.record, act, area) then
+		why = "You haven't found that waypoint yet."
+	else
+		local ok, refused = waypoints.go(h, area, act)
+		if ok then
+			windows.close(h, "waypoints", true)
+			return
+		end
+		why = if refused == "a vote is under way" then "A vote to change area is under way: answer it first."
+			elseif refused == "asked too soon" then "Your last vote failed a moment ago: ask again in a few seconds."
+			else "Not now (" .. tostring(refused) .. ")."
+	end
+	windows.note(h, "waypoints", why :: string)
+end
+
+-- The town's waypoints pentagram touched: its window opened on the toucher's UI, at a new step
+-- onto it (not again while it stands there after closing it).
 local function padTouched(unit: number)
 	local h = hero.byUnit(unit)
 	if not h or not areas then
 		return
 	end
-	local act = areas.current().act
-	local list = progress.waypoints(h.record, act)
-	if #list == 0 then
-		town.say(unit, "You've found no waypoint yet. Look for one out in the areas.")
+	local now = nox.frame()
+	local last = h.padAt
+	h.padAt = now
+	if last and now - last <= PAD_GAP then
 		return
 	end
-	local since = offers.since(h.peer)
-	if since and nox.frame() - since < OFFER_AGAIN then
-		return
-	end
-	local now = areas.current().index
-	local answers = {}
-	local shown = {}
-	for _, index in list do
-		if #answers < 9 then
-			local info = areas.info(index)
-			table.insert(answers, info.title .. (if index == now then " (here)" else ""))
-			table.insert(shown, index)
-		end
-	end
-	local peer = h.peer
-	offers.make(peer, "Waypoints", answers, function(i: number)
-		local who = hero.byPeer(peer)
-		local area = shown[i]
-		if who and area then
-			waypoints.go(who, area)
-		end
-	end)
+	windows.open(h, "waypoints")
 end
+
+windows.register("waypoints", { station = "waypoints", view = waypoints.view })
 
 -- Something landed on the town's receiving pentagram: a hero came home by this map's waypoint
 -- (found, if it wasn't); a monster that followed is sent back.
@@ -141,7 +201,7 @@ end
 -- the town's pentagrams set to work, and this area's waypoint looked for.
 function waypoints.place(spots: any, info: any, areasApi: any)
 	areas = areasApi
-	touch.adopt("TeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, 45)
+	touch.adopt("TeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, PAD_EVERY)
 	touch.adopt("InvisibleTeleportPentagram", spots.town.wayIn.x, spots.town.wayIn.y, arrived, 30, true)
 	if spots.waypoint then
 		here = { act = info.act, index = info.index, title = info.title, x = spots.waypoint.x, y = spots.waypoint.y, arrive = spots.wayArrive }
@@ -164,7 +224,6 @@ end
 -- A new map: the old one's waypoint is gone with it.
 function waypoints.reset()
 	here = nil
-	offers.forget()
 	if beat then
 		nox.cancelTimer(beat)
 		beat = nil

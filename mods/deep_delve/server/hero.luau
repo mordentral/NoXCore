@@ -11,8 +11,13 @@
 --   stock  its own vendor stock (vendor.luau); partySig, labelSig what its UI was last sent of the
 --          party strip and the ground's labels (party.luau, labels.luau);
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
---          mana, strength, healthPct, manaPct, own (% more by a hit's thing type: a spell's own) };
---   open   its windows open (windows.luau);
+--          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), spellCost,
+--          summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a hit's thing
+--          type: a spell's own) };
+--   regen  its passive regeneration's timer and state (regen.luau);
+--   open   its windows open (windows.luau); sheetOf the party member whose sheet its sheet window
+--          shows (nil: its own; sheet.luau); padAt the frame it last touched the town's
+--          waypoints pentagram (waypoints.luau);
 --   told   what its client was told of its book (book.luau);
 --   need   the experience to its next level;
 --   arrival where it comes into play in this map (the area's start or its waypoint, when it came
@@ -22,7 +27,8 @@
 --   portal where its town portal stands in this map, when one is open (portal.luau).
 --
 -- Gear is given from the record when a unit first comes into play and in every new map (a map
--- change outside a quest strips a player); never after a death, which keeps everything.
+-- change outside a quest strips a player); never after a death, which keeps everything. Each
+-- set-up also puts the unit on the party's team (team.luau).
 --
 -- When the record is written: on an area change, a level up, a death, an option set, leaving, the
 -- game's end and every numbers.timing.saveEvery frames.
@@ -34,6 +40,8 @@ local hud = require("hud")
 local town = require("town")
 local tree = require("tree")
 local book = require("book")
+local team = require("team")
+local regen = require("regen")
 local classes = require("data/classes")
 local numbers = require("data/numbers")
 local treeData = require("data/tree")
@@ -64,6 +72,9 @@ end
 -- may run rounding toward zero, where a whole power such as 4 ^ 1.5 comes out a hair under 8.)
 function hero.needFor(level: number): number
 	local l = numbers.levels
+	if level == 1 and l.first then
+		return l.first
+	end
 	return math.floor(l.base * level ^ l.growth + 1e-6)
 end
 
@@ -95,6 +106,11 @@ local function bonusOf(unit: number, rec: any)
 		healthPct = t.healthPct,
 		manaPct = t.manaPct,
 		resist = t.resist,
+		healthRegen = t.healthRegen,
+		manaRegen = t.manaRegen,
+		spellCost = t.spellCost,
+		summonCost = t.summonCost,
+		summonHealth = t.summonHealth,
 		own = t.own,
 	}
 	for _, it in nox.inventory(unit) do
@@ -269,8 +285,11 @@ function hero.setUp(h: any, at: any, keep: boolean?)
 	applyStats(h, true)
 	-- Only the tree's spells (a warrior: its abilities).
 	book.apply(h)
-	-- The hits it takes from the mod's monsters (combat.luau).
-	nox.watchEvents(h.unit, nox.events.damage)
+	-- The hits it takes: the mod's monsters' scaled, the party's and its own Fireball's cancelled
+	-- (combat.luau); and those it took, which hold its health's regeneration back (regen.luau).
+	nox.watchEvents(h.unit, nox.events.damage + nox.events.damaged)
+	-- On the party's team (team.luau; already on it, nothing happens).
+	team.join(h.unit)
 	-- A player joining (or in a new map) watches until it asks to play; here it's brought into
 	-- play at once, in town (or at `at`).
 	if bit32.band(nox.status(h.unit), 1) ~= 0 and nox.living(h.unit) then
@@ -371,19 +390,29 @@ function hero.join(p: any)
 	end
 	local fresh = record == nil
 	record = record or store.new(p)
+	-- (an act built since the record's last clear: opened now, the record written)
+	if progress.openAfterCleared(record) then
+		older = true
+	end
 	local h = {
 		peer = p.peer,
 		unit = p.unit,
 		key = key,
 		record = record,
 		ready = false,
-		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, own = {} },
+		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, healthRegen = 0, manaRegen = 0,
+			spellCost = 0, summonCost = 0, summonHealth = 0, own = {} },
 		open = {},
 		need = hero.needFor(record.level.level),
 		since = nox.frame(),
 	}
+	if byPeer[p.peer] then
+		regen.stop(byPeer[p.peer])
+	end
 	byPeer[p.peer] = h
 	byUnit[p.unit] = h
+	-- (its passive regeneration's timer, from now till it leaves: regen.luau)
+	regen.start(h)
 	nox.after(numbers.timing.setUpAfter, function()
 		hero.setUp(h, nil)
 		local lv = record.level
@@ -407,6 +436,7 @@ function hero.leave(p: any)
 		return
 	end
 	hero.save(h, "leaving")
+	regen.stop(h)
 	if h.key then
 		store.release(h.key)
 	end

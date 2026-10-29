@@ -4,40 +4,53 @@
 --   store.luau     character records: made, read, migrated, written (nox.store)
 --   progress.luau  a character's progress through the acts (waypoints, deepest, cleared)
 --   hero.luau      the players' characters in play: set up, read back, experience and levels
+--   regen.luau     passive health and mana regeneration (a class's base and its tree's), a timer
+--                  per hero
 --   items.luau     item records and the game's items (modifiers, rarity, affixes)
 --   loot.luau      what deaths drop, rarity rules, how loot shows on the ground
 --   monsters.luau  packs, tiers, champions
 --   boss.luau      the act boss: its fight, its drop, the act cleared
---   combat.luau    the damage tiers and affixes change (onDamage)
+--   gate.luau      the gate in a lair to the next act: opened by its boss's death, kept for a
+--                  character who has killed it
+--   combat.luau    the damage tiers and affixes change, no damage within the party, no splash
+--                  from a hero's own Fireball (onDamage)
 --   casts.luau     a hero's casts: its missiles larger at the tree levels that say so
---                  (onSpellCast; Fireball 4 and 5)
---   areas.luau     the act's chain of generated areas, the next built ahead, the ways between
---   waypoints.luau waypoints: found, kept, travelled
+--                  (onSpellCast; Fireball 4 and 5); the cast-cost keystones' prices (castCost)
+--   summons.luau   the creatures the heroes summon: found as they come, watched
+--   team.luau      the party's one team: every hero and its creatures on it (the game's own "who
+--                  is an enemy" then spares the party: monsters' and creatures' foes, homing
+--                  missiles, pixies)
+--   areas.luau     the acts' chains of generated areas, the next built ahead, the ways between,
+--                  each outdoor area's weather
+--   waypoints.luau waypoints: found, kept, travelled (the town's waypoints window)
 --   votes.luau     the party's vote to change area (the whole game moves)
 --   portal.luau    the town portal (anyone's open portal takes the party back out, its owner gone
 --                  or not)
 --   party.luau     the party strip's numbers; the party's size for the scaling
 --   scale.luau     party scaling: monsters' health, damage and experience, packs, loot
 --   labels.luau    ground loot's labels on each player's UI
---   offers.luau    nox.choice offers and their answers
---   tree.luau      the passive tree's rules (points, nodes taken, respec, what it adds and gives)
+--   offers.luau    nox.choice offers and their answers (the open portals)
+--   tree.luau     the passive tree's rules (points, nodes taken, respec, what it adds and gives)
 --   book.luau      the spells (a warrior: the abilities) the tree gives, on the unit and its client
 --   windows.luau   the bigger windows: which are open, the carried list, their beat
 --   stash.luau     the stash at the town's chest
 --   vendor.luau    the vendor at the town's anvil
 --   treeview.luau  the passive tree's window
---   sheet.luau     the character sheet
---   town.luau      the town's stations
+--   sheet.luau     the character sheet (one's own, or a party member's from the strip)
+--   town.luau     the town's stations
 --   touch.luau     things worked by touching them
 --   hud.luau       what each player's UI shows (ui/main.luau draws it)
 --   data/*.luau    the tables it's all tuned by
 --   ../gen/*.luau  the area generator (run by nox.generate in its own VM)
 --
 -- Alone or as a party: the town (its stash, vendor, healer and the passive tree's respec), act 1's
--- chain of areas to its boss, waypoints and the town portal, monsters by tier, loot by rarity
+-- chain of areas to its boss and the gate it opens to act 2's (outdoors, with weather),
+-- waypoints and the town portal, monsters by tier, loot by rarity
 -- (named on the ground), a character that's kept with its passive tree, its spells from the tree,
--- and its stash. A party sees each other on the strip, votes to change area, shares its portals,
--- has a vendor stock each, splits each kill's experience and meets monsters scaled to its size.
+-- and its stash. A party sees each other on the strip (and each other's sheets), votes to change
+-- area, shares its portals, has a vendor stock each, splits each kill's experience, meets monsters
+-- scaled to its size, does no damage to itself or its creatures, and is one team (so the game's
+-- monsters, creatures and homing spells never take a member for a foe).
 --
 -- The game is a plain game, not a quest; a dead player keeps everything it carries and wears
 -- (keepThingsOnDeath), so a death costs nothing. The book is the mod's (bookIsTheMod): what the
@@ -47,6 +60,7 @@ local areas = require("areas")
 local boss = require("boss")
 local casts = require("casts")
 local combat = require("combat")
+local gate = require("gate")
 local hero = require("hero")
 local labels = require("labels")
 local loot = require("loot")
@@ -54,11 +68,15 @@ local monsters = require("monsters")
 local offers = require("offers")
 local party = require("party")
 local portal = require("portal")
-local _sheet = require("sheet") -- (it registers the sheet's window)
+local regen = require("regen")
+local sheet = require("sheet")
 local stash = require("stash")
+local summons = require("summons")
+local team = require("team")
 local treeview = require("treeview")
 local vendor = require("vendor")
 local votes = require("votes")
+local waypoints = require("waypoints")
 local windows = require("windows")
 local numbers = require("data/numbers")
 local town = require("town")
@@ -78,6 +96,7 @@ function mode.configure(ctx: any)
 end
 
 function mode.start()
+	team.start()
 	nox.every(numbers.timing.saveEvery, hero.saveAll, "every minute")
 	party.start()
 	labels.start()
@@ -97,18 +116,23 @@ end
 
 -- ---- Players
 
+-- A player joins (a rejoin too): onto the party's team at once, then its character; in a lair, the
+-- gate to the next act opened if its character has cleared the act.
 function mode.onJoin(player: any)
+	team.join(player.unit)
 	hero.join(player)
+	gate.joined(hero.byPeer(player.peer))
 	party.changed()
 end
 
 -- A player left: its record written, its open portal kept for the others, no longer waited for in
--- a vote.
+-- a vote, its sheet closed on the UIs showing it.
 function mode.onLeave(player: any)
 	portal.left(hero.byPeer(player.peer))
 	hero.leave(player)
 	offers.forget(player.peer)
 	votes.left(player.peer)
+	sheet.left(player.peer)
 	party.changed()
 end
 
@@ -130,7 +154,8 @@ function mode.onKill(victim: number, _killer: number?, _assist: number?)
 end
 
 -- The player's UI: its Town portal button, its windows (open and close; the stash's, the
--- vendor's and the tree's clicks), its options (the Character window's), its answer to a vote.
+-- vendor's, the tree's and the waypoints' clicks; the sheet, its own or a party member's), its
+-- options (the Character window's), its answer to a vote.
 function mode.onUiMessage(player: any, value: any)
 	if type(value) ~= "table" then
 		return
@@ -142,6 +167,9 @@ function mode.onUiMessage(player: any, value: any)
 	local kind = value.kind
 	if kind == "portal" then
 		portal.open(h)
+	elseif kind == "open" and value.window == "sheet" then
+		-- (`peer`: a party member's, from its card on the strip; none: its own)
+		sheet.show(h, tonumber(value.peer))
 	elseif kind == "open" and type(value.window) == "string" then
 		if value.fresh then
 			h.treeSent = nil -- (a UI without the tree's nodes: sent again)
@@ -155,6 +183,8 @@ function mode.onUiMessage(player: any, value: any)
 		vendor.message(h, value)
 	elseif kind == "tree" then
 		treeview.message(h, value)
+	elseif kind == "waypoints" then
+		waypoints.message(h, value)
 	elseif kind == "option" then
 		if type(value.name) == "string" and type(value.value) == "string" then
 			hero.setOption(h, value.name, value.value)
@@ -185,7 +215,7 @@ function mode.onChat(player: any, text: string): boolean?
 	return nil
 end
 
--- An answer to an offer (the town's waypoints, the open portals).
+-- An answer to an offer (the open portals).
 function mode.onChoice(player: any, index: number)
 	offers.chosen(player.peer, index)
 end
@@ -209,6 +239,7 @@ end
 -- A monster the mod made died: experience to the heroes, its loot on the ground (the act boss:
 -- its own drop, and the act cleared); both by the party's size (scale.luau).
 function mode.onObjectKilled(e: any)
+	summons.killed(e.id)
 	local m = monsters.killed(e.id)
 	if not m then
 		return
@@ -225,10 +256,24 @@ function mode.onDamage(target: number, source: number?, weapon: number?, amount:
 	return combat.onDamage(target, source, weapon, amount, kind)
 end
 
+-- A hero took a hit: its health's regeneration waits a moment (regen.luau).
+function mode.onDamaged(target: number, amount: number)
+	local h = hero.byUnit(target)
+	if h then
+		regen.hurt(h, amount)
+	end
+end
+
+-- A player's spell's price before it's paid: the cast-cost keystones' (casts.luau); nil the game's.
+function mode.castCost(caster: number, spell: string, cost: number, _how: string): (number?, number?)
+	return casts.cost(caster, spell, cost)
+end
+
 -- A spell cast (a player's; `made` what it made this frame): a hero's missiles sized by its tree
--- level (casts.luau).
+-- level (casts.luau); a hero's summoning watched for its creature (summons.luau).
 function mode.onSpellCast(caster: number, spell: any, _target: number?, _x: number, _y: number, made: { number }?)
 	casts.cast(caster, spell, made)
+	summons.cast(caster, spell)
 end
 
 -- An item picked up: out of the ground's index, its label cleared on every UI at once.

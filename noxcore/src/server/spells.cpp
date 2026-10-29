@@ -255,9 +255,14 @@ ServerObject* Spells::cursorTarget(const ServerObject& caster)
 
 int Spells::manaCost(const ServerObject& caster, std::uint32_t spell, bool trap) const
 {
+    return priceOf(world, things, spell, static_cast<bool>(caster.player), trap);
+}
+
+int Spells::priceOf(const World& world, const things::ThingDb& things, std::uint32_t spell, bool player, bool trap)
+{
     if (things::isSummonSpell(spell)) {
         // The summonings' prices (the exe's own table, things::kSummonManaCosts).
-        return caster.player ? things::summonManaCost(spell) : 0;
+        return player ? things::summonManaCost(spell) : 0;
     }
     // spellManaCost (2: a trap's).
     if (trap && (spell == 0x18 || spell == 0x2B || spell == 0x38)) {
@@ -265,6 +270,45 @@ int Spells::manaCost(const ServerObject& caster, std::uint32_t spell, bool trap)
     }
     const things::SpellDef* def = things.findSpell(spell);
     return def ? def->manaCost : 0;
+}
+
+ModeHooks::CastPrice Spells::castPrice(const ServerObject& caster, std::uint32_t spell, bool trap) const
+{
+    const int mana = manaCost(caster, spell, trap);
+    if (world.modeHooks) {
+        if (const auto price = world.modeHooks->castPrice(world, caster, spell, mana, trap)) {
+            return {std::clamp(price->mana, 0, 0xFFFF), std::clamp(price->health, 0, 0xFFFF)};
+        }
+    }
+    return {mana, 0};
+}
+
+bool Spells::canPay(const ServerObject& caster, const ModeHooks::CastPrice& price)
+{
+    const int mana = caster.player ? caster.player->mana : 0;
+    return price.mana <= mana && (price.health == 0 || price.health < caster.health);
+}
+
+void Spells::pay(ServerObject& caster, const ModeHooks::CastPrice& price)
+{
+    if (caster.player) {
+        caster.player->mana = static_cast<std::uint16_t>(std::max(caster.player->mana - price.mana, 0));
+    }
+    if (price.health > 0) {
+        caster.health = static_cast<std::uint16_t>(std::max(caster.health - price.health, 1)); // (a plain loss: no hit, no hurt)
+        caster.touch();
+    }
+}
+
+void Spells::refund(ServerObject& caster, const ModeHooks::CastPrice& price)
+{
+    if (caster.player) {
+        caster.player->mana = static_cast<std::uint16_t>(std::min<int>(caster.player->mana + price.mana, caster.player->maxMana));
+    }
+    if (price.health > 0) {
+        caster.health = static_cast<std::uint16_t>(std::min<int>(caster.health + price.health, caster.maxHealth));
+        caster.touch();
+    }
 }
 
 void Spells::request(ServerObject& caster, const std::array<std::uint32_t, 5>& spells, bool targetSelf)
@@ -365,14 +409,17 @@ bool Spells::start(ServerObject& caster, const std::array<std::uint32_t, 5>& spe
             return refuse(why);
         }
     } else {
-        // (spellCheckSmth) Its mana must reach each in turn, at a trap's prices.
+        // (spellCheckSmth) Its mana must reach each in turn, at a trap's prices. (noxcpp: a mode's
+        // price, its health too, kept at 1 or more.)
         int mana = p.mana;
+        int health = caster.health;
         for (const std::uint32_t s : listed) {
-            const int cost = manaCost(caster, s, true);
-            if (mana < cost) {
+            const ModeHooks::CastPrice price = castPrice(caster, s, true);
+            if (mana < price.mana || (price.health != 0 && health <= price.health)) {
                 return refuse(0xC, 0xE8);
             }
-            mana -= cost;
+            mana -= price.mana;
+            health -= price.health;
         }
         if (p.classId != 2) {
             // A wizard: not past MaxTrapCount glyphs out.
@@ -475,11 +522,11 @@ void Spells::update()
             const auto queued = std::span(p.trapSpells).first(p.trapCount);
             if (std::ranges::find(queued, spell) != queued.end()) {
                 tell(*caster, {0xA9, 0, 6, 0, 0, 0});
-            } else if (const int cost = manaCost(*caster, spell, true); p.mana < cost) {
+            } else if (const ModeHooks::CastPrice price = castPrice(*caster, spell, true); !canPay(*caster, price)) {
                 tell(*caster, {0xA9, 0, 0xB, 0, 0, 0});
                 playSound(world, 0xE8, *caster);
             } else {
-                p.mana = static_cast<std::uint16_t>(p.mana - cost);
+                pay(*caster, price);
                 p.trapSpells[p.trapCount++] = spell;
             }
         }
@@ -539,14 +586,15 @@ void Spells::finishCast(ServerObject& caster)
                 why = cantCastSpell(caster, spell, false);
             }
             if (why == 0) {
-                // Its mana, taken now and given back if the spell does nothing.
-                const int cost = manaCost(caster, spell, false);
-                if (p.mana < cost) {
+                // Its mana, taken now and given back if the spell does nothing. (noxcpp: a mode's
+                // price, its health too: castPrice.)
+                const ModeHooks::CastPrice price = castPrice(caster, spell, false);
+                if (!canPay(caster, price)) {
                     why = 0xB;
                     tell(caster, {0xA9, 0, lo(why), hi(why), 0, 0}); // MSG_INFORM 0: short of mana
                     playSound(world, 0xE8, caster);
                 } else {
-                    p.mana = static_cast<std::uint16_t>(p.mana - cost);
+                    pay(caster, price);
                     // At its chosen target (itself, or the creature its cursor was
                     // on as a book's spell ended; in a quest not a friend for a hostile spell) and
                     // the cursor.
@@ -556,7 +604,10 @@ void Spells::finishCast(ServerObject& caster)
                     }
                     // (noxcpp: where the new list stood, for a mode told of the cast: what it made.)
                     const std::size_t madeFrom = world.modeHooks ? world.newList().size() : 0;
-                    if (castByUser(spell, caster, target, p.cursorX, p.cursorY)) {
+                    paying = price;
+                    const bool went = castByUser(spell, caster, target, p.cursorX, p.cursorY); // (a refund inside clears paying)
+                    paying.reset();
+                    if (went) {
                         tell(caster, {0xA9, 1, lo(spell), hi(spell), 0, 0}); // MSG_INFORM 1: cast
                         if (world.modeHooks) {
                             const std::span<const std::uint32_t> fresh = world.newList();
@@ -564,7 +615,7 @@ void Spells::finishCast(ServerObject& caster)
                                                        fresh.subspan(std::min(madeFrom, fresh.size()))); // (noxcpp: told a mode)
                         }
                     } else {
-                        p.mana = static_cast<std::uint16_t>(std::min<int>(p.mana + cost, p.maxMana));
+                        refund(caster, price);
                         why = 8;
                     }
                 }
@@ -1017,7 +1068,12 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         Fight fight{world, rng, frame, &things, modifiers};
         if (target->poison == 0) {
             if (target == &caster && caster.player && def) { // (on itself unpoisoned: its mana back)
-                caster.player->mana = static_cast<std::uint16_t>(std::min<int>(caster.player->mana + def->manaCost, caster.player->maxMana));
+                if (paying) {
+                    refund(caster, *paying); // (noxcpp: what the cast paid, a mode's price too)
+                    paying.reset();
+                } else {
+                    caster.player->mana = static_cast<std::uint16_t>(std::min<int>(caster.player->mana + def->manaCost, caster.player->maxMana));
+                }
             }
             return true;
         }
@@ -1967,6 +2023,12 @@ int Spells::lastingStart(DurationSpell& s)
         if (!(t->classes & oc::Monster) || controls(world, *caster, *t)) {
             s.target = 0;
             playSound(world, 0x10, *caster);
+            return 1;
+        }
+        if (t->monster && t->monster->notCharmable) { // (noxcpp: a mode's, nox.setCharmable)
+            inform(*caster, "Summon.c:CreatureNotCharmable");
+            playSound(world, 0x10, *caster);
+            s.target = 0;
             return 1;
         }
         const int index = guideIndex(t->typeName);
@@ -3015,6 +3077,9 @@ int Spells::lastingUpdate(DurationSpell& s)
         }
         if (X87(300.0f) < edgeDistance53(*caster, *target)) {
             return broken("Summon.c:CharmBrokenDistance");
+        }
+        if (target->monster && target->monster->notCharmable) { // (noxcpp: made so mid-charm, a mode's: ended now)
+            return broken("Summon.c:CreatureControlImpossible");
         }
         if (s.end - 1 != frame) {
             return 0;

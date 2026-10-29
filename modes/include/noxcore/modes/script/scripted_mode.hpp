@@ -29,7 +29,7 @@
 // clearPointNear, endSpellEffects, minimap, sound), the engine's paths (heal, cast, enchant,
 // enchanted, damage, unitsNear, countNear, effect, spellSound, create, floorAt, wallAt, cosf, sinf,
 // monsterInfo, setHealth, touch, sightRange, textToAll; nearestFoes, applyForce, attack,
-// direction, directionOf, directionVector, newMark, madeSince, spellInfo, enchantTime, gameNumber,
+// direction, directionOf, directionVector, newMark, madeSince, spellInfo, setCharmable, enchantTime, gameNumber,
 // traceRay, shoot, summon, abilitySound, setPosition, setVelocity, setOwner, setTeam, setNoCollide,
 // damageAt, delete: each the engine's own function, its input checked; setHitRadius, setBurstScale:
 // one missile's own size (ServerObject::ModSize); thingType, present, living,
@@ -39,7 +39,7 @@
 // spells, raiseSpell, grantSpell, abilityLevel, setAbility, fieldGuide, clearBook, revoke,
 // sendRevokes; its quest fields: status, gameOverAt, setGameOverAt, exitGate; the quest's rewards:
 // rewards, rewardAt; setOnOff, unitSay; the game: setServerName, questStage, exitTo, lock, unlock,
-// allow; isEnemy, chests, giveItem, createTeam, joinTeam, removeTeam; soundAt, gameRandom: the
+// allow; isEnemy, chests, giveItem, createTeam, joinTeam, removeTeam, gameplay; soundAt, gameRandom: the
 // server's game stream), seeded streams
 // (mt19937 and its
 // stream:next(), shuffle as the C++'s util::shuffle, mul32), teams and scores (teams, teamScore,

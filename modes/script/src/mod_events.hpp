@@ -25,7 +25,7 @@ public:
 
     struct Has {
         bool onObjectKilled = false, onDestroyed = false, onDamage = false, onDamaged = false, onPickup = false,
-             onDrop = false, onEquip = false, onSpellCast = false, onExit = false;
+             onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false;
     };
     /// Which of them the script's mode table (on top of L's stack) has (each load).
     void look(lua_State* L);
@@ -49,6 +49,10 @@ public:
                 const server::ServerObject* weapon, int& amount, int type);
     /// onExit(exit, player) -> false holds the player at the exit.
     bool exitTouched(lua_State* L, const server::ServerObject& exit, const server::ServerObject& player);
+    /// castCost(caster, spell, cost, how) -> nil (the game's price) | mana [, health]: a player's
+    /// spell's price (`how` "cast", or "trap": into a glyph's trap). False: the game's (`mana`,
+    /// `health` untouched).
+    bool castCost(lua_State* L, const server::ServerObject& caster, std::uint32_t spell, int cost, bool trap, int& mana, int& health);
 
     /// The recorded events to the script's hooks, in order (each its own protected call).
     void deliver(lua_State* L);

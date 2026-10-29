@@ -45,6 +45,12 @@ inline constexpr std::uint8_t kDialog = 8;
 /// reliable message's room): {u16 the whole's size, u16 this part's place in it, its bytes}; the
 /// whole is its server sections as a quest's SAVEDATA carries them.
 inline constexpr std::uint8_t kCharacter = 10;
+/// The party's creatures: every party member's summons and charmed creatures (those in its summon
+/// panel), for the friend dot over them: {u8 count, each u16 net code}, the whole list each time
+/// it changes (and as a player comes in). An older client lets an unknown sub go.
+inline constexpr std::uint8_t kCreatures = 11;
+/// The most net codes kCreatures carries (a party of 4 controls 20 at most: 5 each).
+inline constexpr std::size_t kCreaturesMost = 64;
 
 // ---- client to server
 /// A guest's chapter screen is over (clicked away, or its time ran out): {}.
@@ -140,6 +146,8 @@ std::vector<std::uint8_t> cineMessage(const Cine& c);
 std::vector<std::uint8_t> chapterMessage(const Chapter& c);
 std::vector<std::uint8_t> readyStateMessage(std::uint8_t reading, std::uint8_t of);
 std::vector<std::uint8_t> dialogMessage(const DialogMirror& d);
+std::vector<std::uint8_t> creaturesMessage(std::span<const std::uint16_t> netCodes);
+std::optional<std::vector<std::uint16_t>> parseCreatures(std::span<const std::uint8_t> rest);
 std::vector<std::uint8_t> chapterReadyMessage();
 std::vector<std::uint8_t> hostCmdMessage(HostCmd cmd);
 /// The file's parts (none when it's empty or too big: kCharacterMost).

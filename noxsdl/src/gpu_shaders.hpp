@@ -15,10 +15,14 @@
 //              stamped from a texture (also off with --stock-effects).
 //   fx_glowline  a line of those glow discs (lightning, beams) summed in one quad per segment
 //              instead of thousands of overlapping discs.
-//   fx_puff    soft, noisy puffs of smoke and gas: toxic clouds and smoke blasts as particles
-//              instead of the game's hard-edged sprites (effects_puffs.cpp; --stock-effects).
+//   fx_puff    soft, noisy puffs of smoke and gas: toxic clouds (HD Spell FX) and smoke blasts
+//              (Smooth FX) as particles instead of the game's hard-edged sprites
+//              (effects_puffs.cpp; --stock-effects).
 //   fx_barrier the Force Field as a glassy honeycomb sphere instead of the game's
-//              SphericalShieldAnim (effects_enchant.cpp; --stock-effects).
+//              SphericalShieldAnim (effects_enchant.cpp; HD Spell FX, --stock-effects).
+//   fx_ripple  the Reflective Shield as a disc of rippling water at the screen's resolution
+//              instead of the game's ReflectiveShield* animations (effects_enchant.cpp; HD Spell
+//              FX, --stock-effects).
 //   bloom_blur the blur of the effects' bloom (bloom.hpp; --no-bloom, --bloom N).
 //   bloom_bright  the bright parts of light sources' sprites, for the bloom.
 //   fx_light   the game's light formula per screen pixel (lighting.hpp; --grid-light keeps the
@@ -70,6 +74,8 @@ public:
     SDL_GPURenderState* puff() const { return puff_; }
     /// The Force Field's barrier (shaders/fx_barrier.frag.hlsl).
     SDL_GPURenderState* barrier() const { return barrier_; }
+    /// The Reflective Shield's water disc (shaders/fx_ripple.frag.hlsl).
+    SDL_GPURenderState* ripple() const { return ripple_; }
     SDL_GPURenderState* blur() const { return blur_; }
     SDL_GPURenderState* bright() const { return bright_; }
     SDL_GPURenderState* light() const { return light_; }
@@ -98,6 +104,7 @@ private:
     SDL_GPURenderState* glowLine_ = nullptr;
     SDL_GPURenderState* puff_ = nullptr;
     SDL_GPURenderState* barrier_ = nullptr;
+    SDL_GPURenderState* ripple_ = nullptr;
     SDL_GPURenderState* blur_ = nullptr;
     SDL_GPURenderState* bright_ = nullptr;
     SDL_GPURenderState* light_ = nullptr;

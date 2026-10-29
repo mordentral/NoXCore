@@ -296,6 +296,8 @@ public:
     /// Hosting a mode whose director picks the maps (a NoX Core mode or a map editor session): no
     /// Server Settings.
     bool directed() const noexcept { return serverMode_ != nullptr || edit_.has_value(); }
+    /// The NoX Core mode hosted (HostSettings::modeId); empty: none. Set once, as it's made.
+    const std::string& modeId() const noexcept { return modeId_; }
     /// Hosting a map editor session (HostSettings::editSession).
     bool editSession() const noexcept { return edit_.has_value(); }
     /// A map editor session's director (nullptr: not one). As game(): only on the server thread,

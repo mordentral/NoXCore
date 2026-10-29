@@ -1,8 +1,11 @@
 --!strict
--- A hero's casts (onSpellCast): a spell whose rise has a `size` (data/tree.luau) makes its
--- missiles larger at the levels it names. Fireball 4 and 5: the TitanFireball a cast makes gets a
--- wider burst (nox.setBurstScale), a hit circle (nox.setHitRadius) and is drawn larger
--- (nox.setDrawScale; NoX Core clients at client level 5 draw its burst to match).
+-- A hero's casts: a spell whose rise has a `size` (data/tree.luau) makes its missiles larger at the
+-- levels it names (onSpellCast); and the cast-cost keystones lower a cast's price before it's paid
+-- (castCost).
+--
+-- Larger missiles. Fireball 4 and 5: the TitanFireball a cast makes gets a wider burst
+-- (nox.setBurstScale), a hit circle (nox.setHitRadius) and is drawn larger (nox.setDrawScale; NoX
+-- Core clients at client level 5 draw its burst to match).
 --
 --   * Only a hero's cast: a monster's (or anyone's not set up as a hero) is left as the game made
 --     it.
@@ -16,6 +19,11 @@
 --     flight first comes clear of that grown shape, so the circle doesn't burst it in the hero's
 --     face. After that the hero is a body like any other: a Fireball turned back still hits it.
 --
+-- The cast-cost keystones (by decision 2026-10-29): a hero whose tree has spellCost (or, for a
+-- summoning, summonCost) other than 0 pays the game's price changed by that share, before the cast
+-- (so a cast needs only the lowered price to start; the game's own refusal when short, and its
+-- refunds, follow the lowered price). A glyph's trap is priced the same way.
+--
 -- The engine hands the cast's things over in the frame they are made, before they first fly.
 -- Nothing here walks the world: the cast's own list and one book lookup.
 
@@ -24,14 +32,39 @@ local hero = require("hero")
 
 local casts = {}
 
+-- The summon spells (their price is summonCost's).
+local summoning: { [string]: boolean } = {}
+for _, c in (data.creatures :: any) do
+	summoning[c.spell] = true
+end
+
+-- A hero's price for `spell` (the game's `cost`), the cast-cost keystones applied: mana and health
+-- (always 0), or nil for the game's.
+function casts.cost(caster: number, spell: string, cost: number): (number?, number?)
+	local h = hero.byUnit(caster)
+	if not h or cost <= 0 then
+		return nil, nil
+	end
+	local pct: number = if summoning[spell] then h.bonus.summonCost or 0 else h.bonus.spellCost or 0
+	if pct == 0 then
+		return nil, nil
+	end
+	local change = math.floor(cost * math.abs(pct) / 100 + 0.5)
+	return math.max(0, if pct < 0 then cost - change else cost + change), 0
+end
+
 -- A cast heard (main.luau's onSpellCast): `spell` its name (a number for one the game has no
 -- name for), `made` the ids it made (nil: none).
 function casts.cast(caster: number, spell: string | number, made: { number }?)
-	if not made or type(spell) ~= "string" then
+	if type(spell) ~= "string" then
+		return
+	end
+	local h = hero.byUnit(caster)
+	if not h then
 		return
 	end
 	local size = data.rise(spell).size
-	if not size or not hero.byUnit(caster) then
+	if not made or not size then
 		return
 	end
 	local at = size.byLevel[nox.spellLevel(caster, spell)]

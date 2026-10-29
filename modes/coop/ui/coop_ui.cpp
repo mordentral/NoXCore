@@ -115,6 +115,20 @@ public:
         reading_ = {};
         dialogSeen_ = 0;
         barsLooked_ = false;
+        app_.partyDots = false;
+        app_.partyCreatures.clear();
+        creaturesSeen_ = 0;
+    }
+
+    /// Each frame: the friend dot over the party's creatures while we're in the campaign
+    /// (friend_dot.hpp, VD-39), the session's list copied as it changes.
+    void update(App& app) override
+    {
+        app.partyDots = coop_ && coop_->inCampaign();
+        if (coop_ && coop_->partyCreaturesVersion() != creaturesSeen_) {
+            creaturesSeen_ = coop_->partyCreaturesVersion();
+            app.partyCreatures = coop_->partyCreatures();
+        }
     }
 
     /// Each frame: the rules' notices shown (in the middle of the screen, and the console); a
@@ -236,6 +250,7 @@ private:
     Reading reading_;
     std::uint32_t dialogSeen_ = 0;
     bool barsLooked_ = false;
+    std::uint32_t creaturesSeen_ = 0; ///< (CoopClient::partyCreaturesVersion copied to App::partyCreatures)
 };
 
 } // namespace

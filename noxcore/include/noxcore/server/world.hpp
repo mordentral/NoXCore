@@ -898,6 +898,9 @@ struct ServerObject {
         /// feed (killKind / killType). Kind 2 type 2 at its death: a Berserker kill.
         std::uint32_t killKind = 0;
         std::uint32_t killType = 0;
+        /// noxcpp (a mode's: nox.setCharmable): Charm refuses it as one not charmable, and a charm
+        /// on it when it's set ends uncontrolled. Not kept in a saved map.
+        bool notCharmable = false;
         /// The facing it turns to (Direction2), taken at the motion's end (-1: none).
         int turnTo = -1;
         /// An NPC's (subclass 0x10) worn things (npc.hpp): its worn weapons' equip-flag bits
@@ -1726,6 +1729,14 @@ public:
     /// settings records), but the game's own checks don't act on them (enforcedLessonLimit,
     /// enforcedTimeLimit: 0, so no native win, timer or time-up). Stock and every other game: off.
     bool modeOwnsLimits = false;
+    /// noxcpp (Server::Options::pickupAnyClass, a mode's): a player picks up a weapon, armour or
+    /// potion its class can't use (the class check at pickup skipped, as a solo or quest game
+    /// skips it), never wearing it: equipping still asks the class (and isn't tried at pickup).
+    /// Stock and every other game: off.
+    bool pickupAnyClass = false;
+    /// noxcpp (Server::Options::pickupDuplicates, a mode's): under server option 2 a player picks
+    /// up a second of a weapon or armour it carries (the chakram's one-about rule stays). Off.
+    bool pickupDuplicates = false;
     /// noxcpp (a mode's): players have nothing to fight with by hand, a bare-handed punch too
     /// (the player's attack does nothing). Stock: off.
     bool noBareHands = false;
@@ -1923,6 +1934,10 @@ public:
     std::uint32_t frameNow = 0;
     /// Creatures put in an owner's list so far (ServerObject::ownedOrder).
     std::uint32_t ownedCount = 0;
+    /// (noxcpp's) MSG_REPORT_ACQUIRE_CREATURE / _LOSE_CREATURE told so far (reportAcquired,
+    /// loseCreature): a mode that mirrors the players' creatures (the co-op party's friend dots)
+    /// looks at them again only when this moves. Bookkeeping only.
+    std::uint32_t creatureReports = 0;
     /// The sounds monsters may hear (the MonsterListen list, newest last): a sound with
     /// a hearing of a creature or player (up its owners), not to one player; kept 2 frames.
     struct HeardSound {

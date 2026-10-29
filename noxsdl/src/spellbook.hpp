@@ -59,7 +59,9 @@ struct BookContext {
     /// and creature shown (guiSpellSortList's test). A solo game's book (0x800 alone, the co-op
     /// campaign's too) shows only those known.
     bool allKnown = false;
-    std::uint32_t frame = 0;      ///< the game frame (the page animations)
+    /// The client's own frame (clockFrame: 30 a second, running on while a solo game is paused for
+    /// an award): the page turns and the sparks (book_award.hpp).
+    std::uint32_t frame = 0;
     /// noxcpp's multiclass, a mode's: every class's spells and the abilities in one book, an
     /// ability's entry tagged (nox::client::kAbilityTag); the guide whatever the class.
     bool multiclass = false;

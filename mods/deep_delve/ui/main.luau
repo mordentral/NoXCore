@@ -9,6 +9,7 @@
 --           No, or Cancel for its asker) and each member's answer under their card, and the
 --           finished vote's line for a few seconds after. It takes the mouse only over its cards
 --           and, during a vote, its row (nox.hitArea); a click anywhere else is the game's. A
+--           click on a card shows that member's character sheet (one's own card: one's own). A
 --           player alone in the game has none: it opens when a second player joins and closes
 --           when they leave;
 --   hero    (the Character window) the character's name, level and experience, the area, the Town
@@ -20,14 +21,21 @@
 --   vendor  (touching the town's anvil) its own stock and what the character carries: a click buys
 --           or sells, a right click rerolls a magic or rare piece;
 --   tree    the passive tree: nodes and the lines between them, panned by dragging (or the arrows,
---           on screen or the keys) and zoomed by the wheel (or 1-3); a click takes a node; Respec
---           by the fountain;
---   sheet   the character sheet.
+--           on screen or the keys) and zoomed by the wheel (or 1-3); a click takes a node, a
+--           right click on one taken gives it back alone (anywhere, for gold); a node's
+--           tooltip says what it gives the hero's class; Respec by the fountain;
+--   sheet   the character sheet: one's own, or (from a card on the strip) a party member's, read
+--           only, kept current while it shows;
+--   waypoints (stepping on the town's waypoints pentagram) the waypoints by act (each act open to
+--           the character) and area, the ones found to click (this area's: a step, no vote;
+--           another's, in any act listed: the party's vote, or at once when alone), the area being
+--           played marked.
 --
 -- The pictures are the mod's own (assets\tree\): the tree's backdrop under its links and nodes; a
 -- root's, small's, notable's or keystone's picture as that node (the server names it, "ic"), framed
 -- by its state (taken, open, locked); the class's root picture on each party card; the town
--- portal's, the stash's, the vendor's and the fountain's (by Respec) beside their buttons. A
+-- portal's, the stash's, the vendor's, the waypoints' (in its window's heading) and the
+-- fountain's (by Respec) beside their buttons. A
 -- spell, ability or summon node is the game's own icon for it (nox.spellIcon; the server names
 -- it, "si": a SPELL_* or ABILITY_* name, a summon's spell), framed the same way.
 --
@@ -43,12 +51,17 @@
 --
 -- A list too long for one value comes in parts with a serial (hud.parts); the newest whole list
 -- is drawn, the one before it until the next is whole.
+--
+-- On a screen wider or taller than 4:3 the Character window keeps to the screen's top left corner
+-- (anchor "topleft"), and the party strip and the boss's bar to its top edge (anchor "top"); the
+-- station windows (stash, vendor, waypoints, tree, sheet) stay centred.
 
 local ui = {}
 
 local W, H = 168, 104
 local BOSS_W, BOSS_H = 220, 26
--- The framed windows start below the party strip.
+-- The framed windows start below the party strip: with four or more cards (up to six) it spans
+-- the screen's top left corner on a wide screen too, and with three at 4:3.
 local TOP = 84
 
 local shown: any = nil
@@ -273,7 +286,7 @@ local function placeStrip()
 	end
 	stripSpec = spec
 	-- (placed so the cards stay where they are as the row comes and goes)
-	nox.window("party", { frame = false, hud = true, x = (640 - cardsW) // 2 - (w - cardsW) // 2, y = 2, w = w, h = h })
+	nox.window("party", { frame = false, hud = true, anchor = "top", x = (640 - cardsW) // 2 - (w - cardsW) // 2, y = 2, w = w, h = h })
 end
 
 -- Text cut to `width` (an ellipsis where it was cut).
@@ -336,7 +349,7 @@ local function drawVote(w: number)
 		nox.hitArea(x0, VOTE_Y, VOTE_W, VOTE_H)
 		nox.box(x0, VOTE_Y, VOTE_W, VOTE_H, { 20, 16, 10, 225 })
 		nox.outline(x0, VOTE_Y, VOTE_W, VOTE_H, { 200, 160, 70 })
-		local line = tostring(v.by) .. ": on to " .. tostring(v.to) .. (if v.how == "waypoint" then " (waypoint)" else "") .. "? "
+		local line = tostring(v.by) .. ": on to " .. tostring(v.to) .. (if v.how == "waypoint" then " (waypoint)" elseif v.how == "gate" then " (gate)" else "") .. "? "
 			.. tostring(v.yes or 0) .. "/" .. tostring(v.of or 0) .. ", " .. tostring(left) .. " s"
 		local room = VOTE_W - 8 - (if v.mine == "?" then 76 elseif v.asker then 56 else 0)
 		nox.text(fit(line, room), x0 + 4, VOTE_Y + 4, "bright")
@@ -449,20 +462,39 @@ local function drawParty()
 	local me = nox.player()
 	local myName = me and string.sub(me.name, 1, 16)
 	-- (each card takes the mouse, its answer line under it during a vote; the gaps between are the
-	-- game's)
+	-- game's. A click on a card shows that member's sheet: one's own card, one's own.)
 	local cardH = if vote and vote.active then CARD_H + 4 else CARD_H
+	local mx, my = mouseIn("party")
+	local hot: any = nil
 	for i, m in party do
 		local x = (w - cardsW) // 2 + (i - 1) * (cw + GAP)
+		local mine = m.n == myName
 		nox.hitArea(x, 0, cw, cardH)
-		drawCard(m, x, cw, m.n == myName)
+		drawCard(m, x, cw, mine)
+		zone("party", x, 0, cw, CARD_H, function()
+			nox.send({ kind = "open", window = "sheet", peer = if mine then nil else m.p })
+		end)
+		if over(mx, my, x, 0, cw, CARD_H) then
+			hot = m
+			nox.outline(x + 1, 1, cw - 2, CARD_H - 2, { 120, 100, 60 })
+		end
 	end
 	drawVote(w)
+	if hot then
+		nox.tooltip({
+			{ tostring(hot.n), if hot.n == myName then { 230, 190, 80 } else "bright" },
+			{ if hot.n == myName then "Click: your character sheet." else "Click: their character sheet.", "dim" },
+		})
+	end
 end
 
 -- ---- The hero's window
 
 local function openTreeOrSheet(name: string)
-	if opened[name] then
+	-- (the sheet showing a party member's: one's own shown in its place)
+	local sheetNow: any = whole.sheet
+	local showsMember = name == "sheet" and sheetNow ~= nil and sheetNow.of ~= nil
+	if opened[name] and not showsMember then
 		opened[name] = nil
 		nox.closeWindow(name)
 		nox.send({ kind = "close", window = name })
@@ -696,6 +728,12 @@ local function drawVendor()
 end
 
 -- ---- The passive tree
+--
+-- What a frame draws is worked out only when it changes: the tree's links and clicks once a tree
+-- (treeNodes), which nodes are taken or open once a state (treeMarks), and where each link's
+-- piece and each node in view goes once a zoom, pan, state or tree (layTree). A frame then draws
+-- what was laid out, finds the node under the mouse, and hands the laid-out clicks on; it builds
+-- no strings and makes no tables.
 
 local TW, TH = 600, 420
 local CANVAS_H = 344
@@ -710,6 +748,11 @@ local REGION_COLOUR: { [number]: { number } } = {
 	[2] = { 95, 145, 235 },
 	[3] = { 95, 205, 115 },
 }
+-- (a node with no picture: its fill while open, half its region's colour)
+local REGION_HALF: { [number]: { number } } = {}
+for c, rc in REGION_COLOUR do
+	REGION_HALF[c] = { rc[1] // 2, rc[2] // 2, rc[3] // 2 }
+end
 local CLASS_REGION: { [string]: number } = { warrior = 1, wizard = 2, conjurer = 3 }
 -- A node's size by its kind and the zoom: at the biggest zoom a keystone 30, a root or notable 26,
 -- a spell, ability or summon 22, a small 18; smaller with the zoom's unit at the others, never
@@ -728,14 +771,37 @@ end
 local TAKEN_EDGE = { 255, 214, 96 }
 local TAKEN_INNER = { 255, 248, 226 }
 local LOCKED_EDGE = { 64, 58, 48 }
+local LINK_LIT = { 230, 190, 90 }
+local LINK_DIM = { 80, 72, 60 }
+local BOX_TAKEN = { 235, 195, 90 }
+local BOX_LOCKED = { 34, 30, 26 }
+local BOX_EDGE = { 90, 80, 66 }
+local BOX_MARK = { 120, 60, 20 }
+local FOOT_BACK = { 14, 11, 8 }
+local FOOT_LINE = { 110, 84, 44 }
+local TIP_WORDS = { 235, 230, 215 }
+local TIP_STATUS = { 160, 150, 130 }
+local TIP_BACK = { 10, 8, 6, 240 }
+local TIP_EDGE = { 160, 120, 40 }
+local TIP_FRAME = { 90, 70, 40 }
 -- A node's tooltip picture's size.
 local TIP_ICON = 48
+local HINT = "A node next to one you have takes a point. A right click on one you have gives it back."
 
 local nodeIndex: any = nil -- id -> node, made when a new tree comes
 local nodeNear: { [number]: { number } } = {} -- id -> its neighbours, both ways
 local nodeIcon: { [number]: string } = {} -- id -> its picture's asset name ("tree/..."), if any
 local nodeSpell: { [number]: string } = {} -- id -> the game's icon's name (nox.spellIcon), if any
 local nodeIndexOf: number = -1
+-- Made with the index: the nodes in the order they're drawn; the links as drawn (each node's own,
+-- in that order), link k from linkA[k] to linkB[k]; each node's click (taking it).
+local nodeOrder: { any } = {}
+local linkA: { any } = {}
+local linkB: { any } = {}
+local nodeTake: { [number]: () -> () } = {}
+-- Each node's click once taken: a right click asks to give it back alone (any other click isn't
+-- the tree's: false).
+local nodeRefund: { [number]: (number) -> boolean } = {}
 
 local function treeNodes(): any
 	local d = whole.treeData
@@ -747,6 +813,8 @@ local function treeNodes(): any
 		nodeNear = {}
 		nodeIcon = {}
 		nodeSpell = {}
+		nodeTake = {}
+		nodeRefund = {}
 		for _, n in d.items do
 			nodeIndex[n.i] = n
 			if type(n.ic) == "string" then
@@ -761,10 +829,172 @@ local function treeNodes(): any
 				table.insert(nodeNear[id], n.i)
 			end
 		end
+		nodeOrder = {}
+		linkA = {}
+		linkB = {}
+		for _, n in nodeIndex do
+			table.insert(nodeOrder, n)
+			local id = n.i
+			nodeTake[id] = function()
+				nox.send({ kind = "tree", op = "take", id = id })
+			end
+			nodeRefund[id] = function(b: number): boolean
+				if b ~= 2 then
+					return false
+				end
+				nox.send({ kind = "tree", op = "refund", id = id })
+				return true
+			end
+			for _, other in n.l or {} do
+				local m = nodeIndex[other]
+				if m then
+					table.insert(linkA, n)
+					table.insert(linkB, m)
+				end
+			end
+		end
 		nodeIndexOf = d.serial
 		centred = false
 	end
 	return nodeIndex
+end
+
+-- Which nodes are taken and which open (next to a taken one), and which links lit (both ends
+-- taken): worked out once a state (its taken marks) and tree.
+local marksOf: string? = nil
+local marksTree = -1
+local nodeHave: { [number]: boolean } = {}
+local nodeOpen: { [number]: boolean } = {}
+local linkLit: { boolean } = {}
+
+local function treeMarks(taken: string)
+	if taken == marksOf and marksTree == nodeIndexOf then
+		return
+	end
+	marksOf = taken
+	marksTree = nodeIndexOf
+	table.clear(nodeHave)
+	table.clear(nodeOpen)
+	for _, n in nodeOrder do
+		local id = n.i
+		local have = string.sub(taken, id, id) == "1"
+		local open = false
+		if not have then
+			for _, near in nodeNear[id] or {} do
+				open = open or string.sub(taken, near, near) == "1"
+			end
+		end
+		nodeHave[id] = have
+		nodeOpen[id] = open
+	end
+	table.clear(linkLit)
+	for k = 1, #linkA do
+		linkLit[k] = nodeHave[linkA[k].i] == true and nodeHave[linkB[k].i] == true
+	end
+end
+
+-- One edge of the canvas cutting a link's piece (t0..t1 along it): whether any is left, and what.
+local function clipEdge(p: number, q: number, t0: number, t1: number): (boolean, number, number)
+	if p == 0 then
+		return q >= 0, t0, t1
+	end
+	local r = q / p
+	if p < 0 then
+		if r > t1 then
+			return false, t0, t1
+		end
+		return true, math.max(t0, r), t1
+	end
+	if r < t0 then
+		return false, t0, t1
+	end
+	return true, t0, math.min(t1, r)
+end
+
+-- The canvas as laid out for a zoom, a pan, a state and a tree (the key below): each link's piece
+-- inside the canvas (4 numbers each in segs, lit or not in segLit), the nodes in view (inView: an
+-- entry a node, { n, bx, by, s }, kept by node id and filled afresh), and their clicks (canvasZones:
+-- a zone a node, kept by node id and moved afresh: one not taken is taken by a click, one taken
+-- given back by a right click).
+local laidTree = -1
+local laidMarks: string? = nil
+local laidZoom = 0
+local laidX, laidY = 0, 0
+local segs: { number } = {}
+local segLit: { boolean } = {}
+local segCount = 0
+local inView: { any } = {}
+local inViewCount = 0
+local canvasZones: { any } = {}
+local nodeEntry: { [number]: any } = {}
+local nodeZone: { [number]: any } = {}
+
+local function layTree()
+	laidTree, laidMarks, laidZoom, laidX, laidY = nodeIndexOf, marksOf, zoom, panX, panY
+	local unit = ZOOMS[zoom]
+	local sizes = SIZES[zoom]
+	local ox, oy = TW / 2 + panX, CANVAS_H / 2 + panY
+	-- The links: each one's part inside the canvas, if any.
+	segCount = 0
+	for k = 1, #linkA do
+		local n, m = linkA[k], linkB[k]
+		local x1, y1 = ox + n.x * unit, oy + n.y * unit
+		local x2, y2 = ox + m.x * unit, oy + m.y * unit
+		local dx, dy = x2 - x1, y2 - y1
+		local ok, t0, t1 = clipEdge(-dx, x1, 0, 1)
+		if ok then
+			ok, t0, t1 = clipEdge(dx, TW - x1, t0, t1)
+		end
+		if ok then
+			ok, t0, t1 = clipEdge(-dy, y1, t0, t1)
+		end
+		if ok then
+			ok, t0, t1 = clipEdge(dy, CANVAS_H - y1, t0, t1)
+		end
+		if ok then
+			segCount += 1
+			local b = segCount * 4
+			segs[b - 3] = x1 + t0 * dx
+			segs[b - 2] = y1 + t0 * dy
+			segs[b - 1] = x1 + t1 * dx
+			segs[b] = y1 + t1 * dy
+			segLit[segCount] = linkLit[k]
+		end
+	end
+	-- The nodes in view (a node reaching past the canvas: the window cuts it at the sides and the
+	-- top, the foot drawn after covers it below), and their clicks, kept to the canvas (the foot's
+	-- own below).
+	inViewCount = 0
+	table.clear(canvasZones)
+	for _, n in nodeOrder do
+		local x, y = ox + n.x * unit, oy + n.y * unit
+		local s = sizes[n.k] or sizes.s
+		if x > -s and x < TW + s and y > -s and y < CANVAS_H + s then
+			local id = n.i
+			local e = nodeEntry[id]
+			if not e then
+				e = {}
+				nodeEntry[id] = e
+			end
+			local bx, by = x - s / 2, y - s / 2
+			e.n, e.bx, e.by, e.s = n, bx, by, s
+			inViewCount += 1
+			inView[inViewCount] = e
+			-- (not taken: a click takes it; taken: a right click gives it back)
+			local zy = math.max(by - 2, 0)
+			local zh = math.min(by + s + 2, CANVAS_H) - zy
+			if zh > 0 then
+				local z = nodeZone[id]
+				if not z then
+					z = {}
+					nodeZone[id] = z
+				end
+				z.x, z.y, z.w, z.h = bx - 2, zy, s + 4, zh
+				z.fn = if nodeHave[id] then nodeRefund[id] else nodeTake[id]
+				table.insert(canvasZones, z)
+			end
+		end
+	end
 end
 
 local function centre()
@@ -797,6 +1027,29 @@ local function setZoom(z: number)
 	panX, panY = panX * new / old, panY * new / old
 end
 
+-- The foot's buttons' clicks.
+local function panWest()
+	pan(1, 0)
+end
+local function panNorth()
+	pan(0, 1)
+end
+local function panSouth()
+	pan(0, -1)
+end
+local function panEast()
+	pan(-1, 0)
+end
+local function zoomIn()
+	setZoom(zoom + 1)
+end
+local function zoomOut()
+	setZoom(zoom - 1)
+end
+local function respec()
+	nox.send({ kind = "tree", op = "respec" })
+end
+
 -- A box clipped to the canvas.
 local function clipBox(x: number, y: number, w: number, h: number, colour: any)
 	local x2, y2 = math.min(x + w, TW), math.min(y + h, CANVAS_H)
@@ -806,62 +1059,94 @@ local function clipBox(x: number, y: number, w: number, h: number, colour: any)
 	end
 end
 
--- A line clipped to the canvas (its part inside, if any).
-local function clipLine(x1: number, y1: number, x2: number, y2: number, colour: any, width: number)
-	local t0, t1 = 0, 1
-	local dx, dy = x2 - x1, y2 - y1
-	for _, e in { { -dx, x1 }, { dx, TW - x1 }, { -dy, y1 }, { dy, CANVAS_H - y1 } } do
-		local p, q = e[1], e[2]
-		if p == 0 then
-			if q < 0 then
-				return
-			end
-		else
-			local r = q / p
-			if p < 0 then
-				if r > t1 then
-					return
-				end
-				t0 = math.max(t0, r)
-			else
-				if r < t0 then
-					return
-				end
-				t1 = math.min(t1, r)
-			end
-		end
-	end
-	nox.line(x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy, colour, width)
-end
-
 -- A tree node's tooltip, drawn in the tree's window (nox.tooltip carries words alone): its
--- picture (the mod's `img`, or the game's icon `spell`) at TIP_ICON beside its words, by the
--- mouse, kept inside the window.
-local function tipNode(lines: { any }, img: string?, spell: string?, mx: number, my: number)
+-- picture (the mod's `img`, or the game's icon `spell`) at TIP_ICON beside its words (`widest`
+-- the widest line), by the mouse, kept inside the window.
+local function tipNode(lines: { any }, widest: number, img: string?, spell: string?, mx: number, my: number)
 	local lineH = 11
-	local widest = 0
-	for _, l in lines do
-		widest = math.max(widest, nox.textWidth(l[1]))
-	end
 	local pictured = img ~= nil or spell ~= nil
 	local left = if pictured then TIP_ICON + 8 else 0
 	local w = 4 + left + widest + 6
 	local h = math.max(#lines * lineH + 6, if pictured then TIP_ICON + 8 else 0)
 	local x: number = math.clamp(if mx + 14 + w <= TW then mx + 14 else mx - 8 - w, 0, math.max(0, TW - w))
 	local y: number = math.clamp(if my + 14 + h <= TH then my + 14 else my - 8 - h, 0, math.max(0, TH - h))
-	nox.box(x, y, w, h, { 10, 8, 6, 240 })
-	nox.outline(x, y, w, h, { 160, 120, 40 })
+	nox.box(x, y, w, h, TIP_BACK)
+	nox.outline(x, y, w, h, TIP_EDGE)
 	if img then
 		nox.image(img, x + 4, y + 4, TIP_ICON, TIP_ICON)
 	elseif spell then
 		nox.spellIcon(spell, x + 4, y + 4, TIP_ICON, TIP_ICON)
 	end
 	if pictured then
-		nox.outline(x + 4, y + 4, TIP_ICON, TIP_ICON, { 90, 70, 40 })
+		nox.outline(x + 4, y + 4, TIP_ICON, TIP_ICON, TIP_FRAME)
 	end
 	for i, l in lines do
 		nox.text(l[1], x + 4 + left, y + 3 + (i - 1) * lineH, l[2])
 	end
+end
+
+-- The words a state gives the foot (made once a state), and the tooltip's lines for a node, taken
+-- or not (made once each, and again with each state).
+local footOf: any = nil
+local footPoints = ""
+local footRespec = ""
+local tipOf: any = nil
+local tipTaken = false
+local tipState: any = nil
+local tipLines: { any } = {}
+local tipWidest = 0
+local TIP_FOR_YOU = { 150, 200, 250 }
+local TIP_REFUND = { 230, 190, 80 }
+local CLASS_BIT: { [string]: number } = { warrior = 1, wizard = 2, conjurer = 4 }
+
+-- What a spell, ability or summon node gives a hero of `class` (the server's tree.forClass makes
+-- the same line): its own region's "as above"; another region's it may use "as above" too; else
+-- its class's stats' worth in its place (the words the tree came with). Nil for any other node.
+local function forYou(n: any, class: string?): string?
+	local mask = n.u
+	if type(mask) ~= "number" or not class then
+		return nil
+	end
+	local title = CLASS_TITLE[class] or class
+	if n.c == CLASS_REGION[class] then
+		return "For you: as above"
+	elseif bit32.band(mask, CLASS_BIT[class] or 0) ~= 0 then
+		return "For you: as above (a " .. title .. " can use it too)"
+	end
+	local d = whole.treeData
+	local worth = d and d.header and d.header.worth
+	return "For you: " .. tostring(worth and worth[class] or "its stats' worth") .. " in its place (a " .. title .. " can't use it)"
+end
+
+-- A node's tooltip lines (and the widest): its name, taken or not, what it does, what it gives
+-- the hero's class, and, taken, whether a right click gives it back alone and for what.
+local function nodeTip(n: any, taken: boolean, state: any): ({ any }, number)
+	local tip: { any } = { { tostring(n.n), RARITY.rare }, { if taken then "(yours)" else "(click to take: 1 point)", TIP_STATUS } }
+	local function add(text: string, colour: any)
+		for _, l in wrap(text, 260) do
+			if #tip < 16 then
+				table.insert(tip, { l, colour })
+			end
+		end
+	end
+	add(n.d or "", TIP_WORDS)
+	local mine = forYou(n, state.class)
+	if mine then
+		add(mine, TIP_FOR_YOU)
+	end
+	if taken then
+		local mark = string.sub(state.refund or "", n.i, n.i)
+		if mark == "1" then
+			add("Right click: give it back for " .. tostring(state.refundCost or 0) .. " gold", TIP_REFUND)
+		elseif mark == "h" then
+			add("Can't be given back alone: other nodes you have hang on it", TIP_STATUS)
+		end
+	end
+	local widest = 0
+	for _, l in tip do
+		widest = math.max(widest, nox.textWidth(l[1]))
+	end
+	return tip, widest
 end
 
 local function drawTree()
@@ -877,153 +1162,136 @@ local function drawTree()
 	if not centred then
 		centre()
 	end
-	local unit = ZOOMS[zoom]
-	local sizes = SIZES[zoom]
-	local ox, oy = TW / 2 + panX, CANVAS_H / 2 + panY
+	treeMarks(state.taken or "")
+	if laidTree ~= nodeIndexOf or laidMarks ~= marksOf or laidZoom ~= zoom or laidX ~= panX or laidY ~= panY then
+		layTree()
+	end
 	-- The canvas: the engraved floor, fixed while the tree pans over it.
 	nox.image("tree/backdrop", 0, 0, TW, CANVAS_H)
-	local taken = state.taken or ""
-	local function isTaken(id: number): boolean
-		return string.sub(taken, id, id) == "1"
-	end
-	local function at(n: any): (number, number)
-		return ox + n.x * unit, oy + n.y * unit
-	end
 	-- The links: a line each, kept to the canvas.
-	for _, n in nodes do
-		local x1, y1 = at(n)
-		for _, id in n.l or {} do
-			local m = nodes[id]
-			if m then
-				local x2, y2 = at(m)
-				local lit = isTaken(n.i) and isTaken(m.i)
-				clipLine(x1, y1, x2, y2, if lit then { 230, 190, 90 } else { 80, 72, 60 }, if lit then 2 else 1)
-			end
+	for k = 1, segCount do
+		local b = k * 4
+		if segLit[k] then
+			nox.line(segs[b - 3], segs[b - 2], segs[b - 1], segs[b], LINK_LIT, 2)
+		else
+			nox.line(segs[b - 3], segs[b - 2], segs[b - 1], segs[b], LINK_DIM, 1)
 		end
 	end
-	-- The nodes.
+	-- The nodes in view.
 	local mx, my = mouseIn(w)
+	local mouseOn = mx ~= nil and my ~= nil and my < CANVAS_H
 	local hot: any = nil
-	-- (a node reaching past the canvas: the window cuts it at the sides and the top, the foot drawn
-	-- after covers it below)
-	for _, n in nodes do
-		local x, y = at(n)
-		local s = sizes[n.k] or sizes.s
-		if x > -s and x < TW + s and y > -s and y < CANVAS_H + s then
-			local have = isTaken(n.i)
-			local open = false
-			if not have then
-				for _, id in nodeNear[n.i] or {} do
-					open = open or isTaken(id)
-				end
-			end
-			local rc = REGION_COLOUR[n.c] or REGION_COLOUR[0]
-			local bx, by = x - s / 2, y - s / 2
-			local img = nodeIcon[n.i]
-			local spell = nodeSpell[n.i]
-			if img or spell then
-				-- A root, small, notable or keystone: its picture; a spell, ability or summon: the
-				-- game's icon for it. Taken, a bright frame; open (next to a taken one), its region's
-				-- colour; else dimmed.
-				if img then
-					nox.image(img, bx, by, s, s)
-				else
-					nox.spellIcon(spell :: string, bx, by, s, s)
-				end
-				if have then
-					nox.outline(bx - 1, by - 1, s + 2, s + 2, TAKEN_EDGE)
-					nox.outline(bx, by, s, s, TAKEN_INNER)
-				elseif open then
-					nox.outline(bx - 1, by - 1, s + 2, s + 2, rc)
-					nox.outline(bx, by, s, s, rc)
-				else
-					nox.box(bx, by, s, s, LOCKED_SHADE)
-					nox.outline(bx, by, s, s, LOCKED_EDGE)
-				end
+	for k = 1, inViewCount do
+		local e = inView[k]
+		local n = e.n
+		local id = n.i
+		local bx, by, s = e.bx, e.by, e.s
+		local have = nodeHave[id]
+		local open = nodeOpen[id]
+		local img = nodeIcon[id]
+		local spell = nodeSpell[id]
+		if img or spell then
+			-- A root, small, notable or keystone: its picture; a spell, ability or summon: the
+			-- game's icon for it. Taken, a bright frame; open (next to a taken one), its region's
+			-- colour; else dimmed.
+			if img then
+				nox.image(img, bx, by, s, s)
 			else
-				-- A node with neither (a server sending no names): a box with a ring (a summon: a
-				-- heart) in its region's colour.
-				local fillC = if have then { 235, 195, 90 } elseif open then { rc[1] // 2, rc[2] // 2, rc[3] // 2 } else { 34, 30, 26 }
-				local edge = if have then "white" elseif open then rc else { 90, 80, 66 }
-				clipBox(bx, by, s, s, fillC)
-				if by >= 0 and by + s <= CANVAS_H then
-					nox.outline(bx, by, s, s, edge)
-					local inset = math.max(3, s // 4)
-					if n.k == "p" or n.k == "a" then
-						nox.outline(bx + inset, by + inset, s - 2 * inset, s - 2 * inset, if have then { 120, 60, 20 } else rc)
-					elseif n.k == "c" then
-						-- (a summon: a solid heart where a spell has a ring)
-						clipBox(bx + inset + 1, by + inset + 1, s - 2 * inset - 2, s - 2 * inset - 2, if have then { 120, 60, 20 } else rc)
-					end
-				end
+				nox.spellIcon(spell :: string, bx, by, s, s)
 			end
-			if over(mx, my, bx - 2, by - 2, s + 4, s + 4) and (my or 0) < CANVAS_H then
-				hot = n
-				nox.outline(bx - 3, by - 3, s + 6, s + 6, "bright")
+			if have then
+				nox.outline(bx - 1, by - 1, s + 2, s + 2, TAKEN_EDGE)
+				nox.outline(bx, by, s, s, TAKEN_INNER)
+			elseif open then
+				local rc = REGION_COLOUR[n.c] or REGION_COLOUR[0]
+				nox.outline(bx - 1, by - 1, s + 2, s + 2, rc)
+				nox.outline(bx, by, s, s, rc)
+			else
+				nox.box(bx, by, s, s, LOCKED_SHADE)
+				nox.outline(bx, by, s, s, LOCKED_EDGE)
 			end
-			if not have then
-				-- (its click kept to the canvas: the foot's own below)
-				local zy = math.max(by - 2, 0)
-				local zh = math.min(by + s + 2, CANVAS_H) - zy
-				if zh > 0 then
-					zone(w, bx - 2, zy, s + 4, zh, function()
-						nox.send({ kind = "tree", op = "take", id = n.i })
-					end)
+		else
+			-- A node with neither (a server sending no names): a box with a ring (a summon: a
+			-- heart) in its region's colour.
+			local rc = REGION_COLOUR[n.c] or REGION_COLOUR[0]
+			local fillC = if have then BOX_TAKEN elseif open then (REGION_HALF[n.c] or REGION_HALF[0]) else BOX_LOCKED
+			local edge = if have then "white" elseif open then rc else BOX_EDGE
+			clipBox(bx, by, s, s, fillC)
+			if by >= 0 and by + s <= CANVAS_H then
+				nox.outline(bx, by, s, s, edge)
+				local inset = math.max(3, s // 4)
+				if n.k == "p" or n.k == "a" then
+					nox.outline(bx + inset, by + inset, s - 2 * inset, s - 2 * inset, if have then BOX_MARK else rc)
+				elseif n.k == "c" then
+					-- (a summon: a solid heart where a spell has a ring)
+					clipBox(bx + inset + 1, by + inset + 1, s - 2 * inset - 2, s - 2 * inset - 2, if have then BOX_MARK else rc)
 				end
 			end
 		end
+		if mouseOn and over(mx, my, bx - 2, by - 2, s + 4, s + 4) then
+			hot = n
+			nox.outline(bx - 3, by - 3, s + 6, s + 6, "bright")
+		end
+	end
+	-- The nodes' clicks (zones' first, before the foot's).
+	local list = zones[w]
+	if list then
+		table.move(canvasZones, 1, #canvasZones, #list + 1, list)
 	end
 	-- The foot: the node under the mouse, the points, the buttons.
-	nox.box(0, CANVAS_H, TW, TH - CANVAS_H, { 14, 11, 8 })
-	nox.box(0, CANVAS_H, TW, 1, { 110, 84, 44 })
-	if hot then
-		local status = if isTaken(hot.i) then "(yours)" else "(click to take: 1 point)"
-		nox.text(hot.n, 4, CANVAS_H + 4, RARITY.rare)
-		nox.text(status, 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
-	else
-		nox.text("A node next to one you have takes a point. Spells and summons come from their branch's nodes.", 4, CANVAS_H + 4, "dim")
+	if state ~= footOf then
+		footOf = state
+		footPoints = string.format("Points left: %d of %d", state.points or 0, state.total or 0)
+		footRespec = "Respec (" .. (state.cost or 0) .. " gold)"
 	end
-	nox.text(string.format("Points left: %d of %d", state.points or 0, state.total or 0), 4, CANVAS_H + 42, "gold")
-	local cost = state.cost or 0
+	nox.box(0, CANVAS_H, TW, TH - CANVAS_H, FOOT_BACK)
+	nox.box(0, CANVAS_H, TW, 1, FOOT_LINE)
+	local hotTaken = hot ~= nil and nodeHave[hot.i] == true
+	if hot then
+		nox.text(hot.n, 4, CANVAS_H + 4, RARITY.rare)
+		nox.text(if hotTaken then "(yours)" else "(click to take: 1 point)", 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
+	else
+		nox.text(HINT, 4, CANVAS_H + 4, "dim")
+	end
+	nox.text(footPoints, 4, CANVAS_H + 42, "gold")
 	local canRespec = state.near == true and (state.spent or 0) > 0
 	-- (the fountain's picture beside its button)
 	nox.image("tree/ui_respec", 152, CANVAS_H + 39, 16, 16)
 	if not canRespec then
 		nox.box(152, CANVAS_H + 39, 16, 16, LOCKED_SHADE)
 	end
-	button(w, 172, CANVAS_H + 40, 150, 14, "Respec (" .. cost .. " gold)", canRespec, function()
-		nox.send({ kind = "tree", op = "respec" })
-	end)
+	button(w, 172, CANVAS_H + 40, 150, 14, footRespec, canRespec, respec)
 	if state.near ~= true then
 		nox.text("(at the fountain)", 326, CANVAS_H + 42, "dim")
 	end
 	local bx = TW - 196
-	button(w, bx, CANVAS_H + 58, 22, 14, "<", true, function() pan(1, 0) end)
-	button(w, bx + 24, CANVAS_H + 58, 22, 14, "^", true, function() pan(0, 1) end)
-	button(w, bx + 48, CANVAS_H + 58, 22, 14, "v", true, function() pan(0, -1) end)
-	button(w, bx + 72, CANVAS_H + 58, 22, 14, ">", true, function() pan(-1, 0) end)
-	button(w, bx + 98, CANVAS_H + 58, 22, 14, "+", zoom < #ZOOMS, function() setZoom(zoom + 1) end)
-	button(w, bx + 122, CANVAS_H + 58, 22, 14, "-", zoom > 1, function() setZoom(zoom - 1) end)
+	button(w, bx, CANVAS_H + 58, 22, 14, "<", true, panWest)
+	button(w, bx + 24, CANVAS_H + 58, 22, 14, "^", true, panNorth)
+	button(w, bx + 48, CANVAS_H + 58, 22, 14, "v", true, panSouth)
+	button(w, bx + 72, CANVAS_H + 58, 22, 14, ">", true, panEast)
+	button(w, bx + 98, CANVAS_H + 58, 22, 14, "+", zoom < #ZOOMS, zoomIn)
+	button(w, bx + 122, CANVAS_H + 58, 22, 14, "-", zoom > 1, zoomOut)
 	button(w, bx + 148, CANVAS_H + 58, 44, 14, "Home", true, centre)
 	nox.text("Drag or arrows pan, wheel or 1-3 zoom, 0 home", 4, CANVAS_H + 60, "dim")
 	drawNote(w, 300, CANVAS_H + 60)
 	closeBox(w, TW)
 	-- The node under the mouse: its tooltip over everything in the window.
 	if hot and mx and my then
-		local status = if isTaken(hot.i) then "(yours)" else "(click to take: 1 point)"
-		local tip: { any } = { { tostring(hot.n), RARITY.rare }, { status, { 160, 150, 130 } } }
-		for _, l in wrap(hot.d or "", 260) do
-			if #tip < 14 then
-				table.insert(tip, { l, { 235, 230, 215 } })
-			end
+		if hot ~= tipOf or hotTaken ~= tipTaken or state ~= tipState then
+			tipOf, tipTaken, tipState = hot, hotTaken, state
+			tipLines, tipWidest = nodeTip(hot, hotTaken, state)
 		end
-		tipNode(tip, nodeIcon[hot.i], nodeSpell[hot.i], mx, my)
+		tipNode(tipLines, tipWidest, nodeIcon[hot.i], nodeSpell[hot.i], mx, my)
 	end
 end
 
 -- ---- The character sheet
 
-local HW, HH = 260, 330
+local HW, HH = 260, 343
+-- The sheet window's title: one's own sheet's, or the party member's whose sheet it shows (the
+-- window opened again with it when that changes).
+local OWN_SHEET = "Character sheet"
+local sheetTitle = OWN_SHEET
 
 local function drawSheet()
 	local w = "sheet"
@@ -1033,12 +1301,17 @@ local function drawSheet()
 		nox.text("...", 4, 4, "dim")
 		return
 	end
-	nox.text(string.format("%s, level %d %s", s.name, s.level, s.class), 4, 2, "gold")
+	-- (a party member's: read only, nothing on it acts on them)
+	local other = s.of ~= nil
+	nox.text(string.format("%s, level %d %s", s.name, s.level, s.class), 4, 2, if other then "bright" else "gold")
 	local rows = {
 		{ "Experience", string.format("%d / %d", s.experience, s.need) },
 		{ "Health", string.format("%d / %d", s.health, s.maxHealth) },
 		{ "Mana", string.format("%d / %d", s.mana, s.maxMana) },
 		{ "Strength", tostring(s.strength) },
+		-- (the mod's regeneration a second, on top of the game's own slow refill)
+		{ "Regeneration", if (tonumber(s.maxMana) or 0) > 0 then string.format("%s health, %s mana /s", tostring(s.healthRegen), tostring(s.manaRegen))
+			else string.format("%s health /s", tostring(s.healthRegen)) },
 		{ "Damage dealt", string.format("%d%% (%+d%%)", s.dealt, s.damage) },
 		{ "Resistance", string.format("%d%% (takes %d%%)", s.resist, s.taken) },
 		{ "Gold", string.format("%d carried, %d stashed", s.gold, s.stashed) },
@@ -1059,13 +1332,113 @@ local function drawSheet()
 	end
 	local y = 20 + #rows * 13 + 4
 	nox.text("Spells and abilities", 4, y, "gold")
-	drawWords(if s.skills ~= "" then s.skills else "none yet: take them in the Tree", 4, y + 13, HW - 8, 6, "bright")
+	drawWords(if s.skills ~= "" then s.skills elseif other then "none yet" else "none yet: take them in the Tree", 4, y + 13, HW - 8, 6, "bright")
+end
+
+-- The sheet's title for its value (one's own, or a member's: its name).
+local function titleOfSheet(s: any): string
+	if s and s.of ~= nil then
+		return string.sub(tostring(s.name), 1, 16) .. "'s sheet"
+	end
+	return OWN_SHEET
+end
+
+-- ---- The waypoints
+
+local WPW = 250
+local WP_ROW = 20
+local WP_TOP = 24
+local WP_ACT = 16
+local WP_FOOT = 34
+-- The server's list ({ act, here, names, list = { { a, i, t, l, f } } }), nil until it comes.
+local waypointsShown: any = nil
+
+-- The window's height for the list: its heading, each act's line, a row an area, the foot.
+local function waypointsHeight(): number
+	local rows, actLines = 0, 0
+	local last: any = nil
+	for _, e in (waypointsShown and waypointsShown.list or {}) do
+		rows += 1
+		if e.a ~= last then
+			actLines += 1
+			last = e.a
+		end
+	end
+	return WP_TOP + actLines * WP_ACT + math.max(1, rows) * WP_ROW + WP_FOOT
+end
+
+local function drawWaypoints()
+	local w = "waypoints"
+	closeBox(w, WPW)
+	-- (the waypoint's picture in the heading)
+	nox.image("tree/ui_waypoint", 4, 2, 18, 18)
+	nox.text("Travel by waypoint", 26, 6, "gold")
+	local v = waypointsShown
+	if not v then
+		nox.text("...", 4, WP_TOP, "dim")
+		return
+	end
+	local mx, my = mouseIn(w)
+	local hot: any = nil
+	local y = WP_TOP
+	local last: any = nil
+	local found = 0
+	for _, e in v.list or {} do
+		if e.a ~= last then
+			last = e.a
+			nox.text(string.format("Act %d: %s", tonumber(e.a) or 0, tostring(v.names and v.names[e.a] or "")), 4, y + 2, "dim")
+			y += WP_ACT
+		end
+		local here = e.a == v.act and e.i == v.here
+		-- (a found waypoint of any act listed: another act's moves the party there too)
+		local can = e.f == true
+		if e.f then
+			found += 1
+		end
+		local isHot = over(mx, my, 4, y, WPW - 8, WP_ROW - 2)
+		if isHot then
+			hot = { e = e, here = here, can = can }
+		end
+		nox.box(4, y, WPW - 8, WP_ROW - 2, if can and isHot then { 60, 44, 24 } elseif can then { 30, 26, 20 } else { 18, 15, 12 })
+		if here then
+			nox.outline(3, y - 1, WPW - 6, WP_ROW, TAKEN_EDGE)
+		end
+		nox.outline(4, y, WPW - 8, WP_ROW - 2, if here then "gold" elseif can then { 200, 150, 60 } else { 60, 52, 40 })
+		nox.text(tostring(e.t), 10, y + 4, if can then "bright" else "grey")
+		local right = if here then "you are here" elseif not e.f then "not found yet" else string.format("area level %d", tonumber(e.l) or 0)
+		nox.text(right, WPW - 10 - nox.textWidth(right), y + 4, if here then "gold" elseif e.f then "dim" else "grey")
+		if can then
+			local act, area = e.a, e.i
+			zone(w, 4, y, WPW - 8, WP_ROW - 2, function()
+				nox.send({ kind = "waypoints", op = "go", act = act, area = area })
+			end)
+		end
+		y += WP_ROW
+	end
+	local footY = waypointsHeight() - WP_FOOT
+	nox.box(0, footY, WPW, 1, { 90, 70, 40 })
+	if found == 0 then
+		nox.text("None found yet: look for them out in the areas.", 4, footY + 4, "dim")
+	else
+		nox.text("Another area moves the whole party: a vote.", 4, footY + 4, "dim")
+	end
+	drawNote(w, 4, footY + 17)
+	if hot then
+		local e = hot.e
+		local what = if hot.here then "A step to its waypoint: you alone, no vote."
+			elseif hot.can then (if #party >= 2 then "The whole party goes there: everyone votes." else "You go there at once.")
+			else "Not found yet: find it out in the area."
+		nox.tooltip({
+			{ tostring(e.t), if hot.can then "bright" else "grey" },
+			{ what, if hot.can then { 230, 190, 80 } else "dim" },
+		})
+	end
 end
 
 -- ---- The hooks
 
 function ui.start()
-	nox.window("hero", { title = "Character", x = 6, y = TOP, w = W, h = H })
+	nox.window("hero", { title = "Character", anchor = "topleft", x = 6, y = TOP, w = W, h = H })
 	placeStrip()
 end
 
@@ -1073,8 +1446,23 @@ local SPEC: { [string]: any } = {
 	stash = { title = "Stash", x = 36, y = 34, w = SW, h = SH },
 	vendor = { title = "Vendor", x = 36, y = 34, w = SW, h = SH },
 	tree = { title = "Passive tree", x = 20, y = 34, w = TW, h = TH },
-	sheet = { title = "Character sheet", x = 190, y = 60, w = HW, h = HH },
+	sheet = { title = OWN_SHEET, x = 190, y = 60, w = HW, h = HH },
+	waypoints = { title = "Waypoints", x = 195, y = 60, w = WPW, h = 0 },
 }
+
+-- A window's spec as it opens now: the sheet's title whoever's it shows, the waypoints' height
+-- for its list.
+local function specOf(window: string): any
+	local spec = SPEC[window]
+	if window == "sheet" then
+		spec = table.clone(spec)
+		spec.title = sheetTitle
+	elseif window == "waypoints" then
+		spec = table.clone(spec)
+		spec.h = waypointsHeight()
+	end
+	return spec
+end
 
 function ui.onMessage(value: any)
 	if type(value) ~= "table" then
@@ -1092,7 +1480,7 @@ function ui.onMessage(value: any)
 	elseif kind == "boss" then
 		if value.most and value.most > 0 then
 			if not bossShown then
-				nox.window("boss", { title = value.name, x = 320 - BOSS_W // 2, y = TOP, w = BOSS_W, h = BOSS_H })
+				nox.window("boss", { title = value.name, anchor = "top", x = 320 - BOSS_W // 2, y = TOP, w = BOSS_W, h = BOSS_H })
 			end
 			bossShown = value
 		elseif bossShown then
@@ -1101,7 +1489,7 @@ function ui.onMessage(value: any)
 		end
 	elseif kind == "open" and SPEC[value.window] then
 		opened[value.window] = true
-		nox.window(value.window, SPEC[value.window])
+		nox.window(value.window, specOf(value.window))
 	elseif kind == "close" and SPEC[value.window] then
 		opened[value.window] = nil
 		nox.closeWindow(value.window)
@@ -1125,8 +1513,23 @@ function ui.onMessage(value: any)
 		if kind == "labels" then
 			takeLabels()
 		end
-	elseif kind == "treeState" or kind == "sheet" then
-		whole[kind] = if kind == "sheet" then value else { header = value }
+	elseif kind == "sheet" then
+		whole.sheet = value
+		-- (one's own or a member's: the window's title follows)
+		local title = titleOfSheet(value)
+		if title ~= sheetTitle then
+			sheetTitle = title
+			if opened.sheet then
+				nox.window("sheet", specOf("sheet"))
+			end
+		end
+	elseif kind == "waypoints" then
+		waypointsShown = value
+		if opened.waypoints then
+			nox.window("waypoints", specOf("waypoints"))
+		end
+	elseif kind == "treeState" then
+		whole[kind] = { header = value }
 	elseif kind == "note" then
 		notes[value.window] = { text = value.text, til = nox.time() + 4000 }
 		nox.gameSound("ButtonPress", 60)
@@ -1161,6 +1564,8 @@ function ui.draw(window: string)
 		drawTree()
 	elseif window == "sheet" then
 		drawSheet()
+	elseif window == "waypoints" then
+		drawWaypoints()
 	end
 end
 
@@ -1173,8 +1578,8 @@ function ui.click(window: string, x: number, y: number, button: number?): boolea
 	for i = #list, 1, -1 do
 		local z = list[i]
 		if x >= z.x and x < z.x + z.w and y >= z.y and y < z.y + z.h then
-			z.fn(button or 1)
-			return true
+			-- (a zone's click may say it isn't its own: false)
+			return z.fn(button or 1) ~= false
 		end
 	end
 	return false

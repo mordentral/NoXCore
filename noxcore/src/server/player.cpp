@@ -1718,14 +1718,16 @@ void updatePlayer(ServerObject& unit, std::uint32_t frame, const PlayerAnimation
         p.stamina = static_cast<std::uint8_t>(p.stamina + 100 / 30);
     }
     // Health and mana come back, all of each in 300 seconds: a point every 9000 /
-    // its most frames; health not within a second of a hurt.
+    // its most frames; health not within a second of a hurt. (noxcpp: a most over 9000, which
+    // only a mode can set, is a point every frame, as from 4501 up; the exe's quotient there is 0,
+    // a division by zero.)
     if (!(unit.flags & ObjFlag::Dead)) {
         if (unit.maxHealth != 0 && unit.health < unit.maxHealth && 30u < frame - unit.hurtFrame &&
-            frame % (30u * 300u / unit.maxHealth) == 0) {
+            frame % std::max(30u * 300u / unit.maxHealth, 1u) == 0) {
             ++unit.health;
             unit.touch();
         }
-        if (p.maxMana != 0 && p.mana < p.maxMana && frame % (30u * 300u / p.maxMana) == 0) {
+        if (p.maxMana != 0 && p.mana < p.maxMana && frame % std::max(30u * 300u / p.maxMana, 1u) == 0) {
             ++p.mana;
         }
         // The cry, by how much it lost (under 71, under 451, more) or poison's (type 5), a woman's

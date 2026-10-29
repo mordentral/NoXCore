@@ -251,6 +251,22 @@ struct ModeHooks {
         (void)type;
         return true;
     }
+    /// Asked (noxcpp): what a player's spell costs, the game's mana price `mana` given; `trap`: a
+    /// spell put into a glyph's trap (at its check, and again as it's paid). nullopt: the game's
+    /// price. Asked once a cast, never a frame (Spells::castPrice).
+    struct CastPrice {
+        int mana = 0;
+        int health = 0; ///< a plain loss, never to below 1 health
+    };
+    virtual std::optional<CastPrice> castPrice(World& world, const ServerObject& caster, std::uint32_t spell, int mana, bool trap)
+    {
+        (void)world;
+        (void)caster;
+        (void)spell;
+        (void)mana;
+        (void)trap;
+        return std::nullopt;
+    }
     /// Told: `target` (with ModeEvent::Damaged) about to lose `amount` health (unitDamageClear:
     /// after armour and the rest, at most what it has).
     virtual void damaged(Fight& fight, ServerObject& target, int amount)

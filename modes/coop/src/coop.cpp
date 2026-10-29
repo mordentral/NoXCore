@@ -6,6 +6,7 @@
 #include "noxcore/script/builtins.hpp"
 #include "noxcore/script/opcodes.hpp"
 #include "noxcore/server/modes.hpp"
+#include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/script_host.hpp"
 #include "noxcore/server/server.hpp"
@@ -241,6 +242,8 @@ void CoopDirector::joined(server::GameHost& host, std::uint8_t peer, server::Ser
     std::erase_if(party_, [&](const Member& x) { return x.peer == peer || (x.key == m.key && !host.players().contains(x.peer)); });
     party_.push_back(m);
     rosterDirty_ = true;
+    creaturesDirty_ = true;
+    creaturesTold_.erase(peer); // (a new connection's client knows none)
     if (m.host) {
         return;
     }
@@ -285,6 +288,8 @@ void CoopDirector::leaving(server::GameHost& host, std::uint8_t peer, server::Se
         gather_->standing.erase(unit.extent);
     }
     rosterDirty_ = true;
+    creaturesDirty_ = true; // (its creatures no longer the party's)
+    creaturesTold_.erase(peer);
 }
 
 void CoopDirector::onMessage(server::GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m)
@@ -353,6 +358,7 @@ void CoopDirector::mapLoaded(server::Server& server)
         restoreParty(); // (a saved game's map: the party as the save had it)
     }
     rosterDirty_ = true;
+    creaturesDirty_ = true; // (the creatures came along under new codes, or stayed behind)
 }
 
 void CoopDirector::tick(server::GameHost& host, std::uint32_t nowMs)
@@ -420,6 +426,7 @@ void CoopDirector::tick(server::GameHost& host, std::uint32_t nowMs)
     gatherTick();
     rescale(false); // (the party's size changed: at once; else the monsters not seen yet, each 5 s)
     tellRoster(host);
+    tellCreatures(host);
     watchDialog();
     watchSceneDialog();
     tellPartyHealth();
@@ -499,6 +506,66 @@ void CoopDirector::tellRoster(server::GameHost& host)
     for (const Member& m : party_) {
         if (m.identified && m.welcomed) {
             host.sendToIdentified(m.peer, bytes);
+        }
+    }
+}
+
+void CoopDirector::tellCreatures(server::GameHost& host)
+{
+    server::World& w = world();
+    const auto unitOfOwner = [&](std::uint32_t extent) -> const server::ServerObject* {
+        for (const Member& m : party_) {
+            if (const server::ServerObject* u = host.unitOf(m.peer); u && u->extent == extent && !u->gone()) {
+                return u;
+            }
+        }
+        return nullptr;
+    };
+    // The list as it stands still holds (a handful each frame, no walk of the world): each one
+    // there, its owner's and controlled still.
+    if (!creaturesDirty_ && w.creatureReports == creatureReportsSeen_) {
+        for (const PartyCreature& c : partyCreatures_) {
+            const auto it = w.objects().find(c.extent);
+            const server::ServerObject* owner = it != w.objects().end() ? unitOfOwner(c.owner) : nullptr;
+            if (!owner || it->second.gone() || it->second.owner != c.owner || !server::controls(w, *owner, it->second)) {
+                creaturesDirty_ = true;
+                break;
+            }
+        }
+    }
+    if (creaturesDirty_ || w.creatureReports != creatureReportsSeen_) {
+        creaturesDirty_ = false;
+        creatureReportsSeen_ = w.creatureReports;
+        partyCreatures_.clear();
+        if (!party_.empty()) {
+            for (const auto& [extent, o] : w.objects()) {
+                if (!o.monster || o.owner == 0 || o.gone()) {
+                    continue;
+                }
+                if (const server::ServerObject* owner = unitOfOwner(o.owner); owner && server::controls(w, *owner, o)) {
+                    partyCreatures_.push_back({extent, o.owner});
+                }
+            }
+        }
+        partyCreatureCodes_.clear();
+        for (const PartyCreature& c : partyCreatures_) {
+            partyCreatureCodes_.push_back(server::netCodeOf(w.objects().at(c.extent)));
+        }
+        std::ranges::sort(partyCreatureCodes_);
+    }
+    // Each NoX Core player whose last list differs (none sent yet: an empty one), as its reliable
+    // room allows (GameHost::reliableRoom: else the next tick).
+    for (const Member& m : party_) {
+        if (!m.identified || !m.welcomed) {
+            continue;
+        }
+        const auto told = creaturesTold_.find(m.peer);
+        const bool same = told != creaturesTold_.end() ? told->second == partyCreatureCodes_ : partyCreatureCodes_.empty();
+        if (same || host.reliableRoom(m.peer) == 0) {
+            continue;
+        }
+        if (host.sendToIdentified(m.peer, coopmsg::creaturesMessage(partyCreatureCodes_))) {
+            creaturesTold_[m.peer] = partyCreatureCodes_;
         }
     }
 }

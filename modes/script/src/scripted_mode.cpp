@@ -109,10 +109,12 @@ std::optional<std::string> ModPackage::read(std::string_view relPath) const
 
 fs::file_time_type ModPackage::newest() const
 {
-    fs::file_time_type t{};
     if (source) {
-        return t; // (built in: what it was when loaded)
+        return {}; // (built in: what it was when loaded)
     }
+    // (From the clock's least, not its epoch: libstdc++'s file clock counts from 2174, so a real
+    // file's time is below file_time_type{} there and a max from it would never move.)
+    fs::file_time_type t = fs::file_time_type::min();
     std::error_code ec;
     for (fs::recursive_directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
         if (it.depth() > 4) {
@@ -1858,7 +1860,9 @@ int noxMadeSince(lua_State* L)
 int noxSpellInfo(lua_State* L)
 {
     // nox.spellInfo(spell): thing.bin's record of a spell (its name or number): {flags, onceOnly
-    // (a quest's once-only spell: granted once, never past level 1)}; nil when it has none.
+    // (a quest's once-only spell: granted once, never past level 1), manaCost (what a player's
+    // cast costs as the game has it: a summoning's its table's), trapCost (put into a glyph's
+    // trap)}; nil when it has none.
     server::Fight f = fightOf(L);
     luaL_argcheck(L, f.things != nullptr, 1, "no things");
     const std::uint32_t spell = spellArg(L, 1);
@@ -1867,11 +1871,25 @@ int noxSpellInfo(lua_State* L)
         lua_pushnil(L);
         return 1;
     }
-    lua_createtable(L, 0, 2);
+    lua_createtable(L, 0, 4);
     setField(L, "flags", def->flags);
     lua_pushboolean(L, server::questOnceOnlySpell(static_cast<int>(spell)) ? 1 : 0);
     lua_setfield(L, -2, "onceOnly");
+    setField(L, "manaCost", server::Spells::priceOf(f.world, *f.things, spell, true, false));
+    setField(L, "trapCost", server::Spells::priceOf(f.world, *f.things, spell, true, true));
     return 1;
+}
+
+int noxSetCharmable(lua_State* L)
+{
+    // nox.setCharmable(id, charmable): false: Charm refuses the creature as one not charmable (a
+    // charm on it now ends uncontrolled); true or nil: as the game has it.
+    toolbox::refuseInsideAsked(L, "nox.setCharmable");
+    server::ServerObject& o = objectArg(L, 1);
+    luaL_argcheck(L, static_cast<bool>(o.monster), 1, "a creature");
+    luaL_argcheck(L, lua_isnoneornil(L, 2) || lua_isboolean(L, 2), 2, "true, false or nil");
+    o.monster->notCharmable = !lua_isnoneornil(L, 2) && !lua_toboolean(L, 2);
+    return 0;
 }
 
 int noxEnchantTime(lua_State* L)
@@ -2927,6 +2945,21 @@ int noxRemoveTeam(lua_State* L)
     return 0;
 }
 
+int noxGameplay(lua_State* L)
+{
+    // nox.gameplay() -> {teamDamage, autoAssign, teamPlay}: the gameplay flags 1, 2 and 4 as they
+    // stand (the host's team options; mode.json's "gameplay" pins them).
+    const std::uint32_t f = worldOf(L).gameplayFlags;
+    lua_createtable(L, 0, 3);
+    lua_pushboolean(L, (f & 1u) != 0);
+    lua_setfield(L, -2, "teamDamage");
+    lua_pushboolean(L, (f & 2u) != 0);
+    lua_setfield(L, -2, "autoAssign");
+    lua_pushboolean(L, (f & 4u) != 0);
+    lua_setfield(L, -2, "teamPlay");
+    return 1;
+}
+
 // ---- teams and scores (the stock messages: MSG_REPORT_LESSON, MSG_TEAM_MSG's score)
 
 /// A team's players, as teamPlayers counts them, from its members rather than the whole world:
@@ -3566,7 +3599,7 @@ void Impl::installToolbox()
         {"touch", noxTouch},   {"sightRange", noxSightRange}, {"textToAll", noxTextToAll},
         {"nearestFoes", noxNearestFoes}, {"applyForce", noxApplyForce}, {"attack", noxAttack}, {"direction", noxDirection},
         {"directionOf", noxDirectionOf}, {"directionVector", noxDirectionVector}, {"newMark", noxNewMark}, {"madeSince", noxMadeSince},
-        {"spellInfo", noxSpellInfo}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
+        {"spellInfo", noxSpellInfo}, {"setCharmable", noxSetCharmable}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
         {"shoot", noxShoot},   {"summon", noxSummon},   {"abilitySound", noxAbilitySound}, {"setPosition", noxSetPosition},
         {"setVelocity", noxSetVelocity}, {"setOwner", noxSetOwner}, {"setTeam", noxSetTeam}, {"setNoCollide", noxSetNoCollide},
         {"setHitRadius", noxSetHitRadius}, {"setBurstScale", noxSetBurstScale},
@@ -3585,7 +3618,7 @@ void Impl::installToolbox()
         {"setGameOverAt", noxSetGameOverAt}, {"exitGate", noxExitGate}, {"rewards", noxRewards}, {"rewardAt", noxRewardAt},
         {"setOnOff", noxSetOnOff}, {"unitSay", noxUnitSay}, {"setServerName", noxSetServerName}, {"questStage", noxQuestStage},
         {"exitTo", noxExitTo}, {"lock", noxLock}, {"unlock", noxUnlock}, {"allow", noxAllow}, {"isEnemy", noxIsEnemy},
-        {"chests", noxChests}, {"giveItem", noxGiveItem}, {"createTeam", noxCreateTeam}, {"joinTeam", noxJoinTeam},
+        {"chests", noxChests}, {"giveItem", noxGiveItem}, {"createTeam", noxCreateTeam}, {"joinTeam", noxJoinTeam}, {"gameplay", noxGameplay},
         {"removeTeam", noxRemoveTeam}, {"soundAt", noxSoundAt}, {"gameRandom", noxGameRandom},
         // (seeded streams)
         {"mt19937", noxMt19937}, {"shuffle", noxShuffle}, {"mul32", noxMul32},
@@ -4017,6 +4050,16 @@ public:
         impl_.guarded("onDamage", [&] { hit = impl_.parts.events.damage(impl_.vm->thread(), target, source, weapon, amount, type); });
         return hit;
     }
+    std::optional<CastPrice> castPrice(server::World&, const server::ServerObject& caster, std::uint32_t spell, int mana, bool trap) override
+    {
+        if (!impl_.parts.events.has().castCost || impl_.hidden(caster)) {
+            return std::nullopt;
+        }
+        CastPrice price{mana, 0};
+        bool priced = false;
+        impl_.guarded("castCost", [&] { priced = impl_.parts.events.castCost(impl_.vm->thread(), caster, spell, mana, trap, price.mana, price.health); });
+        return priced ? std::optional(price) : std::nullopt;
+    }
     bool exitTouched(server::Fight&, server::ServerObject& exit, server::ServerObject& player) override
     {
         if (!impl_.parts.events.has().onExit || impl_.hidden(player)) {
@@ -4227,6 +4270,16 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
     // A mod that needs a newer NoX Core (mode.json's "minClientLevel"): an older one refused at its
     // join with the too-old notice, as the host's own --min-client-level (the higher of the two).
     o.minClientLevel = std::max(o.minClientLevel, impl.package->manifest.minClientLevel);
+    // The host's team options a mod pins (mode.json's "gameplay"): set as given whatever the host
+    // chose, and kept so for the game (GameHost::Options::gameplayPinned).
+    if (const std::uint32_t pins = impl.package->manifest.gameplayPinned) {
+        o.gameplayFlags = (o.gameplayFlags & ~pins) | impl.package->manifest.gameplayValues;
+        o.gameplayPinned |= pins;
+    }
+    // A mod's pickup rules (mode.json's "pickup"): what a class can't use carried (never worn),
+    // seconds under the weapons-respawn option.
+    o.pickupAnyClass = o.pickupAnyClass || impl.package->manifest.pickupAnyClass;
+    o.pickupDuplicates = o.pickupDuplicates || impl.package->manifest.pickupDuplicates;
     // The host's callbacks: each the script's when it has the hook (looked up as it's called, so a
     // reload's new hooks count). None of them runs per frame.
     o.onJoin = [&impl, prev = std::move(o.onJoin)](server::GameHost& h, std::uint8_t peer, server::ServerObject& unit) {

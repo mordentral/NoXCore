@@ -30,9 +30,8 @@ struct Smooth {
     SDL_GPURenderState* disc = nullptr;
     SDL_GPURenderState* rect = nullptr;
     SDL_GPURenderState* glow = nullptr; ///< fx_glow: glows worked out per pixel (may be null)
-    SDL_GPURenderState* puff = nullptr; ///< fx_puff: soft smoke puffs (may be null)
+    SDL_GPURenderState* puff = nullptr; ///< fx_puff: the smoke blast's soft dust (may be null)
     SDL_GPURenderState* glowLine = nullptr; ///< fx_glowline: a line of glows in one quad (may be null)
-    SDL_GPURenderState* barrier = nullptr;  ///< fx_barrier: the Force Field's sphere (may be null)
 };
 /// The one shared set of smooth-drawing states.
 inline Smooth& smooth()
@@ -45,6 +44,28 @@ inline bool smoothOn()
 {
     const Smooth& s = smooth();
     return s.white && s.disc && s.rect;
+}
+
+/// HD Spell FX (Options, apart from Smooth FX): the spell effects drawn as noxsdl's own shader
+/// effects in place of the game's sprites: the toxic cloud's puffs (fx_puff), the Force Field's
+/// sphere (fx_barrier) and the Reflective Shield's water disc (fx_ripple). All null (the game's
+/// sprites) unless main sets them.
+struct SpellFx {
+    SDL_Texture* white = nullptr;
+    SDL_GPURenderState* puff = nullptr;
+    SDL_GPURenderState* barrier = nullptr;
+    SDL_GPURenderState* ripple = nullptr;
+};
+/// The one shared set of HD Spell FX states.
+inline SpellFx& spellFx()
+{
+    static SpellFx s;
+    return s;
+}
+/// Whether HD Spell FX is on (its white pixel set).
+inline bool spellFxOn()
+{
+    return spellFx().white != nullptr;
 }
 
 namespace detail {
@@ -262,18 +283,34 @@ inline void glow(SDL_Renderer* renderer, const Camera& camera, SDL_Texture* text
     SDL_RenderTexture(renderer, texture, nullptr, &dest);
 }
 
-/// Whether smoke and gas are drawn as soft puffs (fx_puff) instead of the game's sprites.
+/// Whether a smoke blast is drawn as soft dust (fx_puff, Smooth FX) instead of the game's Smoke.
 inline bool puffsOn()
 {
     return smoothOn() && smooth().puff;
 }
 
+/// Whether a toxic cloud is drawn as soft puffs (fx_puff, HD Spell FX) instead of the game's
+/// GreenPuff / GreenSmoke.
+inline bool cloudPuffsOn()
+{
+    return spellFxOn() && spellFx().puff;
+}
+
+/// Whether any puffs are drawn (puffsOn or cloudPuffsOn): puff() has a state to draw with.
+inline bool anyPuffsOn()
+{
+    return puffsOn() || cloudPuffsOn();
+}
+
 /// A soft puff (fx_puff) of `radius` world units at (x, y), alpha-blended: `color`'s alpha is its
-/// opacity at the middle. `seed` picks its noise.
+/// opacity at the middle. `seed` picks its noise. Needs anyPuffsOn.
 inline void puff(SDL_Renderer* renderer, const Camera& camera, float x, float y, float radius, SDL_Color color,
                  std::uint32_t seed)
 {
-    const Smooth& s = smooth();
+    // (The one fx_puff state, whichever switch lent it.)
+    const bool smoothPuff = puffsOn();
+    SDL_Texture* white = smoothPuff ? smooth().white : spellFx().white;
+    SDL_GPURenderState* state = smoothPuff ? smooth().puff : spellFx().puff;
     const SDL_FPoint c = detail::toScreen(camera, x, y);
     const float r = radius * camera.zoom;
     const SDL_FColor fc{color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f};
@@ -285,16 +322,17 @@ inline void puff(SDL_Renderer* renderer, const Camera& camera, float x, float y,
                              {{c.x + r, c.y + r}, fc, {su + 0.999f, sv + 0.999f}},
                              {{c.x - r, c.y + r}, fc, {su, sv + 0.999f}}};
     const int index[6] = {0, 1, 2, 0, 2, 3};
-    SDL_SetTextureBlendMode(s.white, SDL_BLENDMODE_BLEND);
-    SDL_SetGPURenderState(renderer, s.puff);
-    SDL_RenderGeometry(renderer, s.white, v, 4, index, 6);
+    SDL_SetTextureBlendMode(white, SDL_BLENDMODE_BLEND);
+    SDL_SetGPURenderState(renderer, state);
+    SDL_RenderGeometry(renderer, white, v, 4, index, 6);
     SDL_SetGPURenderState(renderer, nullptr);
 }
 
-/// Whether the Force Field is drawn as the fx_barrier sphere instead of the game's animation.
+/// Whether the Force Field is drawn as the fx_barrier sphere (HD Spell FX) instead of the game's
+/// animation.
 inline bool barrierOn()
 {
-    return smoothOn() && smooth().barrier;
+    return spellFxOn() && spellFx().barrier;
 }
 
 /// The Force Field's sphere (fx_barrier) of `radius` world units about (x, y), added onto the
@@ -303,7 +341,7 @@ inline bool barrierOn()
 inline void barrier(SDL_Renderer* renderer, const Camera& camera, float x, float y, float radius, SDL_Color color,
                     double seconds, std::uint32_t seed)
 {
-    const Smooth& s = smooth();
+    const SpellFx& s = spellFx();
     const SDL_FPoint c = detail::toScreen(camera, x, y);
     const float r = radius * camera.zoom;
     const SDL_FColor fc{color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f};
@@ -320,6 +358,35 @@ inline void barrier(SDL_Renderer* renderer, const Camera& camera, float x, float
     SDL_SetTextureBlendMode(s.white, SDL_BLENDMODE_ADD);
     SDL_SetGPURenderState(renderer, s.barrier);
     SDL_RenderGeometry(renderer, s.white, v, 4, index, 6);
+    SDL_SetGPURenderState(renderer, nullptr);
+}
+
+/// Whether the Reflective Shield is drawn as the fx_ripple water disc (HD Spell FX) instead of the
+/// game's animation.
+inline bool rippleOn()
+{
+    return spellFxOn() && spellFx().ripple;
+}
+
+/// The Reflective Shield's water disc (fx_ripple): an ellipse about (x, y) whose axes are `major`
+/// and `minor` world units across, its major axis `tiltDegrees` off upright (its top to the right),
+/// alpha-blended. `light` multiplies its colour (the scene's light there, as the sprite's); `loop`
+/// (0-1) runs its rings, `seconds` its slow drift; `back`: seen from behind.
+inline void ripple(SDL_Renderer* renderer, const Camera& camera, float x, float y, float major, float minor,
+                   float tiltDegrees, SDL_Color light, float loop, double seconds, bool back)
+{
+    const SpellFx& s = spellFx();
+    const float tilt = tiltDegrees * 3.14159265f / 180.0f;
+    const SDL_FPoint down{-std::sin(tilt), std::cos(tilt)}; // (the major axis, downward on screen)
+    const auto v = detail::QuadBatch::corners(detail::toScreen(camera, x, y), down, major / 2 * camera.zoom,
+                                              minor / 2 * camera.zoom, light);
+    static constexpr int kIndices[6] = {0, 1, 2, 0, 2, 3};
+    const float uniforms[4] = {loop, static_cast<float>(std::fmod(seconds, 3600.0)), back ? 1.0f : 0.0f,
+                               major > 0 ? minor / major : 1.0f};
+    SDL_SetGPURenderStateFragmentUniforms(s.ripple, 0, uniforms, sizeof(uniforms));
+    SDL_SetTextureBlendMode(s.white, SDL_BLENDMODE_BLEND);
+    SDL_SetGPURenderState(renderer, s.ripple);
+    SDL_RenderGeometry(renderer, s.white, v.data(), 4, kIndices, 6);
     SDL_SetGPURenderState(renderer, nullptr);
 }
 

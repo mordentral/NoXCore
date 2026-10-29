@@ -318,6 +318,11 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.openQuitMenu = true; // tests: the in-game menu, as if Escape were pressed
         } else if (a == "--server-options") {
             app.openServerOptions = true; // tests: the host's Server Settings, as Gameplay Controls opens them
+        } else if (a == "--server-options-page") {
+            app.openServerOptions = true; // tests: likewise, on page N (0 Game, 1 General, 2 Access, 3 Teams, 4 Bots)
+            app.serverOptionsPage = std::atoi(next());
+        } else if (a == "--ask-password") {
+            app.askPasswordTest = next(); // tests (with --browse): the join's password asked for HOST over the game list
         } else if (a == "--save-dir") {
             opts.saveDir = next(); // characters listed from and made in here instead of <game>\Save; a solo game's saves too
         } else if (a == "--server") {
@@ -378,7 +383,7 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.fxDemo = true;
         } else if (a == "--fx-demo-only") {
             app.fxDemo = true;
-            app.fxDemoOnly = next(); // bursts, beams, particles or objects
+            app.fxDemoOnly = next(); // bursts, beams, particles, objects, enchant, rain, chain, undead, summon or shields
         } else if (a == "--spawn") {
             app.autoSpawn = true;
         } else if (a == "--console") {

@@ -1145,19 +1145,19 @@ void MapView::drawScene(SDL_Renderer* renderer, const Camera& camera, SpriteCach
             alpha = nox::client::lingerAlpha(time_ - static_cast<double>(o.fade.inSightFrame));
         }
         // BELOW things (a plate, a fire pit, scorch marks) lie on the floor: before everything
-        // standing on them, in their own order. Wall hangings (AIRBORNE + NO_COLLIDE: shields,
-        // banners) aren't sorted at all: the exe draws them after the back walls, before
-        // everything else (the hangings' own list), in the order they come.
-        const float key = o.art->hanging ? std::numeric_limits<float>::lowest() : o.art->below || o.plate ? o.y - kBelow : o.y;
-        items.push_back({key, nullptr, &o, nullptr, alpha});
+        // standing on them, in their own order; the floor's decals (the scene's second list,
+        // drawn with the floor: a cave lift's stone ring) before the other BELOW things (its
+        // pit, drawn over it). Wall hangings (AIRBORNE + NO_COLLIDE: shields, banners) aren't
+        // sorted at all: the exe draws them after the back walls, before everything else (the
+        // hangings' own list), in the order they come.
+        items.push_back({sortKey(*o.art, o.y, o.plate.has_value()), nullptr, &o, nullptr, alpha});
     }
     // A session's pending client-only things, where their point is in sight.
     for (const Object& o : pendingObjects_) {
         if (!visible(o.x, o.y) || (sight && !sight->visible(o.x, o.y))) {
             continue;
         }
-        const float key = o.art->hanging ? std::numeric_limits<float>::lowest() : o.art->below ? o.y - kBelow : o.y;
-        items.push_back({key, nullptr, &o, nullptr});
+        items.push_back({sortKey(*o.art, o.y, false), nullptr, &o, nullptr});
     }
     // A drawable's body goes by the scene's sort (client/fade.hpp), worked out once for its sprites
     // (they come together): the general list's lingers out of sight with Fade Objects; the others

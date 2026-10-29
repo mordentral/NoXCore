@@ -653,32 +653,38 @@ void View3D::drawFloorTexture(const Frame& f)
     }
     // What lies on the floor goes into it, drawn as in 2D (BELOW things, pressure plates).
     const auto lightAt = [&](float x, float y) { return f.light ? f.light->sample(x, y) : Rgb{255, 255, 255}; };
-    for (const auto& o : f.view.objects_) {
-        // Skipped: no art, neither a floor type nor a plate, drawn from the server's copy instead (its
-        // extent is in liveCodes), or past the texture's reach.
-        if (!o.art || !(floorType(*o.art) || o.plate) || (f.liveCodes && f.liveCodes->contains(o.extent)) ||
-            std::hypot(o.x - eyeX_, o.y - eyeY_) > kFloorRadius) {
-            continue;
-        }
-        if (o.plate) {
-            f.view.drawPlate(f.renderer, above, o);
-            continue;
-        }
-        const auto image = mapObjectImage(*o.art, o.extent, o.doorAngle, o.frame, o.enabled, o.xStatus, o.xStatusSince, f.time);
-        if (!image) {
-            continue;
-        }
-        if (const Sprite* s = o.colours ? f.sprites.tinted(*image, *o.colours) : f.sprites.get(*image)) {
-            if (debugLog() && (s->width > 100 || s->height > 100)) {
-                static std::set<std::string> logged;
-                if (logged.insert(o.art->name).second) {
-                    SDL_Log("view3d: floor %s at %.0f,%.0f: %.0fx%.0f below %d box %.0fx%.0f r%.0f z %.0f-%.0f Z %.0f classes %08X",
-                            o.art->name.c_str(), o.x, o.y, s->width, s->height, o.art->below ? 1 : 0, o.art->extentWidth,
-                            o.art->extentHeight, o.art->extentRadius, o.art->zSizeMin, o.art->zSizeMax, o.art->z, o.art->classes);
-                }
+    // (The floor's decals first, as the 2D scene draws them: a cave lift's stone ring under its pit.)
+    for (int pass = 0; pass < 2; ++pass) {
+        for (const auto& o : f.view.objects_) {
+            // Skipped: no art, neither a floor type nor a plate, drawn from the server's copy instead (its
+            // extent is in liveCodes), or past the texture's reach.
+            if (!o.art || !(floorType(*o.art) || o.plate) || (f.liveCodes && f.liveCodes->contains(o.extent)) ||
+                std::hypot(o.x - eyeX_, o.y - eyeY_) > kFloorRadius) {
+                continue;
             }
-            f.view.drawSprite(f.renderer, f.sprites, above, *s, o.x - o.art->halfWidth, o.y - o.art->halfHeight - o.art->z,
-                              lightAt(o.x, o.y));
+            if (o.art->floorDecal != (pass == 0)) {
+                continue;
+            }
+            if (o.plate) {
+                f.view.drawPlate(f.renderer, above, o);
+                continue;
+            }
+            const auto image = mapObjectImage(*o.art, o.extent, o.doorAngle, o.frame, o.enabled, o.xStatus, o.xStatusSince, f.time);
+            if (!image) {
+                continue;
+            }
+            if (const Sprite* s = o.colours ? f.sprites.tinted(*image, *o.colours) : f.sprites.get(*image)) {
+                if (debugLog() && (s->width > 100 || s->height > 100)) {
+                    static std::set<std::string> logged;
+                    if (logged.insert(o.art->name).second) {
+                        SDL_Log("view3d: floor %s at %.0f,%.0f: %.0fx%.0f below %d box %.0fx%.0f r%.0f z %.0f-%.0f Z %.0f classes %08X",
+                                o.art->name.c_str(), o.x, o.y, s->width, s->height, o.art->below ? 1 : 0, o.art->extentWidth,
+                                o.art->extentHeight, o.art->extentRadius, o.art->zSizeMin, o.art->zSizeMax, o.art->z, o.art->classes);
+                    }
+                }
+                f.view.drawSprite(f.renderer, f.sprites, above, *s, o.x - o.art->halfWidth, o.y - o.art->halfHeight - o.art->z,
+                                  lightAt(o.x, o.y));
+            }
         }
     }
     // The live drawables MapView sorts as lying on the floor (their sort y pushed back by kBelow).
@@ -1700,7 +1706,7 @@ void View3D::addEffects(const Frame& f)
         addParticle(x, ground, z, static_cast<float>(std::clamp(size, 1, 3)) * 0.5f + 0.25f, s.type->palette.core, 1, 1);
     }
     // Soft puffs of smoke and gas, lit where they are.
-    if (fxdraw::puffsOn()) {
+    if (fxdraw::anyPuffsOn()) {
         for (const auto& p : fx.puffs_) {
             const float x = p.prevX + (p.x - p.prevX) * t;
             const float y = p.prevY + (p.y - p.prevY) * t;

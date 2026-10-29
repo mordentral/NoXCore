@@ -61,6 +61,7 @@ std::unique_ptr<GpuShaders> GpuShaders::create(SDL_Renderer* renderer)
         !out->add(renderer, "fx_glowline", ShaderId::fx_glowline, 1, out->glowLine_) ||
         !out->add(renderer, "fx_puff", ShaderId::fx_puff, 0, out->puff_) ||
         !out->add(renderer, "fx_barrier", ShaderId::fx_barrier, 1, out->barrier_) ||
+        !out->add(renderer, "fx_ripple", ShaderId::fx_ripple, 1, out->ripple_) ||
         !out->add(renderer, "bloom_blur", ShaderId::bloom_blur, 1, out->blur_) ||
         !out->add(renderer, "bloom_bright", ShaderId::bloom_bright, 0, out->bright_) ||
         !out->add(renderer, "fx_light", ShaderId::fx_light, 0, out->light_) ||
@@ -103,7 +104,7 @@ std::unique_ptr<GpuShaders> GpuShaders::create(SDL_Renderer* renderer)
 
 GpuShaders::~GpuShaders()
 {
-    for (SDL_GPURenderState* state : {material_, disc_, rect_, glow_, glowLine_, puff_, barrier_, blur_, bright_, light_, gamma_, pending_, weather_}) {
+    for (SDL_GPURenderState* state : {material_, disc_, rect_, glow_, glowLine_, puff_, barrier_, ripple_, blur_, bright_, light_, gamma_, pending_, weather_}) {
         if (state) {
             SDL_DestroyGPURenderState(state);
         }

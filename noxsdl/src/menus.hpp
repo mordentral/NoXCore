@@ -153,6 +153,12 @@ public:
     /// noxcpp's: lobby::kClientTooOldNotice in that notice (client_level_gate.hpp), for a game that
     /// wants a newer NoX Core.
     void tooOldNotice();
+    /// The join's password asked for (the lobby's PASSWORD_REQUIRED, which our join had none to
+    /// answer; `wrong`: the one given was refused): the game's dialog, noxworld.c's Password and
+    /// PasswordRequired (Gui_Dialog_Create's 7: OK, Cancel, the entry; OK only with something
+    /// typed); OK joins `host` (the game list's game just left) again with `profile` and what was
+    /// typed, Cancel stays here.
+    void askJoinPassword(const std::string& host, const nox::client::PlayerProfile& profile, bool wrong);
     /// Where characters are listed from and saved to (default: the game's Save folder).
     void setSaveDir(std::filesystem::path dir) { saveDir_ = std::move(dir); }
     /// The folder a solo game's Save\ is under (default: the game's).

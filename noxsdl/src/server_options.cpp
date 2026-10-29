@@ -138,7 +138,7 @@ void ServerOptions::close()
     gui_.setModal(nullptr);
     gui_.destroy(window_);
     window_ = nullptr;
-    if (callbacks_.windowClosed) {
+    if (callbacks_.windowClosed && !campaign_) {
         callbacks_.windowClosed();
     }
 }
@@ -193,6 +193,9 @@ std::string ServerOptions::chosenMapWord() const
 
 void ServerOptions::editSlot(const SettingsEdit& e)
 {
+    if (campaign_) {
+        return; // (a campaign's window writes no settings slot)
+    }
     if (callbacks_.windowState) {
         callbacks_.windowState(windowState()); // (the window as it is when it writes)
     }
@@ -228,6 +231,7 @@ void ServerOptions::open()
     if (!callbacks_.current) {
         return;
     }
+    campaign_ = callbacks_.campaign ? callbacks_.campaign() : std::nullopt;
     const gui::Proc proc = [this](gui::Window&, int message, gui::Window& from) { return onMessage(from, message); };
     nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / "servopts.wnd");
     addBotsPage(def);
@@ -259,9 +263,13 @@ void ServerOptions::open()
     }
     // The map list's slider thumb (with UISlider / UISliderLit).
     gui::useSliderThumb(window_->find(kMapSlider));
-    // The host's: Go and Cancel, not OK.
+    // The host's: Go and Cancel, not OK. (noxcpp: a campaign's, OK in Go's place: no map or type
+    // to go to.)
     if (gui::Window* ok = window_->find(kOk)) {
-        ok->show(false);
+        ok->show(campaign_.has_value());
+    }
+    if (gui::Window* go = window_->find(kGo); go && campaign_) {
+        go->show(false);
     }
 
     // The settings as they stand, the host's.
@@ -280,7 +288,7 @@ void ServerOptions::open()
         w->show(false);
     }
     fillTeamOptions();
-    maps_ = callbacks_.maps ? callbacks_.maps() : std::vector<MapChoice>{};
+    maps_ = callbacks_.maps && !campaign_ ? callbacks_.maps() : std::vector<MapChoice>{};
     fillMaps();
     fillLimits();
     if (gui::Window* button = window_->find(kTypeButton)) {
@@ -290,9 +298,30 @@ void ServerOptions::open()
     setLabels();
     // (guiServerOptsLoad, the host's: the window marked changed, slot 0 refreshed and copied
     // to slot 1, the current one.)
-    if (callbacks_.windowOpened) {
+    if (callbacks_.windowOpened && !campaign_) {
         callbacks_.windowOpened(windowState());
     }
+    greyForCampaign();
+}
+
+void ServerOptions::greyForCampaign()
+{
+    if (!window_ || !campaign_) {
+        return;
+    }
+    // The Game page: all but the name (the type and its list, "Form a new game", the maps, the
+    // limits, Defaults, Advanced..., the team options); the Bots tab.
+    // Greyed: disabled and drawn dimmed (gui::setGreyed).
+    for (const auto id : {kTypeButton, kTypeList, kNewGame, kDefault, kAdvanced, kBotsTab, kMapGroup, kLimitsGroup, kTeamsGroup}) {
+        gui::setGreyed(window_->find(id), true);
+    }
+    if (gui::Window* hint = window_->find(kGoMsg)) {
+        hint->dimDisabled = false; // (the hint above the maps, the campaign's own: read as it is)
+    }
+    if (gui::Window* tab = window_->find(kBotsTab)) {
+        tab->tooltip = "Not in a " + *campaign_ + " game";
+    }
+    greyServerForCampaign();
 }
 
 void ServerOptions::addBotsPage(nox::gui::WindowDef& def)
@@ -570,6 +599,14 @@ void ServerOptions::fillMaps()
     }
     list->lines.clear();
     shown_.clear();
+    if (campaign_) {
+        // (noxcpp: a campaign's map alone, the one being played: its maps follow from its exits)
+        shown_.push_back(settings_.map);
+        list->lines.push_back({settings_.map, list->textColor});
+        list->selectedLine = 0;
+        scrollMaps(0);
+        return;
+    }
     int selected = -1;
     for (const auto& m : maps_) {
         if (!(m.modes & settings_.mode)) {
@@ -650,11 +687,14 @@ void ServerOptions::setLabels()
         w->text = format(text("SettingsMsg"), {settings_.map});
     }
     if (gui::Window* w = window_->find(kTypeLabel)) {
-        w->text = (startMode_ & 0x80) ? text("GameType") : format(text("GameTypeIs"), {typeName(startMode_)});
+        w->text = campaign_             ? format(text("GameTypeIs"), {*campaign_})
+                  : (startMode_ & 0x80) ? text("GameType")
+                                        : format(text("GameTypeIs"), {typeName(startMode_)});
     }
     if (gui::Window* w = window_->find(kGoMsg)) {
-        w->text = text("GoMessage");
+        w->text = campaign_ ? "Co-op: set the name and access, then click OK" : text("GoMessage");
     }
+    greyForCampaign(); // (the maps and limits stay off in a campaign's)
 }
 
 void ServerOptions::showTypes(bool on)
@@ -840,10 +880,18 @@ bool ServerOptions::onMessage(gui::Window& from, int message)
         deferred_.push_back([this] { openAdvanced(); });
         return true;
     case kGo:
+        if (campaign_) {
+            return true; // (hidden in a campaign's: nothing to go to)
+        }
         deferred_.push_back([this] { go(); });
         return true;
-    case kCancel:
     case kOk:
+        if (campaign_) {
+            commitName(); // (a campaign's OK: the name as typed, then closed)
+        }
+        deferred_.push_back([this] { close(); });
+        return true;
+    case kCancel:
         deferred_.push_back([this] { close(); });
         return true;
     default:
@@ -909,7 +957,7 @@ void ServerOptions::commitName()
         return;
     }
     settings_.name = nox::strings::toUtf8(w->entry).substr(0, 15);
-    if (callbacks_.editSettings) {
+    if (callbacks_.editSettings && !campaign_) {
         SettingsEdit e; // (strcpy'd into the current slot's + 9, and the game's: GameHost::editSettings)
         e.name = settings_.name;
         editSlot(e);

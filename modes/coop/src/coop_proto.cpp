@@ -122,6 +122,36 @@ std::vector<std::uint8_t> dialogMessage(const DialogMirror& d)
     return framed(kDialog, r);
 }
 
+std::vector<std::uint8_t> creaturesMessage(std::span<const std::uint16_t> netCodes)
+{
+    std::vector<std::uint8_t> r;
+    const std::size_t n = std::min(netCodes.size(), kCreaturesMost);
+    r.push_back(static_cast<std::uint8_t>(n));
+    for (std::size_t i = 0; i < n; ++i) {
+        put16(r, netCodes[i]);
+    }
+    return framed(kCreatures, r);
+}
+
+std::optional<std::vector<std::uint16_t>> parseCreatures(std::span<const std::uint8_t> rest)
+{
+    Reader in{rest};
+    const std::size_t n = in.u8();
+    if (n > kCreaturesMost) {
+        return std::nullopt;
+    }
+    std::vector<std::uint16_t> codes;
+    codes.reserve(n);
+    for (std::size_t i = 0; i < n && in.ok; ++i) {
+        codes.push_back(in.u16());
+    }
+    if (!in.ok) {
+        return std::nullopt;
+    }
+    std::ranges::sort(codes);
+    return codes;
+}
+
 std::vector<std::uint8_t> chapterReadyMessage()
 {
     return framed(kChapterReady, {});

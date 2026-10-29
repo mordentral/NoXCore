@@ -20,6 +20,9 @@
 // buttons, off): multiplayer's Save (the server's copy of the character to the .plr), and Vote
 // elsewhere (the stock kick vote).
 // Gameplay Controls is off (greyed) in a game we don't host.
+// (noxcpp) A campaign mode's game we host for guests (the co-op campaign: a solo game) keeps the
+// solo layout with Gameplay Controls added in Vote's place and Quit below it (the box 220 x 330):
+// the host's Server Settings there take the game's name and its Access settings.
 #pragma once
 
 #include "gui.hpp"
@@ -55,6 +58,9 @@ public:
         /// We host the game (Game_HasFlags(1)): Gameplay Controls usable.
         std::function<bool()> hosting;
         std::function<void()> gameplay; ///< 0x2330: guiServerOptsLoad (this has closed)
+        /// (noxcpp) We host a campaign mode's solo game for guests (hostedCampaign): the solo
+        /// layout with Gameplay Controls, usable.
+        std::function<bool()> campaignHost;
         /// A noxcpp server that says a map vote can be called here (its vote on, not a quest):
         /// Vote calls it.
         std::function<bool()> canVoteMap;
@@ -88,6 +94,7 @@ private:
     gui::Window* menu_ = nullptr;
     gui::Window* dialog_ = nullptr;
     SDL_Rect voteRect_{};
+    SDL_Rect gameplayRect_{}; ///< Gameplay Controls' place in the file (the network layout's)
     std::string saveText_[2]; ///< MultiplayerSaveLabel, SoloSaveLabel
     std::string gameplayText_;
     std::string voteText_; ///< GUIQuit.c:Vote

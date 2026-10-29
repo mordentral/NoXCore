@@ -20,15 +20,16 @@
 //                         act here and are shown; the others are kept in the file but have
 //                         nothing to switch, so they're left out of the panel.
 //   noxsdl's switches     below those: the frame-rate counter, bloom, per-pixel lighting, smooth
-//                         effects, HD images, the kill feed, Windows' mouse acceleration and
-//                         VSync (Extras), in the panel's own checkbox style; the mouse's speed, a
+//                         effects, HD spell effects, HD images, the kill feed, Windows' mouse
+//                         acceleration and VSync (Extras), in the panel's own checkbox style; the mouse's speed, a
 //                         slider; then two drop-downs: Smoothing (Off / Smooth Movement / Smooth
 //                         Network / Lock to 30 FPS) and Display (Windowed / Fullscreen Windowed /
 //                         Fullscreen); and on More, Weather Effects (On / Reduced / Off).
 //   the panel's tabs      (noxsdl's) General and More along its top, in the game's tab look (the
 //                         Server Settings' tabs, servopts.wnd): More has the rarely changed
-//                         switches (Soft Shadow Edge, Fade Objects, Render GUI, Frame Rate),
-//                         General the rest. It opens on General each time.
+//                         switches (Soft Shadow Edge, Fade Objects, Render GUI, Frame Rate) and
+//                         HD Spell FX (General is full), General the rest. It opens on General
+//                         each time.
 //
 // Changes apply at once (onChange); nox.cfg is written when the window closes.
 #pragma once
@@ -54,7 +55,11 @@ public:
         bool frameRate = true;     ///< the frame-rate counter
         bool bloom = true;         ///< bloom round bright effects and lights
         bool perPixelLight = true; ///< per-pixel lighting (off: the game's light grid)
-        bool smoothEffects = true; ///< effects drawn smooth at the screen's resolution
+        bool smoothEffects = true; ///< effects drawn smooth at the screen's resolution (sparks, rays, glows)
+        /// HD Spell FX (the More page): the poison cloud and Force Field drawn as noxsdl's own shader
+        /// effects instead of the game's sprites (the Reflective Shield's is off for now, to be
+        /// reworked). Needs the GPU renderer's shaders. Off by default (by decision, 2026-10-29).
+        bool hdSpellFx = false;
         /// Smoothing: 0 off (as vanilla), 1 Smooth Movement (everything eased to each new position
         /// over a server frame), 2 Smooth Network (everything drawn between server snapshots: the
         /// default), 3 Lock to 30 FPS (off, a frame drawn as each server update comes).

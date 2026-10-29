@@ -2,6 +2,8 @@
 // animation frame a drawable shows for its pose.
 #include "thing_art.hpp"
 
+#include "scene_order.hpp"
+
 #include "noxcore/client/fade.hpp"
 #include "noxcore/client/state_draw.hpp"
 #include "noxcore/things/object_class.hpp"
@@ -481,10 +483,7 @@ const std::optional<TypeArt>& ThingArt::entry(std::string_view name)
                     a.classes |= nox::things::ObjectClass::Pickup; // the client's WEIGHT reader
                 }
                 a.visibleEnable = (a.classes & nox::things::ObjectClass::VisibleEnable) != 0;
-                namespace oc = nox::things::ObjectClass;
-                a.floorDecal = a.below && !a.editorOnly && (a.drawName == "StaticDraw" || a.drawName == "StaticRandomDraw") &&
-                               !(a.classes & (oc::Pickup | oc::VisibleEnable)) &&
-                               (allowOverlap || noCollide || (a.classes & oc::Immobile)) && !ownerVisible;
+                a.floorDecal = scene::floorDecal(a.below, a.editorOnly, a.drawName, a.classes, allowOverlap, noCollide, ownerVisible);
                 a.fades = nox::client::drawFades(a.drawName);
                 a.ghost = a.name == "Ghost";
                 a.polyp = a.name == "Polyp";

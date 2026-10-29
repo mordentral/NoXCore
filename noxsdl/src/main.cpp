@@ -540,7 +540,11 @@ void chooseCursor(App& app, bool inGame)
         app.cursorType = CursorType::Target; // a spell waiting for its target (video_cursorDrawImpl)
         return;
     }
-    app.cursorType = CursorType::Move;
+    // cursorUpdate's start: the move cursor, but the arrow under a cinematic's widescreen, where
+    // the world's cursors (Talk, Trade, the pickup hands, Use) are skipped: a click then starts no
+    // talk (Cli_ProcessControlEvents acts on the cursor).
+    const bool wide = app.cinematics && app.cinematics->wideScreen();
+    app.cursorType = wide ? CursorType::Select : CursorType::Move;
     const auto& client = app.live->client();
     if (app.inventory && inGame) {
         // Identify mode's hand over the tray and the magnifier, its no-hand elsewhere.
@@ -600,6 +604,7 @@ void chooseCursor(App& app, bool inGame)
     pick::Situation situation;
     situation.busy = client.world().dialog().open || (app.tradeScreens && app.tradeScreens->shopOpen());
     situation.dragging = app.inventory && app.inventory->dragging();
+    situation.wideScreen = wide;
     pick::Target target;
     if (app.cursorUseable) {
         // A useable map object (enabled: useableAt takes no other).
@@ -1175,6 +1180,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             OptionsWindow::Extras extras = loadExtras(gameDir);
             extras.hdImages = (extras.hdImages || opts.hdImages) && !app->imagePack.empty();
             extras.smoothEffects = extras.smoothEffects && !opts.stockEffects;
+            extras.hdSpellFx = extras.hdSpellFx && !opts.stockEffects;
             extras.perPixelLight = extras.perPixelLight && !opts.gridLight;
             extras.bloom = extras.bloom && !opts.noBloom;
             extras.frameRate = extras.frameRate && app->showFps;
@@ -1591,6 +1597,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                     app->audio->music(25); // the menus' music, "shell" (game_showMainMenu)
                 }
                 app->menus->showGameBrowser();
+                if (!app->askPasswordTest.empty()) {
+                    // (--ask-password HOST: the join's password asked for over the list, as a game
+                    // that wants one leaves it asked)
+                    app->menus->askJoinPassword(app->askPasswordTest, opts.profile, false);
+                }
             } else if (!opts.movieArg.empty()) {
                 app->movie->play(opts.movieArg, movies::Skip::AnyInput, [app] { startMainMenu(*app); });
             } else if (automated) {
@@ -3422,6 +3433,9 @@ void updateGameWindows(App& app)
             if (!app.serverOptions->isOpen()) {
                 app.serverOptions->toggle();
             }
+            if (app.serverOptionsPage != 0) {
+                app.serverOptions->showPageForTest(app.serverOptionsPage);
+            }
         }
         app.serverOptions->update(SDL_GetTicks());
     }
@@ -3502,10 +3516,15 @@ SDL_AppResult gameLeft(App& app)
     PortMapper::retire(std::move(app.portMapper)); // (the router's mapping removed off this thread)
     // A game we hosted ends as we leave it, as the exe's host's: its players told
     // (MSG_SERVER_QUIT, then SERVER_CLOSE as it goes), in the background (LocalHost::retire).
+    const bool ownGame = app.host != nullptr;
     LocalHost::retire(std::move(app.host));
     const bool failed = app.live->client().stage() == nox::client::HeadlessClient::Stage::Failed || app.live->tooOld();
     using EndReason = nox::client::HeadlessClient::EndReason;
     const EndReason endReason = app.live->client().endReason();
+    // (The lobby asked for the game's password and we had none, or the one given was refused:
+    // asked for over the game list, the game joined again with it.)
+    const bool wrongPassword = app.live->client().joinError() == nox::net::JoinError::WrongPassword;
+    const bool askPassword = failed && !ownGame && endReason == EndReason::None && (app.live->client().passwordAsked() || wrongPassword);
     if (app.menus && !app.shotTaken) { // (a screenshot run ends once it has left)
         // Back to the game list.
         std::string couldNot = "Couldn't join " + app.liveHost + " (see noxcore-log.txt)";
@@ -3529,6 +3548,8 @@ SDL_AppResult gameLeft(App& app)
         const bool tooOldNotice = noxsdl::client_level::noticeAfterJoin(failed, endReason != EndReason::None, app.live->extended());
         if (tooOldNotice) {
             couldNot = "Couldn't join " + app.liveHost;
+        } else if (askPassword) {
+            couldNot = "Couldn't join " + app.liveHost + (wrongPassword ? ": the password was wrong" : ": it asks for a password");
         }
         app.browser->setMessage(failed && endReason == EndReason::None ? couldNot : "Left " + app.liveHost);
         saveBars(app);
@@ -3569,6 +3590,8 @@ SDL_AppResult gameLeft(App& app)
             app.menus->notice("Noxworld.c:Notification", "Noxworld.c:Kicked");
         } else if (tooOldNotice) {
             app.menus->tooOldNotice();
+        } else if (askPassword) {
+            app.menus->askJoinPassword(app.liveHost, app.profile, wrongPassword);
         }
         handMouseTo(app, MouseOwner::Menus); // (nothing of a play view's mouse left behind)
         app.logMenuPointer = true;
@@ -4428,6 +4451,7 @@ void SDL_AppQuit(void* appstate, SDL_AppResult /*result*/)
         app->view.reset();
         app->sprites.reset();
         fxdraw::smooth() = {};
+        fxdraw::spellFx() = {};
         app->view3d.releaseGpu(); // (its depth pass's GPU objects: on the renderer's device, gone below)
         app->bloom.reset();
         app->shaders.reset(); // before the renderer and its GPU device go

@@ -191,7 +191,7 @@ add_custom_command(TARGET noxsdl POST_BUILD
 # time. Without either compiler the GPU renderer still runs and recolours sprites on the CPU.
 set(NOXSDL_SHADERS
     material.frag material_split.frag fx_disc.frag fx_rect.frag fx_glow.frag fx_glowline.frag fx_puff.frag
-    fx_barrier.frag bloom_blur.frag bloom_bright.frag fx_light.frag gamma.frag
+    fx_barrier.frag fx_ripple.frag bloom_blur.frag bloom_bright.frag fx_light.frag gamma.frag
     # A map editor session's pending edits.
     pending.frag
     # nox.weather's rain, snow, storm and wind (weather.cpp).

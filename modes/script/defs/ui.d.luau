@@ -7,7 +7,10 @@ type NoxColour = string | { number }
 -- frame, clickThrough and hud are UI API 3's: frame = false draws no frame, title or background
 -- (any y on the screen); clickThrough = true leaves clicks, the wheel and the mouse over it to the
 -- game; hud = true hides it whenever the game hides its HUD and draws it under the framed windows.
-type NoxWindowSpec = { title: string?, x: number?, y: number?, w: number?, h: number?, frame: boolean?, clickThrough: boolean?, hud: boolean? }
+-- anchor (UI API 3 and up): "topleft", "top", "topright", "left", "right", "bottomleft", "bottom"
+-- or "bottomright" keeps the window's distance (x, y in the 640 x 480) to that edge or corner of
+-- the whole view on a wider or taller screen; none or "center": centred with the 640 x 480.
+type NoxWindowSpec = { title: string?, x: number?, y: number?, w: number?, h: number?, frame: boolean?, clickThrough: boolean?, hud: boolean?, anchor: string? }
 type NoxTooltipLine = { any } | string -- { text, colour? }, or a white line's text
 -- keep is UI API 4's: true keeps the label while its object is out of the client's world.
 type NoxLabelOptions = { show: string?, near: number?, offset: number?, keep: boolean? }

@@ -176,6 +176,10 @@ public:
     /// draws the game's list-box down arrow (UIScrollDn, lit while the mouse is on it) at its
     /// right end, its text centred in the rest.
     bool dropArrow = false;
+    /// (noxcpp) Drawn visibly greyed while disabled: its texts, list lines and box outlines in a dim
+    /// grey, its images darkened. Off (the stock look, every window the files
+    /// make): a disabled window draws as the exe's does, often no different from an enabled one.
+    bool dimDisabled = false;
 
     Window* parent = nullptr;
     std::vector<std::unique_ptr<Window>> children; ///< file order
@@ -215,6 +219,20 @@ inline void setEnabled(Window* w, bool on)
     }
 }
 
+/// (noxcpp) A window (if there is one) and everything in it greyed out: disabled and drawn dimmed
+/// (Window::dimDisabled), or back to usable and the stock look.
+inline void setGreyed(Window* w, bool greyed)
+{
+    if (!w) {
+        return;
+    }
+    setEnabled(w, !greyed);
+    w->dimDisabled = greyed;
+    for (auto& c : w->children) {
+        setGreyed(c.get(), greyed);
+    }
+}
+
 /// A window centred in the game's 640 x 480 layout.
 inline void centreOnScreen(Window& w)
 {
@@ -248,6 +266,8 @@ public:
     void outline(int x, int y, int w, int h, const nox::gui::Color& c); ///< one-pixel border lines
     /// An image by name (thing.bin's named images; animations play), at its own offset.
     void image(const std::string& name, int x, int y);
+    /// (noxcpp) The same darkened, `dim` set (a greyed control's: Window::dimDisabled); else as image.
+    void image(const std::string& name, int x, int y, bool dim);
     /// The same with its material pixels shaded (draw_setMaterial's two forms).
     void image(const std::string& name, int x, int y, const SpriteCache::Materials& materials);
     int fontHeight(bool large) const { return large ? 16 : 10; }

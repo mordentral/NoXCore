@@ -398,6 +398,10 @@ void ServerOptions::commitAccessFields()
         a.sysopPassword = nox::strings::toUtf8(w->entry);
     }
     callbacks_.setAccess(a);
+    if (campaign_) {
+        // (noxcpp: a campaign's limit is its room at most, the host's own and its guests': as taken)
+        setField(window_->find(kAccMaxPlayers), std::to_string(callbacks_.access().maxPlayers));
+    }
 }
 
 void ServerOptions::fillTeamOptions()
@@ -430,11 +434,26 @@ void ServerOptions::fillTeamOptions()
     } else {
         off(kUseTeams, t.teams ? kAutoAssign : kTeamDamage);
     }
+    // (noxcpp) A mode's pinned flags: shown, never changed (GameHost refuses them too); with team
+    // play pinned, Shuffle as well.
+    if (t.pinned & 4u) {
+        off(kUseTeams, kUseTeams);
+        off(kShuffle, kShuffle);
+    }
+    if (t.pinned & 2u) {
+        off(kAutoAssign, kAutoAssign);
+    }
+    if (t.pinned & 1u) {
+        off(kTeamDamage, kTeamDamage);
+    }
     if (gui::Window* w = window_->find(kAutoAssign)) {
         w->tooltip = gui_.text(t.autoAssign ? "guiserv.c:AutoAssignOnTT" : "guiserv.c:AutoAssignOffTT");
     }
     if (gui::Window* w = window_->find(kTeamDamage)) {
         w->tooltip = gui_.text(t.teamDamage ? "guiserv.c:TeamDamageOnTT" : "guiserv.c:TeamDamageOffTT");
+    }
+    if (campaign_) {
+        gui::setGreyed(group, true); // (noxcpp: no team options in a campaign's)
     }
 }
 
@@ -613,6 +632,45 @@ void ServerOptions::fillGeneral()
                         "saying \"?MapVote\"), once "
                         "every 5 minutes (more than half changes the map).";
         gui::setChecked(vote, s.mapVote);
+    }
+    greyServerForCampaign();
+}
+
+void ServerOptions::greyServerForCampaign()
+{
+    // (noxcpp) A campaign's window: the General page's arena rules (force respawn, the message of
+    // the day, the map cycle, items respawning, the camper alarm, the map vote), the classes
+    // refused (the campaign's class is the only one let in) and the Teams page off; the update
+    // rate and the rest of the Access page stay.
+    if (!window_ || !campaign_) {
+        return;
+    }
+    for (const auto id : {kForceRespawn, kShowMotd, kMapCycle, kItemRespawn, kCamperAlarm, kMapVote, kAccClasses, kSubTeams}) {
+        gui::setGreyed(window_->find(id), true);
+    }
+    if (gui::Window* tab = window_->find(kSubTeams)) {
+        tab->tooltip = "Not in a " + *campaign_ + " game";
+    }
+}
+
+void ServerOptions::showPageForTest(int page)
+{
+    if (!window_) {
+        return;
+    }
+    constexpr std::int32_t kGameTab = 10160, kBotsTab = 12100; // (servopts.wnd's, server_options.cpp's)
+    const std::int32_t tab = page <= 0 ? kGameTab : page >= 4 ? kBotsTab : kServerTab;
+    for (const auto id : {kGameTab, kServerTab, kBotsTab}) {
+        if (gui::Window* w = window_->find(id)) {
+            w->state = id == tab ? (w->state | gui::kPressed) : (w->state & ~gui::kPressed);
+        }
+    }
+    showTab(page <= 0 ? Tab::Game : page >= 4 ? Tab::Bots : Tab::Server);
+    if (0 < page && page < 4) {
+        gui::setChecked(window_->find(kSubGeneral), page == 1);
+        gui::setChecked(window_->find(kSubAccess), page == 2);
+        gui::setChecked(window_->find(kSubTeams), page == 3);
+        showServerPage(page - 1);
     }
 }
 

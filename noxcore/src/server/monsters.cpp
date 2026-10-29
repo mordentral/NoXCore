@@ -4487,6 +4487,7 @@ void reportAcquired(World& world, ServerObject& player, ServerObject& c)
     const std::uint32_t code = netCodeOf(c);
     const std::uint32_t type = c.type | ((world.gameFlags & 0x8000000u) ? 0x8000u : 0u);
     world.broadcasts().push_back({{0x6C, lo(code), hi(code), lo(type), hi(type)}, true, player.extent});
+    ++world.creatureReports;
     if (c.maxHealth != 0) {
         world.broadcasts().push_back({{0xDD, lo(code), hi(code), lo(c.health), hi(c.health), lo(c.maxHealth), hi(c.maxHealth)}, true, player.extent});
     }
@@ -5142,6 +5143,7 @@ void loseCreature(World& world, ServerObject& creature)
     creature.subclasses &= ~0x80u;
     const std::uint32_t code = creature.extent | ((world.gameFlags & 0x8000000u) ? 0x8000u : 0u);
     world.broadcasts().push_back({{0x6D, static_cast<std::uint8_t>(code), static_cast<std::uint8_t>(code >> 8)}, true, owner->extent});
+    ++world.creatureReports;
     unmarkMinimap(world, *owner, creature, 1);
 }
 
