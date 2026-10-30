@@ -435,6 +435,11 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
                 o.player->ankhsTaken = {}; // (with its checkpoint)
                 o.player->soulGate = 0;
                 o.hurtBy = 0;
+                // The weapon in its hand stays in its hand (the exe's ud->currentWeapon is the same
+                // thing's pointer after the switch): by its new number when it was numbered afresh, a
+                // map's staff picked up, say. Else it named whatever of the new map had the old
+                // number: nothing fired, and the next weapon worn left this one worn too.
+                o.player->currentWeapon = carried(o.player->currentWeapon);
                 // The NPC it talks to (DialogWith) isn't forgotten: the exe keeps its pointer to the
                 // old map's. One left behind stays an NPC no longer there (still talking).
                 if (o.player->dialogWith != 0) {
