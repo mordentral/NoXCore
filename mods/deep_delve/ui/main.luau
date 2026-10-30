@@ -51,6 +51,12 @@
 -- into the list, kept while the item is out of the client's world (keep), and cleared as it
 -- leaves the list (picked up, gone, or out of reach) or another map's list comes.
 --
+-- A named monster (a rare, a champion, the act boss) has its name over its head in its tier's
+-- colour, always (the loot names option doesn't touch it): the server sends the plates as their
+-- own list (net code, name, colour) as the named set changes, and each is a kept label like the
+-- loot's, raised by the list's offset over the creature's top. A plate is set before any loot
+-- label: if the client's 128 are taken, a loot label gives way (set again once there's room).
+--
 -- ui.tick (once a frame, the HUD shown or not) keeps what time alone changes: the strip sized back
 -- to its cards once a finished vote's line is over, and a label the client refused tried again.
 --
@@ -107,7 +113,7 @@ local function takePart(v: any)
 	end
 end
 
-local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true, labels = true, chars = true }
+local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true, labels = true, plates = true, chars = true }
 
 -- ---- Drawing helpers
 
@@ -396,14 +402,21 @@ local LABEL_COLOUR: { [string]: { number } } = {
 }
 -- The newest list (net code -> { t = text, r = rarity }), and the labels set on the client now
 -- (each a kept one: it waits while its item is out of the client's world). The server's list is
--- at most 96 (well under the client's 128), so every label it names fits.
+-- at most 96 and its plates at most 32: the client's 128 together.
 local wanted: { [number]: any } = {}
 local labelled: { [number]: any } = {}
 local labelSerial = -1
--- The map the labels are of (the list's `map`: another means the client let them all go).
+-- The newest plates (net code -> { t = name, c = colour }), those set on the client now, how far
+-- over the creature's top they sit (the list's offset).
+local plateWanted: { [number]: any } = {}
+local plated: { [number]: any } = {}
+local plateSerial = -1
+local plateOffset = 6
+-- The map the labels and plates are of (a list's `map`: another means the client let them all go).
 local labelMap: any = nil
--- A label the client refused (its 128 set): tried again from the beat, RETRY ms apart.
+-- A label or plate the client refused (its 128 set): tried again from the beat, RETRY ms apart.
 local labelsShort = false
+local platesShort = false
 local labelRetryAt = 0
 local RETRY = 1000
 -- The character's option: "alt" (shown while Alt is held) or "always".
@@ -411,6 +424,12 @@ local lootNames = "alt"
 
 local function setLabel(code: number, l: any): boolean
 	return nox.label(code, l.t, LABEL_COLOUR[l.r] or LABEL_COLOUR.normal, { show = if lootNames == "always" then "always" else "alt", keep = true })
+end
+
+-- A plate's label: always shown, kept while its monster is out of the client's world.
+local function setPlate(code: number, p: any): boolean
+	local c: any = if type(p.c) == "table" then p.c else "white"
+	return nox.label(code, tostring(p.t), c, { show = "always", keep = true, offset = plateOffset })
 end
 
 -- The labels wanted and not set yet, set.
@@ -428,6 +447,77 @@ local function setMissing()
 	labelRetryAt = nox.time() + RETRY
 end
 
+-- The plates wanted and not set yet, set; one the client refuses (its 128 taken) has a loot
+-- label give way to it (that one set again once there's room).
+local function setPlates()
+	platesShort = false
+	for code, p in plateWanted do
+		if not plated[code] then
+			local ok = setPlate(code, p)
+			if not ok then
+				local give = next(labelled)
+				if give ~= nil then
+					nox.clearLabel(give)
+					labelled[give] = nil
+					labelsShort = true
+					ok = setPlate(code, p)
+				end
+			end
+			if ok then
+				plated[code] = p
+			else
+				platesShort = true
+			end
+		end
+	end
+	labelRetryAt = nox.time() + RETRY
+end
+
+-- A list of another map than the labels set now (`kind`'s): the client let them all go as it
+-- loaded the new map; the other kind's list is the old map's until its own comes.
+local function toMap(map: any, kind: string)
+	if map == labelMap then
+		return
+	end
+	labelMap = map
+	nox.clearLabels()
+	labelled = {}
+	plated = {}
+	if kind ~= "labels" then
+		wanted = {}
+	end
+	if kind ~= "plates" then
+		plateWanted = {}
+	end
+end
+
+-- The newest whole list of plates: the ones no longer in it cleared (killed, gone), the new ones
+-- set; another map's list starts afresh.
+local function takePlates()
+	local w = whole.plates
+	if not w or w.serial == plateSerial then
+		return
+	end
+	plateSerial = w.serial
+	toMap(w.header.map, "plates")
+	if type(w.header.offset) == "number" then
+		plateOffset = w.header.offset
+	end
+	plateWanted = {}
+	for _, p in w.items do
+		if type(p.o) == "number" then
+			plateWanted[p.o] = p
+		end
+	end
+	for code in plated do
+		if not plateWanted[code] then
+			nox.clearLabel(code)
+			plated[code] = nil
+		end
+	end
+	setPlates()
+end
+
 -- The newest whole list of labels: the ones no longer in it cleared (picked up, gone, out of
 -- reach), the new ones set; another map's list starts afresh.
 local function takeLabels()
@@ -436,12 +526,7 @@ local function takeLabels()
 		return
 	end
 	labelSerial = w.serial
-	if w.header.map ~= labelMap then
-		-- (the client let the old map's labels go as it loaded the new one)
-		labelMap = w.header.map
-		nox.clearLabels()
-		labelled = {}
-	end
+	toMap(w.header.map, "labels")
 	wanted = {}
 	for _, l in w.items do
 		if type(l.o) == "number" then
@@ -1709,6 +1794,8 @@ function ui.onMessage(value: any)
 		takePart(value)
 		if kind == "labels" then
 			takeLabels()
+		elseif kind == "plates" then
+			takePlates()
 		elseif kind == "chars" then
 			-- (the whole list in: the window open (sized to it) or closed, as the server has it)
 			local c = whole.chars
@@ -1751,8 +1838,14 @@ function ui.tick(now: number)
 	if stripRow and now >= doneUntil and not (vote and vote.active) then
 		placeStrip()
 	end
-	if labelsShort and now >= labelRetryAt then
-		setMissing()
+	if (labelsShort or platesShort) and now >= labelRetryAt then
+		-- (the plates first: a loot label gives way to one)
+		if platesShort then
+			setPlates()
+		end
+		if labelsShort then
+			setMissing()
+		end
 	end
 end
 

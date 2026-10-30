@@ -3761,8 +3761,9 @@ void Impl::installToolbox()
         lua_pushcfunction(L, fn, name);
         lua_setfield(L, -2, name);
     }
-    // The parts in their own files (timers, events, the store, items, players, generation).
-    addPartsToolbox(L, !ctx.modData.empty());
+    // The parts in their own files (timers, events, the store, the records, items, players,
+    // generation).
+    addPartsToolbox(L, !ctx.modData.empty(), ctx.records != nullptr);
     lua_pushinteger(L, kScriptApi);
     lua_setfield(L, -2, "api");
     lua_setreadonly(L, -1, 1);

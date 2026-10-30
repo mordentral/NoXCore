@@ -4,9 +4,10 @@
 -- the damage a monster deals.
 --
 -- What the tiers change today: health (nox.setHealth), the damage the monster deals (combat.luau
--- scales it through onDamage), enchantments (haste stands in for speed) and a rare's or champion's
--- name over its head now and then (nox.unitSay). Engine ask A7 (a coloured name plate, speed and
--- damage multipliers) replaces the stand-ins in `present` below, and nothing else.
+-- scales it through onDamage), enchantments (haste stands in for speed) and a name for a rare, a
+-- champion or the act boss, drawn over its head in its tier's colour on NoX Core clients (a world
+-- label: labels.luau sends each player's UI the named ones, from the index `named` here). Engine
+-- ask A7's speed and damage multipliers would replace the stand-in in `present` below.
 
 --
 -- Party scaling (scale.luau, design 7): a monster's most health is its own times the party's
@@ -20,12 +21,13 @@ local scale = require("scale")
 
 local monsters = {}
 
--- Each live monster the mod made: id -> { type, tier, name?, level, damage, experience, base (its
--- most health for one player) }.
+-- Each live monster the mod made: id -> { type, tier, name?, code (its net code), level, damage,
+-- experience, base (its most health for one player) }.
 local known: { [number]: any } = {}
--- The named ones (their names shown again now and then): a list of ids.
-local named: { number } = {}
-local nameTimer: number? = nil
+-- The live ones with a name (their plates): id -> its entry in `known`.
+local named: { [number]: any } = {}
+-- Called as a named monster comes or goes (labels.luau's plates), or nil.
+local namedChanged: (() -> ())? = nil
 local packsMade = 0
 -- The packs the last area entered was given, in order (for "dd packs"): { along, size (its
 -- monsters, leader too), tier (its leader's), leader (its type), experience (its monsters' all
@@ -33,10 +35,26 @@ local packsMade = 0
 local packList: { any } = {}
 -- The end chamber's champion and its guards in the last area entered: { size, experience }, or nil.
 local guarded: any = nil
-local NEAR_PLAYERS: any = { players = true, alive = true }
 
 function monsters.info(id: number): any
 	return known[id]
+end
+
+-- The live named monsters (id -> entry: its name, tier and net code); the index itself, read only.
+function monsters.named(): { [number]: any }
+	return named
+end
+
+-- `fn` called as a named monster comes or goes (made, killed, forgotten).
+function monsters.onNamedChanged(fn: () -> ())
+	namedChanged = fn
+end
+
+local function namedNow()
+	local fn = namedChanged
+	if fn then
+		fn()
+	end
 end
 
 -- How many the mod made are alive now (for "dd status").
@@ -48,15 +66,9 @@ function monsters.count(): number
 	return n
 end
 
--- ---- Presentation: A7's stand-ins, in one place
+-- ---- Presentation: A7's stand-in
 
 local present = {}
-
--- A name over a monster in its tier's colour. (A7: a name plate. Today: a speech bubble, shown
--- again by the name timer; the colour waits for A7.)
-function present.name(id: number, name: string, _colour: string)
-	nox.unitSay(id, name, 90)
-end
 
 -- A monster's speed multiplier. (A7: the multiplier itself. Today: faster is haste.)
 function present.speed(id: number, multiplier: number)
@@ -156,6 +168,7 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	local entry: any = {
 		type = thingType,
 		tier = tierName,
+		code = if o then o.netCode else 0,
 		level = level,
 		base = alone,
 		damage = tier.damage * (1 + a.damagePerLevel * (level - 1)) * openDamage,
@@ -187,9 +200,12 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	end
 	if tier.named then
 		entry.name = if fixed then fixed.name else rareName()
-		table.insert(named, id)
 	end
 	known[id] = entry
+	if entry.name then
+		named[id] = entry
+		namedNow()
+	end
 	-- Its death (experience, loot) and the hits it takes (combat.luau's affixes).
 	nox.watchEvents(id, nox.events.death + nox.events.damage)
 	return entry
@@ -297,29 +313,16 @@ function monsters.populate(spots: any, area: any)
 		end
 		guarded = group
 	end
-	-- The named ones' names again now and then while a player is near (one timer for all of
-	-- them; a client shows a far one's words at the edge of its screen).
-	if not nameTimer then
-		nameTimer = nox.every(numbers.timing.nameEvery, function()
-			local n = nox.keepLiving(named)
-			for i = 1, n do
-				local id = named[i]
-				local e = known[id]
-				if e and e.name then
-					local x, y = nox.position(id)
-					if nox.countNear(x, y, numbers.timing.nameReach, NEAR_PLAYERS) > 0 then
-						present.name(id, e.name, (data.tiers :: any)[e.tier].colour)
-					end
-				end
-			end
-		end)
-	end
 end
 
 -- A watched monster's death: its entry (forgotten here), or nil when it wasn't one of the mod's.
 function monsters.killed(id: number): any
 	local e = known[id]
 	known[id] = nil
+	if named[id] then
+		named[id] = nil
+		namedNow()
+	end
 	return e
 end
 
@@ -402,7 +405,7 @@ function monsters.guardians(): any
 	return guarded
 end
 
--- A new map: the old monsters are gone with it.
+-- A new map: the old monsters are gone with it (labels.luau's reset lets their plates go).
 function monsters.reset()
 	table.clear(known)
 	table.clear(named)

@@ -1,6 +1,7 @@
 // The mods folder (mods.hpp).
 #include "noxcore/modes/mods.hpp"
 
+#include "noxcore/modes/script/mod_records.hpp"
 #include "noxcore/modes/script/scripted_mode.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -78,6 +79,11 @@ ModsReport loadMods(const fs::path& modsDir, Registry& registry)
         m.info = package->manifest.info;
         m.info.fromMods = true; // (not built into the program: the lists show it after those that are)
         m.makeServer = [package](const ServerContext& ctx) { return std::make_unique<script::ScriptedMode>(package, ctx); };
+        // Its records, for a host that keeps a mode's records (its games' nox.records): <id>_records.txt
+        // in the folder the host names. Nothing is written till the script puts a row.
+        m.openRecords = [id = package->manifest.info.id](const fs::path& folder) {
+            return std::static_pointer_cast<void>(std::make_shared<script::ModRecords>(folder / (id + "_records.txt")));
+        };
         // Its generated maps (mode.json's mapPrefix): <prefix>_<slot><TAG>, its own and no other
         // mode's (a prefix whose names another mode already claims is refused), kept out of the
         // map lists and swept as a host starts.

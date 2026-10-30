@@ -75,6 +75,12 @@
 --                        or set its time; alone, the vote: its asker, where to, time, each answer
 --   dd labels            the ground's labels ("id code rarity text") and the codes the first
 --                        player's UI was last sent
+--   dd plates            the named monsters' name plates ("id code tier r,g,b name") and the
+--                        codes the first player's UI was last sent
+--   dd spawn TIER [N] [TYPE]   N monsters (1-60) of that tier (normal, magic, rare, champion: the
+--                        area's biome's champion, its name and set) round the first player, of
+--                        TYPE or the biome roster's first (a champion: its own); "id code tier name"
+--   dd slay ID           one of the mod's monsters killed by the first player
 --   dd portals           the open portals, "owner x y" ("owner(left)": its owner left the game)
 --   dd portal take       the first player through the town's portal pentagram (as its touch)
 --   dd hud               how many values the first player's UI is owed (sends not taken yet)
@@ -490,6 +496,62 @@ end
 
 function commands.labels(_args: { string }): { string }
 	return labels.lines(firstHero())
+end
+
+function commands.plates(_args: { string }): { string }
+	return labels.plateLines(firstHero())
+end
+
+function commands.spawn(args: { string }): { string }
+	local tier = args[2] or "rare"
+	if tier == "boss" or not (monsterData.tiers :: any)[tier] then
+		return { "tiers: normal, magic, rare, champion" }
+	end
+	local h = firstHero()
+	local o = h and nox.object(h.unit)
+	if not o then
+		return { "no player" }
+	end
+	local s = areas.status()
+	local fixed: any = nil
+	local thingType = args[4]
+	if tier == "champion" then
+		fixed = (monsterData.champions :: any)[s.biome] or monsterData.champions.Crypt
+		thingType = thingType or fixed.type
+	end
+	local roster: any = (monsterData.rosters :: any)[s.biome] or monsterData.rosters.Crypt
+	local out = {}
+	for i = 1, math.clamp(tonumber(args[3]) or 1, 1, 60) do
+		-- (a widening ring round the player)
+		local r = 60 + 6 * i
+		local id = monsters.spawn(thingType or roster[1].type, o.x + r * math.cos(i * 1.3), o.y + r * math.sin(i * 1.3), tier, s.level, fixed)
+		local m: any = if id then monsters.info(id) else nil
+		if id and m then
+			table.insert(out, table.concat({ tostring(id), tostring(m.code), tier, tostring(m.name or "-") }, " "))
+		end
+	end
+	return if #out > 0 then out else { "not made" }
+end
+
+-- "dd slay ID": one of the mod's monsters killed by the first player (as a kill: its experience,
+-- its loot, its plate gone).
+function commands.slay(args: { string }): { string }
+	local id = tonumber(args[2]) or 0
+	local h = firstHero()
+	if not h or not monsters.info(id) then
+		return { "not one of ours" }
+	end
+	for _, e in { "ENCHANT_SHIELD", "ENCHANT_PROTECT_FROM_MAGIC", "ENCHANT_VAMPIRISM" } do
+		nox.enchant(id, e, -1)
+	end
+	for _ = 1, 40 do
+		local o = nox.object(id)
+		if not o or not nox.living(id) then
+			break
+		end
+		nox.damage(id, h.unit, o.health + 10, 0)
+	end
+	return { if nox.living(id) then "still standing" else "slain" }
 end
 
 function commands.waypoint(args: { string }): { string }
@@ -1082,7 +1144,7 @@ function commands.help(_args: { string }): { string }
 		"dd progress | boss | smite | trial SEED N | gate [take]",
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L]",
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs] | icons | book | sheet | ui stash|vendor|waypoints|tree|sheet [NAME]",
-		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | portals | portal take | hud",
+		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | plates | spawn TIER [N] [TYPE] | slay ID | portals | portal take | hud",
 		"dd option [lootNames alt|always] | hits [clear] | summons | team",
 		"dd chars [clock S | lockat N|none | NAME list|play I|new|code|enter CODE|unlink I|pcs]",
 	}

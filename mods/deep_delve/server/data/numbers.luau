@@ -140,6 +140,13 @@ numbers.vote = { seconds = 30, again = 30 * 5, beat = 15 }
 -- within `reach` of its unit (at most `most`, nearest first), looked at every `every` frames.
 numbers.labels = { reach = 450, most = 96, every = 15 }
 
+-- Named monsters' name plates (rares, champions, the act boss: their names over their heads in
+-- their tier's colour, always shown on NoX Core clients): each player is sent every named monster
+-- of the area while there are at most `most` of them, else the `most` nearest its unit (looked at
+-- on the labels' beat). `offset`: how far over the top of the creature's picture the plate sits.
+-- The plates' most and the loot's add up to the client's 128 labels at most.
+numbers.plates = { most = 32, offset = 6 }
+
 -- ---- The game
 
 numbers.timing = {
@@ -150,10 +157,6 @@ numbers.timing = {
 	setUpAfter = 10,
 	-- A level up's glow over the player put away after this many frames.
 	glow = 60,
-	-- A rare's or champion's name over its head every this many frames while a player is within
-	-- nameReach of it (A7's name plate's stand-in).
-	nameEvery = 30 * 4,
-	nameReach = 300,
 	-- A ready client's hero looked at once more this many frames after its ready (in case the
 	-- game sets it watching after the ready).
 	readyRecheck = 10,

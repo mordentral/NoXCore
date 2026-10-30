@@ -37,9 +37,13 @@ struct Parts {
 };
 
 /// The parts' toolbox functions set in the `nox` table on top of L's stack: the scheduler's, the
-/// events', the store's (nox.store when the host keeps one), the items', the players', the
+/// events', the store's (nox.store when the host keeps one), the records' (nox.records when the
+/// host keeps the mode's records: ServerContext::records), the items', the players', the
 /// generator's, the weather's, the draw scales'.
-void addPartsToolbox(lua_State* L, bool store);
+void addPartsToolbox(lua_State* L, bool store, bool records);
+
+/// The toolbox's nox.records table pushed (its functions: mod_records.cpp).
+void pushRecordsTable(lua_State* L);
 
 /// configure's returned table (at `t`): its quest keys onto the host's options (13.7: quest,
 /// questScreens, questMaps, forceClass, multiclass, monstersAlert, keepThingsOnDeath, bookIsTheMod (the host's

@@ -19,6 +19,10 @@ type NoxStore = {
     unlock: (key: string) -> (),
     keyOf: (text: string) -> string,
 }
+type NoxRecords = {
+    put: (key: string, row: { [string]: number | string }) -> (boolean, string?),
+    remove: (key: string) -> boolean,
+}
 type NoxObject = { id: number, type: string, x: number, y: number, team: number, holder: number, health: number, maxHealth: number, radius: number, mass: number, direction: number, owner: number, pendingDelete: boolean, netCode: number, alive: boolean, player: boolean, observing: boolean, lessons: number, deaths: number, peer: number, flag: boolean, colour: number, home: { x: number, y: number }, dropped: number }
 type NoxItem = { id: number, type: string, flag: boolean }
 type NoxUnitFilter = { monsters: boolean?, players: boolean?, alive: boolean?, notDead: boolean?, notGone: boolean?, enemiesOf: number? }
@@ -359,6 +363,8 @@ declare nox: {
     --- # Storage
     --- The mod's own key-value store on the host (nil when this host keeps none).
     store: NoxStore?,
+    --- The mode's records on a host that keeps them (rows of at most 16 named numbers or texts, stamped with the time they were put; nil when this host keeps none).
+    records: NoxRecords?,
     --- # Generated maps
     --- Builds one of the mod's own maps: ahead (default) on a worker, onGenerated tells; or now, its result back.
     generate: (request: NoxGenerate) -> (boolean, any),

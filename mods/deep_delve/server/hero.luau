@@ -9,7 +9,8 @@
 --          the unit read back into the record;
 --   mapReady its client has this map loaded (playerReady), so world labels reach it;
 --   stock  its own vendor stock (vendor.luau); partySig, labelSig what its UI was last sent of the
---          party strip and the ground's labels (party.luau, labels.luau);
+--          party strip and the ground's labels (party.luau, labels.luau); boardSig what this game
+--          last put of its records row (records.luau);
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
 --          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), spellCost,
 --          summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a hit's thing
@@ -42,6 +43,7 @@ local tree = require("tree")
 local book = require("book")
 local team = require("team")
 local regen = require("regen")
+local records = require("records")
 local classes = require("data/classes")
 local numbers = require("data/numbers")
 local treeData = require("data/tree")
@@ -233,6 +235,8 @@ function hero.save(h: any, why: string): boolean
 	local ok, err = store.save(h.key, h.record)
 	if not ok then
 		nox.log("deep_delve: " .. h.record.identity.name .. "'s record not saved (" .. why .. "): " .. tostring(err))
+	else
+		records.note(h) -- (the host's records row, when it has moved on: records.luau)
 	end
 	return ok
 end
@@ -605,6 +609,7 @@ function hero.reached(info: any)
 	here = info
 	for _, h in byPeer do
 		progress.reached(h.record, info.act, info.index)
+		records.note(h) -- (a new deepest area: the host's records row now, records.luau)
 	end
 end
 

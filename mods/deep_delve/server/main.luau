@@ -31,7 +31,7 @@
 --                  or not)
 --   party.luau     the party strip's numbers; the party's size for the scaling
 --   scale.luau     party scaling: monsters' health, damage and experience, packs, loot
---   labels.luau    ground loot's labels on each player's UI
+--   labels.luau    ground loot's labels and named monsters' name plates on each player's UI
 --   offers.luau    nox.choice offers and their answers (the open portals)
 --   tree.luau     the passive tree's rules (points, nodes taken, respec, what it adds and gives)
 --   book.luau      the spells (a warrior: the abilities) the tree gives, on the unit and its client
@@ -125,7 +125,8 @@ end
 
 -- ---- Players
 
--- A hero's client ready in the map: its UI sent the strip, the vote and the ground's labels again.
+-- A hero's client ready in the map: its UI sent the strip, the vote, the ground's labels and the
+-- name plates again.
 local function heroReady(player: any)
 	hero.clientReady(player)
 	local h = hero.byPeer(player.peer)

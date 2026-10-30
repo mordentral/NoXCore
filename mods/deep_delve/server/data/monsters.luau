@@ -72,15 +72,16 @@ monsters.rising = {
 
 -- The tiers, in order (design 3.3). health and damage multiply the monster's own (after the area
 -- level's); experience its experience; enchantments is how many of the tier's list it gets
--- (each for good); colour is its name's (for A7's name plate; a text line's colour today is the
--- client's own); drops the extra loot rolls its death makes.
+-- (each for good); colour is its name plate's ({ r, g, b }: magic and rare as the loot of that
+-- rarity is named; labels.luau sends it); drops the extra loot rolls its death makes. A monster
+-- with a name (a `named` tier's) has its name over its head.
 monsters.tiers = {
-	normal = { health = 1.0, damage = 1.0, experience = 1.0, enchantments = 0, drops = 0, colour = "white" },
-	magic = { health = 1.4, damage = 1.15, experience = 2.0, enchantments = 1, drops = 1, colour = "blue" },
-	rare = { health = 2.5, damage = 1.3, experience = 4.0, enchantments = 2, drops = 2, colour = "gold", named = true },
-	champion = { health = 4.0, damage = 1.5, experience = 8.0, enchantments = 0, drops = 4, colour = "orange", named = true },
+	normal = { health = 1.0, damage = 1.0, experience = 1.0, enchantments = 0, drops = 0, colour = { 225, 222, 210 } },
+	magic = { health = 1.4, damage = 1.15, experience = 2.0, enchantments = 1, drops = 1, colour = { 110, 160, 255 } },
+	rare = { health = 2.5, damage = 1.3, experience = 4.0, enchantments = 2, drops = 2, colour = { 250, 220, 80 }, named = true },
+	champion = { health = 4.0, damage = 1.5, experience = 8.0, enchantments = 0, drops = 4, colour = { 255, 150, 40 }, named = true },
 	-- (an act boss: its own enchantment set and drop, boss.luau)
-	boss = { health = 6.0, damage = 1.4, experience = 20.0, enchantments = 0, drops = 0, colour = "red", named = true },
+	boss = { health = 6.0, damage = 1.4, experience = 20.0, enchantments = 0, drops = 0, colour = { 240, 70, 50 }, named = true },
 }
 
 -- The chances of a pack's tier (its leader's; its followers are normal, or magic with a rare one),

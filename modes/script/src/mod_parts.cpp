@@ -153,7 +153,7 @@ int noxCancelGenerate(lua_State* L)
 
 } // namespace
 
-void addPartsToolbox(lua_State* L, bool store)
+void addPartsToolbox(lua_State* L, bool store, bool records)
 {
     static constexpr std::pair<const char*, lua_CFunction> kFns[] = {
         {"after", noxAfter},          {"every", noxEvery},        {"cancelTimer", noxCancelTimer},
@@ -169,6 +169,10 @@ void addPartsToolbox(lua_State* L, bool store)
     if (store) {
         pushStoreTable(L);
         lua_setfield(L, -2, "store");
+    }
+    if (records) {
+        pushRecordsTable(L);
+        lua_setfield(L, -2, "records");
     }
     addItemsToolbox(L);
     addWeatherToolbox(L);
