@@ -8,6 +8,9 @@
 //     back edges) and checked against the thread's own CPU time (never the wall clock: a host
 //     asleep or suspended mid-call doesn't spend it); past it the call errors ("ran too long"), and
 //     keeps erroring at every safepoint till it ends (a script's own pcall can't keep it going).
+//     A mod's server scripts (Limits::serverMod) count the time only once a call has done real
+//     work (safepointsBeforeTime), with a longer backstop whatever the work: a virtual machine's
+//     host stalls are counted in the thread's CPU time too, and a light call mustn't be cut off.
 // The host's own Lua API calls around a call (pushing arguments, reading results) can still raise
 // a Lua error (memory): each host entry point catches it (std::exception) and resets the stack.
 // The host calls into it only on one thread (the server's).
@@ -29,6 +32,23 @@ public:
         std::size_t memoryBytes = 64u << 20;          ///< the VM's whole heap
         std::uint64_t safepointsPerCall = 4'000'000;  ///< (calls and loop turns, roughly)
         std::chrono::milliseconds timePerCall{250};
+        /// timePerCall counts only once a call has run this many safepoints (0: always, as the UI's);
+        /// below it only `timeBackstop` ends a call by its time. A call's time on a virtual machine
+        /// includes its host's stalls (hundreds of ms on the bot server's KVM guest), so time alone
+        /// can't tell a stalled light call from a heavy one: the work can.
+        std::uint64_t safepointsBeforeTime = 0;
+        /// (With safepointsBeforeTime) the time that ends a call whatever its work: a loop of slow
+        /// library calls, which have few safepoints, still ends. 0: timePerCall's.
+        std::chrono::milliseconds timeBackstop{0};
+        /// A mod's server scripts: the default limits, the time counted past a quarter of the
+        /// safepoint cap, and 3 s whatever the work (the safepoint cap stays the runaway guard).
+        static Limits serverMod() noexcept
+        {
+            Limits l;
+            l.safepointsBeforeTime = l.safepointsPerCall / 4;
+            l.timeBackstop = std::chrono::seconds(3);
+            return l;
+        }
         /// A built-in mode's script (the program's own, trusted: the Tide's, the Delve's): a mod's
         /// memory, no count of safepoints, a minute's CPU time a call (a heavy rule on a slow or
         /// stalled machine isn't ended, and what it does doesn't hang on the machine's speed).
@@ -70,6 +90,9 @@ public:
     /// time the thread spends asleep, waiting or suspended isn't in it. (Windows counts it in its
     /// timer's ticks, about 16 ms.)
     static std::chrono::nanoseconds threadCpuTime() noexcept;
+    /// The clock the budget reads (threadCpuTime unless set): a test's own, to show a stall.
+    using Clock = std::chrono::nanoseconds (*)() noexcept;
+    void setClock(Clock clock) noexcept { clock_ = clock ? clock : &threadCpuTime; }
 
 private:
     static void* allocate(void* ud, void* ptr, std::size_t osize, std::size_t nsize);
@@ -89,6 +112,7 @@ private:
     std::chrono::nanoseconds cpuStart_{-1};
     bool inCall_ = false;
     bool spent_ = false; ///< (this call's budget gone: every safepoint errors till it ends)
+    Clock clock_ = &threadCpuTime;
 };
 
 } // namespace nox::modes::script

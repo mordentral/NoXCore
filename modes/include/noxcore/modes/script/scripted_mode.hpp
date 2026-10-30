@@ -101,7 +101,9 @@ struct ModPackage {
 
 class ScriptedMode final : public ServerMode {
 public:
-    ScriptedMode(std::shared_ptr<const ModPackage> package, ServerContext ctx, LuauVm::Limits limits = {});
+    /// (`limits`: a mod's server scripts' by default, LuauVm::Limits::serverMod; a built-in mode's
+    /// owner passes Limits::builtIn.)
+    ScriptedMode(std::shared_ptr<const ModPackage> package, ServerContext ctx, LuauVm::Limits limits = LuauVm::Limits::serverMod());
     ~ScriptedMode() override;
 
     /// The scripts run and their configure called; the map they name (none: the host's). Throws

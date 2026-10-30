@@ -91,11 +91,16 @@ void LuauVm::interrupt(lua_State* L, int gc)
     // most; the first 32 safepoints aren't counted.)
     bool overTime = false;
     if ((vm->safepoints_ & 31u) == 0) {
-        const std::chrono::nanoseconds now = threadCpuTime();
+        const std::chrono::nanoseconds now = vm->clock_();
         if (vm->cpuStart_.count() < 0) {
             vm->cpuStart_ = now;
         } else {
-            overTime = now - vm->cpuStart_ > vm->limits_.timePerCall;
+            // (A mod's server scripts: the budget only past real work, the backstop whatever the
+            // work, so a stalled light call goes on. Others, as ever: the budget alone.)
+            const std::chrono::nanoseconds took = now - vm->cpuStart_;
+            const Limits& l = vm->limits_;
+            overTime = (vm->safepoints_ >= l.safepointsBeforeTime && took > l.timePerCall) ||
+                       (l.timeBackstop.count() > 0 && took > l.timeBackstop);
         }
     }
     if (overCount || overTime) {
