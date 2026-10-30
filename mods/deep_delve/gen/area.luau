@@ -23,18 +23,20 @@
 -- are walled by their foliage and stones too.
 --
 -- params: biome (a built-in biome's name), corridor, segments, endRadius, packs (how many),
--- townFloor (a floor's name), waypoint (true: one here), waypointAt ("start": by the start
--- chamber), lair (true: the act's lair), gate (true: a lair's gate spot), seed.
+-- town (the act's town look: towns.luau's name), waypoint (true: one here), waypointAt ("start":
+-- by the start chamber), lair (true: the act's lair), gate (true: a lair's gate spot), seed.
 -- Returns the spots (world points), all plain numbers:
 --   { arrive, back (with its arch's type), exit (too; none in a lair), guardian (none in a lair),
 --     boss (a lair's), gate (a lair's with an act after it), waypoint and wayArrive (a waypoint
 --     area's: the pentagram, and where travellers to it arrive), packs = { {x, y}... },
---     town = { centre, healer, gate (with its type), stash, vendor, portal, waypoints, wayIn } }
+--     town = { centre, healer, gate (with its type), stash, vendor, portal, waypoints, wayIn,
+--     look (its look's name) } }
 
 local util = require("util")
 local layout = require("layout")
 local floors = require("floors")
 local town = require("town")
+local towns = require("towns")
 local arch = require("arch")
 local ground = require("ground")
 local scenery = require("scenery")
@@ -52,6 +54,10 @@ function area.build(p, w)
 	local biome = floors.findBiome(p.biome)
 	if not biome then
 		gen.refuse("deep_delve: no biome named " .. tostring(p.biome))
+	end
+	local look = towns.find(tostring(p.town))
+	if not look then
+		gen.refuse("deep_delve: no town look named " .. tostring(p.town))
 	end
 
 	-- ---- The layout: the area's route, and the town beside it. A layout must have a straight
@@ -105,14 +111,17 @@ function area.build(p, w)
 		gen.refuse("deep_delve: no layout with straight back walls for its ways")
 	end
 
-	-- ---- Walls and floors
+	-- ---- Walls and floors (the town's by its look)
 	local plan = ground.build({
 		layout = lay,
 		town = section,
 		open = open,
 		walls = walls,
 		biome = biome,
-		townFloor = w:floorIndex(p.townFloor),
+		townFloor = w:floorIndex(look.floor),
+		townSquare = if look.square then { floor = w:floorIndex(look.square.floor), radius = look.square.radius } else nil,
+		townPaths = if look.paths then w:floorIndex(look.paths) else nil,
+		townWays = if look.paths then town.ways(section, { backs = backs, walls = walls }) else nil,
 		seed = p.seed,
 	}, w)
 
@@ -308,7 +317,8 @@ function area.build(p, w)
 	scenery.place({ layout = lay, biome = biome, backs = backs, walls = walls, used = used, clear = clear, rng = rng }, w)
 
 	-- ---- The town
-	spots.town = town.dress(section, site, w)
+	spots.town = town.dress(section, site, w, look)
+	spots.town.look = p.town
 
 	-- ---- The waypoint's pentagram, leading to the town's receiving one (written above), lit.
 	if spots.waypoint then

@@ -109,6 +109,7 @@
 #include "noxcore/modes/mode.hpp"
 #include "noxcore/modes/script/luau_vm.hpp"
 #include "noxcore/modes/script/mod_assets.hpp"
+#include "noxcore/modes/script/ui_proto.hpp"
 #include "noxcore/modes/script/weather.hpp"
 
 #include <cstddef>
@@ -337,6 +338,10 @@ public:
     /// the view's margins): the game's top-left icons (the enchantments' row) start below it. None:
     /// no box, or no UI running.
     std::optional<UiRect> hudReserve() const;
+    /// (Client level 7) The server's ground decals (ui_proto.hpp's kDecal: nox.decal), each a mod
+    /// asset (assets()'s index) drawn flat on the floor under the things; their spin and pulse the
+    /// program's to run. At most uimsg::kMaxDecals.
+    const std::vector<uimsg::Decal>& decals() const noexcept;
     /// (API 3) This frame's tooltip (empty: none).
     const std::vector<UiTooltipLine>& tooltip() const noexcept;
     /// (API 3) The labels, in the order set.

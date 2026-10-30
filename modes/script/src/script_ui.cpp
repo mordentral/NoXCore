@@ -114,6 +114,8 @@ struct ScriptUiClient::Impl {
     BigData big;
     int bigIn = 0;
     static constexpr int kMaxBigIn = 8;
+    /// (Client level 7) The server's ground decals (kDecal), at most uimsg::kMaxDecals.
+    std::vector<uimsg::Decal> decals;
     std::uint64_t nowMs = 0;
     std::string error;
     // API 2's.
@@ -1436,6 +1438,27 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             tellDrawScale(*d);
         }
         break;
+    case uimsg::kDecal:
+        // (Client level 7) A ground decal: the same id again replaces it; past kMaxDecals let go.
+        // (Whatever the UI's state: they're the server's, kept through a UI's drop and sent again
+        // with it; a map's load clears them by the server's kDecalRemove 0.)
+        if (const auto d = uimsg::decodeDecal(rest)) {
+            if (const auto it = std::ranges::find(decals, d->id, &uimsg::Decal::id); it != decals.end()) {
+                *it = *d;
+            } else if (decals.size() < uimsg::kMaxDecals) {
+                decals.push_back(*d);
+            }
+        }
+        break;
+    case uimsg::kDecalRemove:
+        if (const std::uint16_t id = r.u16(); r.ok) {
+            if (id == 0) {
+                decals.clear();
+            } else {
+                std::erase_if(decals, [&](const uimsg::Decal& d) { return d.id == id; });
+            }
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -1694,6 +1717,11 @@ void ScriptUiClient::setHudShown(bool shown)
 bool ScriptUiClient::hudShown() const noexcept
 {
     return impl_->hudShown;
+}
+
+const std::vector<uimsg::Decal>& ScriptUiClient::decals() const noexcept
+{
+    return impl_->decals;
 }
 
 std::optional<UiRect> ScriptUiClient::hudReserve() const

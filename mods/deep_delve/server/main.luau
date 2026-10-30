@@ -29,6 +29,7 @@
 --   votes.luau     the party's vote to change area (the whole game moves)
 --   portal.luau    the town portal (anyone's open portal takes the party back out, its owner gone
 --                  or not)
+--   decals.luau    the pads' rings on the floor (waypoints cyan, portals violet; nox.decal)
 --   party.luau     the party strip's numbers; the party's size for the scaling
 --   scale.luau     party scaling: monsters' health, damage and experience, packs, loot
 --   labels.luau    ground loot's labels and named monsters' name plates on each player's UI

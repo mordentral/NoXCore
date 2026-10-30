@@ -18,14 +18,19 @@
 -- map itself. A map that isn't one of the mod's holds nothing of it: the game is sent back to
 -- its area.
 --
+-- Every map is drawn from the play's seed and the area's place, so within a play an area keeps its
+-- map (a waypoint back to it finds the same one). A play is a game's first, or an emptied game
+-- starting over in act 1 (areas.home): a new seed, nothing kept from the old play's maps.
+--
 -- An area is entered once both its map has loaded and its spots (the generator's result) are in:
--- its stations, pentagrams and exits set to work, the vendor's stock rolled at its level, its
--- monsters (and boss) put in, its weather set (an outdoor area's; none again on coming back
--- indoors), its players set up.
+-- its stations, pentagrams and exits set to work (the pads' rings drawn under them), the vendor's
+-- stock rolled at its level, its monsters (and boss) put in, its weather set (an outdoor area's;
+-- none again on coming back indoors), its players set up.
 
 local acts = require("data/acts")
 local numbers = require("data/numbers")
 local boss = require("boss")
+local decals = require("decals")
 local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
@@ -59,7 +64,8 @@ for a, act in ipairs(acts) do
 end
 
 local state: any = {
-	seed = 1,
+	seed = 1, -- the play's seed: every area's map is drawn from it and the area's place
+	play = 1, -- which play of this game it is (a new one each time an emptied game starts over)
 	place = 0, -- the area being played (1 the first)
 	tag = "a", -- its map's tag
 	held = {}, -- tag -> the place generated into its map
@@ -128,11 +134,24 @@ function areas.info(place: number)
 	}
 end
 
--- The area's map seed: the game's seed and the area's place (and a retry's count), so a game's
--- areas are stable while it runs (a waypoint's area built again is the same map) and new each
--- game.
+-- The area's map seed: the play's seed and the area's place (and a retry's count), so a play's
+-- areas are stable while it lasts (a waypoint's area built again is the same map) and new each
+-- play: a new game, or an emptied game starting over (areas.home).
 local function seedOf(place: number, retry: number): number
 	return (state.seed * 7919 + place * 104729 + retry * 1299709) % 2147483647
+end
+
+-- A new play's seed: the mode's random stream mixed with the frame (when the game emptied), so
+-- a host restarted with the same game seed doesn't play the same areas again either.
+local function freshSeed(): number
+	local r = math.floor(nox.random(1, 2147483646))
+	return (r + nox.frame() * 48271) % 2147483646 + 1
+end
+
+-- The town of act `act`: { name, look } (data/acts.luau's).
+function areas.townOf(act: number): any
+	local a = acts[act]
+	return (a and a.town) or acts.town
 end
 
 -- nox.generate's request for the area at `place` into map `tag`.
@@ -153,7 +172,7 @@ function areas.request(place: number, tag: string, ahead: boolean, retry: number
 			endRadius = info.endRadius,
 			packs = info.packs,
 			ramp = if info.opening then info.opening.ramp else 0,
-			townFloor = acts.town.floor,
+			town = areas.townOf(info.act).look,
 			waypoint = info.waypoint,
 			waypointAt = info.waypointAt,
 			lair = info.lair,
@@ -193,6 +212,23 @@ local function generateNext()
 	build(state.place + 1, OTHER[state.tag])
 end
 
+-- The game to the area at `place` in the other map tag (built there unless it's there or on its
+-- way already), its players arriving at `arrive`; `fresh`: a new play's first map, the old play's
+-- other map dropped as it loads.
+local function go(place: number, arrive: string, fresh: boolean)
+	local tag = OTHER[state.tag]
+	local n = state.nextArea
+	if not (n and n.place == place and n.tag == tag and nox.generating(tag) ~= "failed") then
+		build(place, tag)
+	end
+	state.leaving = true
+	hero.saveAll("area change")
+	hero.mapChanging()
+	state.pending = { place = place, tag = tag, arrive = arrive, fresh = fresh }
+	nox.textToAll("Deep Delve: on to " .. areas.info(place).title .. ".")
+	nox.exitTo(nox.mapName(tag) .. ".map")
+end
+
 -- The whole game to the area at `place`, its players arriving at `arrive` ("start": its start
 -- chamber; "waypoint": beside its waypoint): every record written, the area built into the other
 -- map tag unless it's there or on its way already, the map changed. Whether it went (else why).
@@ -206,27 +242,34 @@ function areas.travel(place: number, arrive: string): (boolean, string?)
 	if place == state.place then
 		return false, "here already"
 	end
-	local tag = OTHER[state.tag]
-	local n = state.nextArea
-	if not (n and n.place == place and n.tag == tag and nox.generating(tag) ~= "failed") then
-		build(place, tag)
-	end
-	state.leaving = true
-	hero.saveAll("area change")
-	hero.mapChanging()
-	state.pending = { place = place, tag = tag, arrive = arrive }
-	nox.textToAll("Deep Delve: on to " .. areas.info(place).title .. ".")
-	nox.exitTo(nox.mapName(tag) .. ".map")
+	go(place, arrive, false)
 	return true, nil
 end
 
--- An empty game back to act 1's first area, its town (a server's game, its last player gone: the
--- next to come starts where every character can). Whether it went.
+-- A new play: a new seed (every area's map new from here on), and nothing built from the old one
+-- kept but the map being played until the game leaves it (the area built ahead in the other tag
+-- stopped and forgotten, its spots too).
+function areas.freshPlay()
+	state.seed = freshSeed()
+	state.play += 1
+	local other = OTHER[state.tag]
+	nox.cancelGenerate(other)
+	state.held[other] = nil
+	state.spots[other] = nil
+	state.nextArea = nil
+	state.tries = 0
+end
+
+-- An empty game started over (a server's game, its last player gone): a new play (areas.freshPlay),
+-- back to act 1's first area, its town, built new (the next to come starts where every character
+-- can, on maps nobody has seen; even when the game was in that area already). Whether it went.
 function areas.home(): boolean
-	if state.place == 1 or state.leaving then
+	if state.leaving then
 		return false
 	end
-	return (areas.travel(1, "town"))
+	areas.freshPlay()
+	go(1, "town", true)
+	return true
 end
 
 -- A player stepped on the exit: the game on to the next area, arriving at its start (the party's
@@ -312,10 +355,11 @@ local function enter()
 	local info = areas.info(state.place)
 	town.place(spots.town, function(unit)
 		moveTo(unit, spots.arrive)
-	end, stash.touched, vendor.touched)
+	end, stash.touched, vendor.touched, areas.townOf(info.act).name)
 	vendor.restock(info.level)
 	portal.place(spots.town)
 	waypoints.place(spots, info, areas)
+	decals.place(spots)
 	touch.adopt(spots.back.type, spots.back.x, spots.back.y, town.sendHome)
 	if spots.exit then
 		touch.adopt(spots.exit.type, spots.exit.x, spots.exit.y, exitTouched, 15)
@@ -355,6 +399,7 @@ function areas.mapLoaded(name: string)
 	labels.reset()
 	items.reset()
 	touch.reset()
+	decals.reset()
 	portal.reset()
 	waypoints.reset()
 	boss.reset()
@@ -375,6 +420,11 @@ function areas.mapLoaded(name: string)
 	if tag and state.held[tag] then
 		state.place, state.tag = state.held[tag], tag
 		state.arriving = if p and p.tag == tag then p.arrive else nil
+		if p and p.fresh and p.tag == tag then
+			-- (a new play's first map: the old play's, left in the other tag, holds nothing now)
+			state.held[OTHER[tag]] = nil
+			state.spots[OTHER[tag]] = nil
+		end
 		state.loaded = true
 		state.leaving = false
 		state.tries = 0
@@ -393,9 +443,11 @@ function areas.mapLoaded(name: string)
 	end)
 end
 
--- configure: the first area's request (built before the game).
+-- configure: the first area's request (built before the game). The first play's seed is the
+-- game's (new for each game: a pool's instance, a player's own host).
 function areas.configure(ctx: any)
 	state.seed = if ctx.seed and ctx.seed ~= 0 then ctx.seed else 1
+	state.play = 1
 	state.place, state.tag = 1, "a"
 	state.held.a = 1
 	return areas.request(1, "a", false)
@@ -451,6 +503,9 @@ function areas.status()
 		nextState = if state.nextArea then (nox.generating(state.nextArea.tag) or "none") else "none",
 		nextPlace = if state.nextArea then state.nextArea.place else nil,
 		spots = state.spots[state.tag],
+		seed = state.seed,
+		play = state.play,
+		town = areas.townOf(info.act),
 	}
 end
 

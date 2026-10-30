@@ -41,6 +41,11 @@
 //   kDataBegin  u32 the value's bytes, u8 coding (0 stored, 1 NXZ), u32 the coded bytes
 //   kDataChunk  u32 offset, the coded bytes there                            (in order)
 // (decoded: a value for the UI's onMessage, read with the kBigValue limits below).
+// and, only to a client at client level 7 or above (kDecalLevel) that runs the mode's UI with its
+// assets, a script's ground decals (nox.decal), each map's, the set again to a client that comes:
+//   kDecal        a decal set (decalMessage: 22 bytes; the same id again replaces it)
+//   kDecalRemove  u16 id (0: every one)
+// (a map's load lets the client's go: one set after it is the new map's).
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -79,6 +84,8 @@ enum Sub : std::uint8_t {
     kDrawScale = 11,
     kDataBegin = 12,
     kDataChunk = 13,
+    kDecal = 14,
+    kDecalRemove = 15,
     kReady = 16,
     kSend = 17,
     kAnswer = 18,
@@ -165,6 +172,99 @@ inline std::optional<DrawScale> decodeDrawScale(std::span<const std::uint8_t> pa
         return std::nullopt;
     }
     return d;
+}
+
+/// (Client level 7) A ground decal (nox.decal): a mod asset drawn flat on the floor at a world
+/// point, under the things; its spin and pulse the client's to run. kDecal's payload, 22 bytes:
+/// u16 id (1 on), u16 asset (its index in the set), u16 x, u16 y (world units), u16 size (across,
+/// 4-1024), u8 r, g, b, a, u8 flags (kDecalGlow, kDecalPulseScale), i16 spin (degrees a second,
+/// -720 to 720), u8 pulse amount (/255), u16 pulse period (ms, 100-60000; 0: none), u16 the net
+/// code it follows (0: none).
+inline constexpr std::uint16_t kDecalLevel = 7;
+inline constexpr std::size_t kMaxDecals = 64; ///< a map's at most (a server's; a client keeps no more)
+inline constexpr std::uint8_t kDecalGlow = 1;       ///< drawn additive
+inline constexpr std::uint8_t kDecalPulseScale = 2; ///< the pulse swings the size (else the alpha)
+struct Decal {
+    std::uint16_t id = 0;
+    std::uint16_t asset = 0;
+    std::uint16_t x = 0, y = 0;
+    std::uint16_t size = 64;
+    std::uint8_t r = 255, g = 255, b = 255, a = 255;
+    std::uint8_t flags = 0;
+    std::int16_t spin = 0;
+    std::uint8_t pulseAmount = 0;
+    std::uint16_t pulsePeriodMs = 0;
+    std::uint16_t follow = 0;
+    bool operator==(const Decal&) const = default;
+};
+
+/// A decal's numbers kept to their bounds (a script's or a server's: untrusted either way).
+inline Decal boundedDecal(Decal d)
+{
+    d.size = std::clamp<std::uint16_t>(d.size, 4, 1024);
+    d.spin = std::clamp<std::int16_t>(d.spin, -720, 720);
+    d.flags &= kDecalGlow | kDecalPulseScale;
+    if (d.pulsePeriodMs != 0) {
+        d.pulsePeriodMs = std::clamp<std::uint16_t>(d.pulsePeriodMs, 100, 60000);
+    }
+    return d;
+}
+
+inline std::vector<std::uint8_t> decalMessage(const Decal& in)
+{
+    const Decal d = boundedDecal(in);
+    std::vector<std::uint8_t> p;
+    const auto u16 = [&](std::uint16_t v) {
+        p.push_back(static_cast<std::uint8_t>(v));
+        p.push_back(static_cast<std::uint8_t>(v >> 8));
+    };
+    u16(d.id);
+    u16(d.asset);
+    u16(d.x);
+    u16(d.y);
+    u16(d.size);
+    p.insert(p.end(), {d.r, d.g, d.b, d.a, d.flags});
+    u16(static_cast<std::uint16_t>(d.spin));
+    p.push_back(d.pulseAmount);
+    u16(d.pulsePeriodMs);
+    u16(d.follow);
+    return message(kDecal, p);
+}
+
+/// A kDecal payload read (bytes past the 22 left for later versions), kept to its bounds; none:
+/// cut short, or id 0.
+inline std::optional<Decal> decodeDecal(std::span<const std::uint8_t> payload)
+{
+    if (payload.size() < 22) {
+        return std::nullopt;
+    }
+    const auto u16 = [&](std::size_t at) { return static_cast<std::uint16_t>(payload[at] | payload[at + 1] << 8); };
+    Decal d;
+    d.id = u16(0);
+    d.asset = u16(2);
+    d.x = u16(4);
+    d.y = u16(6);
+    d.size = u16(8);
+    d.r = payload[10];
+    d.g = payload[11];
+    d.b = payload[12];
+    d.a = payload[13];
+    d.flags = payload[14];
+    d.spin = static_cast<std::int16_t>(u16(15));
+    d.pulseAmount = payload[17];
+    d.pulsePeriodMs = u16(18);
+    d.follow = u16(20);
+    if (d.id == 0) {
+        return std::nullopt;
+    }
+    return boundedDecal(d);
+}
+
+/// kDecalRemove's message: the decal `id` gone (0: every one).
+inline std::vector<std::uint8_t> decalRemoveMessage(std::uint16_t id)
+{
+    const std::uint8_t payload[2] = {static_cast<std::uint8_t>(id), static_cast<std::uint8_t>(id >> 8)};
+    return message(kDecalRemove, payload);
 }
 
 /// A message's sub and payload; none: not one (or cut short).

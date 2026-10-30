@@ -4,10 +4,11 @@
 --   * Opening: the Town portal button in the player's Deep Delve window (ui/main.luau sends
 --     { kind = "portal" }), or saying "portal". Out in the area, the portal opens where the player
 --     stands and the player goes home at once. In town it does nothing.
---   * Where it stands: violet sparks every so often, so it reads as a way through. Each player has
---     one at a time; a new one moves it.
---   * Back out: the town's portal pentagram (violet, east of the fountain) takes anyone in the
---     party through any open portal: the toucher's own straight away; with only another's open,
+--   * Where it stands: the portal's violet ring on the floor (decals.luau, as on the town's
+--     portal pentagram) and violet sparks every so often, so it reads as a way through. Each
+--     player has one at a time; a new one moves it.
+--   * Back out: the town's portal pentagram (an invisible one under the violet ring, east of the
+--     fountain) takes anyone in the party through any open portal: the toucher's own straight away; with only another's open,
 --     through that one; with several, an offer of them. Its owner going back through it closes it;
 --     the others may use it as often as they like while it's open.
 --   * It lasts until its owner goes back through it, its owner opens another, or the map changes (a
@@ -17,6 +18,7 @@
 -- An open portal is kept on its owner's hero (hero.luau's `portal`); one whose owner left is kept
 -- here (`left`), with its owner's name, until the map changes. One shared beat sparks them all.
 
+local decals = require("decals")
 local hero = require("hero")
 local hud = require("hud")
 local offers = require("offers")
@@ -73,10 +75,13 @@ function portal.open(h: any): string
 		town.say(h.unit, "You're in town already.")
 		return "in town"
 	end
-	h.portal = { x = o.x, y = o.y }
+	if h.portal then
+		decals.remove(h.portal.decal) -- (its old one closes)
+	end
+	h.portal = { x = o.x, y = o.y, decal = decals.put("portal", o.x, o.y) }
 	nox.effect(0x89, o.x, o.y) -- (MSG_FX_TELEPORT)
 	town.sendHome(h.unit)
-	nox.tell(h.unit, "Your portal stays open where you stood: the violet pentagram in town takes you (and your party) back.")
+	nox.tell(h.unit, "Your portal stays open where you stood: the violet ring in town takes you (and your party) back.")
 	sparking()
 	hud.hero(h)
 	return "opened"
@@ -125,6 +130,7 @@ function portal.through(h: any, e: any): boolean
 	local at = if e.owner then e.owner.portal else e
 	local x0, y0 = at.x, at.y
 	if e.owner == h then
+		decals.remove(h.portal.decal)
 		h.portal = nil
 		hud.hero(h)
 	end
@@ -179,14 +185,14 @@ function portal.left(h: any)
 	if not p then
 		return
 	end
-	table.insert(left, { name = tostring(h.record.identity.name), x = p.x, y = p.y })
+	table.insert(left, { name = tostring(h.record.identity.name), x = p.x, y = p.y, decal = p.decal })
 	h.portal = nil
 	sparking()
 end
 
 -- A map's town: its portal pentagram set to work.
 function portal.place(townSpots: any)
-	touch.adopt("TeleportPentagram", townSpots.portal.x, townSpots.portal.y, portal.touched, 45)
+	touch.adopt("InvisibleTeleportPentagram", townSpots.portal.x, townSpots.portal.y, portal.touched, 45)
 end
 
 -- The open portals as lines, "owner x y" (an owner who left: "owner(left) x y"; for "dd portals").

@@ -12,6 +12,8 @@ local touch = require("touch")
 local town = {}
 
 local spots: any = nil
+-- The town's name in this act (data/acts.luau's), as the healer's waters are told.
+local townName = "the Waystation"
 
 -- The town's reach from its middle, |dx| + |dy| in world units: its walls' (gen/town.luau's
 -- RADIUS, 12 cells). The area's floor is never nearer than six cells past them.
@@ -47,14 +49,15 @@ local function heal(unit: number)
 	local _, most = nox.mana(unit)
 	nox.setMana(unit, most, most)
 	nox.effect(0x81, o.x, o.y) -- (MSG_FX_BLUE_SPARKS)
-	say(unit, "The waters of the Waystation make you whole.")
+	say(unit, "The waters of " .. townName .. " make you whole.")
 end
 
--- The map's stations (the generator wrote them at its town spots) set to work. `out(unit)`: the
--- gate's way to the area; `stash(unit)` and `vendor(unit)`: the chest's and the anvil's windows
--- opened.
-function town.place(townSpots: any, out: any, stash: any, vendor: any)
+-- The map's stations (the generator wrote them at its town spots, the same in every act's town)
+-- set to work. `out(unit)`: the gate's way to the area; `stash(unit)` and `vendor(unit)`: the
+-- chest's and the anvil's windows opened; `name`: the act's town's.
+function town.place(townSpots: any, out: any, stash: any, vendor: any, name: string?)
 	spots = townSpots
+	townName = name or "the Waystation"
 	table.clear(lastLine)
 	touch.adopt(spots.gate.type, spots.gate.x, spots.gate.y, out)
 	touch.adopt("Fountain", spots.healer.x, spots.healer.y, heal)

@@ -1,9 +1,12 @@
 -- An area's walls and floor: the biome's base floor everywhere, its patches and worn path on the
--- area's floor, the town's own floor on the town's, then both written (w:walls, w:floors) once.
+-- area's floor, the town's own floors on the town's (its look's: towns.luau), then both written
+-- (w:walls, w:floors) once.
 --
 -- (The built-in floors module paints one layout; an area map holds two, the area and the town,
 -- each with its own floor, so the painting is done here with the same native blocks.) The layers
--- decide which floor's edge blends over which: base 0, the town 1, a patch 2, the path 3.
+-- decide which floor's edge blends over which: base 0, the town 1, a patch or the town's square
+-- 2, the path or the town's paths 3 (the town's floors only ever meet each other: its walls stand
+-- between them and the area's).
 
 local util = require("util")
 
@@ -12,8 +15,9 @@ local ground = {}
 local TOWN_LAYER, PATCH_LAYER, PATH_LAYER = 1, 2, 3
 
 -- site: layout (the area's), town (its section), open (both floors' cells), walls (gen.cellmap),
--- biome (the built-in biome's table), townFloor (a floor index), seed. Returns { floor (the
--- gen.cellmap of floors), harming (the harming floors laid) }.
+-- biome (the built-in biome's table), townFloor (the town's floor, an index), townSquare ({ floor
+-- index, radius } or nil), townPaths (a floor index or nil) and townWays (the cells its paths run
+-- along), seed. Returns { floor (the gen.cellmap of floors), harming (the harming floors laid) }.
 function ground.build(site, w)
 	local lay, biome = site.layout, site.biome
 	local rng = gen.minstd(util.hash(site.seed, 2654435761, 23))
@@ -70,6 +74,15 @@ function ground.build(site, w)
 	local town = site.town
 	floor:paintWithin(layer, util.cell(town.x, town.y), town.radius, town.open, site.townFloor, TOWN_LAYER)
 	table.insert(laid, site.townFloor)
+	-- Its worn paths and the square round the fountain they lead from (a look that has them).
+	if site.townPaths then
+		floor:paintAround(layer, site.townWays, town.open, site.townPaths, PATH_LAYER)
+		table.insert(laid, site.townPaths)
+	end
+	if site.townSquare then
+		floor:paintWithin(layer, util.cell(town.x, town.y), site.townSquare.radius, town.open, site.townSquare.floor, PATCH_LAYER)
+		table.insert(laid, site.townSquare.floor)
+	end
 	-- Lone base cells among another floor taken into it (no specks), never into a harming one.
 	floor:absorb(layer, base, harming, 2)
 

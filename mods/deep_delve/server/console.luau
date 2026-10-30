@@ -18,7 +18,11 @@
 --                        waypoint). N: the area's number on through the acts (act 1's 1-7, act
 --                        2's from 8), or "A-N": area N of act A
 --   dd trial SEED N      area N (as dd area names it) built now from game seed SEED (into a map
---                        never played); "ok", or why it was refused or what it lacks
+--                        never played); "ok", or why it was refused or what it lacks (its act's
+--                        town and every one of its stations too)
+--   dd seed              the play's seed and which play of the game it is (an emptied game
+--                        starting over is a new play, with a new seed)
+--   dd town              the act's town: its look and name
 --   dd gate [take]       the lair's gate to the next act (its spot, open or shut, its swirl and
 --                        light); "take": the first player steps into it (the game on, or a vote)
 --   dd portal            the first player opens a town portal (as its UI's button does)
@@ -83,6 +87,7 @@
 --   dd slay ID           one of the mod's monsters killed by the first player
 --   dd portals           the open portals, "owner x y" ("owner(left)": its owner left the game)
 --   dd portal take       the first player through the town's portal pentagram (as its touch)
+--   dd decals            the pads' rings on the map's floor, "kind x y" (waypoint, portal)
 --   dd hud               how many values the first player's UI is owed (sends not taken yet)
 --   dd option [NAME VALUE]   the first player's options ("name value"), or one set (as its
 --                        Character window does): lootNames alt | always
@@ -94,6 +99,7 @@
 local areas = require("areas")
 local boss = require("boss")
 local combat = require("combat")
+local decals = require("decals")
 local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
@@ -301,7 +307,7 @@ function commands.spots(_args: { string }): { string }
 	end
 	local out = {}
 	-- (one line a place: name, x, y, its thing's type or "-"; "none" for a place this area lacks)
-	local types: any = { portal = "TeleportPentagram", pad = "TeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram" }
+	local types: any = { portal = "InvisibleTeleportPentagram", pad = "InvisibleTeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram" }
 	for _, name in { "arrive", "back", "exit", "guardian", "boss", "waypoint", "wayArrive", "gate", "healer", "stash", "vendor", "portal", "pad", "wayIn", "actGate" } do
 		local p = place(s, name)
 		if p then
@@ -312,6 +318,18 @@ function commands.spots(_args: { string }): { string }
 	end
 	table.insert(out, string.format("packs %d", #s.packs))
 	return out
+end
+
+-- "dd seed": the play's seed and which play of the game it is ("seed S, play P"); "dd town": the
+-- act's town ("town LOOK, NAME").
+function commands.seed(_args: { string }): { string }
+	local s = areas.status()
+	return { string.format("seed %d, play %d", s.seed, s.play) }
+end
+
+function commands.town(_args: { string }): { string }
+	local t = areas.status().town
+	return { string.format("town %s, %s", tostring(t.look), tostring(t.name)) }
 end
 
 function commands.area(args: { string }): { string }
@@ -343,6 +361,15 @@ function commands.trial(args: { string }): { string }
 		missing = "gate"
 	elseif not info.lair and not s.exit then
 		missing = "exit"
+	elseif not s.town or s.town.look ~= areas.townOf(info.act).look then
+		missing = "town of act " .. info.act
+	else
+		-- (the town's stations, every one, in every act's look)
+		for _, name in { "centre", "healer", "gate", "stash", "vendor", "portal", "waypoints", "wayIn" } do
+			if not missing and not s.town[name] then
+				missing = "town " .. name
+			end
+		end
 	end
 	if missing then
 		return { string.format("seed %d area %d: no %s", seed, place, missing) }
@@ -389,6 +416,11 @@ end
 
 function commands.portals(_args: { string }): { string }
 	local out = portal.lines()
+	return if #out > 0 then out else { "none" }
+end
+
+function commands.decals(_args: { string }): { string }
+	local out = decals.lines()
 	return if #out > 0 then out else { "none" }
 end
 
@@ -1141,7 +1173,7 @@ function commands.help(_args: { string }): { string }
 	return {
 		"dd status | spots | save | xp N | award N | loot RARITY [N] | ground | monster ID | check",
 		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|actGate|pack [N] | area N|A-N [waypoint] | portal | waypoint N|A-N",
-		"dd progress | boss | smite | trial SEED N | gate [take]",
+		"dd progress | boss | smite | trial SEED N | gate [take] | seed | town",
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L]",
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs] | icons | book | sheet | ui stash|vendor|waypoints|tree|sheet [NAME]",
 		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | plates | spawn TIER [N] [TYPE] | slay ID | portals | portal take | hud",

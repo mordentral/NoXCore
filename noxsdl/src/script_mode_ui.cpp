@@ -226,6 +226,60 @@ public:
         drawLabels(app, renderer);
     }
 
+    /// (Client level 7) The server's ground decals: each its mod image flat on the floor, centred
+    /// on its point (or on the thing it follows while we have it), `size` world units across at the
+    /// camera's zoom, turned by its spin and swung by its pulse as time goes (nothing per frame from
+    /// the server); tinted, additive when it glows. Off screen: not drawn.
+    void drawFloor(App& app, SDL_Renderer* renderer) override
+    {
+        if (!ui_ || ui_->decals().empty() || !app.live) {
+            return;
+        }
+        const double t = static_cast<double>(SDL_GetTicks()) / 1000.0;
+        const auto& world = app.live->client().world();
+        const float zoom = app.camera.zoom;
+        for (const nox::modes::script::uimsg::Decal& d : ui_->decals()) {
+            SDL_Texture* tex = textureOf(renderer, d.asset);
+            if (!tex) {
+                continue;
+            }
+            float x = d.x, y = d.y;
+            if (d.follow != 0) {
+                if (const auto* o = world.drawable(d.follow)) {
+                    x = static_cast<float>(o->x);
+                    y = static_cast<float>(o->y);
+                }
+            }
+            float size = d.size;
+            float alpha = d.a / 255.0f;
+            if (d.pulsePeriodMs != 0 && d.pulseAmount != 0) {
+                const double wave = std::sin(2 * 3.14159265358979 * t * 1000.0 / d.pulsePeriodMs); // (-1 to 1)
+                const float amount = d.pulseAmount / 255.0f;
+                if (d.flags & nox::modes::script::uimsg::kDecalPulseScale) {
+                    size *= 1.0f + 0.5f * amount * static_cast<float>(wave); // (half its amount either way)
+                } else {
+                    alpha *= 1.0f - amount * static_cast<float>(0.5 - 0.5 * wave); // (down to 1 - amount)
+                }
+            }
+            const float px = size * zoom;
+            const float cx = (x - app.camera.left()) * zoom;
+            const float cy = (y - app.camera.top()) * zoom;
+            if (cx + px < 0 || cy + px < 0 || cx - px > app.camera.viewWidth || cy - px > app.camera.viewHeight) {
+                continue;
+            }
+            const double angle = std::fmod(static_cast<double>(d.spin) * t, 360.0);
+            const SDL_FRect dst{cx - px / 2, cy - px / 2, px, px};
+            SDL_SetTextureColorMod(tex, d.r, d.g, d.b);
+            SDL_SetTextureAlphaModFloat(tex, std::clamp(alpha, 0.0f, 1.0f));
+            SDL_SetTextureBlendMode(tex, (d.flags & nox::modes::script::uimsg::kDecalGlow) ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_BLEND);
+            SDL_RenderTextureRotated(renderer, tex, nullptr, &dst, angle, nullptr, SDL_FLIP_NONE);
+            // (The texture as the UI's images draw it again.)
+            SDL_SetTextureColorMod(tex, 255, 255, 255);
+            SDL_SetTextureAlphaModFloat(tex, 1.0f);
+            SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+        }
+    }
+
     void drawUnderWindows(App& app, SDL_Renderer* renderer, const HudFrame& hud) override
     {
         if (!ui_) {
@@ -542,17 +596,19 @@ private:
         }
     }
 
-    void drawImage(SDL_Renderer* renderer, const UiDraw& d, const SDL_FRect& r)
+    /// The mod's image `index` as a texture (made at its first use, let go with the set); null: no
+    /// such image in the set now (a draw from before a new set came, or a sound).
+    SDL_Texture* textureOf(SDL_Renderer* renderer, int index)
     {
         const ModAssets* set = ui_->assets().get();
-        if (!set || d.index < 0 || static_cast<std::size_t>(d.index) >= set->list.size() || !(d.w > 0) || !(d.h > 0)) {
-            return; // (a draw from before a new set came)
+        if (!set || index < 0 || static_cast<std::size_t>(index) >= set->list.size()) {
+            return nullptr;
         }
-        const ModAsset& a = set->list[static_cast<std::size_t>(d.index)];
+        const ModAsset& a = set->list[static_cast<std::size_t>(index)];
         if (a.kind != ModAsset::Kind::Image) {
-            return;
+            return nullptr;
         }
-        auto it = textures_.find(d.index);
+        auto it = textures_.find(index);
         if (it == textures_.end()) {
             SDL_Texture* t = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, a.width, a.height);
             if (t) {
@@ -560,10 +616,18 @@ private:
                 SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
                 SDL_SetTextureScaleMode(t, SDL_SCALEMODE_LINEAR);
             }
-            it = textures_.emplace(d.index, t).first;
+            it = textures_.emplace(index, t).first;
         }
-        if (it->second) {
-            SDL_RenderTexture(renderer, it->second, nullptr, &r);
+        return it->second;
+    }
+
+    void drawImage(SDL_Renderer* renderer, const UiDraw& d, const SDL_FRect& r)
+    {
+        if (!(d.w > 0) || !(d.h > 0)) {
+            return;
+        }
+        if (SDL_Texture* t = textureOf(renderer, d.index)) {
+            SDL_RenderTexture(renderer, t, nullptr, &r);
         }
     }
 

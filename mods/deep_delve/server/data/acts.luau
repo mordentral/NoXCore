@@ -1,8 +1,8 @@
 --!strict
 -- The acts and their areas. An act is a chain of areas played in order, each a generated map of
 -- one of the built-in generator's biomes (by name); its last area is the act boss's lair. The
--- area level is the act's base level plus the area's index less one. The town's own floor is here
--- too.
+-- area level is the act's base level plus the area's index less one. Each act's town (its name
+-- and look) is here too.
 --
 -- The acts go by biome, a journey upward and onward: act 1 the catacombs, act 2 up out of them
 -- into the open fields. An act without a `base` carries on from the act before it (that act's
@@ -15,11 +15,16 @@
 -- middle), lair (true: the act boss's lair, the act's last area), title (its name, when not the
 -- biome's), weather (one of `weathers` below, by name: outdoor areas only; none indoors and none
 -- in a lair).
+--
+-- An act's town: its name (as the healer's waters are told) and its look (the generator's
+-- gen/towns.luau, by name: the town's floors, lights and scenery; the stations are the same in
+-- every act). An act without one has `town` below.
 
 local acts: { any } = {
 	{
 		name = "The Sunken Halls",
 		base = 1,
+		town = { name = "the Waystation", look = "waystation" },
 		areas = {
 			{ biome = "Crypt", corridor = 2 },
 			{ biome = "Dungeon", corridor = 2, waypoint = true },
@@ -35,6 +40,8 @@ local acts: { any } = {
 	{
 		-- Up out of the catacombs: the open fields above them, grass and marsh under a wet sky.
 		name = "The Barrow Fields",
+		-- (a hamlet on the green, outdoors: the area's weather falls on it too)
+		town = { name = "Low Barrow", look = "hamlet" },
 		areas = {
 			{ biome = "Grasslands", corridor = 3, waypoint = true, waypointAt = "start", weather = "drizzle" },
 			{ biome = "Grasslands", corridor = 3, weather = "windy" },
@@ -83,9 +90,7 @@ end
 local out: any = acts
 out.weathers = weathers
 out.gate = gate
-out.town = {
-	name = "the Waystation",
-	floor = "CobblestoneGrayLight",
-}
+-- (the town of an act that names none)
+out.town = { name = "the Waystation", look = "waystation" }
 
 return out

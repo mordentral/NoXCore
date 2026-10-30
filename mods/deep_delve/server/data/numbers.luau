@@ -91,6 +91,14 @@ numbers.portal = {
 	every = 24,
 }
 
+-- The pads' rings on the floor (decals.luau): the asset, its size across (world units; a
+-- pentagram's own ring is about 52 across, so its ring sits inside the picture's outer band), its
+-- turn (degrees a second) and its alpha's pulse (amount 0-1, period in seconds). Drawn additive.
+numbers.decals = {
+	waypoint = { asset = "fx/waypoint", size = 80, spin = 12, pulse = 0.25, period = 3 },
+	portal = { asset = "fx/portal", size = 80, spin = -40, pulse = 0.35, period = 1.6 },
+}
+
 numbers.boss = {
 	-- Its thinking beat (frames): its phases, its slam, its health bar.
 	beat = 15,

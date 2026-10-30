@@ -178,6 +178,9 @@ struct ScriptedMode::Impl {
         };
         std::deque<Outgoing> outbox;
         std::size_t outboxBytes = 0;
+        /// (Client level 7) The map's decals sent it (pumpUi, once its UI and assets are in): from
+        /// then on each set or removal goes to it as it happens.
+        bool decalsSent = false;
     };
     static constexpr std::size_t kHeldViews = 16;
     /// A player's queued values' bytes at most (UiPeer::outbox): past it nox.send says false.
@@ -219,6 +222,10 @@ struct ScriptedMode::Impl {
     fs::file_time_type assetsAt{};
     std::vector<std::uint8_t> wireSet;
     std::vector<WireAsset> wireAssets;
+    std::vector<std::string> assetNames; ///< (the set's names, sorted: an asset's index is its place)
+    /// (Client level 7) The map's ground decals (nox.decal), and the next id to give.
+    std::vector<uimsg::Decal> decals;
+    std::uint16_t nextDecalId = 1;
     std::vector<std::string> errors;
     std::map<std::string, std::chrono::steady_clock::time_point> lastLogged;
     std::unique_ptr<server::ModeHooks> engineHooks; ///< (installed on the server while attached)
@@ -416,6 +423,7 @@ struct ScriptedMode::Impl {
         bool changed = false; ///< (else only `at` moved)
         std::vector<std::uint8_t> wireSet;
         std::vector<WireAsset> wireAssets;
+        std::vector<std::string> names;
     };
     /// False: `error` why (over a cap...). None: as they are.
     bool loadAssets(std::string& error, std::optional<LoadedAssets>& out);
@@ -428,6 +436,31 @@ struct ScriptedMode::Impl {
         assetsAt = {};
         std::vector<std::uint8_t>().swap(wireSet);
         std::vector<WireAsset>().swap(wireAssets);
+        assetNames.clear();
+    }
+    /// (Client level 7) Whether `peer` is sent the decals: it runs this UI, with the mod's assets,
+    /// at kDecalLevel or above.
+    bool decalReaches(std::uint8_t peer) const
+    {
+        return assetsHash && package->manifest.uiApi >= 2 && uiReaches(peer) && host->clientLevel(peer) >= uimsg::kDecalLevel;
+    }
+    /// A decal message to every player it's been sent the map's decals (UiPeer::decalsSent).
+    void toDecalPlayers(const std::vector<std::uint8_t>& message)
+    {
+        for (const auto& [peer, u] : ui) {
+            if (u.decalsSent && decalReaches(peer)) {
+                host->sendToIdentified(peer, message);
+            }
+        }
+    }
+    /// The map's decals gone (a map's load, nox.clearDecals), told to whoever has them.
+    void clearDecals()
+    {
+        if (decals.empty()) {
+            return;
+        }
+        decals.clear();
+        toDecalPlayers(uimsg::decalRemoveMessage(0));
     }
     /// The client features the UI needs: ModeUi, and ModeUi2 for a UI of API 2 (a client without
     /// them gets the views as text, the UI never sent).
@@ -1962,6 +1995,106 @@ int noxSpellInfo(lua_State* L)
     setField(L, "manaCost", server::Spells::priceOf(f.world, *f.things, spell, true, false));
     setField(L, "trapCost", server::Spells::priceOf(f.world, *f.things, spell, true, true));
     return 1;
+}
+
+int noxDecal(lua_State* L)
+{
+    // nox.decal(asset, x, y, opts) -> id | nil: a mod asset drawn flat on the floor at (x, y) under
+    // the things, by NoX Core clients of level 7 that run the mode's UI (uimsg::kDecal); opts {size
+    // (world units across, 64), colour {r, g, b[, a]}, glow, spin (degrees a second), pulse {amount
+    // 0-1, period (s), scale}, follow (a thing's id)}. The map's own: gone at its load. nil: the
+    // map has kMaxDecals.
+    Impl& impl = implOf(L);
+    size_t len = 0;
+    const char* s = luaL_checklstring(L, 1, &len);
+    const std::string_view name(s, len);
+    const auto it = std::ranges::lower_bound(impl.assetNames, name);
+    luaL_argcheck(L, it != impl.assetNames.end() && *it == name, 1, "no such asset (the mod's assets\\, a UI of API 2 or above)");
+    uimsg::Decal d;
+    d.asset = static_cast<std::uint16_t>(it - impl.assetNames.begin());
+    const auto coord = [&](int idx) { return static_cast<std::uint16_t>(std::clamp(luaL_checknumber(L, idx), 0.0, 65535.0)); };
+    d.x = coord(2);
+    d.y = coord(3);
+    if (!lua_isnoneornil(L, 4)) {
+        luaL_checktype(L, 4, LUA_TTABLE);
+        const auto number = [&](int table, const char* key, double lo, double hi, double fallback) {
+            lua_getfield(L, table, key);
+            const double v = lua_isnil(L, -1) ? fallback : (luaL_argcheck(L, lua_isnumber(L, -1), 4, "opts' numbers"), lua_tonumber(L, -1));
+            lua_pop(L, 1);
+            return v == v ? std::clamp(v, lo, hi) : fallback;
+        };
+        d.size = static_cast<std::uint16_t>(number(4, "size", 4, 1024, 64));
+        d.spin = static_cast<std::int16_t>(number(4, "spin", -720, 720, 0));
+        lua_getfield(L, 4, "glow");
+        if (lua_toboolean(L, -1)) {
+            d.flags |= uimsg::kDecalGlow;
+        }
+        lua_pop(L, 1);
+        lua_getfield(L, 4, "colour");
+        if (lua_istable(L, -1)) {
+            std::uint8_t* rgba[4] = {&d.r, &d.g, &d.b, &d.a};
+            for (int i = 0; i < 4; ++i) {
+                lua_rawgeti(L, -1, i + 1);
+                if (lua_isnumber(L, -1)) {
+                    *rgba[i] = static_cast<std::uint8_t>(std::clamp(lua_tonumber(L, -1), 0.0, 255.0));
+                }
+                lua_pop(L, 1);
+            }
+        }
+        lua_pop(L, 1);
+        lua_getfield(L, 4, "pulse");
+        if (lua_istable(L, -1)) {
+            const int p = lua_gettop(L);
+            d.pulseAmount = static_cast<std::uint8_t>(number(p, "amount", 0, 1, 0) * 255 + 0.5);
+            d.pulsePeriodMs = static_cast<std::uint16_t>(number(p, "period", 0.1, 60, 1) * 1000 + 0.5);
+            lua_getfield(L, p, "scale");
+            if (lua_toboolean(L, -1)) {
+                d.flags |= uimsg::kDecalPulseScale;
+            }
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 1);
+        lua_getfield(L, 4, "follow");
+        if (lua_isnumber(L, -1)) {
+            server::World& world = worldOf(L);
+            const double id = lua_tonumber(L, -1);
+            if (const server::ServerObject* o = id >= 1 && id <= 4294967295.0 ? world.byExtent(static_cast<std::uint32_t>(id)) : nullptr) {
+                d.follow = server::netCodeOf(*o);
+            }
+        }
+        lua_pop(L, 1);
+    }
+    if (impl.decals.size() >= uimsg::kMaxDecals) {
+        lua_pushnil(L);
+        return 1;
+    }
+    d.id = impl.nextDecalId++;
+    if (impl.nextDecalId == 0) {
+        impl.nextDecalId = 1;
+    }
+    d = uimsg::boundedDecal(d);
+    impl.decals.push_back(d);
+    impl.toDecalPlayers(uimsg::decalMessage(d));
+    lua_pushnumber(L, d.id);
+    return 1;
+}
+
+int noxRemoveDecal(lua_State* L)
+{
+    // nox.removeDecal(id): that decal gone (nothing for one not there).
+    Impl& impl = implOf(L);
+    const auto id = static_cast<std::uint16_t>(wholeArg(L, 1, 1, 65535, "a decal's id"));
+    if (std::erase_if(impl.decals, [&](const uimsg::Decal& d) { return d.id == id; }) != 0) {
+        impl.toDecalPlayers(uimsg::decalRemoveMessage(id));
+    }
+    return 0;
+}
+
+int noxClearDecals(lua_State* L)
+{
+    // nox.clearDecals(): every decal of the map gone.
+    implOf(L).clearDecals();
+    return 0;
 }
 
 int noxSetCharmable(lua_State* L)
@@ -3624,6 +3757,13 @@ void Impl::pumpUi()
             sendUi(peer, uimsg::kChunk, w.out);
             u.sent += n;
         }
+        // (Client level 7) Its UI and assets in: the map's decals, then each as it's set.
+        if (!u.decalsSent && u.sent >= uiSource.size() && decalReaches(peer)) {
+            for (const uimsg::Decal& d : decals) {
+                host->sendToIdentified(peer, uimsg::decalMessage(d));
+            }
+            u.decalsSent = true;
+        }
     }
 }
 
@@ -3714,7 +3854,7 @@ void Impl::installToolbox()
         {"touch", noxTouch},   {"sightRange", noxSightRange}, {"textToAll", noxTextToAll},
         {"nearestFoes", noxNearestFoes}, {"applyForce", noxApplyForce}, {"attack", noxAttack}, {"direction", noxDirection},
         {"directionOf", noxDirectionOf}, {"directionVector", noxDirectionVector}, {"newMark", noxNewMark}, {"madeSince", noxMadeSince},
-        {"spellInfo", noxSpellInfo}, {"setCharmable", noxSetCharmable}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
+        {"spellInfo", noxSpellInfo}, {"setCharmable", noxSetCharmable}, {"decal", noxDecal}, {"removeDecal", noxRemoveDecal}, {"clearDecals", noxClearDecals}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
         {"shoot", noxShoot},   {"summon", noxSummon},   {"abilitySound", noxAbilitySound}, {"setPosition", noxSetPosition},
         {"setVelocity", noxSetVelocity}, {"setOwner", noxSetOwner}, {"setTeam", noxSetTeam}, {"setNoCollide", noxSetNoCollide},
         {"setHitRadius", noxSetHitRadius}, {"setBurstScale", noxSetBurstScale},
@@ -3912,6 +4052,7 @@ bool Impl::keepAssets(LoadedAssets&& a)
     assetsHash = a.hash;
     wireSet = std::move(a.wireSet);
     wireAssets = std::move(a.wireAssets);
+    assetNames = std::move(a.names);
     return true;
 }
 
@@ -3977,6 +4118,9 @@ bool Impl::loadAssets(std::string& error, std::optional<LoadedAssets>& out)
     }
     out->wireSet = std::move(set.out);
     out->wireAssets = std::move(wire);
+    for (const ModAsset& a : now->list) {
+        out->names.push_back(a.name); // (in order: nox.decal names an asset by its place)
+    }
     out->changed = true;
     return true;
 }
@@ -4045,6 +4189,7 @@ public:
 
     void mapLoaded(server::Server& server) override
     {
+        impl_.clearDecals(); // (a map's decals are its own: the new map's come from its mapLoaded)
         if (impl_.has.mapLoaded) {
             impl_.guarded("mapLoaded", [&] {
                 if (impl_.begin("mapLoaded")) {

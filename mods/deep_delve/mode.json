@@ -6,7 +6,7 @@
   "order": 50,
   "players": [1, 6],
   "stockClients": false,
-  "minClientLevel": 6,
+  "minClientLevel": 7,
   "levels": "generated",
   "mapPrefix": "DD",
   "clientKeys": true,

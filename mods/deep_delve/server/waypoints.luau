@@ -7,7 +7,8 @@
 --   * Out in the area -> town: the waypoint is a real pentagram written into the map, leading to
 --     the town's receiving pentagram; the game itself sends whoever stands on it (a pentagram
 --     links places in one map, and the town is in every map).
---   * Town -> a waypoint: stepping on the town's waypoints pentagram (cyan) opens the waypoints
+--   * Town -> a waypoint: stepping on the town's waypoints pentagram (an invisible one under the
+--     cyan ring) opens the waypoints
 --     window on the toucher's UI (ui/main.luau): the areas that have a waypoint, by act (each
 --     act open to its character), the ones it has found to click, the area being played marked.
 --     This area's: a step across the map, at once, for that player alone (no vote). Another
@@ -52,7 +53,7 @@ local function found(h: any)
 	end
 	nox.effect(0x83, here.x, here.y) -- (MSG_FX_CYAN_SPARKS)
 	if nox.present(h.unit) then
-		nox.tell(h.unit, "Waypoint found: " .. here.title .. ". Its pentagram leads to town; the cyan pentagram in town leads back.")
+		nox.tell(h.unit, "Waypoint found: " .. here.title .. ". Its pentagram leads to town; the cyan ring in town leads back.")
 	end
 	hero.save(h, "waypoint found")
 	hud.hero(h)
@@ -146,7 +147,7 @@ function waypoints.message(h: any, v: any)
 	local act = tonumber(v.act) or areas.current().act
 	local why: string? = nil
 	if not area or not windows.near(h, "waypoints") then
-		why = "Stand on the waypoints' pentagram."
+		why = "Stand on the waypoints' ring."
 	elseif not areas.placeOf(act, area) or (act ~= areas.current().act and not progress.isOpen(h.record, act))
 		or not progress.hasWaypoint(h.record, act, area) then
 		why = "You haven't found that waypoint yet."
@@ -201,7 +202,7 @@ end
 -- the town's pentagrams set to work, and this area's waypoint looked for.
 function waypoints.place(spots: any, info: any, areasApi: any)
 	areas = areasApi
-	touch.adopt("TeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, PAD_EVERY)
+	touch.adopt("InvisibleTeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, PAD_EVERY)
 	touch.adopt("InvisibleTeleportPentagram", spots.town.wayIn.x, spots.town.wayIn.y, arrived, 30, true)
 	if spots.waypoint then
 		here = { act = info.act, index = info.index, title = info.title, x = spots.waypoint.x, y = spots.waypoint.y, arrive = spots.wayArrive }

@@ -142,6 +142,12 @@ declare nox: {
     spellInfo: (spell: string | number) -> NoxSpellInfo?,
     --- false: Charm refuses the creature as one not charmable (a charm on it now ends uncontrolled); true or nil: as the game has it.
     setCharmable: (id: number, charmable: boolean?) -> (),
+    --- A mod image drawn flat on the floor at (x, y) under the things, for NoX Core clients of level 7 running the mode's UI; opts { size (world units, 64), colour { r, g, b, a }, glow, spin (degrees a second), pulse { amount 0-1, period (s), scale }, follow (a thing's id) }; the map's own (gone at its load); its id, nil past 64 a map.
+    decal: (asset: string, x: number, y: number, opts: { size: number?, colour: { number }?, glow: boolean?, spin: number?, pulse: { amount: number?, period: number?, scale: boolean? }?, follow: number? }?) -> number?,
+    --- A decal (nox.decal's id) gone.
+    removeDecal: (id: number) -> (),
+    --- Every decal of the map gone.
+    clearDecals: () -> (),
     --- An enchantment's frames left on a thing (0: on for good, or not on).
     enchantTime: (id: number, enchantment: string | number) -> number,
     --- A gamedata.bin number as this game reads it (index from 0); nil for a name it hasn't.

@@ -71,6 +71,13 @@ public:
     virtual void inputLost(App& app) { (void)app; }
     /// Each frame with the game's windows' updates (before anything's drawn).
     virtual void update(App& app) { (void)app; }
+    /// Each frame in the 2D view, on the floor: after the floor and the hover ring, under every
+    /// thing and creature (a script mode's ground decals).
+    virtual void drawFloor(App& app, SDL_Renderer* renderer)
+    {
+        (void)app;
+        (void)renderer;
+    }
     /// Each frame in the 2D view, over the world and what's drawn over it (names, bars, bubbles),
     /// under the HUD: a mode's labels over things.
     virtual void drawWorld(App& app, SDL_Renderer* renderer)

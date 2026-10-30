@@ -3743,6 +3743,11 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
         const std::uint64_t worldDrawStart = app.frameStats ? SDL_GetTicksNS() : 0;
         app.view->drawFloor(app.renderer, app.camera, *app.sprites, light, sight);
         drawHoverRing(app); // (on the floor, under the objects: the world's draw draws it before them)
+        if (app.live) {
+            for (auto& [id, ui] : app.modeUis) {
+                ui->drawFloor(app, app.renderer); // (a mode's ground decals: on the floor, under the things)
+            }
+        }
         app.view->setCollectBloom(app.bloom != nullptr);
         app.view->setTime(app.live ? app.interpolator.gameTime() : static_cast<double>(SDL_GetTicks()) * 30 / 1000);
         if (app.effects) {

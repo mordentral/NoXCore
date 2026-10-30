@@ -108,7 +108,10 @@ struct ClientSecret {
 ///      kDataChunk), sent only to a client of level 6 or above that named ModeUi (ui_proto.hpp's
 ///      kBigDataLevel); and UI API 5 (mode.json's "uiApi": 5: nox.hudReserve), a UI of it sent only
 ///      to a client of level 6 or above that named ModeUi and ModeUi2 (kUiApi5Level)
-inline constexpr std::uint16_t kClientLevel = 6;
+///   7  a script mode's ground decals (nox.decal: MSG_NOXCPP_MODEUI's kDecal and kDecalRemove, a mod
+///      asset drawn on the floor), sent only to a client of level 7 or above that runs the mode's UI
+///      with its assets (ui_proto.hpp's kDecalLevel)
+inline constexpr std::uint16_t kClientLevel = 7;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).
 inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.
