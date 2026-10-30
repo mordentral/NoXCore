@@ -1379,8 +1379,9 @@ std::vector<std::uint32_t> World::placeRecords(World& w, const map::ObjectTOC& t
         }
         std::uint32_t extent = 0;
         if (placed) {
-            if (o.extent == 0 || w.objects_.contains(o.extent) || (kDynamicExtents <= o.extent && std::ranges::find(w.reservedExtents, o.extent) != w.reservedExtents.end())) {
-                // (0: one made in play, saved; one of the numbers made in play the kept things have)
+            if (o.extent == 0 || w.objects_.contains(o.extent) || std::ranges::find(w.reservedExtents, o.extent) != w.reservedExtents.end()) {
+                // (0: one made in play, saved; one of the numbers the kept things have, a map's
+                // number too: they keep theirs, as the exe's keep their NetCodes)
                 o.extent = w.newExtent();
                 w.noteRenumbered(o); // (its map number still names it: byMapNumber)
             }

@@ -750,15 +750,14 @@ The engine's logic is the exe's; these are where the output differs.
     act under way and where the party is, its fork's two acts) at their join and with each level
     made, and see it behind a MAP button left of the meters (modes/delve/ui/delve_map_window.cpp).
     Stock players are told the same in text lines.
-  - A thing of a map's carried into the next one (a picked-up potion, a chest's armour) is
-    numbered afresh there (our extent is its net code; the exe's keep their NetCode across the
-    switch), so its holder's client is told: MSG_REPORT_DROP for the old number, then
-    MSG_REPORT_PICKUP / _MODIFIABLE_PICKUP, _ITEM_HEALTH, _CHARGES and _EQUIP for the new
-    (Server's load, after the carry). Without quest saves nothing else tells it, and the potion
-    keys and inventory named things no longer held. (A solo game's carry gets the same.) Not a
-    delve server's alone: it runs at any server's map change that carries a map's thing (solo,
-    quest or network game), the client ending as the exe's, knowing each thing by the server's
-    number.
+  - A thing of a map's carried into the next one (a picked-up potion, a chest's armour, a staff)
+    keeps its number there, as the exe's keep their NetCode across the switch: the new map's thing
+    of that number takes a fresh one at the load (its map number still names it), so the holder's
+    client sees no change and keeps its inventory window's secondary weapon and quiver. Only if the
+    number were taken all the same (a guard, not expected) is the thing numbered afresh and its
+    holder's client told MSG_REPORT_DROP for the old number, then MSG_REPORT_PICKUP /
+    _MODIFIABLE_PICKUP, _ITEM_HEALTH, _CHARGES and _EQUIP for the new (Server's load, after the
+    carry). It runs at any server's map change (solo, quest or network game).
   - Multiclass for noxsdl players (GameHost::Options::multiclass, on for Delve; a player whose
     client identified with the extended query, PlayerControl::multiclass): any class's spells,
     abilities and guides learned (books) and used, any class's weapons and armour

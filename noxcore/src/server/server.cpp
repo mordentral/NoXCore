@@ -317,12 +317,15 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
             });
         }
         // What stays: `kept`, as it was before the switch let go of the rest.
-        // Each kept under its extent when that's free in the new map and not one of a map's; else
-        // a new one (our extents are the exe's pointers: a map thing carried over must not meet
-        // the new map's of the same number), its links to the others carried with it.
+        // Each kept under its own extent, a map's number too (a staff picked up off the last map):
+        // the exe's things stay the same objects with their NetCodes, so the clients see nothing
+        // change, their inventory windows' secondary weapon and quiver kept. The new map's thing
+        // of such a number took a fresh one at the load (World::load's reserved extents; its map
+        // number still names it). A new one only if the number were taken all the same (never
+        // expected), its links to the others carried with it and its client told below.
         std::unordered_map<std::uint32_t, std::uint32_t> renumbered;
         for (const std::uint32_t e : kept) {
-            if (e >= kDynamicExtents && !world_.byExtent(e)) {
+            if (!world_.byExtent(e)) {
                 renumbered[e] = e;
             }
         }
@@ -409,6 +412,22 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
                     s = carried(s);
                 }
                 o.monster->transits.clear();
+                // An NPC's weapon in hand (one it carries), and a bomber's glyph's target.
+                o.monster->weapon = carried(o.monster->weapon);
+                o.monster->bombTarget = carried(o.monster->bombTarget);
+            }
+            // What else names a thing by its extent goes with it: none when the thing stayed behind
+            // (the exe's pointer to a freed thing, whose checks find it gone), never the new map's
+            // thing that has the number now. A creature's generator (left behind: its death no
+            // longer counts against the new map's generator of that number), a turned spell
+            // projectile's first caster, a carried glyph's target, a crown's next holder.
+            o.spawnedBy = carried(o.spawnedBy);
+            o.flyCaster = carried(o.flyCaster);
+            if (o.trap) {
+                o.trap->target = carried(o.trap->target);
+            }
+            if (o.crown) {
+                o.crown->returnTo = carried(o.crown->returnTo);
             }
             if (o.typeName == "Pixie") {
                 o.seekTarget = 0; // (its target forgotten)
@@ -440,6 +459,14 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
                 // map's staff picked up, say. Else it named whatever of the new map had the old
                 // number: nothing fired, and the next weapon worn left this one worn too.
                 o.player->currentWeapon = carried(o.player->currentWeapon);
+                // Its spell's chosen target, and its minimap's marks: a mark of a thing left behind
+                // names nothing (and goes as the list's walk drops a gone thing's: those of bits 1
+                // and 2 alone), never the new map's thing of that number.
+                o.player->spellTarget = carried(o.player->spellTarget);
+                for (auto& m : o.player->minimapMarks) {
+                    m.object = carried(m.object);
+                }
+                std::erase_if(o.player->minimapMarks, [](const PlayerControl::MinimapMark& m) { return m.object == 0 && (m.bits & ~3u) == 0; });
                 // The NPC it talks to (DialogWith) isn't forgotten: the exe keeps its pointer to the
                 // old map's. One left behind stays an NPC no longer there (still talking).
                 if (o.player->dialogWith != 0) {
@@ -494,7 +521,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         }
         world_.motionQueue.insert(world_.motionQueue.begin(), stillQueued.begin(), stillQueued.end());
         world_.reservedExtents.clear();
-        // A player's thing numbered afresh (a map's, carried into another) is unknown to its
+        // A player's thing numbered afresh (the guard above; none expected) would be unknown to its
         // client, which knows it by the old number: ours is the extent the net code, the exe's
         // keep their NetCode across the switch. Its client told, a drop of the old and a pickup
         // of the new with its health, charges and wearing; else its potion keys, its inventory's
