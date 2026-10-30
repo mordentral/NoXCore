@@ -242,6 +242,7 @@ void ServerTransport::lobby(const Endpoint& from, std::span<const std::uint8_t> 
                 server.typesPacks = typesPacks_;
                 server.minClientLevel = minClientLevel_;
                 server.clientLevel = lobby::kClientLevel;
+                server.realm = clientKeyRealm_;
                 sendTo(from, lobby::encodeExtendedReply(*token, server));
             } else {
                 sendTo(from, lobby::encodeExtendedReply(*token, *extended_));
@@ -251,6 +252,18 @@ void ServerTransport::lobby(const Endpoint& from, std::span<const std::uint8_t> 
             std::erase_if(identifying_, [nowMs](const auto& kv) { return nowMs - kv.second > 60'000; });
             std::erase_if(identifyingFeatures_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
             std::erase_if(identifyingLevels_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
+            std::erase_if(identifyingKeys_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
+            // (A client's secret for this host's realm: its key, taken at its connect from here; a
+            // secret for another realm is no key. Only an unconnected address's query reaches here.)
+            if (clientKeyRealm_ != 0) {
+                const auto secret = lobby::extendedQuerySecret(d);
+                std::string key = secret && secret->realm == clientKeyRealm_ ? lobby::clientKeyOf(*secret) : std::string();
+                if (!key.empty()) {
+                    identifyingKeys_[from] = std::move(key);
+                } else {
+                    identifyingKeys_.erase(from);
+                }
+            }
             identifying_[from] = nowMs;
             if (const std::uint32_t features = lobby::extendedQueryClientFeatures(d).value_or(0); features != 0) {
                 identifyingFeatures_[from] = features;
@@ -473,6 +486,12 @@ void ServerTransport::connect(const Endpoint& from, std::span<const std::uint8_t
     if (const auto l = identifyingLevels_.find(from); l != identifyingLevels_.end()) {
         p.clientLevel = p.identified ? l->second : std::uint16_t{0};
         identifyingLevels_.erase(l);
+    }
+    if (const auto k = identifyingKeys_.find(from); k != identifyingKeys_.end()) {
+        if (p.identified) {
+            p.clientKey = std::move(k->second);
+        }
+        identifyingKeys_.erase(k);
     }
     std::optional<std::uint8_t> ack;
     p.stream.acceptDatagram(d, ack); // the connect is its reliable seq 0: expect 1 next

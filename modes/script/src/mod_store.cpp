@@ -18,7 +18,9 @@
 #include <cstdio>
 #include <ctime>
 #include <fstream>
+#include <random>
 #include <system_error>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 
@@ -560,6 +562,57 @@ void pushStoreTable(lua_State* L)
         lua_setfield(L, -2, name);
     }
     lua_setreadonly(L, -1, 1);
+}
+
+std::uint64_t clientKeyRealm(const fs::path& modData, std::string_view id, std::string& error)
+{
+    const fs::path file = (modData / (std::string(id) + ".realm")).lexically_normal();
+    const auto read = [&]() -> std::uint64_t {
+        std::ifstream f(file, std::ios::binary);
+        std::string text;
+        std::getline(f, text);
+        if (text.size() < 16) {
+            return 0;
+        }
+        std::uint64_t v = 0;
+        for (const char c : std::string_view(text).substr(0, 16)) {
+            const int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+            if (d < 0) {
+                return 0;
+            }
+            v = v << 4 | static_cast<std::uint64_t>(d);
+        }
+        return v;
+    };
+    std::error_code ec;
+    fs::create_directories(modData, ec);
+    for (int attempt = 0; attempt < 50; ++attempt) {
+        if (fs::exists(file, ec)) {
+            if (const std::uint64_t v = read()) {
+                return v;
+            }
+            // (Being written by another game this moment, or damaged: a short wait, then again.)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            continue;
+        }
+        std::random_device rd;
+        std::uint64_t v = 0;
+        while (v == 0) {
+            v = static_cast<std::uint64_t>(rd()) << 32 | rd();
+        }
+        char text[18];
+        std::snprintf(text, sizeof text, "%016llx\n", static_cast<unsigned long long>(v));
+        // Exclusive: only one game makes it ("x": fails when it's there already).
+        if (std::FILE* f = std::fopen(file.string().c_str(), "wbx")) {
+            const bool ok = std::fwrite(text, 1, 17, f) == 17;
+            std::fclose(f);
+            if (ok) {
+                return v;
+            }
+        }
+    }
+    error = file.string() + ": the client key realm can't be made or read (a damaged file is set aside by hand)";
+    return 0;
 }
 
 } // namespace nox::modes::script

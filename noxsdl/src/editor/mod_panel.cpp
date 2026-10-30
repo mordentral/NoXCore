@@ -1167,10 +1167,10 @@ void ModPanel::formWindow()
     inputText("##ui", form_.uiScript, 128);
     editor::labelRow("UI API", fieldX,
                      "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more. 3: lines, tooltips, labels over things, HUD strips, "
-                     "drags and the wheel. 4: the game's spell icons, hit areas, a tick, kept labels (each sent only to clients that run it; "
-                     "the rest get text).");
-    int api = std::clamp(form_.uiApi, 1, 4) - 1;
-    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0" "4\0")) form_.uiApi = api + 1;
+                     "drags and the wheel. 4: the game's spell icons, hit areas, a tick, kept labels. 5: the game's top-left icons kept "
+                     "out of a box (each sent only to clients that run it; the rest get text).");
+    int api = std::clamp(form_.uiApi, 1, 5) - 1;
+    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0" "4\0" "5\0")) form_.uiApi = api + 1;
 
     ImGui::SeparatorText("Options");
     help("Settings shown under the mode's row in Host Custom; a script reads them with nox.option(key).");

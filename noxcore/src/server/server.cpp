@@ -282,9 +282,11 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     // createAt while the list is open: until the first frame's pass). Only a thing flagged
     // RESPAWN (its type's FLAGS: potions, weapons, armour, the crown, creatures), and none in a
     // quest, as unitsNewAddToList adds them: a CTF flag (FLAGS = NULL) never comes back as a new
-    // one at its base while it's carried, a broken crate never mends.
+    // one at its base while it's carried, a broken crate never mends. (noxcpp: none at all for a
+    // mode that asks, Options::noMapRespawns: its maps' things stay gone once used or broken.)
     for (const auto& [extent, o] : world_.objects()) {
-        if (o.holder == 0 && (o.flags & ObjFlag::Respawn) && !(o.classes & things::ObjectClass::Player) && !(world_.gameFlags & GameFlag::Quest)) {
+        if (o.holder == 0 && (o.flags & ObjFlag::Respawn) && !(o.classes & things::ObjectClass::Player) && !(world_.gameFlags & GameFlag::Quest) &&
+            !options_.noMapRespawns) {
             addRespawn(world_, o);
         }
     }

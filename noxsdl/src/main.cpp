@@ -320,23 +320,34 @@ void zoomBy(Camera& cam, float factor)
 
 /// Nox facing units (0 east, 64 south, clockwise on screen) from us to the mouse: from where the
 /// server last put us, not the view centre, which smooth scrolling keeps a little behind us (so
-/// the facing sent, a swing's direction, isn't off by it).
+/// the facing sent, a swing's direction, isn't off by it). While the mouse is on a drawable (the
+/// front pick), to the mouse's x at that drawable's own y, the y MSG_MOUSE carries for it
+/// (Cli_ProcessControlEvents): a fireball sent up a creature's body flies at its feet.
 std::uint8_t facingToMouse(const App& app)
 {
     if (const auto f = app.view3d.facing()) {
         return *f; // the 3D view's facing
     }
     const SDL_FPoint m = mousePos(app);
-    float dx = m.x - app.camera.viewWidth / 2.0f;
-    float dy = m.y - app.camera.viewHeight / 2.0f;
+    float fromX = app.camera.viewWidth / 2.0f;
+    float fromY = app.camera.viewHeight / 2.0f;
+    float toX = m.x;
+    float toY = m.y;
+    std::optional<int> frontY;
     if (app.live) {
         if (const auto at = app.live->client().position()) {
-            dx = app.camera.left() + m.x / app.camera.zoom - static_cast<float>(at->first);
-            dy = app.camera.top() + m.y / app.camera.zoom - static_cast<float>(at->second);
+            fromX = static_cast<float>(at->first);
+            fromY = static_cast<float>(at->second);
+            toX = app.camera.left() + m.x / app.camera.zoom;
+            toY = app.camera.top() + m.y / app.camera.zoom;
+            if (app.hovered) {
+                if (const auto* d = app.live->client().world().drawable(*app.hovered)) {
+                    frontY = std::clamp(static_cast<int>(d->y), 0, 0xFFFF); // (as cursorToSend sends it)
+                }
+            }
         }
     }
-    const float turns = std::atan2(dy, dx) / (2 * std::numbers::pi_v<float>);
-    return static_cast<std::uint8_t>(static_cast<int>(std::lround(turns * 256)) & 0xFF);  // 256 facing units to a turn
+    return pick::facing(fromX, fromY, toX, toY, frontY);
 }
 /// gameChangeMap after a map it had (not one just downloaded) is read: on a chat
 /// map (MapInfo's 0x80000000) cdecode.c:EnterChat and cdecode.c:KeyToChat with the first key

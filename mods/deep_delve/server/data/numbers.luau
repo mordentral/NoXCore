@@ -157,6 +157,31 @@ numbers.timing = {
 	-- A ready client's hero looked at once more this many frames after its ready (in case the
 	-- game sets it watching after the ready).
 	readyRecheck = 10,
+	-- An empty game of server characters goes back to the first area this many frames after its
+	-- last player left (roster.luau).
+	homeAfter = 30 * 5,
+}
+
+-- ---- Server characters (roster.luau, accounts.luau)
+
+numbers.roster = {
+	-- The most characters an account keeps.
+	most = 10,
+	-- A server's game (the bot server's pool) closes to newcomers once this many players are in,
+	-- and opens again below it: the pool then opens another game for the next to come (nil: never
+	-- closed). The game's most (mode.json's players) for now; when a party's game should close is
+	-- the owner's call.
+	lockAt = 6,
+}
+
+numbers.links = {
+	-- A link code is good this many minutes, once.
+	minutes = 10,
+	-- Wrong codes counted over this many seconds: a PC may try `tries` in it, the whole server
+	-- `storeTries`; past either, none till the window's end.
+	window = 600,
+	tries = 5,
+	storeTries = 50,
 }
 
 return numbers

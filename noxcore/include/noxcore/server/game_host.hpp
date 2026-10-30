@@ -274,6 +274,9 @@ public:
         /// noxcpp: the lowest NoX Core client level let in (lobby::kClientLevel; 0: any, as before):
         /// a NoX Core game below it is refused at its join (ServerTransport::setMinClientLevel).
         std::uint16_t minClientLevel = 0;
+        /// noxcpp (a mode's "clientKeys"): this host's client key realm (0: none). The extended reply
+        /// names it, and a NoX Core client that sends its secret for it is given a key (clientKey).
+        std::uint64_t clientKeyRealm = 0;
         /// A solo game's saves: the game's folder (Save\ under it, solo_save.hpp; empty: none
         /// written, every save succeeds) and the host client's own Player.plr sections and its
         /// closing 0 id (noxsdl's; none: only the 0 id).
@@ -385,6 +388,9 @@ public:
         /// noxcpp: a mode that plays as a stock one and keeps its limits itself: lessonLimits and
         /// timeLimits told to clients, not acted on by the game's checks (World::modeOwnsLimits).
         bool modeOwnsLimits = false;
+        /// noxcpp (a mode's: mode.json's "mapRespawns": false): no map thing respawns
+        /// (Server::Options::noMapRespawns).
+        bool noMapRespawns = false;
         /// noxcpp (a mode's: mode.json's "pickup"): players pick up what their class can't use
         /// (never wearing it), and seconds under server option 2 (World::pickupAnyClass,
         /// World::pickupDuplicates).
@@ -479,6 +485,9 @@ public:
     /// The client level an identified client named (lobby::kClientLevel: a feature keyed "level N
     /// or above" goes only to one at N or above); 0 for any other.
     std::uint16_t clientLevel(std::uint8_t peer) const { return transport_.clientLevel(peer); }
+    /// (Options::clientKeyRealm) The key `peer`'s client proved for this host's realm: 32 hex
+    /// digits, the same for that PC every time; empty for any other.
+    const std::string& clientKey(std::uint8_t peer) const { return transport_.clientKey(peer); }
     /// (noxcpp's) The reliable packets `peer` has out and not yet acknowledged (the sequence
     /// numbers from its last acknowledgement to the next we'd send).
     std::size_t reliableOutstanding(std::uint8_t peer) const { return transport_.reliableOutstanding(peer); }

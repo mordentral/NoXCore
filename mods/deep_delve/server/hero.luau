@@ -371,13 +371,18 @@ end
 
 -- ---- Joining and leaving
 
-function hero.join(p: any)
+-- A player's character into play: the one its join names (its account, class and name), or
+-- `chosen` = { key, record, fresh, older } (a server character picked at character select,
+-- roster.luau: held for this game already; key nil: played, but not kept).
+function hero.join(p: any, chosen: any?)
 	if not store.available() then
 		nox.tell(p.unit, "Deep Delve: this host keeps no characters; you play, but nothing is kept.")
 	end
-	local key = if store.available() then store.keyFor(p) else nil
+	local key = if chosen then chosen.key elseif store.available() then store.keyFor(p) else nil
 	local record, why, older = nil, nil, nil
-	if key then
+	if chosen then
+		record, older = chosen.record, chosen.older
+	elseif key then
 		record, why, older = store.load(key)
 		if record == nil and why ~= "none" then
 			nox.log("deep_delve: " .. key .. " not read (" .. tostring(why) .. "); a new character")
@@ -388,7 +393,7 @@ function hero.join(p: any)
 			key = nil
 		end
 	end
-	local fresh = record == nil
+	local fresh = if chosen then chosen.fresh == true else record == nil
 	record = record or store.new(p)
 	-- (an act built since the record's last clear: opened now, the record written)
 	if progress.openAfterCleared(record) then

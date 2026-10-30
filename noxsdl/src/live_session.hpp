@@ -4,6 +4,7 @@
 #include "identify_wait.hpp"
 
 #include "noxcore/client/headless_client.hpp"
+#include "noxcore/lobby/client_keys.hpp"
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/net/udp_socket.hpp"
 
@@ -25,9 +26,12 @@ public:
     /// add object types; our level alone never makes it wait (joinWaits). `knownStock`:
     /// the game list saw the host answer its ping but not the extended query (a GAME.EXE host):
     /// the join starts at once, never waiting for an answer that won't come.
+    /// `realm`: the host's client key realm, when known before (the game list's answer, or our own
+    /// host's): the first query carries our secret for it (client_keys.hpp); else a keyed query
+    /// follows as soon as the host's answer names one.
     LiveSession(const std::string& hostAndPort, nox::client::PlayerProfile profile, const nox::things::ThingDb& things,
                 const std::filesystem::path& gameDir, const std::filesystem::path& mapCache, bool identifyFirst = false,
-                bool knownStock = false);
+                bool knownStock = false, std::uint64_t realm = 0);
 
     /// Receives, runs the client and sends. Call every frame.
     void update();
@@ -82,6 +86,12 @@ private:
     bool tooOld_ = false; ///< (tooOld)
     std::vector<std::uint8_t> typesQuery_; ///< (empty: no wait, the join starts at once)
     IdentifyWait wait_;
+    /// Our secrets for hosts' client key realms (noxcore_keys.txt in the game's folder), and the
+    /// realm our last query carried a secret for (0: none).
+    nox::lobby::ClientKeyring keyring_;
+    std::uint64_t keyedRealm_ = 0;
+    /// Our extended query, with our secret for `realm` when it's not 0.
+    std::vector<std::uint8_t> query(std::uint64_t realm);
 };
 
 } // namespace noxsdl

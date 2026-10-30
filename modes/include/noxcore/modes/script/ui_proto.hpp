@@ -36,6 +36,11 @@
 //               (128-768: 0.5-3; 256: as its type's, the scale let go)    (6 bytes)
 // A UI of API 4 (kBegin's api byte 4) and everything of it go only to a client at client level 5
 // or above (kUiApi4Level) that named ModeUi and ModeUi2; the bytes are API 2's.
+// and, only to a client at client level 6 or above (kBigDataLevel), a value too big for one kData
+// (nox.send over kMaxValue bytes, to kMaxBigValue), in order with the kData before and after it:
+//   kDataBegin  u32 the value's bytes, u8 coding (0 stored, 1 NXZ), u32 the coded bytes
+//   kDataChunk  u32 offset, the coded bytes there                            (in order)
+// (decoded: a value for the UI's onMessage, read with the kBigValue limits below).
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -72,6 +77,8 @@ enum Sub : std::uint8_t {
     kWeather = 9,
     kBook = 10,
     kDrawScale = 11,
+    kDataBegin = 12,
+    kDataChunk = 13,
     kReady = 16,
     kSend = 17,
     kAnswer = 18,
@@ -99,8 +106,17 @@ inline constexpr std::uint16_t kBookLevel = 2;
 inline constexpr std::uint16_t kUiApi3Level = 3;
 /// The lowest client level a server sends a UI of API 4 to (as kUiApi3Level's for API 3).
 inline constexpr std::uint16_t kUiApi4Level = 5;
+/// The lowest client level a server sends a UI of API 5 to (nox.hudReserve: as kUiApi3Level's).
+inline constexpr std::uint16_t kUiApi5Level = 6;
 /// The lowest client level a server sends kDrawScale to (with ModeUi named).
 inline constexpr std::uint16_t kDrawScaleLevel = 5;
+/// The lowest client level a server sends kDataBegin and kDataChunk to (a big value).
+inline constexpr std::uint16_t kBigDataLevel = 6;
+/// A big value's bytes at most (encoded, before packing), and the depth and pairs a table it's
+/// read with (the mod store's: value_codec.hpp's CodecLimits).
+inline constexpr std::size_t kMaxBigValue = 256 * 1024;
+inline constexpr int kBigValueDepth = 16;
+inline constexpr int kBigValuePairs = 8192;
 
 /// kBook's message: `modes` 1, the book is the mode's; 0, the stock book.
 inline std::vector<std::uint8_t> bookMessage(bool modes)

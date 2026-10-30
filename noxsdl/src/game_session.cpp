@@ -703,18 +703,23 @@ void joinLive(App& app, const std::string& host)
         // Our player is the host's own (GAME.EXE's 0x1F, its client sharing the settings: it isn't
         // sent MSG_UPDATE_GUI_GAME_SETTINGS), known by our game socket's address (told before the
         // server takes our first datagram).
-        app.host->withGame([&](nox::server::GameHost&) {
-            app.live = std::make_unique<LiveSession>(host, app.profile, app.things, app.gameDir, app.mapCache);
+        // (Our own host's client key realm, a mode's: our first query carries our secret for it.)
+        app.host->withGame([&](nox::server::GameHost& g) {
+            app.live = std::make_unique<LiveSession>(host, app.profile, app.things, app.gameDir, app.mapCache, false, false,
+                                                     g.options().clientKeyRealm);
             joinOwnHost(app);
         });
     } else {
         // (A NoX Core-only game, as the list has it: the join waits till the host knows us. A
-        // game the list saw as stock: joined at once, as before.)
+        // game the list saw as stock: joined at once, as before. A listed client key realm: our
+        // first query carries our secret for it.)
         const nox::lobby::ServerEntry* listed = app.browser ? app.browser->selectedEntry() : nullptr;
-        const bool identifyFirst = joinWaitsForIdentity(listed) && BrowserScreen::address(listed->game) == host;
+        const bool isListed = listed && BrowserScreen::address(listed->game) == host;
+        const bool identifyFirst = joinWaitsForIdentity(listed) && isListed;
         const bool knownStock = app.browser && app.browser->sawStock(host);
+        const std::uint64_t realm = isListed && listed->extended ? listed->extended->realm : 0;
         app.live = std::make_unique<LiveSession>(host, app.profile, app.things, app.gameDir, app.mapCache, identifyFirst,
-                                                 knownStock);
+                                                 knownStock, realm);
     }
     setUpLiveSession(app, host);
     if (app.audio) {

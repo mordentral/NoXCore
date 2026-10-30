@@ -220,6 +220,15 @@ function areas.travel(place: number, arrive: string): (boolean, string?)
 	return true, nil
 end
 
+-- An empty game back to act 1's first area, its town (a server's game, its last player gone: the
+-- next to come starts where every character can). Whether it went.
+function areas.home(): boolean
+	if state.place == 1 or state.leaving then
+		return false
+	end
+	return (areas.travel(1, "town"))
+end
+
 -- A player stepped on the exit: the game on to the next area, arriving at its start (the party's
 -- vote when anyone else is in the game: votes.luau). Whether it went or a vote started.
 function areas.exitTouched(unit: number): (boolean, string?)

@@ -858,7 +858,7 @@ Inventory::Hover Inventory::hoverAt(float x, float y, int w, int h, const nox::c
     }
     // The buffs' row under the panel (inventroryOnHovewerSub): the enchantment's spell title, or the item
     // power's name.
-    if (const float rowY = static_cast<float>(slide_) + 0xE0; gy >= rowY && gy < rowY + 0x28) {
+    if (const float rowY = static_cast<float>(slide_) + 0xE0 + buffsDown(s); gy >= rowY && gy < rowY + 0x28) {
         if (const auto b = buffAt(world, gx)) {
             if (b->first != 0) {
                 if (const auto* spell = things_.findSpell(b->first)) {
@@ -1399,7 +1399,7 @@ void Inventory::drawBuffs(SDL_Renderer* r, const nox::client::World& world, floa
     const auto* self = world.drawable(world.self().netCode);
     const std::uint32_t buffs = self ? self->buffs : 0;
     float x = 10;
-    const float y = static_cast<float>(slide_) + 0xEA;
+    const float y = static_cast<float>(slide_) + 0xEA + buffsDown(s); // (noxcpp: below a mode's reserved box)
     for (std::uint32_t i = 0; i < 30; ++i) {
         if (!(buffs & (1u << i))) {
             continue;

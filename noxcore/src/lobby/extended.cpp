@@ -1,6 +1,8 @@
 // The noxcpp server query and reply datagrams; the byte layout is in extended.hpp.
 #include "noxcore/lobby/extended.hpp"
 
+#include "noxcore/crypto/sha256.hpp"
+
 #include <algorithm>
 #include <string_view>
 
@@ -75,14 +77,17 @@ std::uint64_t get64(std::span<const std::uint8_t> d, std::size_t at)
 } // namespace
 
 std::vector<std::uint8_t> encodeExtendedQuery(std::uint32_t token, std::uint32_t clientFeatures, std::uint64_t typesHash,
-                                              std::uint16_t clientLevel)
+                                              std::uint16_t clientLevel, const std::optional<ClientSecret>& secret)
 {
     std::vector<std::uint8_t> out;
-    if (clientFeatures == 0 && typesHash == 0 && clientLevel == 0) {
+    if (clientFeatures == 0 && typesHash == 0 && clientLevel == 0 && !secret) {
         header(out, kQueryMagic, kExtendedVersion, token); // (version 1's, byte for byte)
         return out;
     }
-    const std::uint16_t version = clientLevel != 0 ? kExtendedLevelVersion : typesHash != 0 ? kExtendedTypesVersion : 2;
+    const std::uint16_t version = secret             ? kExtendedRealmVersion
+                                  : clientLevel != 0 ? kExtendedLevelVersion
+                                  : typesHash != 0   ? kExtendedTypesVersion
+                                                     : 2;
     header(out, kQueryMagic, version, token);
     put32(out, clientFeatures);
     if (version >= kExtendedTypesVersion) {
@@ -91,7 +96,31 @@ std::vector<std::uint8_t> encodeExtendedQuery(std::uint32_t token, std::uint32_t
     if (version >= kExtendedLevelVersion) {
         put16(out, clientLevel);
     }
+    if (version >= kExtendedRealmVersion) {
+        put64(out, secret->realm);
+        out.insert(out.end(), secret->secret.begin(), secret->secret.end());
+    }
     return out;
+}
+
+std::optional<ClientSecret> extendedQuerySecret(std::span<const std::uint8_t> datagram)
+{
+    std::size_t at = 0;
+    const auto h = readHeader(datagram, kQueryMagic, at);
+    if (!h || h->first < kExtendedRealmVersion) {
+        return std::nullopt;
+    }
+    at += 4 + 8 + 2;
+    if (datagram.size() < at + 8 + kClientSecretBytes) {
+        return std::nullopt; // (a version 5 query without its tail: garbled)
+    }
+    ClientSecret s;
+    s.realm = get64(datagram, at);
+    std::copy_n(datagram.begin() + static_cast<std::ptrdiff_t>(at + 8), kClientSecretBytes, s.secret.begin());
+    if (s.realm == 0) {
+        return std::nullopt; // (no realm's)
+    }
+    return s;
 }
 
 std::optional<std::uint32_t> decodeExtendedQuery(std::span<const std::uint8_t> datagram)
@@ -153,14 +182,35 @@ std::optional<std::uint16_t> extendedQueryClientLevel(std::span<const std::uint8
     return get16(datagram, at + 4 + 8);
 }
 
+std::string clientKeyOf(const ClientSecret& secret)
+{
+    constexpr std::string_view kTag = "noxcore-client-key";
+    crypto::Sha256 h;
+    h.update(std::span(reinterpret_cast<const std::uint8_t*>(kTag.data()), kTag.size()));
+    std::vector<std::uint8_t> realm;
+    put64(realm, secret.realm);
+    h.update(realm);
+    h.update(secret.secret);
+    const auto digest = h.finish();
+    static constexpr char kHex[] = "0123456789abcdef";
+    std::string key;
+    for (std::size_t i = 0; i < 16; ++i) {
+        key += kHex[digest[i] >> 4];
+        key += kHex[digest[i] & 15];
+    }
+    return key;
+}
+
 std::vector<std::uint8_t> encodeExtendedReply(std::uint32_t token, const ExtendedServer& server)
 {
     std::vector<std::uint8_t> out;
     const bool types = server.typesHash != 0;
-    const bool levels = server.minClientLevel != 0 || server.clientLevel != 0;
-    const std::uint16_t version = levels  ? std::max(server.version, kExtendedLevelVersion)
-                                  : types ? std::max(server.version, kExtendedTypesVersion)
-                                          : server.version;
+    const bool realm = server.realm != 0;
+    const bool levels = server.minClientLevel != 0 || server.clientLevel != 0 || realm;
+    const std::uint16_t version = realm   ? std::max(server.version, kExtendedRealmVersion)
+                                  : levels ? std::max(server.version, kExtendedLevelVersion)
+                                  : types  ? std::max(server.version, kExtendedTypesVersion)
+                                           : server.version;
     header(out, kReplyMagic, version, token);
     // Then u8 max substeps a frame and u32 feature bits.
     out.push_back(server.maxMultiplier);
@@ -186,6 +236,9 @@ std::vector<std::uint8_t> encodeExtendedReply(std::uint32_t token, const Extende
     if (levels) {
         put16(out, server.minClientLevel);
         put16(out, server.clientLevel);
+    }
+    if (realm) {
+        put64(out, server.realm);
     }
     return out;
 }
@@ -224,6 +277,14 @@ std::optional<ExtendedReply> decodeExtendedReply(std::span<const std::uint8_t> d
         }
         r.server.minClientLevel = get16(datagram, at);
         r.server.clientLevel = get16(datagram, at + 2);
+        at += 4;
+    }
+    if (h->first >= kExtendedRealmVersion) {
+        // u64 the host's client key realm.
+        if (datagram.size() < at + 8) {
+            return std::nullopt;
+        }
+        r.server.realm = get64(datagram, at);
     }
     return r;
 }

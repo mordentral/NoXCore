@@ -111,6 +111,10 @@ public:
     void tick(server::GameHost& host, std::uint32_t nowMs) override;
     void detach(server::GameHost& host) override;
     std::optional<std::vector<std::string>> console(server::GameHost& host, std::string_view line) override;
+    /// The script's nox.lock (true till its nox.unlock), as a pool or a host asks: a locked game
+    /// takes no newcomers, so a pool opens another lobby (as for Delve's and Tide's).
+    bool locked() const override;
+    bool takeLockChanged() override;
     /// Its generated maps (mode.json's mapPrefix, this slot's) deleted; how many went.
     int sweepOwn() override;
     /// Its builds under way let go (waited for at the program's end: Mode::finishBackground).

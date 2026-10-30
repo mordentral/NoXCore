@@ -38,6 +38,8 @@ declare nox: {
     spellIcon: (name: string, x: number, y: number, w: number?, h: number?) -> (),
     --- Marks a part of a frameless window that takes the mouse this frame; with any, the rest of it is click-through (inside ui.draw; 32 a window; UI API 4).
     hitArea: (x: number, y: number, w: number, h: number) -> (),
+    --- Keeps the game's own top-left icons (the enchantments' row) out of a box: they start below it ({x, y, w, h, anchor} as a window's; nil: none; UI API 5).
+    hudReserve: (box: { x: number, y: number, w: number, h: number, anchor: string? }?) -> (),
     --- # World labels (UI API 3)
     --- Labels an object (its net code: the server's nox.object(id).netCode) with up to 64 bytes; opts { show = "always" | "alt" | "near", near = 150, offset = 4, keep = false (UI API 4: kept while it's away, till nox.clearLabel or a map's load: clear it when your server says its object is gone) }; false over 128 labels (UI API 3).
     label: (object: number, text: string, colour: NoxColour?, opts: NoxLabelOptions?) -> boolean,

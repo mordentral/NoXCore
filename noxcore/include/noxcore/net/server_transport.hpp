@@ -114,6 +114,10 @@ public:
     /// says so, and a join from a NoX Core game whose query named a lower level is refused with
     /// WrongVersion. A game that never asked (a stock one) is let in as before.
     void setMinClientLevel(std::uint16_t level) noexcept { minClientLevel_ = level; }
+    /// noxcpp (a mode's "clientKeys"): this host's client key realm (0: none, as before). The
+    /// extended reply names it (version 5), and a query naming it with a client's secret gives that
+    /// client its key (lobby::clientKeyOf: clientKey); the secret itself isn't kept.
+    void setClientKeyRealm(std::uint64_t realm) noexcept { clientKeyRealm_ = realm; }
     /// Where the lobby's refusals say why (the host's log); none: not said.
     void setLog(std::function<void(const std::string&)> log) { log_ = std::move(log); }
 
@@ -190,6 +194,14 @@ public:
         const auto it = peers_.find(peer);
         return it != peers_.end() && it->second.identified ? it->second.clientLevel : std::uint16_t{0};
     }
+    /// (setClientKeyRealm) The key a peer's client proved for this host's realm (its query's
+    /// secret, before its connect); empty: none (a stock client, an older one, no realm).
+    const std::string& clientKey(std::uint8_t peer) const
+    {
+        static const std::string kNone;
+        const auto it = peers_.find(peer);
+        return it != peers_.end() && it->second.identified ? it->second.clientKey : kNone;
+    }
     /// A peer's unacknowledged reliable packets, all of them (0: no peer).
     std::size_t queuedReliable(std::uint8_t peer) const
     {
@@ -249,6 +261,7 @@ private:
         bool identified = false; ///< (noxcpp's: it asked the extended query from here first)
         std::uint32_t clientFeatures = 0; ///< (what that query said it takes: lobby::ClientFeature)
         std::uint16_t clientLevel = 0;    ///< (and its client level: lobby::kClientLevel)
+        std::string clientKey;            ///< (and its client key: setClientKeyRealm)
         Stream stream{0x800};
         std::uint8_t key = 0;
         bool timerStarted = false;
@@ -318,6 +331,7 @@ private:
     std::map<Endpoint, std::uint32_t> identifying_; ///< extended queries' addresses, when (ms)
     std::map<Endpoint, std::uint32_t> identifyingFeatures_; ///< those queries' client features (lobby::ClientFeature), when any
     std::map<Endpoint, std::uint16_t> identifyingLevels_;   ///< and their client levels, when above 0
+    std::map<Endpoint, std::string> identifyingKeys_;       ///< and their client keys, when they proved one
     /// Queries' added object types' hashes and client levels, and when (ms), for the join's gates
     /// (kept only by a host with added types or a lowest level): kept apart from identifying_ for
     /// kAskedKeepMs, over a password prompt too, till the connect from there takes it.
@@ -333,6 +347,7 @@ private:
     std::uint64_t typesHash_ = 0; ///< setNewThingTypes'
     std::string typesPacks_;
     std::uint16_t minClientLevel_ = 0; ///< setMinClientLevel's
+    std::uint64_t clientKeyRealm_ = 0; ///< setClientKeyRealm's
     std::function<void(const std::string&)> log_;
     std::vector<Datagram> outgoing_;
     std::vector<Event> events_;

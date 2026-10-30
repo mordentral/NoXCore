@@ -2,6 +2,9 @@
 -- Deep Delve: the mode's hooks. Each hook hands its work to the module that owns it:
 --
 --   store.luau     character records: made, read, migrated, written (nox.store)
+--   roster.luau    server characters (the mode option characters=server, the bot server's):
+--                  character select, the PC's account, link codes (accounts.luau), who a PC is
+--                  (identity.luau)
 --   progress.luau  a character's progress through the acts (waypoints, deepest, cleared)
 --   hero.luau      the players' characters in play: set up, read back, experience and levels
 --   regen.luau     passive health and mana regeneration (a class's base and its tree's), a timer
@@ -68,6 +71,7 @@ local monsters = require("monsters")
 local offers = require("offers")
 local party = require("party")
 local portal = require("portal")
+local roster = require("roster")
 local regen = require("regen")
 local sheet = require("sheet")
 local stash = require("stash")
@@ -92,10 +96,14 @@ local mode = {}
 -- use only what the tree grants, at the level granted, and the engine's own books and pedestals
 -- give nothing).
 function mode.configure(ctx: any)
-	return { generate = areas.configure(ctx), keepThingsOnDeath = true, bookIsTheMod = true }
+	-- (a server that keeps the characters, the bot server's pool: listed as the game, not the mod's
+	-- longer name, which a listing cuts at 15 letters)
+	local listed = if nox.option("characters") == "server" then "Deep Delve" else nil
+	return { generate = areas.configure(ctx), keepThingsOnDeath = true, bookIsTheMod = true, serverName = listed }
 end
 
 function mode.start()
+	roster.active()
 	team.start()
 	nox.every(numbers.timing.saveEvery, hero.saveAll, "every minute")
 	party.start()
@@ -107,6 +115,7 @@ function mode.stop()
 end
 
 function mode.mapLoaded(name: string)
+	roster.mapLoaded()
 	areas.mapLoaded(name or nox.currentMap())
 end
 
@@ -116,29 +125,8 @@ end
 
 -- ---- Players
 
--- A player joins (a rejoin too): onto the party's team at once, then its character; in a lair, the
--- gate to the next act opened if its character has cleared the act.
-function mode.onJoin(player: any)
-	team.join(player.unit)
-	hero.join(player)
-	gate.joined(hero.byPeer(player.peer))
-	party.changed()
-end
-
--- A player left: its record written, its open portal kept for the others, no longer waited for in
--- a vote, its sheet closed on the UIs showing it.
-function mode.onLeave(player: any)
-	portal.left(hero.byPeer(player.peer))
-	hero.leave(player)
-	offers.forget(player.peer)
-	votes.left(player.peer)
-	sheet.left(player.peer)
-	party.changed()
-end
-
--- A player's client ready in the map (its join, and each map change once it has the new map):
--- its UI sent the strip, the vote and the ground's labels again.
-function mode.playerReady(player: any)
+-- A hero's client ready in the map: its UI sent the strip, the vote and the ground's labels again.
+local function heroReady(player: any)
 	hero.clientReady(player)
 	local h = hero.byPeer(player.peer)
 	if h then
@@ -146,6 +134,60 @@ function mode.playerReady(player: any)
 		labels.resend(h)
 		votes.resend(h)
 	end
+end
+
+-- A player's character into play (`chosen`: a server character from character select); in a
+-- lair, the gate to the next act opened if its character has cleared the act.
+local function play(player: any, chosen: any?)
+	hero.join(player, chosen)
+	gate.joined(hero.byPeer(player.peer))
+	party.changed()
+	if chosen and chosen.ready then
+		-- (its client had the map already)
+		heroReady(player)
+	end
+end
+roster.onChosen(play)
+
+-- A player joins (a rejoin too): onto the party's team at once, then its character (on a server
+-- that keeps the characters, once it's chosen one at character select).
+function mode.onJoin(player: any)
+	team.join(player.unit)
+	if not roster.joined(player) then
+		play(player, nil)
+	end
+	roster.checkLock()
+end
+
+-- A player left: its record written, its open portal kept for the others, no longer waited for in
+-- a vote, its sheet closed on the UIs showing it. (A server's game: open again to newcomers below
+-- its most; left empty, back to the first area a moment on.)
+function mode.onLeave(player: any)
+	portal.left(hero.byPeer(player.peer))
+	hero.leave(player)
+	roster.left(player.peer)
+	offers.forget(player.peer)
+	votes.left(player.peer)
+	sheet.left(player.peer)
+	party.changed()
+	if roster.active() then
+		-- (a frame on: the one leaving gone from the list)
+		nox.after(1, function()
+			roster.checkLock()
+		end)
+		nox.after(numbers.timing.homeAfter, function()
+			if #nox.players() == 0 then
+				areas.home()
+			end
+		end)
+	end
+end
+
+-- A player's client ready in the map (its join, and each map change once it has the new map):
+-- character select shown again to one choosing; a hero's UI sent its strip and the rest again.
+function mode.playerReady(player: any)
+	roster.ready(player)
+	heroReady(player)
 end
 
 -- A player's death (its record written; it keeps its things).
@@ -158,6 +200,10 @@ end
 -- options (the Character window's), its answer to a vote.
 function mode.onUiMessage(player: any, value: any)
 	if type(value) ~= "table" then
+		return
+	end
+	-- (character select's: choosing, a link code; from the Character window too)
+	if roster.message(player, value) then
 		return
 	end
 	local h = hero.byPeer(player.peer)
@@ -200,6 +246,10 @@ end
 
 -- Saying "portal" opens a town portal too; while a vote is under way, "yes" or "no" answers it.
 function mode.onChat(player: any, text: string): boolean?
+	-- ("link" and "link CODE" on a server that keeps the characters: never relayed)
+	if roster.chat(player, text) then
+		return true
+	end
 	local said = string.lower((string.gsub(text, "^%s*(.-)%s*$", "%1")))
 	if said == "portal" then
 		portal.open(hero.byPeer(player.peer))

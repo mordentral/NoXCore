@@ -1063,7 +1063,7 @@ ServerObject* Missiles::seekTarget(float x, float y, const ServerObject& missile
 void Missiles::magicMissileUpdate(ServerObject& m)
 {
     // MagicMissileUpdate: its owner gone or 3 s out, it bursts.
-    const ServerObject* owner = world.byExtent(m.owner);
+    ServerObject* owner = world.byExtent(m.owner);
     if (!owner || owner->gone() || 30u * 3u < frame - m.born) {
         collide(m, nullptr, 0, 0);
         m.pendingDelete = true;
@@ -1075,9 +1075,10 @@ void Missiles::magicMissileUpdate(ServerObject& m)
             m.seekTarget = 0;
         }
     }
-    // No target: one is sought every 8th frame.
+    // No target: one is sought every 8th frame (spellFlySearchTarget about the missile, a
+    // hostile spell's: the enemy under its owner's cursor first, else the nearest enemy).
     if (m.seekTarget == 0 && (frame & 7) == 0) {
-        const ServerObject* t = seekTarget(m.x, m.y, m, 600.0f, owner);
+        const ServerObject* t = searchTarget(world, nullptr, &m, 0x20, 600.0f, 0, owner);
         m.seekTarget = t && t->extent != m.owner ? t->extent : 0;
     }
     if (const ServerObject* t = m.seekTarget ? world.byExtent(m.seekTarget) : nullptr) {

@@ -7,14 +7,22 @@
 -- yet, a player too far behind or with too many unacknowledged) keeps its value owed, tried again
 -- by the beat below each frame until it's taken; and a player is sent at most a few a frame.
 --
--- A value is at most 900 bytes (the UI channel's limit): a list too long for one goes in parts
--- (hud.parts), each part carrying the list's serial so the UI puts the parts of one list together.
+-- Big values: nox.send takes a value up to 256 KB from a client of level 6 on (the mod's minimum),
+-- packed and sent in pieces by the engine (about 14 KB a frame a player), whole in the UI's
+-- onMessage, in order with the rest. So a list goes as one value (hud.parts: one part, its serial
+-- kept, the UI takes it as it took parts), and only one past MOST below is cut into parts: carried,
+-- stash, stock (the vendor's), treeData, labels and chars (character select). Single values (sheet,
+-- waypoints, party) go whole as they are.
 
 local progress = require("progress")
 local store = require("store")
 local tree = require("tree")
 
 local hud = {}
+
+-- Whether this game keeps server characters (roster.luau sets it): the Character window gets its
+-- Characters button.
+hud.serverCharacters = false
 
 -- The area now: { title, level } (areas.luau sets it).
 local area: any = { title = "", level = 0 }
@@ -110,8 +118,9 @@ local function sizeOf(v: any): number
 end
 hud.sizeOf = sizeOf
 
--- The most a value may be (the channel's 900, less a little).
-local MOST = 880
+-- The most a list's part may be: half the engine's 256 KB (sizeOf's count is near the codec's, not
+-- exact).
+local MOST = 128 * 1024
 
 -- A list to a player's UI in parts: each part { kind, serial, part, parts, list, ...header },
 -- as many of `list`'s entries in each as fit. The UI keeps the parts of the newest serial.
@@ -174,6 +183,7 @@ function hud.hero(h: any)
 		cleared = area.act ~= nil and progress.isCleared(h.record, area.act),
 		points = left,
 		lootNames = store.option(h.record, "lootNames"),
+		server = hud.serverCharacters or nil,
 	})
 	if bossValue then
 		owe(h.peer, "boss", bossValue)

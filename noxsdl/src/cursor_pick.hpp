@@ -109,4 +109,11 @@ struct Situation {
 
 WorldCursor worldCursor(const Target& target, const Situation& situation);
 
+/// The facing sent each frame (control 1), in Nox facing units (0 east, 64 south, clockwise on
+/// screen), from (fromX, fromY) to the cursor: to its x at the front pick's own y (`frontY`: where
+/// the thing stands, the y MSG_MOUSE carries for it, not where its body is drawn) while there's
+/// one under it, else to the cursor's y. The game's sum: the angle plus a turn, times 256 a turn,
+/// plus a half, cut toward zero, then wrapped into 0..255.
+std::uint8_t facing(float fromX, float fromY, float cursorX, float cursorY, std::optional<int> frontY);
+
 } // namespace noxsdl::pick

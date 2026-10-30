@@ -81,6 +81,14 @@ function store.keyFor(player: any): string
 	return "char/" .. account .. "/" .. (player.class or "warrior") .. "/" .. s.keyOf(player.name)
 end
 
+-- A server character's key (roster.luau): "srv/<account id>/<class>/<name>", the account the
+-- server's own (accounts.luau), never what the client named.
+function store.serverKey(account: string, class: string, name: string): string
+	local s = nox.store
+	assert(s, "no store")
+	return "srv/" .. account .. "/" .. class .. "/" .. string.sub(s.keyOf(name), 1, 60)
+end
+
 -- A new level-1 character's record, its class's starting gear in it.
 function store.new(player: any): any
 	local class = player.class or "warrior"

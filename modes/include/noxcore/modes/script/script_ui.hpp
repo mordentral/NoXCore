@@ -94,6 +94,12 @@
 //                                    the call's budget like any hook; windows open, move and close
 //                                    from it
 //
+// UI API 5 (mode.json's "uiApi": 5; sent only to a client at client level 6 or above that names
+// ModeUi and ModeUi2: ui_proto.hpp's kUiApi5Level) adds, beside nox.api being 5:
+//   nox.hudReserve({x, y, w, h, anchor}) a box (the 640 x 480's units, its anchor as a window's)
+//                                    the game's own top-left icons (the enchantments' row) keep
+//                                    out of: they start below it; nil: none (hudReserve())
+//
 // The program calls frame() once a frame and draws windows(); a click in one goes to click().
 // Without a server (the map editor's UI preview), runLocal starts a UI from its source, useAssets
 // hands it a mod's assets, receive() feeds it messages as a server would, setSender takes what it
@@ -327,6 +333,10 @@ public:
     /// How far the view reaches past the 640 x 480 on each side, in its units (the program's fit:
     /// 0, 0 until told, as in a 4:3 view); anchored windows (UiWindow::anchorX/Y) moved by them.
     void setViewMargins(float x, float y);
+    /// (API 5) nox.hudReserve's box, in the 640 x 480's units moved by its anchor (as a window's, by
+    /// the view's margins): the game's top-left icons (the enchantments' row) start below it. None:
+    /// no box, or no UI running.
+    std::optional<UiRect> hudReserve() const;
     /// (API 3) This frame's tooltip (empty: none).
     const std::vector<UiTooltipLine>& tooltip() const noexcept;
     /// (API 3) The labels, in the order set.

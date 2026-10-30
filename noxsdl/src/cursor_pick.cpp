@@ -4,6 +4,7 @@
 #include "noxcore/things/object_class.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace noxsdl::pick {
 
@@ -129,6 +130,24 @@ WorldCursor worldCursor(const Target& t, const Situation& s)
         return WorldCursor::Use;
     }
     return WorldCursor::None;
+}
+
+std::uint8_t facing(float fromX, float fromY, float cursorX, float cursorY, std::optional<int> frontY)
+{
+    // (The game's x87: the angle from FPATAN, the turn, the units a turn and the half its float
+    // constants; the sum cut toward zero.)
+    constexpr float kTurn = 6.2831855f;     // 2 pi
+    constexpr float kPerTurn = 40.743664f;  // 256 / (2 pi)
+    const double dx = static_cast<double>(cursorX) - fromX;
+    const double dy = (frontY ? static_cast<double>(*frontY) : static_cast<double>(cursorY)) - fromY;
+    int f = static_cast<int>((std::atan2(dy, dx) + kTurn) * kPerTurn + 0.5f);
+    if (f < 0) {
+        f += static_cast<int>((0xFFu - static_cast<unsigned>(f)) & 0xFFFFFF00u);
+    }
+    if (f > 0xFF) {
+        f -= static_cast<int>((static_cast<unsigned>(f) >> 8) << 8);
+    }
+    return static_cast<std::uint8_t>(f);
 }
 
 } // namespace noxsdl::pick

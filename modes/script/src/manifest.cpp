@@ -148,6 +148,8 @@ ManifestResult readManifest(std::string_view text_)
             throw Bad{"asks for client level " + std::to_string(m.minClientLevel) + "; this build's clients are level " +
                       std::to_string(lobby::kClientLevel)};
         }
+        m.clientKeys = flag(doc, "clientKeys", false);
+        m.noMapRespawns = !flag(doc, "mapRespawns", true);
         const std::string levels = text(doc, "levels", "mapFiles", 16);
         if (levels != "mapFiles" && levels != "generated") {
             throw Bad{"\"levels\" is \"mapFiles\" or \"generated\""};

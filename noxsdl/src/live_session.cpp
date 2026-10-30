@@ -67,13 +67,14 @@ const char* kindName(nox::client::ClientEvent::Kind kind)
 
 LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProfile profile,
                          const nox::things::ThingDb& things, const fs::path& gameDir, const fs::path& mapCache, bool identifyFirst,
-                         bool knownStock)
+                         bool knownStock, std::uint64_t realm)
     : server_(resolve(hostAndPort))
     , client_(std::move(profile), &things, gameDir / "maps", mapCache)
     , lobby_(nox::net::UdpSocket::open())
     , game_(nox::net::UdpSocket::open())
     , mapsDir_(gameDir / "maps")
     , mapCache_(mapCache)
+    , keyring_(gameDir / "noxcore_keys.txt")
 {
     SDL_Log("joining %s", server_.toString().c_str());
     // noxcpp's: the extended query from the socket the game will connect from, before it does (a
@@ -87,10 +88,9 @@ LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProf
         // ClientFeature reads it, an older one the token alone. The object types our content
         // packs add, if any: a host with added types lets in only a game with the same ones. Our
         // client level: a host with a lowest one lets in only a game at it or above, and says it
-        // in its answer.)
+        // in its answer. Our secret for the host's client key realm, when we know it.)
         const std::uint64_t types = nox::content::newThingTypes().hash;
-        const auto query = nox::lobby::encodeExtendedQuery(
-            nowMs(), nox::lobby::ClientFeature::ModeUi | nox::lobby::ClientFeature::ModeUi2, types, nox::lobby::kClientLevel);
+        const auto query = this->query(realm);
         game_.sendTo(server_, query);
         game_.sendTo(server_, query);
         // (A host the game list saw as stock, or any host when only our level is new: the join
@@ -103,6 +103,19 @@ LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProf
     }
     client_.start(nowMs());
     started_ = true;
+}
+
+std::vector<std::uint8_t> LiveSession::query(std::uint64_t realm)
+{
+    // Our script mode UI's features (API 2 with its assets too), our content packs' added object
+    // types, our client level, and our secret for the host's client key realm (made the first time
+    // we meet it: client_keys.hpp).
+    const auto secret = keyring_.secretFor(realm);
+    if (secret) {
+        keyedRealm_ = realm;
+    }
+    return nox::lobby::encodeExtendedQuery(nowMs(), nox::lobby::ClientFeature::ModeUi | nox::lobby::ClientFeature::ModeUi2,
+                                           nox::content::newThingTypes().hash, nox::lobby::kClientLevel, secret);
 }
 
 void LiveSession::update()
@@ -127,6 +140,18 @@ void LiveSession::update()
                 }
                 extended_ = reply->server;
                 client_.setFreshInput(true); // (our facing and moves as they change: its next frame has them)
+                // A host with a client key realm our query had no secret for: the query again with
+                // it, before our connect (at a listed one the join waits for this answer).
+                if (reply->server.realm != 0 && reply->server.realm != keyedRealm_ && !SDL_getenv("NOX_STOCK_STREAM")) {
+                    const auto keyed = query(reply->server.realm);
+                    if (keyedRealm_ == reply->server.realm) {
+                        game_.sendTo(server_, keyed);
+                        game_.sendTo(server_, keyed);
+                        if (!typesQuery_.empty()) {
+                            typesQuery_ = keyed;
+                        }
+                    }
+                }
                 continue;
             }
             client_.receive(d, now);

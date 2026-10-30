@@ -46,7 +46,7 @@ struct ModManifest {
     bool generatedLevels = false;           ///< "levels": "generated" (else "mapFiles")
     std::string serverScript = "server/main.luau";
     std::string uiScript;                   ///< empty: none
-    int uiApi = 1;                          ///< the UI API it asks for (1 to 4)
+    int uiApi = 1;                          ///< the UI API it asks for (1 to 5)
     std::string looksLike;                  ///< "", "arena" or "ctf"
     /// "mapPrefix": 2-3 capital letters its generated maps' names start with ("DSC" -> "DSC_..."),
     /// "" none. (The form checks it: mapPrefixProblem.)

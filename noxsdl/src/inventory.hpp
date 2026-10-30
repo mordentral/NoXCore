@@ -88,6 +88,9 @@ public:
     /// noxcpp's multiclass, a mode's (HeadlessClient::multiclass): the stats' mana a
     /// conjurer's, whatever the class.
     void setMulticlass(bool on) { multiclass_ = on; }
+    /// (A script mode's UI API 5: nox.hudReserve) The bottom of a box, in screen pixels, the buffs'
+    /// row keeps out of: it starts below it whenever it would start higher. 0: none.
+    void setBuffsBelow(float px) { buffsBelowPx_ = px; }
     /// The cells that could take `count` more of `typeId`: empty ones, and stacks of it
     /// with room (31; food 3, or 9 in games with flag 0x800 / 0x1000 of `gameFlags`; never a
     /// NOT_STACKABLE thing).
@@ -274,6 +277,15 @@ private:
     /// server's stat multipliers); `cls` 0 warrior, 1 wizard, 2 conjurer.
     std::array<float, 4> classMax(const nox::client::World& world, int cls) const;
     bool multiclass_ = false;
+    float buffsBelowPx_ = 0; ///< (setBuffsBelow)
+    /// How far the buffs' row moves down (game units at scale `s`) to start below setBuffsBelow's
+    /// box: none while its top is below the box already (the panel open), else to 4 below it.
+    float buffsDown(float s) const
+    {
+        const float rowTop = static_cast<float>(slide_) + 0xE0;
+        const float below = s > 0 ? buffsBelowPx_ / s + 4 : 0;
+        return buffsBelowPx_ > 0 && rowTop < below ? below - rowTop : 0;
+    }
     /// The buff icon slot under output x (inventroryOnHovewerSub), as a (spell, item power bit) pair.
     std::optional<std::pair<std::uint32_t, std::uint8_t>> buffAt(const nox::client::World& world, float gx) const;
     int weightOf(std::uint16_t typeId) const;

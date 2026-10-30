@@ -80,6 +80,10 @@
 --   dd hud               how many values the first player's UI is owed (sends not taken yet)
 --   dd option [NAME VALUE]   the first player's options ("name value"), or one set (as its
 --                        Character window does): lootNames alt | always
+--   dd chars [...]       server characters (roster.luau): alone, each player's seat; "clock
+--                        SECONDS" the link codes' clock moved on; "lockat N|none" the game closed to
+--                        newcomers from N players (its lock policy, numbers.roster.lockAt); "NAME list | play I | new |
+--                        code | enter CODE | unlink I | pcs" as its character select does
 
 local areas = require("areas")
 local boss = require("boss")
@@ -97,6 +101,7 @@ local store = require("store")
 local votes = require("votes")
 local progress = require("progress")
 local regen = require("regen")
+local characters = require("roster")
 local town = require("town")
 local waypoints = require("waypoints")
 local book = require("book")
@@ -1066,6 +1071,10 @@ function commands.team(_args: { string }): { string }
 	return team.lines(hero.all())
 end
 
+function commands.chars(args: { string }): { string }
+	return characters.console(args)
+end
+
 function commands.help(_args: { string }): { string }
 	return {
 		"dd status | spots | save | xp N | award N | loot RARITY [N] | ground | monster ID | check",
@@ -1075,6 +1084,7 @@ function commands.help(_args: { string }): { string }
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs] | icons | book | sheet | ui stash|vendor|waypoints|tree|sheet [NAME]",
 		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | portals | portal take | hud",
 		"dd option [lootNames alt|always] | hits [clear] | summons | team",
+		"dd chars [clock S | lockat N|none | NAME list|play I|new|code|enter CODE|unlink I|pcs]",
 	}
 end
 

@@ -3,7 +3,7 @@
 -- editor's Luau diagnostics and its Mod Reference panel. Each function: one "--- " doc line, then
 -- its declaration on one line.
 
-type NoxPlayer = { peer: number, name: string, unit: number, identified: boolean, account: string?, class: string?, level: number?, experience: number? }
+type NoxPlayer = { peer: number, name: string, unit: number, identified: boolean, clientKey: string?, account: string?, class: string?, level: number?, experience: number? }
 type NoxItemSpec = { effectiveness: string?, material: string?, primary: string?, secondary: string?, durability: number?, charges: number? }
 type NoxItemFacts = { type: string, effectiveness: string?, material: string?, primary: string?, secondary: string?, durability: number, maxDurability: number, charges: number, maxCharges: number, worn: boolean, holder: number? }
 type NoxModifier = { name: string, section: string, position: string, color: { r: number, g: number, b: number }, worth: number, desc: string }
@@ -41,10 +41,12 @@ declare nox: {
     option: (key: string) -> string?,
     --- The game frame now (30 a second); 0 before the game is made.
     frame: () -> number,
-    --- Sends a value to a player's UI (its onMessage); false when it has no UI ready or its link is behind (nothing sent: send it again later).
+    --- Sends a value to a player's UI (its onMessage), in order; over 900 bytes (to 256 KB) packed and sent in pieces to a client of level 6 or above; false when it has no UI ready, its link is behind, 1 MB is already queued for it, or a big value's client is older (nothing sent: send it again later).
     send: (peer: number, value: any) -> boolean,
     --- Whether a player's client runs the mode's UI (and so draws views as data).
     hasUi: (peer: number) -> boolean,
+    --- The key a player's NoX Core client proved for this host (mode.json's "clientKeys": 32 hex digits, the same for that PC every time); nil: none.
+    clientKey: (peer: number) -> string?,
     --- A text line to one player's unit alone, as the native modes tell one (250 characters at most).
     tell: (unit: number, text: string) -> (),
     --- A text line to everyone as the engine broadcasts one (250 characters at most).

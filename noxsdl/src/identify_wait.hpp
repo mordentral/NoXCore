@@ -37,12 +37,14 @@ struct IdentifyWait {
 
 /// Whether joining the listed game `entry` waits for the answer: a NoX Core-only game's
 /// (ServerFeature::NoxCoreOnly in its extended reply), or one with a lowest client level (its
-/// host's features keyed to our level reach us only if it has our query at the connect). Every
-/// other host keeps the join's timing.
+/// host's features keyed to our level reach us only if it has our query at the connect), or one
+/// with a client key realm (our key is ours only if our keyed query is there before the connect).
+/// Every other host keeps the join's timing.
 inline bool joinWaitsForIdentity(const nox::lobby::ServerEntry* entry)
 {
     return entry && entry->extended &&
-           ((entry->extended->features & nox::lobby::ServerFeature::NoxCoreOnly) != 0 || entry->extended->minClientLevel != 0);
+           ((entry->extended->features & nox::lobby::ServerFeature::NoxCoreOnly) != 0 || entry->extended->minClientLevel != 0 ||
+            entry->extended->realm != 0);
 }
 
 /// Whether a join waits for the host's answer before it begins (live_session.cpp): our content

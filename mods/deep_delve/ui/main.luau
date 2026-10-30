@@ -1,5 +1,5 @@
 --!strict
--- Deep Delve's UI on a NoX Core client (UI API 4: client level 5). The server sends the numbers
+-- Deep Delve's UI on a NoX Core client (UI API 5: client level 6). The server sends the numbers
 -- (server/hud.luau and the modules it names) when they change; this draws them and sends the
 -- clicks back. Its windows:
 --
@@ -29,7 +29,12 @@
 --   waypoints (stepping on the town's waypoints pentagram) the waypoints by act (each act open to
 --           the character) and area, the ones found to click (this area's: a step, no vote;
 --           another's, in any act listed: the party's vote, or at once when alone), the area being
---           played marked.
+--           played marked;
+--   chars   (a server that keeps the characters: character select) the account's characters, one
+--           of the class joined as to play, a new one, "Link another PC" (a code shown here alone),
+--           a code from another PC typed on its keys (or the number keys) at character select,
+--           the account's PCs (one unlinked); from the Character window's Characters button too,
+--           to make a code or unlink a PC while playing.
 --
 -- The pictures are the mod's own (assets\tree\): the tree's backdrop under its links and nodes; a
 -- root's, small's, notable's or keystone's picture as that node (the server names it, "ic"), framed
@@ -52,17 +57,20 @@
 -- A list too long for one value comes in parts with a serial (hud.parts); the newest whole list
 -- is drawn, the one before it until the next is whole.
 --
--- On a screen wider or taller than 4:3 the Character window keeps to the screen's top left corner
--- (anchor "topleft"), and the party strip and the boss's bar to its top edge (anchor "top"); the
--- station windows (stash, vendor, waypoints, tree, sheet) stay centred.
+-- The Character window is in the screen's top left corner, and the party strip beside it to its right
+-- (both anchor "topleft": they keep to that corner on a screen wider or taller than 4:3); the boss's
+-- bar is centred under the strip (anchor "top"); the station windows (stash, vendor, waypoints,
+-- tree, sheet) stay centred.
 
 local ui = {}
 
 local W, H = 168, 104
+-- The Character window's corner: the screen's top left (a framed window's highest is y 20).
+local HERO_X, HERO_Y = 6, 20
 local BOSS_W, BOSS_H = 220, 26
--- The framed windows start below the party strip: with four or more cards (up to six) it spans
--- the screen's top left corner on a wide screen too, and with three at 4:3.
-local TOP = 84
+-- The boss's bar: its frame below the party strip with its vote's row (the strip's top, its height,
+-- a gap and the frame's title bar).
+local BOSS_Y = 90
 
 local shown: any = nil
 local bossShown: any = nil
@@ -99,7 +107,7 @@ local function takePart(v: any)
 	end
 end
 
-local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true, labels = true }
+local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true, labels = true, chars = true }
 
 -- ---- Drawing helpers
 
@@ -175,7 +183,7 @@ end
 local function drawNote(window: string, x: number, y: number)
 	local n = notes[window]
 	if n and nox.time() < n.til then
-		nox.text(n.text, x, y, "red")
+		nox.text(n.text, x, y, if n.good then "gold" else "red")
 	end
 end
 
@@ -236,6 +244,12 @@ local CLASS_ICON: { [string]: string } = { warrior = "tree/root_warrior", wizard
 local CARD_ICON = 24
 local CARD_H = 40
 local GAP = 4
+-- The strip: just right of the Character window, its top level with the top of the window's frame
+-- (its title bar, 14 above its y); its cards share what's left of the 640 at 4:3 (narrower with more
+-- members, a long name cut with an ellipsis).
+local STRIP_X = HERO_X + W + 6
+local STRIP_Y = HERO_Y - 14
+local STRIP_ROOM = 640 - STRIP_X - 4
 local VOTE_Y, VOTE_H = 46, 18
 local STRIP_H = VOTE_Y + VOTE_H + 2
 local VOTE_W = 380
@@ -244,14 +258,13 @@ local party: { any } = {}
 local vote: any = nil -- the vote's value ({ active, by, to, how, left, yes, of, mine, asker, done })
 local voteEnds = 0 -- (the client's clock when it runs out)
 local doneUntil = 0 -- (a finished vote's line shown till then)
--- How the strip's window was last opened ("hidden": closed, the player alone in the game), its
--- width, and whether it had the vote's row.
+-- How the strip's window was last opened ("hidden": closed, the player alone in the game), and
+-- whether it had the vote's row.
 local stripSpec: string = "hidden"
-local stripW = 0
 local stripRow = false
 
 local function cardWidth(n: number): number
-	return math.min(124, (640 + GAP) // math.max(1, n) - GAP)
+	return math.min(124, (STRIP_ROOM + GAP) // math.max(1, n) - GAP)
 end
 
 -- Whether the strip shows the vote's row: a vote under way, or a finished one's line, for a while.
@@ -279,14 +292,14 @@ local function placeStrip()
 	local w = if row then math.max(cardsW, VOTE_W) else cardsW
 	local h = if row then STRIP_H else CARD_H + 4
 	stripRow = row
-	stripW = w
 	local spec = string.format("%d/%d", w, h)
 	if spec == stripSpec then
 		return
 	end
 	stripSpec = spec
-	-- (placed so the cards stay where they are as the row comes and goes)
-	nox.window("party", { frame = false, hud = true, anchor = "top", x = (640 - cardsW) // 2 - (w - cardsW) // 2, y = 2, w = w, h = h })
+	-- (the cards and the row from its left edge: the cards stay where they are as the row comes and
+	-- goes)
+	nox.window("party", { frame = false, hud = true, anchor = "topleft", x = STRIP_X, y = STRIP_Y, w = w, h = h })
 end
 
 -- Text cut to `width` (an ellipsis where it was cut).
@@ -339,10 +352,10 @@ local function drawCard(m: any, x: number, w: number, me: boolean)
 	end
 end
 
-local function drawVote(w: number)
+local function drawVote()
 	local v = vote
 	local now = nox.time()
-	local x0 = (w - VOTE_W) // 2
+	local x0 = 0
 	if v and v.active then
 		local left = math.max(0, math.ceil((voteEnds - now) / 1000))
 		-- (the row takes the mouse, its buttons with it)
@@ -457,8 +470,6 @@ local function drawParty()
 		return
 	end
 	local cw = cardWidth(n)
-	local cardsW = n * (cw + GAP) - GAP
-	local w = stripW
 	local me = nox.player()
 	local myName = me and string.sub(me.name, 1, 16)
 	-- (each card takes the mouse, its answer line under it during a vote; the gaps between are the
@@ -467,7 +478,7 @@ local function drawParty()
 	local mx, my = mouseIn("party")
 	local hot: any = nil
 	for i, m in party do
-		local x = (w - cardsW) // 2 + (i - 1) * (cw + GAP)
+		local x = (i - 1) * (cw + GAP)
 		local mine = m.n == myName
 		nox.hitArea(x, 0, cw, cardH)
 		drawCard(m, x, cw, mine)
@@ -479,7 +490,7 @@ local function drawParty()
 			nox.outline(x + 1, 1, cw - 2, CARD_H - 2, { 120, 100, 60 })
 		end
 	end
-	drawVote(w)
+	drawVote()
 	if hot then
 		nox.tooltip({
 			{ tostring(hot.n), if hot.n == myName then { 230, 190, 80 } else "bright" },
@@ -505,7 +516,7 @@ end
 
 local function drawHero()
 	if not shown then
-		nox.text("...", 4, 4, "dim")
+		nox.text(if opened.chars then "Choose a character first." else "...", 4, 4, "dim")
 		return
 	end
 	nox.text(string.format("%s, level %d", shown.name, shown.level), 4, 2, "gold")
@@ -555,6 +566,12 @@ local function drawHero()
 	if shown.act then
 		local line: string = "Act " .. tostring(shown.act) .. (if shown.cleared then " cleared" else "")
 		nox.text(line, 4, 90, if shown.cleared then "gold" else "dim")
+	end
+	-- (a server that keeps the characters: the account's characters, its PCs and a link code)
+	if shown.server then
+		button("hero", W - 76, 88, 72, 13, "Characters", true, function()
+			nox.send({ kind = "chars", op = "open" })
+		end)
 	end
 end
 
@@ -1435,10 +1452,187 @@ local function drawWaypoints()
 	end
 end
 
+-- ---- Character select (a server that keeps the characters)
+
+local CW = 300
+local CH_TOP = 18
+local CH_ROW = 18
+local KEY_W, KEY_H, KEY_COLS = 34, 14, 8
+-- The letters of a link code (the server's: no 0, O, 1, I or L).
+local CODE_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+local CODE_LENGTH = 8
+-- The code made on this PC ({ code, til }: shown till it's out of time) and the code being typed.
+local linkCode: any = nil
+local typed = ""
+
+-- The window's height for what it shows: the rows, a new character's button, making a code, typing
+-- one (at character select only), the PCs, a note's line.
+local function charsHeight(): number
+	local c = whole.chars
+	local h = c and c.header or {}
+	local rows = math.max(1, c and #c.items or 0)
+	local y = CH_TOP + rows * CH_ROW + 4
+	if h.new or h.full then
+		y += 20
+	end
+	y += 8 + 18 + 14 -- (the line, Link another PC, its code)
+	if not h.playing then
+		y += 14 + 18 + math.ceil(#CODE_LETTERS / KEY_COLS) * (KEY_H + 2) + 4
+	end
+	y += 14 + #(h.pcs or {}) * 14 + 16
+	return y
+end
+
+local function openChars()
+	opened.chars = true
+	-- (below the party strip's cards; a long list higher, as far as the screen's bottom takes it)
+	nox.window("chars", { title = "Characters", x = 170, y = 64, w = CW, h = charsHeight() })
+end
+
+local function closeChars()
+	opened.chars = nil
+	nox.closeWindow("chars")
+end
+
+-- (its x, or escape: playing only)
+local function putAway()
+	closeChars()
+	nox.send({ kind = "chars", op = "close" })
+end
+
+local function typeLetter(ch: string)
+	if #typed < CODE_LENGTH then
+		typed ..= ch
+	end
+end
+
+local function sendCode()
+	if #typed == CODE_LENGTH then
+		nox.send({ kind = "chars", op = "enter", code = typed })
+		typed = ""
+	end
+end
+
+local function drawChars()
+	local w = "chars"
+	local c = whole.chars
+	if not c then
+		nox.text("...", 4, 4, "dim")
+		return
+	end
+	local h = c.header
+	local playing = h.playing == true
+	if playing then
+		button(w, CW - 16, 2, 14, 13, "x", true, putAway)
+	end
+	nox.text(if playing then "Your characters on this server" else "Choose a character", 4, 3, "gold")
+	if h.proven == false then
+		local s = "(known by account)"
+		nox.text(s, CW - (if playing then 22 else 6) - nox.textWidth(s), 3, "dim")
+	end
+	local y = CH_TOP
+	if #c.items == 0 then
+		nox.text("None yet on this server.", 8, y + 4, "dim")
+	end
+	local mx, my = mouseIn(w)
+	for i, e in c.items do
+		local hot = over(mx, my, 4, y, CW - 8, CH_ROW - 2)
+		local can = e.p == true and not playing and not e.busy
+		nox.box(4, y, CW - 8, CH_ROW - 2, if can and hot then { 60, 44, 24 } elseif e.me then { 50, 40, 20 } else { 22, 18, 14 })
+		nox.outline(4, y, CW - 8, CH_ROW - 2, if e.me then "gold" elseif can then { 200, 150, 60 } else { 60, 52, 40 })
+		local cls = tostring(e.c)
+		local icon = CLASS_ICON[cls]
+		if icon then
+			nox.image(icon, 6, y + 1, 14, 14)
+		end
+		nox.text(tostring(e.n), 24, y + 3, if e.p then "bright" else "grey")
+		nox.text(string.format("level %d %s", tonumber(e.l) or 1, CLASS_TITLE[cls] or cls), 126, y + 3, CLASS_COLOUR[cls] or "dim")
+		local right = if e.me then "playing" elseif e.busy then "in play" elseif not e.p then "other class" elseif playing then "" else "Play"
+		nox.text(right, CW - 10 - nox.textWidth(right), y + 3, if can then "gold" else "dim")
+		if can then
+			zone(w, 4, y, CW - 8, CH_ROW - 2, function()
+				nox.send({ kind = "chars", op = "play", i = i })
+			end)
+		end
+		if hot and not e.p then
+			nox.tooltip({ { "Join as a " .. (CLASS_TITLE[cls] or cls) .. " to play this one.", "dim" } })
+		end
+		y += CH_ROW
+	end
+	y = CH_TOP + math.max(1, #c.items) * CH_ROW + 4
+	if h.new then
+		local cls = tostring(h.class)
+		button(w, 4, y, CW - 8, 16, "New " .. (CLASS_TITLE[cls] or cls) .. ": " .. tostring(h.name), true, function()
+			nox.send({ kind = "chars", op = "new" })
+		end)
+		y += 20
+	elseif h.full then
+		nox.text("An account keeps 10 characters at most.", 6, y + 3, "dim")
+		y += 20
+	end
+	nox.box(0, y + 3, CW, 1, { 90, 70, 40 })
+	y += 8
+	button(w, 4, y, 140, 15, "Link another PC", true, function()
+		nox.send({ kind = "chars", op = "code" })
+	end)
+	nox.text("one code, 10 minutes", 152, y + 3, "dim")
+	y += 18
+	local lc = linkCode
+	if lc and nox.time() < lc.til then
+		local left = math.max(1, math.ceil((lc.til - nox.time()) / 60000))
+		local shown = string.sub(lc.code, 1, 4) .. "-" .. string.sub(lc.code, 5)
+		nox.text(string.format("Code: %s  (%d min; type it on the other PC)", shown, left), 6, y, "gold")
+	end
+	y += 14
+	if not playing then
+		nox.text("Enter a link code from your other PC:", 4, y, "bright")
+		y += 14
+		nox.box(4, y, 120, 15, { 16, 13, 10 })
+		nox.outline(4, y, 120, 15, { 200, 150, 60 })
+		nox.text(typed .. (if #typed < CODE_LENGTH and (nox.time() // 500) % 2 == 0 then "_" else ""), 8, y + 3, "bright")
+		button(w, 130, y, 40, 15, "Del", #typed > 0, function()
+			typed = string.sub(typed, 1, #typed - 1)
+		end)
+		button(w, 174, y, 50, 15, "Link", #typed == CODE_LENGTH, sendCode)
+		y += 18
+		for k = 1, #CODE_LETTERS do
+			local ch = string.sub(CODE_LETTERS, k, k)
+			local kx = 4 + ((k - 1) % KEY_COLS) * (KEY_W + 2)
+			local ky = y + ((k - 1) // KEY_COLS) * (KEY_H + 2)
+			button(w, kx, ky, KEY_W, KEY_H, ch, #typed < CODE_LENGTH, function()
+				typeLetter(ch)
+			end)
+		end
+		y += math.ceil(#CODE_LETTERS / KEY_COLS) * (KEY_H + 2) + 4
+	end
+	nox.text("This account's PCs:", 4, y, "bright")
+	y += 14
+	-- (a PC may unlink the ones linked after it)
+	local mine = #(h.pcs or {}) + 1
+	for i, pc in h.pcs or {} do
+		if pc.me then
+			mine = i
+		end
+	end
+	for i, pc in h.pcs or {} do
+		nox.text(tostring(pc.label) .. (if pc.me then " (this PC)" else ""), 10, y + 1, if pc.me then "gold" else "bright")
+		if i > mine then
+			button(w, CW - 64, y, 58, 13, "Unlink", true, function()
+				nox.send({ kind = "chars", op = "unlink", i = i })
+			end)
+		end
+		y += 14
+	end
+	drawNote(w, 4, y + 2)
+end
+
 -- ---- The hooks
 
 function ui.start()
-	nox.window("hero", { title = "Character", anchor = "topleft", x = 6, y = TOP, w = W, h = H })
+	nox.window("hero", { title = "Character", anchor = "topleft", x = HERO_X, y = HERO_Y, w = W, h = H })
+	-- (the game's buff icons draw down the screen's top left: by decision they start below this
+	-- window, its frame's bottom and a margin; UI API 5)
+	nox.hudReserve({ x = 0, y = 0, w = HERO_X + W + 4, h = HERO_Y + H + 4, anchor = "topleft" })
 	placeStrip()
 end
 
@@ -1480,7 +1674,7 @@ function ui.onMessage(value: any)
 	elseif kind == "boss" then
 		if value.most and value.most > 0 then
 			if not bossShown then
-				nox.window("boss", { title = value.name, anchor = "top", x = 320 - BOSS_W // 2, y = TOP, w = BOSS_W, h = BOSS_H })
+				nox.window("boss", { title = value.name, anchor = "top", x = 320 - BOSS_W // 2, y = BOSS_Y, w = BOSS_W, h = BOSS_H })
 			end
 			bossShown = value
 		elseif bossShown then
@@ -1508,10 +1702,24 @@ function ui.onMessage(value: any)
 			doneUntil = nox.time() + 6000
 		end
 		placeStrip()
+	elseif kind == "linkCode" and type(value.code) == "string" then
+		-- ("": used up)
+		linkCode = if value.code ~= "" then { code = value.code, til = nox.time() + (tonumber(value.minutes) or 10) * 60000 } else nil
 	elseif PARTS[kind] then
 		takePart(value)
 		if kind == "labels" then
 			takeLabels()
+		elseif kind == "chars" then
+			-- (the whole list in: the window open (sized to it) or closed, as the server has it)
+			local c = whole.chars
+			if c and c.serial == value.serial then
+				if c.header.show then
+					openChars()
+				elseif opened.chars then
+					closeChars()
+					typed = ""
+				end
+			end
 		end
 	elseif kind == "sheet" then
 		whole.sheet = value
@@ -1531,7 +1739,7 @@ function ui.onMessage(value: any)
 	elseif kind == "treeState" then
 		whole[kind] = { header = value }
 	elseif kind == "note" then
-		notes[value.window] = { text = value.text, til = nox.time() + 4000 }
+		notes[value.window] = { text = value.text, til = nox.time() + 4000, good = value.good == true }
 		nox.gameSound("ButtonPress", 60)
 	end
 end
@@ -1566,6 +1774,8 @@ function ui.draw(window: string)
 		drawSheet()
 	elseif window == "waypoints" then
 		drawWaypoints()
+	elseif window == "chars" then
+		drawChars()
 	end
 end
 
@@ -1586,6 +1796,23 @@ function ui.click(window: string, x: number, y: number, button: number?): boolea
 end
 
 function ui.key(window: string, key: string): boolean
+	-- (character select: a link code's digits typed, left deletes, enter sends it)
+	if window == "chars" then
+		local c = whole.chars
+		local choosing = c ~= nil and not c.header.playing
+		if choosing and #key == 1 and string.find(CODE_LETTERS, key, 1, true) then
+			typeLetter(key)
+		elseif choosing and key == "left" then
+			typed = string.sub(typed, 1, #typed - 1)
+		elseif choosing and key == "enter" then
+			sendCode()
+		elseif key == "escape" and not choosing then
+			putAway()
+		else
+			return false
+		end
+		return true
+	end
 	if window == "tree" then
 		if key == "left" then
 			pan(1, 0)

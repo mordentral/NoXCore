@@ -34,6 +34,7 @@
 #include "foes.hpp"
 #include "mod_items.hpp"
 #include "mod_parts.hpp"
+#include "mod_store.hpp"
 #include "mode_shared.hpp"
 #include "toolbox.hpp"
 #include "value_codec.hpp"
@@ -164,8 +165,25 @@ struct ScriptedMode::Impl {
         /// its text: pumpUi sends them first as room comes; past kHeldViews the oldest goes as
         /// text. (nox.send says false while any is held: a value never overtakes a view.)
         std::deque<std::pair<std::vector<std::uint8_t>, std::string>> heldViews;
+        /// (Client level 6) nox.send's values queued behind a big one, in order: a value small
+        /// enough for one kData, or a big one (kDataBegin, then its kDataChunks); pumpUi sends them
+        /// as room comes. `outboxBytes` their bytes (kMaxOutbox at most).
+        struct Outgoing {
+            std::vector<std::uint8_t> bytes; ///< (a small one's value; a big one's coded bytes)
+            bool big = false;
+            std::uint32_t raw = 0;  ///< (a big one's value bytes)
+            std::uint8_t coding = 0; ///< (a big one's: 0 stored, 1 NXZ)
+            bool begun = false;      ///< (its kDataBegin sent)
+            std::size_t sent = 0;    ///< (its coded bytes sent)
+        };
+        std::deque<Outgoing> outbox;
+        std::size_t outboxBytes = 0;
     };
     static constexpr std::size_t kHeldViews = 16;
+    /// A player's queued values' bytes at most (UiPeer::outbox): past it nox.send says false.
+    static constexpr std::size_t kMaxOutbox = 1u << 20;
+    /// Big values' chunks a frame to a player at most, each while it has bulk room (as the assets').
+    static constexpr int kDataChunksPerFrame = 16;
     /// A mod asset as the wire carries it (ui_proto.hpp's kAsset and kAssetChunk): its header's
     /// payload and its bytes, NXZ-packed when that's smaller (each peer's copy is this one).
     struct WireAsset {
@@ -222,8 +240,10 @@ struct ScriptedMode::Impl {
     static constexpr std::size_t kRevokesPerFrame = 30;
     std::map<std::string, std::vector<std::array<std::uint8_t, 4>>> revokes;
     std::uint32_t revokedAt = ~0u;
-    /// nox.lock's: the host's own Closed and allowed list, put back by nox.unlock.
+    /// nox.lock's: the host's own Closed and allowed list, put back by nox.unlock. `lockChanged`:
+    /// since the host last asked (ServerMode::takeLockChanged: a pool opens another lobby).
     bool locked = false;
+    bool lockChanged = false;
     bool savedClosed = false;
     std::vector<std::string> savedAllowed;
     /// A frame's text messages (tell, textToAll): at most kTextPerFrame (chargeText).
@@ -353,6 +373,10 @@ struct ScriptedMode::Impl {
             }
             lua_pushboolean(L, host->identified(peer));
             lua_setfield(L, -2, "identified");
+            if (const std::string& key = host->clientKey(peer); !key.empty()) { // (mode.json's "clientKeys")
+                lua_pushlstring(L, key.data(), key.size());
+                lua_setfield(L, -2, "clientKey");
+            }
             if (const auto it = host->players().find(peer); it != host->players().end() && sees(peer)) {
                 addPlayerFacts(L, it->second, host->server().world().byExtent(it->second.extent)); // (account, class, level...)
             }
@@ -412,13 +436,13 @@ struct ScriptedMode::Impl {
         return lobby::ClientFeature::ModeUi | (package->manifest.uiApi >= 2 ? lobby::ClientFeature::ModeUi2 : 0u);
     }
     /// Whether `peer` takes this UI: it named what the UI needs, and for a UI of API 3 its client
-    /// is at uimsg::kUiApi3Level or above, for API 4 at kUiApi4Level (asked each time: a slot may
-    /// change hands).
+    /// is at uimsg::kUiApi3Level or above, for API 4 at kUiApi4Level, for API 5 at kUiApi5Level
+    /// (asked each time: a slot may change hands).
     bool uiReaches(std::uint8_t peer) const
     {
         const int api = package->manifest.uiApi;
-        return host && (host->clientFeatures(peer) & uiNeeds()) == uiNeeds() &&
-               (api < 3 || host->clientLevel(peer) >= (api >= 4 ? uimsg::kUiApi4Level : uimsg::kUiApi3Level));
+        const std::uint16_t level = api >= 5 ? uimsg::kUiApi5Level : api >= 4 ? uimsg::kUiApi4Level : uimsg::kUiApi3Level;
+        return host && (host->clientFeatures(peer) & uiNeeds()) == uiNeeds() && (api < 3 || host->clientLevel(peer) >= level);
     }
     void sendUi(std::uint8_t peer, uimsg::Sub sub, std::span<const std::uint8_t> payload = {})
     {
@@ -643,23 +667,83 @@ int noxTable(lua_State* L)
 
 int noxSend(lua_State* L)
 {
-    // A value to a player's UI (its onMessage); whether it went (no UI there, or its link behind:
-    // no reliable room, or views held for it: false).
+    // A value to a player's UI (its onMessage), in order; whether it went or is queued (no UI
+    // there, its link behind: no reliable room, views held for it, its queue full, or a value over
+    // one message's bytes for a client below kBigDataLevel: false). A big value (to
+    // uimsg::kMaxBigValue) goes NXZ-packed in pieces as room comes (pumpUi), and the values after
+    // it wait behind it.
     Impl& impl = implOf(L);
     const auto peer = peerArg(L, 1);
     luaL_argcheck(L, peer.has_value(), 1, "send: a player's peer");
     const auto u = impl.ui.find(*peer);
-    if (u == impl.ui.end() || !u->second.ready || !impl.host || impl.host->reliableRoom(*peer) == 0 || !u->second.heldViews.empty()) {
+    if (u == impl.ui.end() || !u->second.ready || !impl.host || !u->second.heldViews.empty()) {
         lua_pushboolean(L, 0);
         return 1;
     }
+    Impl::UiPeer& up = u->second;
     std::vector<std::uint8_t> bytes;
     std::string why;
-    if (!encodeValue(L, 2, bytes, why)) {
+    // (A client below kBigDataLevel reads values with the UI's limits: one too big for a message is
+    // no error, only not sent to it.)
+    const bool big = impl.host->clientLevel(*peer) >= uimsg::kBigDataLevel;
+    constexpr CodecLimits kBig{.depth = uimsg::kBigValueDepth, .pairs = uimsg::kBigValuePairs, .bytes = uimsg::kMaxBigValue};
+    if (!encodeValue(L, 2, bytes, why, big ? kBig : CodecLimits{})) {
+        // (Below the level: a value a big one could carry is only not for this client.)
+        std::vector<std::uint8_t> probe;
+        if (!big && encodeValue(L, 2, probe, why, kBig)) {
+            lua_pushboolean(L, 0);
+            return 1;
+        }
         luaL_error(L, "send: %s", why.c_str());
     }
-    impl.sendUi(*peer, uimsg::kData, bytes);
+    // One message's worth, nothing queued before it: at once, as ever (none while its link is behind).
+    if (bytes.size() <= uimsg::kMaxValue && up.outbox.empty()) {
+        if (impl.host->reliableRoom(*peer) == 0) {
+            lua_pushboolean(L, 0);
+            return 1;
+        }
+        impl.sendUi(*peer, uimsg::kData, bytes);
+        lua_pushboolean(L, 1);
+        return 1;
+    }
+    // Queued: behind a big one, or a big one itself (packed when that's smaller).
+    Impl::UiPeer::Outgoing out;
+    if (bytes.size() > uimsg::kMaxValue) {
+        out.big = true;
+        out.raw = static_cast<std::uint32_t>(bytes.size());
+        std::vector<std::uint8_t> packed = video::nxzCompress(bytes);
+        if (packed.size() < bytes.size()) {
+            out.coding = 1;
+            out.bytes = std::move(packed);
+        } else {
+            out.bytes = std::move(bytes);
+        }
+    } else {
+        out.bytes = std::move(bytes);
+    }
+    if (up.outboxBytes + out.bytes.size() > Impl::kMaxOutbox) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    up.outboxBytes += out.bytes.size();
+    up.outbox.push_back(std::move(out));
     lua_pushboolean(L, 1);
+    return 1;
+}
+
+int noxClientKey(lua_State* L)
+{
+    // nox.clientKey(peer): the key its NoX Core client proved for this host (mode.json's
+    // "clientKeys": 32 hex digits, the same for that PC each time); nil: none.
+    const Impl& impl = implOf(L);
+    const auto peer = peerArg(L, 1);
+    luaL_argcheck(L, peer.has_value(), 1, "clientKey: a player's peer");
+    const std::string& key = impl.host ? impl.host->clientKey(*peer) : std::string();
+    if (key.empty()) {
+        lua_pushnil(L);
+    } else {
+        lua_pushlstring(L, key.data(), key.size());
+    }
     return 1;
 }
 
@@ -2789,6 +2873,7 @@ int noxLock(lua_State* L)
     if (!impl.locked) {
         server::detail::lockGame(*impl.host, impl.savedClosed, impl.savedAllowed);
         impl.locked = true;
+        impl.lockChanged = true;
     }
     return 0;
 }
@@ -2801,6 +2886,7 @@ int noxUnlock(lua_State* L)
     if (impl.locked) {
         server::detail::unlockGame(*impl.host, impl.savedClosed, impl.savedAllowed);
         impl.locked = false;
+        impl.lockChanged = true;
     }
     return 0;
 }
@@ -3485,6 +3571,35 @@ void Impl::pumpUi()
             sendUi(peer, uimsg::kView, u.heldViews.front().first);
             u.heldViews.pop_front();
         }
+        // (Client level 6) Values queued behind a big one, in order, a few pieces a frame while it
+        // has bulk room.
+        for (int k = 0; k < kDataChunksPerFrame && !u.outbox.empty() && host->reliableBulkRoom(peer) > 0; ++k) {
+            UiPeer::Outgoing& o = u.outbox.front();
+            if (!o.big) {
+                sendUi(peer, uimsg::kData, o.bytes);
+            } else if (!o.begun) {
+                uimsg::Writer w;
+                w.u32(o.raw);
+                w.u8(o.coding);
+                w.u32(static_cast<std::uint32_t>(o.bytes.size()));
+                sendUi(peer, uimsg::kDataBegin, w.out);
+                o.begun = true;
+                continue;
+            } else {
+                const std::size_t n = std::min(uimsg::kChunkBytes, o.bytes.size() - o.sent);
+                uimsg::Writer w;
+                w.u32(static_cast<std::uint32_t>(o.sent));
+                w.out.insert(w.out.end(), o.bytes.begin() + static_cast<std::ptrdiff_t>(o.sent),
+                             o.bytes.begin() + static_cast<std::ptrdiff_t>(o.sent + n));
+                sendUi(peer, uimsg::kDataChunk, w.out);
+                o.sent += n;
+                if (o.sent < o.bytes.size()) {
+                    continue;
+                }
+            }
+            u.outboxBytes -= o.bytes.size();
+            u.outbox.pop_front();
+        }
         if (!u.begun) {
             // (A UI of API 2: its mod's assets first, all of them queued before it.)
             if (assetsHash && !pumpAssets(peer, u)) {
@@ -3585,7 +3700,7 @@ void Impl::installToolbox()
     static constexpr std::pair<const char*, lua_CFunction> kToolbox[] = {
         {"log", noxLog},       {"players", noxPlayers}, {"player", noxPlayer}, {"say", noxSay},       {"sayAll", noxSayAll},
         {"choice", noxChoice}, {"table", noxTable},     {"option", noxOption}, {"frame", noxFrame}, {"random", noxRandom},
-        {"f32", noxF32},       {"send", noxSend},       {"hasUi", noxHasUi},
+        {"f32", noxF32},       {"send", noxSend},       {"hasUi", noxHasUi},     {"clientKey", noxClientKey},
         // (the world)
         {"object", noxObject}, {"objects", noxObjects}, {"units", noxUnits}, {"inventory", noxInventory},
         {"watchCollide", noxWatchCollide},
@@ -4102,6 +4217,16 @@ void ScriptedMode::setF32Chop(std::optional<bool> chop) noexcept
     impl_->f32Chop = chop;
 }
 
+bool ScriptedMode::locked() const
+{
+    return impl_->locked;
+}
+
+bool ScriptedMode::takeLockChanged()
+{
+    return std::exchange(impl_->lockChanged, false);
+}
+
 server::ModeHooks* ScriptedMode::engineHooks() noexcept
 {
     return impl_->host ? impl_->engineHooks.get() : nullptr;
@@ -4280,6 +4405,17 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
     // seconds under the weapons-respawn option.
     o.pickupAnyClass = o.pickupAnyClass || impl.package->manifest.pickupAnyClass;
     o.pickupDuplicates = o.pickupDuplicates || impl.package->manifest.pickupDuplicates;
+    // A mod whose maps' things stay gone (mode.json's "mapRespawns": false).
+    o.noMapRespawns = o.noMapRespawns || impl.package->manifest.noMapRespawns;
+    // A mod's client keys (mode.json's "clientKeys"): the host's realm, kept beside its store (a
+    // pool's games share it); none without a store's folder.
+    if (impl.package->manifest.clientKeys && !impl.ctx.modData.empty()) {
+        std::string why;
+        o.clientKeyRealm = clientKeyRealm(impl.ctx.modData, impl.package->manifest.info.id, why);
+        if (!why.empty()) {
+            impl.errors.push_back(why);
+        }
+    }
     // The host's callbacks: each the script's when it has the hook (looked up as it's called, so a
     // reload's new hooks count). None of them runs per frame.
     o.onJoin = [&impl, prev = std::move(o.onJoin)](server::GameHost& h, std::uint8_t peer, server::ServerObject& unit) {

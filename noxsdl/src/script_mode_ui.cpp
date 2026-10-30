@@ -338,6 +338,12 @@ private:
             freeTextures(); // (a new set: its pictures made as they're drawn)
             texturesOf_ = ui_->assets();
         }
+        // (API 5) The buffs' row kept out of the UI's reserved box (nox.hudReserve): its bottom on the screen.
+        if (app.inventory) {
+            const auto box = ui_->hudReserve();
+            const SDL_FRect r = box ? toScreen(box->x, box->y, box->w, box->h) : SDL_FRect{};
+            app.inventory->setBuffsBelow(box && box->w > 0 && box->h > 0 ? std::max(0.0f, r.y + r.h) : 0.0f);
+        }
         playSounds(app);
         stepped_ = true;
     }

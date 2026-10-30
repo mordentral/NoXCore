@@ -1547,7 +1547,6 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
             }
             return false;
         }
-        Missiles missiles{world, things, modifiers, rng, frame};
         static constexpr int kSpread[5] = {0, -0x10, 0x10, -0x20, 0x20};
         // (From the source, the caster's.)
         // (The exe's switch has five cases: a sixth missile (a quest's level 5, the ARENA table's
@@ -1574,17 +1573,21 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
             m.newX = sx;
             m.newY = sy;
             m.touch();
-            // After the one the player picked, or the nearest enemy to its cursor (from the
-            // missile, if it sees the cursor). A glyph's: the nearest to the missile.
-            const ServerObject* t = nullptr;
-            if (source.player) {
-                t = target && target != &caster ? target : nullptr;
-                if (!t) {
-                    const bool sees = world.traceRay(sx, sy, source.player->cursorX, source.player->cursorY, Trace::Doors | Trace::ThroughWindows);
-                    t = missiles.seekTarget(sees ? source.player->cursorX : sx, sees ? source.player->cursorY : sy, m, 600.0f, &caster);
+            // spellFlySearchTarget, the spell's target never read: the enemy under the owner's
+            // cursor, else the nearest enemy to the source player's cursor (to the missile when
+            // it doesn't see the cursor); a glyph's, the nearest to the missile. So a cast on
+            // itself homes on the cursor's enemy too. (A mode script's own cast at a foe it chose,
+            // nox.cast's `direct`: that foe, as before.)
+            ServerObject* t = direct && target && target != &caster ? target : nullptr;
+            if (!t) {
+                float cursor[2] = {};
+                const float* at = nullptr;
+                if (source.player) {
+                    cursor[0] = source.player->cursorX;
+                    cursor[1] = source.player->cursorY;
+                    at = cursor;
                 }
-            } else {
-                t = searchTarget(world, nullptr, &m, kHostile, 600.0f, 0, &caster);
+                t = searchTarget(world, at, &m, kHostile, 600.0f, 0, &caster);
             }
             m.seekTarget = t ? t->extent : 0;
         }

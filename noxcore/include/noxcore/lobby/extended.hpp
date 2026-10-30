@@ -5,12 +5,16 @@
 //          [version 2: u32 the client's feature bits]
 //          [version 3: then u64 its added object types' hash (content::newThingTypesHash)]
 //          [version 4: then u16 its client level (kClientLevel); the hash 0 when none]
+//          [version 5: then u64 a host's client key realm, 32 bytes: the client's secret for it
+//           (ClientSecret: only to a host whose reply named that realm)]
 //   reply  00 00 F0 "NXSV" u16 version, u32 token,         (noxcpp server -> browser)
 //          u8 max substeps a frame (1-4: 30-120 Hz), u32 feature bits
 //          [version 3: then u64 the host's added object types' hash, u8 n, n bytes: the ids
 //           of the packs that add them, joined with ", "]
 //          [version 4: then u16 the lowest client level it lets in, u16 its own level; the
 //           hash and n 0 when it adds no types]
+//          [version 5: then u64 its client key realm (a mode's "clientKeys": GameHost::Options::
+//           clientKeyRealm); only from a host that has one]
 //
 // A query with no client features is version 1's, byte for byte, and one from a game whose
 // content packs add no object types is version 2's at most: version 3's tail is only there when
@@ -30,6 +34,8 @@
 // browser's socket is never one. A stock client never sees a reply: only the query asks for one.
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -63,6 +69,18 @@ inline constexpr std::uint32_t ModeUi2 = 2;
 inline constexpr std::uint16_t kExtendedTypesVersion = 3;
 /// The version whose tail carries the client levels.
 inline constexpr std::uint16_t kExtendedLevelVersion = 4;
+/// The version whose tail carries a client key realm (the reply) and a client's secret for it (the query).
+inline constexpr std::uint16_t kExtendedRealmVersion = 5;
+
+/// A NoX Core client's secret for one host realm (a mode's "clientKeys"): random, made by the client
+/// the first time it meets the realm and kept in its own folder; the host keeps only a key made
+/// from it (clientKeyOf), never the secret.
+inline constexpr std::size_t kClientSecretBytes = 32;
+struct ClientSecret {
+    std::uint64_t realm = 0;
+    std::array<std::uint8_t, kClientSecretBytes> secret{};
+    bool operator==(const ClientSecret&) const = default;
+};
 
 /// What this build's client takes, as one number: raised by 1 in each release that adds something
 /// a server may send only to a client that takes it (a feature keyed "level N or above", where a
@@ -84,7 +102,13 @@ inline constexpr std::uint16_t kExtendedLevelVersion = 4;
 ///      that named ClientFeature::ModeUi; and UI API 4 (mode.json's "uiApi": 4: nox.spellIcon,
 ///      nox.hitArea, ui.tick, nox.label's keep), a UI of it sent only to a client of level 5 or
 ///      above that named ModeUi and ModeUi2 (ui_proto.hpp's kDrawScaleLevel and kUiApi4Level)
-inline constexpr std::uint16_t kClientLevel = 5;
+///   6  a host's client key realm (a mode's "clientKeys"): the reply's version 5 tail read, and the
+///      client's secret for it sent in its query (ClientSecret, client_keys.hpp); and a script mode's
+///      big values (nox.send over 900 bytes, to 256 KB: MSG_NOXCPP_MODEUI's kDataBegin and
+///      kDataChunk), sent only to a client of level 6 or above that named ModeUi (ui_proto.hpp's
+///      kBigDataLevel); and UI API 5 (mode.json's "uiApi": 5: nox.hudReserve), a UI of it sent only
+///      to a client of level 6 or above that named ModeUi and ModeUi2 (kUiApi5Level)
+inline constexpr std::uint16_t kClientLevel = 6;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).
 inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.
@@ -99,13 +123,21 @@ struct ExtendedServer {
     std::string typesPacks;      ///< the packs that add them, ", "-joined (sent up to 255 bytes, cut after a whole one)
     std::uint16_t minClientLevel = 0; ///< the lowest client level it lets in (version 4; 0: any)
     std::uint16_t clientLevel = 0;    ///< its own build's kClientLevel (version 4; 0 in an older one's)
+    std::uint64_t realm = 0;          ///< its client key realm (version 5; 0: none)
     bool operator==(const ExtendedServer&) const = default;
 };
 
 /// The query; with client features, version 2's (none: version 1's, as before); with an added
-/// object types' hash, version 3's; with a client level above 0, version 4's.
+/// object types' hash, version 3's; with a client level above 0, version 4's; with a secret,
+/// version 5's.
 std::vector<std::uint8_t> encodeExtendedQuery(std::uint32_t token, std::uint32_t clientFeatures = 0, std::uint64_t typesHash = 0,
-                                              std::uint16_t clientLevel = 0);
+                                              std::uint16_t clientLevel = 0, const std::optional<ClientSecret>& secret = std::nullopt);
+/// The secret a query carries (version 5's), if `datagram` is one with it (nullopt: none, too
+/// short, or realm 0).
+std::optional<ClientSecret> extendedQuerySecret(std::span<const std::uint8_t> datagram);
+/// The key a host keeps for a secret: the first 32 hex digits (lower case) of SHA-256 over
+/// "noxcore-client-key", the realm (u64, little-endian) and the secret.
+std::string clientKeyOf(const ClientSecret& secret);
 /// The query's token, if `datagram` is one.
 std::optional<std::uint32_t> decodeExtendedQuery(std::span<const std::uint8_t> datagram);
 /// The query's version, if `datagram` is one (1: a browser's bare one; 2 on: a game's).

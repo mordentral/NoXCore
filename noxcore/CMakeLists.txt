@@ -41,6 +41,7 @@ add_library(noxcore
     src/crypto/blowfish_tables.cpp
     src/crypto/crc.cpp
     src/crypto/noxcrypt.cpp
+    src/crypto/sha256.cpp
     src/io/byte_reader.cpp
     src/io/file.cpp
     src/io/game_dir.cpp
@@ -82,6 +83,7 @@ add_library(noxcore
     src/mapedit/walls.cpp
     src/mapedit/writer.cpp
     src/lobby/browser.cpp
+    src/lobby/client_keys.cpp
     src/lobby/listing.cpp
     src/lobby/wol_chat.cpp
     src/lobby/xwis.cpp

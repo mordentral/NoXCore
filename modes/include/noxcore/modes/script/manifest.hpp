@@ -11,6 +11,11 @@
 //     "stockClients": true,              GAME.EXE players can join (false: NoX Core only)
 //     "minClientLevel": 5,               the lowest NoX Core client level let in (0, the default:
 //                                        any; at most this build's, lobby::kClientLevel)
+//     "clientKeys": true,                a per-PC key for each NoX Core player (player.clientKey,
+//                                        nox.clientKey): the host's realm in its moddata, each
+//                                        client's secret for it in its own folder (false: none)
+//     "mapRespawns": false,              nothing its maps put in respawns (a barrel broken, a potion
+//                                        drunk, a weapon taken stay gone; true, the default: as the game)
 //     "gameplay": {"teamDamage": false}, the host's team options it pins for the game: any of
 //                                        "teamDamage", "autoAssign", "teamPlay" (gameplay flags
 //                                        1, 2, 4), each kept as given (none: the host's)
@@ -50,7 +55,7 @@ namespace nox::modes::script {
 /// The script API this build gives (a mode.json's "api"; another's is refused, with its reason).
 inline constexpr int kScriptApi = 1;
 /// The newest UI API this build gives (a mode.json's "uiApi", 1 to this; script_ui.hpp).
-inline constexpr int kUiApi = 4;
+inline constexpr int kUiApi = 5;
 
 struct Manifest {
     ModeInfo info;
@@ -64,6 +69,10 @@ struct Manifest {
     /// mode.json's "minClientLevel": a NoX Core client below it is refused at its join with the
     /// too-old notice (GameHost::Options::minClientLevel, raised to it). 0: any.
     std::uint16_t minClientLevel = 0;
+    /// mode.json's "clientKeys" (GameHost::Options::clientKeyRealm: the realm file in moddata).
+    bool clientKeys = false;
+    /// mode.json's "mapRespawns": false (GameHost::Options::noMapRespawns).
+    bool noMapRespawns = false;
     /// mode.json's "pickup" (GameHost::Options::pickupAnyClass / pickupDuplicates).
     bool pickupAnyClass = false;
     bool pickupDuplicates = false;

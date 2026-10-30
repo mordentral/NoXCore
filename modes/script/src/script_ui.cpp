@@ -102,6 +102,18 @@ struct ScriptUiClient::Impl {
     std::vector<UiWindow> windows;
     UiWindow* drawing = nullptr; ///< (the window whose draw is running: draws go to it)
     std::deque<std::pair<std::uint8_t, std::vector<std::uint8_t>>> inbox; ///< data and views, oldest first
+    /// (Client level 6) A big value on its way (kDataBegin, then its kDataChunks); whole, it goes
+    /// into the inbox under kDataBegin, its value's bytes unpacked. `bigIn` how many such wait there.
+    struct BigData {
+        bool active = false;
+        std::uint32_t raw = 0;
+        std::uint8_t coding = 0;
+        std::uint32_t coded = 0;
+        std::vector<std::uint8_t> bytes;
+    };
+    BigData big;
+    int bigIn = 0;
+    static constexpr int kMaxBigIn = 8;
     std::uint64_t nowMs = 0;
     std::string error;
     // API 2's.
@@ -120,6 +132,12 @@ struct ScriptUiClient::Impl {
         w.x = w.specX + w.anchorX * marginX;
         w.y = w.specY + w.anchorY * marginY;
     }
+    /// (API 5) nox.hudReserve's box, as given (its anchor moves it as a window's).
+    struct Reserve {
+        UiRect box;
+        std::int8_t anchorX = 0, anchorY = 0;
+    };
+    std::optional<Reserve> reserve;
     std::vector<UiTooltipLine> tooltip; ///< (this frame's, or the last one's when a frame ran out of time first)
     bool tooltipSet = false;            ///< (nox.tooltip called in this frame)
     std::vector<UiLabel> labels;
@@ -173,7 +191,10 @@ struct ScriptUiClient::Impl {
         uiRef = 0;
         runningApi = 0;
         windows.clear();
+        reserve.reset();
         inbox.clear();
+        big = BigData{};
+        bigIn = 0;
         sounds.clear();
         tooltip.clear();
         labels.clear();
@@ -400,6 +421,58 @@ UiWindow& drawingWindow(lua_State* L)
     return *impl.drawing;
 }
 
+float clampedFloat(double v, float lo, float hi, float fallback);
+
+/// The table at `idx`'s anchor (NoxWindowSpec's: none or "center" 0, 0) into `ax`, `ay`: -1 the left
+/// or top, 1 the right or bottom; another name stops the UI with the names.
+void readAnchor(lua_State* L, int idx, std::int8_t& ax, std::int8_t& ay)
+{
+    lua_getfield(L, idx, "anchor");
+    if (!lua_isnil(L, -1)) {
+        const char* a = lua_isstring(L, -1) ? lua_tostring(L, -1) : "";
+        struct Anchor {
+            std::string_view name;
+            std::int8_t x, y;
+        };
+        static constexpr Anchor kAnchors[] = {{"center", 0, 0},  {"topleft", -1, -1}, {"top", 0, -1},       {"topright", 1, -1}, {"left", -1, 0},
+                                              {"right", 1, 0},   {"bottomleft", -1, 1}, {"bottom", 0, 1}, {"bottomright", 1, 1}};
+        const auto found = std::ranges::find(kAnchors, std::string_view(a), &Anchor::name);
+        luaL_argcheck(L, found != std::end(kAnchors), idx,
+                      "anchor is \"center\", \"topleft\", \"top\", \"topright\", \"left\", \"right\", \"bottomleft\", \"bottom\" or \"bottomright\"");
+        ax = found->x;
+        ay = found->y;
+    }
+    lua_pop(L, 1);
+}
+
+int uiHudReserve(lua_State* L)
+{
+    // (API 5) nox.hudReserve({x, y, w, h, anchor}) or nil: a box (the 640 x 480's units, its anchor
+    // as a window's) the game's own top-left icons (the enchantments' row) keep out of: they start
+    // below it. nil: none (as the game draws them).
+    Impl& impl = implOf(L);
+    if (lua_isnoneornil(L, 1)) {
+        impl.reserve.reset();
+        return 0;
+    }
+    luaL_checktype(L, 1, LUA_TTABLE);
+    const auto num = [&](const char* name, float lo, float hi) {
+        lua_getfield(L, 1, name);
+        luaL_argcheck(L, lua_isnumber(L, -1), 1, "x, y, w and h are numbers");
+        const float v = clampedFloat(lua_tonumber(L, -1), lo, hi, 0);
+        lua_pop(L, 1);
+        return v;
+    };
+    Impl::Reserve r;
+    r.box.x = num("x", 0, 640);
+    r.box.y = num("y", 0, 480);
+    r.box.w = num("w", 0, 640);
+    r.box.h = num("h", 0, 480);
+    readAnchor(L, 1, r.anchorX, r.anchorY);
+    impl.reserve = r;
+    return 0;
+}
+
 int uiWindow(lua_State* L)
 {
     Impl& impl = implOf(L);
@@ -432,22 +505,7 @@ int uiWindow(lua_State* L)
         w.frame = flag("frame", true);
         w.clickThrough = flag("clickThrough", false);
         w.hud = flag("hud", false);
-        lua_getfield(L, 2, "anchor");
-        if (!lua_isnil(L, -1)) {
-            const char* a = lua_isstring(L, -1) ? lua_tostring(L, -1) : "";
-            struct Anchor {
-                std::string_view name;
-                std::int8_t x, y;
-            };
-            static constexpr Anchor kAnchors[] = {{"center", 0, 0},  {"topleft", -1, -1}, {"top", 0, -1},       {"topright", 1, -1}, {"left", -1, 0},
-                                                  {"right", 1, 0},   {"bottomleft", -1, 1}, {"bottom", 0, 1}, {"bottomright", 1, 1}};
-            const auto found = std::ranges::find(kAnchors, std::string_view(a), &Anchor::name);
-            luaL_argcheck(L, found != std::end(kAnchors), 2,
-                          "anchor is \"center\", \"topleft\", \"top\", \"topright\", \"left\", \"right\", \"bottomleft\", \"bottom\" or \"bottomright\"");
-            w.anchorX = found->x;
-            w.anchorY = found->y;
-        }
-        lua_pop(L, 1);
+        readAnchor(L, 2, w.anchorX, w.anchorY);
     }
     if (w.frame) {
         // (On the screen whole, and no smaller than its frame's title needs.)
@@ -1021,7 +1079,11 @@ void Impl::start()
     static constexpr std::pair<const char*, lua_CFunction> kToolbox4[] = {
         {"spellIcon", uiSpellIcon}, {"hitArea", uiHitArea},
     };
-    lua_createtable(L, 0, static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3) + std::size(kToolbox4)) + 1);
+    static constexpr std::pair<const char*, lua_CFunction> kToolbox5[] = {
+        {"hudReserve", uiHudReserve},
+    };
+    lua_createtable(L, 0,
+                    static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3) + std::size(kToolbox4) + std::size(kToolbox5)) + 1);
     for (const auto& [name, fn] : kToolbox) {
         lua_pushcfunction(L, fn, name);
         lua_setfield(L, -2, name);
@@ -1040,6 +1102,12 @@ void Impl::start()
     }
     if (uiApi >= 4) {
         for (const auto& [name, fn] : kToolbox4) {
+            lua_pushcfunction(L, fn, name);
+            lua_setfield(L, -2, name);
+        }
+    }
+    if (uiApi >= 5) {
+        for (const auto& [name, fn] : kToolbox5) {
             lua_pushcfunction(L, fn, name);
             lua_setfield(L, -2, name);
         }
@@ -1289,6 +1357,56 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             inbox.emplace_back(sub, std::vector<std::uint8_t>(rest.begin(), rest.end()));
         }
         break;
+    case uimsg::kDataBegin: {
+        // (Client level 6) A big value: its sizes checked against the caps (a packed one no bigger
+        // than its value and a little more), then its pieces in order.
+        const std::uint32_t raw = r.u32();
+        const std::uint8_t coding = r.u8();
+        const std::uint32_t coded = r.u32();
+        big = BigData{};
+        if (!r.ok || raw == 0 || raw > uimsg::kMaxBigValue || coding > 1 || coded == 0 || coded > raw + raw / 8 + 64 ||
+            (coding == 0 && coded != raw)) {
+            break; // (not one we take: its pieces let go)
+        }
+        big.active = true;
+        big.raw = raw;
+        big.coding = coding;
+        big.coded = coded;
+        big.bytes.reserve(coded);
+        break;
+    }
+    case uimsg::kDataChunk: {
+        const std::uint32_t at = r.u32();
+        if (!big.active || !r.ok || at != big.bytes.size()) {
+            big = BigData{}; // (out of order or not begun: the server sends them in order)
+            break;
+        }
+        const auto bytes = r.rest();
+        if (big.bytes.size() + bytes.size() > big.coded) {
+            big = BigData{};
+            break;
+        }
+        big.bytes.insert(big.bytes.end(), bytes.begin(), bytes.end());
+        if (big.bytes.size() < big.coded) {
+            break;
+        }
+        std::vector<std::uint8_t> value;
+        if (big.coding == 1) {
+            try {
+                value = video::nxzDecompress(big.bytes, big.raw);
+            } catch (const std::exception&) {
+                value.clear();
+            }
+        } else {
+            value = std::move(big.bytes);
+        }
+        if (value.size() == big.raw && vm && inbox.size() < 256 && bigIn < kMaxBigIn) {
+            inbox.emplace_back(uimsg::kDataBegin, std::move(value));
+            ++bigIn;
+        }
+        big = BigData{};
+        break;
+    }
     case uimsg::kDrop:
         receiving = false;
         stop({});
@@ -1382,11 +1500,17 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
         for (int n = 0; impl.vm && !impl.inbox.empty() && n < 32 && inTime(); ++n) {
             auto [sub, bytes] = std::move(impl.inbox.front());
             impl.inbox.pop_front();
+            if (sub == uimsg::kDataBegin) {
+                --impl.bigIn; // (a big value: its own limits)
+            }
             const char* hook = sub == uimsg::kView ? "onView" : "onMessage";
             if (!(sub == uimsg::kView ? impl.hasView : impl.hasMessage) || !impl.begin(hook)) {
                 continue;
             }
-            if (!decodeValue(impl.vm->thread(), bytes)) {
+            const CodecLimits limits = sub == uimsg::kDataBegin
+                                           ? CodecLimits{.depth = uimsg::kBigValueDepth, .pairs = uimsg::kBigValuePairs, .bytes = uimsg::kMaxBigValue}
+                                           : CodecLimits{};
+            if (!decodeValue(impl.vm->thread(), bytes, limits)) {
                 lua_pop(impl.vm->thread(), 1);
                 continue; // (not a value: let go)
             }
@@ -1570,6 +1694,18 @@ void ScriptUiClient::setHudShown(bool shown)
 bool ScriptUiClient::hudShown() const noexcept
 {
     return impl_->hudShown;
+}
+
+std::optional<UiRect> ScriptUiClient::hudReserve() const
+{
+    const Impl& impl = *impl_;
+    if (!impl.reserve || !impl.vm) {
+        return std::nullopt;
+    }
+    UiRect r = impl.reserve->box;
+    r.x += static_cast<float>(impl.reserve->anchorX * impl.marginX);
+    r.y += static_cast<float>(impl.reserve->anchorY * impl.marginY);
+    return r;
 }
 
 void ScriptUiClient::setViewMargins(float x, float y)

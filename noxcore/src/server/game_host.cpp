@@ -162,6 +162,7 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
                        .modeOwnsLimits = options_.modeOwnsLimits,
                        .pickupAnyClass = options_.pickupAnyClass,
                        .pickupDuplicates = options_.pickupDuplicates,
+                       .noMapRespawns = options_.noMapRespawns,
                        .exactMaths = options_.exactMaths})
     , transport_({.maxPlayers = options_.solo ? 1 + options_.soloGuests : options_.maxPlayers, .password = options_.password})
 {
@@ -261,8 +262,9 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
         }
         transport_.setNewThingTypes(types.hash, std::move(packs));
     }
-    // The lowest client level let in (0: any).
+    // The lowest client level let in (0: any); a mode's client key realm (0: none).
     transport_.setMinClientLevel(options_.minClientLevel);
+    transport_.setClientKeyRealm(options_.clientKeyRealm);
     if (types.hash != 0 || options_.minClientLevel != 0) {
         // (the joins' refusals, why, in the process's log: the content packs' log sink)
         transport_.setLog([](const std::string& line) { content::writeContentPackLog(line); });

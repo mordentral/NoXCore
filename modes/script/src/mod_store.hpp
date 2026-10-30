@@ -123,4 +123,10 @@ private:
 /// The toolbox's nox.store table pushed (its functions).
 void pushStoreTable(lua_State* L);
 
+/// (mode.json's "clientKeys") A mod's client key realm on this host: `<modData>/<id>.realm`, 16 hex
+/// digits, made at the first call (random, never 0) and kept for good. Made exclusive: of games
+/// starting at once (a pool's) one writes it and every one reads that one. 0 when it can't be made
+/// or read (`error` why).
+std::uint64_t clientKeyRealm(const std::filesystem::path& modData, std::string_view id, std::string& error);
+
 } // namespace nox::modes::script
