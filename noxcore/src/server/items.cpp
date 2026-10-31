@@ -83,11 +83,19 @@ void Items::tellEveryone(std::vector<std::uint8_t> bytes)
 
 bool Items::classMay(const ServerObject& player, const ServerObject& item) const
 {
-    if (!modifiers || !player.player) {
+    if (!player.player) {
         return true;
     }
     if (player.player->multiclass) {
         return true; // (noxcpp: a multiclass player, a mode's, wields any class's weapons and wears any armour)
+    }
+    if (!(item.classes & (oc::Weapon | oc::Wand | oc::Armor))) {
+        // (itemClassUseMask, 0x57A590: a food's ~(SUBCLASS >> 5) | 0xFE, so only the warrior's
+        // bit drops out, for a mana potion, SUBCLASS bit 5; anything else any class.)
+        return !(item.classes & oc::Food) || !(item.subclasses & 0x20u) || player.player->classId != 0;
+    }
+    if (!modifiers) {
+        return true;
     }
     const things::EquipDef* def = (item.classes & oc::Armor) ? modifiers->findArmor(item.typeName) : modifiers->findWeapon(item.typeName);
     return !def || !def->classUse || (*def->classUse & (1u << player.player->classId)) != 0;
@@ -236,10 +244,10 @@ bool Items::pickupFunction(ServerObject& player, ServerObject& item, bool everyo
     }
     if (item.pickup == "PotionPickup") {
         // pickupPotion: in a network game (not a quest) only what a player's class may
-        // use ("pickup.c:ObjectEquipClassFail"); drunk at once when it doesn't overfill: health
-        // (its number, a player's by its class's multiplier) while short of more than that, mana
-        // the same (from the health's amount when both), poison cured (a player's); drunk, gone;
-        // else no longer decaying and DefaultPickup. Sounds: 0x39D refused, 0x2F2 health, 0x2F3
+        // use, a warrior no mana potion ("pickup.c:ObjectEquipClassFail"); drunk at once when it
+        // doesn't overfill: health (its number, a player's by its class's multiplier) while short
+        // of more than that, mana the same (from the health's amount when both), poison cured (a
+        // player's); drunk, gone; else no longer decaying and DefaultPickup. Sounds: 0x39D refused, 0x2F2 health, 0x2F3
         // mana, Cure Poison's on, 0x340 picked up.
         // (noxcpp: a mode's pickupAnyClass takes any.)
         if ((world.gameFlags & GameFlag::Network) && !world.quest() && player.player && !world.pickupAnyClass && !classMay(player, item)) {
