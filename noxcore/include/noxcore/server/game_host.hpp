@@ -162,7 +162,7 @@ private:
 // knows, and the important messages held for it while it loads.
 struct HostedPlayer {
     std::uint8_t peer = 0;         ///< the transport's stream id
-    std::uint32_t extent = 0;      ///< its unit; the net code clients know it by
+    ObjectRef extent;              ///< its unit; the net code clients know it by (host_links.hpp)
     /// Its join's number in this host, never given again (1 on): a cache's key for the player
     /// (a peer, its record's address and a unit's number are all used again). Not on the wire.
     std::uint32_t joinSerial = 0;
@@ -195,6 +195,10 @@ struct HostedPlayer {
 // The hosted game. The owner feeds it datagrams (receive) and the time (tick) and sends what
 // takeOutgoing hands back; the rest is the host's windows and console reading or changing it.
 class GameHost {
+    /// (host_links.hpp: the host's records' links, carried through a map change.)
+    template <class>
+    friend struct Links;
+
 public:
     struct Options {
         std::string serverName = "noxcpp";
@@ -230,6 +234,10 @@ public:
         /// noxcpp (a NoX Core mode's): a player's CLIENT_READY (its map loaded, at its join and at
         /// each map's), after what the game sends it then.
         std::function<void(GameHost&, std::uint8_t peer)> onClientReady;
+        /// noxcpp (a NoX Core mode's): its records' links carried through a map change, told right
+        /// after the switch as the host carries its own (carryLinks over them with the switch's
+        /// keys: object_links.hpp, Server::carry), before anything else of the mode's runs.
+        std::function<void(GameHost&, const KeyCarry&)> carryLinks;
         /// noxcpp (a NoX Core mode's): an object a mode gave a draw scale (ServerObject::ModSize's
         /// drawScale, not 1) went to a player that didn't know it: its record written in this
         /// player's update, the first since it came into its view (or since its client forgot
@@ -858,7 +866,7 @@ private:
     net::msg::GameSettings2 gameSettings2() const;
     std::set<std::uint8_t> sysops_;       ///< (g_srvSysopList) by peer
     std::vector<std::string> console_;
-    std::uint32_t echoTo_ = 0;            ///< a sysop's unit, for test-command echoes
+    ObjectRef echoTo_;                    ///< a sysop's unit, for test-command echoes
     bool settingsChanged_ = false;        ///< (server_gameSettingsUpdated)
     bool mapCycleOn_ = true;              ///< ("set cycle")
     int latency_ = 0;                     ///< (the latency compensation mode)
@@ -968,7 +976,7 @@ private:
     void endVote(std::size_t index);
     struct Vote {
         int kind = 0;
-        std::uint32_t target = 0;   ///< its unit
+        ObjectRef target;           ///< its unit
         std::uint8_t votes = 0;
         std::uint32_t voters = 0;   ///< by slot
         std::uint8_t needed = 0;

@@ -5,6 +5,8 @@
 // mode.
 #pragma once
 
+#include "noxcore/server/object_key.hpp"
+
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -14,6 +16,9 @@ namespace nox::server {
 class World;
 
 class KeptLists {
+    template <class>
+    friend struct Links; ///< (block_links.hpp)
+
 public:
     /// What a list keeps: things in the world and not going (Present), of `type` if it's not 0
     /// (thing.bin's number, from 1); or those also alive (Living: not dead, health not 0).
@@ -43,10 +48,10 @@ private:
     struct List {
         std::uint32_t key = 0;
         Rule rule;
-        std::vector<std::uint32_t> things;
+        std::vector<ObjectRef> things;
     };
     struct Holder {
-        std::uint32_t holder = 0;
+        ObjectRef holder;
         std::vector<List> lists;
     };
     Rule rule(std::uint32_t key) const;

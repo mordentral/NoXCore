@@ -106,11 +106,11 @@ inline ThingTypes thingTypes(const modes::script::MapThings& things)
 }
 
 /// A generated lobby's things as it loads: its signs west to east, its portal and its records
-/// board (`types`), each the last found; 0: none.
+/// board (`types`), each the last found; 0: none. (A load's answer: keys, not stored links.)
 struct LobbyThings {
-    std::vector<std::uint32_t> signs;
-    std::uint32_t portal = 0;
-    std::uint32_t board = 0;
+    std::vector<ObjectKey> signs;
+    ObjectKey portal = 0;
+    ObjectKey board = 0;
 };
 inline LobbyThings lobbyThings(const World& world, const ThingTypes& types)
 {

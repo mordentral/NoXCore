@@ -9,6 +9,8 @@
 // things to the next.
 #pragma once
 
+#include "noxcore/server/object_key.hpp"
+
 #include <cstdint>
 #include <map>
 #include <vector>
@@ -24,6 +26,9 @@ class World;
 struct ServerObject;
 
 class Satellites {
+    template <class>
+    friend struct Links; ///< (block_links.hpp)
+
 public:
     /// The harm about each thing each frame (Missiles::damageAt's): out to `reach`, the whole of
     /// `damage` within `full`, of `type`, from the thing, the centre spared.
@@ -41,7 +46,7 @@ public:
         float step = 0;
     };
     struct Group {
-        std::vector<std::uint32_t> things;
+        std::vector<ObjectRef> things;
         float angle = 0;
         std::uint32_t born = 0;      ///< the frame its things were handed over
         std::uint32_t life = 0;      ///< past this many frames from `born`, put away
@@ -53,7 +58,7 @@ public:
     explicit Satellites(const things::ThingDb& things) : things_(things) {}
 
     /// The centre's group (made, its angle 0, when it has none).
-    Group& group(std::uint32_t centre) { return groups_[centre]; }
+    Group& group(std::uint32_t centre) { return groups_[ObjectRef{centre}]; }
     const Group* find(std::uint32_t centre) const;
     /// Things handed to the centre's group from `frame` (its things before them let go).
     void start(std::uint32_t centre, std::vector<std::uint32_t> things, std::uint32_t frame, std::uint32_t life, std::uint32_t harmAfter,
@@ -90,7 +95,7 @@ private:
     void letGo(World& world, const Group& g);
 
     const things::ThingDb& things_;
-    std::map<std::uint32_t, Group> groups_; ///< by centre
+    RefMap<Group> groups_; ///< by centre
 };
 
 } // namespace nox::server

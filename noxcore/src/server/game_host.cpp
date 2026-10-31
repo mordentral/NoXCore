@@ -16,6 +16,7 @@
 #include "noxcore/server/collide.hpp"
 #include "noxcore/server/dialog.hpp"
 #include "noxcore/server/enchant.hpp"
+#include "noxcore/server/host_links.hpp"
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/modes.hpp"
@@ -2788,7 +2789,7 @@ void GameHost::onVote(std::uint8_t peer, std::span<const std::uint8_t> m)
     const auto newVote = [&](int kind, std::uint32_t target, std::uint8_t needed, bool team) {
         // (at the list's head; the first, MSG_VOTE 6 {1} to everyone).
         const bool first = votes_.empty();
-        votes_.insert(votes_.begin(), Vote{kind, target, 0, 0, needed, team});
+        votes_.insert(votes_.begin(), Vote{kind, ObjectRef{target}, 0, 0, needed, team});
         if (first) {
             sendImportantToAll(std::vector<std::uint8_t>{0xEE, 0x06, 1}, true); // (SrvNet_SendVoteState(0xFF, 1))
         }
@@ -2976,7 +2977,7 @@ void GameHost::updateVotes()
                     endVote(static_cast<std::size_t>(at - votes_.begin()));
                 }
                 i = static_cast<std::size_t>(std::ranges::find_if(votes_, [&](const Vote& w) {
-                                                 return std::ranges::find(later, std::pair{w.kind, w.target}) != later.end();
+                                                 return std::ranges::find(later, std::pair{w.kind, w.target.key()}) != later.end();
                                              }) - votes_.begin());
                 continue;
             }
@@ -3765,6 +3766,12 @@ void GameHost::loadNextMap()
     // exe already in the important queue, which the load keeps) goes on ahead of the load's own.
     auto earlier = std::exchange(server_.world().broadcasts(), {});
     server_.switchMap(file, mapFile_, waypoint);
+    // The host's records that name things carried by their rules (host_links.hpp), then the mode's
+    // (its own tables), with the switch's keys.
+    carryLinks(*this, server_.carry());
+    if (options_.carryLinks) {
+        options_.carryLinks(*this, server_.carry());
+    }
     for (const auto& [peer, held] : refused_) {
         keepHeldOut(peer); // (noxcpp: Options::stockRefusal's, through the switch's outfit and starts)
     }

@@ -68,7 +68,7 @@ void CoopDirector::applyScale(float health)
         // Its own health as the map made it (first seen), times the party's. (An extent can be
         // used again for a new thing: the base is that thing's only while its script id and type
         // are.)
-        Base& b = baseHealth_[o.extent];
+        Base& b = baseHealth_[server::ObjectRef{o.extent}];
         if (b.own == 0 || b.scriptId != o.scriptId || b.type != o.type) {
             b = Base{o.scriptId, o.type, o.maxHealth};
         }
@@ -370,7 +370,7 @@ void CoopDirector::pickedUp(server::World& w, server::ServerObject& taker, serve
     if (std::ranges::find(units, &taker) == units.end()) {
         return;
     }
-    copies_.erase(item.extent);
+    copies_.erase(server::ObjectRef{item.extent});
     // Another of the party who hasn't had it yet (all of the campaign's class: what the taker
     // could use, they can). A spell book's: below the level the taker has now (a second book of
     // a spell is its next level).
@@ -398,7 +398,7 @@ void CoopDirector::pickedUp(server::World& w, server::ServerObject& taker, serve
         copy->guideCreature = item.guideCreature;
         copy->subclasses = item.subclasses;
         if (spell) {
-            copies_[copy->extent] = level; // (for those below it only: mayPickUp)
+            copies_[server::ObjectRef{copy->extent}] = level; // (for those below it only: mayPickUp)
         }
     }
 }

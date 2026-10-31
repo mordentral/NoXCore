@@ -10,6 +10,8 @@
 // player, where it lay). Nothing here knows any mode.
 #pragma once
 
+#include "noxcore/server/object_key.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -23,6 +25,9 @@ class World;
 struct ServerObject;
 
 class Gatherables {
+    template <class>
+    friend struct Links; ///< (block_links.hpp)
+
 public:
     enum class Way : std::uint8_t { Drift, Touch };
     struct Rules {
@@ -37,7 +42,7 @@ public:
         float near = 1;
     };
     struct Item {
-        std::uint32_t extent = 0;
+        ObjectRef extent;
         std::uint32_t value = 0;
         std::uint32_t born = 0;
     };

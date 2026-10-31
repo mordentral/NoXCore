@@ -265,7 +265,7 @@ int Watchers::list(std::uint32_t ends, Handler handler)
 
 void Watchers::watch(int l, std::uint32_t thing, Name type, float x, float y)
 {
-    lists_.at(static_cast<std::size_t>(l)).things.push_back({thing, type, x, y});
+    lists_.at(static_cast<std::size_t>(l)).things.push_back({ObjectRef{thing}, type, x, y});
 }
 
 void Watchers::unwatchAll(int l)
@@ -400,7 +400,7 @@ void Watchers::evaluateKeep(int g, GameHost& host, std::uint32_t frame, std::uin
                 found = group.kept.emplace(p.name, Group::Kept{group.keepAll}).first;
             }
             kept = found != group.kept.end() ? &found->second : nullptr;
-            cached = {p.joinSerial, unit->extent, kept};
+            cached = {p.joinSerial, ObjectRef{unit->extent}, kept};
         }
         if (!kept) {
             continue;
@@ -483,7 +483,7 @@ void Watchers::evaluateFirsts(int g, GameHost& host)
     }
 }
 
-void Watchers::exits(int g, std::vector<std::uint32_t> gates, Handler handler)
+void Watchers::exits(int g, std::vector<ObjectRef> gates, Handler handler)
 {
     Group& group = groups_.at(static_cast<std::size_t>(g));
     group.gates = std::move(gates);
@@ -503,7 +503,7 @@ void Watchers::evaluateExits(int g, GameHost& host)
         if (gate == 0 || it == group.gates.end() || group.through.contains(unit->extent)) {
             continue;
         }
-        group.through.insert(unit->extent);
+        group.through.emplace(unit->extent);
         WatchEvent e;
         e.kind = Event::Kind::Exit;
         e.peer = peer;

@@ -8,6 +8,8 @@
 // nox.setDrawScale keeps and sends nothing. (Internal to the script modes' sources.)
 #pragma once
 
+#include "noxcore/server/object_key.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -23,6 +25,10 @@ struct ServerObject;
 namespace nox::modes::script {
 
 class DrawScales {
+    /// (script_links.hpp: what's owed names things.)
+    template <class>
+    friend struct server::Links;
+
 public:
     /// The most messages kept owed (a player with no reliable room: GameHost::reliableRoom); past
     /// it a new one is let go (its client draws that thing as its type).
@@ -53,7 +59,7 @@ public:
 private:
     struct Owed {
         std::uint8_t peer = 0;
-        std::uint32_t extent = 0;
+        server::ObjectRef extent;
         std::uint16_t type = 0;
     };
     /// `o`'s scale sent to `peer` now, or owed when it has no room.

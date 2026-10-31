@@ -24,11 +24,36 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <unordered_map>
 #include <utility>
 
 namespace nox::server {
 
+/// The last map change's keys (Server::loadMapKeeping): each thing it kept, its key then to its key
+/// now; 0 for anything left behind (or before any map change). What the records outside the world
+/// that outlive a map change are carried through (carryLinks over them with it: the host's, right
+/// after the switch, and the modes' records with it, GameHost::Options::carryLinks).
+class KeyCarry {
+public:
+    ObjectKey operator()(ObjectKey before) const
+    {
+        const auto it = keys_.find(before);
+        return it != keys_.end() ? it->second : 0u;
+    }
+    /// Whether the last load was a map change (kept what it had: false for a game's first map).
+    bool switched() const noexcept { return switched_; }
+
+private:
+    friend class Server;
+    std::unordered_map<ObjectKey, ObjectKey> keys_;
+    bool switched_ = false;
+};
+
 class Server {
+    /// (host_links.hpp: its World and script, each map's own.)
+    template <class>
+    friend struct Links;
+
 public:
     struct Options {
         int multiplier = 1;        ///< substeps a frame: 1-4 (30-120 Hz)
@@ -191,6 +216,8 @@ public:
     /// The last map script read (the exe's <work dir>\nc.obj, written as a map's ScriptObject is
     /// read): a save of a map without one writes it (an original bug).
     const std::vector<std::uint8_t>& lastScriptCode() const noexcept { return lastScriptCode_; }
+    /// The last map change's carry (KeyCarry: set by each load, empty for one without an old map).
+    const KeyCarry& carry() const noexcept { return carry_; }
 
 private:
     /// The map editor's hot reload (script_reload.hpp, NoX Core's only: never in a game) swaps
@@ -214,6 +241,7 @@ private:
     SimClock clock_;
     SoundTable soundTable_; ///< thing.bin's sound numbers (World::soundTable points here)
     World world_;
+    KeyCarry carry_; ///< (the last load's: carry())
     map::MapFile mapFile_;
     std::vector<std::uint8_t> lastScriptCode_;
     script::ScriptFile scriptFile_;

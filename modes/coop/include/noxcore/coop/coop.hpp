@@ -134,6 +134,10 @@ private:
 /// (Its registry entry, coop_mode.cpp, makes it as the mode's server side: a ServerMode, the rest
 /// of which it leaves as the defaults.)
 class CoopDirector final : public server::ModeHooks, public modes::ServerMode {
+    /// (coop_links.hpp: its records' links, carried as each map loads: mapLoaded.)
+    template <class>
+    friend struct server::Links;
+
 public:
     struct Options {
         /// The campaign's class (0 warrior, 1 wizard, 2 conjurer): every player this class.
@@ -187,6 +191,9 @@ public:
     void killExperienceGiven(server::Fight& fight, server::ServerObject& victim, server::ServerObject& earner) override;
     bool mayStartDialog(server::Fight& fight, server::ServerObject& player, server::ServerObject& npc) override;
     void mapLoaded(server::Server& server) override;
+    /// A map change's carry of its records' links (GameHost::Options::carryLinks: coop_links.hpp's
+    /// rules), right after the switch.
+    void carryLinks(const server::KeyCarry& carry);
     /// No world-wide pause for one player's level-up, award flight or the host's menus while a
     /// guest is in (the campaign's rule); a chapter screen's, a map load's and a fade's stand.
     bool mayPause(server::PauseReason why) override;
@@ -281,7 +288,7 @@ public:
         std::string key;  ///< runnerKey
         std::string name;
         std::uint8_t peer = 0;
-        std::uint32_t extent = 0;
+        server::ObjectRef extent;
         bool host = false;
         bool identified = false;
         bool welcomed = false; ///< told the campaign and the rules (once its map was loaded)
@@ -419,8 +426,8 @@ private:
         std::uint16_t type = 0;
         std::uint16_t own = 0; ///< its own max health
     };
-    std::map<std::uint32_t, Base> baseHealth_; ///< each monster's own max health (by extent)
-    std::map<std::uint32_t, std::uint8_t> copies_; ///< spell books put back (extent -> the level they're for)
+    server::RefMap<Base> baseHealth_; ///< each monster's own max health (by extent)
+    server::RefMap<std::uint8_t> copies_; ///< spell books put back (extent -> the level they're for)
     /// A book, ability book or field guide a script hands "the player" (Pickup on the host, or on
     /// a guest in its own talk), as it was before it was used up.
     struct RewardBook {
@@ -462,15 +469,15 @@ private:
         std::uint16_t maxHealth = 0;
         std::uint32_t pass = 0;
     };
-    std::map<std::pair<std::uint8_t, std::uint32_t>, HealthTold> healthTold_;
+    std::map<std::pair<std::uint8_t, server::ObjectKey>, HealthTold> healthTold_; ///< (not links: emptied as each map loads)
     std::uint32_t healthPass_ = 0;
     void tellPartyHealth();
     /// The host's talk in a scene shown to the others as the game's own dialog (MSG_DIALOG 3, its
     /// close 4), view-only: their answers find no talk of theirs and do nothing.
     void showSceneDialog(const server::ServerObject& host, std::size_t mark);
     void watchSceneDialog();
-    std::set<std::uint32_t> sceneViewers_; ///< the players shown the host's scene talk (extents)
-    std::uint32_t sceneTalker_ = 0;        ///< the host's unit while it's shown
+    server::RefSet sceneViewers_;          ///< the players shown the host's scene talk (extents)
+    server::ObjectRef sceneTalker_;        ///< the host's unit while it's shown
     float scaledHealth_ = 1.0f;
     std::uint64_t lastRescale_ = 0;
     std::function<bool(const std::string&, server::ServerObject*)> coreSave_;
@@ -490,15 +497,15 @@ private:
     std::uint32_t refused_ = 0;            ///< the pauses refused (a bit per PauseReason): their next unpause too
     std::uint32_t chapterAt_ = 0;          ///< the frame the chapter's wait began
     bool mirrorOpen_ = false;
-    std::uint32_t mirrorNpc_ = 0;
-    std::uint32_t mirrorTalker_ = 0;       ///< the mirrored talk's player (extent)
+    server::ObjectRef mirrorNpc_;
+    server::ObjectRef mirrorTalker_;       ///< the mirrored talk's player (extent)
     // (P3: exits, deaths, revisited maps)
     struct Gather {
-        std::uint32_t exit = 0;           ///< the first exit touched
+        server::ObjectRef exit;           ///< the first exit touched
         std::string to;                   ///< where it leads (its key: side-by-side exits are one way)
         std::uint64_t since = 0;          ///< the world's ticks as it began
         std::uint64_t lastTouch = 0;
-        std::map<std::uint32_t, std::uint64_t> standing; ///< each player's last touch (by extent)
+        server::RefMap<std::uint64_t> standing; ///< each player's last touch (by extent)
         bool warned = false;              ///< the "10 s left" told
     };
     std::optional<Gather> gather_;
@@ -506,7 +513,7 @@ private:
     std::optional<std::uint64_t> scriptMovedAt_; ///< the world's ticks of a script's last MoveObject of the party
     std::map<std::uint8_t, std::uint64_t> downs_; ///< a dead player's peer -> the tick it's back
     bool wipe_ = false;
-    std::uint32_t wipeBy_ = 0;            ///< the last one down (its PlayerDeath functions the party's)
+    server::ObjectRef wipeBy_;            ///< the last one down (its PlayerDeath functions the party's)
     bool wipeRan_ = false;                ///< the wipe's PlayerDeath functions run
     std::optional<std::pair<float, float>> checkpoint_;
     std::vector<std::uint32_t> pristine_;
@@ -517,7 +524,7 @@ private:
     std::vector<Member> party_;
     std::minstd_rand rng_;
     /// When each guest was last told of a host-only thing ((its extent, the thing's) -> frame).
-    std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> toldAt_;
+    std::map<std::pair<server::ObjectKey, server::ObjectKey>, std::uint32_t> toldAt_; ///< (not links: a guest's leave drops its own)
     coopmsg::Roster lastRoster_;
     bool rosterDirty_ = true;
     /// The party's creatures (kCreatures, the friend dot over them): each party member's
@@ -525,8 +532,8 @@ private:
     /// a creature report goes out (World::creatureReports) or one of them is no longer the party's;
     /// the whole list to each NoX Core player whose last differs, while it has reliable room.
     struct PartyCreature {
-        std::uint32_t extent = 0;
-        std::uint32_t owner = 0;
+        server::ObjectRef extent;
+        server::ObjectRef owner;
     };
     std::vector<PartyCreature> partyCreatures_;
     std::vector<std::uint16_t> partyCreatureCodes_; ///< (their net codes, sorted: the message's)

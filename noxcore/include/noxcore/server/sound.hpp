@@ -107,9 +107,9 @@ void defaultDamageSound(World& world, const ServerObject& t, const ServerObject*
 /// how loud (0-100) a sound at (x, y) is at (atX, atY), by its range.
 int soundLoudness(const SoundInfo& info, float x, float y, float atX, float atY);
 
-/// The listener for one player's sends.
+/// The listener for one player's sends (made for the frame's sends: its key, not a stored link).
 struct SoundListener {
-    std::uint32_t extent = 0;  ///< its unit
+    ObjectKey extent = 0;      ///< its unit
     std::uint8_t team = 0;
     float camX = 0;            ///< its camera (PlayerControl::camX / camY)
     float camY = 0;

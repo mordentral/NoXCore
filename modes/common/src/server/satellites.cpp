@@ -24,8 +24,8 @@ const Satellites::Group* Satellites::find(std::uint32_t centre) const
 void Satellites::start(std::uint32_t centre, std::vector<std::uint32_t> things, std::uint32_t frame, std::uint32_t life, std::uint32_t harmAfter,
                        std::uint16_t type, const Harm& harm)
 {
-    Group& g = groups_[centre];
-    g.things = std::move(things);
+    Group& g = groups_[ObjectRef{centre}];
+    g.things.assign(things.begin(), things.end());
     g.born = frame;
     g.life = life;
     g.harmAfter = harmAfter;

@@ -12,9 +12,12 @@
 //  - GroupMember: one of a map group's members: a map number, a waypoint id or a group id by the
 //    group's kind.
 //  - ObjectRef: a stored link to another thing (its key), held in a field that outlives the frame
-//    (an owner, a holder, a target...). Every such field is listed with its rule for a map change in
-//    object_links.hpp, which the map change carries them all through (carryLinks), and a test checks
-//    the lists against the headers: a new link field can't be left out.
+//    (an owner, a holder, a target...), the world model's and the host's and modes' records alike
+//    (RefSet and RefMap: a set and a table by link). Every such field is listed with its rule for a
+//    map change in object_links.hpp (the host's in host_links.hpp, each mode's in its own), which
+//    the map change carries them all through (carryLinks), and a test checks the lists against the
+//    headers: a new link field can't be left out. A key held for the frame alone (an event's, a
+//    listener's) is an ObjectKey.
 //
 // MapNumber, NetCode and GroupMember convert to nothing implicitly, so passing one where a key is
 // expected (byExtent, an ObjectRef) doesn't compile; their raw values are explicit (number(), code(),
@@ -25,6 +28,8 @@
 #include <compare>
 #include <cstdint>
 #include <functional>
+#include <map>
+#include <set>
 #include <vector>
 
 namespace nox::server {
@@ -116,6 +121,18 @@ private:
 };
 
 static_assert(sizeof(MapNumber) == 4 && sizeof(NetCode) == 4 && sizeof(GroupMember) == 4 && sizeof(ObjectRef) == 4);
+
+/// A set of links, and a table by link (a record kept for each thing it names): looked up by a key
+/// as they are (find, contains, count: the comparison's transparent); an entry is added or erased
+/// by an ObjectRef (emplace takes a key). Listed in object_links.hpp as any link is.
+using RefSet = std::set<ObjectRef, std::less<>>;
+template <class V>
+using RefMap = std::map<ObjectRef, V, std::less<>>;
+
+/// A struct's links and their rules (object_links.hpp's tables): a struct whose links are private
+/// befriends every table (`template <class> friend struct Links;`).
+template <class S>
+struct Links;
 
 /// A list of links copied as keys (to walk while the list itself changes: an inventory emptied).
 inline std::vector<ObjectKey> keysOf(const std::vector<ObjectRef>& refs) { return {refs.begin(), refs.end()}; }

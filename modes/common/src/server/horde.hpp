@@ -14,6 +14,8 @@
 //     one's health with it), the dead handed to the fall handler and dropped.
 #pragma once
 
+#include "noxcore/server/object_key.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -25,9 +27,12 @@ class GameHost;
 struct ServerObject;
 
 class Horde {
+    template <class>
+    friend struct Links; ///< (block_links.hpp)
+
 public:
     struct Member {
-        std::uint32_t extent = 0;
+        ObjectRef extent;
         std::uint8_t worth = 1;      ///< (the mode's own)
         std::uint32_t steerAt = 0;   ///< its next look
         std::uint16_t most = 0;      ///< its most health held (0: as it is)

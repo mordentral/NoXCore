@@ -427,7 +427,7 @@ void CoopDirector::showSceneDialog(const server::ServerObject& host, std::size_t
             continue;
         }
         if (const server::ServerObject* u = host_->unitOf(m.peer)) {
-            sceneViewers_.insert(u->extent);
+            sceneViewers_.emplace(u->extent);
             tell(m, bytes);
         }
     }

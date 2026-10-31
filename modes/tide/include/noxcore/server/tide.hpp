@@ -23,6 +23,7 @@
 #pragma once
 
 #include "noxcore/mapgen/arena.hpp"
+#include "noxcore/server/object_key.hpp"
 #include "noxcore/server/which_map.hpp"
 
 #include <array>
@@ -59,6 +60,7 @@ class ReadyTimers;
 class Horde;
 class Watchers;
 class Gatherables;
+class KeyCarry;
 struct HostedPlayer;
 struct ServerObject;
 
@@ -263,6 +265,10 @@ std::optional<Results> parseResults(std::span<const std::uint8_t> rest);
 } // namespace tidemsg
 
 class TideDirector {
+    /// (tide_links.hpp: its records' links, carried through a map change.)
+    template <class>
+    friend struct Links;
+
 public:
     struct Options {
         std::filesystem::path mapsDir;
@@ -327,7 +333,7 @@ public:
         std::uint8_t cls = 0;   ///< its class (0 warrior, 1 wizard, 2 conjurer)
         bool multiclass = false; ///< every class's spells and abilities (its record says MultiClass)
         bool noxCore = false;    ///< on the NoX Core client (it identified itself; for its record)
-        std::uint32_t unit = 0; ///< its unit as last seen
+        ObjectRef unit; ///< its unit as last seen
         struct Weapon {
             TideWeapon kind = TideWeapon::Swing;
             std::uint8_t level = 1;
@@ -355,6 +361,9 @@ public:
 
     /// The host gone (the mode's detach): the script's own let go of it.
     void detach(GameHost& host);
+    /// A map change's carry of its records' links (GameHost::Options::carryLinks: tide_links.hpp's
+    /// rules), right after the switch.
+    void carryLinks(const KeyCarry& carry);
 
     /// A player's runner key: "account/name" (its WOL account, as it joined), or its name alone
     /// when it gave no account (a LAN game).
@@ -398,7 +407,7 @@ public:
     /// or no unit.
     bool giveXp(GameHost& host, const std::string& name, int xp);
     /// A piece of armour charmed (tests and the host's test commands): warding or repelling.
-    void charmItem(std::uint32_t item, bool warding) { charms_[item] = {warding ? Ward::Warding : Ward::Repulsion, 0}; }
+    void charmItem(std::uint32_t item, bool warding) { charms_[ObjectRef{item}] = {warding ? Ward::Warding : Ward::Repulsion, 0}; }
 
     /// The difficulty (the next run's in the lobby, the run's own in one). Set in the lobby alone:
     /// false (unchanged) once the run has begun.
@@ -481,21 +490,21 @@ private:
     /// The revive shrine: risen near a player in play a while after someone falls for good; a
     /// player in play touching it brings every fallen one who's watching back beside it.
     void runShrine(GameHost& host, const std::vector<std::pair<ServerObject*, Runner*>>& alive);
-    std::uint32_t shrine_ = 0;
+    ObjectRef shrine_;
     std::uint32_t shrineDueAt_ = 0; ///< when the next rises (0: nobody fallen)
     int revived_ = 0;
     /// The records: this run's filed as it ends; the lobby's board tells the table to whoever
     /// walks up to it (each at most every 20 s).
     void fileRecord(GameHost& host);
     bool runBoard(GameHost& host, const ServerObject& unit); ///< (true: told)
-    std::uint32_t board_ = 0;
+    ObjectRef board_;
     int sceneryWalked_ = 0;
     TideDifficulty difficulty_ = TideDifficulty::Adventurer;
     /// The noxsdl players asked at the gate (by peer: its unit then, when), till they walk off or
     /// answer. One that stays there unanswered kAskWaitFrames begins the run (an older noxsdl
     /// knows no question).
     struct Asked {
-        std::uint32_t unit = 0;
+        ObjectRef unit;
         std::uint32_t at = 0;
     };
     std::map<std::uint8_t, Asked> askedAtGate_;
@@ -508,7 +517,7 @@ private:
     std::unique_ptr<Watchers> watch_;
     int lobbyGroup_ = -1;
     GameHost* lobbyHost_ = nullptr;
-    std::set<std::uint32_t> boardWaiting_; ///< (by unit: within the board, its wait not over)
+    RefSet boardWaiting_;            ///< (by unit: within the board, its wait not over)
     std::set<std::uint8_t> atGate_;       ///< (by peer: within the gate)
     bool beginNow_ = false;
     void watchLobby();
@@ -544,10 +553,10 @@ private:
     bool won_ = false;
     std::uint32_t endedAt_ = 0;
     std::uint32_t endSeconds_ = 0; ///< the run's time as it ended (the HUD's clock stops there)
-    std::vector<std::uint32_t> signs_; ///< the lobby's, west to east
-    std::uint32_t portal_ = 0;
+    std::vector<ObjectRef> signs_; ///< the lobby's, west to east
+    ObjectRef portal_;
     std::map<std::string, Runner> runners_;
-    std::vector<std::uint32_t> prepared_; ///< units made ready (prepareUnit), this arena
+    std::vector<ObjectRef> prepared_; ///< units made ready (prepareUnit), this arena
     /// The soul gems on the ground (their worth the items' values) and the pickups lying out (their
     /// kinds): modes/common's gatherables, drawn in and taken natively, what's taken the script's.
     std::unique_ptr<Gatherables> gemField_;
@@ -560,16 +569,16 @@ private:
     std::vector<float> gemReach_;
     std::map<std::uint64_t, std::pair<std::uint16_t, int>> passiveHealth_;
     /// The LevelUp glows made for a level up, put away a while on (extent, made at).
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> glows_;
+    std::vector<std::pair<ObjectRef, std::uint32_t>> glows_;
     /// The elites' chests (CryptChest: a touch opens it, ChestCollide), each a free upgrade to the
     /// one who opens it (the nearest player as it opens); the opened ones put away later (extent,
     /// when).
     struct Chest {
-        std::uint32_t extent = 0;
+        ObjectRef extent;
         float x = 0, y = 0;
     };
     std::vector<Chest> chests_;
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> openedChests_;
+    std::vector<std::pair<ObjectRef, std::uint32_t>> openedChests_;
     void runChests(GameHost& host);
     /// Rare armour's effects, kept here (the item itself a stock one): while it's worn, Warding
     /// casts Shield on its wearer when it has none, Repulsion pushes the tide off it now and then.
@@ -578,10 +587,10 @@ private:
         Ward ward = Ward::Warding;
         std::uint32_t nextAt = 0;
     };
-    std::map<std::uint32_t, Charm> charms_; ///< by the item's extent
+    RefMap<Charm> charms_; ///< by the item's extent
     void runCharms(GameHost& host, const std::vector<std::pair<ServerObject*, Runner*>>& alive);
     /// The dawn boss: its extent once come (0: not yet, or slain), its name.
-    std::uint32_t boss_ = 0;
+    ObjectRef boss_;
     bool bossCame_ = false;
     std::string bossName_;
     int elitesSlain_ = 0;
@@ -605,10 +614,10 @@ private:
     /// The classes in the run (bits: 1 warrior, 2 wizard, 4 conjurer): armour dropped is theirs.
     std::uint8_t partyClasses() const;
     /// The slain's bodies, cleared a while on (extent, died at).
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> bodies_;
+    std::vector<std::pair<ObjectRef, std::uint32_t>> bodies_;
     /// What each noxsdl player (by peer: its unit then, and whether in a run) was last told of the run
     /// (MSG_NOXCPP_MODE_F5 kState; a peer's number taken by a newcomer, told afresh).
-    std::map<std::uint8_t, std::pair<std::uint32_t, bool>> told_;
+    std::map<std::uint8_t, std::pair<ObjectRef, bool>> told_;
     void tellState(GameHost& host);
     /// Each noxsdl player's run (kHud), every few frames; its offer (kOffer) as it opens and closes;
     /// the results (kResults). A stock player has the chat lines.

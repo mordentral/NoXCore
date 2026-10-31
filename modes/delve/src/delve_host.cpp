@@ -33,6 +33,7 @@ void hookDelveHost(DelveDirector& director, GameHost::Options& o)
     o.monstersAlert = true; // (its monsters look all about them: quick to the party coming in)
     // (A campfire's pick: a stock player's by chat, a noxsdl player's by MSG_NOXCPP_MODE_F4.)
     o.onChat = [&director](GameHost& host, std::uint8_t peer, std::u16string_view text) { return director.onChat(host, peer, text); };
+    o.carryLinks = [&director](GameHost&, const KeyCarry& carry) { director.carryLinks(carry); };
     o.noxcppMessages[static_cast<std::uint8_t>(net::Op::NoxcppModeF4)] = [&director](GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m) {
         director.onMessage(host, peer, m);
     };

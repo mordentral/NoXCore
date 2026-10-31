@@ -90,11 +90,11 @@ bool CoopDirector::exitTouched(server::Fight& fight, server::ServerObject& exit,
         return false;
     }
     if (!gather_) {
-        gather_ = Gather{exit.extent, to, now, now, {}, false};
+        gather_ = Gather{server::ObjectRef{exit.extent}, to, now, now, {}, false};
         noticeAll(coopmsg::Notice::Info, nameOf(player) + " is at the way to " + exitMapName(exit.exitMap) +
                                              ". Everyone there, or the party goes in 30 seconds (the host: ?go).");
     }
-    gather_->standing[player.extent] = now;
+    gather_->standing[server::ObjectRef{player.extent}] = now;
     gather_->lastTouch = now;
     // Everyone alive on it now (touched this tick or the last), the time's up, or the host says go.
     const bool all = std::ranges::all_of(living, [&](const server::ServerObject* u) {

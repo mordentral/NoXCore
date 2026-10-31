@@ -14,6 +14,7 @@
 #pragma once
 
 #include "noxcore/server/name.hpp"
+#include "noxcore/server/object_key.hpp"
 
 #include <array>
 #include <cstdint>
@@ -38,12 +39,15 @@ struct WatchEvent {
     std::uint8_t peer = 0;  ///< (Any: the last player within)
     const HostedPlayer* player = nullptr;
     ServerObject* unit = nullptr;
-    /// (A list's or a find's: the thing, and where it last stood.)
-    std::uint32_t id = 0;
+    /// (A list's or a find's: the thing, and where it last stood. The event's: a key, not a stored link.)
+    ObjectKey id = 0;
     float x = 0, y = 0;
 };
 
 class Watchers {
+    template <class>
+    friend struct Links; ///< (block_links.hpp)
+
 public:
     /// What's watched for a player, besides being in the group: bits all of which must hold.
     enum Filter : std::uint32_t {
@@ -174,7 +178,7 @@ public:
     void evaluateFirsts(int g, GameHost& host);
     /// Group `g`'s exits: each player's unit once (till reset), as its exit gate is one of `gates`
     /// (Exit; zone: its index in them).
-    void exits(int g, std::vector<std::uint32_t> gates, Handler handler);
+    void exits(int g, std::vector<ObjectRef> gates, Handler handler);
     void evaluateExits(int g, GameHost& host);
 
     /// Group `g`'s conditions over its players this pass, each once till rearmed:
@@ -209,7 +213,7 @@ public:
 private:
     struct Zone {
         std::uint32_t number = 0;
-        std::uint32_t thing = 0;
+        ObjectRef thing;
         bool point = false; ///< about (x, y), not a thing
         float x = 0, y = 0, radius = 0;
         std::uint32_t filter = 0;
@@ -222,7 +226,7 @@ private:
         bool anyHit = false;
         WatchEvent anyEvent;
         std::set<std::string> inside; ///< (EachEnter's: by player name)
-        std::set<std::uint32_t> insideIds; ///< (EachEnter's with ByUnit or ByPeer: by unit or peer)
+        std::set<std::uint32_t> insideIds; ///< (EachEnter's with ByUnit or ByPeer: by unit or peer; a peer or a key by the filter, not a link)
         std::map<std::string, std::array<std::uint8_t, 0x89>> spells; ///< (SpellsChanged's: as each was last seen)
         Handler handler;
     };
@@ -248,16 +252,16 @@ private:
         Keep keepAll;
         struct Cached {
             std::uint32_t join = 0; ///< (HostedPlayer::joinSerial: 0 none)
-            std::uint32_t unit = 0;
+            ObjectRef unit;
             Kept* kept = nullptr;
         };
         std::array<Cached, 256> keptByPeer{};
         std::uint32_t firstsFilter = 0;
         Handler firsts;
         std::set<std::string> first;
-        std::vector<std::uint32_t> gates;
+        std::vector<ObjectRef> gates;
         Handler exits;
-        std::set<std::uint32_t> through;
+        RefSet through;
         Conditions conditions;
         bool anyoneDone = false, afterDone = false, allDone = false;
         std::uint32_t allSince = 0;
@@ -273,7 +277,7 @@ private:
     // (A type as the server's interned name: an object's typeName is the same entry, so a type's
     // compared by one pointer.)
     struct Watched {
-        std::uint32_t thing = 0;
+        ObjectRef thing;
         Name type;
         float x = 0, y = 0;
     };

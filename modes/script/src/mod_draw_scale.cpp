@@ -2,6 +2,7 @@
 #include "mod_draw_scale.hpp"
 
 #include "mod_parts.hpp"
+#include "script_links.hpp"
 #include "toolbox.hpp"
 
 #include "noxcore/lobby/extended.hpp"
@@ -48,7 +49,7 @@ void DrawScales::tell(server::GameHost& host, std::uint8_t peer, const server::S
     // (No room: owed, once, till its acknowledgements catch up.)
     const bool already = std::ranges::any_of(owed_, [&](const Owed& w) { return w.peer == peer && w.extent == o.extent; });
     if (!already && owed_.size() < kMaxOwed) {
-        owed_.push_back({peer, o.extent, o.type});
+        owed_.push_back({peer, server::ObjectRef{o.extent}, o.type});
     }
 }
 

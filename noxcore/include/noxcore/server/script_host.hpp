@@ -38,7 +38,7 @@ struct ScriptEvent {
     Kind kind = Kind::Print;
     std::uint32_t frame = 0;
     std::string text;
-    std::uint32_t object = 0; ///< an extent
+    ObjectKey object = 0; ///< (this frame's: the host takes the events each frame, a key, not a stored link)
     float x = 0;
     float y = 0;
     float x2 = 0;
@@ -54,8 +54,8 @@ struct ScriptTimer {
     std::uint32_t function = 0;
     std::uint32_t arg = 0;
     std::uint32_t id = 0;
-    std::uint32_t trigger = 0; ///< extents (none, when a builtin sets one)
-    std::uint32_t caller = 0;
+    ObjectRef trigger; ///< (none, when a builtin sets one; the map's: Links<ScriptTimer>)
+    ObjectRef caller;
     /// A saved map's timer, read back: its objects' script ids till resolveTimerObjects.
     std::int32_t triggerId = 0;
     std::int32_t callerId = 0;
@@ -75,6 +75,10 @@ BuiltinArity builtinArity(std::uint32_t id);
 void setScriptLog(std::function<void(const std::string&)> sink);
 
 class ScriptHost : public script::Host {
+    /// (host_links.hpp: its timers' links, the map's.)
+    template <class>
+    friend struct Links;
+
 public:
     ScriptHost(World& world, const things::ThingDb& things, const script::ScriptFile& file, std::uint32_t seed = 1);
 
@@ -138,8 +142,8 @@ public:
     /// The handlers put off, oldest first (handler, caller, trigger).
     struct QueuedBlock {
         ServerObject::ScriptBlock* block = nullptr;
-        std::uint32_t caller = 0;
-        std::uint32_t trigger = 0;
+        ObjectRef caller;
+        ObjectRef trigger;
     };
     static constexpr std::size_t kMaxQueuedBlocks = 32;
     const std::vector<QueuedBlock>& queuedBlocks() const noexcept { return queued_; }

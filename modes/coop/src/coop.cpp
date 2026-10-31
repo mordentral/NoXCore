@@ -16,6 +16,7 @@
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/util/x87.hpp"
 
+#include "coop_links.hpp"
 #include "mode_shared.hpp"
 
 #include <algorithm>
@@ -107,6 +108,7 @@ std::filesystem::path CoopDirector::configure(server::GameHost::Options& o)
     o.noxcppMessages[coopmsg::kOp] = [this](server::GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m) { onMessage(host, peer, m); };
     o.onChat = [this](server::GameHost& host, std::uint8_t peer, std::u16string_view text) { return onChat(host, peer, text); };
     o.onClientReady = [this](server::GameHost& host, std::uint8_t peer) { clientReady(host, peer); };
+    o.carryLinks = [this](server::GameHost&, const server::KeyCarry& carry) { carryLinks(carry); };
     o.forPeer = [this](server::GameHost&, std::uint8_t peer, std::span<const std::uint8_t> m) { return forPeer(peer, m); };
     o.onCharacter = [this](server::GameHost& host, std::uint8_t peer, bool loaded) { characterIn(host, peer, loaded); };
     // Stock guests: a quest to them (listed as one: a stock player brings a quest character; told
@@ -285,7 +287,7 @@ void CoopDirector::leaving(server::GameHost& host, std::uint8_t peer, server::Se
     downs_.erase(peer);
     fileNumbered_.erase(peer);
     if (gather_) {
-        gather_->standing.erase(unit.extent);
+        gather_->standing.erase(server::ObjectRef{unit.extent});
     }
     rosterDirty_ = true;
     creaturesDirty_ = true; // (its creatures no longer the party's)
@@ -318,6 +320,11 @@ void CoopDirector::onMessage(server::GameHost& host, std::uint8_t peer, std::spa
             releaseChapter();
         }
     }
+}
+
+void CoopDirector::carryLinks(const server::KeyCarry& carry)
+{
+    server::carryLinks(*this, carry); // (coop_links.hpp)
 }
 
 void CoopDirector::mapLoaded(server::Server& server)
@@ -543,7 +550,7 @@ void CoopDirector::tellCreatures(server::GameHost& host)
                     continue;
                 }
                 if (const server::ServerObject* owner = unitOfOwner(o.owner); owner && server::controls(w, *owner, o)) {
-                    partyCreatures_.push_back({extent, o.owner});
+                    partyCreatures_.push_back({server::ObjectRef{extent}, o.owner});
                 }
             }
         }

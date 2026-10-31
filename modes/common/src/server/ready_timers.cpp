@@ -108,7 +108,7 @@ std::uint32_t ReadyTimers::fire(GameHost& host, std::uint32_t frame, ServerObjec
     }
     const Result r = fire_(shot);
     if (r.wait.test != Wait::Test::None) {
-        waits_.push_back({unit.extent, shot.kind, shot.level, bonus, r.wait});
+        waits_.push_back({ObjectRef{unit.extent}, shot.kind, shot.level, bonus, r.wait});
     }
     return r.readyAt;
 }

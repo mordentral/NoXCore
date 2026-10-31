@@ -35,6 +35,9 @@ class World;
 struct ServerObject;
 
 class ReadyTimers {
+    template <class>
+    friend struct Links; ///< (block_links.hpp)
+
 public:
     enum class Way : std::uint8_t { Fire, Orbit, Keep };
     /// A kind's way; for Keep, its lists' group, the most the group keeps in all, and the foe it
@@ -163,7 +166,7 @@ private:
     /// The waits standing: by holder and kind, for the level and bonus they were declined at (a
     /// slot at another is asked afresh).
     struct Held {
-        std::uint32_t holder = 0;
+        ObjectRef holder;
         std::uint32_t kind = 0;
         int level = 0;
         int bonus = 0;

@@ -11,6 +11,8 @@
 // on a PlayerStart puts it back at the point (never after a death: the respawn is the game's).
 #pragma once
 
+#include "noxcore/server/object_key.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -56,6 +58,9 @@ std::optional<std::pair<float, float>> nearestOpenSpot(const World& world, float
                                                        std::span<const std::pair<float, float>> from = {});
 
 class PlayFromHere {
+    template <class>
+    friend struct Links; ///< (host_links.hpp)
+
 public:
     /// `map`: the test's map (nothing is done on another: a quest's chat map before it). `quest`:
     /// a quest's test (its players come in by the quest).
@@ -82,7 +87,7 @@ private:
     bool placed_ = false;
     std::pair<float, float> spot_{};
     std::uint32_t placedFrame_ = 0;
-    std::uint32_t extent_ = 0;
+    ObjectRef extent_; ///< our player's unit, placed (the test's map's: nothing's done on another)
     std::pair<float, float> last_{};
     int undone_ = 0;
 };

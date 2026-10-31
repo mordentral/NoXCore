@@ -12,6 +12,14 @@
 //    ObjectRef field...") reads the headers and fails for one that isn't;
 //  - each table is checked at compile time: the members exist, each rule fits the member's type
 //    (a part's rule is Nested, a list's may be CarryDropLost...), no member twice.
+// Outside the world model the same holds for the records that name things: the host's
+// (host_links.hpp: its players, votes, the map's script, carried by GameHost::loadNextMap right after
+// the switch with Server::carry) and the modes' (their blocks', block_links.hpp; the Tide's, the
+// Delve's, the co-op's and the script modes' own tables, each mode's carried through
+// GameHost::Options::carryLinks). A table's member may be a link, a list, deque or array of links
+// (or of a link and a number), a set or table by link (RefSet, RefMap), a table by something else
+// whose values are links or parts, or a part (by value, boxed, in a unique_ptr or optional, or a
+// list of them).
 // A record read from a map, save or .plr names things by map number or script id, never by key
 // (MapNumber can't become an ObjectRef), so a load's renumbering has no links to carry: what a
 // record's object has is cleared by clearLinks where a loader wants it so (a .plr's item).
@@ -29,7 +37,12 @@
 
 #include <algorithm>
 #include <array>
+#include <deque>
 #include <list>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -72,10 +85,20 @@ concept HasLinks = requires { Links<T>::fields; };
 
 namespace detail {
 
+/// A part held out of line, or maybe not at all (a box, a unique_ptr, an optional): walked when
+/// it's there.
 template <class T>
 struct IsBoxed : std::false_type {};
 template <class T, class W>
 struct IsBoxed<Boxed<T, W>> : std::true_type {
+    using type = T;
+};
+template <class T, class D>
+struct IsBoxed<std::unique_ptr<T, D>> : std::true_type {
+    using type = T;
+};
+template <class T>
+struct IsBoxed<std::optional<T>> : std::true_type {
     using type = T;
 };
 template <class T>
@@ -90,17 +113,52 @@ struct Seq<std::list<T, A>> : std::true_type {
     using type = T;
     static constexpr bool clearable = true;
 };
+template <class T, class A>
+struct Seq<std::deque<T, A>> : std::true_type {
+    using type = T;
+    static constexpr bool clearable = true;
+};
 template <class T, std::size_t N>
 struct Seq<std::array<T, N>> : std::true_type {
     using type = T;
     static constexpr bool clearable = false;
 };
-
-/// Whether a link's element type is a key: an ObjectRef, or a pair of them (a bolt's ends).
+/// A set or table by link (RefSet, RefMap: object_key.hpp): its keys the links.
 template <class T>
-inline constexpr bool kKeyLike = std::is_same_v<T, ObjectRef> || std::is_same_v<T, std::pair<ObjectRef, ObjectRef>>;
+struct Keyed : std::false_type {};
+template <class C, class A>
+struct Keyed<std::set<ObjectRef, C, A>> : std::true_type {
+    using mapped = void;
+};
+template <class V, class C, class A>
+struct Keyed<std::map<ObjectRef, V, C, A>> : std::true_type {
+    using mapped = V;
+};
+/// A table by something else (a peer, a name) whose values hold links.
+template <class T>
+struct ValueMap : std::false_type {};
+template <class K, class V, class C, class A>
+    requires(!std::is_same_v<K, ObjectRef>)
+struct ValueMap<std::map<K, V, C, A>> : std::true_type {
+    using type = V;
+};
 
-/// Whether `rule` fits a member of type M (each table's entries are checked with it).
+template <class T>
+inline constexpr bool kRefPair = false;
+template <class T>
+inline constexpr bool kRefPair<std::pair<ObjectRef, T>> = std::is_same_v<T, ObjectRef> || std::is_arithmetic_v<T>;
+/// Whether a link's element type is a key: an ObjectRef, or a pair of them (a bolt's ends), or a
+/// link and a number (a thing and the frame it was made at).
+template <class T>
+inline constexpr bool kKeyLike = std::is_same_v<T, ObjectRef> || kRefPair<T>;
+/// Whether a list of such elements can drop those left behind (CarryDropLost): an element's key is
+/// its link (its first).
+template <class T>
+inline constexpr bool kDroppable = std::is_same_v<T, ObjectRef> || (kRefPair<T> && !std::is_same_v<T, std::pair<ObjectRef, ObjectRef>>);
+
+/// Whether `rule` fits a member of type M (each table's entries are checked with it). A part (a
+/// struct with a table, boxed or not, or a list or table of them) is Nested, or Keep where what
+/// holds it empties it itself as a map loads.
 template <class M>
 consteval bool ruleFits(LinkRule r)
 {
@@ -110,16 +168,29 @@ consteval bool ruleFits(LinkRule r)
     if constexpr (std::is_same_v<M, ObjectRef>) {
         return r == LinkRule::Carry || r == LinkRule::CarryOrLost || r == LinkRule::Clear || r == LinkRule::Keep;
     } else if constexpr (IsBoxed<M>::value) {
-        return HasLinks<typename IsBoxed<M>::type> && r == LinkRule::Nested;
+        return HasLinks<typename IsBoxed<M>::type> && (r == LinkRule::Nested || r == LinkRule::Keep);
     } else if constexpr (HasLinks<M>) {
-        return r == LinkRule::Nested;
+        return r == LinkRule::Nested || r == LinkRule::Keep;
     } else if constexpr (Seq<M>::value) {
         using E = typename Seq<M>::type;
         if constexpr (kKeyLike<E>) {
             return r == LinkRule::Carry || r == LinkRule::Clear || r == LinkRule::Keep ||
-                   (r == LinkRule::CarryDropLost && std::is_same_v<E, ObjectRef> && Seq<M>::clearable);
+                   (r == LinkRule::CarryDropLost && kDroppable<E> && Seq<M>::clearable);
         } else if constexpr (HasLinks<E>) {
-            return r == LinkRule::Nested || (r == LinkRule::Clear && Seq<M>::clearable);
+            return r == LinkRule::Nested || r == LinkRule::Keep || (r == LinkRule::Clear && Seq<M>::clearable);
+        } else {
+            return false;
+        }
+    } else if constexpr (Keyed<M>::value) {
+        using V = typename Keyed<M>::mapped;
+        return (std::is_void_v<V> || !std::is_same_v<V, ObjectRef>) &&
+               (r == LinkRule::CarryDropLost || r == LinkRule::Clear || r == LinkRule::Keep);
+    } else if constexpr (ValueMap<M>::value) {
+        using V = typename ValueMap<M>::type;
+        if constexpr (kKeyLike<V>) {
+            return r == LinkRule::Carry || r == LinkRule::Clear || r == LinkRule::Keep;
+        } else if constexpr (HasLinks<V>) {
+            return r == LinkRule::Nested || r == LinkRule::Keep || r == LinkRule::Clear;
         } else {
             return false;
         }
@@ -199,6 +270,12 @@ private:
         ref(p.first, rule);
         ref(p.second, rule);
     }
+    template <class T>
+        requires std::is_arithmetic_v<T>
+    void element(std::pair<ObjectRef, T>& p, LinkRule rule) const
+    {
+        ref(p.first, rule);
+    }
     template <class E>
         requires HasLinks<E>
     void element(E& e, LinkRule) const
@@ -231,10 +308,50 @@ private:
             for (auto& e : m) {
                 element(e, rule);
             }
-            if constexpr (std::is_same_v<M, std::vector<ObjectRef>>) {
+            if constexpr (detail::kDroppable<E> && detail::Seq<M>::clearable) {
                 if (rule == LinkRule::CarryDropLost) {
-                    std::erase(m, 0u);
+                    std::erase_if(m, [](const E& e) {
+                        if constexpr (std::is_same_v<E, ObjectRef>) {
+                            return e == 0u;
+                        } else {
+                            return e.first == 0u;
+                        }
+                    });
                 }
+            }
+        } else if constexpr (detail::Keyed<M>::value) {
+            // (CarryDropLost: each entry under its thing's key now, those left behind dropped; the
+            // entries' nodes moved, not copied.)
+            if (rule == LinkRule::Clear || !carried_) {
+                m.clear();
+                return;
+            }
+            M carried;
+            while (!m.empty()) {
+                auto node = m.extract(m.begin());
+                ObjectKey now = 0;
+                if constexpr (std::is_void_v<typename detail::Keyed<M>::mapped>) {
+                    now = (*carried_)(node.value());
+                    node.value() = ObjectRef{now};
+                } else {
+                    now = (*carried_)(node.key());
+                    node.key() = ObjectRef{now};
+                    if constexpr (HasLinks<typename detail::Keyed<M>::mapped>) {
+                        walk(node.mapped());
+                    }
+                }
+                if (now != 0) {
+                    carried.insert(std::move(node));
+                }
+            }
+            m = std::move(carried);
+        } else if constexpr (detail::ValueMap<M>::value) {
+            if (rule == LinkRule::Clear || (!carried_ && detail::kKeyLike<typename detail::ValueMap<M>::type>)) {
+                m.clear();
+                return;
+            }
+            for (auto& [k, v] : m) {
+                element(v, rule);
             }
         }
     }

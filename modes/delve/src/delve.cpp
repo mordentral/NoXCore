@@ -31,6 +31,7 @@
 #include "noxcore/util/x87.hpp"
 
 #include "delve_data.hpp"
+#include "delve_links.hpp"
 #include "watchers.hpp"
 #include "lua_lists.hpp"
 #include "mode_script.hpp"
@@ -534,9 +535,9 @@ void DelveDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
                 list.push_back({static_cast<std::uint8_t>(lua_tonumber(L, -2)), static_cast<std::uint8_t>(lua_tonumber(L, -1))});
                 lua_pop(L, 3);
             }
-            offers_[unit] = list;
+            offers_[ObjectRef{unit}] = list;
         } else {
-            offers_.erase(unit);
+            offers_.erase(ObjectRef{unit});
         }
         if (levelHost_) {
             levelHost_->sendToIdentified(peer, delvemap::campfireMessage(list));
@@ -548,7 +549,7 @@ void DelveDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
         return 1;
     });
     s.addOwnerFunction("heal", [this](lua_State* L) {
-        healed_.insert(static_cast<std::uint32_t>(lua_tonumber(L, 1)));
+        healed_.emplace(static_cast<std::uint32_t>(lua_tonumber(L, 1)));
         return 0;
     });
     s.addOwnerFunction("celebrate", [this](lua_State* L) {
@@ -576,9 +577,9 @@ void DelveDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
                 list.push_back({static_cast<delvemap::Blessing>(static_cast<int>(lua_tonumber(L, -2))), static_cast<std::uint8_t>(lua_tonumber(L, -1))});
                 lua_pop(L, 3);
             }
-            blessOffers_[unit] = list;
+            blessOffers_[ObjectRef{unit}] = list;
         } else {
-            blessOffers_.erase(unit);
+            blessOffers_.erase(ObjectRef{unit});
         }
         if (levelHost_) {
             levelHost_->sendToIdentified(peer, delvemap::blessingMessage(list));
@@ -619,6 +620,11 @@ void DelveDirector::detach(GameHost& host)
         rules_->script->detach(host);
         scriptHost_ = nullptr;
     }
+}
+
+void DelveDirector::carryLinks(const KeyCarry& carry)
+{
+    ::nox::server::carryLinks(*this, carry); // (delve_links.hpp)
 }
 
 std::string_view delveDifficultyName(DelveDifficulty d)
@@ -1248,7 +1254,7 @@ void DelveDirector::watchLobby(GameHost& host)
     // The lobby's things, found as it's loaded (the map's numbers for them).
     lobbyTargeted_ = true;
     const detail::LobbyThings found = detail::lobbyThings(world, thingTypes());
-    lobbySigns_.assign(signZones_.size(), 0);
+    lobbySigns_.assign(signZones_.size(), ObjectRef{});
     for (std::size_t i = 0; i < signZones_.size(); ++i) {
         lobbySigns_[i] = i < found.signs.size() ? found.signs[i] : 0;
         watch_->retarget(signZones_[i], lobbySigns_[i]);
@@ -1789,7 +1795,7 @@ void DelveDirector::beginLevel(GameHost& host, World& world, std::uint32_t frame
         if (o.gone() || o.holder != 0 || std::ranges::find(breakables, std::string_view(o.typeName)) == breakables.end()) {
             continue;
         }
-        found.push_back({extent, o.typeName, o.x, o.y, Barrel::Holds::Nothing});
+        found.push_back({ObjectRef{extent}, o.typeName, o.x, o.y, Barrel::Holds::Nothing});
     }
     if (!found.empty()) {
         const std::vector<double> holds = rules_->numbers(rules_->barrels, {static_cast<double>(found.size())});
@@ -2012,7 +2018,7 @@ void DelveDirector::runGates(World& world, std::uint32_t frame)
         gatesOpen_ = true;
         for (const mapgen::ArenaSpots::Gate& spot : spots_.gates) {
             if (const ServerObject* gate = world.createAt(things_, spot.type, spot.at.x, spot.at.y, frame)) { // (CreateObject's)
-                gates_.push_back(gate->extent);
+                gates_.emplace_back(gate->extent);
                 playSoundAt(world, "TeleportIn", spot.at.x, spot.at.y);
             }
         }
@@ -2049,7 +2055,7 @@ void DelveDirector::runGates(World& world, std::uint32_t frame)
                     found = extent;
                 }
             }
-            gateSigns_.push_back(found);
+            gateSigns_.emplace_back(found);
         }
         watchLevel();
         watch_->reset(gateSignGroup_);
@@ -2251,7 +2257,7 @@ void DelveDirector::runCampfire(GameHost& host)
                 continue;
             }
             if (!(within(*unit, cx, cy, data().near.campfire) && unit->health != 0 && (unit->player->statusFlags & 1u) == 0)) {
-                offers_.erase(unit->extent);
+                offers_.erase(ObjectRef{unit->extent});
                 host.sendToIdentified(peer, delvemap::campfireMessage({}));
             }
         }
@@ -2308,7 +2314,7 @@ void DelveDirector::celebrate(World& world, const ServerObject& unit, std::uint3
 {
     // The level-up's sound and glow, and a rain of sparks (runCampfire).
     playSound(world, 0x386, unit);
-    Celebration c{unit.x, unit.y, frame, 0};
+    Celebration c{unit.x, unit.y, frame, ObjectRef{}};
     if (const ServerObject* glow = world.createAt(things_, "LevelUp", unit.x, unit.y, frame)) {
         c.glow = glow->extent;
     }
@@ -2381,7 +2387,7 @@ bool DelveDirector::bless(GameHost& host, std::uint8_t peer, ServerObject& unit,
     keepBlessings(who->second.name); // (what's kept on it, its raises worked out again)
     watch_->restat(blessGroup_, who->second.name);
     blessOffers_.erase(it);
-    healed_.insert(unit.extent); // (one blessing at an altar)
+    healed_.emplace(unit.extent); // (one blessing at an altar)
     host.sendToIdentified(peer, delvemap::blessingMessage({}));
     celebrate(world, unit, host.server().clock().frame());
     const std::string& name = who->second.name;
@@ -2503,7 +2509,7 @@ void DelveDirector::makeElite(ServerObject& unit, std::span<const int> traits)
     if (traits.empty() || !unit.monster) {
         return;
     }
-    Elite e{unit.extent, {}};
+    Elite e{ObjectRef{unit.extent}, {}};
     for (const int t : traits) {
         e.traits.push_back(static_cast<Trait>(t));
     }
@@ -2534,7 +2540,7 @@ void DelveDirector::makeElite(ServerObject& unit, std::span<const int> traits)
 }
 void DelveDirector::keepHealth(const ServerObject& o)
 {
-    keptHealth_[o.extent] = o.maxHealth;
+    keptHealth_[ObjectRef{o.extent}] = o.maxHealth;
 }
 
 void DelveDirector::runElites(GameHost& host)
@@ -2619,7 +2625,7 @@ void DelveDirector::startObjective(World& world, const ServerObject& someone)
     case DelveObjective::Purge:
         for (const auto& [extent, o] : world.objects()) {
             if (foe(o)) {
-                objective_.targets.push_back(extent);
+                objective_.targets.emplace_back(extent);
             }
         }
         objective_.of = static_cast<int>(objective_.targets.size());
@@ -2657,7 +2663,7 @@ void DelveDirector::startObjective(World& world, const ServerObject& someone)
     case DelveObjective::Seals:
         for (const auto& [extent, o] : world.objects()) {
             if (o.typeName == kDelveSeal && !o.gone()) {
-                objective_.targets.push_back(extent);
+                objective_.targets.emplace_back(extent);
             }
         }
         objective_.of = static_cast<int>(objective_.targets.size());
@@ -3305,7 +3311,7 @@ bool DelveDirector::onChatRun(GameHost& host, std::uint8_t peer, std::u16string_
     if (const auto b = blessOffers_.find(unit->extent); b != blessOffers_.end()) {
         return 1 <= n && n <= b->second.size() && bless(host, peer, *unit, b->second[n - 1].blessing);
     }
-    const auto& list = offers_.at(unit->extent);
+    const auto& list = offers_.at(ObjectRef{unit->extent});
     if (n < 1 || list.size() < n) {
         return false;
     }

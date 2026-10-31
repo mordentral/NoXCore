@@ -65,7 +65,7 @@ private:
     enum class Kind : std::uint8_t { Killed, Destroyed, Damaged, PickedUp, Dropped, Equipped, SpellCast };
     struct Event {
         Kind kind;
-        std::uint32_t a = 0, b = 0; ///< the ids it names (0: none)
+        server::ObjectKey a = 0, b = 0; ///< the ids it names (0: none; this frame's: keys, not stored links)
         float x = 0, y = 0;
         std::int32_t n = 0;          ///< an amount, a spell, worn
         server::Name type;           ///< (a death's or a deletion's thing type)
@@ -77,7 +77,7 @@ private:
 
     Has has_;
     std::vector<Event> queue_;
-    std::vector<std::uint32_t> made_; ///< the queued casts' made ids, each a run of them
+    std::vector<server::ObjectKey> made_; ///< the queued casts' made ids, each a run of them (this frame's)
     std::size_t overflow_ = 0;
 };
 

@@ -42,16 +42,16 @@ void KeptLists::add(std::uint32_t holder, std::uint32_t key, std::uint32_t thing
 {
     Holder* h = find(holder);
     if (!h) {
-        holders_.push_back({holder, {}});
+        holders_.push_back({ObjectRef{holder}, {}});
         h = &holders_.back();
     }
     for (List& l : h->lists) {
         if (l.key == key) {
-            l.things.push_back(thing);
+            l.things.emplace_back(thing);
             return;
         }
     }
-    h->lists.push_back({key, rule(key), {thing}});
+    h->lists.push_back({key, rule(key), {ObjectRef{thing}}});
 }
 
 void KeptLists::settle(World& world, List& list)

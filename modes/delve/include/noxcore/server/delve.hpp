@@ -31,6 +31,7 @@
 #include "noxcore/mapgen/arena.hpp"
 #include "noxcore/server/delve_map.hpp"
 #include "noxcore/server/delve_records.hpp"
+#include "noxcore/server/object_key.hpp"
 #include "noxcore/server/which_map.hpp"
 
 #include <array>
@@ -68,6 +69,7 @@ class World;
 struct DelveRules;
 struct ModeHooks;
 class Watchers;
+class KeyCarry;
 struct WatchEvent;
 struct HostedPlayer;
 struct ServerObject;
@@ -166,6 +168,10 @@ struct DelveLevel {
 inline constexpr std::string_view kDelveSeal = "OrbPoolWithOrb";
 
 class DelveDirector {
+    /// (delve_links.hpp: its records' links, carried through a map change.)
+    template <class>
+    friend struct Links;
+
 public:
     struct Options {
         std::filesystem::path mapsDir;
@@ -204,6 +210,9 @@ public:
 
     /// The host gone (the mode's detach): the script's own let go of it.
     void detach(GameHost& host);
+    /// A map change's carry of its records' links (GameHost::Options::carryLinks: delve_links.hpp's
+    /// rules), right after the switch.
+    void carryLinks(const KeyCarry& carry);
 
     /// The UDP port the server listens on (its loop's, once the socket's open): a bot boss joins
     /// there from this process. None (0): a guardian is always a monster.
@@ -266,7 +275,7 @@ public:
     /// Which of the fork's acts the last fork took (0 left, 1 right; -1 none yet).
     int lastChoice() const noexcept { return lastChoice_; }
     /// The level's gates once open (their extents, left then right).
-    const std::vector<std::uint32_t>& gates() const noexcept { return gates_; }
+    const std::vector<ObjectRef>& gates() const noexcept { return gates_; }
 
     /// GameHost::Options::onChat: a stock player's answer at a campfire (the number of a spell
     /// offered it) strengthens that spell, at an altar (1-3) takes that blessing; "?blessings"
@@ -294,7 +303,7 @@ public:
     delvemap::Objective objective() const;
     /// The quarry (Hunt's) and the seals still whole (Seals'), by extent (tests).
     std::uint32_t quarry() const noexcept { return objective_.quarry; }
-    const std::vector<std::uint32_t>& seals() const noexcept { return objective_.targets; }
+    const std::vector<ObjectRef>& seals() const noexcept { return objective_.targets; }
     int builtOnTheSpot() const noexcept { return builtOnTheSpot_; }
     /// The levels still being built ahead, let go: the director's end no longer waits for their
     /// threads; the call returned does. Called with `wait` false it only lets go of those finished
@@ -389,7 +398,7 @@ private:
     std::unique_ptr<Watchers> watch_;
     int lobbyGroup_ = -1;
     std::vector<std::uint32_t> signZones_;
-    std::vector<std::uint32_t> lobbySigns_; ///< each sign zone's sign (0: none)
+    std::vector<ObjectRef> lobbySigns_; ///< each sign zone's sign (0: none)
     std::uint32_t boardZone_ = 0;
     std::uint32_t portalZone_ = 0;
     bool lobbyTargeted_ = false;
@@ -432,7 +441,7 @@ private:
     int bossFinder_ = -1;
     std::vector<WatchEvent> broken_;
     bool guardianFell_ = false;
-    std::uint32_t guardianWatched_ = 0;
+    ObjectRef guardianWatched_;
     bool bossSought_ = false;
     void bossFound(ServerObject& o);
     /// The blessed (kept by name: blessingKept), the air (every one of the party: its heat's bites
@@ -482,32 +491,32 @@ private:
     std::uint32_t levelSeen_ = 0;
     std::uint32_t levelFrame_ = 0;
     bool told_ = false;
-    std::uint32_t boss_ = 0; ///< the champion's or guardian's extent, once found
+    ObjectRef boss_; ///< the champion's or guardian's extent, once found
     bool bossDown_ = false;
     bool gatesOpen_ = false; ///< the level's gates made (a guardian's once it dies)
-    std::vector<std::uint32_t> gates_;
-    std::vector<std::uint32_t> gateSigns_;
+    std::vector<ObjectRef> gates_;
+    std::vector<ObjectRef> gateSigns_;
     int firstGate_ = -1;
-    std::set<std::uint32_t> healed_;      ///< players the shrine healed, or the fire strengthened
+    RefSet healed_;                       ///< players the shrine healed, or the fire strengthened
     /// The campfire's open offers, by player: the spells, numbered in this order.
-    std::map<std::uint32_t, std::vector<delvemap::Upgradable>> offers_;
+    RefMap<std::vector<delvemap::Upgradable>> offers_;
     /// A spell strengthened: sparks rain about where it happened for a couple of seconds, a
     /// LevelUp glow (`glow`, made then) over the player.
     struct Celebration {
         float x = 0, y = 0;
         std::uint32_t from = 0;
-        std::uint32_t glow = 0;
+        ObjectRef glow;
     };
     std::vector<Celebration> celebrations_;
     /// The level's breakable barrels and crates, what each holds (rolled as the level starts) and
     /// where it last stood: broken, it gives it there (runBarrels).
     struct Barrel {
-        std::uint32_t extent = 0;
+        ObjectRef extent;
         std::string type; ///< (its extent another's once it's gone and freed)
         float x = 0, y = 0;
         enum class Holds : std::uint8_t { Nothing, Loot, Monster, Gem } holds = Holds::Nothing;
     };
-    std::map<std::uint32_t, Barrel> barrels_; ///< (by extent; watched in order: barrelList_)
+    RefMap<Barrel> barrels_; ///< (by extent; watched in order: barrelList_)
     void runBarrels(GameHost& host);
     /// An elite: a creature made stronger by traits (the stock enchantments, so every client
     /// sees them, and two of the director's own). Swift (Hasted), Vampiric (Vampirism),
@@ -515,7 +524,7 @@ private:
     /// health back every second: runElites).
     enum class Trait : std::uint8_t { Swift, Vampiric, Reflective, Tough, Regenerating };
     struct Elite {
-        std::uint32_t extent = 0;
+        ObjectRef extent;
         std::vector<Trait> traits;
     };
     std::vector<Elite> elites_;
@@ -537,7 +546,7 @@ private:
     };
     std::map<std::string, Blessed> blessed_;
     /// The altar's open offers, by player.
-    std::map<std::uint32_t, std::vector<delvemap::BlessingOffer>> blessOffers_;
+    RefMap<std::vector<delvemap::BlessingOffer>> blessOffers_;
     /// The altar's offers (a noxsdl player's kBlessing, a stock player's lines), and each player's
     /// blessings kept on it (runBlessings).
     void runAltar(GameHost& host);
@@ -550,8 +559,8 @@ private:
     /// (Purge's foes, Seals' seals still whole, Hunt's quarry), how far it's gone, its end;
     /// told to noxsdl players as it changes (kObjective: the version each has).
     struct ObjectiveRun {
-        std::vector<std::uint32_t> targets;
-        std::uint32_t quarry = 0;
+        std::vector<ObjectRef> targets;
+        ObjectRef quarry;
         int done = 0;
         int of = 0;
         std::uint8_t state = 0; ///< 0 open, 1 done, 2 failed
@@ -583,7 +592,7 @@ private:
     /// Creatures whose health the director raised (the difficulty's, Tough, a champion's or
     /// guardian's), by extent, and to what: the quest's rescale (questRescale, as the party's size
     /// changes) puts an unhurt one back to its stock health, so it's raised again.
-    std::map<std::uint32_t, std::uint16_t> keptHealth_;
+    RefMap<std::uint16_t> keptHealth_;
     void keepHealth(const ServerObject& o);
     /// The Delve's script (script/server/main.luau, built in): the run's rules are its functions,
     /// each looked up once, the director calling them. Attached to the host at the first tick (its

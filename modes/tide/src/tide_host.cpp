@@ -20,6 +20,7 @@ std::filesystem::path setUpTideHost(TideDirector& director, GameHost::Options& o
         }
     };
     o.onChat = [&director](GameHost& host, std::uint8_t peer, std::u16string_view text) { return director.onChat(host, peer, text); };
+    o.carryLinks = [&director](GameHost&, const KeyCarry& carry) { director.carryLinks(carry); };
     o.noxcppMessages[static_cast<std::uint8_t>(net::Op::NoxcppModeF5)] = [&director](GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m) {
         director.onMessage(host, peer, m);
     };

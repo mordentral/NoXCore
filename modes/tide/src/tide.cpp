@@ -19,6 +19,7 @@
 #include "noxcore/server/items.hpp"
 #include "noxcore/server/modes.hpp"
 #include "noxcore/server/record_class.hpp"
+#include "noxcore/server/server.hpp"
 #include "noxcore/server/tide_records.hpp"
 #include "noxcore/server/world.hpp"
 #include "noxcore/things/object_class.hpp"
@@ -34,6 +35,7 @@
 #include "record_file.hpp"
 #include "watchers.hpp"
 #include "tide_data.hpp"
+#include "tide_links.hpp"
 
 #include "lua.h"
 #include "lualib.h"
@@ -644,7 +646,7 @@ void TideDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
     // A creature the tide made: its worth, its first steer, its most health, its rank (0 the
     // tide's, 1 an elite, 2 the guardian: brought back when left far behind).
     s.addOwnerFunction("addFoe", [this](lua_State* L) {
-        Horde::Member m{static_cast<std::uint32_t>(luaL_checknumber(L, 1)), static_cast<std::uint8_t>(luaL_checknumber(L, 2)),
+        Horde::Member m{ObjectRef{static_cast<std::uint32_t>(luaL_checknumber(L, 1))}, static_cast<std::uint8_t>(luaL_checknumber(L, 2)),
                         static_cast<std::uint32_t>(luaL_checknumber(L, 3)), static_cast<std::uint16_t>(luaL_checknumber(L, 4)),
                         static_cast<std::uint8_t>(luaL_checknumber(L, 5))};
         m.comesBack = m.rank == 2;
@@ -779,7 +781,7 @@ void TideDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
         return 0;
     });
     s.addOwnerFunction("addGem", [this](lua_State* L) {
-        gemField_->items().push_back({static_cast<std::uint32_t>(luaL_checknumber(L, 1)), static_cast<std::uint8_t>(luaL_checknumber(L, 2)), ruleFrame_});
+        gemField_->items().push_back({ObjectRef{static_cast<std::uint32_t>(luaL_checknumber(L, 1))}, static_cast<std::uint8_t>(luaL_checknumber(L, 2)), ruleFrame_});
         return 0;
     });
     // An elite slain (counted), its chest (opened, a free upgrade: runChests); the guardian slain
@@ -789,7 +791,7 @@ void TideDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
         ++elitesSlain_;
         if (!lua_isnoneornil(L, 1)) {
             if (const ServerObject* c = scriptHost_->server().world().byExtent(static_cast<std::uint32_t>(luaL_checknumber(L, 1)))) {
-                chests_.push_back({c->extent, c->x, c->y});
+                chests_.push_back({ObjectRef{c->extent}, c->x, c->y});
             }
         }
         return 0;
@@ -810,7 +812,7 @@ void TideDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
         return 1;
     });
     s.addOwnerFunction("charm", [this](lua_State* L) {
-        charms_[static_cast<std::uint32_t>(luaL_checknumber(L, 1))] = {lua_toboolean(L, 2) ? Ward::Warding : Ward::Repulsion, 0};
+        charms_[ObjectRef{static_cast<std::uint32_t>(luaL_checknumber(L, 1))}] = {lua_toboolean(L, 2) ? Ward::Warding : Ward::Repulsion, 0};
         return 0;
     });
     // Whether a thing is kept on its holder's death (KEPT_ON_DEATH: a quest's own things).
@@ -936,6 +938,11 @@ void TideDirector::detach(GameHost& host)
         script_->detach(host);
         scriptHost_ = nullptr;
     }
+}
+
+void TideDirector::carryLinks(const KeyCarry& carry)
+{
+    ::nox::server::carryLinks(*this, carry); // (tide_links.hpp)
 }
 
 bool TideDirector::setDifficulty(TideDifficulty d)
@@ -1776,10 +1783,10 @@ void TideDirector::watchLobby()
     const std::uint32_t board = watch_->zone(lobbyGroup_, board_, 0, 0, near.boardNear, Watchers::ByUnit, Watchers::Mode::EachEnter, 0, [this](const Watchers::Event& e) {
         if (e.kind == Watchers::Event::Kind::Enter) {
             if (!runBoard(*lobbyHost_, *e.unit)) {
-                boardWaiting_.insert(e.unit->extent);
+                boardWaiting_.emplace(e.unit->extent);
             }
         } else if (e.kind == Watchers::Event::Kind::Leave) {
-            boardWaiting_.erase(e.unit->extent);
+            boardWaiting_.erase(ObjectRef{e.unit->extent});
         }
     });
     if (board_ == 0) {
@@ -1794,7 +1801,7 @@ void TideDirector::watchLobby()
             if (!host.identified(e.peer)) {
                 beginNow_ = true;
             } else if (!askedAtGate_.contains(e.peer) && state_ == State::Lobby) {
-                askedAtGate_[e.peer] = {e.unit->extent, host.server().clock().frame()};
+                askedAtGate_[e.peer] = {ObjectRef{e.unit->extent}, host.server().clock().frame()};
                 host.sendToIdentified(e.peer, tidemsg::askMessage(static_cast<std::uint8_t>(difficulty_)));
             }
         } else if (e.kind == Watchers::Event::Kind::Leave) {
@@ -1834,7 +1841,7 @@ void TideDirector::runLobby(GameHost& host)
     if (!portal || portal->gone() || portal->typeName != types.portal || lobbyGroup_ < 0) {
         // West to east: the i-th sign from the left speaks the i-th rule.
         detail::LobbyThings found = detail::lobbyThings(world, types);
-        signs_ = std::move(found.signs);
+        signs_.assign(found.signs.begin(), found.signs.end());
         portal_ = found.portal;
         board_ = found.board;
         watchLobby();
@@ -1849,7 +1856,7 @@ void TideDirector::runLobby(GameHost& host)
             continue;
         }
         if (boardWaiting_.contains(unit->extent) && runBoard(host, *unit)) {
-            boardWaiting_.erase(unit->extent);
+            boardWaiting_.erase(ObjectRef{unit->extent});
         }
         if (const auto it = askedAtGate_.find(peer); it != askedAtGate_.end() && atGate_.contains(peer) && data().lobby.askWait < frame - it->second.at) {
             beginNow_ = true;
@@ -2058,7 +2065,7 @@ void TideDirector::runArena(GameHost& host)
             }
         }
         if ((unit->player->statusFlags & 1u) == 0 && std::ranges::find(prepared_, unit->extent) == prepared_.end()) {
-            prepared_.push_back(unit->extent);
+            prepared_.emplace_back(unit->extent);
             prepareUnit(world, *unit, *r);
         }
         disarm(host, *unit);
@@ -2637,7 +2644,7 @@ bool TideDirector::dropPickup(GameHost& host, int kind, float x, float y)
     // made no Food, so the hurt tide doesn't eat it.
     o->pickup = std::string("TrapPickup");
     o->classes &= ~oc::Food;
-    pickupField_->items().push_back({o->extent, static_cast<std::uint8_t>(kind), frame});
+    pickupField_->items().push_back({ObjectRef{o->extent}, static_cast<std::uint8_t>(kind), frame});
     // At most 25 on the ground (the oldest go).
     pickupField_->cap(world);
     return true;

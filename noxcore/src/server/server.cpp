@@ -131,6 +131,8 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     // thawed (unfreezeUnit with lock 1: its creatures with it) and its trade cancelled, on the old
     // map (trade.hpp: what it offered back to it; the sessions end with the old map).
     std::vector<std::uint32_t> kept;
+    carry_.keys_.clear(); // (a map change's: set below)
+    carry_.switched_ = old != nullptr;
     if (old) {
         Fight f{*old, rng_, clock_.frame(), &things_, options_.modifiers};
         mapChangeTrades(f);
@@ -344,6 +346,9 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
             const auto it = renumbered.find(e);
             return it != renumbered.end() ? it->second : 0u;
         };
+        // (The same for the records outside the world: carry(), the host's and the modes' after
+        // the switch.)
+        carry_.keys_ = renumbered;
         carryLinks(world_, carried); // (the teams' members, bases and crowns, the level-up's player and object, the save's exit)
         // The lasting spells: a solo game's on a player go on (their links carried;
         // one already cancelled too: its end runs at the next pass), the rest are over. (The ends of

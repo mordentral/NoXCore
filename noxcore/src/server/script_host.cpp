@@ -271,7 +271,7 @@ std::optional<std::uint32_t> ScriptHost::callBlock(ServerObject::ScriptBlock& bl
     // comes it's refused and stays first, holding up the rest: an original bug.)
     if (vm_.stackTop() != 0) {
         if (queued_.size() < kMaxQueuedBlocks) {
-            queued_.push_back({&block, caller, trigger});
+            queued_.push_back({&block, ObjectRef{caller}, ObjectRef{trigger}});
         }
         return blockResult_;
     }
@@ -337,7 +337,7 @@ std::uint32_t ScriptHost::startTimer(std::uint32_t frames, std::uint32_t functio
 {
     const std::uint32_t id = nextTimerId_;
     nextTimerId_ = nextTimerId_ >= 32000 ? 1 : nextTimerId_ + 1;  // ids wrap from 32000 back to 1
-    timers_.push_back({frame_ + frames, function, arg, id, 0, 0});
+    timers_.push_back({frame_ + frames, function, arg, id, ObjectRef{}, ObjectRef{}});
     return id;
 }
 
