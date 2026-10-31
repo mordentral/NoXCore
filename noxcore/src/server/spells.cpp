@@ -3433,9 +3433,10 @@ int Spells::lastingUpdate(DurationSpell& s)
             by = caster->y;
         }
         // (The walls take it too: with the walls' damage.) Its power, less past ManaBombInRadius,
-        // out to ManaBombOutRadius, as mana-bomb harm (15), from its caster.
+        // out to ManaBombOutRadius, as mana-bomb harm (15), from its caster: the caster too
+        // (gameSetWallsDamage(1): its source not spared).
         Missiles{world, things, modifiers, rng, frame}.damageAt(bx, by, world.number("ManaBombOutRadius"), world.number("ManaBombInRadius"),
-                                                                 power, 15, caster, nullptr, true);
+                                                                 power, 15, caster, nullptr, false);
         jiggle(bx, by, static_cast<int>(world.number("ManaBombShakeMag")));
         pointFx(0x81, bx, by);
         pointFx(0x9A, bx, by);

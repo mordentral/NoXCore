@@ -213,8 +213,8 @@ private:
     void spellFlyHits(ServerObject& m, ServerObject* other, float nx, float ny);
     /// mapDamageUnitsAround: `damage` of `type` from `source` to all with health
     /// within `reach` of (x, y), no wall between, less past `full` (linearly, none at the edge);
-    /// not `except`. The source itself too, unless `spareSource` (the exe's 1 but for
-    /// the one call after gameSetWallsDamage: Death Ray's and Mana Bomb's).
+    /// not `except`. The source itself too, unless `spareSource` (the exe's flag that
+    /// gameSetWallsDamage sets, back to 1 after each call: Death Ray's 0 spares it, Mana Bomb's 1 doesn't).
     void damageAround(float x, float y, float reach, float full, int damage, int type, ServerObject* source, const ServerObject* except,
                       bool spareSource = false);
     /// mapPushUnitsAround: the movable within `reach` of (x, y), no wall between,
