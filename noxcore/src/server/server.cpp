@@ -15,6 +15,7 @@
 #include "noxcore/server/modes.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/npc.hpp"
+#include "noxcore/server/object_links.hpp"
 #include "noxcore/server/object_save.hpp"
 #include "noxcore/server/physics.hpp"
 #include "noxcore/server/player.hpp"
@@ -248,11 +249,9 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         world_.questSlotSeenAt = old->questSlotSeenAt;
         world_.ticks = old->ticks; // (the solo pause's globals, solo.hpp)
         world_.pauseUntilTick = old->pauseUntilTick;
-        world_.levelUp = old->levelUp;
-        world_.levelUp.object = 0; // (its LevelUp went with the old map)
+        world_.levelUp = old->levelUp; // (its LevelUp went with the old map: carryLinks below)
         world_.gameFlags |= old->gameFlags & GameFlag::Paused;
-        world_.saveRequest = old->saveRequest; // (requestSave's globals; its exit went with the old map)
-        world_.saveRequest.exit = 0;
+        world_.saveRequest = old->saveRequest; // (requestSave's globals; its exit went with the old map: carryLinks below)
         world_.saveName = old->saveName;
         world_.cameByExit = old->cameByExit;
         world_.saveByExit = old->saveByExit;
@@ -307,10 +306,8 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         // The players and what they hold stay (the
         // teams with them), their links to the old map's things gone: the wall they touched,
         // frozen, their marks, the crown frame, their last attacker.
-        world_.teams = old->teams;
+        world_.teams = old->teams; // (their bases and crowns the old map's: carryLinks below)
         for (ServerTeam& t : world_.teams) {
-            t.base = 0;
-            t.crown = 0;
             std::erase_if(t.members, [&](std::uint32_t e) {
                 const ServerObject* m = old->byExtent(e);
                 return !m || !m->player;
@@ -339,10 +336,15 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
             }
             carriedOver.push_back(renumbered.at(e));
         }
-        const auto carried = [&](std::uint32_t e) -> std::uint32_t {
+        // A link to a kept thing goes to its key now; to anything else, none (the exe's pointer to a
+        // freed thing, whose checks find it gone), never the new map's thing that has the number
+        // now. Every stored link is carried, cleared or kept by its rule in object_links.hpp
+        // (carryLinks): the World's carried state here, each lasting spell and each kept thing below.
+        const auto carried = [&](ObjectKey e) -> ObjectKey {
             const auto it = renumbered.find(e);
             return it != renumbered.end() ? it->second : 0u;
         };
+        carryLinks(world_, carried); // (the teams' members, bases and crowns, the level-up's player and object, the save's exit)
         // The lasting spells: a solo game's on a player go on (their links carried;
         // one already cancelled too: its end runs at the next pass), the rest are over. (The ends of
         // those the exe cancels here aren't run: not yet.)
@@ -351,21 +353,10 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
                 const ServerObject* t = s.target ? old->byExtent(s.target) : nullptr;
                 if (t && (t->classes & things::ObjectClass::Player) && carried(s.target) != 0) {
                     DurationSpell k = s;
-                    k.target = carried(s.target);
-                    k.caster = carried(s.caster);
-                    k.source = carried(s.source);
-                    k.rayTarget = carried(s.rayTarget);
-                    k.object = carried(s.object);
-                    k.staff = carried(s.staff);
-                    k.glyphExtent = carried(s.glyphExtent);
-                    if (s.spell == 0x36) { // (Moonglow's value: its Moonglow)
+                    carryLinks(k, carried);
+                    if (s.spell == 0x36) { // (Moonglow's value: its Moonglow, a key in a number)
                         k.value = static_cast<int>(carried(static_cast<std::uint32_t>(s.value)));
                     }
-                    for (auto& [from, to] : k.bolts) {
-                        from = carried(from);
-                        to = carried(to);
-                    }
-                    k.lastBolts.clear();
                     world_.durationSpells().push_back(std::move(k));
                 }
             }
@@ -393,44 +384,13 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
                 o.timer = o.decayAt;
                 o.decayAt = 0;
             }
-            o.owner = carried(o.owner);
-            o.holder = carried(o.holder);
-            for (std::uint32_t& i : o.inventory) {
-                i = carried(i);
-            }
-            std::erase(o.inventory, 0u);
-            o.hurtBy = 0; // (mapSwitchLevel: every one's hurtBy cleared)
+            // Its links: its owner, holder and inventory, its creature's and player's targets, its
+            // parts' (object_links.hpp: the weapon in hand, the spell's target, the minimap marks, a
+            // creature's generator, a carried glyph's target, a crown's next holder... carried; its
+            // hurtBy, cursor, harpoon, teleport marks, gates and what it heard cleared).
+            carryLinks(o, carried);
             if (o.monster) {
-                // (its AI's targets: mapSwitchLevel resets an isUnit's, the map's load its stack and sight
-                // when it came by an exit)
-                o.monster->enemy = carried(o.monster->enemy);
-                o.monster->lastEnemy = carried(o.monster->lastEnemy);
-                o.monster->focus = carried(o.monster->focus);
-                o.monster->heardFrom = 0;
-                o.monster->heardAt = 0;
-                for (std::uint32_t& s : o.monster->seen) {
-                    s = carried(s);
-                }
-                o.monster->transits.clear();
-                // An NPC's weapon in hand (one it carries), and a bomber's glyph's target.
-                o.monster->weapon = carried(o.monster->weapon);
-                o.monster->bombTarget = carried(o.monster->bombTarget);
-            }
-            // What else names a thing by its extent goes with it: none when the thing stayed behind
-            // (the exe's pointer to a freed thing, whose checks find it gone), never the new map's
-            // thing that has the number now. A creature's generator (left behind: its death no
-            // longer counts against the new map's generator of that number), a turned spell
-            // projectile's first caster, a carried glyph's target, a crown's next holder.
-            o.spawnedBy = carried(o.spawnedBy);
-            o.flyCaster = carried(o.flyCaster);
-            if (o.trap) {
-                o.trap->target = carried(o.trap->target);
-            }
-            if (o.crown) {
-                o.crown->returnTo = carried(o.crown->returnTo);
-            }
-            if (o.typeName == "Pixie") {
-                o.seekTarget = 0; // (its target forgotten)
+                o.monster->heardAt = 0; // (with heardFrom)
             }
             if (o.player) {
                 // (The pending casts' clear: the list emptied, each player's spell being
@@ -441,37 +401,12 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
                 o.player->trapSpells = {};
                 o.player->trapCount = 0;
                 o.player->lastWallX = o.player->lastWallY = -1;
-                o.player->marks = {};
-                o.player->markUses = {};
+                o.player->markUses = {}; // (with its marks)
                 o.player->crownAt = 0;
-                o.player->cameraFollow = 0;
                 o.player->polygon = kPolygonUnknown; // (servResetPlayers: 0xDEADFACE)
-                o.player->cursorObject = 0;
-                o.player->harpoonTarget = o.player->harpoonBolt = 0;
-                o.player->teleportedBy = 0;
-                o.player->assistBy = 0;
-                o.player->exitGate = o.player->warpGate = 0; // (the new outfit's playerMakeDefItems)
-                o.player->ankhsTaken = {}; // (with its checkpoint)
-                o.player->soulGate = 0;
-                o.hurtBy = 0;
-                // The weapon in its hand stays in its hand (the exe's ud->currentWeapon is the same
-                // thing's pointer after the switch): by its new number when it was numbered afresh, a
-                // map's staff picked up, say. Else it named whatever of the new map had the old
-                // number: nothing fired, and the next weapon worn left this one worn too.
-                o.player->currentWeapon = carried(o.player->currentWeapon);
-                // Its spell's chosen target, and its minimap's marks: a mark of a thing left behind
-                // names nothing (and goes as the list's walk drops a gone thing's: those of bits 1
-                // and 2 alone), never the new map's thing of that number.
-                o.player->spellTarget = carried(o.player->spellTarget);
-                for (auto& m : o.player->minimapMarks) {
-                    m.object = carried(m.object);
-                }
+                // A minimap mark of a thing left behind names nothing now (carryLinks) and goes as
+                // the list's walk drops a gone thing's: those of bits 1 and 2 alone.
                 std::erase_if(o.player->minimapMarks, [](const PlayerControl::MinimapMark& m) { return m.object == 0 && (m.bits & ~3u) == 0; });
-                // The NPC it talks to (DialogWith) isn't forgotten: the exe keeps its pointer to the
-                // old map's. One left behind stays an NPC no longer there (still talking).
-                if (o.player->dialogWith != 0) {
-                    o.player->dialogWith = carried(o.player->dialogWith) != 0 ? carried(o.player->dialogWith) : 0xFFFFFFFFu;
-                }
             }
             world_.adopt(std::move(o), false);
         }

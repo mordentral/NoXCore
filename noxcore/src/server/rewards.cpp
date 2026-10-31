@@ -764,7 +764,7 @@ void questRewardPass(Fight& fight)
             remove(world, *o);
         // A chest's markers: each one's item a stage better, put in the chest (and a Quiver with a bow).
         } else if (isChest(world, *o)) {
-            for (const std::uint32_t e : std::vector<std::uint32_t>(o->inventory)) {
+            for (const std::uint32_t e : keysOf(o->inventory)) {
                 ServerObject* in = world.byExtent(e);
                 if (!in || !isMarker(*in)) {
                     continue;

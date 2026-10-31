@@ -99,7 +99,7 @@ bool Spells::castGlyph(ServerObject& owner, ServerObject& source, float x, float
             g.born = g.timer = frame;
             g.holder = bomber->extent; // (inventoryPutImpl: the bomber's)
             g.owner = bomber->extent;
-            bomber->inventory.push_back(g.extent);
+            bomber->inventory.emplace_back(g.extent);
             made = &g;
         }
         playSound(world, 0x16F, source);
@@ -267,7 +267,7 @@ void removeSpawned(World& world, ServerObject& player)
         // go, with what they carry, in a puff (MSG_FX 0x81).
         for (auto& [extent, o] : world.objects()) {
             if (o.owner == player.extent && !o.gone() && controls(world, player, o)) {
-                for (const std::uint32_t e : std::vector<std::uint32_t>(o.inventory)) {
+                for (const std::uint32_t e : keysOf(o.inventory)) {
                     if (ServerObject* i = world.byExtent(e)) {
                         deleteObject(world, *i); // (delayedDeleteObject: out of it at once)
                         i->flags |= ObjFlag::Destroyed;

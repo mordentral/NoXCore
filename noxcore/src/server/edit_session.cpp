@@ -1094,7 +1094,7 @@ void EditSessionDirector::rebind(GameHost& host)
     }
     for (const std::uint32_t e : w.loadOrder) {
         if (const ServerObject* o = w.byExtent(e)) {
-            if (const auto it = byExtent.find(o->fileExtent); it != byExtent.end()) {
+            if (const auto it = byExtent.find(o->fileExtent.number()); it != byExtent.end()) { // (the document's by map number)
                 live_.try_emplace(it->second, e);
             }
         }

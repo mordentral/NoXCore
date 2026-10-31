@@ -565,7 +565,7 @@ void Items::inventoryPut(ServerObject& player, ServerObject& item, bool report)
     item.holder = player.extent;
     setOwner(world, &player, item); // (inventoryPutImpl -> unitSetOwner)
     item.vx = item.vy = 0;
-    player.inventory.insert(player.inventory.begin(), item.extent);
+    player.inventory.emplace(player.inventory.begin(), item.extent);
     // Its client hears (SrvNet_SendReportPickup).
     const std::uint32_t code = item.extent;
     if (report) {
@@ -699,7 +699,7 @@ bool Items::equipWeapon(ServerObject& player, ServerObject& item, bool everyone,
         // else "weapon.c:BowNotFound". The quiver worn comes off.
         bool bow = (p.weaponEquip & 0xCu) != 0;  // bits 0xC: a bow or crossbow
         if (!bow) {
-            for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+            for (const std::uint32_t e : keysOf(player.inventory)) {
                 ServerObject* o = world.byExtent(e);
                 if (o && (things::weaponBitOf(o->typeName) & 0xCu)) {
                     bow = equipWeapon(player, *o, everyone);
@@ -739,7 +739,7 @@ bool Items::equipWeapon(ServerObject& player, ServerObject& item, bool everyone,
     if (bit & 0x7FFE40Cu) {
         // Two-handed (bows, crossbows, the great sword, staves): the shields worn off
         // (armour bits 0x3000000).
-        for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+        for (const std::uint32_t e : keysOf(player.inventory)) {
             ServerObject* o = world.byExtent(e);
             if (o && (o->classes & oc::Armor) && (o->flags & ObjFlag::Equipped) && (things::armorBitOf(o->typeName) & 0x3000000u)) {
                 takeOff(player, *o, true, true);
@@ -768,7 +768,7 @@ bool Items::equipArmor(ServerObject& player, ServerObject& item, bool everyone, 
         return false;
     }
     // What's worn of its kind comes off (armorHaveSameSubclass: the same SUBCLASS).
-    for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+    for (const std::uint32_t e : keysOf(player.inventory)) {
         ServerObject* o = world.byExtent(e);
         if (o && o != &item && (o->classes & oc::Armor) && (o->flags & ObjFlag::Equipped) && o->subclasses == item.subclasses) {
             takeOff(player, *o, true, true);
@@ -790,7 +790,7 @@ bool Items::equipArmor(ServerObject& player, ServerObject& item, bool everyone, 
     if (item.subclasses & 2u) {
         // A shield (subclass 2): the two-handed weapons in hand off (weapon bits
         // 0x7FFE40C, bows, crossbows, the great sword, staves; playerDequipWeapon).
-        for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+        for (const std::uint32_t e : keysOf(player.inventory)) {
             ServerObject* o = world.byExtent(e);
             if (o && (o->flags & ObjFlag::Equipped) && (o->classes & (oc::Weapon | oc::Wand)) && (things::weaponBitOf(o->typeName) & 0x7FFE40Cu)) {
                 takeOff(player, *o, true, true);
@@ -806,7 +806,7 @@ bool Items::equipArmor(ServerObject& player, ServerObject& item, bool everyone, 
 void Items::takeOffQuiver(ServerObject& player, bool tellOwner, bool everyone)
 {
     // The first quiver worn comes off.
-    for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+    for (const std::uint32_t e : keysOf(player.inventory)) {
         ServerObject* o = world.byExtent(e);
         if (o && (o->flags & ObjFlag::Equipped) && things::weaponBitOf(o->typeName) == 2) {
             takeOff(player, *o, tellOwner, everyone);
@@ -1267,7 +1267,7 @@ bool Items::dropDefault(ServerObject& player, ServerObject& item, float x, float
     if ((item.classes & oc::Weapon) && things::weaponBitOf(item.typeName) == 4u) {
         // A bow dropped takes with it the first quiver carried, not worn, that's endless
         // (infinite ammo): out of the inventory and deleted (delayedDeleteObject).
-        for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+        for (const std::uint32_t e : keysOf(player.inventory)) {
             ServerObject* q = world.byExtent(e);
             if (q && (q->classes & oc::Weapon) && things::weaponBitOf(q->typeName) == 2u && !(q->flags & ObjFlag::Equipped) &&
                 q->infiniteAmmo) {
@@ -1443,7 +1443,7 @@ void Items::defaultItems(ServerObject& player)
 {
     PlayerControl& p = *player.player;
     // What isn't worn clothing goes (but medieval pants and shirts).
-    for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+    for (const std::uint32_t e : keysOf(player.inventory)) {
         ServerObject* item = world.byExtent(e);
         if (!item) {
             continue;

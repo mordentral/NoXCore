@@ -239,7 +239,7 @@ void Abilities::tryExecute(ServerObject& unit, int ability)
     }
     const int duration = static_cast<int>(world.number(kDuration[ability]));
     if (0 < duration) {
-        world.activeAbilities().push_front({ability, unit.extent, fight.frame + static_cast<std::uint32_t>(duration), 1});
+        world.activeAbilities().push_front({ability, ObjectRef{unit.extent}, fight.frame + static_cast<std::uint32_t>(duration), 1});
     }
     run(unit, ability);
     if (fight.things) {

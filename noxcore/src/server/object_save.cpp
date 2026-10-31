@@ -263,7 +263,7 @@ map::ObjectHeader Saver::header(const ServerObject& o, std::size_t held)
     const TypeFacts* f = facts(o);
     map::ObjectHeader h;
     h.version = 0x40;
-    h.extent = o.fileExtent; // (the exe's Extent: the map's number, 0 for a thing made in play)
+    h.extent = o.fileExtent.number(); // (the exe's Extent: the map's number, 0 for a thing made in play)
     h.scriptId = static_cast<std::uint32_t>(o.scriptId);
     h.x = o.x;
     h.y = o.y;
@@ -398,7 +398,7 @@ xf::Data Saver::data(const ServerObject& o, const TypeFacts& f, const map::Objec
             return r ? *r : xf::Mover{};
         }
         const auto& m = *o.mover;
-        return xf::Mover{static_cast<std::uint32_t>(m.speed), static_cast<std::uint32_t>(m.start), m.carried, m.state,
+        return xf::Mover{static_cast<std::uint32_t>(m.speed), static_cast<std::uint32_t>(m.start), m.carried.number(), m.state,
                          static_cast<std::uint32_t>(m.target), static_cast<std::uint32_t>(m.previous), o.speedBase, o.speedCur};
     }
     if (x == "GlyphXfer") { // (Direction1's low byte, its target point and the spells)
@@ -474,8 +474,8 @@ xf::Data Saver::data(const ServerObject& o, const TypeFacts& f, const map::Objec
         const auto* r = decoded<xf::Obelisk>(old);
         std::uint8_t known = r ? r->minimapKnown : std::uint8_t{0};
         if (world_.hostClient) {
-            known = (world_.gameFlags & GameFlag::Solo) && o.fileExtent <= 0x7FFFu &&
-                            world_.hostClient->minimapMarked(static_cast<std::uint16_t>(o.fileExtent | 0x8000u))
+            known = (world_.gameFlags & GameFlag::Solo) && o.fileExtent.number() <= 0x7FFFu &&
+                            world_.hostClient->minimapMarked(static_cast<std::uint16_t>(o.fileExtent.number() | 0x8000u))
                         ? std::uint8_t{1}
                         : std::uint8_t{0};
         }
@@ -950,8 +950,8 @@ map::ObjectRecord Saver::clientRecord(const World::ClientOnly& o, const TypeFact
     world_.newScriptId();
     const map::ObjectXfer& rec = *o.record;
     ServerObject fresh = describeType(world_, things_, o.typeName);
-    fresh.extent = rec.header.extent;
-    fresh.fileExtent = rec.header.extent;
+    fresh.fileExtent = MapNumber{rec.header.extent};
+    fresh.extent = fresh.fileExtent.asExtent(); // (a drawable's: its map number its key and net code)
     fresh.scriptId = static_cast<std::int32_t>(rec.header.extent);
     fresh.x = static_cast<float>(static_cast<int>(rec.header.x)) + 0.5f;
     fresh.y = static_cast<float>(static_cast<int>(rec.header.y)) + 0.5f;

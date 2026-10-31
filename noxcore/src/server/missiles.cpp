@@ -383,7 +383,7 @@ bool Missiles::shoot(ServerObject& shooter, ServerObject& weapon)
     // Put one on from the inventory, if there is one (playerTryReloadQuiver).
     Items items{world, things, modifiers, rng, frame};
     bool reloaded = false;
-    for (const std::uint32_t e : std::vector<std::uint32_t>(shooter.inventory)) {
+    for (const std::uint32_t e : keysOf(shooter.inventory)) {
         ServerObject* o = world.byExtent(e);
         if (o && things::weaponBitOf(o->typeName) == 2) {
             reloaded = items.equipWeapon(shooter, *o, true);
@@ -535,8 +535,8 @@ bool Missiles::throwChakram(ServerObject& thrower, ServerObject& weapon)
         world.broadcasts().push_back({{0x4D, lo(weapon.extent), hi(weapon.extent), lo(weapon.type), hi(weapon.type)}, true, thrower.extent});
         std::erase(thrower.inventory, weapon.extent);
         weapon.holder = m.extent;
-        m.inventory.push_back(weapon.extent);
-        m.chakram = ServerObject::Chakram{4, 2, 0, 0, thrower.x, thrower.y};  // (4 bounces, leg 2: outward)
+        m.inventory.emplace_back(weapon.extent);
+        m.chakram = ServerObject::Chakram{4, 2, {}, {}, thrower.x, thrower.y};  // (4 bounces, leg 2: outward)
         return true;
     }
     // A fan chakram looses one of its charges (AmmoUse), gone at none.

@@ -235,7 +235,7 @@ TradeSession::Item* addToStock(Fight& fight, TradeSession& s, ServerObject& o)
     if (!tradeItemLeft(world)) {
         return nullptr;
     }
-    const TradeSession::Item item{o.extent, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 1, &s, o))};
+    const TradeSession::Item item{ObjectRef{o.extent}, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 1, &s, o))};
     const std::uint32_t key = stockKey(o, item.price);
     auto at = s.stock.begin();
     while (at != s.stock.end()) {
@@ -433,13 +433,14 @@ ServerObject* heldByCode(World& world, const ServerObject& unit, std::uint32_t c
 }
 
 /// packetDynamicUnitCode: a code with bit 15 a map object's by its map number (netGetUnitByExtent).
-std::uint32_t dynamicCode(World& world, std::uint32_t code)
+/// The thing's key: ours is its net code.
+ObjectKey dynamicCode(World& world, NetCode code)
 {
-    if ((code & 0x8000u) == 0x8000u) {
-        const ServerObject* o = world.byMapNumber(code & 0x7FFFu);
+    if (code.mapObject()) {
+        const ServerObject* o = world.byMapNumber(code.mapNumber());
         return o ? o->extent : 0;
     }
-    return code;
+    return code.asExtent();
 }
 
 } // namespace
@@ -761,7 +762,7 @@ int addOffer(Fight& fight, TradeSession& s, const ServerObject& who, ServerObjec
         }
         return 0;
     }
-    const TradeSession::Item entry{item.extent, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 1, &s, item))};
+    const TradeSession::Item entry{ObjectRef{item.extent}, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 1, &s, item))};
     offers->insert(offers->begin(), entry);
     balance(world, s);
     resetAccepts(world, s);
@@ -1265,7 +1266,7 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         }
         break;
     case 0x0F: { // offer a thing it holds
-        const std::uint32_t code = dynamicCode(world, u16(2));
+        const std::uint32_t code = dynamicCode(world, NetCode{u16(2)});
         ServerObject* item = heldByCode(world, unit, code);
         if (item && s && addOffer(fight, *s, unit, *item) == 1) {
             if (fight.things) {
@@ -1276,7 +1277,7 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         break;
     }
     case 0x10: // take an offer back
-        if (const std::uint32_t code = dynamicCode(world, u16(2)); s) {
+        if (const std::uint32_t code = dynamicCode(world, NetCode{u16(2)}); s) {
             withdrawOffer(fight, *s, code);
         }
         break;
@@ -1294,7 +1295,7 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         if (world.saveRequest.pending || (p.statusFlags & 3u)) {
             break;
         }
-        ServerObject* other = world.byExtent(dynamicCode(world, u16(2)) & 0x7FFFu);
+        ServerObject* other = world.byExtent(dynamicCode(world, NetCode{u16(2)}) & 0x7FFFu);
         if (other && !other->gone() && (other->subclasses & 8u)) {
             startTrade(fight, unit, *other);
         }

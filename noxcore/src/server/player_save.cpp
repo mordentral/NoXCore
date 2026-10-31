@@ -12,6 +12,7 @@
 #include "noxcore/server/enchant.hpp"
 #include "noxcore/server/host_client.hpp"
 #include "noxcore/server/items.hpp"
+#include "noxcore/server/object_links.hpp"
 #include "noxcore/server/object_save.hpp"
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/quest.hpp"
@@ -693,7 +694,7 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         subGold(unit, p.gold);
         addGold(unit, static_cast<std::int32_t>(gold));
         // What it carried goes (delayedDeleteObject: out of its inventory).
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             if (ServerObject* o = world.byExtent(e)) {
                 items.removeFromInventory(unit, *o);
                 o->flags |= ObjFlag::Destroyed;
@@ -726,8 +727,7 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
             ServerObject* item = nullptr;
             if (!world.disabledTypes.contains(o.typeName)) {
                 o.extent = world.newExtent();
-                o.holder = 0;
-                o.inventory.clear();
+                clearLinks(o); // (a thing of its own: held by nothing, holding nothing, naming nothing)
                 o.x = o.frameStartX = o.newX = o.lastX = o.homeX = 2944.0f;
                 o.y = o.frameStartY = o.newY = o.lastY = o.homeY = 2944.0f;
                 o.flags = (o.flags & 0x35E9FEDBu) | ObjFlag::Active;
@@ -755,7 +755,7 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         const std::uint8_t worn = r.u8();
         for (std::uint8_t i = 0; i < worn; ++i) {
             const std::int32_t id = r.i32();
-            for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+            for (const std::uint32_t e : keysOf(unit.inventory)) {
                 if (ServerObject* o = world.byExtent(e); o && o->scriptId == id) {
                     items.tryEquip(unit, *o);
                 }
@@ -1147,7 +1147,7 @@ std::optional<player::PlayerFile> buildQuestFile(Fight& fight, ServerObject& pla
     }
     World& world = fight.world;
     PlayerControl& p = *player.player;
-    const std::vector<std::uint32_t> inventory = player.inventory;
+    const std::vector<ObjectRef> inventory = player.inventory;
     const auto spells = p.spellLevels;
     const auto guide = p.fieldGuide;
     std::map<std::string, int> held;
@@ -1252,7 +1252,7 @@ bool applyFile(Fight& fight, ServerObject& unit, const player::PlayerFile& file,
     } catch (const Fail&) {
         // A section failed: what it carries goes (delayedDeleteObject).
         Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             if (ServerObject* o = world.byExtent(e)) {
                 items.removeFromInventory(unit, *o);
                 o->flags |= ObjFlag::Destroyed;
@@ -1264,7 +1264,7 @@ bool applyFile(Fight& fight, ServerObject& unit, const player::PlayerFile& file,
     } catch (const std::exception&) {
         // (A section shorter than its fields: the exe reads on into the next; here it fails.)
         Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             if (ServerObject* o = world.byExtent(e)) {
                 items.removeFromInventory(unit, *o);
                 o->flags |= ObjFlag::Destroyed;

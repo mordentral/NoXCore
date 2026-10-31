@@ -81,10 +81,10 @@ void eachObjectOf(World& world, std::int32_t group, F&& fn, std::vector<std::int
     if (!g) {
         return;
     }
-    const std::vector<std::int32_t> members = g->members;
+    const std::vector<GroupMember> members = g->members;
     if (g->kind == ServerGroup::Kind::Objects) {
-        for (const std::int32_t m : members) {
-            if (ServerObject* o = world.byMapNumber(static_cast<std::uint32_t>(m))) {
+        for (const GroupMember m : members) {
+            if (ServerObject* o = world.byMapNumber(m.mapNumber())) {
                 fn(*o);
             }
         }
@@ -95,8 +95,8 @@ void eachObjectOf(World& world, std::int32_t group, F&& fn, std::vector<std::int
             return;
         }
         path.push_back(group);
-        for (const std::int32_t m : members) {
-            eachObjectOf(world, m, fn, &path);
+        for (const GroupMember m : members) {
+            eachObjectOf(world, m.groupId(), fn, &path);
         }
         path.pop_back();
     }
@@ -107,9 +107,9 @@ void eachObjectOf(World& world, std::int32_t group, F&& fn, std::vector<std::int
 template <class F>
 void eachMemberOf(World& world, const ServerGroup& g, F&& fn)
 {
-    const std::vector<std::int32_t> members = g.members;
-    for (const std::int32_t m : members) {
-        if (ServerObject* o = world.byMapNumber(static_cast<std::uint32_t>(m))) {
+    const std::vector<GroupMember> members = g.members;
+    for (const GroupMember m : members) {
+        if (ServerObject* o = world.byMapNumber(m.mapNumber())) {
             fn(*o);
         }
     }
@@ -837,8 +837,8 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
             if (!all) {
                 return;
             }
-            for (const std::int32_t m : first->members) {
-                ServerObject* u = world_.byMapNumber(static_cast<std::uint32_t>(m));
+            for (const GroupMember m : first->members) {
+                ServerObject* u = world_.byMapNumber(m.mapNumber());
                 if (u && !hasParent(world_, u, &owner)) {
                     all = false;
                     break;
@@ -1145,7 +1145,7 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         }
         bool worn = false;
         auto it = items();
-        for (const std::uint32_t e : std::vector<std::uint32_t>(host->inventory)) {
+        for (const std::uint32_t e : keysOf(host->inventory)) {
             ServerObject* i = world_.byExtent(e);
             if (i && (i->classes & oc::Weapon) && (i->subclasses & 0x7800000u)) {  // the Oblivion staffs (subclass bits 23-26)
                 worn = (i->flags & ObjFlag::Equipped) != 0;

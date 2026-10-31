@@ -917,7 +917,7 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         }
         if (target->player || ((target->classes & oc::Monster) && (target->subclasses & 0x10u))) {
             // What it holds and its shield fall, each somewhere within 50 (invForceDropItem).
-            for (const std::uint32_t e : std::vector<std::uint32_t>(target->inventory)) {
+            for (const std::uint32_t e : keysOf(target->inventory)) {
                 ServerObject* item = world.byExtent(e);
                 if (item && (item->flags & ObjFlag::Equipped) &&
                     ((item->classes & (oc::Weapon | oc::Wand)) || ((item->classes & oc::Armor) && (item->subclasses & 2u)))) {
@@ -2840,7 +2840,7 @@ int Spells::chainLightning(DurationSpell& s, ServerObject* caster)
     // the 5th from the 3rd (or 2nd).
     const auto at = [&](std::size_t i) { return i < struck.size() ? struck[i] : nullptr; };
     const auto bolt = [&](const ServerObject* from, const ServerObject* to) { // (newest first)
-        s.bolts.insert(s.bolts.begin(), {from->extent, to->extent});
+        s.bolts.insert(s.bolts.begin(), {ObjectRef{from->extent}, ObjectRef{to->extent}});
     };
     bolt(caster, at(0));
     if (1 < most && at(1)) {

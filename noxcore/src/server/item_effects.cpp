@@ -393,7 +393,7 @@ void updateEffects(Fight& fight, ServerObject& player)
         })) {
         return;
     }
-    for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+    for (const std::uint32_t e : keysOf(player.inventory)) {
         ServerObject* item = world.byExtent(e);
         if (!item || !wornModifiable(*item)) {
             continue;

@@ -793,7 +793,7 @@ void forceClass(Fight& fight, ServerObject& unit, std::uint8_t classId)
     // What the class can't use: taken off, kept (nothing it carries is lost).
     if (fight.things) {
         Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             ServerObject* o = world.byExtent(e);
             if (o && (o->flags & ObjFlag::Equipped) && (o->classes & (oc::Weapon | oc::Wand | oc::Armor)) && !items.classMay(unit, *o)) {
                 items.takeOff(unit, *o, true, true);
@@ -871,7 +871,7 @@ void startQuest(Fight& fight)
             items.defaultItems(*u);
             // Its armour but the 0x405 kinds and its weapons of subclass 0x8200 (long swords,
             // staffs) gone.
-            for (const std::uint32_t e : std::vector<std::uint32_t>(u->inventory)) {
+            for (const std::uint32_t e : keysOf(u->inventory)) {
                 ServerObject* i = world.byExtent(e);
                 if (!i) {
                     continue;
@@ -1315,7 +1315,7 @@ void questPlayerLeaves(Fight& fight, ServerObject& unit)
     }
     // Its keys to the others (Plr_GiveAwayKeysOnLeave), then everything it holds gone.
     questGiveAwayKeys(fight, unit);
-    for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+    for (const std::uint32_t e : keysOf(unit.inventory)) {
         if (ServerObject* i = world.byExtent(e)) {
             deleteObject(world, *i); // (delayedDeleteObject: out of it at once)
         }
@@ -1361,7 +1361,7 @@ void questGiveAwayKeys(Fight& fight, ServerObject& unit)
     Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
     const auto isKey = [&](const ServerObject* i) { return i && (i->classes & oc::Key); };
     if (questPlayers(world) != 0) {
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             ServerObject* key = world.byExtent(e);
             if (!isKey(key)) {
                 continue;
@@ -1386,7 +1386,7 @@ void questGiveAwayKeys(Fight& fight, ServerObject& unit)
             }
         }
     }
-    for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+    for (const std::uint32_t e : keysOf(unit.inventory)) {
         if (ServerObject* key = world.byExtent(e); isKey(key)) {
             items.removeFromInventory(unit, *key);
             const auto [x, y] = clearPointNear(world, fight.rng, unit.x, unit.y, 60.0f);
@@ -1731,7 +1731,7 @@ void questAnkhCollide(Fight& fight, ServerObject& ankh, ServerObject* other)
         world.lockNoticeAt = fight.frame;
     };
     const auto noteTaken = [&] {
-        for (std::uint32_t& t : p.ankhsTaken) {
+        for (ObjectRef& t : p.ankhsTaken) {
             if (t == 0) {
                 t = ankh.extent;
                 break;

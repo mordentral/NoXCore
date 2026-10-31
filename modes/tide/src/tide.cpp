@@ -1888,7 +1888,7 @@ void TideDirector::disarm(GameHost& host, ServerObject& unit)
 {
     World& world = host.server().world();
     std::optional<Fight> fight;
-    for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+    for (const std::uint32_t e : keysOf(unit.inventory)) {
         ServerObject* i = world.byExtent(e);
         if (!i || i->pendingDelete || !(i->classes & data().disarm)) { // (data.luau's disarm)
             continue;

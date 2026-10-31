@@ -1232,7 +1232,7 @@ std::int32_t createMover(World& world, const things::ThingDb& things, ServerObje
     if (!m->mover) {
         m->mover.emplace();
     }
-    m->mover->carried = 0;
+    m->mover->carried = MapNumber{};
     m->mover->start = waypoint;
     m->mover->speed = static_cast<int>(speed);
     m->mover->state = 0;
@@ -1265,7 +1265,7 @@ void Objects::moverUpdate(ServerObject& o)
     // Its thing by its map number, at an update that has none (netGetUnitByExtent: the first on
     // the map of that number), kept; one no longer ACTIVE, or destroyed, let go (its number kept,
     // so the next start finds the thing of that number again).
-    if (m.carried == 0) {
+    if (!m.carried) {
         stop();
         return;
     }

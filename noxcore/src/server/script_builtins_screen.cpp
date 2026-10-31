@@ -118,7 +118,7 @@ int ScriptHost::screenBuiltin(std::uint32_t id, script::Vm& vm)
             // Its keys gone (delayedDeleteObject: out of the inventory at once,
             // Obj_RemoveFromInventory telling its client, MSG_REPORT_DROP).
             Items items{world_, things_, modifiers_, creatureRng_, frame_};
-            for (const std::uint32_t e : std::vector<std::uint32_t>(p->inventory)) {
+            for (const std::uint32_t e : keysOf(p->inventory)) {
                 if (ServerObject* item = world_.byExtent(e); item && !item->pendingDelete && (item->classes & oc::Key)) {
                     items.removeFromInventory(*p, *item);
                     item->pendingDelete = true;

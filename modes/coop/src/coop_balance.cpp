@@ -159,7 +159,7 @@ void CoopDirector::keysToHost(server::ServerObject& unit)
         return;
     }
     server::Items items{world(), *f.things, f.modifiers, f.rng, f.frame};
-    for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+    for (const std::uint32_t e : keysOf(unit.inventory)) {
         server::ServerObject* key = world().byExtent(e);
         if (!key || !(key->classes & oc::Key) || key->pendingDelete) {
             continue;
@@ -184,7 +184,7 @@ void CoopDirector::keysGone(server::ServerObject& unit)
         return;
     }
     server::Items items{world(), *f.things, f.modifiers, f.rng, f.frame};
-    for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+    for (const std::uint32_t e : keysOf(unit.inventory)) {
         if (server::ServerObject* item = world().byExtent(e); item && !item->pendingDelete && (item->classes & oc::Key)) {
             items.removeFromInventory(unit, *item);
             item->pendingDelete = true;

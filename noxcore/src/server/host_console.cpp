@@ -734,7 +734,7 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
                     if (o.holder != 0) {
                         continue;
                     }
-                    for (const std::uint32_t e : std::vector<std::uint32_t>(o.inventory)) {
+                    for (const std::uint32_t e : keysOf(o.inventory)) {
                         if (ServerObject* i = world.byExtent(e); i && i->typeName == def->name) {
                             deleteObject(world, *i);
                         }

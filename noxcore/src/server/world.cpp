@@ -485,7 +485,7 @@ const things::ThingDef* describeType(ServerObject& o, const things::ThingDb& thi
     const ServerObject& proto = w.typeProto(things, static_cast<std::size_t>(t - things.things.data()),
                                             [&](ServerObject& fresh) { describeTypeFresh(fresh, things, type, w); });
     const std::uint32_t extent = o.extent;
-    const std::uint32_t fileExtent = o.fileExtent;
+    const MapNumber fileExtent = o.fileExtent;
     const std::int32_t scriptId = o.scriptId;
     o = proto;
     o.extent = extent;
@@ -719,7 +719,7 @@ static void readActionData(World& w, ServerObject& o, const map::xfer::ActionDat
         it.started = e.unknown != 0;
     }
     m.seenCount = static_cast<std::uint8_t>(std::min<std::size_t>(b.unknownList2.size(), m.seen.size()));
-    m.seen.fill(0);
+    m.seen.fill(ObjectRef{});
     refs.seen = b.unknownList2;
     refs.enemy = b.unknown14;
     m.enemy = 0;
@@ -864,6 +864,13 @@ static void withXfer(const map::ObjectXfer& xfer, const ServerObject& o, std::st
 // (u32At: the little-endian u32 at `at` in a record's extra bytes.)
 using util::u32At;
 
+/// The partner a lift's, shaft's or pad's record names (ElevatorXfer, ElevatorShaftXfer,
+/// TransporterXfer: the u32 each starts with, any version), by map number; none without a record.
+static MapNumber recordPartner(const ServerObject& o)
+{
+    return o.record && o.record->extra.size() >= 4 ? MapNumber{u32At(o.record->extra, 0)} : MapNumber{};
+}
+
 /// One object from its map record (the type's, then the record's header and its type's xfer),
 /// as World::load reads each (and a monster generator its templates).
 static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typeName, World& w, const things::ThingDb& things,
@@ -879,8 +886,8 @@ static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typ
     if (!(gameFlags & 0x200000u)) {
         o.scriptId = w.newScriptId();
     }
-    o.extent = h.extent;
-    o.fileExtent = h.extent;
+    o.fileExtent = MapNumber{h.extent};
+    o.extent = o.fileExtent.asExtent(); // (the record's number its key, unless the load numbers it afresh: placeRecords)
     o.scriptId = static_cast<std::int32_t>(h.scriptId);
     if (h.scriptId == 0 && !(gameFlags & 0x600000u)) {
         o.scriptId = w.newScriptId();
@@ -926,9 +933,9 @@ static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typ
     }
     if ((o.classes & 0xC000u) && xfer.extra.size() >= 4) {  // an elevator (0x4000) or its shaft (0x8000)
         // ElevatorXfer: u32 its shaft, (version 0x29 on) u32 its height,
-        // (0x3D on) u8 its state. ElevatorShaftXfer: u32 its elevator.
+        // (0x3D on) u8 its state. ElevatorShaftXfer: u32 its elevator. (The partner's map number
+        // stays in the record: the load's link pass reads it there, recordPartner.)
         const auto& e = xfer.extra;
-        o.elevatorLink = u32At(e, 0);
         std::size_t at = 4;
         if ((o.classes & 0x4000u) && xfer.xferVersion > 0x28 && at + 4 <= e.size()) {
             o.elevatorLevel = static_cast<std::int32_t>(u32At(e, at));
@@ -989,7 +996,7 @@ static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typ
         withXfer<map::xfer::Mover>(xfer, o, "MoverXfer", [&](const map::xfer::Mover& m) {
             o.mover->speed = static_cast<int>(m.movingSpeed);
             o.mover->start = static_cast<std::int32_t>(m.waypoint);
-            o.mover->carried = m.movedExtent;
+            o.mover->carried = MapNumber{m.movedExtent};
             o.mover->state = m.moveType;
             o.mover->target = static_cast<std::int32_t>(m.waypointStart);
             o.mover->previous = static_cast<std::int32_t>(m.waypointEnd);
@@ -1167,11 +1174,9 @@ static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typ
         });
     }
     if (o.classes & things::ObjectClass::Transporter) {
-        // TransporterXfer: u32 its partner (0: none).
+        // TransporterXfer: u32 its partner (0: none), by map number: left in the record for the
+        // load's link pass (recordPartner).
         o.transport.emplace();
-        if (xfer.extra.size() >= 4) {
-            o.transport->link = u32At(xfer.extra, 0);
-        }
     }
     if (o.classes & things::ObjectClass::Trigger) {
         // TriggerXfer: its box (at most 60 a side), what may press it, its
@@ -1413,10 +1418,10 @@ std::vector<std::uint32_t> World::placeRecords(World& w, const map::ObjectTOC& t
                 }
             }
         }
-        std::vector<std::uint32_t> items;
+        std::vector<ObjectRef> items;
         for (const auto& item : node.inventory) {
             if (const std::uint32_t e = self(self, item, extent, placed)) {
-                items.insert(items.begin(), e);
+                items.emplace(items.begin(), e);
             }
         }
         if (!placed) {
@@ -1474,7 +1479,69 @@ std::vector<std::uint32_t> World::placeLiveRecords(const map::ObjectTOC& toc, co
             attachDoorWall(*o);
         }
     }
+    // The lifts, shafts and pads linked as a map load links them (by the map numbers their records
+    // name), then to partners already in the world (placed live before them) for those still
+    // without one.
+    linkElevators(*this, roots);
+    linkTransporters(*this, roots);
+    linkLive(*this, roots);
     return roots;
+}
+
+void World::linkLive(World& w, const std::vector<std::uint32_t>& placed)
+{
+    // (noxcpp's editor sessions only: a thing is placed live on its own, its partner maybe already
+    // in the world or to come. Of several with the number, the first in the extents' order.)
+    const auto inPlaced = [&](const ServerObject& o) { return std::ranges::find(placed, o.extent) != placed.end(); };
+    const auto present = [](const ServerObject& o) { return !o.gone() && !o.pendingDelete && o.holder == 0; };
+    for (const std::uint32_t e : placed) {
+        ServerObject* p = w.byExtent(e);
+        if (!p) {
+            continue;
+        }
+        if ((p->classes & things::ObjectClass::Elevator) && p->elevatorLink == 0) {
+            // An elevator: the shaft its record names, among those not linked to another elevator.
+            if (const MapNumber named = recordPartner(*p)) {
+                for (auto& [k, s] : w.objects_) {
+                    if ((s.classes & things::ObjectClass::ElevatorShaft) && present(s) && !inPlaced(s) && s.fileExtent == named && s.elevatorLink == 0) {
+                        p->elevatorLink = s.extent;
+                        s.elevatorLink = p->extent;
+                        break;
+                    }
+                }
+            }
+        } else if ((p->classes & things::ObjectClass::ElevatorShaft) && p->elevatorLink == 0 && p->fileExtent) {
+            // A shaft: the elevator in the world that names it and has none.
+            for (auto& [k, el] : w.objects_) {
+                if ((el.classes & things::ObjectClass::Elevator) && present(el) && !inPlaced(el) && el.elevatorLink == 0 &&
+                    recordPartner(el) == p->fileExtent) {
+                    el.elevatorLink = p->extent;
+                    p->elevatorLink = el.extent;
+                    break;
+                }
+            }
+        }
+        if (p->transport && (p->classes & things::ObjectClass::Transporter)) {
+            // A pad (one way, as the load's): the pad its record names; and those in the world that
+            // name it and have none, it.
+            if (const MapNumber named = recordPartner(*p); named && p->transport->link == 0) {
+                for (auto& [k, q] : w.objects_) {
+                    if (q.transport && (q.classes & things::ObjectClass::Transporter) && present(q) && !inPlaced(q) && q.fileExtent == named) {
+                        p->transport->link = q.extent;
+                        break;
+                    }
+                }
+            }
+            if (p->fileExtent) {
+                for (auto& [k, q] : w.objects_) {
+                    if (q.transport && (q.classes & things::ObjectClass::Transporter) && present(q) && !inPlaced(q) && q.transport->link == 0 &&
+                        recordPartner(q) == p->fileExtent) {
+                        q.transport->link = p->extent;
+                    }
+                }
+            }
+        }
+    }
 }
 
 World World::load(const map::MapFile& map, const things::ThingDb& things, std::uint32_t gameFlags, const things::GameData* gameData,
@@ -1664,7 +1731,9 @@ World World::load(const map::MapFile& map, const things::ThingDb& things, std::u
             sg.id = g.id;
             sg.name = g.name.substr(0, std::min(g.name.find('\0'), std::size_t{75}));
             sg.kind = static_cast<ServerGroup::Kind>(g.kind);
-            sg.members.assign(g.members.rbegin(), g.members.rend());
+            for (auto m = g.members.rbegin(); m != g.members.rend(); ++m) {
+                sg.members.emplace_back(*m);
+            }
             for (auto p = g.walls.rbegin(); p != g.walls.rend(); ++p) {
                 sg.walls.emplace_back(p->x, p->y);
             }
@@ -1705,7 +1774,7 @@ void World::linkElevators(World& w, const std::vector<std::uint32_t>& placed)
         s->elevatorLink = 0;
     }
     for (ServerObject* e : elevators) {
-        const std::uint32_t named = e->elevatorLink; // (the record's: the shaft's map number)
+        const MapNumber named = recordPartner(*e); // (the record's: the shaft's map number)
         e->elevatorLink = 0;
         for (ServerObject* s : shafts) {
             if (s->fileExtent == named) {
@@ -1730,13 +1799,13 @@ void World::linkTransporters(World& w, const std::vector<std::uint32_t>& placed)
             pads.push_back(o);
         }
     }
-    std::vector<std::uint32_t> named(pads.size());
+    std::vector<MapNumber> named(pads.size());
     for (std::size_t i = 0; i < pads.size(); ++i) {
-        named[i] = pads[i]->transport->link; // (the record's: the partner's map number)
+        named[i] = recordPartner(*pads[i]); // (the record's: the partner's map number)
     }
     for (std::size_t i = 0; i < pads.size(); ++i) {
         pads[i]->transport->link = 0;
-        if (named[i] == 0) {
+        if (!named[i]) {
             continue;
         }
         for (const ServerObject* p : pads) {
@@ -1748,7 +1817,7 @@ void World::linkTransporters(World& w, const std::vector<std::uint32_t>& placed)
     }
 }
 
-ServerObject* World::byExtent(std::uint32_t extent)
+ServerObject* World::byExtent(ObjectKey extent)
 {
     if (extent < ExtentTable::kLimit) {
         ServerObject* o = objects_.index().at(extent);
@@ -1760,18 +1829,18 @@ ServerObject* World::byExtent(std::uint32_t extent)
 
 void World::noteRenumbered(const ServerObject& o)
 {
-    if (o.fileExtent != 0 && o.fileExtent != o.extent) {
+    if (o.fileExtent && o.fileExtent.asExtent() != o.extent) {
         renumbered_[o.fileExtent].push_back(o.extent);
     }
 }
 
-void World::setMapNumber(ServerObject& o, std::uint32_t number)
+void World::setMapNumber(ServerObject& o, MapNumber number)
 {
     o.fileExtent = number;
     noteRenumbered(o);
 }
 
-ServerObject* World::byMapNumber(std::uint32_t number)
+ServerObject* World::byMapNumber(MapNumber number)
 {
     // (netGetUnitByExtent) The object list from its head: the first not destroyed (0x20) whose
     // Extent it is, so of two things on the map with one number the newest (each pass puts its
@@ -1781,7 +1850,7 @@ ServerObject* World::byMapNumber(std::uint32_t number)
     // the oldest (born); of one load's, the later record (a save lists the newer things first).
     // The candidates: the thing under that extent (of a load, the first record of the number),
     // then those numbered afresh as they came.
-    if (number == 0) {
+    if (!number) {
         return nullptr;
     }
     const auto listed = [&](ServerObject* o) {
@@ -1791,7 +1860,7 @@ ServerObject* World::byMapNumber(std::uint32_t number)
         // (one put back in the world this frame, still on the new list: Items::place)
         return o->born != frameNow || std::ranges::find(fresh_, o->extent) == fresh_.end();
     };
-    ServerObject* best = byExtent(number);
+    ServerObject* best = byExtent(number.asExtent()); // (the thing that kept the number as its key)
     if (!listed(best)) {
         best = nullptr;
     }
@@ -1806,24 +1875,24 @@ ServerObject* World::byMapNumber(std::uint32_t number)
     return best;
 }
 
-ServerObject* World::byPacketCode(std::uint32_t code)
+ServerObject* World::byPacketCode(NetCode code)
 {
     // (packetDynamicUnitCode: bit 15 a map object's, netGetUnitByExtent's NetCode; then
     // Obj_GetByNetCode)
-    if ((code & 0x8000u) == 0x8000u) {
-        return byMapNumber(code & 0x7FFFu);
+    if (code.mapObject()) {
+        return byMapNumber(code.mapNumber());
     }
     return byNetCode(code);
 }
 
-ServerObject* World::byNetCode(std::uint32_t code)
+ServerObject* World::byNetCode(NetCode code)
 {
     // (Obj_GetByNetCode: none destroyed. A map object's NetCode is its own, under 0x8000: a code
     // with bit 15 is nobody's.)
-    if (code == 0 || (code & 0x8000u) != 0) {
+    if (code.code() == 0 || code.mapObject()) {
         return nullptr;
     }
-    return byExtent(code);
+    return byExtent(code.asExtent()); // (a dynamic thing's net code is our key)
 }
 
 ServerObject* World::byScriptId(std::int32_t id)
@@ -2326,7 +2395,7 @@ std::optional<ServerGroup::Kind> World::groupKind(const ServerGroup& g)
         if (at->members.empty()) {
             return std::nullopt;
         }
-        at = group(at->members.front());
+        at = group(at->members.front().groupId());
     }
     return std::nullopt;
 }

@@ -133,14 +133,14 @@ void fixMonster(World& world, ServerObject& o, bool carried)
     m.focus = refs ? find(refs->focus) : liveFind(m.focus);
     // The transits (and how many): one not found ends the count at 0.
     const std::size_t transits = refs ? refs->transits.size() : m.transits.size();
-    std::vector<std::uint32_t> kept;
+    std::vector<ObjectRef> kept;
     for (std::size_t i = 0; i < transits; ++i) {
         const std::uint32_t t = refs ? find(refs->transits[i]) : liveFind(m.transits[i]);
         if (t == 0) {
             kept.clear();
             break;
         }
-        kept.push_back(t);
+        kept.emplace_back(t);
     }
     m.transits = std::move(kept);
     m.savedRefs.reset();
@@ -414,7 +414,7 @@ void soloMapLoaded(Server& server, bool fromSave, const std::vector<std::uint32_
                     continue;
                 }
                 if ((o.classes & things::ObjectClass::Monster) && (o.subclasses & 0x2000u)) {
-                    for (const std::uint32_t i : std::vector<std::uint32_t>(o.inventory)) {
+                    for (const std::uint32_t i : keysOf(o.inventory)) {
                         if (ServerObject* item = world.byExtent(i); item && item->typeName == "Glyph") {
                             deleteObject(world, *item); // (delayedDeleteObject)
                         }

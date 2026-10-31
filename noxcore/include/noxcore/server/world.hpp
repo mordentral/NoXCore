@@ -9,6 +9,7 @@
 #include "noxcore/server/indexed_map.hpp"
 #include "noxcore/server/map_grid.hpp"
 #include "noxcore/server/name.hpp"
+#include "noxcore/server/object_key.hpp"
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/map/objects.hpp"
 #include "noxcore/map/sections.hpp"
@@ -142,8 +143,8 @@ struct PlayerControl {
     std::uint8_t ownClass = 0xFF;
     float cursorX = 0;            ///< where its cursor is in the world (MSG_MOUSE)
     float cursorY = 0;
-    std::uint32_t cursorObject = 0; ///< what's under its cursor, found each frame
-    std::uint32_t dialogWith = 0;   ///< (DialogWith) the NPC it's talking to (dialog.hpp; 0 none)
+    ObjectRef cursorObject;         ///< what's under its cursor, found each frame
+    ObjectRef dialogWith;           ///< (DialogWith) the NPC it's talking to (dialog.hpp; 0 none; kLostLink one left behind)
     std::uint32_t statusFlags = 0;  ///< (Player->statusFlags) 1 observing, 0x20 eliminated, 0x400 poisoned...
     std::uint8_t creatureOrder = 4; ///< (SummonOrderAll) its creatures' standing order: 4 escort
     /// The creatures in its field guide (by guide index): what it may summon or charm in
@@ -155,18 +156,18 @@ struct PlayerControl {
     std::array<int, 6> abilityCooldown{};
     // A warrior's harpoon: what it's stuck in, the bolt, when it was thrown,
     // where its target was at the last check and when that was.
-    std::uint32_t harpoonTarget = 0;
-    std::uint32_t harpoonBolt = 0;
+    ObjectRef harpoonTarget;
+    ObjectRef harpoonBolt;
     std::uint32_t harpoonThrown = 0;
     float harpoonTargetX = 0;
     float harpoonTargetY = 0;
     std::uint32_t harpoonChecked = 0;
     /// Its four teleport marks (TeleportGlyph1-4's extents) and the uses each has left
     /// (3 when set).
-    std::array<std::uint32_t, 4> marks{};
+    std::array<ObjectRef, 4> marks{};
     std::array<std::uint8_t, 4> markUses{};
     /// Who last teleported it, and when (0 none).
-    std::uint32_t teleportedBy = 0;
+    ObjectRef teleportedBy;
     std::uint32_t teleportedAt = 0;
     /// Half its screen (from its join: Swap's sight rectangle).
     float viewHalfWidth = 320;
@@ -174,7 +175,7 @@ struct PlayerControl {
     std::uint8_t stamina = 100;
     /// Its minimap's marks (player.hpp's markMinimap), the list's head first.
     struct MinimapMark {
-        std::uint32_t object = 0;
+        ObjectRef object;
         std::uint32_t bits = 0;
     };
     std::vector<MinimapMark> minimapMarks;
@@ -200,11 +201,11 @@ struct PlayerControl {
     /// A quest's exits: the quest exit it went out by, the warp gate it waits in
     /// both by extent (0: none; cleared at a map change by playerMakeDefItems);
     /// the highest stage it reached (MSG_GAUNTLET 0x1D).
-    std::uint32_t exitGate = 0;
-    std::uint32_t warpGate = 0;
+    ObjectRef exitGate;
+    ObjectRef warpGate;
     std::uint32_t questHighestStage = 0;
     /// Its checkpoint: the soul gate it last touched (cleared at a map change).
-    std::uint32_t soulGate = 0;
+    ObjectRef soulGate;
     /// Its gold and what its client was last told (MSG_REPORT_GOLD 0x4A).
     std::uint32_t gold = 0;
     std::uint32_t goldSent = 0;
@@ -231,7 +232,7 @@ struct PlayerControl {
     /// SrvNet_OnIncomingClient, cleared by the load of its SAVE_SERVER).
     bool questAwaitingSave = false;
     /// The ankhs it took a life from on this map (five; cleared at a map change).
-    std::array<std::uint32_t, 5> ankhsTaken{};
+    std::array<ObjectRef, 5> ankhsTaken{};
     /// Its name (its join data's) and CD key serial (the ankhs' memory).
     std::u16string name;
     std::string serial;
@@ -253,7 +254,7 @@ struct PlayerControl {
     bool heldOut = false;
     float camX = 0;
     float camY = 0;
-    std::uint32_t cameraFollow = 0;
+    ObjectRef cameraFollow;
     bool freeCam = false;
     bool moveHeld = false;
     bool moveHeldBefore = false; ///< last frame's
@@ -292,14 +293,14 @@ struct PlayerControl {
     float damageCarry = 0;        ///< the fraction of a point of damage left over
     /// The last player to cast on it, the kill
     /// feed's assist within 10 s.
-    std::uint32_t assistBy = 0;
+    ObjectRef assistBy;
     std::uint32_t assistFrame = 0;
     std::int32_t healthSent = -1; ///< what its client was last told (MSG_REPORT_PLAYER_HEALTH)
     // Its equipment (Player.WeaponEquip / ArmorEquip, ud->currentWeapon, the armour
     // value) and its outfit's colours (CLIENT_ACCEPT: pants, shirt 1 and 2, shoes 1 and 2).
     std::uint32_t weaponEquip = 0;
     std::uint32_t armorEquip = 0;
-    std::uint32_t currentWeapon = 0;
+    ObjectRef currentWeapon;
     float armorValue = 0;
     float armorSent = 0; ///< what its client was last told (MSG_REPORT_ARMOR_VALUE)
     std::uint8_t itemBuffsSent = 0; ///< its unit's itemBuffs its client was last told
@@ -369,7 +370,7 @@ struct PlayerControl {
     bool hearsOwnPhonemes = false;
     float castX = 0;
     float castY = 0;
-    std::uint32_t spellTarget = 0;
+    ObjectRef spellTarget;
     /// The trap being built (TrapSpells and their count): the spells spoken for
     /// a glyph so far, their mana paid. A wizard's glyphs out (CurTraps).
     std::array<std::uint32_t, 5> trapSpells{};
@@ -464,7 +465,7 @@ struct ServerObject {
     float frameStartX = 0;
     float frameStartY = 0;
     std::uint32_t flags = ObjFlag::Enabled;
-    std::uint32_t holder = 0;   ///< the extent whose inventory it's in; 0: on the ground
+    ObjectRef holder;           ///< the extent whose inventory it's in; 0: on the ground
     float vx = 0;        ///< per classic frame (a mobile object's: its velocity, the exe's VelVec)
     float vy = 0;
     float forceX = 0;    ///< this frame's own push, walking (ForceVec)
@@ -472,7 +473,7 @@ struct ServerObject {
     float z = 0;
     float zVel = 0;      ///< its height's change a frame
     std::uint32_t decayAt = 0; ///< gone at this frame (unitSetDecayTime; 0 never)
-    std::uint32_t hurtBy = 0;  ///< what last hurt it (with hurtType and hurtFrame, below)
+    ObjectRef hurtBy;          ///< what last hurt it (with hurtType and hurtFrame, below)
     Boxed<PlayerControl, PlayerRecordWatch> player; ///< a player's unit (on the heap: boxed.hpp)
     Boxed<Monster> monster;                          ///< a monster's AI (Monster, below; on the heap)
     Name updateFn; ///< its UPDATE function's name ("": none)
@@ -493,7 +494,7 @@ struct ServerObject {
     std::uint32_t castBy = 0;      ///< the spell that made it
     /// A spell projectile's (Magic) first caster, kept when it's
     /// turned (its owner changes); its spell is castBy, its power value.
-    std::uint32_t flyCaster = 0;
+    ObjectRef flyCaster;
     /// noxcpp: the mode events it opted into (mode_hooks.hpp ModeEvent: Death, Damage...): asked
     /// or told to World::modeHooks for it alone. 0: none, as every object of the game's. (In the
     /// padding before `value`: the object's size is the same.)
@@ -530,7 +531,7 @@ struct ServerObject {
         float typeBoxHeight = 0;
         bool hit = false;
         float burstScale = 1;
-        std::uint32_t ownerCleared = 0;
+        ObjectRef ownerCleared;
         float drawScale = 1;
         /// Nothing of a mode's left (the part let go; `ownerCleared` matters only with `hit`).
         bool idle() const noexcept { return !hit && burstScale == 1.0f && drawScale == 1.0f; }
@@ -609,7 +610,7 @@ struct ServerObject {
     Name dropFn;                      ///< its DROP function's name ("": DefaultDrop)
     Name useFn;                       ///< its USE function's name ("": none)
     int useArg = 0;                   ///< its USE's number (PotionUse 50)
-    std::uint32_t owner = 0;          ///< ObjOwner (a missile's shooter)
+    ObjectRef owner;                  ///< ObjOwner (a missile's shooter)
     /// When it was put in its owner's list (unitSetOwner puts the newest first:
     /// firstOwned / nextOwned), for the creatures (World::ownedCount); the lists' order.
     std::uint32_t ownedOrder = 0;
@@ -648,15 +649,15 @@ struct ServerObject {
     /// Its DAMAGE function's name ("": DefaultDamage's, or PlayerDamage's for a player).
     Name damageFn;
     Name damageSoundFn; ///< DAMAGESOUND (PlayerDamageSound; else DefaultDamageSound's)
-    std::uint32_t seekTarget = 0; ///< a homing missile's target
+    ObjectRef seekTarget;         ///< a homing missile's target
     /// A thrown round chakram in flight (ChakramInMotion's UpdateData: the chakram itself rides
     /// in its inventory). Bounces left, what it homes on, what it last hit,
     /// where its thrower is, and its leg: 2 out, 0 home, 1 lost.
     struct Chakram {
         std::uint8_t bounces = 4;
         std::uint8_t leg = 2;
-        std::uint32_t target = 0;
-        std::uint32_t lastHit = 0;
+        ObjectRef target;
+        ObjectRef lastHit;
         float homeX = 0;
         float homeY = 0;
     };
@@ -666,7 +667,7 @@ struct ServerObject {
     struct Trap {
         std::array<std::uint32_t, 5> spells{};
         std::uint8_t count = 0;
-        std::uint32_t target = 0;
+        ObjectRef target;
         float x = 0;
         float y = 0;
     };
@@ -695,7 +696,7 @@ struct ServerObject {
     /// press it (classes, not these; team, not this team).
     struct Trigger {
         std::uint32_t flags = 0;
-        std::uint32_t toucher = 0;
+        ObjectRef toucher;
         std::uint8_t state = 0;
         ScriptBlock collided;
         ScriptBlock pressed;
@@ -707,12 +708,12 @@ struct ServerObject {
     };
     Boxed<Trigger> trigger;
     /// A teleport pentagram's (TeleportPentagram / InvisiblePentagram, TransporterXfer):
-    /// its partner (by extent: a map load links it, World::linkTransporters; the record's number
-    /// for it is what a save writes), its state (0 at rest, 1 sending, 2
+    /// its partner (by extent: a map load links it, World::linkTransporters, from the map number its
+    /// record names, which is what a save writes), its state (0 at rest, 1 sending, 2
     /// receiving), its frame and the counts that pace it (the cycle, the frames
     /// into one), and whether something touched it this frame.
     struct Transport {
-        std::uint32_t link = 0;
+        ObjectRef link;
         std::uint8_t state = 0;
         std::uint8_t cycle = 0;
         std::uint8_t step = 0;
@@ -782,8 +783,8 @@ struct ServerObject {
         /// The map number of the thing it carries (its record's; the save writes it) and the
         /// thing it found by it (its extent, 0 none yet): the exe finds it at an update that has
         /// none (netGetUnitByExtent: World::byMapNumber) and keeps it till it's off the map.
-        std::uint32_t carried = 0;
-        std::uint32_t carriedObject = 0;
+        MapNumber carried;
+        ObjectRef carriedObject;
     };
     Boxed<Mover> mover;
     /// A CTF flag's (FlagUpdate's UpdateData): its home (where TeamXfer put it) and the
@@ -799,7 +800,7 @@ struct ServerObject {
     /// player took it, how long it may keep it (FlagballPossDuration frames) and
     /// the speed under which a loose ball is nobody's (FlagballResetVel).
     struct Ball {
-        std::uint32_t toucher = 0;
+        ObjectRef toucher;
         std::uint8_t toucherTeam = 0;
         std::uint32_t heldAt = 0;
         std::uint32_t touchedAt = 0;
@@ -810,7 +811,7 @@ struct ServerObject {
     /// A crown's (CrownUpdate's UpdateData): who it goes back to (CrownDrop's choice of its
     /// team's player, or a dead king's killer; taken by them on its next update).
     struct Crown {
-        std::uint32_t returnTo = 0;
+        ObjectRef returnTo;
     };
     Boxed<Crown> crown;
     /// A monster's AI state (MonsterUpdateData, monsters.hpp).
@@ -859,20 +860,20 @@ struct ServerObject {
         std::array<Item, 24> stack{};
         int top = 0;                             ///< AIStackInd
         bool stackChanged = false;               ///< (a push or pop this pass)
-        std::uint32_t enemy = 0;                 ///< CurrentEnemy
+        ObjectRef enemy;                         ///< CurrentEnemy
         std::uint32_t actionFrame = 0;           ///< when the stack last changed
         /// Its sight (unitUpdateSightMB): the creatures it sees (at most
         /// 16, and their count), the enemy it had before, when it last
         /// looked about, when it may next, when it last checked it can still
         /// reach them, the one it keeps to while it sees it, the
         /// nearest player's distance at its last look (-1 none within 1000).
-        std::array<std::uint32_t, 16> seen{};
+        std::array<ObjectRef, 16> seen{};
         std::uint8_t seenCount = 0;
-        std::uint32_t lastEnemy = 0;
+        ObjectRef lastEnemy;
         std::uint32_t lookedAt = 0;
         std::uint32_t nextLook = 0;
         std::uint32_t reachCheckedAt = 0;
-        std::uint32_t focus = 0;
+        ObjectRef focus;
         float nearestPlayer = 0;
         std::uint32_t sightedSoundAt = 0;        ///< (its next "enemy sighted" sound)
         std::int16_t lookDelay = 0;              ///< (MonsterXfer: its LookingForEnemy's moment idle)
@@ -888,7 +889,7 @@ struct ServerObject {
         /// What it heard: whether, whose, where, when
         /// and how loud.
         std::uint32_t heard = 0;
-        std::uint32_t heardFrom = 0;
+        ObjectRef heardFrom;
         float heardX = 0;
         float heardY = 0;
         std::uint32_t heardAt = 0;
@@ -910,7 +911,7 @@ struct ServerObject {
         /// armour value (recalculateArmorVal's).
         std::uint32_t weaponFlags = 0;
         std::uint32_t armorFlags = 0;
-        std::uint32_t weapon = 0;
+        ObjectRef weapon;
         std::uint8_t punch = 0;
         float armorValue = 0;
         /// A blow's fraction of a point carried to the next (playerDecrementHPMana
@@ -943,7 +944,7 @@ struct ServerObject {
         float waypointsToX = 0;
         float waypointsToY = 0;
         /// The transporters and elevators on its path (at most 8, and how many).
-        std::vector<std::uint32_t> transits;
+        std::vector<ObjectRef> transits;
         /// Its spells (stage D): by spell id (137), the ways it uses each (0x8000000
         /// against a spell coming at it, 0x10000000 on itself, 0x20000000 at an enemy,
         /// 0x40000000 a summons or a hold on an enemy, 0x80000000 to get away); the least and
@@ -956,7 +957,7 @@ struct ServerObject {
         /// A bomber's glyph's spells (MonsterXfer's), and what it ran into
         /// (BombCollide: its glyph's target).
         std::array<std::uint32_t, 3> bombSpells{};
-        std::uint32_t bombTarget = 0;
+        ObjectRef bombTarget;
         /// Its health as each player was last told it (by player index: the health
         /// deltas, MSG_REPORT_HEALTH_DELTA, SrvNet_SendComplexObj).
         std::array<std::uint16_t, 32> healthSeen{};
@@ -1029,7 +1030,7 @@ struct ServerObject {
         bool initialised = false;
     };
     Boxed<Generator> generator;
-    std::uint32_t spawnedBy = 0; ///< (a monster's) the generator that made it
+    ObjectRef spawnedBy;         ///< (a monster's) the generator that made it
     /// An exit's map (ExitXfer: CollideData; empty: none).
     Name exitMap;
     /// And where a warp gate puts out those it turns away (ExitXfer from version 0x1F,
@@ -1109,14 +1110,14 @@ struct ServerObject {
     bool doorSwinging = false;       ///< doors: in the step's swing list
     std::uint32_t doorTouched = 0;   ///< doors: the frame something last touched it
     /// Elevators and their shafts (ElevatorUpdateData): the other of the pair (its extent: a
-    /// map load links them, World::linkElevators; the record's number for it is what a save
-    /// writes), an elevator's state (0 down, 3 rising, 2 up, 1 sinking; a shaft's
-    /// copy of its elevator's), its height (0-64) and the frame it stopped.
-    std::uint32_t elevatorLink = 0;
+    /// map load links them, World::linkElevators, from the map number the elevator's record
+    /// names, which is what a save writes), an elevator's state (0 down, 3 rising, 2 up, 1
+    /// sinking; a shaft's copy of its elevator's), its height (0-64) and the frame it stopped.
+    ObjectRef elevatorLink;
     std::uint8_t elevatorState = 0;
     int elevatorLevel = 0;
     std::uint32_t elevatorStopped = 0;
-    std::vector<std::uint32_t> inventory;
+    std::vector<ObjectRef> inventory; ///< what it holds, by extent (the inventory's head first)
     Priority priority = Priority::Low;
     /// Players (a bit each, by slot) who're owed an update of it (set by
     /// unitNeedSync when it changes): all at first.
@@ -1128,7 +1129,7 @@ struct ServerObject {
     /// The exe's Extent: the number the map (or .plr) gave it, 0 for a thing made in play. Ours
     /// (`extent`) is our key and may differ: a map numbering two things alike, a thing carried to
     /// a map using its number (Server::loadMapKeeping). The save writes this.
-    std::uint32_t fileExtent = 0;
+    MapNumber fileExtent;
 
     bool enabled() const noexcept { return (flags & ObjFlag::Enabled) != 0; }
     bool gone() const noexcept { return (flags & ObjFlag::Destroyed) != 0; }
@@ -1164,7 +1165,7 @@ struct WallCell {
     bool window = false;
     bool broken = false;
     /// The door it's the leaf of (flag 0x10, doorAttachWall): its extent.
-    std::uint32_t door = 0;
+    ObjectRef door;
     /// A secret wall's record (server_mapRWSecretWalls): state 1 closed, 2 closing, 3 open,
     /// 4 opening; how far open, 0-23; flags (4 shuts / opens by itself, 8 open
     /// at first); the seconds it waits and the frames left of it.
@@ -1428,7 +1429,7 @@ struct SoundEvent {
     std::uint32_t id = 0;
     float x = 0;
     float y = 0;
-    std::uint32_t source = 0;
+    ObjectKey source = 0; ///< (this frame's: sent and cleared after it, a key, not a stored link)
     std::uint8_t mode = 0;
     std::uint32_t arg = 0;
 };
@@ -1441,7 +1442,7 @@ struct ServerGroup {
     std::int32_t id = 0;
     std::string name;
     Kind kind = Kind::Objects;
-    std::vector<std::int32_t> members;              ///< extents, waypoint ids or group ids: the list's order, its head (the file's last) first
+    std::vector<GroupMember> members;               ///< map numbers, waypoint ids or group ids: the list's order, its head (the file's last) first
     std::vector<std::pair<int, int>> walls;         ///< grid cells, in the same order
 };
 
@@ -1451,14 +1452,14 @@ struct DurationSpell {
     std::uint32_t serial = 0;    ///< its number
     std::uint32_t spell = 0;
     int power = 0;
-    std::uint32_t source = 0;    ///< what cast it (a wand, the caster)
-    std::uint32_t caster = 0;    ///< 0: gone (a glyph's still runs)
+    ObjectRef source;            ///< what cast it (a wand, the caster)
+    ObjectRef caster;            ///< 0: gone (a glyph's still runs)
     bool glyph = false;          ///< from a glyph (glyphExtent: which)
-    std::uint32_t glyphExtent = 0;
+    ObjectRef glyphExtent;
     float x = 0;                 ///< where it was cast from
     float y = 0;
-    std::uint32_t rayTarget = 0; ///< what its beam was last shown to (a drain's, a bolt's)
-    std::uint32_t target = 0;    ///< the spell's target
+    ObjectRef rayTarget;         ///< what its beam was last shown to (a drain's, a bolt's)
+    ObjectRef target;            ///< the spell's target
     float targetX = 0;
     float targetY = 0;
     std::uint32_t start = 0;
@@ -1468,11 +1469,11 @@ struct DurationSpell {
     float carry = 0;             ///< the fraction of a point not yet given
     /// Chain Lightning's bolts, from and to (its child records, spell 7, newest first),
     /// and the last frame's.
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> bolts;
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> lastBolts;
+    std::vector<std::pair<ObjectRef, ObjectRef>> bolts;
+    std::vector<std::pair<ObjectRef, ObjectRef>> lastBolts;
     /// Firewalk's trail: where the last flames went, and the ones before.
     std::array<float, 4> trail{};
-    std::uint32_t object = 0; ///< its own object: Force of Nature's or Mana Bomb's charge
+    ObjectRef object;         ///< its own object: Force of Nature's or Mana Bomb's charge
     bool burst = false;       ///< Mana Bomb's gone off
     /// A summoning's: the creature's type, where and facing it comes, its number for
     /// the clients' effect (FX_SUMMON / _CANCEL), and whether it came.
@@ -1484,7 +1485,7 @@ struct DurationSpell {
     bool summoned = false;
     bool cancelled = false;      ///< to go next pass
     bool fromStaff = false;      ///< cast by its caster's staff
-    std::uint32_t staff = 0;     ///< Chain Lightning's and Plasma's staff: they pay in its charges
+    ObjectRef staff;             ///< Chain Lightning's and Plasma's staff: they pay in its charges
     /// Its create, update and destroy null: the Wall a .plr's walls are raised with,
     /// until restoreMagicWalls gives it the Wall's (solo.hpp).
     bool noFunctions = false;
@@ -1502,14 +1503,14 @@ struct DurationSpell {
 struct ServerTeam {
     bool active = false;
     std::u16string name;
-    std::vector<std::uint32_t> members;
+    std::vector<ObjectRef> members;
     int lessons = 0;
     std::uint8_t color = 0;
     std::uint8_t id = 0;
     std::uint32_t clan = 0;
     bool useTitle = false;
-    std::uint32_t base = 0;
-    std::uint32_t crown = 0; ///< team KotR's crown
+    ObjectRef base;
+    ObjectRef crown; ///< team KotR's crown
 };
 
 /// A warrior's ability under way (the exe's executingAbilityClass records, Abil_TryExecute):
@@ -1517,7 +1518,7 @@ struct ServerTeam {
 /// Cry's shout).
 struct ActiveAbility {
     int ability = 0;
-    std::uint32_t unit = 0;
+    ObjectRef unit;
     std::uint32_t end = 0;
     int flag = 1;
 };
@@ -1531,14 +1532,14 @@ struct ActiveAbility {
 /// of the two piles).
 struct TradeSession {
     struct Item {
-        std::uint32_t object = 0;
+        ObjectRef object;
         std::uint32_t price = 0;
     };
     std::uint32_t id = 0; ///< ours: what PlayerControl::trade holds
     bool active = false;
     std::uint32_t started = 0;
-    std::uint32_t a = 0;
-    std::uint32_t b = 0;
+    ObjectRef a;
+    ObjectRef b;
     bool shop = false;
     std::vector<Item> stock;
     bool acceptedA = false;
@@ -1567,7 +1568,7 @@ constexpr std::uint16_t netCodeOf(const ServerObject& o) noexcept
     // (A map thing the client loads: its map number, the exe's Extent; ours may differ for one the
     // map numbered twice. One made in play has Extent 0 in the exe (nothing but a map record's read
     // sets it: createAt doesn't), so such a one of these classes is 0x8000: an original bug.)
-    const std::uint32_t mapNumber = o.fileExtent;
+    const std::uint32_t mapNumber = o.fileExtent.number();
     if ((o.classes & 0x20400000u) && mapNumber > 0x7FFFu) {
         return 0;
     }
@@ -1580,9 +1581,16 @@ constexpr std::uint32_t wallHandle(int x, int y) noexcept
     return static_cast<std::uint32_t>(x) << 16 | static_cast<std::uint32_t>(y & 0xFFFF);
 }
 
+/// A struct's stored links and their rules (object_links.hpp).
+template <class S>
+struct Links;
+
 /// The map being played: its objects by extent, walls, waypoints, groups, the map grid, and the
 /// game-wide state the server's logic shares (flags, teams, quest numbers, lasting spells...).
 class World {
+    template <class>
+    friend struct Links;
+
 public:
     /// The game's flags (GameFlag: the mode, network or solo), as the host runs it; what plays
     /// by them asks here. A network arena unless the mode layer says otherwise.
@@ -1793,8 +1801,8 @@ public:
     /// start, timed).
     struct LevelUpMoment {
         bool active = false;
-        std::uint32_t unit = 0;
-        std::uint32_t object = 0;
+        ObjectRef unit;
+        ObjectRef object;
         int kind = 0;
         std::uint64_t startTick = 0;
         bool timed = false;
@@ -1804,7 +1812,7 @@ public:
     /// "came by an exit".
     struct SaveRequest {
         bool pending = false;
-        std::uint32_t exit = 0;
+        ObjectRef exit;
         std::uint32_t at = 0;
         std::uint32_t delay = 0;
     } saveRequest;
@@ -1854,7 +1862,7 @@ public:
     /// The map's ImaginaryCaster (imagCasterUnit), the extent: made at each
     /// map's load before its things (mapSwitchLevel -> the pending casts' clear), the
     /// script's CastSpellLocation* builtins cast from it.
-    std::uint32_t imaginaryCaster = 0;
+    ObjectRef imaginaryCaster;
     /// Each team's flag as last reported (by team id), sent again
     /// to a client coming in: its state (0 home, 1 carried, 2 dropped), colour and carrier.
     struct FlagStatus {
@@ -1884,7 +1892,7 @@ public:
     /// (respawnsOpen: respawnAllow). Newest last here.
     struct Respawn {
         std::string type;
-        std::uint32_t object = 0;
+        ObjectRef object;
         float x = 0;
         float y = 0;
         std::uint16_t direction = 0;
@@ -1942,7 +1950,7 @@ public:
     /// a hearing of a creature or player (up its owners), not to one player; kept 2 frames.
     struct HeardSound {
         std::uint32_t id = 0;
-        std::uint32_t source = 0; ///< what played it (an extent; 0 once it's gone)
+        ObjectRef source;         ///< what played it (an extent; 0 once it's gone; kept two frames)
         float x = 0;
         float y = 0;
         std::uint32_t frame = 0;
@@ -2244,7 +2252,12 @@ public:
     }
     /// The walk's player list (Server::updateWorld sets it for the walk; null outside it).
     const std::vector<ServerObject*>* walkPlayers = nullptr;
-    ServerObject* byExtent(std::uint32_t extent);
+    /// By our key (ServerObject::extent; an ObjectRef reads as one). A map number or a client's code
+    /// isn't a key: byMapNumber, byPacketCode, byNetCode (object_key.hpp).
+    ServerObject* byExtent(ObjectKey extent);
+    ServerObject* byExtent(MapNumber) = delete;
+    ServerObject* byExtent(NetCode) = delete;
+    ServerObject* byExtent(GroupMember) = delete;
     /// One the last sweep deleted, kept till the next sweep frees it (the exe's deleted list),
     /// if any.
     ServerObject* dying(std::uint32_t extent);
@@ -2266,16 +2279,16 @@ public:
     /// Ours are keys, so a load numbers such a thing afresh (placeRecords, Server::loadMapKeeping, a
     /// .plr's things), and those are kept by number for this. 0 names none. (A group's members, a
     /// mover's thing, a map object's net code: bit 15 and the number.)
-    ServerObject* byMapNumber(std::uint32_t number);
+    ServerObject* byMapNumber(MapNumber number);
     /// Its map number given after it was put in the world (kept for byMapNumber).
-    void setMapNumber(ServerObject& o, std::uint32_t number);
+    void setMapNumber(ServerObject& o, MapNumber number);
     /// A client's code for a thing as packetDynamicUnitCode, then Obj_GetByNetCode, take it: with
     /// bit 15 a map object's, by its map number (byMapNumber); else the thing it's the code of.
-    ServerObject* byPacketCode(std::uint32_t code);
+    ServerObject* byPacketCode(NetCode code);
     /// A client's code for a thing as Obj_GetByNetCode alone takes it: one with bit 15 names
     /// nothing (a map object's own NetCode is under 0x8000; its clients know it only by its map
     /// number with bit 15); else the thing it's the code of.
-    ServerObject* byNetCode(std::uint32_t code);
+    ServerObject* byNetCode(NetCode code);
     /// By script name (the map editor's), as getObjectByScrName: with no 0x20 test,
     /// so a deleted thing still in the exe's lists is found (one on the map, ACTIVE, or held by
     /// one; a held thing deleted left its holder at once) till the next tick's frees
@@ -2379,7 +2392,9 @@ public:
     struct Broadcast {
         std::vector<std::uint8_t> bytes;
         bool reliable = true;
-        std::uint32_t to = 0; ///< a player's unit's extent: that client alone; 0 everyone
+        /// A player's unit's extent: that client alone; 0 everyone. (An address for this frame's
+        /// sending, not a stored link: a key, not an ObjectRef.)
+        ObjectKey to = 0;
     };
     std::vector<Broadcast>& broadcasts() noexcept { return broadcasts_; }
     /// Objects that left the world this frame (picked up, deleted): the clients that know them
@@ -2443,6 +2458,10 @@ private:
     /// The map load's teleport pads among `placed` each linked to its partner by extent, from its
     /// record's number for it (one way).
     static void linkTransporters(World& w, const std::vector<std::uint32_t>& placed);
+    /// A live placement's (placeLiveRecords) lifts, shafts and pads among `placed` still without a
+    /// partner linked to one already in the world, and those in the world without one to them, by map
+    /// number (noxcpp's editor sessions).
+    static void linkLive(World& w, const std::vector<std::uint32_t>& placed);
     /// A door's leaf takes the cell half its shut swing reaches (XFerDoor -> doorAttachWall).
     void attachDoorWall(const ServerObject& o);
     /// How many of the cell's wall segments the ray crosses within its span,
@@ -2453,7 +2472,7 @@ private:
     /// The things put in the world under an extent that isn't their map number, by that number
     /// (byMapNumber's other candidates, in the order they came; one gone, or the extent another's
     /// since, is passed over there). Few: a load's clashes, the things a map change or a .plr brings.
-    std::map<std::uint32_t, std::vector<std::uint32_t>> renumbered_;
+    std::map<MapNumber, std::vector<ObjectKey>> renumbered_;
     /// Notes `o` in renumbered_ when its map number isn't 0 nor its extent.
     void noteRenumbered(const ServerObject& o);
     /// playerUnits' (sentryUnits') list as last gathered, and the counts it was gathered at

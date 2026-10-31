@@ -108,7 +108,7 @@ void playSound(World& world, std::uint32_t id, const ServerObject& source, int m
     // (Its "MonsterListen" class holds 0x80 at once, freed only as the monsters' hearing passes
     // over the stale: full, the sound goes unnoted.)
     if (o && (o->classes & (oc::Monster | oc::Player)) && world.heardSounds.size() < 0x80) {
-        world.heardSounds.push_back({id, from, source.x, source.y, world.frameNow});
+        world.heardSounds.push_back({id, ObjectRef{from}, source.x, source.y, world.frameNow});
     }
 }
 

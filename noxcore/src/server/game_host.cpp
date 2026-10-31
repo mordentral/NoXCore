@@ -1496,7 +1496,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // (An original bug, kept: no reach check, so a modified client can pick up items
             // anywhere. Not to be fixed without the project's say.)
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byPacketCode(static_cast<std::uint32_t>(m[1] | m[2] << 8)); // (packetDynamicUnitCode)
+            ServerObject* item = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)}); // (packetDynamicUnitCode)
             // Not while a save's asked for (Game_IsSavePending), observing (status & 3),
             // trading (PlayerControl::trade), talking to an NPC (DialogWith, dialog.hpp) or frozen.
             if (unit && unit->player && item && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) &&
@@ -1525,7 +1525,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // nor one talking to an NPC (DialogWith, dialog.hpp).
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
             // (packetDynamicUnitCode: a map object's code is its map number with bit 15.)
-            ServerObject* o = server_.world().byPacketCode(static_cast<std::uint32_t>(m[1] | m[2] << 8));
+            ServerObject* o = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)});
             if (unit && unit->player && players_[peer].ready && !(unit->player->statusFlags & 3u) && !trading(*unit) && unit->player->dialogWith == 0 && o &&
                 !o->gone() && o->collides) {
                 Fight f = server_.fight();
@@ -1537,7 +1537,9 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
         case net::Op::TryEquip:   // (0x75: u16 item)
         case net::Op::TryDequip: { // (0x76: u16 item)
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byExtent(static_cast<std::uint32_t>(m[1] | m[2] << 8));
+            // (Its code taken as our key, no bit-15 test: only a thing the player holds will do, and
+            // no held thing has a map object's code.)
+            ServerObject* item = server_.world().byExtent(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)}.asExtent());
             if (!unit || !unit->player || !item || !players_[peer].ready || item->holder != unit->extent) {
                 break;
             }
@@ -1562,7 +1564,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // Not while a save's asked for (Game_IsSavePending) nor an observer (status 1
             // or 2); the item in its inventory.
             ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byPacketCode(static_cast<std::uint32_t>(m[1] | m[2] << 8));
+            ServerObject* item = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)});
             if (unit && unit->player && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) && item &&
                 item->holder == unit->extent) {
                 server_.items().use(*unit, *item);
@@ -1577,7 +1579,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
                 const std::uint32_t code = static_cast<std::uint32_t>(m[1] | m[2] << 8);
                 ServerObject* creature = nullptr;
                 if (code != 0) {
-                    creature = server_.world().byPacketCode(code);
+                    creature = server_.world().byPacketCode(NetCode{code});
                     if (!creature) {
                         break;
                     }
@@ -1610,7 +1612,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // (Kept in the exe's player record: what reads it, the saves, takes the host's window.)
             if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() >= 3) {
                 const std::uint16_t code = static_cast<std::uint16_t>(m[1] | (m[2] << 8));
-                if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(code) : nullptr) {
+                if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(NetCode{code}) : nullptr) {
                     if (!server_.items().classMay(*unit, *item) || !server_.items().strongEnough(*unit, *item)) {
                         sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportSecondaryWeapon), 0, 0, 1});
                     }
@@ -1625,7 +1627,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // ability's number (its UseData's first byte), important (Net_QueueImportant).
             if (m.size() >= 4) {
                 const std::uint32_t code = static_cast<std::uint32_t>(m[1] | (m[2] << 8));
-                const ServerObject* book = server_.world().byPacketCode(code);
+                const ServerObject* book = server_.world().byPacketCode(NetCode{code});
                 if (!book && !(code & 0x8000u)) { // (a shop's stock: in its trade's keeping, out of the world)
                     const auto kept = server_.world().tradeObjects.find(code);
                     book = kept != server_.world().tradeObjects.end() ? &kept->second : nullptr;
@@ -1720,7 +1722,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // bug).
             World& world = server_.world();
             const std::uint32_t teamId = m[2] | m[3] << 8 | m[4] << 16 | static_cast<std::uint32_t>(m[5]) << 24;
-            ServerObject* o = world.byNetCode(static_cast<std::uint32_t>(m[6] | m[7] << 8)); // (Obj_GetByNetCode)
+            ServerObject* o = world.byNetCode(NetCode{static_cast<std::uint32_t>(m[6] | m[7] << 8)}); // (Obj_GetByNetCode)
             ServerTeam* team = teamId < 256 ? teamById(world, static_cast<std::uint8_t>(teamId)) : nullptr;
             Fight f = server_.fight();
             if (m[1] == 10) {
@@ -1744,10 +1746,12 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
                 Fight f = server_.fight();
                 if (m[1] == 1) {
                     // Not while a save's asked for (Game_IsSavePending) nor observing (status
-                    // & 3); the NPC by its code (Obj_GetByNetCode: none destroyed).
-                    const std::uint32_t code = static_cast<std::uint32_t>(m[2] | m[3] << 8);
-                    ServerObject* npc = world.byExtent(code & 0x7FFFu);
-                    if (npc && (npc->gone() || netCodeOf(*npc) != code)) {
+                    // & 3); the NPC by its code (Obj_GetByNetCode alone, no packetDynamicUnitCode: none
+                    // destroyed, and a code with bit 15, a map object's, names nothing). Ours then checks
+                    // it's the thing's own code (a static thing's is its map number with bit 15).
+                    const NetCode code{static_cast<std::uint32_t>(m[2] | m[3] << 8)};
+                    ServerObject* npc = world.byNetCode(code);
+                    if (npc && (npc->gone() || netCodeOf(*npc) != code.code())) {
                         npc = nullptr;
                     }
                     if (!world.saveRequest.pending && !(unit->player->statusFlags & 3u) && npc &&
@@ -2117,8 +2121,8 @@ void GameHost::onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> m)
         if (m[3] & 1) {
             // (Obj_GetByNetCode: the server's net code as it came, bit 15 and all, none
             // destroyed; not the client's form of a map object's code.)
-            const std::uint32_t code = static_cast<std::uint32_t>(m[1] | m[2] << 8);
-            const ServerObject* speaker = world.byExtent(code);
+            const NetCode code{static_cast<std::uint32_t>(m[1] | m[2] << 8)};
+            const ServerObject* speaker = world.byExtent(code.asExtent());
             if (speaker && speaker->gone()) {
                 speaker = nullptr;
             }
@@ -2599,7 +2603,7 @@ void GameHost::leave(std::uint8_t peer)
         if (unit->player && !server_.world().quest()) {
             server_.items().dropAll(*unit);
         } else {
-            for (const std::uint32_t e : std::vector<std::uint32_t>(unit->inventory)) {
+            for (const std::uint32_t e : keysOf(unit->inventory)) {
                 if (ServerObject* i = server_.world().byExtent(e)) {
                     deleteObject(server_.world(), *i); // (delayedDeleteObject)
                 }
@@ -3558,7 +3562,7 @@ void GameHost::joinTeam(std::uint32_t netCode, std::uint8_t team)
     // (to its base); out of a chat game, to a player start (Map_FindPlayerStart).
     World& world = server_.world();
     ServerTeam* to = teamById(world, team);
-    ServerObject* unit = world.byExtent(netCode);
+    ServerObject* unit = world.byExtent(NetCode{netCode}.asExtent()); // (a player's unit: its code is its key)
     if (!to || !unit || !unit->player || (unit->player->weaponEquip & 1u) || (unit->player->statusFlags & 1u)) {
         return;
     }

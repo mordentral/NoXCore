@@ -631,22 +631,26 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
                 if (kind != ServerGroup::Kind::Walls) {
                     break;
                 }
-                for (const auto& [x, y] : g->walls) {
-                    fn(wallHandle(x, y));
+                if constexpr (std::is_invocable_v<decltype(fn), std::uint32_t>) { // (a wall group's walk: wall handles)
+                    for (const auto& [x, y] : g->walls) {
+                        fn(wallHandle(x, y));
+                    }
                 }
                 for (const auto& [x, y] : g->walls) {
                     self(self, world_.group(x));
                 }
                 break;
             case ServerGroup::Kind::Unknown3:
-                for (const auto m : g->members) {
-                    self(self, world_.group(m));
+                for (const GroupMember m : g->members) {
+                    self(self, world_.group(m.groupId()));
                 }
                 break;
             default:
-                if (g->kind == kind) {
-                    for (const auto m : g->members) {
-                        fn(static_cast<std::uint32_t>(m));
+                if constexpr (std::is_invocable_v<decltype(fn), GroupMember>) { // (an object or waypoint group's: its members)
+                    if (g->kind == kind) {
+                        for (const GroupMember m : g->members) {
+                            fn(m);
+                        }
                     }
                 }
                 break;
@@ -657,15 +661,15 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
     };
     const auto eachGroupObject = [&](auto fn) {
         // (each member by its map number, netGetUnitByExtent: one on the map)
-        forGroup(ServerGroup::Kind::Objects, [&](std::uint32_t number) {
-            if (ServerObject* o = world_.byMapNumber(number)) {
+        forGroup(ServerGroup::Kind::Objects, [&](GroupMember m) {
+            if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
                 fn(*o);
             }
         });
     };
     const auto eachGroupWaypoint = [&](auto fn) {
-        forGroup(ServerGroup::Kind::Waypoints, [&](std::uint32_t wid) {
-            if (ServerWaypoint* w = world_.waypoint(static_cast<std::int32_t>(wid))) {
+        forGroup(ServerGroup::Kind::Waypoints, [&](GroupMember m) {
+            if (ServerWaypoint* w = world_.waypoint(m.waypointId())) {
                 fn(*w);
             }
         });
@@ -769,8 +773,8 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         const auto members = [&](std::int32_t group) {
             std::vector<ServerObject*> out;
             if (ServerGroup* g = world_.group(group)) {
-                for (const auto m : g->members) {
-                    if (ServerObject* o = world_.byMapNumber(static_cast<std::uint32_t>(m))) {
+                for (const GroupMember m : g->members) {
+                    if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
                         out.push_back(o);
                     }
                 }
@@ -853,8 +857,8 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         const std::int32_t wp = vm.popInt();
         const ServerGroup* g = world_.group(vm.popInt());
         if (g && world_.waypoint(wp)) {
-            for (const auto m : g->members) {
-                if (ServerObject* o = world_.byMapNumber(static_cast<std::uint32_t>(m))) {
+            for (const GroupMember m : g->members) {
+                if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
                     moveObject(world_, things_, frame_, *o, wp);
                 }
             }

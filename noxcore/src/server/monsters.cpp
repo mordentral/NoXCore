@@ -2313,7 +2313,7 @@ void Monsters::detailedPath(ServerObject& o, float x, float y)
     m.pathToX = x;
     m.pathToY = y;
     PathSearch s = pathTo(fight.world, o, x, y, fight.rng, fight.frame);
-    m.transits = std::move(s.transits);
+    m.transits.assign(s.transits.begin(), s.transits.end());
     m.pathCount = static_cast<int>(s.points.size());
     std::copy(s.points.begin(), s.points.end(), m.path.begin());
     m.pathStatus = static_cast<std::uint8_t>(s.status);
@@ -3204,7 +3204,7 @@ void Monsters::flee(ServerObject& o)
     }
     if (m.pathCount == 0 && 10u < fight.frame - m.pathAt) {
         PathSearch s = retreatPath(world, o, floatOf(me().args[0]), floatOf(me().args[1]), fight.rng, fight.frame);
-        m.transits = std::move(s.transits);
+        m.transits.assign(s.transits.begin(), s.transits.end());
         m.pathCount = static_cast<int>(s.points.size());
         std::copy(s.points.begin(), s.points.end(), m.path.begin());
         m.pathAt = fight.frame;
@@ -4066,7 +4066,7 @@ void Monsters::act(ServerObject& o, int action)
             m.waypoints.fill(0);
             m.waypointCount = 0;
             m.waypointIndex = 0;
-            m.seen.fill(0);
+            m.seen.fill(ObjectRef{});
             m.seenCount = 0;
             m.enemy = 0;
             if (m.def && (m.def->status & ms::DestroyWhenDead)) {
@@ -4399,7 +4399,7 @@ void orderCreatures(Fight& fight, ServerObject& owner, ServerObject* creature, i
         switch (order) {
         case 0: // Banish (banishUnit): its own; its glyphs and it gone.
             if (unit.owner == owner.extent) {
-                for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+                for (const std::uint32_t e : keysOf(unit.inventory)) {
                     if (ServerObject* g = world.byExtent(e); g && g->typeName == "Glyph") {
                         deleteObject(world, *g); // (delayedDeleteObject)
                     }
@@ -4777,7 +4777,7 @@ ServerObject* carriedGlyph(World& world, const things::ThingDb& things, ServerOb
     // (inventoryPutImpl: held, and its holder's.)
     g.holder = bomber.extent;
     g.owner = bomber.extent;
-    bomber.inventory.push_back(g.extent);
+    bomber.inventory.emplace_back(g.extent);
     return &g;
 }
 
@@ -5049,7 +5049,7 @@ void generatorUpdate(Fight& fight, ServerObject& gen)
         // sword after it, a sword's the quiver). That's npcWearLoaded over the new things in the
         // template's order; the same worn at the end as the exe's wearing the template's worn ones.
         Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-        std::vector<std::uint32_t> made; // (the template's inventory's order, its head first)
+        std::vector<ObjectRef> made; // (the template's inventory's order, its head first)
         for (auto it = tp.items.rbegin(); it != tp.items.rend(); ++it) {
             const ServerObject& item = **it;
             if (ServerObject* copy = world.createAt(*fight.things, item.typeName, m->x, m->y, fight.frame)) {
@@ -5059,10 +5059,10 @@ void generatorUpdate(Fight& fight, ServerObject& gen)
                 copy->flags &= ~(ObjFlag::Active | ObjFlag::Equipped);
                 copy->flags |= item.flags & ObjFlag::Equipped;
                 items.inventoryPut(*m, *copy, false);
-                made.push_back(copy->extent);
+                made.emplace_back(copy->extent);
             }
         }
-        std::vector<std::uint32_t> order = m->inventory; // (each put to the head: the exe's copy's order)
+        std::vector<ObjectRef> order = m->inventory; // (each put to the head: the exe's copy's order)
         m->inventory = made;
         npcWearLoaded(world, fight.modifiers, *m);
         m->inventory = std::move(order);

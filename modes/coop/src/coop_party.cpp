@@ -200,7 +200,7 @@ void CoopDirector::respawnPlayer(server::ServerObject& unit)
     // (outside a quest), and the respawn's MSG_PLAYER_RESPAWN puts nothing back.
     if (f.things) {
         server::Items items{w, *f.things, f.modifiers, f.rng, f.frame};
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             if (const server::ServerObject* o = w.byExtent(e); o && (o->flags & server::ObjFlag::Equipped)) {
                 items.reportEquip(unit, *o);
             }
@@ -262,8 +262,8 @@ void CoopDirector::readPristine(server::Server& server)
     try {
         const server::World pristine = server::World::load(map::loadMapFile(own), server.things(), server::GameFlag::Solo);
         for (const auto& [e, o] : pristine.objects()) {
-            if ((o.classes & kClientLoaded) && o.fileExtent != 0 && o.fileExtent <= 0x7FFFu) {
-                pristine_.push_back(o.fileExtent);
+            if ((o.classes & kClientLoaded) && o.fileExtent && o.fileExtent.number() <= 0x7FFFu) {
+                pristine_.push_back(o.fileExtent.number());
             }
         }
         // The walls: a saved copy leaves out those broken before (map_state's walls), so the
@@ -322,8 +322,8 @@ void CoopDirector::findHiddenStatics()
     }
     std::set<std::uint32_t> inWorld;
     for (const auto& [e, o] : world().objects()) {
-        if ((o.classes & kClientLoaded) && !o.gone() && !o.pendingDelete && o.fileExtent != 0) {
-            inWorld.insert(o.fileExtent);
+        if ((o.classes & kClientLoaded) && !o.gone() && !o.pendingDelete && o.fileExtent) {
+            inWorld.insert(o.fileExtent.number());
         }
     }
     for (const std::uint32_t n : pristine_) {

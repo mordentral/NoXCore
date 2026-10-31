@@ -3193,7 +3193,7 @@ int teamPlayerCount(const Impl& impl, server::World& world, const server::Server
     if (first == world.teams.end()) {
         return 0;
     }
-    const std::vector<std::uint32_t>& members = first->members;
+    const std::vector<server::ObjectRef>& members = first->members;
     int n = 0;
     for (auto it = members.begin(); it != members.end(); ++it) {
         if (std::find(members.begin(), it, *it) != it) {

@@ -347,7 +347,9 @@ map::MapFile saveMapSections(World& world, const things::ThingDb& things, const 
         g.name = cstr(it->name, 75); // (server_mapLoadAddGroup: strncpy 0x4C, the last byte 0)
         g.kind = static_cast<map::Group::Kind>(it->kind);
         g.id = it->id;
-        g.members = it->members; // (ours kept in the list's order, its head first: World::load)
+        for (const GroupMember m : it->members) { // (ours kept in the list's order, its head first: World::load)
+            g.members.push_back(m.raw());
+        }
         for (const auto& [x, y] : it->walls) {
             g.walls.push_back({x, y});
         }

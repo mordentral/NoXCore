@@ -559,7 +559,7 @@ void Fight::wearArmor(ServerObject& t, ServerObject* src, ServerObject* obj3, in
         return;
     }
     const float total = t.player ? t.player->armorValue : t.monster->armorValue;
-    for (const std::uint32_t e : std::vector<std::uint32_t>(t.inventory)) {
+    for (const std::uint32_t e : keysOf(t.inventory)) {
         ServerObject* item = world.byExtent(e);
         if (!item || item->holder != t.extent || !(item->classes & oc::Armor) || !(item->flags & ObjFlag::Equipped)) {
             continue;

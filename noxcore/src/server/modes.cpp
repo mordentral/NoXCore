@@ -193,7 +193,7 @@ void addTeamMember(World& world, std::uint8_t id, ServerObject& o, bool sendNet,
     } else if (inTeam(world, o, id)) {
         return;
     }
-    team->members.insert(team->members.begin(), o.extent);
+    team->members.emplace(team->members.begin(), o.extent);
     o.team = team->id;
     if (world.network()) {
         // (A player's: its "NewMember" line on the host's own screen.) In a chat game without
@@ -1021,7 +1021,7 @@ bool goObserver(Fight& fight, ServerObject& unit, bool canJoin, bool force)
             ballStatus(world, 1, 0);
         }
         Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-        for (const std::uint32_t e : std::vector<std::uint32_t>(unit.inventory)) {
+        for (const std::uint32_t e : keysOf(unit.inventory)) {
             ServerObject* o = world.byExtent(e);
             if (o && o->owner == unit.extent && (o->typeName == NameId::Crown || (o->classes & oc::Flag))) {
                 items.drop(unit, *o, unit.x, unit.y);
@@ -1552,7 +1552,7 @@ void beforeMapLoad(Fight& fight)
             }
         }
         for (ServerObject* p : players) {
-            for (const std::uint32_t e : std::vector<std::uint32_t>(p->inventory)) {
+            for (const std::uint32_t e : keysOf(p->inventory)) {
                 ServerObject* item = world.byExtent(e);
                 if (item && item->holder == p->extent && (item->classes & oc::Flag)) {
                     const auto [x, y] = clearPointNear(world, fight.rng, p->x, p->y, 50.0f);
@@ -1945,7 +1945,7 @@ void pickupFlagCtf(Fight& fight, ServerObject& flag, ServerObject& player)
         return;
     }
     Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-    for (const std::uint32_t e : std::vector<std::uint32_t>(player.inventory)) {
+    for (const std::uint32_t e : keysOf(player.inventory)) {
         ServerObject* taken = world.byExtent(e);
         if (!taken || !(taken->classes & oc::Flag) || !taken->flag) {
             continue;
@@ -2463,7 +2463,7 @@ void dropKingsCrown(Fight& fight, ServerObject& victim, ServerObject* killer)
         return;
     }
     Items items{fight.world, *fight.things, fight.modifiers, fight.rng, fight.frame};
-    for (const std::uint32_t e : std::vector<std::uint32_t>(victim.inventory)) {
+    for (const std::uint32_t e : keysOf(victim.inventory)) {
         ServerObject* crown = fight.world.byExtent(e);
         if (crown && crown->typeName == NameId::Crown && crown->owner == victim.extent) {
             dropCrown(items, victim, *crown, victim.x, victim.y);
