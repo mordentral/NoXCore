@@ -90,8 +90,8 @@ bool Items::classMay(const ServerObject& player, const ServerObject& item) const
         return true; // (noxcpp: a multiclass player, a mode's, wields any class's weapons and wears any armour)
     }
     if (!(item.classes & (oc::Weapon | oc::Wand | oc::Armor))) {
-        // (itemClassUseMask, 0x57A590: a food's ~(SUBCLASS >> 5) | 0xFE, so only the warrior's
-        // bit drops out, for a mana potion, SUBCLASS bit 5; anything else any class.)
+        // (itemClassUseMask: a food's ~(SUBCLASS >> 5) | 0xFE, so only the warrior's bit drops
+        // out, for a mana potion, SUBCLASS bit 5; anything else any class.)
         return !(item.classes & oc::Food) || !(item.subclasses & 0x20u) || player.player->classId != 0;
     }
     if (!modifiers) {
