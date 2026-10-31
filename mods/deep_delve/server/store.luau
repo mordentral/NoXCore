@@ -10,6 +10,7 @@
 
 local classes = require("data/classes")
 local progress = require("progress")
+local atlas = require("atlas")
 
 local store = {}
 
@@ -33,7 +34,17 @@ local store = {}
 --      and world.act is the furthest act reached or opened at its tier (progress.luau). Version
 --      4 had one act, so an act 1 clear left world.act at 1; its step marks every act it has
 --      progress in opened, opens the act after each one it cleared, and moves world.act on.
-store.VERSION = 5
+--   6  act 2 opens with two more areas (the climb out of the catacombs) before its fields, so each
+--      of its areas' indices is two more than before: its step moves act 2's progress on at every
+--      tier (deepest and each waypoint found, + ACT2_OPENING), so a found waypoint is the same
+--      area's and the deepest the same place; world.deepest follows.
+--   7  atlas = { open, best, runs, cleared = { [biome] = { ranks } } }: the expeditions cleared
+--      (atlas.luau). Version 6's records get an empty atlas, open when they cleared the last act.
+store.VERSION = 7
+
+-- How many areas version 6 put in front of act 2's (data/acts.luau's act 2: Old Workings, Cave
+-- Mouth).
+local ACT2_OPENING = 2
 
 -- The options' defaults, and the values each may take (the first: the default).
 store.OPTIONS = {
@@ -115,6 +126,7 @@ function store.new(player: any): any
 		spells = { spells = {}, abilities = {}, creatures = {} }, -- what its passive tree gives (book.luau)
 		records = { kills = 0, deaths = 0, frames = 0 }, -- frames: time played, in game frames
 		options = { lootNames = "alt" }, -- see VERSION
+		atlas = atlas.fresh(), -- see VERSION (atlas.luau)
 	}
 	for t = 1, STASH_TABS do
 		rec.stash.tabs[t] = {}
@@ -233,6 +245,41 @@ local function toVersion5(rec: any)
 	rec.version = 5
 end
 
+-- Version 5 -> 6: act 2's progress at every tier ("<tier>-2") moved on by the areas put in front of
+-- it: its deepest (when it had reached any) and each waypoint found; world.deepest at least the
+-- deepest any act now has.
+local function toVersion6(rec: any)
+	local world = rec.world
+	for key, p in world.progress do
+		if type(p) == "table" and string.match(tostring(key), "^%d+%-2$") then
+			if type(p.deepest) == "number" and p.deepest > 0 then
+				p.deepest += ACT2_OPENING
+				if p.deepest > (tonumber(world.deepest) or 0) then
+					world.deepest = p.deepest
+				end
+			end
+			if type(p.waypoints) == "table" then
+				local moved = {}
+				for _, i in p.waypoints do
+					if type(i) == "number" then
+						table.insert(moved, i + ACT2_OPENING)
+					end
+				end
+				table.sort(moved)
+				p.waypoints = moved
+			end
+		end
+	end
+	rec.version = 6
+end
+
+-- Version 6 -> 7: an empty atlas, the map table open when it has cleared the last act.
+local function toVersion7(rec: any)
+	rec.atlas = atlas.fresh()
+	atlas.note(rec)
+	rec.version = 7
+end
+
 -- An older record brought up to date (each version's step in turn).
 local function migrate(rec: any): any
 	if rec.version < 2 then
@@ -246,6 +293,12 @@ local function migrate(rec: any): any
 	end
 	if rec.version < 5 then
 		toVersion5(rec)
+	end
+	if rec.version < 6 then
+		toVersion6(rec)
+	end
+	if rec.version < 7 then
+		toVersion7(rec)
 	end
 	rec.version = store.VERSION
 	return rec

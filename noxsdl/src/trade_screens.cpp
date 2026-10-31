@@ -578,7 +578,7 @@ std::optional<int> TradeScreens::stockAt(SDL_FPoint l) const
     return slot;
 }
 
-void TradeScreens::openDialog(const nox::client::World& world)
+void TradeScreens::openDialog(const nox::client::World& world, float scale)
 {
     // Gui_NpcDialog_Open.
     const auto& d = world.dialog();
@@ -587,51 +587,11 @@ void TradeScreens::openDialog(const nox::client::World& world)
     if (!dialog_.window) {
         return;
     }
-    // Rebuild the text: split at newlines, each paragraph word-wrapped onto list lines.
-    gui::Window* list = dialog_.window->find(kDlgList);
-    if (list) {
-        // The line word-wrapped to the box (less 10), a list line each, as many as it holds.
-        list->lines.clear();
+    dialog_.text = actions_.spoken ? actions_.spoken(d.textId) : text(d.textId);
+    if (gui::Window* list = dialog_.window->find(kDlgList)) {
         list->scroll = 0;
-        const std::string line = actions_.spoken ? actions_.spoken(d.textId) : text(d.textId);
-        const auto* ld = std::get_if<nox::gui::ListBoxData>(&list->data);
-        const std::size_t most = ld && ld->lines ? ld->lines : 128;
-        gui::Painter measure(nullptr, gui_.resources(), 1.0f, 0, 0);
-        const int width = list->rect.w - 10;
-        std::size_t from = 0;
-        while (from <= line.size() && list->lines.size() < most) {
-            const auto nl = line.find('\n', from);
-            std::string para = line.substr(from, nl == std::string::npos ? std::string::npos : nl - from);
-            if (!para.empty() && para.back() == '\r') {
-                para.pop_back();
-            }
-            // Words onto the line while they fit; a word too long for a line is cut.
-            std::string cur;
-            std::size_t i = 0;
-            while (i <= para.size() && list->lines.size() < most) {
-                const auto sp = para.find(' ', i);
-                const std::string word = para.substr(i, sp == std::string::npos ? std::string::npos : sp - i);
-                const std::string tryLine = cur.empty() ? word : cur + " " + word;
-                if (measure.textWidth(tryLine, list->largeFont) <= width || cur.empty()) {
-                    cur = tryLine;
-                } else {
-                    list->lines.push_back({cur, list->textColor});
-                    cur = word;
-                }
-                if (sp == std::string::npos) {
-                    break;
-                }
-                i = sp + 1;
-            }
-            if (list->lines.size() < most) {
-                list->lines.push_back({cur, list->textColor});
-            }
-            if (nl == std::string::npos) {
-                break;
-            }
-            from = nl + 1;
-        }
     }
+    wrapDialog(scale);
     scrollDialog(0);
     if (gui::Window* title = dialog_.window->find(kDlgTitle)) {
         title->text = d.title;
@@ -659,6 +619,33 @@ void TradeScreens::openDialog(const nox::client::World& world)
     dialog_.window->show(true);
     // The dialog takes the inventory's place on the screen.
     inventory_.close();
+}
+
+void TradeScreens::wrapDialog(float scale)
+{
+    // GUIDlg's text setter: the line cut into list lines at the box's width less 10 (text_wrap.hpp's
+    // dialogLines), as many as the list holds. Measured with the font at the size it's drawn
+    // at this scale, so every line fits the box as drawn and none wraps again in the list's own
+    // drawing (which wraps a line wider than the box less 7); rewrapped when the scale changes.
+    dialog_.wrapScale = scale;
+    gui::Window* list = dialog_.window ? dialog_.window->find(kDlgList) : nullptr;
+    if (!list) {
+        return;
+    }
+    list->lines.clear();
+    const auto& res = gui_.resources();
+    if (!res.font) {
+        return;
+    }
+    const auto* ld = std::get_if<nox::gui::ListBoxData>(&list->data);
+    const std::size_t most = ld && ld->lines ? ld->lines : 128;
+    const gui::Painter p(nullptr, res, scale, 0, 0);
+    const float width = static_cast<float>(list->rect.w - 10) * scale;
+    for (auto& line : dialogLines(dialog_.text, width, most, res.font->advances(p.pixelSize(list->largeFont)))) {
+        list->lines.push_back({std::move(line), list->textColor});
+    }
+    // (the scroll kept, clamped to the new lines)
+    scrollDialog(list->scroll);
 }
 
 void TradeScreens::closeDialog()
@@ -972,10 +959,13 @@ void TradeScreens::update(const nox::client::World& world, std::uint64_t nowMs, 
     // ---- the dialog
     const auto& d = world.dialog();
     // A new dialog page (its count changed) rebuilds the window even while one is open.
+    // (at the windows' scale, s)
     if (d.open && (!dialog_.open || d.count != dialog_.count)) {
-        openDialog(world);
+        openDialog(world, s);
     } else if (!d.open && dialog_.open) {
         closeDialog();
+    } else if (dialog_.open && s != dialog_.wrapScale) {
+        wrapDialog(s); // the window resized: the text to the new widths
     }
 
     // ---- the player trade

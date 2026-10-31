@@ -132,6 +132,29 @@ WorldCursor worldCursor(const Target& t, const Situation& s)
     return WorldCursor::None;
 }
 
+std::uint8_t itemClassUse(std::uint32_t classes, std::uint32_t subclasses, std::uint8_t record)
+{
+    namespace oc = nox::things::ObjectClass;
+    if (classes & (oc::Weapon | oc::Wand | oc::Armor)) {
+        return record;
+    }
+    if (classes & oc::Food) {
+        return static_cast<std::uint8_t>(~((subclasses >> 5) & 7) | 0xFE); // (only bit 0, the warrior's, can drop out)
+    }
+    return 0xFF;
+}
+
+bool classMayTake(std::uint8_t use, int playerClass, bool glyph, bool soloOrQuest, bool anyClass)
+{
+    if (soloOrQuest) {
+        return true;
+    }
+    if (glyph) {
+        return playerClass == 1; // (a wizard's alone: pickupAnyClass doesn't reach a glyph, its trap's own pickup)
+    }
+    return anyClass || ((use >> playerClass) & 1u) != 0;
+}
+
 std::uint8_t facing(float fromX, float fromY, float cursorX, float cursorY, std::optional<int> frontY)
 {
     // (The game's x87: the angle from FPATAN, the turn, the units a turn and the half its float

@@ -1032,8 +1032,9 @@ std::string liveTooltip(App& app)
 }
 
 /// The tooltip once the mouse has kept still (client_drawCursorAndTooltips): its lines in yellow on a darkened box
-/// at the cursor, a line and 4 above it (under the pickup and use hands' words), kept on the screen. `below` (Options' switches, whose
-/// tooltips run to several lines): under the pointer instead, at the menus' scale.
+/// at the cursor, a line and 4 above it (the pickup and use hands: under their words; by the cursor below), kept on
+/// the screen. `below` (Options' switches, whose tooltips run to several lines): under the pointer instead, at the
+/// menus' scale.
 void drawTooltip(App& app, bool below)
 {
     const SDL_FPoint m = mousePos(app);
@@ -1076,15 +1077,7 @@ void drawTooltip(App& app, bool below)
     // How far above the pointer the box's top goes, by the cursor (video_cursorDrawImpl sets it per
     // cursor, a line and 4 by default): the hands with a word under them put it below that word.
     // In lines of the cursor's own scale (drawCursor's), so it clears the word at any zoom.
-    float above = kFontHeight + 4;
-    switch (app.cursorType) {
-    case CursorType::Pickup:
-    case CursorType::PickupFar:
-    case CursorType::Use: above = -2 * kFontHeight; break;
-    case CursorType::Caution: above = -kFontHeight; break;
-    case CursorType::Repair: above = 2 * kFontHeight + 4; break;
-    default: break;
-    }
+    const float above = pick::tooltipLift(static_cast<int>(app.cursorType), kFontHeight);
     const float cursorScale = std::max(app.camera.zoom, 1.0f);
     float x = below ? m.x / s + 12 : m.x / s;
     float y = below ? m.y / s + 20 : (m.y - above * cursorScale) / s;

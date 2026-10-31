@@ -160,9 +160,11 @@ struct Items {
     /// MSG_REPORT_MODIFIER, every player for the always-sent (0x20400004).
     static void setModifiers(ServerObject& item, const std::array<std::uint8_t, 4>& mods);
 
-private:
-    /// Obj_DropAt as the game has it (drop: then a mode told, ModeHooks::dropped).
+    /// Obj_DropAt as the game has it (drop: then a mode told, ModeHooks::dropped); a lost chakram's
+    /// from its missile too (Missiles::chakramDrops).
     bool dropAt(ServerObject& player, ServerObject& item, float x, float y);
+
+private:
     void tellString(const ServerObject& player, std::string_view id);
     /// SrvNet_SendReportCharges (MSG_REPORT_CHARGES 0x64, important): a held item's charges and
     /// most, to its holder.

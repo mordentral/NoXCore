@@ -38,7 +38,7 @@ struct EquipDef {
     /// primary enchantment, secondary enchantment; 0 = none.
     std::array<std::uint8_t, 4> modifierSlots{};
     /// CLASSUSE: bit n for the player class that may use it (1 warrior, 2 wizard, 4 conjurer);
-    /// nullopt when the definition doesn't say (anyone may).
+    /// nullopt when the definition doesn't say (the game's record then holds 0: no class may).
     std::optional<std::uint8_t> classUse;
     /// DESC: its name's string id (modifier.db:LongswordDesc), the base of an item's tooltip.
     std::string desc;

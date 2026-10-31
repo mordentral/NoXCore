@@ -13,6 +13,11 @@
 -- the gate opens (gate.luau); for a waypoint's travel, the waypoint's area instead (the ahead
 -- build replaced). A map change waits for a build that isn't done yet.
 --
+-- Past the acts' places are the expeditions' runs (expeditions.luau): each run asked for at the map
+-- table is a place of its own after the last act's last, its facts the run's (areas.info), built
+-- and travelled to like any area (the party's vote), but with no area after it, no act progress
+-- and its end chamber's arch leading home once its champion is dead.
+--
 -- Which area is being played comes from the map the engine loaded (mapLoaded's name, the same
 -- as nox.currentMap()), looked up in what each tag holds; so it holds when the host changes the
 -- map itself. A map that isn't one of the mod's holds nothing of it: the game is sent back to
@@ -24,13 +29,15 @@
 --
 -- An area is entered once both its map has loaded and its spots (the generator's result) are in:
 -- its stations, pentagrams and exits set to work (the pads' rings drawn under them), the vendor's
--- stock rolled at its level, its monsters (and boss) put in, its weather set (an outdoor area's;
--- none again on coming back indoors), its players set up.
+-- stock rolled at its level, its monsters (and boss) put in, its weather set (an outdoor area's,
+-- rolled from its biome's list as its map was built, so each visit may differ and a visit keeps
+-- its own; none again on coming back indoors), its players set up.
 
 local acts = require("data/acts")
 local numbers = require("data/numbers")
 local boss = require("boss")
 local decals = require("decals")
+local expeditions = require("expeditions")
 local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
@@ -77,6 +84,7 @@ local state: any = {
 	pending = nil, -- { place, tag, arrive }: the one the game is changing to
 	leaving = false,
 	tries = 0, -- a failed build's retries
+	sky = {}, -- tag -> the weather rolled for the map built into it (nil: none)
 	weather = nil, -- the weather's name last set for everyone (nil: none ever set)
 }
 
@@ -98,8 +106,15 @@ end
 
 -- The area at `place` (clamped to the areas there are): its act and index in it, its biome,
 -- level, layout, packs, weather, and what it holds (area level = the act's base level plus the
--- index less one).
-function areas.info(place: number)
+-- index less one). A run's place (past the acts'): the run's facts (expeditions.info), with
+-- `expedition` set.
+function areas.info(place: number): any
+	if place > #places then
+		local run = expeditions.info(place)
+		if run then
+			return run
+		end
+	end
 	local p = places[math.clamp(place, 1, #places)]
 	local act = acts[p.act]
 	local i = p.index
@@ -119,14 +134,18 @@ function areas.info(place: number)
 		act = p.act,
 		level = level,
 		biome = spec.biome,
+		-- (the roster and champion its monsters come from: its biome's, or its own)
+		roster = spec.roster or spec.biome,
 		corridor = spec.corridor,
 		title = (spec.title or spec.biome) .. " " .. i,
 		waypoint = spec.waypoint == true,
 		waypointAt = spec.waypointAt,
 		lair = lair,
+		arena = if lair then spec.arena else nil,
 		-- (a lair with an act after it: its boss's death opens the gate on)
 		gate = lair and acts[p.act + 1] ~= nil,
-		weather = if lair then nil else spec.weather,
+		-- (its biome's weathers, rolled as its map is built: none for a lair or indoors)
+		skies = if lair then nil else (acts.skies :: any)[spec.biome],
 		segments = if lair then a.lair.segments else math.min(a.segments.most, math.floor(a.segments.base + a.segments.perLevel * level)),
 		packs = packs,
 		endRadius = if lair then a.lair.endRadius else a.endRadius,
@@ -176,15 +195,42 @@ function areas.request(place: number, tag: string, ahead: boolean, retry: number
 			waypoint = info.waypoint,
 			waypointAt = info.waypointAt,
 			lair = info.lair,
+			arena = info.arena,
 			gate = info.gate,
 		},
 	}
 end
 
+-- A weather for the area at `place`, rolled from its biome's list by weight (data/acts.luau's
+-- skies): its name, or nil (indoors, a lair).
+local function rollSky(place: number): string?
+	local list: any = areas.info(place).skies
+	if not list then
+		return nil
+	end
+	local total = 0
+	for _, e in list do
+		total += e[2]
+	end
+	local roll = nox.random() * total
+	for _, e in list do
+		roll -= e[2]
+		if roll < 0 then
+			return e[1]
+		end
+	end
+	return list[#list][1]
+end
+
 -- The area being played: { place, index (in its act), act, tag, spots } (spots nil until they're
 -- in).
 function areas.current(): any
-	local p = places[math.max(1, state.place)]
+	local p: any = places[math.max(1, state.place)]
+	if not p then
+		-- (a run: no act's area; its act the one whose town it has)
+		local info = areas.info(state.place)
+		p = { index = info.index, act = info.act }
+	end
 	return { place = state.place, index = p.index, act = p.act, tag = state.tag, spots = state.spots[state.tag] }
 end
 
@@ -196,16 +242,19 @@ local function build(place: number, tag: string)
 	state.nextArea = { place = place, tag = tag }
 	state.held[tag] = place
 	state.spots[tag] = nil
+	-- (its weather rolled for this build: kept while its map is played)
+	state.sky[tag] = rollSky(place)
 	local ok, why = nox.generate(areas.request(place, tag, true, state.tries))
 	if not ok then
 		nox.log("deep_delve: area " .. place .. " not started: " .. tostring(why))
 	end
 end
 
--- The area after this one in its act built ahead (none after a lair until its gate opens).
+-- The area after this one in its act built ahead (none after a lair until its gate opens, none
+-- after a run).
 local function generateNext()
 	local info = areas.info(state.place)
-	if info.lair then
+	if info.lair or info.expedition then
 		state.nextArea = nil
 		return
 	end
@@ -236,7 +285,7 @@ function areas.travel(place: number, arrive: string): (boolean, string?)
 	if state.leaving then
 		return false, "on the way already"
 	end
-	if place < 1 or place > #places then
+	if place < 1 or (place > #places and not expeditions.has(place)) then
 		return false, "no such area"
 	end
 	if place == state.place then
@@ -256,6 +305,7 @@ function areas.freshPlay()
 	nox.cancelGenerate(other)
 	state.held[other] = nil
 	state.spots[other] = nil
+	state.sky[other] = nil
 	state.nextArea = nil
 	state.tries = 0
 end
@@ -273,8 +323,12 @@ function areas.home(): boolean
 end
 
 -- A player stepped on the exit: the game on to the next area, arriving at its start (the party's
--- vote when anyone else is in the game: votes.luau). Whether it went or a vote started.
+-- vote when anyone else is in the game: votes.luau); a run's arch: home once it's cleared
+-- (expeditions.luau). Whether it went or a vote started.
 function areas.exitTouched(unit: number): (boolean, string?)
+	if state.place > #places then
+		return expeditions.exitTouched(unit)
+	end
 	local n = state.nextArea
 	if state.leaving or not n then
 		return false, "no way on"
@@ -327,10 +381,9 @@ local function moveTo(unit: number, at: any)
 	nox.effect(0x89, at.x, at.y) -- (MSG_FX_TELEPORT)
 end
 
--- The area's weather for everyone: an outdoor area's own; on coming back to an area with none,
--- none again (a game that never goes outdoors never sets any).
-local function setWeather(info: any)
-	local name = info.weather
+-- The area's weather for everyone: the one rolled as its map was built (an outdoor area's); on
+-- coming back to an area with none, none again (a game that never goes outdoors never sets any).
+local function setWeather(name: string?)
 	if name == state.weather or (name == nil and state.weather == nil) then
 		return
 	end
@@ -360,12 +413,15 @@ local function enter()
 	portal.place(spots.town)
 	waypoints.place(spots, info, areas)
 	decals.place(spots)
+	expeditions.place(spots)
 	touch.adopt(spots.back.type, spots.back.x, spots.back.y, town.sendHome)
 	if spots.exit then
+		-- (a run's: home once its champion is dead)
 		touch.adopt(spots.exit.type, spots.exit.x, spots.exit.y, exitTouched, 15)
 	end
-	setWeather(info)
+	setWeather(state.sky[state.tag])
 	monsters.populate(spots, info)
+	expeditions.enter(spots, info)
 	if info.lair then
 		boss.enter(spots, info)
 	end
@@ -407,6 +463,7 @@ function areas.mapLoaded(name: string)
 	summons.reset()
 	windows.reset()
 	votes.reset()
+	expeditions.reset()
 	hero.mapChanging()
 	state.entered = false
 	local tag = nil
@@ -424,6 +481,7 @@ function areas.mapLoaded(name: string)
 			-- (a new play's first map: the old play's, left in the other tag, holds nothing now)
 			state.held[OTHER[tag]] = nil
 			state.spots[OTHER[tag]] = nil
+			state.sky[OTHER[tag]] = nil
 		end
 		state.loaded = true
 		state.leaving = false
@@ -450,6 +508,7 @@ function areas.configure(ctx: any)
 	state.play = 1
 	state.place, state.tag = 1, "a"
 	state.held.a = 1
+	state.sky.a = rollSky(1)
 	return areas.request(1, "a", false)
 end
 
@@ -497,8 +556,11 @@ function areas.status()
 		title = info.title,
 		level = info.level,
 		biome = info.biome,
+		roster = info.roster,
 		lair = info.lair,
 		weather = state.weather,
+		-- (the weather rolled for this map as it was built)
+		sky = state.sky[state.tag],
 		entered = state.entered,
 		nextState = if state.nextArea then (nox.generating(state.nextArea.tag) or "none") else "none",
 		nextPlace = if state.nextArea then state.nextArea.place else nil,
@@ -509,7 +571,9 @@ function areas.status()
 	}
 end
 
--- (votes.luau moves the game when a vote passes: it's handed this module, which requires it)
+-- (votes.luau moves the game when a vote passes, and expeditions.luau numbers its runs on from the
+-- acts' places: each is handed this module, which requires it)
 votes.attach(areas)
+expeditions.attach(areas)
 
 return areas

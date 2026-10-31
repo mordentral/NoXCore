@@ -8,13 +8,15 @@
 --
 -- A row holds what may be shown of a character and nothing more: its name and class, its level and
 -- experience, the deepest place it has reached (its difficulty tier, act, the area's number in that
--- act, and `place`, the area counted on through the acts, for ordering), and `bosses`, how many
--- acts' bosses it has killed. The host stamps it with the time it was put. No account, key or PC is
+-- act, and `place`, the area counted on through the acts, for ordering), `bosses`, how many
+-- acts' bosses it has killed, and `maps`, the highest expedition rank it has cleared (atlas.luau;
+-- a host's leaderboard may show it or not). The host stamps it with the time it was put. No account, key or PC is
 -- in a row (the row's key, the character's own, stays with the host).
 --
 -- A row is looked at as the character's record is written (hero.save: a level up, an act boss
 -- killed...) and as the party enters an area (hero.reached), and put only when what it shows has
--- moved on since this game last put it: a level up, a new deepest area, an act boss killed (and once
+-- moved on since this game last put it: a level up, a new deepest area, an act boss killed, a
+-- higher expedition rank cleared (and once
 -- in each game it plays, the first time). Its experience goes with it as it stood then. One record
 -- read each time; nothing walks the records.
 
@@ -68,6 +70,12 @@ function records.bosses(rec: any): number
 	return n
 end
 
+-- The highest expedition rank a record has cleared (its atlas's best; 0: none).
+function records.maps(rec: any): number
+	local a = rec.atlas
+	return if type(a) == "table" and type(a.best) == "number" then a.best else 0
+end
+
 -- A character's row.
 function records.row(rec: any): any
 	local tier, act, area, place = records.deepest(rec)
@@ -81,6 +89,7 @@ function records.row(rec: any): any
 		area = area,
 		place = place,
 		bosses = records.bosses(rec),
+		maps = records.maps(rec),
 	}
 end
 
@@ -91,7 +100,7 @@ function records.note(h: any)
 		return
 	end
 	local row = records.row(h.record)
-	local sig = string.format("%d|%d|%d|%d|%d", row.level, row.tier, row.act, row.area, row.bosses)
+	local sig = string.format("%d|%d|%d|%d|%d|%d", row.level, row.tier, row.act, row.area, row.bosses, row.maps)
 	if h.boardSig == sig then
 		return
 	end

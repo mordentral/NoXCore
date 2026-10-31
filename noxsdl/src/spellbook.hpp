@@ -26,9 +26,12 @@
 //              creature or ability learned with the show flag opens the book, moved up to a third
 //              of the screen, on its page, sparks bursting from its edges; with the fill flag a
 //              spell or ability also goes to the first empty slot of the bars, sparks trailing to
-//              it (bookFillAll, in a network game at once).
+//              it (bookFillAll, in a network game at once). With a menu up, or on the solo
+//              moment under a widescreen or dying, the book isn't shown; a solo award within two
+//              client frames of the last does only its first page turn and showing (book_award.hpp).
 #pragma once
 
+#include "book_award.hpp"
 #include "screen_particles.hpp"
 #include "sprite_cache.hpp"
 #include "text.hpp"
@@ -68,6 +71,10 @@ struct BookContext {
     /// noxcpp: the server's mode owns the book (HeadlessClient::modeOwnsBook; allKnown is off
     /// then): the guide's creatures, all granted, are summoned from it without Summon Creature.
     bool modeOwnsBook = false;
+    /// What an award's showing of the book looks at (book_award.hpp; filled for the awards only),
+    /// and whether an award is flying to the bars (bookFlying).
+    bookaward::ShowCheck award;
+    bool flying = false;
 };
 
 class Spellbook {
@@ -182,6 +189,8 @@ private:
     Anim anim_ = Anim::None;
     std::uint32_t animStart_ = 0;
     bool raised_ = false; ///< moved up by an award
+    /// The client frame of the last award past bookRewardCli's first test (0 with each game).
+    std::uint32_t lastReward_ = 0;
     std::optional<SDL_FPoint> moved_; ///< where it was dragged to (its window's position), game pixels
     std::optional<SDL_FPoint> grab_;  ///< the pointer while the book itself is held
     int lastHeight_ = 600; ///< the screen's height in game pixels when last drawn

@@ -136,7 +136,9 @@ private:
     void closeShop();
     void setShopMode(int mode);
     void syncStock(const nox::client::World& world);
-    void openDialog(const nox::client::World& world);
+    void openDialog(const nox::client::World& world, float scale);
+    /// The dialog's text onto its list's lines, at the widths it's drawn with at `scale`.
+    void wrapDialog(float scale);
     void closeDialog();
     void openTrade(const nox::client::World& world);
     void closeTrade();
@@ -184,6 +186,8 @@ private:
         gui::Window* window = nullptr;
         std::uint32_t count = 0;
         std::string voiceLine;
+        std::string text;     ///< the line as spoken, before wrapping
+        float wrapScale = 0;  ///< the scale its list lines were wrapped at (0: none yet)
     } dialog_;
     struct {
         bool open = false;

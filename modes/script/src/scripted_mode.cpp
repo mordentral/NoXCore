@@ -21,6 +21,7 @@
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/spells.hpp"
 #include "noxcore/server/teleport.hpp"
+#include "noxcore/server/trade.hpp"
 #include "noxcore/server/world.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/game_data.hpp"
@@ -1109,6 +1110,49 @@ int noxTake(lua_State* L)
         }
     }
     return 0;
+}
+
+int noxPickUp(lua_State* L)
+{
+    toolbox::refuseInsideAsked(L, "nox.pickUp"); // (not inside onDamage or onExit)
+    // A player's pickup of a thing on the ground as its client's MSG_TRY_GET asks for it, wherever
+    // it is (the game checks no reach): its pickup function (gold into the purse, a potion drunk,
+    // the class and three-of-a-kind refusals with their lines and sounds, the thing's own
+    // onPickup, the mode's pickup hook). Whether it was taken.
+    server::ServerObject& u = unitArg(L, 1);
+    server::ServerObject& item = objectArg(L, 2);
+    luaL_argcheck(L, static_cast<bool>(u.player), 1, "a player's unit");
+    luaL_argcheck(L, &item != &u && !item.player && !item.monster &&
+                         !(item.classes & (things::ObjectClass::Player | things::ObjectClass::Monster)),
+                  2, "not a thing a unit can carry");
+    server::Fight f = fightOf(L);
+    luaL_argcheck(L, f.things != nullptr, 2, "no things");
+    server::World& world = f.world;
+    // The request's own refusals: held already or gone; a save asked for, observing, trading,
+    // talking to an NPC or frozen.
+    if (item.holder != 0 || item.gone() || world.saveRequest.pending || (u.player->statusFlags & 3u) || server::trading(u) ||
+        u.player->dialogWith != 0 || (u.flags & server::ObjFlag::NoUpdate)) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    // Past its carry capacity: "pickup.c:CarryingTooMuch" in the frame's datagram (none while
+    // its .plr is applied).
+    int carried = 0;
+    for (const std::uint32_t e : u.inventory) {
+        if (const server::ServerObject* o = world.byExtent(e)) {
+            carried += o->weight;
+        }
+    }
+    if (u.carryCapacity < item.weight + carried) {
+        if (!u.player->transfer) {
+            world.broadcasts().push_back({server::informStringBytes("pickup.c:CarryingTooMuch"), false, u.extent});
+        }
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    server::Items items{world, *f.things, f.modifiers, f.rng, f.frame};
+    lua_pushboolean(L, items.pickUp(u, item, true) ? 1 : 0);
+    return 1;
 }
 
 int noxDrop(lua_State* L)
@@ -3844,7 +3888,7 @@ void Impl::installToolbox()
         // (the world)
         {"object", noxObject}, {"objects", noxObjects}, {"units", noxUnits}, {"inventory", noxInventory},
         {"watchCollide", noxWatchCollide},
-        {"take", noxTake},     {"drop", noxDrop},       {"place", noxPlace},     {"clearPointNear", noxClearPointNear},
+        {"take", noxTake},     {"pickUp", noxPickUp},   {"drop", noxDrop},       {"place", noxPlace},     {"clearPointNear", noxClearPointNear},
         {"endSpellEffects", noxEndSpellEffects}, {"minimap", noxMinimap}, {"sound", noxSound},
         // (the engine's paths)
         {"heal", noxHeal},     {"cast", noxCast},       {"enchant", noxEnchant}, {"enchanted", noxEnchanted},

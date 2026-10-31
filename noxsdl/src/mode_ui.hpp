@@ -107,6 +107,15 @@ public:
         (void)renderer;
         (void)hud;
     }
+    /// Whether a click at screen point (x, y) in the world would be the mode's (a script UI's
+    /// clickable label there): the pointer is the pickup hand over it.
+    virtual bool clickableAt(const App& app, float x, float y) const
+    {
+        (void)app;
+        (void)x;
+        (void)y;
+        return false;
+    }
     /// Each frame once the camera's set from our own player (it may move it: a scene's view).
     virtual void cameraSet(App& app) { (void)app; }
     /// A join of `game` refused (`joinError`, net::JoinError's): what the game list says, when

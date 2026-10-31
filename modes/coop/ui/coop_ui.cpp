@@ -116,15 +116,18 @@ public:
         dialogSeen_ = 0;
         barsLooked_ = false;
         app_.partyDots = false;
+        app_.partyNames = false;
         app_.partyCreatures.clear();
         creaturesSeen_ = 0;
     }
 
     /// Each frame: the friend dot over the party's creatures while we're in the campaign
-    /// (friend_dot.hpp, VD-39), the session's list copied as it changes.
+    /// (friend_dot.hpp, VD-39), the session's list copied as it changes; the names over the party's
+    /// players (name_plate.hpp).
     void update(App& app) override
     {
         app.partyDots = coop_ && coop_->inCampaign();
+        app.partyNames = app.partyDots;
         if (coop_ && coop_->partyCreaturesVersion() != creaturesSeen_) {
             creaturesSeen_ = coop_->partyCreaturesVersion();
             app.partyCreatures = coop_->partyCreatures();

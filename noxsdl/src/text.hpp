@@ -6,6 +6,8 @@
 // rasterised on first use per pixel size into shared atlas textures.
 #pragma once
 
+#include "text_wrap.hpp"
+
 #include <SDL3/SDL.h>
 
 #include <cstdint>
@@ -34,8 +36,14 @@ public:
 
     /// Advance width of a UTF-8 string at `pixelSize` (the em height in screen pixels).
     float measure(std::string_view utf8, int pixelSize);
-    /// Splits a UTF-8 string into lines no wider than `maxWidth`, at spaces where it can (and at
-    /// '\n'). A word too long for a line is broken anywhere.
+    /// One glyph's advance at `pixelSize`.
+    float advance(char32_t codepoint, int pixelSize);
+    /// The glyphs' advances at `pixelSize`, for text_wrap.hpp's line breaking (valid while the
+    /// font lives).
+    GlyphAdvance advances(int pixelSize);
+    /// Splits a UTF-8 string into lines no wider than `maxWidth` as the game's drawStringWrap
+    /// does (text_wrap.hpp's wrapLines): at the last space, a word with no space broken one
+    /// character early, and at line breaks.
     std::vector<std::string> wrap(std::string_view utf8, int pixelSize, float maxWidth);
     /// Distance from the top of a line to its baseline, and the full line height.
     float ascent(int pixelSize);
@@ -90,8 +98,5 @@ private:
     int shelfY_ = 0;
     int shelfHeight_ = 0;
 };
-
-/// Decodes one code point from UTF-8 at `pos`, advancing it. Invalid bytes decode as U+FFFD.
-char32_t nextCodepoint(std::string_view utf8, std::size_t& pos);
 
 } // namespace noxsdl

@@ -782,6 +782,23 @@ void drawFlight(App& app)
     app.sprites->render(*sp, nullptr, dst);
 }
 
+namespace {
+
+/// What an award's showing of the book looks at now (book_award.hpp): the menus, the level-up
+/// moment on the server we host, the widescreen, our player dying or dead, a solo game.
+bookaward::ShowCheck awardShowCheck(App& app)
+{
+    bookaward::ShowCheck c;
+    c.menuUp = menuWindowUp(app);
+    c.moment = app.host && app.host->withGame([](nox::server::GameHost& game) { return game.server().world().levelUp.active; });
+    c.wideScreen = app.cinematics && app.cinematics->wideScreen();
+    c.dyingOrDead = bookaward::dyingOrDead(ownAnimState(app));
+    c.solo = soloGame(app);
+    return c;
+}
+
+} // namespace
+
 /// The spellbook's awards and revokes (World::takeBookEvents), and what they do to the bars.
 void bookEvents(App& app)
 {
@@ -847,7 +864,12 @@ void bookEvents(App& app)
             break;
         }
         // Then the book itself: an award it says to fill goes onto the bars.
-        if (const auto fill = app.book->event(e, bookContext(app))) {
+        BookContext ctx = bookContext(app);
+        if (e.show) {
+            ctx.award = awardShowCheck(app);
+            ctx.flying = app.flight.has_value();
+        }
+        if (const auto fill = app.book->event(e, ctx)) {
             fillBars(app, *fill, e.kind == Kind::Ability);
         }
     }

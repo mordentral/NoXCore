@@ -24,7 +24,7 @@ local hud = {}
 -- Characters button.
 hud.serverCharacters = false
 
--- The area now: { title, level } (areas.luau sets it).
+-- The area now: { title, level, act, run } (areas.luau sets it).
 local area: any = { title = "", level = 0 }
 -- The boss's value now (nil: no boss in this map).
 local bossValue: any = nil
@@ -181,6 +181,8 @@ function hud.hero(h: any)
 		portal = h.portal ~= nil,
 		act = area.act,
 		cleared = area.act ~= nil and progress.isCleared(h.record, area.act),
+		-- (an expedition's map: { b = its biome, r = its rank, c = cleared }; nil in an act's area)
+		run = area.run,
 		points = left,
 		lootNames = store.option(h.record, "lootNames"),
 		server = hud.serverCharacters or nil,
@@ -193,9 +195,25 @@ end
 
 -- The area changed: every player's value again (`all`: the heroes).
 function hud.area(info: any, all: any)
-	area = { title = info.title, level = info.level, act = info.act }
+	local run = info.expedition
+	area = {
+		title = info.title,
+		level = info.level,
+		act = if run then nil else info.act,
+		run = if run then { b = run.biome, r = run.rank, c = false } else nil,
+	}
 	for _, h in all do
 		hud.hero(h)
+	end
+end
+
+-- The expedition being played cleared: every player's value again (`all`: the heroes).
+function hud.runCleared(all: any)
+	if area.run then
+		area.run = { b = area.run.b, r = area.run.r, c = true }
+		for _, h in all do
+			hud.hero(h)
+		end
 	end
 end
 
@@ -204,8 +222,8 @@ function hud.currentArea(): any
 	return area
 end
 
--- The boss's health to everyone: { kind = "boss", name, health, most } (most 0: it's gone), or
--- nil (a new map: none).
+-- The boss's health to everyone: { kind = "boss", name, health, most, c = its colour { r, g, b }
+-- (its title's over the bar) } (most 0: it's gone), or nil (a new map: none).
 function hud.boss(value: any)
 	bossValue = if value and value.most > 0 then value else nil
 	local sent = value or { kind = "boss", name = "", health = 0, most = 0 }

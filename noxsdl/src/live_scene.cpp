@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include "draw_scale.hpp"
 #include "friend_dot.hpp"
+#include "name_plate.hpp"
 #include "player_art.hpp"
 #include "team_colors.hpp"
 
@@ -118,13 +119,15 @@ bool hasChatBubble(const nox::client::World& world, std::uint16_t netCode, std::
 /// The name plate PlayerDraw puts over a player, or nullopt if it draws none.
 ///
 /// The name is grey, or the team's text colour when they're on a team (observing too). No name
-/// in solo games (`solo`: soloGame, game flag 0x800), while the player has
-/// a chat bubble up (`bubbleUp`), or when showsOverhead says no.
+/// in solo games (`flags`: gameFlags, with soloGame's 0x800) but the co-op campaign's
+/// (`coopCampaign`: App::partyNames), while the player has a chat bubble up (`bubbleUp`), or when
+/// showsOverhead says no (name_plate.hpp).
 std::optional<NamePlate> namePlate(const nox::client::HeadlessClient& client, const nox::client::PlayerEntry& player,
-                                   const nox::client::Drawable& d, float x, float y, bool bubbleUp, bool solo)
+                                   const nox::client::Drawable& d, float x, float y, bool bubbleUp, std::uint32_t flags,
+                                   bool coopCampaign)
 {
     const auto& world = client.world();
-    if (player.name.empty() || solo || bubbleUp || !showsOverhead(client, player, d)) {
+    if (!namePlateShown(flags, !player.name.empty(), bubbleUp, showsOverhead(client, player, d), coopCampaign)) {
         return std::nullopt;
     }
     NamePlate plate{x, y, player.name, {155, 155, 155, 255}};
@@ -611,7 +614,7 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
                 look.weaponEquip = player->weaponEquip;
                 // (a muted player's line makes no bubble: playerCanTalkMB)
                 const bool bubbleUp = hasChatBubble(client.world(), netCode, frame) && !app.muted.contains(netCode);
-                plateHere = namePlate(client, *player, d, p.x, p.y, bubbleUp, soloGame(app));
+                plateHere = namePlate(client, *player, d, p.x, p.y, bubbleUp, gameFlags(app), app.partyNames);
                 // (Who's editing) An editor of the map editor session we're in: the pencil with
                 // their name (shown where the name would be, so not over the invisible).
                 if (app.editSession && app.editSession->inSession() && !bubbleUp && showsOverhead(client, *player, d)) {

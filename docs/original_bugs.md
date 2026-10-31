@@ -1926,6 +1926,70 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   GlyphDraw gives a GUI drawable and a player under INFRAVISION (`glyphAlpha`,
   `noxcore/include/noxcore/client/state_draw.hpp`).
 
+### OB-415: An award shows the book under a cinematic or over a dying solo player
+- **Where:** an award with the show flag (Cli_AwardSpell, Cli_AwardGuideCreature, abilityReward)
+  shows the book twice: first its own bookShow, then bookRewardCli's bookSetForward through
+  bookShowMB. bookShowMB refuses under a cinematic's widescreen and with a solo game's player dying
+  or dead, but the first bookShow checks neither (only the Escape menu, the in-game Options and the
+  key bindings, and the server's level-up moment), so it has shown the book already.
+- **Effect:** bookShowMB's two refusals count only on the level-up moment (a solo level-up's or a
+  flying award's pause, where the first bookShow refuses too). Otherwise an award opens the book
+  over a cinematic or a dying solo player.
+- **Ours:** the same (`bookaward::showing`, `noxsdl/src/book_award.hpp`).
+
+### OB-416: drawStringWrap breaks a word with no space one character early
+- **Where:** drawStringWrap (the GUI's wrapped text: labels, list lines, messages), when a
+  character takes the line past the width and the line has no space to break at, ends the line
+  before the character ahead of it, not before the one that overflowed; counting starts again at
+  the overflowing character, so the one carried over isn't counted on the new line. Two glyphs
+  that are together wider than the width break before each other for ever (a hang).
+- **Effect:** a word too long for its box breaks a character sooner than it needs to, and the
+  next line can run one character past the width. Only words longer than a whole line show it.
+- **Ours:** kept by decision (`wrapLines`, `noxsdl/src/text_wrap.cpp`, used by every wrapped
+  text through `Font::wrap`). A single glyph wider than the whole width stays on its line instead
+  of hanging.
+
+### OB-417: drawStringWrap keeps the last space across a newline
+- **Where:** drawStringWrap forgets the last space it saw only when it breaks a line at the
+  width, not at a newline. When the first word after a newline overflows the width before any
+  new space, it breaks at that stale space from an earlier line: nothing is drawn, a character of
+  the new line is skipped, the scan goes back to after the old space and meets the newline again
+  (another empty line, another character skipped), and the word is then broken as OB-416 says.
+- **Effect:** in a text with a space anywhere before a newline, a word longer than the box right
+  after the newline shows as blank lines and loses its first two characters. No retail string
+  wraps in a box that narrow.
+- **Ours:** kept by decision (`wrapLines`, `noxsdl/src/text_wrap.cpp`).
+
+### OB-418: The NPC dialog never shows a blank line between paragraphs
+- **Where:** the NPC dialog's text setter (GUIDlg) splits the line into pieces with
+  `wcstok(text, "\r\n")`, which skips empty pieces, before wrapping each piece onto the list.
+- **Effect:** the dialog strings written with a blank line between paragraphs ("...\n\nFollow the
+  tunnel...", most of the campaign's speeches) show their paragraphs on consecutive lines with no
+  gap, and so take fewer lines to scroll.
+- **Ours:** kept by decision (`dialogLines`, `noxsdl/src/text_wrap.cpp`, used by
+  `TradeScreens::wrapDialog`).
+
+### OB-419: A centred label whose last word is too long for it reads past its text
+- **Where:** wndStaticDrawNoImage, laying out a centred STATICTEXT that needs more than one line,
+  takes a word too long for the box alone as a line of its own and marks the line "not the last";
+  when that word ends the text, the next line starts one character past the text's terminator.
+- **Effect:** whatever follows the string in memory is laid out and drawn as more lines (or the
+  game crashes). No retail string has a word that long in a centred box.
+- **Ours:** the text ends there (`centredLines`, `noxsdl/src/text_wrap.cpp`): memory that isn't
+  the text's isn't read.
+
+### OB-420: An award shuts and reopens an open book, and plays its sounds twice
+- **Where:** an award with the show flag (Cli_AwardSpell, Cli_AwardGuideCreature, abilityReward)
+  runs bookHideMB (BookClose if the book is shown and no award flies), bookMoveToPage (PageTurn)
+  and bookShow (BookOpen), then bookRewardCli's bookSetForward shows it again through bookShowMB
+  (another BookOpen) and turns to the same page again (another PageTurn). bookShow plays BookOpen
+  whether the book was shown already or not.
+- **Effect:** an award with the book open plays BookClose, PageTurn, BookOpen, BookOpen, PageTurn
+  in the same frame; with it shut PageTurn, BookOpen, BookOpen, PageTurn. One BookOpen and one
+  PageTurn were meant.
+- **Ours:** kept by decision (`bookaward::showing`, `noxsdl/src/book_award.hpp`, played step by
+  step by `Spellbook::event`).
+
 ## Menus
 
 ### OB-189: The game list's description box takes a LAN game's last weapons from its map's name
@@ -2407,3 +2471,17 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** `Move` on any thing made in play turns on and starts every such mover; each leaves
   the update list at its next turn having moved nothing, but stays on.
 - **Ours:** the same (`scriptMoveTo` in `noxcore/src/server/objects.cpp`).
+
+### OB-421: Eight weapons, wands and armour no class may use
+- **Where:** the class test of the pickups and equips (itemClassUseMask) reads a weapon's, wand's or
+  armour's class byte from its modifier.bin record. WebWand, PoisonWand, Staff and Chainmail have no
+  record (0: no class); Dagger, MissileWand, DemonsBreathWand and SummoningWand have a stub record
+  (DURABILITY alone) without a CLASSUSE line, so their byte stays as the zeroed record left it.
+- **Effect:** no player can wield or wear any of them, in any game (the equips ask the class every
+  time; Staff and Chainmail fail the strength test too, having no record); out of solo and quest
+  games none can even be picked up ("weapon.c:WeaponEquipClassFail" / "armor.c:ArmorEquipClassFail"),
+  and the client shows the Caution cursor over them. Of the shipped maps only War03d has one (a
+  SummoningWand, in its object list); no class could wield it there. They look like unfinished
+  items.
+- **Ours:** the same (`Items::classMay` in `noxcore/src/server/items.cpp`, noxsdl's cursor). A
+  multiclass player (a mode's) may, and a mode's pickupAnyClass carries them.

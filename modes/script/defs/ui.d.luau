@@ -13,7 +13,8 @@ type NoxColour = string | { number }
 type NoxWindowSpec = { title: string?, x: number?, y: number?, w: number?, h: number?, frame: boolean?, clickThrough: boolean?, hud: boolean?, anchor: string? }
 type NoxTooltipLine = { any } | string -- { text, colour? }, or a white line's text
 -- keep is UI API 4's: true keeps the label while its object is out of the client's world.
-type NoxLabelOptions = { show: string?, near: number?, offset: number?, keep: boolean? }
+-- click is UI API 5's: true makes a left click on the label the UI's (ui.labelClick), never the game's.
+type NoxLabelOptions = { show: string?, near: number?, offset: number?, keep: boolean?, click: boolean? }
 
 declare nox: {
     --- # Windows
@@ -26,10 +27,10 @@ declare nox: {
     box: (x: number, y: number, w: number, h: number, colour: NoxColour?) -> (),
     --- Draws a box's outline in the window being drawn.
     outline: (x: number, y: number, w: number, h: number, colour: NoxColour?) -> (),
-    --- Draws text at its top left in the window being drawn (at most 256 bytes).
-    text: (text: string, x: number, y: number, colour: NoxColour?) -> (),
-    --- How wide the client draws `text`, in the UI's units.
-    textWidth: (text: string) -> number,
+    --- Draws text at its top left in the window being drawn (at most 256 bytes); size 1-4 times the UI's text (UI API 5: 1.5 or 2 for a title; a client before it draws it at 1).
+    text: (text: string, x: number, y: number, colour: NoxColour?, size: number?) -> (),
+    --- How wide the client draws `text` (at size, UI API 5), in the UI's units.
+    textWidth: (text: string, size: number?) -> number,
     --- Draws a line from (x1, y1) to (x2, y2) in the window being drawn, width 1-8 (UI API 3).
     line: (x1: number, y1: number, x2: number, y2: number, colour: NoxColour?, width: number?) -> (),
     --- Shows { { text, colour? }, ... } (16 lines, 128 bytes each) at the mouse over everything this frame, kept on the screen (inside ui.draw; UI API 3).
@@ -41,7 +42,7 @@ declare nox: {
     --- Keeps the game's own top-left icons (the enchantments' row) out of a box: they start below it ({x, y, w, h, anchor} as a window's; nil: none; UI API 5).
     hudReserve: (box: { x: number, y: number, w: number, h: number, anchor: string? }?) -> (),
     --- # World labels (UI API 3)
-    --- Labels an object (its net code: the server's nox.object(id).netCode) with up to 64 bytes; opts { show = "always" | "alt" | "near", near = 150, offset = 4, keep = false (UI API 4: kept while it's away, till nox.clearLabel or a map's load: clear it when your server says its object is gone) }; false over 128 labels (UI API 3).
+    --- Labels an object (its net code: the server's nox.object(id).netCode) with up to 64 bytes; opts { show = "always" | "alt" | "near", near = 150, offset = 4, keep = false (UI API 4: kept while it's away, till nox.clearLabel or a map's load: clear it when your server says its object is gone), click = false (UI API 5: a left click on it goes to ui.labelClick, not the game) }; false over 128 labels (UI API 3).
     label: (object: number, text: string, colour: NoxColour?, opts: NoxLabelOptions?) -> boolean,
     --- Takes the label off an object (UI API 3).
     clearLabel: (object: number) -> (),
@@ -84,5 +85,6 @@ declare nox: {
 --- @hook drag(window, phase, x, y, button) | (UI API 3) A press in a window moved 3 units or more: phase "start" (at the press), "move", "end" (let go), in that window's units.
 --- @hook mouseUp(window, x, y, button) | (UI API 3) A button let go over a window (pressed in one of the UI's windows), in its units.
 --- @hook wheel(window, x, y, steps) | (UI API 3) The wheel over a window: steps > 0 up, < 0 down (the UI's, taken or not).
+--- @hook labelClick(object) | (UI API 5) A left click on a label set with click = true (the topmost where labels overlap): its object's net code. The click never reaches the game.
 --- @hook onMessage(value) | A value the server script sent (nox.send).
 --- @hook onView(view) | A view as data ({ kind = "say" | "choice" | "table", ... }): true draws it (else it's shown as text).

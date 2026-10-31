@@ -146,6 +146,7 @@ add_executable(noxsdl WIN32
     src/sprite_cache.cpp
     src/stb_truetype.cpp
     src/text.cpp
+    src/text_wrap.cpp
     src/test_drive.cpp
     src/thing_art.cpp
     src/view3d.cpp

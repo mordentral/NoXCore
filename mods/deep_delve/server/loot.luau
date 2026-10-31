@@ -19,8 +19,11 @@ local scale = require("scale")
 
 local loot = {}
 
--- Each item lying on the ground from the mod: id -> { code (its net code), text, rarity, x, y }.
+-- Each item lying on the ground from the mod: id -> { code (its net code), text, rarity, kind
+-- ("gear", "potion", "gold"), x, y }; and by its net code: code -> id (an entry checked against
+-- `ground` as it's read: one dropped there is stale).
 local ground: { [number]: any } = {}
+local byCode: { [number]: number } = {}
 
 -- A thing type's name as words ("LeatherBoots": "Leather Boots").
 local function spaced(name: string): string
@@ -29,14 +32,15 @@ local function spaced(name: string): string
 end
 
 -- An item on the ground indexed with its label ("gold" for a pile of gold).
-local function index(id: number, rec: any, rarity: string, x: number, y: number)
+local function index(id: number, rec: any, rarity: string, x: number, y: number, kind: string)
 	local o = nox.object(id)
 	if not o then
 		return
 	end
 	local words = (data.words :: any)[rarity] or ""
 	local text = if rarity == "gold" then "Gold" else ((if words ~= "" then words .. " " else "") .. spaced(rec.type))
-	ground[id] = { code = o.netCode, text = text, rarity = rarity, x = x, y = y }
+	ground[id] = { code = o.netCode, text = text, rarity = rarity, kind = kind, x = x, y = y }
+	byCode[o.netCode] = id
 end
 
 -- The ground's index (labels.luau reads it; an entry whose item is gone is dropped there).
@@ -280,7 +284,7 @@ function loot.place(rec: any, x: number, y: number): number?
 	end
 	items.setMeta(id, { rarity = rec.rarity or "normal", affixes = rec.affixes, level = rec.level })
 	showOnGround(id, rec.rarity or "normal", x, y)
-	index(id, rec, rec.rarity or "normal", x, y)
+	index(id, rec, rec.rarity or "normal", x, y, "gear")
 	return id
 end
 
@@ -296,12 +300,12 @@ function loot.drop(x: number, y: number, level: number, rolls: number, better: n
 			if d.kind == "gold" then
 				id = nox.create("Gold", px, py)
 				if id then
-					index(id, { type = "Gold" }, "gold", px, py)
+					index(id, { type = "Gold" }, "gold", px, py, "gold")
 				end
 			elseif d.kind == "potion" then
 				id = nox.create(d.type, px, py)
 				if id then
-					index(id, { type = d.type }, "normal", px, py)
+					index(id, { type = d.type }, "normal", px, py, "potion")
 				end
 			else
 				id = loot.place(d.record, px, py)
@@ -344,9 +348,26 @@ end
 -- An item picked up (by anyone): its sparks stop, its label goes; whether it was ground loot.
 function loot.pickedUp(item: number): boolean
 	hide(item)
-	local was = ground[item] ~= nil
+	local g = ground[item]
 	ground[item] = nil
-	return was
+	if g and byCode[g.code] == item then
+		byCode[g.code] = nil
+	end
+	return g ~= nil
+end
+
+-- The ground loot with net code `code` still lying there: its id and entry, or nil.
+function loot.byCode(code: number): (number?, any)
+	local id = byCode[code]
+	if not id then
+		return nil, nil
+	end
+	local g = ground[id]
+	if not g or g.code ~= code or not nox.present(id) then
+		byCode[code] = nil
+		return nil, nil
+	end
+	return id, g
 end
 
 -- The items sparking on the ground now, as "id effect" lines (for "dd ground").
@@ -363,6 +384,7 @@ end
 function loot.reset()
 	table.clear(shown)
 	table.clear(ground)
+	table.clear(byCode)
 	count = 0
 end
 

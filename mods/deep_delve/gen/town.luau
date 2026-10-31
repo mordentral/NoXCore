@@ -17,6 +17,7 @@ local util = require("util")
 local layout = require("layout")
 local arch = require("arch")
 local lights = require("lights")
+local towns = require("towns")
 
 local town = {}
 
@@ -160,8 +161,8 @@ end
 -- The town's stations, starts, lights and scenery (site: the section; backs, walls: the map's;
 -- look: the act's, towns.luau), written through `w`. Returns where its stations stand, for the
 -- server to work them: { centre, healer, gate (with its arch's type), stash, vendor, portal,
--- waypoints, wayIn } (world points), and wayInExtent (the receiving pentagram's, for the area's
--- waypoint to lead to).
+-- waypoints, wayIn, maps (the map table) } (world points), and
+-- wayInExtent (the receiving pentagram's, for the area's waypoint to lead to).
 function town.dress(section, site, w, look)
 	local cx, cy = section.x, section.y
 	local used = gen.cells()
@@ -255,6 +256,15 @@ function town.dress(section, site, w, look)
 		local c = freeNear(section, used, cx + piece[2], cy + piece[3])
 		town.put(w, piece[1], worldX(c), worldY(c))
 	end
+	-- The map table (the expeditions'): a scholar's desk that never moves, lit gold (the server draws
+	-- a gold ring on the floor round it, and touching it opens the window). At the same place in
+	-- every look (towns.mapTable), and placed last, so nothing placed before it moves.
+	local mt = towns.mapTable
+	local tc = freeNear(section, used, cx + mt[1], cy + mt[2])
+	used:addSquare(tc, 1)
+	spots.maps = point(tc)
+	town.put(w, "Desk1", spots.maps.x, spots.maps.y)
+	lights.put(w, "maps", spots.maps.x, spots.maps.y)
 	return spots
 end
 

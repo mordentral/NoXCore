@@ -99,6 +99,17 @@
 //   nox.hudReserve({x, y, w, h, anchor}) a box (the 640 x 480's units, its anchor as a window's)
 //                                    the game's own top-left icons (the enchantments' row) keep
 //                                    out of: they start below it; nil: none (hudReserve())
+//   nox.label's opts.click           true: the label's box takes a left click while it's drawn
+//                                    (labelClick): the click never reaches the game (no walk,
+//                                    attack or pickup), the pointer over it is the pickup hand and
+//                                    the box brightens; where labels overlap the one drawn last
+//                                    (topmost) takes it. A client before it ignores the field: the
+//                                    label is drawn as before and a click on it is the game's
+//   ui.labelClick(object)            a click on such a label: its object's net code
+//   nox.text(text, x, y, colour, size) a fifth argument: the text that many times the UI's size
+//                                    (1-4: 1.5, 2 for a title); nox.textWidth(text, size) its
+//                                    width at that size. A client before it ignores it (the text
+//                                    at the UI's size)
 //
 // The program calls frame() once a frame and draws windows(); a click in one goes to click().
 // Without a server (the map editor's UI preview), runLocal starts a UI from its source, useAssets
@@ -174,6 +185,7 @@ struct UiDraw {
     std::string text;
     int index = -1;    ///< (Image, Thing)
     float width = 1;   ///< (Line) 1-8 UI units
+    float size = 1;    ///< (Text, API 5) times the UI's text size, 1-4
 };
 
 /// (API 3) A line of a tooltip (nox.tooltip).
@@ -202,6 +214,7 @@ struct UiLabel {
     float near = 150;  ///< (Near) world units
     float offset = 4;  ///< game pixels above the object's top
     bool keep = false; ///< (API 4) kept while its object is away (back with the same type: drawn again)
+    bool click = false; ///< (API 5) a left click on its box is the UI's (ui.labelClick), never the game's
     // (The client's: whether its object has been in the client's world, its type then, and when
     // it was set.)
     bool seen = false;
@@ -323,6 +336,9 @@ public:
     bool mouseUp(std::string_view windowId, float x, float y, int button);
     /// (API 3) The wheel over window `id` (steps > 0 up): whether the UI took it.
     bool wheel(std::string_view windowId, float x, float y, int steps);
+    /// (API 5) A left click on the label over `object` (one set with click = true): told to
+    /// ui.labelClick. The click is the UI's whatever the hook does.
+    void labelClick(std::uint16_t object);
     /// The window the mouse at (x, y) (the 640 x 480 units) is over, the topmost as drawn (the
     /// others, then the hud ones): none over a clickThrough window or a hud one while the HUD is
     /// hidden.

@@ -21,9 +21,13 @@ local KINDS = {
 	waypoint = { intensity = 44, color = { 40, 220, 255 } },
 	-- The act boss's arena: red fire round its floor.
 	arena = { intensity = 46, color = { 255, 70, 35 }, intensityKeys = { 46, 40, 48, 42 }, intensityStep = 5 },
+	-- The barrow-king's arena: a cold grave-green glow, slowly breathing.
+	barrow = { intensity = 44, color = { 110, 255, 150 }, intensityKeys = { 44, 36, 46, 38 }, intensityStep = 10 },
 	-- The gate to the next act (switched on by the server as the lair's boss dies): a pale blue
 	-- glow that swells slowly.
 	gate = { intensity = 52, color = { 120, 190, 255 }, intensityKeys = { 52, 46, 56, 48 }, intensityStep = 9 },
+	-- The map table in town (the expeditions'): a warm gold glow over the desk.
+	maps = { intensity = 40, color = { 255, 195, 90 } },
 }
 
 -- A light of `kind` written at (x, y); its extent.

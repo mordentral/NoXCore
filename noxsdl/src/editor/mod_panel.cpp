@@ -1594,7 +1594,7 @@ void ModPanel::previewWindow()
             switch (d.kind) {
             case nox::modes::script::UiDraw::Kind::Box: dl->AddRectFilled(a, ImVec2(a.x + d.w * scale, a.y + d.h * scale), c); break;
             case nox::modes::script::UiDraw::Kind::Outline: dl->AddRect(a, ImVec2(a.x + d.w * scale, a.y + d.h * scale), c); break;
-            case nox::modes::script::UiDraw::Kind::Text: dl->AddText(font, textPx, a, c, d.text.c_str()); break;
+            case nox::modes::script::UiDraw::Kind::Text: dl->AddText(font, textPx * d.size, a, c, d.text.c_str()); break;
             case nox::modes::script::UiDraw::Kind::Line:
                 dl->AddLine(a, pt(static_cast<float>(w.x) + d.w, static_cast<float>(w.y) + d.h), c, std::max(1.0f, d.width * scale));
                 break;

@@ -11,8 +11,11 @@
 --     nothing to that hero. A Fireball turned back by a reflection is the reflector's, so it is no
 --     longer the hero's own.
 --   * A hit on a player's unit from one of the mod's monsters (or something it owns: its arrow)
---     is scaled by the monster's tier and area level.
+--     is scaled by the monster's tier and area level; one by something it owns, times its
+--     `spells` too (a boss's: the barrow-king's mist and fists; 1 for every other monster).
 --     The player's resistance (worn affixes, its passive tree) takes its share off.
+--   * The mod's monsters never hurt each other (a hit on one by another, or by something another
+--     owns, is cancelled): a boss's quake, mist or fist spares its own dead.
 --   * A hit on one of the mod's monsters from a player (or something it owns: a missile, a
 --     summoned creature) is scaled by the player's worn "damage" affixes and its passive tree
 --     (and a spell's own bonus when the hit came by that spell's missile: hero.dealt).
@@ -134,9 +137,17 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 	if not who then
 		return nil
 	end
+	-- (the mod's monsters never hurt each other: a boss's own quake, mist or fist among its dead)
+	if not victim and monsters.info(target) and monsters.info(who) then
+		return 0
+	end
 	local factor = 1
 	if victim then
 		factor = monsters.damageOf(who) * hero.taken(victim)
+		-- (a thing it owns, not its own blow: a boss's spells, times its own share)
+		if who ~= source then
+			factor *= monsters.spellsOf(who)
+		end
 	elseif monsters.info(target) then
 		local h = hero.byUnit(who)
 		if h then

@@ -36,6 +36,7 @@
 
 local store = require("store")
 local progress = require("progress")
+local atlas = require("atlas")
 local items = require("items")
 local hud = require("hud")
 local town = require("town")
@@ -232,6 +233,8 @@ function hero.save(h: any, why: string): boolean
 		return false
 	end
 	hero.snapshot(h)
+	-- (the map table opened for good once the last act is cleared: atlas.luau)
+	atlas.note(h.record)
 	local ok, err = store.save(h.key, h.record)
 	if not ok then
 		nox.log("deep_delve: " .. h.record.identity.name .. "'s record not saved (" .. why .. "): " .. tostring(err))
@@ -401,6 +404,9 @@ function hero.join(p: any, chosen: any?)
 	record = record or store.new(p)
 	-- (an act built since the record's last clear: opened now, the record written)
 	if progress.openAfterCleared(record) then
+		older = true
+	end
+	if atlas.note(record) then
 		older = true
 	end
 	local h = {
@@ -604,11 +610,14 @@ function hero.setOption(h: any, name: string, value: string): (boolean, string?)
 end
 
 -- An area entered (`info`: areas.info's): the deepest each character has been, in the act and
--- in all (and for each one set up in it later: hero.setUp).
+-- in all (and for each one set up in it later: hero.setUp). An expedition's map is no act's area:
+-- it moves no act's progress.
 function hero.reached(info: any)
-	here = info
+	here = if info.expedition then nil else info
 	for _, h in byPeer do
-		progress.reached(h.record, info.act, info.index)
+		if here then
+			progress.reached(h.record, info.act, info.index)
+		end
 		records.note(h) -- (a new deepest area: the host's records row now, records.luau)
 	end
 end

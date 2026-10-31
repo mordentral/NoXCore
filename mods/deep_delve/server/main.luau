@@ -26,6 +26,8 @@
 --   areas.luau     the acts' chains of generated areas, the next built ahead, the ways between,
 --                  each outdoor area's weather
 --   waypoints.luau waypoints: found, kept, travelled (the town's waypoints window)
+--   expeditions.luau the endgame's runs from the town's map table (a biome at a rank, its
+--                  champion, its reward); atlas.luau keeps what each character has cleared
 --   votes.luau     the party's vote to change area (the whole game moves)
 --   portal.luau    the town portal (anyone's open portal takes the party back out, its owner gone
 --                  or not)
@@ -64,6 +66,7 @@ local areas = require("areas")
 local boss = require("boss")
 local casts = require("casts")
 local combat = require("combat")
+local expeditions = require("expeditions")
 local gate = require("gate")
 local hero = require("hero")
 local labels = require("labels")
@@ -197,6 +200,43 @@ function mode.onKill(victim: number, _killer: number?, _assist: number?)
 	hero.died(victim)
 end
 
+-- An item picked up (by the game's pickup, or a label's click): out of the ground's index, its
+-- label cleared on every UI at once; a magic or better find told to its finder.
+local function pickedUp(taker: number, item: number)
+	if loot.pickedUp(item) then
+		labels.changed()
+	end
+	hero.pickedUp(taker, item)
+end
+
+-- A click on a ground item's label (its net code): picked up by the game's own pickup (gold into
+-- the purse, a potion drunk, the game's refusals with their lines; onPickup hears it) when the hero
+-- stands within numbers.pick.reach of it (the game's own click-pickup reach), else "too far" told
+-- to that player (now and then). An item gone, held already or not the mod's ground loot is let
+-- be; so is a dead hero's click.
+local function pick(h: any, code: any)
+	local id, g = loot.byCode(tonumber(code) or -1)
+	if not id or not g or not nox.living(h.unit) then
+		return
+	end
+	local o = nox.object(id)
+	if not o or o.holder ~= 0 then
+		return
+	end
+	local x, y = nox.position(h.unit)
+	local dx, dy = o.x - x, o.y - y
+	local p = numbers.pick
+	if dx * dx + dy * dy > p.reach * p.reach then
+		local now = nox.frame()
+		if not h.farAt or now - h.farAt >= p.toldEvery then
+			h.farAt = now
+			nox.tell(h.unit, "Too far.")
+		end
+		return
+	end
+	nox.pickUp(h.unit, id)
+end
+
 -- The player's UI: its Town portal button, its windows (open and close; the stash's, the
 -- vendor's, the tree's and the waypoints' clicks; the sheet, its own or a party member's), its
 -- options (the Character window's), its answer to a vote.
@@ -233,6 +273,10 @@ function mode.onUiMessage(player: any, value: any)
 		treeview.message(h, value)
 	elseif kind == "waypoints" then
 		waypoints.message(h, value)
+	elseif kind == "maps" then
+		expeditions.message(h, value)
+	elseif kind == "pick" then
+		pick(h, value.code)
 	elseif kind == "option" then
 		if type(value.name) == "string" and type(value.value) == "string" then
 			hero.setOption(h, value.name, value.value)
@@ -301,6 +345,8 @@ function mode.onObjectKilled(e: any)
 		boss.killed(e.id, e.x, e.y)
 	else
 		loot.drop(e.x, e.y, m.level, loot.rollsFor(1 + m.drops), m.drops * 0.25)
+		-- (an expedition's champion: the run cleared, its reward)
+		expeditions.killed(m, e.x, e.y)
 	end
 end
 
@@ -330,10 +376,7 @@ end
 
 -- An item picked up: out of the ground's index, its label cleared on every UI at once.
 function mode.onPickup(taker: number, item: number, _x: number, _y: number)
-	if loot.pickedUp(item) then
-		labels.changed()
-	end
-	hero.pickedUp(taker, item)
+	pickedUp(taker, item)
 end
 
 function mode.onEquip(unit: number, _item: number, _worn: boolean)

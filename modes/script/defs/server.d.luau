@@ -77,6 +77,8 @@ declare nox: {
     watchCollide: (id: number) -> (),
     --- Puts a thing from the ground into a player's unit's inventory, as a pickup does.
     take: (unit: number, item: number) -> (),
+    --- A player picks a thing on the ground up as the game's own pickup does (gold into the purse, a potion drunk, class and three-of-a-kind refusals with their lines and sounds, onPickup; past the carry capacity "too much"), wherever it is: check reach yourself (the game's click pickup: 75). Whether it was taken.
+    pickUp: (unit: number, item: number) -> boolean,
     --- Drops an item out of a player's unit's inventory at (x, y); whether it was dropped.
     drop: (unit: number, item: number, x: number, y: number) -> boolean,
     --- Puts a thing at (x, y): moved on the ground, or out of its holder's inventory into the world.

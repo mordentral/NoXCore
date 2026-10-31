@@ -220,11 +220,15 @@ public:
 
     void drawWorld(App& app, SDL_Renderer* renderer) override
     {
+        placed_.clear(); // (none drawn this frame: none to click)
+        placedFrame_ = app.frames;
         if (!ui_ || ui_->api() < 3 || app.modeLabelSpots.empty() || !app.font || gameHudHidden(app)) {
             return;
         }
         drawLabels(app, renderer);
     }
+
+    bool clickableAt(const App& app, float x, float y) const override { return labelClickAt(app, x, y).has_value(); }
 
     /// (Client level 7) The server's ground decals: each its mod image flat on the floor, centred
     /// on its point (or on the thing it follows while we have it), `size` world units across at the
@@ -340,6 +344,13 @@ public:
             default: break;
             }
         }
+        // (API 5) A left click on a clickable label (none of the windows there): the UI's alone.
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (const std::optional<std::uint16_t> object = labelClickAt(app, event.button.x, event.button.y)) {
+                ui_->labelClick(*object);
+                return true;
+            }
+        }
         if (ui_->windows().empty()) {
             return false;
         }
@@ -435,7 +446,9 @@ private:
                 switch (d.kind) {
                 case UiDraw::Kind::Box: box::fill(renderer, r, c); break;
                 case UiDraw::Kind::Outline: box::outline(renderer, r, c); break;
-                case UiDraw::Kind::Text: app.font->draw(d.text, r.x, r.y, px, c); break;
+                case UiDraw::Kind::Text:
+                    app.font->draw(d.text, r.x, r.y, d.size != 1 ? app.font->lineSize(kTextLine * d.size, scale_) : px, c);
+                    break;
                 case UiDraw::Kind::Image: drawImage(renderer, d, r); break;
                 case UiDraw::Kind::Thing: drawThing(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
                 case UiDraw::Kind::SpellIcon: drawSpellIcon(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
@@ -508,7 +521,7 @@ private:
             if (r.x + r.w < 0 || r.x > static_cast<float>(cam.viewWidth) || r.y + r.h < 0 || r.y > static_cast<float>(cam.viewHeight)) {
                 continue; // (off the screen: not laid out)
             }
-            placed_.push_back({r, spot.index});
+            placed_.push_back({r, spot.index, l.object});
         }
         // The nearest the bottom first; each later one moved up above any it overlaps (a few
         // passes at most: n is the labels on the screen, at most kUiMaxLabels).
@@ -530,11 +543,52 @@ private:
             }
         }
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        // (API 5) The clickable one under the pointer brightened.
+        const SDL_FPoint m = mousePos(app);
+        const std::optional<std::uint16_t> hovered = labelClickAt(app, m.x, m.y);
         for (const LabelBox& b : placed_) {
             const UiLabel& l = labels[b.index];
-            box::fill(renderer, b.r, {0, 0, 0, 160});
+            if (hovered && b.object == *hovered) {
+                box::fill(renderer, b.r, {60, 46, 16, 210});
+                box::outline(renderer, b.r, {240, 180, 42, 255});
+            } else {
+                box::fill(renderer, b.r, {0, 0, 0, 160});
+            }
             app.font->draw(l.text, b.r.x + 3, b.r.y + 1, px, SDL_Color{l.color.r, l.color.g, l.color.b, l.color.a});
         }
+    }
+
+    /// (API 5) The object of the clickable label at screen point (x, y) as last drawn: the topmost
+    /// label there (drawn last) when it was set with click = true; none where a window (the mod's
+    /// or the game's), the HUD or a menu has the point, or while a spell waits for its target.
+    std::optional<std::uint16_t> labelClickAt(const App& app, float x, float y) const
+    {
+        if (!ui_ || ui_->api() < 5 || placed_.empty() || placedFrame_ + 1 < app.frames || app.armed || menuUp(app)) {
+            return std::nullopt;
+        }
+        const LabelBox* top = nullptr;
+        for (auto it = placed_.rbegin(); it != placed_.rend(); ++it) {
+            const SDL_FRect& r = it->r;
+            if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
+                top = &*it;
+                break;
+            }
+        }
+        const auto& labels = ui_->labels();
+        if (!top || top->index >= labels.size() || labels[top->index].object != top->object || !labels[top->index].click) {
+            return std::nullopt; // (none there, or the topmost isn't clickable: the game's)
+        }
+        if (gameWindowOver(app, x, y, true) || hit(app, x, y, true) ||
+            (app.tradeScreens && app.tradeScreens->contains(x, y, app.camera.viewWidth, app.camera.viewHeight))) {
+            return std::nullopt;
+        }
+        if (app.hud && app.live) {
+            const auto& client = app.live->client();
+            if (app.hud->hit(client.world(), client.netCode(), quickbarState(app), x, y, app.camera.viewWidth, app.camera.viewHeight)) {
+                return std::nullopt;
+            }
+        }
+        return top->object;
     }
 
     /// (API 3) The wheel over one of the windows (its frame and title bar too, as a click there):
@@ -702,10 +756,11 @@ private:
         return s;
     }
 
-    /// (A label laid out this frame: its box on the screen and its index among the labels.)
+    /// (A label laid out this frame: its box on the screen, its index among the labels and its object.)
     struct LabelBox {
         SDL_FRect r;
         std::size_t index;
+        std::uint16_t object;
     };
 
     App& app_;
@@ -720,6 +775,7 @@ private:
     modeui::Pointer pointer_;  ///< (API 3: a press in a window and its drag)
     float wheelLeft_ = 0;      ///< (a fine wheel's part of a step)
     std::vector<LabelBox> placed_; ///< (kept: no allocation a frame)
+    long placedFrame_ = -1;        ///< (App::frames when placed_ was laid out: stale ones take no click)
     /// The mod's pictures as textures (by asset index), of the set `texturesOf_` (held: never
     /// another set at its address).
     std::map<int, SDL_Texture*> textures_;

@@ -597,6 +597,16 @@ void chooseCursor(App& app, bool inGame)
             return;
         }
     }
+    if (inGame && !wide) {
+        // A mod's clickable label (a click there is the mode's): the pickup hand.
+        const SDL_FPoint m = mousePos(app);
+        for (const auto& [id, ui] : app.modeUis) {
+            if (ui->clickableAt(app, m.x, m.y)) {
+                app.cursorType = CursorType::Pickup;
+                return;
+            }
+        }
+    }
     const auto* me = ownPlayer(client);
     if (!inGame || !playing(client) || (!app.cursorHovered && !app.cursorUseable)) {
         return;
@@ -641,24 +651,23 @@ void chooseCursor(App& app, bool inGame)
         target.dist2 = dist2(there->second.x, there->second.y);
         if (a->classes & oc::Pickup) {
             // An item our class can't use gets Caution (not in solo or quest games): weapons and
-            // armour by modifier.bin's CLASSUSE, mana potions for a warrior (FOOD SUBCLASS bit 5),
-            // a glyph for anyone but a wizard.
+            // armour by modifier.bin's CLASSUSE (none without a record or without the line: the
+            // game's record byte zeroed), mana potions for a warrior (FOOD SUBCLASS bit 5), a glyph
+            // for anyone but a wizard. (noxcpp: none but the glyph's when the host's mode lets any
+            // class pick anything up, ServerFeature::PickupAnyClass in its extended reply.)
             const int cls = me ? me->playerClass : 0;
-            std::uint8_t usable = 0xFF;
+            std::uint8_t record = 0;
             if (a->classes & (oc::Weapon | oc::Wand)) {
                 const auto* def = app.modifiers.findWeapon(a->name);
-                usable = def ? def->classUse.value_or(0xFF) : 0;
+                record = def ? def->classUse.value_or(0) : 0;
             } else if (a->classes & oc::Armor) {
                 const auto* def = app.modifiers.findArmor(a->name);
-                usable = def ? def->classUse.value_or(0xFF) : 0;
-            } else if (a->classes & oc::Food) {
-                usable = static_cast<std::uint8_t>(~((a->subclasses >> 5) & 7) | 0xFE);  // only bit 0 (the warrior) can drop out
-            }
-            if (a->name == "Glyph" && cls != 1) {
-                usable = 0;
+                record = def ? def->classUse.value_or(0) : 0;
             }
             const bool soloOrQuest = (client.world().game().gameFlags & 0x1800) != 0;  // 0x800 solo, 0x1000 quest
-            situation.canUse = soloOrQuest || (usable & (1u << cls));
+            const auto& host = app.live->extended();
+            const bool anyClass = host && (host->features & nox::lobby::ServerFeature::PickupAnyClass);
+            situation.canUse = pick::classMayTake(pick::itemClassUse(a->classes, a->subclasses, record), cls, a->name == "Glyph", soloOrQuest, anyClass);
         }
     }
     switch (pick::worldCursor(target, situation)) {

@@ -279,6 +279,11 @@ public:
     /// The first line of the text wrapped at `wrapWidth` (drawStringWrap given one
     /// line's height).
     std::string firstLine(const std::string& utf8, bool large, int wrapWidth);
+    /// The widest line of the text wrapped at `wrapWidth` (drawGetStringSize's width).
+    int wrappedWidth(const std::string& utf8, bool large, int wrapWidth);
+    /// A centred STATICTEXT's lines, for a text that wraps at `wrapWidth` (text_wrap.hpp's
+    /// centredLines).
+    std::vector<std::string> centredLines(const std::string& utf8, bool large, int wrapWidth);
     /// A thing's image with its top-left at (x, y), at its own offset.
     void sprite(const nox::things::ImageRef& ref, int x, int y);
     /// A rectangle in output pixels, for things drawn in a window's place (our browser).

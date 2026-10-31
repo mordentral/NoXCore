@@ -62,6 +62,11 @@ towns.hamlet = {
 	},
 }
 
+-- The map table (the expeditions'), the same in every look: its place, { dx, dy } cells from the
+-- town's middle (the free cell nearest it, placed after everything else): south of the waypoints'
+-- pad, clear of its ring.
+towns.mapTable = { 3, 7 }
+
 -- The look named `name`, or nil.
 function towns.find(name: string)
 	local look = towns[name]

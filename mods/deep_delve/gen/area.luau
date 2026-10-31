@@ -13,10 +13,10 @@
 --   * a waypoint area: a teleport pentagram in a side room off the route (else half way along
 --     it; an act's first area: by its start chamber), lit, that sends whoever stands on it to the
 --     town's receiving pentagram;
---   * the act's lair (its last area): no exit on; its end chamber is the boss's arena, braziers
---     and red light round its floor, the boss's spot in its middle, and (with an act after it)
---     the spot at the arena's back where the boss's death opens the gate on, its light written
---     there.
+--   * the act's lair (its last area): no exit on; its end chamber is the boss's arena in its look
+--     (ARENAS below: braziers and red light round its floor; or a cold green light and a ring of
+--     graves, the barrow-king's), the boss's spot in its middle, and (with an act after it) the
+--     spot at the arena's back where the boss's death opens the gate on, its light written there.
 --
 -- An outdoor biome (grass, marsh: the built-in biomes' Open and Natural styles, their hedge,
 -- root or field-stone walls and blended floors) is built the same way: the game's outdoor maps
@@ -24,10 +24,12 @@
 --
 -- params: biome (a built-in biome's name), corridor, segments, endRadius, packs (how many),
 -- town (the act's town look: towns.luau's name), waypoint (true: one here), waypointAt ("start":
--- by the start chamber), lair (true: the act's lair), gate (true: a lair's gate spot), seed.
+-- by the start chamber), lair (true: the act's lair), arena (a lair's look), gate (true: a lair's
+-- gate spot), seed.
 -- Returns the spots (world points), all plain numbers:
 --   { arrive, back (with its arch's type), exit (too; none in a lair), guardian (none in a lair),
---     boss (a lair's), gate (a lair's with an act after it), waypoint and wayArrive (a waypoint
+--     boss (a lair's), gate (a lair's with an act after it), graves (an arena look with graves:
+--     each grave's point), waypoint and wayArrive (a waypoint
 --     area's: the pentagram, and where travellers to it arrive), packs = { {x, y}... },
 --     town = { centre, healer, gate (with its type), stash, vendor, portal, waypoints, wayIn,
 --     look (its look's name) } }
@@ -46,8 +48,103 @@ local area = {}
 
 local centre, worldX, worldY = util.centre, util.worldX, util.worldY
 
+-- A lair's arena looks (params.arena, by name; none: "pyre"):
+--   quarter  what stands at its four quarters, each with a light of kind `light` (gen/lights.luau);
+--            a glow of `light` over the boss's spot too
+--   graves   (when there are any) the graves set round the arena's edge, at most `count` of them,
+--            one to each of eight sectors round its middle (and the outermost others, apart, up
+--            to `least` in a small arena), each a type of the list in turn, kept off the way in
+--            (the boss's dead climb out of them: spots.graves)
+local ARENAS = {
+	-- (act 1's: braziers lit red)
+	pyre = { quarter = "Brazier", light = "arena" },
+	-- (act 2's barrow-king's mound: braziers in a cold green, a ring of graves and stones)
+	barrow = { quarter = "Brazier", light = "barrow", graves = { "Tombstone1", "Monument1", "Tombstone5" }, count = 8, least = 5 },
+}
+
 local function point(c: number)
 	return { x = worldX(c), y = worldY(c) }
+end
+
+-- An open cell with open cells on its four sides, not taken.
+local function roomyFree(open, used, c: number): boolean
+	if not open:has(c) or used:has(c) then
+		return false
+	end
+	for _, side in util.SIDES do
+		if not open:has(c + side) then
+			return false
+		end
+	end
+	return true
+end
+
+-- A waypoint by the start chamber, and its travellers' arrival beside it: (waypoint cell, arrival
+-- cell), both taken in `used`, or nil.
+--
+-- The cells near the start are looked at where they are, not drawn from every roomy cell of the
+-- map (a big outdoor area's few cells by its start were drawn too seldom, and a draw five cells off
+-- on both axes, ten steps away, was taken as "by the start" too). The cells from three to seven
+-- steps from the start (|dx| + |dy|, at least three on one axis: clear of the arrivals' square),
+-- nearest first, each with an arrival three to six cells from it (not within two of it); one of
+-- the nearest four that has one is drawn.
+local function byStart(rng, open, used, start: number): (number?, number?)
+	local sx, sy = util.xy(start)
+	local list = {}
+	for dx = -7, 7 do
+		for dy = -7, 7 do
+			local d = math.abs(dx) + math.abs(dy)
+			if d <= 7 and math.max(math.abs(dx), math.abs(dy)) >= 3 then
+				local c = util.cell(sx + dx, sy + dy)
+				if roomyFree(open, used, c) then
+					table.insert(list, { c = c, d = d })
+				end
+			end
+		end
+	end
+	-- (nearest first; then by cell, so the order never depends on the draw)
+	table.sort(list, function(a, b)
+		if a.d ~= b.d then
+			return a.d < b.d
+		end
+		return a.c < b.c
+	end)
+	-- Each candidate's arrival: the nearest cell to it (3-6 off, by |dx| and |dy|), not by it.
+	local function arrival(wc: number): number?
+		local wx, wy = util.xy(wc)
+		local around = used:clone()
+		around:addSquare(wc, 2)
+		for r = 3, 6 do
+			for dx = -r, r do
+				for dy = -r, r do
+					if math.max(math.abs(dx), math.abs(dy)) == r then
+						local c = util.cell(wx + dx, wy + dy)
+						if roomyFree(open, around, c) then
+							return c
+						end
+					end
+				end
+			end
+		end
+		return nil
+	end
+	local good = {}
+	for _, e in list do
+		local ac = arrival(e.c)
+		if ac then
+			table.insert(good, { c = e.c, a = ac })
+			if #good >= 4 then
+				break
+			end
+		end
+	end
+	if #good == 0 then
+		return nil, nil
+	end
+	local pick = good[rng:next() % #good + 1]
+	used:add(pick.c)
+	used:add(pick.a)
+	return pick.c, pick.a
 end
 
 function area.build(p, w)
@@ -58,6 +155,10 @@ function area.build(p, w)
 	local look = towns.find(tostring(p.town))
 	if not look then
 		gen.refuse("deep_delve: no town look named " .. tostring(p.town))
+	end
+	local arena = ARENAS[p.arena or "pyre"]
+	if not arena then
+		gen.refuse("deep_delve: no arena look named " .. tostring(p.arena))
 	end
 
 	-- ---- The layout: the area's route, and the town beside it. A layout must have a straight
@@ -178,13 +279,13 @@ function area.build(p, w)
 				local c = util.cell(fx + d[1] * step, fy + d[2] * step)
 				if lay.open:has(c) and not used:has(c) then
 					used:addSquare(c, 1)
-					town.put(w, "Brazier", worldX(c), worldY(c))
-					lights.put(w, "arena", worldX(c), worldY(c))
+					town.put(w, arena.quarter, worldX(c), worldY(c))
+					lights.put(w, arena.light, worldX(c), worldY(c))
 					break
 				end
 			end
 		end
-		lights.put(w, "arena", spots.boss.x, spots.boss.y)
+		lights.put(w, arena.light, spots.boss.x, spots.boss.y)
 		-- The gate's spot (a lair with an act after it): at the arena's back, away from its way
 		-- in, clear of the boss. Nothing stands there until the boss dies (the server makes the
 		-- gate then); only its light is written, which the server keeps off till then.
@@ -203,6 +304,85 @@ function area.build(p, w)
 			used:addSquare(gc, 2)
 			lights.put(w, "gate", spots.gate.x, spots.gate.y)
 		end
+		-- The graves round the arena (a look with graves): the floor within its reach (an open cell
+		-- with open sides, from 4 cells off its middle to a cell past its nominal edge) parted into
+		-- eight sectors round its middle (east, south-east, south...), and in each the outermost
+		-- cell (the lowest cell number of equals) that isn't on the way in (a cell round the
+		-- route) or by anything placed; written as the look's types in turn. No draw, so the rest of
+		-- the map is as it would be without them.
+		if arena.graves then
+			local way = gen.cells()
+			for _, c in path do
+				way:addSquare(c, 1)
+			end
+			local reach = math.max(6, lay.finish.radius + 1)
+			-- (a sector by the offset's signs, straight when one axis is over twice the other)
+			local function sector(dx: number, dy: number): number
+				local sx = if dx > 0 then 1 elseif dx < 0 then -1 else 0
+				local sy = if dy > 0 then 1 elseif dy < 0 then -1 else 0
+				if math.abs(dx) > 2 * math.abs(dy) then
+					sy = 0
+				elseif math.abs(dy) > 2 * math.abs(dx) then
+					sx = 0
+				end
+				return (sx + 1) * 3 + (sy + 1)
+			end
+			local best: { [number]: { c: number, d: number } } = {}
+			-- (every cell that may take one, the outermost first: for a small or lopsided arena
+			-- whose sectors give fewer than `least`)
+			local all: { { c: number, d: number } } = {}
+			for dx = -reach, reach do
+				for dy = -reach, reach do
+					local dist = math.max(math.abs(dx), math.abs(dy))
+					if dist >= 4 then
+						local c = util.cell(fx + dx, fy + dy)
+						if roomyFree(lay.open, used, c) and not way:has(c) then
+							local k = sector(dx, dy)
+							local b = best[k]
+							if not b or dist > b.d or (dist == b.d and c < b.c) then
+								best[k] = { c = c, d = dist }
+							end
+							table.insert(all, { c = c, d = dist })
+						end
+					end
+				end
+			end
+			table.sort(all, function(a, b)
+				if a.d ~= b.d then
+					return a.d > b.d
+				end
+				return a.c < b.c
+			end)
+			spots.graves = {}
+			local placed: { number } = {}
+			local function grave(c: number)
+				used:addSquare(c, 1)
+				table.insert(placed, c)
+				local at = point(c)
+				town.put(w, arena.graves[(#placed - 1) % #arena.graves + 1], at.x, at.y)
+				table.insert(spots.graves, at)
+			end
+			-- (in a fixed order round the arena)
+			for _, k in { 7, 8, 5, 2, 1, 0, 3, 6 } do
+				local b = best[k]
+				if b and #placed < arena.count and roomyFree(lay.open, used, b.c) then
+					grave(b.c)
+				end
+			end
+			-- (too few: the outermost others, two cells from any placed)
+			for _, e in all do
+				if #placed >= arena.least then
+					break
+				end
+				local apart = roomyFree(lay.open, used, e.c)
+				for _, q in placed do
+					apart = apart and util.chebyshev(q, e.c) >= 2
+				end
+				if apart then
+					grave(e.c)
+				end
+			end
+		end
 	else
 		-- The champion in the end chamber's middle.
 		spots.guardian = point(finish)
@@ -220,24 +400,26 @@ function area.build(p, w)
 				best, bestD = room, d
 			end
 		end
+		local wc, ac = nil, nil
+		if p.waypointAt == "start" then
+			-- (an act's first area: by the start chamber, from the cells near it, not a draw from
+			-- the whole map: see byStart)
+			wc, ac = byStart(rng, lay.open, used, start)
+		end
 		-- (each place tried with room beside it for the arrivals: the side room, the route's
 		-- middle, anywhere)
 		local tries = {}
-		if p.waypointAt == "start" then
-			-- (an act's first area: by the start chamber, five cells from its middle at most, else
-			-- eight)
-			table.insert(tries, { start, 5, 400 })
-			table.insert(tries, { start, 8, 400 })
-		end
 		if best then
 			table.insert(tries, { centre(best), 2, 200 })
 		end
 		table.insert(tries, { mid, 6, 400 })
 		table.insert(tries, { mid, 30, 400 })
-		local wc, ac = nil, nil
 		for _, t in tries do
-			-- (at least 10 cells from the start; 3 for one by the start chamber)
-			wc = gen.freeCell(rng, roomy, used, start, if t[1] == start then 3 else 10, t[1], t[2], t[3])
+			if wc and ac then
+				break
+			end
+			-- (at least 10 cells from the start)
+			wc = gen.freeCell(rng, roomy, used, start, 10, t[1], t[2], t[3])
 			if wc then
 				local around = used:clone()
 				around:addSquare(wc, 2)

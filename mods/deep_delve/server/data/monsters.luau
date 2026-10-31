@@ -34,28 +34,50 @@ monsters.rosters = {
 		{ type = "GruntAxe", from = 3, weight = 2 },
 		{ type = "SpittingSpider", from = 4, weight = 1 },
 	},
-	-- Act 2's biomes, above ground. Their entries give `at` (the act's area index a type first
-	-- shows at) in place of `from`, so they follow the act wherever its levels are tuned. No
-	-- spellcaster yet (the party rules' check of what can reach a player stands as it was).
+	-- Act 2's. Their entries give `at` (the act's area index a type first shows at) in place of
+	-- `from`, so they follow the act wherever its levels are tuned. No spellcaster in act 2 (by
+	-- decision: they come from act 3 on, each one's spells checked as 18.3's were).
+	-- The climb out: the old workings at the catacombs' mouth (act 2's first area, a Mines map: an
+	-- area's `roster` in data/acts.luau), then the caves above them, where the beasts of the
+	-- fields come in out of the weather.
+	Workings = {
+		{ type = "Bat", at = 1, weight = 3 },
+		{ type = "SmallSpider", at = 1, weight = 2 },
+		{ type = "Urchin", at = 1, weight = 4 },
+		{ type = "GruntAxe", at = 1, weight = 3 },
+		{ type = "Scorpion", at = 1, weight = 2 },
+		{ type = "SpittingSpider", at = 1, weight = 1 },
+	},
+	Cave = {
+		{ type = "Bat", at = 1, weight = 3 },
+		{ type = "Spider", at = 1, weight = 3 },
+		{ type = "Urchin", at = 1, weight = 3 },
+		{ type = "GiantLeech", at = 1, weight = 2 },
+		{ type = "Wolf", at = 2, weight = 3 },
+		{ type = "AlbinoSpider", at = 2, weight = 1 },
+		{ type = "Bear", at = 2, weight = 1 },
+	},
+	-- Above ground (the fields' first area is act 2's third: their `at` counts from the act's
+	-- first area, the climb included).
 	Grasslands = {
 		{ type = "Wolf", at = 1, weight = 5 },
 		{ type = "Urchin", at = 1, weight = 4 },
 		{ type = "Wasp", at = 1, weight = 2 },
-		{ type = "Bear", at = 2, weight = 2 },
-		{ type = "BlackWolf", at = 3, weight = 2 },
-		{ type = "GruntAxe", at = 3, weight = 2 },
-		{ type = "BlackBear", at = 5, weight = 1 },
-		{ type = "OgreBrute", at = 5, weight = 1 },
+		{ type = "Bear", at = 4, weight = 2 },
+		{ type = "BlackWolf", at = 5, weight = 2 },
+		{ type = "GruntAxe", at = 5, weight = 2 },
+		{ type = "BlackBear", at = 7, weight = 1 },
+		{ type = "OgreBrute", at = 7, weight = 1 },
 	},
 	Swamp = {
 		{ type = "GiantLeech", at = 1, weight = 4 },
 		{ type = "Spider", at = 1, weight = 3 },
 		{ type = "Zombie", at = 1, weight = 3, rises = true },
 		{ type = "Wasp", at = 1, weight = 2 },
-		{ type = "BlackWidow", at = 3, weight = 2 },
-		{ type = "CarnivorousPlant", at = 3, weight = 1 },
-		{ type = "Shade", at = 5, weight = 1 },
-		{ type = "Troll", at = 5, weight = 1 },
+		{ type = "BlackWidow", at = 5, weight = 2 },
+		{ type = "CarnivorousPlant", at = 5, weight = 1 },
+		{ type = "Shade", at = 7, weight = 1 },
+		{ type = "Troll", at = 7, weight = 1 },
 	},
 }
 
@@ -105,15 +127,21 @@ monsters.champions = {
 	Mines = { name = "Old Stinger", type = "Scorpion", enchantments = { "ENCHANT_HASTED", "ENCHANT_SHIELD" }, guards = 3 },
 	Grasslands = { name = "Greymuzzle, the Pack Sire", type = "WhiteWolf", enchantments = { "ENCHANT_HASTED", "ENCHANT_VAMPIRISM" }, guards = 4 },
 	Swamp = { name = "The Bog Widow", type = "BlackWidow", enchantments = { "ENCHANT_SHIELD", "ENCHANT_VAMPIRISM" }, guards = 3 },
+	Workings = { name = "Rustjaw, the Tunnel Boss", type = "GruntAxe", enchantments = { "ENCHANT_SHIELD", "ENCHANT_HASTED" }, guards = 3 },
+	Cave = { name = "Old Mother Den", type = "Bear", enchantments = { "ENCHANT_VAMPIRISM", "ENCHANT_SHIELD" }, guards = 3 },
 }
 
 -- The act bosses (data/acts.luau names each act's): its name, type, its own enchantment set (for
--- good), the one it takes when enraged, its guards at the start (magic), the adds it calls (each
--- a type of its roster, magic), and what it says.
+-- good), its guards at the start (magic), the adds it calls (each a type of its roster), what it
+-- says, and its fight (boss.luau: "warlord", the default, or "barrow": barrowking.luau), whose
+-- numbers are data/numbers.luau's (boss, barrowKing). `health`: its most health times this
+-- (after the boss tier's; none: 1); `draw`: drawn this much larger on NoX Core clients.
 monsters.bosses = {
+	-- Act 1's: adds called at shares of its health, an enrage, a slam at a player near it.
 	warlord = {
 		name = "Gorvald, the Drowned Warlord",
 		type = "OgreWarlord",
+		fight = "warlord",
 		enchantments = { "ENCHANT_SHIELD", "ENCHANT_PROTECT_FROM_MAGIC", "ENCHANT_VAMPIRISM" },
 		enrage = "ENCHANT_HASTED",
 		guards = 4,
@@ -123,18 +151,31 @@ monsters.bosses = {
 			enrage = "Enough!",
 		},
 	},
-	-- Act 2's boss. A placeholder: a strong champion on act 1's fight (the same phases, slam and
-	-- numbers), its own name, type and adds, until act 2 has a fight of its own.
-	hillbreaker = {
-		name = "Brakka the Hillbreaker",
-		type = "OgreBrute",
+	-- Act 2's: the barrow-king, a skeleton lord drawn large, in a ring of graves on his mound. His
+	-- dead climb out of the graves round the arena (not at his side), he charges a player across it,
+	-- then the grave-mist (the game's Toxic Cloud) under the party, and enraged the sky's fists (Fist
+	-- of Vengeance) and a quake (barrowking.luau).
+	barrowking = {
+		name = "Vorthane, the Barrow-King",
+		type = "SkeletonLord",
+		fight = "barrow",
+		health = 2.0,
+		draw = 1.5,
+		-- (his mist's and fists' hits: this share of what his own blows' scaling makes them)
+		spells = 0.3,
 		enchantments = { "ENCHANT_SHIELD", "ENCHANT_VAMPIRISM" },
 		enrage = "ENCHANT_HASTED",
-		guards = 4,
-		adds = { "GruntAxe", "Wolf", "Urchin" },
+		guards = 2,
+		-- (the guards at the start, and what the graves give up: the first list while he's above
+		-- the mist's share of his health, the second below it)
+		adds = { "Skeleton", "Zombie" },
+		laterAdds = { "Skeleton", "Ghost", "VileZombie" },
 		lines = {
-			summon = "To me, brothers!",
-			enrage = "Brakka breaks you!",
+			wake = "Who walks upon my barrow?",
+			graves = "Rise, my oath-sworn!",
+			charge = "Kneel!",
+			mist = "Breathe the grave's breath.",
+			enrage = "The barrow will not hold me!",
 		},
 	},
 }

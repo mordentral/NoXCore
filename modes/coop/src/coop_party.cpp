@@ -7,6 +7,7 @@
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/server/combat.hpp"
 #include "noxcore/server/items.hpp"
+#include "noxcore/server/modes.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/server.hpp"
@@ -17,6 +18,7 @@
 #include <algorithm>
 #include <cctype>
 #include <exception>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -337,7 +339,11 @@ void CoopDirector::clientReady(server::GameHost& host, std::uint8_t peer)
 {
     host_ = &host;
     const auto it = std::ranges::find_if(party_, [&](const Member& m) { return m.peer == peer; });
-    if (it == party_.end() || it->host) {
+    if (it == party_.end()) {
+        return;
+    }
+    tellTeam(*it);
+    if (it->host) {
         return;
     }
     findHiddenStatics();
@@ -350,6 +356,36 @@ void CoopDirector::clientReady(server::GameHost& host, std::uint8_t peer)
     for (const std::uint16_t id : goneWalls_) {
         fileNumbered_[peer].insert(id);
         tell(*it, {0x3A, static_cast<std::uint8_t>(id), static_cast<std::uint8_t>(id >> 8)});
+    }
+}
+
+void CoopDirector::tellTeam(const Member& ready)
+{
+    // (At its ready the other members' MSG_NEW_PLAYER are in, as is its own at theirs: the team
+    // message finds the player it names. Stock clients are told nothing new.)
+    server::World& w = world();
+    const auto membership = [&](const Member& m) -> std::optional<std::vector<std::uint8_t>> {
+        const server::ServerObject* u = host_->unitOf(m.peer);
+        if (!u || !u->player || u->team == 0 || !server::inTeam(w, *u, u->team)) {
+            return std::nullopt;
+        }
+        const server::ServerTeam* team = server::teamById(w, u->team);
+        return team ? std::optional(server::teamMemberMessage(*team, *u)) : std::nullopt;
+    };
+    const auto own = membership(ready);
+    for (const Member& m : party_) {
+        if (m.peer == ready.peer) {
+            continue;
+        }
+        if (ready.identified) {
+            if (auto theirs = membership(m)) {
+                host_->sendToIdentified(ready.peer, std::move(*theirs));
+            }
+        }
+        const auto in = host_->players().find(m.peer);
+        if (own && m.identified && in != host_->players().end() && in->second.ready) {
+            host_->sendToIdentified(m.peer, *own);
+        }
     }
 }
 

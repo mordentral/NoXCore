@@ -581,6 +581,9 @@ struct App {
     /// and those the session lists (`partyCreatures`: net codes, sorted; copied as it changes).
     bool partyDots = false;
     std::vector<std::uint16_t> partyCreatures;
+    /// Live: the same, for the names over the party's players (name_plate.hpp): drawn as a network
+    /// game draws them, though our game's flags say solo (0x800).
+    bool partyNames = false;
     std::vector<std::uint16_t> flagLabels;
     std::vector<std::uint16_t> damageShown;
     /// Live: a script mode UI's world labels (UI API 3): the net codes it labels with each one's
@@ -658,6 +661,7 @@ struct App {
     bool gameWasOver = false; ///< the World's game-over state last frame
     int fakeScreen = 0; ///< --fake-shop (1) / --fake-dialog (2) / --fake-sell (3, then 4: an offer) / --fake-quest-keys (7) / --fake-game-over (8) / a mode's own (kFakeModeScreen: fakeModeFlag: its --fake-* flags): shown locally, 2 s in (tests)
     static constexpr int kFakeModeScreen = 100;
+    std::string fakeDialogText; ///< --fake-dialog-text ID: the fake dialog's string id (else Con01a:CaptainGreet)
     bool holdMoveTest = false;                 ///< --hold-move: the move button held from 1.5 s in
     std::string chatTest;                      ///< --chat-test TEXT: says it (Enter, TEXT, Enter), 2.5 s in
     std::string consoleRun; ///< --console "cmd; cmd": the console opened and these run (in a game, once in)

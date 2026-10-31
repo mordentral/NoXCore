@@ -65,7 +65,8 @@ local function signatureOf(list: { any }): string
 	return table.concat(words, " ")
 end
 
--- The labels near a hero: { { o = net code, t = text, r = rarity } } nearest first.
+-- The labels near a hero: { { o = net code, t = text, r = rarity, p = true (every loot label is
+-- clickable: a click picks it up in reach) } } nearest first.
 local function nearOf(h: any): { any }
 	local o = nox.object(h.unit)
 	if not o then
@@ -91,7 +92,7 @@ local function nearOf(h: any): { any }
 		if i > numbers.labels.most then
 			break
 		end
-		table.insert(list, { o = f.g.code, t = f.g.text, r = f.g.rarity })
+		table.insert(list, { o = f.g.code, t = f.g.text, r = f.g.rarity, p = true })
 	end
 	return list
 end

@@ -115,6 +115,30 @@ numbers.boss = {
 	drop = { rare = 2, levelUp = 2, rolls = 6, better = 1.5 },
 }
 
+-- Act 2's barrow-king (barrowking.luau; data/monsters.luau's barrowking). Frames at 30 a second.
+--   beat      his thinking beat (his phases, the next blow chosen, his bar)
+--   graves    every `every` frames the graves round his arena give up `count` of his dead (`count`
+--             + `enraged` once he is), one grave each, `warn` frames after the grave's sparks; at
+--             most `most` of them standing at once; of tier `tier`
+--   charge    every `every` frames he charges a player `near`-`far` from him: `warn` frames of
+--             sparks along the way, then a rush of `speed` units a frame for at most `frames`
+--             frames (a wall stops it), each player within `reach` of him on the way struck once
+--             for `damage` (crushing, scaled as his own hits are) and thrown back (`force`).
+--             Enraged, every `enragedEvery`.
+--   mist      below `at` of his health: every `every` frames the grave-mist (the game's Toxic
+--             Cloud, his own) at `count` players' feet (`enraged` more once he is), `warn` frames
+--             after the green warning there
+--   enrage    below `at`: hasted for good, and the barrow quakes once (Earthquake at `quake`
+--             power); then every `fistEvery` frames a Fist of Vengeance (`fistPower`) falls on a
+--             player
+numbers.barrowKing = {
+	beat = 15,
+	graves = { every = 30 * 10, count = 2, enraged = 1, warn = 30, most = 6, tier = "normal" },
+	charge = { every = 30 * 8, enragedEvery = 30 * 5, near = 100, far = 420, warn = 27, speed = 24, frames = 18, reach = 42, damage = 16, force = 70 },
+	mist = { at = 0.7, every = 30 * 9, count = 1, enraged = 1, warn = 24 },
+	enrage = { at = 0.3, quake = 1, fistEvery = 30 * 6, fistPower = 1 },
+}
+
 -- ---- The party (design 7)
 
 -- Party scaling, counted from the players in the game (each extra player beyond the first adds
@@ -147,6 +171,11 @@ numbers.vote = { seconds = 30, again = 30 * 5, beat = 15 }
 -- Ground loot's labels (shown on NoX Core clients while Alt is held): each player is sent those
 -- within `reach` of its unit (at most `most`, nearest first), looked at every `every` frames.
 numbers.labels = { reach = 450, most = 96, every = 15 }
+
+-- A click on a piece of gear's label picks it up when the hero is within `reach` of it (the game's
+-- own click-pickup reach, world units); further, the player is told "too far", at most once in
+-- `toldEvery` frames.
+numbers.pick = { reach = 75, toldEvery = 30 }
 
 -- Named monsters' name plates (rares, champions, the act boss: their names over their heads in
 -- their tier's colour, always shown on NoX Core clients): each player is sent every named monster

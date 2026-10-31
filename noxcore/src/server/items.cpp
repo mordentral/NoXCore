@@ -95,10 +95,14 @@ bool Items::classMay(const ServerObject& player, const ServerObject& item) const
         return !(item.classes & oc::Food) || !(item.subclasses & 0x20u) || player.player->classId != 0;
     }
     if (!modifiers) {
-        return true;
+        return true; // (noxcpp: a server without modifier.bin, a test's: no record to ask)
     }
-    const things::EquipDef* def = (item.classes & oc::Armor) ? modifiers->findArmor(item.typeName) : modifiers->findWeapon(item.typeName);
-    return !def || !def->classUse || (*def->classUse & (1u << player.player->classId)) != 0;
+    // (itemClassUseMask: a weapon or wand by its weapon record, else armour by its armour record,
+    // the record's CLASSUSE. Without a record no class may (WebWand, PoisonWand, Staff,
+    // Chainmail), nor with a record that has no CLASSUSE line, its byte left zeroed (Dagger and the
+    // stub wands: MissileWand, DemonsBreathWand, SummoningWand).)
+    const things::EquipDef* def = (item.classes & (oc::Weapon | oc::Wand)) ? modifiers->findWeapon(item.typeName) : modifiers->findArmor(item.typeName);
+    return def && def->classUse && (*def->classUse & (1u << player.player->classId)) != 0;
 }
 
 void Items::setModifiers(ServerObject& item, const std::array<std::uint8_t, 4>& mods)
@@ -247,9 +251,10 @@ bool Items::pickupFunction(ServerObject& player, ServerObject& item, bool everyo
         // use, a warrior no mana potion ("pickup.c:ObjectEquipClassFail"); drunk at once when it
         // doesn't overfill: health (its number, a player's by its class's multiplier) while short
         // of more than that, mana the same (from the health's amount when both), poison cured (a
-        // player's); drunk, gone; else no longer decaying and DefaultPickup. Sounds: 0x39D refused, 0x2F2 health, 0x2F3
-        // mana, Cure Poison's on, 0x340 picked up.
-        // (noxcpp: a mode's pickupAnyClass takes any.)
+        // player's); drunk, gone; else no longer decaying and DefaultPickup. Sounds: 0x39D
+        // refused, 0x2F2 health, 0x2F3 mana, Cure Poison's on, 0x340 picked up.
+        // (noxcpp: a mode's pickupAnyClass takes any. The co-op campaign is a solo game and the
+        // Delve and the Tide are quests: a warrior takes mana potions in all three.)
         if ((world.gameFlags & GameFlag::Network) && !world.quest() && player.player && !world.pickupAnyClass && !classMay(player, item)) {
             tellString(player, "pickup.c:ObjectEquipClassFail");
             playSound(world, 0x39D, player, 2, player.extent);

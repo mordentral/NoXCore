@@ -220,9 +220,10 @@ public:
     void pickedUp(server::World& w, server::ServerObject& taker, server::ServerObject& item, float x, float y) override;
     /// A spell book put back is for those below the level it was put back at.
     bool mayPickUp(server::World& w, server::ServerObject& taker, server::ServerObject& item) override;
-    /// A player's CLIENT_READY (GameHost::Options::onClientReady): a guest's view of a map it loaded
-    /// from its own file put right (the things the client draws from it that the world no longer
-    /// has hidden: MSG_DESTROY_OBJECT with the map number's high bit).
+    /// A player's CLIENT_READY (GameHost::Options::onClientReady): the party's team told between
+    /// it and the other NoX Core players (tellTeam); a guest's view of a map it loaded from its own
+    /// file put right (the things the client draws from it that the world no longer has hidden:
+    /// MSG_DESTROY_OBJECT with the map number's high bit).
     void clientReady(server::GameHost& host, std::uint8_t peer);
     /// Whether the party lost (every one dead at once), till the next map's load.
     bool wiped() const noexcept { return wipe_; }
@@ -350,6 +351,12 @@ private:
     void tellHello(server::GameHost& host, const Member& m);
     /// A guest put in team 1 with the host.
     void intoTeam(server::ServerObject& unit);
+    /// At `ready`'s CLIENT_READY: each other member's team to it, and its own to each other NoX Core
+    /// member already in (MSG_TEAM_MSG sub 1, NoX Core clients only). A solo game tells no team
+    /// change (addTeamMember sends only in a network game), so a client knew only the members its
+    /// own join listed: the host's client none of the guests (their names grey over them, where a
+    /// guest's client showed the host's in the party's colour).
+    void tellTeam(const Member& ready);
 
     /// A chapter screen sent to the guests: StartupScreen's / DeathScreen's chapter and kind.
     void chapterToGuests(std::uint8_t chapter, bool startup);

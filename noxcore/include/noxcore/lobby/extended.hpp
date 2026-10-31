@@ -55,6 +55,10 @@ inline constexpr std::uint32_t Bots = 4;        ///< in-server bots
 inline constexpr std::uint32_t EditSession = 8; ///< a collaborative map editor session (the browser's pencil)
 inline constexpr std::uint32_t CoopCampaign = 16; ///< a co-op campaign (a NoX Core mode's: the browser shows it so)
 inline constexpr std::uint32_t NoxCoreOnly = 32;  ///< stock clients are turned away (GameHost::Options::stockRefusal)
+/// A mode lets any class pick up any weapon, wand, armour or potion (World::pickupAnyClass: carried,
+/// never worn): noxsdl's cursor shows the pickup hand over them, not Caution. A client before it
+/// ignores the bit and shows Caution as before; a stock client never asks.
+inline constexpr std::uint32_t PickupAnyClass = 64;
 } // namespace ServerFeature
 
 /// What a client says it takes (a version 2 query's): a server sends what needs a feature only to

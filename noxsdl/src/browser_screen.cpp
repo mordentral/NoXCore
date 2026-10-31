@@ -5,11 +5,58 @@
 #include "pencil_icon.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <numbers>
 
 namespace noxsdl {
 
 namespace {
+
+// A padlock `s` pixels high centred at (cx, cy): the list's mark for a game with a password, at the
+// row's far right. A grey shackle over a gold body with a dark keyhole, a dark edge round both.
+void drawLock(SDL_Renderer* renderer, float cx, float cy, float s)
+{
+    const float bodyTop = cy - 0.06f * s, bodyBottom = cy + 0.46f * s, bodyHalf = 0.36f * s;
+    const float arcY = cy - 0.20f * s, rOut = 0.26f * s, thick = std::max(1.5f, 0.09f * s);
+    // The shackle: a half ring over arcY, its legs straight down to legEnd, as one strip of quads.
+    const auto shackle = [&](float rOuter, float rInner, float legEnd, SDL_FColor c) {
+        constexpr int kSteps = 12;
+        std::array<SDL_Vertex, 2 * (kSteps + 3)> v{};
+        int n = 0;
+        const auto put = [&](float x, float y) { v[static_cast<std::size_t>(n++)] = {{x, y}, c, {0, 0}}; };
+        put(cx - rOuter, legEnd);
+        put(cx - rInner, legEnd);
+        for (int i = 0; i <= kSteps; ++i) { // (from the left, over the top, to the right)
+            const float a = std::numbers::pi_v<float> * (1.0f + static_cast<float>(i) / kSteps);
+            put(cx + rOuter * std::cos(a), arcY + rOuter * std::sin(a));
+            put(cx + rInner * std::cos(a), arcY + rInner * std::sin(a));
+        }
+        put(cx + rOuter, legEnd);
+        put(cx + rInner, legEnd);
+        std::array<int, 6 * (kSteps + 2)> quads{};
+        int k = 0;
+        for (int q = 0; q + 3 < n; q += 2) {
+            for (const int d : {0, 1, 2, 1, 3, 2}) {
+                quads[static_cast<std::size_t>(k++)] = q + d;
+            }
+        }
+        SDL_RenderGeometry(renderer, nullptr, v.data(), n, quads.data(), k);
+    };
+    shackle(rOut + 1, rOut - thick - 1, bodyTop, {0.04f, 0.04f, 0.05f, 1});
+    shackle(rOut, rOut - thick, bodyTop + 1, {0.80f, 0.80f, 0.84f, 1});
+    SDL_SetRenderDrawColor(renderer, 10, 10, 12, 255);
+    const SDL_FRect edge{cx - bodyHalf - 1, bodyTop - 1, 2 * bodyHalf + 2, bodyBottom - bodyTop + 2};
+    SDL_RenderFillRect(renderer, &edge);
+    SDL_SetRenderDrawColor(renderer, 240, 180, 42, 255);
+    const SDL_FRect body{cx - bodyHalf, bodyTop, 2 * bodyHalf, bodyBottom - bodyTop};
+    SDL_RenderFillRect(renderer, &body);
+    SDL_SetRenderDrawColor(renderer, 40, 28, 8, 255);
+    const float holeW = std::max(1.0f, std::round(0.10f * s));
+    const SDL_FRect hole{std::round(cx - holeW / 2), std::round((bodyTop + bodyBottom) / 2 - 0.09f * s), holeW,
+                         std::max(2.0f, std::round(0.18f * s))};
+    SDL_RenderFillRect(renderer, &hole);
+}
 
 // An IPv4 address held most significant byte first, as dotted text.
 std::string ipText(std::uint32_t a)
@@ -308,7 +355,8 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
     const float w = area.w;
 
     // Columns: name, map, mode, players, ping, where it was found.
-    const float cols[6] = {x0, x0 + w * 0.38f, x0 + w * 0.53f, x0 + w * 0.66f, x0 + w * 0.77f, x0 + w * 0.88f};
+    // (From has the most room after the name's: "NoX Core XWIS LAN" and the padlock beside it.)
+    const float cols[6] = {x0, x0 + w * 0.35f, x0 + w * 0.49f, x0 + w * 0.61f, x0 + w * 0.71f, x0 + w * 0.80f};
     const char* headers[6] = {"Name", "Map", "Mode", "Players", "Ping", "From"};
     const float headerY = l.top - l.rowHeight;
     for (int i = 0; i < 6; ++i) {
@@ -317,11 +365,15 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
     SDL_SetRenderDrawColor(renderer, framed ? 0 : 80, framed ? 120 : 80, framed ? 0 : 80, 255);
     SDL_RenderLine(renderer, x0, l.top - 2, x0 + w, l.top - 2);
 
+    // The padlock's place at each row's far right, kept clear whether or not a row has one.
+    const float lockSize = std::round(font_.lineHeight(l.size) * 0.95f);
+    const float lockRoom = lockSize + 4;
+
     // A column's text, cut to fit before the next one (with `after`, cut to leave room for it,
     // drawn after it in `afterColor`).
     const auto cell = [&](int column, const std::string& s, float ty, SDL_Color c, const std::string& after = {},
                           SDL_Color afterColor = {}) {
-        const float room = (column < 5 ? cols[column + 1] : x0 + w) - cols[column] - 4;
+        const float room = (column < 5 ? cols[column + 1] : x0 + w - lockRoom) - cols[column] - 4;
         const float afterWidth = after.empty() ? 0.0f : font_.measure(after, l.size);
         std::string shown = s;
         while (!shown.empty() && font_.measure(shown, l.size) > room - afterWidth) {
@@ -333,7 +385,7 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
         }
     };
     // A game that wants a newer NoX Core (client_level_gate.hpp): "(Update needed)" after its name,
-    // as a password's or a closed game's, in the messages' orange, kept whole however long the name.
+    // as a closed game's, in the messages' orange, kept whole however long the name.
     const SDL_Color updateColor{235, 160, 110, 255};
     for (int r = 0; r < l.visibleRows && scroll_ + r < static_cast<int>(rows_.size()); ++r) {
         const int index = scroll_ + r;
@@ -353,9 +405,8 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
         const float ty = y + (l.rowHeight - font_.lineHeight(l.size)) / 2;
         // Unnamed listings show their address instead.
         std::string name = g.name.empty() ? ipText(g.address) : g.name;
-        if (g.access == nox::lobby::GameAccess::Password) {
-            name += " (password)";
-        } else if (g.access == nox::lobby::GameAccess::Closed) {
+        // (A password's game: the padlock at the row's far right, drawn below.)
+        if (g.access == nox::lobby::GameAccess::Closed) {
             name += " (closed)";
         }
         if (e.extended && (e.extended->features & nox::lobby::ServerFeature::NoxCoreOnly)) {
@@ -406,6 +457,9 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             from += "list";
         }
         cell(5, from, ty, grey);
+        if (g.access == nox::lobby::GameAccess::Password) {
+            drawLock(renderer, x0 + w - lockSize / 2 - 1, y + l.rowHeight / 2, lockSize);
+        }
     }
 }
 

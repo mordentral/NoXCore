@@ -530,7 +530,9 @@ bool Missiles::throwChakram(ServerObject& thrower, ServerObject& weapon)
     playSound(world, 0x37B, thrower);
     if (round) {
         // It goes itself: out of the thrower's inventory (taken off, MSG_REPORT_DROP), riding in
-        // the one in flight, which starts out with 4 bounces and its thrower's place.
+        // the one in flight, which starts out with 4 bounces and its thrower's place. The one in
+        // flight owns it now, not the thrower (unitClearOwner, then inventoryPutImpl's
+        // unitSetOwner), so only that one blocks a second under server option 2.
         Items{world, things, modifiers, rng, frame}.takeOff(thrower, weapon, true, true);
         world.broadcasts().push_back({{0x4D, lo(weapon.extent), hi(weapon.extent), lo(weapon.type), hi(weapon.type)}, true, thrower.extent});
         std::erase(thrower.inventory, weapon.extent);
@@ -556,21 +558,21 @@ bool Missiles::throwChakram(ServerObject& thrower, ServerObject& weapon)
     return true;
 }
 
-void Missiles::chakramDrops(ServerObject& m, ServerObject& chakram)
+void Missiles::chakramDrops(ServerObject& m, ServerObject& chakram, bool dropped)
 {
-    // (Obj_DropAt: into the world where it is; a weapon not picked up at once; it decays.)
-    std::erase(m.inventory, chakram.extent);
-    chakram.holder = 0;
-    clearOwner(world, chakram); // (Obj_RemoveFromInventory: nobody's)
-    chakram.flags = (chakram.flags & 0x35E9FEDBu) | ObjFlag::Active | ObjFlag::NoCollide;
-    chakram.x = chakram.frameStartX = chakram.newX = m.x;
-    chakram.y = chakram.frameStartY = chakram.newY = m.y;
-    chakram.vx = chakram.vy = 0;
-    world.noteNew(chakram); // (createAt's new list)
-    if (!(chakram.flags & 0x80000u)) {  // (not RESPAWN: a respawning weapon doesn't decay)
-        chakram.decayAt = frame + 30 * 10;
+    // Either way out of the missile's inventory (Obj_RemoveFromInventory: nobody's) and into the
+    // world where the missile is.
+    Items items{world, things, modifiers, rng, frame};
+    if (dropped) {
+        // Obj_DropAt: in a network game but a quest not picked up at once; its WeaponDrop, DefaultDrop
+        // (decaying in 10 s out of solo and quest games unless it respawns), its drop's sound, then
+        // 25 s out of solo and quest games under server option 2.
+        items.dropAt(m, chakram, m.x, m.y);
+    } else {
+        // Off a body: Obj_RemoveFromInventory and createAt alone, no DROP: it doesn't decay.
+        items.removeFromInventory(m, chakram);
+        items.place(chakram, m.x, m.y);
     }
-    chakram.touch();
     m.pendingDelete = true;
 }
 
@@ -674,7 +676,7 @@ void Missiles::chakramHits(ServerObject& m, ServerObject* other, float nx, float
         }
     };
     // After a bounce: one fewer, or none left: home (unless already on the way: out again).
-    // (Off a body, a lost one falls with 0x37D; off a wall, silently.)
+    // (Off a body, a lost one falls with 0x37D and no DROP; off a wall, by its DROP.)
     const auto afterBounce = [&](bool hadBounces, bool body) {
         bool contact = true;
         if (!hadBounces) {
@@ -689,7 +691,7 @@ void Missiles::chakramHits(ServerObject& m, ServerObject* other, float nx, float
             if (body) {
                 playSound(world, 0x37D, m);
             }
-            chakramDrops(m, *chakram); // (lost: down it falls)
+            chakramDrops(m, *chakram, !body); // (lost: down it falls)
             return;
         }
         if (c.bounces == 0 && contact) {
@@ -731,7 +733,7 @@ void Missiles::chakramHits(ServerObject& m, ServerObject* other, float nx, float
     }
     ServerObject* owner = world.byExtent(m.owner);
     if (!owner || (owner->flags & (ObjFlag::Destroyed | ObjFlag::Dead))) {
-        chakramDrops(m, *chakram);
+        chakramDrops(m, *chakram, true); // (its thrower gone: Obj_DropAt)
         return;
     }
     // Its damage as a weapon's: (strength - required strength) x coefficient + least, from

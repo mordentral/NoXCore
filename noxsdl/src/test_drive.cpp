@@ -163,7 +163,7 @@ void fakeScreen(App& app, int which)
     } else {
         // 2: an NPC's dialog (sub 3): its line, name, picture and a Yes / No answer.
         m = {0xD0, 0x03};
-        ascii("Con01a:CaptainGreet", 32);
+        ascii(app.fakeDialogText.empty() ? "Con01a:CaptainGreet" : app.fakeDialogText, 32);
         wide("Airship Captain", 32);
         u32(0);
         ascii("AirshipCaptainPic", 32);

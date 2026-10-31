@@ -1208,6 +1208,22 @@ The engine's logic is the exe's; these are where the output differs.
     campaign the dot is unchanged. Players never had the dot (MonsterDraw's alone). A stock guest,
     told the quest's flags, gets nothing new and draws its quest's dot (every friend but a
     shopkeeper).
+  - The players' names over their heads are drawn as any network game draws them (PlayerDraw's:
+    grey or the team's colour, us too, none while a chat bubble is up or over an invisible player
+    we can't see), by decision: the game draws none in a campaign game (game flag 0x800), the
+    flags the host's client and NoX Core guests are told. A NoX Core client the co-op campaign
+    greeted (host or guest) draws them (noxsdl's name_plate.hpp, App::partyNames); a stock guest,
+    told the quest's flags, always drew them (the game's quest does). The solo campaign still
+    draws none. A name's colour is its player's team as the client knows it, and a solo game
+    tells no team change (only a network game's Team_AddMember sends one): so at each member's
+    CLIENT_READY the host tells it the other members' team, and them its own (MSG_TEAM_MSG sub 1,
+    NoX Core clients only), and every NoX Core client knows the whole party in team 1 (before,
+    the host's client knew none of the guests'). A stock guest is told nothing new (one in before a
+    NoX Core guest doesn't know that guest's team, as before).
+  - Chat is the game's: a line from any player (TEXT_MESSAGE) reaches every player of the party,
+    stock guests too, with its bubble and console line; team chat reaches them all (team 1). The
+    director takes only the host's "?skip" and "?go". (noxsdl opens its chat box in every game, the
+    solo game's too, where the game's client doesn't; left open by decision.)
   - Only a party wipe loses. A player who falls while another lives keeps what it holds (nothing
     dropped), the pending save stands, the map's PlayerDeath functions don't run, and it's back on
     its feet 10 s on (the game's respawn, its things kept) by the party's checkpoint: where the host

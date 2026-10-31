@@ -2,11 +2,15 @@
 -- The act boss, in its act's last area (the lair, its end chamber the arena):
 --
 --   * made at the arena's middle as the "boss" tier (data/monsters.luau: more health, its damage
---     and experience) with its own enchantment set, and its guards;
---   * its fight, thought over every numbers.boss.beat frames (one timer, one monster): adds called
---     at shares of its health, an enrage below another, and a slam at a player near it (a
---     warning at that player's feet, the blow a moment later where the warning was);
---   * its health shown on every player's UI (a bar under its name);
+--     and experience; its own health factor and draw scale when it has them) with its own
+--     enchantment set, and its guards; never charmed;
+--   * its fight (data/monsters.luau's `fight`), thought over every beat (one timer, one monster):
+--       warlord  act 1's: adds called at shares of its health, an enrage below another, and a
+--                slam at a player near it (a warning at that player's feet, the blow a moment
+--                later where the warning was);
+--       barrow   act 2's barrow-king (barrowking.luau): his dead from the graves round the arena,
+--                his charge, the grave-mist, and enraged the quake and the sky's fist;
+--   * its health shown on every player's UI (a bar under its name, in the boss's colour);
 --   * its death: a guaranteed better drop (rare gear above the area's level, and more rolls with
 --     better odds), the act marked cleared in every character's record (a passive point the first
 --     time at a tier; the next act opened), the vendor's stock rolled again, and the gate to the
@@ -15,6 +19,7 @@
 local acts = require("data/acts")
 local data = require("data/monsters")
 local numbers = require("data/numbers")
+local barrowking = require("barrowking")
 local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
@@ -26,10 +31,14 @@ local vendor = require("vendor")
 
 local boss = {}
 
--- The boss of this map: { id, def, info, called, enraged, slamAt, beat, shown }, or nil.
+-- The boss of this map: { id, def, info, called, enraged, slamAt, beat, shown, k (the barrow
+-- fight's) }, or nil.
 local current: any = nil
 
 local NEAR_PLAYERS: any = { players = true, alive = true }
+
+-- Its bar's colour: the boss tier's, as its name plate has it.
+local COLOUR: any = (data.tiers :: any).boss.colour
 
 local function show(c: any)
 	local o = nox.object(c.id)
@@ -41,7 +50,7 @@ local function show(c: any)
 		return
 	end
 	c.shown = health
-	hud.boss({ kind = "boss", name = c.def.name, health = health, most = most })
+	hud.boss({ kind = "boss", name = c.def.name, health = health, most = most, c = COLOUR })
 end
 
 -- Adds at the boss: `n` of its list, magic, as its roster's monsters are.
@@ -57,11 +66,8 @@ local function call(c: any, n: number)
 	end
 end
 
-local function think()
-	local c = current
-	if not c or not nox.living(c.id) then
-		return
-	end
+-- Act 1's fight (the warlord's).
+local function warlord(c: any)
 	local b = numbers.boss
 	local o = nox.object(c.id)
 	if not o then
@@ -101,6 +107,18 @@ local function think()
 			end)
 		end
 	end
+end
+
+local function think()
+	local c = current
+	if not c or not nox.living(c.id) then
+		return
+	end
+	if c.def.fight == "barrow" then
+		barrowking.think(c)
+	else
+		warlord(c)
+	end
 	show(c)
 end
 
@@ -115,9 +133,14 @@ function boss.enter(spots: any, info: any)
 	if not id then
 		return
 	end
-	monsters.info(id).boss = true
+	local entry = monsters.info(id)
+	entry.boss = true
+	entry.spells = def.spells
 	-- (never charmed: a charmed boss can't be hurt by the party, and the act would stall)
 	nox.setCharmable(id, false)
+	if def.draw then
+		nox.setDrawScale(id, def.draw)
+	end
 	for _ = 1, def.guards do
 		monsters.spawn(def.adds[nox.random(#def.adds)], spots.boss.x, spots.boss.y, "magic", info.level)
 	end
@@ -130,7 +153,11 @@ function boss.enter(spots: any, info: any)
 		slamAt = nox.frame() + numbers.boss.slam.every,
 		shown = -1,
 	}
-	current.beat = nox.every(numbers.boss.beat, think)
+	if def.fight == "barrow" then
+		barrowking.start(current, spots)
+	end
+	local beat = if def.fight == "barrow" then numbers.barrowKing.beat else numbers.boss.beat
+	current.beat = nox.every(beat, think)
 	show(current)
 end
 
@@ -141,6 +168,7 @@ function boss.killed(id: number, x: number, y: number)
 		return
 	end
 	nox.cancelTimer(c.beat)
+	barrowking.stop(c)
 	current = nil
 	local d = numbers.boss.drop
 	loot.bossDrop(x, y, c.info.level, d)
@@ -180,10 +208,24 @@ function boss.current(): any
 	return { id = c.id, name = c.def.name, type = c.def.type }
 end
 
+-- "dd fight": its fight's state (the barrow-king's), or nil; `hurry`: its next blows brought to
+-- the next beat.
+function boss.fight(hurry: boolean?): string?
+	local c = current
+	if not c or c.def.fight ~= "barrow" then
+		return nil
+	end
+	if hurry then
+		barrowking.hurry(c)
+	end
+	return barrowking.line(c)
+end
+
 -- A new map: the old one's boss went with it.
 function boss.reset()
 	if current then
 		nox.cancelTimer(current.beat)
+		barrowking.stop(current)
 		current = nil
 		hud.boss(nil)
 	end

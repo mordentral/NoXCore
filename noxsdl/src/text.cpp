@@ -28,39 +28,6 @@ struct Font::Info {
     stbtt_fontinfo font{};
 };
 
-char32_t nextCodepoint(std::string_view s, std::size_t& pos)
-{
-    constexpr char32_t kReplacement = 0xFFFD;
-    const auto byte = [&](std::size_t i) { return static_cast<std::uint8_t>(s[i]); };
-    const std::uint8_t b0 = byte(pos++);
-    if (b0 < 0x80) {
-        return b0;
-    }
-    // The lead byte gives the sequence's length (2-4 bytes) and its top bits; each continuation
-    // byte (10xxxxxx) adds 6 more.
-    int more = 0;
-    char32_t cp = 0;
-    if ((b0 & 0xE0) == 0xC0) {
-        more = 1;
-        cp = b0 & 0x1F;
-    } else if ((b0 & 0xF0) == 0xE0) {
-        more = 2;
-        cp = b0 & 0x0F;
-    } else if ((b0 & 0xF8) == 0xF0) {
-        more = 3;
-        cp = b0 & 0x07;
-    } else {
-        return kReplacement;
-    }
-    for (int i = 0; i < more; ++i) {
-        if (pos >= s.size() || (byte(pos) & 0xC0) != 0x80) {
-            return kReplacement;
-        }
-        cp = (cp << 6) | (byte(pos++) & 0x3F);
-    }
-    return cp;
-}
-
 std::unique_ptr<Font> Font::load(SDL_Renderer* renderer, const std::filesystem::path& gameDir)
 {
     for (const char* file : {"default.ttf", "default.otf"}) {
@@ -195,51 +162,21 @@ float Font::measure(std::string_view utf8, int pixelSize)
     return width;
 }
 
-std::vector<std::string> Font::wrap(std::string_view utf8, int pixelSize, float maxWidth)
+float Font::advance(char32_t codepoint, int pixelSize)
+{
+    return glyph(face(pixelSize), codepoint).advance;
+}
+
+GlyphAdvance Font::advances(int pixelSize)
 {
     Face& f = face(pixelSize);
-    std::vector<std::string> lines;
-    std::string line;
-    float width = 0;
-    std::size_t lastSpace = std::string::npos; // in `line`
-    // Glyph by glyph: a line full breaks at its last space, or mid-word when it has none.
-    for (std::size_t pos = 0; pos < utf8.size();) {
-        const std::size_t start = pos;
-        const char32_t c = nextCodepoint(utf8, pos);
-        if (c == '\n') {
-            lines.push_back(std::move(line));
-            line.clear();
-            width = 0;
-            lastSpace = std::string::npos;
-            continue;
-        }
-        const float advance = glyph(f, c).advance;
-        // Past the width: a break (a space never breaks the line itself; it marks where the next may).
-        if (width + advance > maxWidth && !line.empty() && c != ' ') {
-            if (lastSpace != std::string::npos) {
-                // Break at the last space; the rest of the word starts the next line.
-                std::string rest = line.substr(lastSpace + 1);
-                line.resize(lastSpace);
-                lines.push_back(std::move(line));
-                line = std::move(rest);
-                width = measure(line, pixelSize);
-            } else {
-                lines.push_back(std::move(line)); // one long word: break it anywhere
-                line.clear();
-                width = 0;
-            }
-            lastSpace = std::string::npos;
-        }
-        if (c == ' ') {
-            lastSpace = line.size();
-        }
-        line.append(utf8.substr(start, pos - start));
-        width += advance;
-    }
-    if (!line.empty() || lines.empty()) {
-        lines.push_back(std::move(line));
-    }
-    return lines;
+    return [this, &f](char32_t c) { return glyph(f, c).advance; };
+}
+
+std::vector<std::string> Font::wrap(std::string_view utf8, int pixelSize, float maxWidth)
+{
+    // drawStringWrap's breaks (text_wrap.hpp), at this size's widths.
+    return wrapLines(utf8, maxWidth, advances(pixelSize));
 }
 
 float Font::ascent(int pixelSize)

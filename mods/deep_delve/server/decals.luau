@@ -16,15 +16,17 @@ local decals = {}
 -- The decals this map holds: id -> { kind, x, y } (for "dd decals").
 local placed: { [number]: any } = {}
 
--- A pad's ring of `kind` ("waypoint" or "portal", numbers.decals') at (x, y); its id, or nil
+-- A pad's ring of `kind` ("waypoint" or "portal", numbers.decals'; or `def`, a ring of the same
+-- fields and maybe a colour, under a kind of its own: the map table's) at (x, y); its id, or nil
 -- when the map holds its 64 already.
-function decals.put(kind: string, x: number, y: number): number?
-	local k: any = (numbers.decals :: any)[kind]
+function decals.put(kind: string, x: number, y: number, def: any?): number?
+	local k: any = def or (numbers.decals :: any)[kind]
 	if not k then
 		return nil
 	end
 	local size: number, spin: number, amount: number, period: number = k.size, k.spin, k.pulse, k.period
-	local id = nox.decal(tostring(k.asset), x, y, { size = size, glow = true, spin = spin, pulse = { amount = amount, period = period } })
+	local colour: { number }? = k.colour
+	local id = nox.decal(tostring(k.asset), x, y, { size = size, glow = true, spin = spin, pulse = { amount = amount, period = period }, colour = colour })
 	if id then
 		placed[id] = { kind = kind, x = x, y = y }
 	end

@@ -4503,7 +4503,8 @@ std::uint32_t GameHost::extendedFeatures() const
     // ask: they see the "[EDIT]" name alone.)
     return lobby::ServerFeature::HighRate | options_.features |
            (options_.noxcppMessages.contains(static_cast<std::uint8_t>(net::Op::NoxcppEdit)) ? lobby::ServerFeature::EditSession : 0u) |
-           (options_.stockRefusal ? lobby::ServerFeature::NoxCoreOnly : 0u); // (noxsdl's browser marks it NoX Core only)
+           (options_.stockRefusal ? lobby::ServerFeature::NoxCoreOnly : 0u) | // (noxsdl's browser marks it NoX Core only)
+           (options_.pickupAnyClass ? lobby::ServerFeature::PickupAnyClass : 0u); // (World::pickupAnyClass: noxsdl's cursor no Caution then)
 }
 
 void GameHost::setSandboxNoScoring(bool on)

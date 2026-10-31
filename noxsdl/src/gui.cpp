@@ -255,6 +255,26 @@ std::string Painter::firstLine(const std::string& utf8, bool large, int wrapWidt
     return lines.empty() ? std::string() : lines.front();
 }
 
+int Painter::wrappedWidth(const std::string& utf8, bool large, int wrapWidth)
+{
+    if (!res_.font || utf8.empty()) {
+        return 0;
+    }
+    float widest = 0;
+    for (const auto& line : res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_)) {
+        widest = std::max(widest, res_.font->measure(line, pixelSize(large)));
+    }
+    return static_cast<int>(std::ceil(widest / scale_));
+}
+
+std::vector<std::string> Painter::centredLines(const std::string& utf8, bool large, int wrapWidth)
+{
+    if (!res_.font) {
+        return {utf8};
+    }
+    return noxsdl::centredLines(utf8, static_cast<float>(wrapWidth) * scale_, res_.font->advances(pixelSize(large)));
+}
+
 void Painter::image(const std::string& name, int x, int y)
 {
     const auto ref = namedImage(res_.things, name);
@@ -744,15 +764,27 @@ void Gui::drawByType(Window& w, Painter& p)
         // The wrapped block centred up and down.
         const bool centre = data && data->center;
         const bool glow = data && data->glow;
-        const int tw = p.textWidth(w.text, w.largeFont);
-        const int tx = centre ? x + (width - std::min(tw, width)) / 2 : x + 2;
-        const int ty = y + height / 2 - p.textHeight(w.text, w.largeFont, width) / 2;
-        if (glow && !dim) {
-            for (const auto& [dx, dy] : {std::pair{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}) {
-                p.text(w.text, tx + dx, ty + dy, w.largeFont, w.selectedColor, width);
+        const auto drawText = [&](const std::string& t, int tx, int ty) {
+            if (glow && !dim) {
+                for (const auto& [dx, dy] : {std::pair{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}) {
+                    p.text(t, tx + dx, ty + dy, w.largeFont, w.selectedColor, width);
+                }
             }
+            p.text(t, tx, ty, w.largeFont, textColor, width);
+        };
+        const int textH = p.textHeight(w.text, w.largeFont, width);
+        int ty = y + height / 2 - textH / 2;
+        if (centre && textH > p.fontHeight(w.largeFont)) {
+            // Centred and more than a line: each line centred on its own, a pixel between them
+            // (the block's top from the plain wrap's height, as the exe works it out).
+            for (const auto& line : p.centredLines(w.text, w.largeFont, width)) {
+                drawText(line, x + (width - p.wrappedWidth(line, w.largeFont, width)) / 2, ty);
+                ty += p.textHeight(line, w.largeFont, width) + 1;
+            }
+            return;
         }
-        p.text(w.text, tx, ty, w.largeFont, textColor, width);
+        const int tw = p.textWidth(w.text, w.largeFont);
+        drawText(w.text, centre ? x + (width - std::min(tw, width)) / 2 : x + 2, ty);
         return;
     }
 

@@ -97,13 +97,15 @@ function monsters.rises(thingType: string): boolean
 end
 
 -- A type of the roster for an area (areas.info's: its level, and its index in its act for the
--- entries that count from that), by weight; `noRising`: none that rises again after its death (a
--- roster entry's `rises`); `lightOnly`: only light ones (`light`), when the roster has any there.
+-- entries that count from that; an expedition's `rosterAt` in place of the index), by weight;
+-- `noRising`: none that rises again after its death (a roster entry's `rises`); `lightOnly`: only
+-- light ones (`light`), when the roster has any there.
 local function pickType(roster: any, area: any, noRising: boolean?, lightOnly: boolean?): string?
 	local list: { any }, total = {}, 0
+	local index: number = area.rosterAt or area.index
 	local function gather(light: boolean)
 		for _, e in roster do
-			if ((e.at and e.at <= area.index) or (e.from and e.from <= area.level)) and not (noRising and e.rises) and (not light or e.light) then
+			if ((e.at and e.at <= index) or (e.from and e.from <= area.level)) and not (noRising and e.rises) and (not light or e.light) then
 				table.insert(list, e)
 				total += e.weight
 			end
@@ -157,7 +159,9 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	local opening: any = (a.opening :: any)[level]
 	local openHealth = if opening then opening.health else 1
 	local openDamage = if opening then opening.damage else 1
-	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health * openHealth + 0.5), 1, 65535)
+	-- (a boss's own factor on its tier's: data/monsters.luau's bosses' `health`)
+	local own: number = if fixed and type(fixed.health) == "number" then fixed.health else 1
+	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health * openHealth * own + 0.5), 1, 65535)
 	local alone = health
 	local party = scale.factor("health")
 	if party ~= 1 then
@@ -227,9 +231,12 @@ monsters.spawn = spawn
 
 -- An area's monsters at the generator's spots: a pack at each (a leader of the pack's tier and
 -- its followers), the champion and its guards in the end chamber (a lair has no champion's spot:
--- its boss is boss.luau's). `area`: areas.info's ({ biome, level, index }).
+-- its boss is boss.luau's). `area`: areas.info's ({ roster (its biome's, or the area's own), level,
+-- index }; an expedition's map hands its roster and champion themselves, runRoster and
+-- runChampion, and its guards).
 function monsters.populate(spots: any, area: any)
-	local roster = (data.rosters :: any)[area.biome] or data.rosters.Crypt
+	local rosterName = area.roster or area.biome
+	local roster = area.runRoster or (data.rosters :: any)[rosterName] or data.rosters.Crypt
 	-- The opening's numbers at this level (numbers.areas.opening): smaller packs, the first stretch
 	-- of the route quieter still.
 	local opening: any = if area.lair then nil else (numbers.areas.opening :: any)[area.level]
@@ -295,11 +302,11 @@ function monsters.populate(spots: any, area: any)
 			table.insert(packList, pack)
 		end
 	end
-	local champ = (data.champions :: any)[area.biome]
+	local champ = area.runChampion or (data.champions :: any)[rosterName]
 	guarded = nil
 	if champ and spots.guardian then
 		local g = spots.guardian
-		local group = { size = 0, experience = 0 }
+		local group: any = { size = 0, experience = 0 }
 		local function made(id: number?)
 			local e = id and known[id]
 			if e then
@@ -307,8 +314,10 @@ function monsters.populate(spots: any, area: any)
 				group.experience += e.experience
 			end
 		end
-		made(spawn(champ.type, g.x, g.y, "champion", area.level, champ))
-		for _ = 1, if opening and opening.guards then opening.guards else champ.guards do
+		-- (the champion's id kept: an expedition's run ends with its death)
+		group.id = spawn(champ.type, g.x, g.y, "champion", area.level, champ)
+		made(group.id)
+		for _ = 1, if opening and opening.guards then opening.guards else (area.guards or champ.guards) do
 			made(spawn(pickType(roster, area) or champ.type, g.x, g.y, "magic", area.level))
 		end
 		guarded = group
@@ -337,6 +346,13 @@ end
 function monsters.damageOf(id: number): number
 	local e = known[id]
 	return if e then e.damage * scale.factor("damage") else 1
+end
+
+-- The share of its damage a monster's spells deal (what it owns: a boss's mist, its fist): its
+-- entry's `spells` (a boss's, data/monsters.luau), else 1.
+function monsters.spellsOf(id: number): number
+	local e = known[id]
+	return if e and type(e.spells) == "number" then e.spells else 1
 end
 
 -- The experience a monster's death gives (before it's split), the party's factor in it.
@@ -400,7 +416,8 @@ function monsters.packs(): { any }
 	return packList
 end
 
--- The champion's group in the last area entered ({ size, experience }), or nil.
+-- The champion's group in the last area entered ({ size, experience, id (the champion's) }), or
+-- nil.
 function monsters.guardians(): any
 	return guarded
 end

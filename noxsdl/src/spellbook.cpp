@@ -319,18 +319,39 @@ std::optional<std::uint32_t> Spellbook::event(const nox::client::BookEvent& e, c
     if (it == entries_.end()) {
         return std::nullopt;
     }
-    // Shown (BookOpen, even if it was open already), moved a third of the way down, turned to its
-    // page (PageTurn), sparks off its edges (bookSetForward, then bookRewardCli's bursts).
-    drag_ = 0;
-    pressed_.reset();
-    iconPressed_ = false;
-    open_ = true;
-    sound(0x312); // BookOpen
-    raised_ = true;
-    moved_.reset(); // (window_setPos: the award puts it there whatever it was dragged to)
-    moveToPage(static_cast<int>(it - entries_.begin()), ctx);
-    burst(e.kind == Kind::Spell ? 0 : e.kind == Kind::Ability ? 3 : 2, lastHeight_);
-    if (!e.fill || e.kind == Kind::Creature) {
+    // Shut (BookClose), turned to its page (PageTurn) and shown (BookOpen); then shown again
+    // (BookOpen), moved a third of the way down, turned again (PageTurn) and sparks off its edges
+    // (bookSetForward, then bookRewardCli's bursts), each step as book_award.hpp's showing lists it.
+    const auto s = bookaward::showing(ctx.award, e.kind, e.fill, open_, ctx.flying, ctx.frame, lastReward_);
+    const int page = static_cast<int>(it - entries_.begin());
+    for (std::size_t i = 0; i < s.count; ++i) {
+        switch (s.steps[i]) {
+        case bookaward::Step::Close:
+            hide();
+            break;
+        case bookaward::Step::Turn:
+            moveToPage(page, ctx);
+            break;
+        case bookaward::Step::Show:
+            drag_ = 0;
+            pressed_.reset();
+            iconPressed_ = false;
+            open_ = true;
+            sound(bookaward::kBookOpen);
+            break;
+        case bookaward::Step::Raise:
+            raised_ = true;
+            moved_.reset(); // (window_setPos: the award puts it there whatever it was dragged to)
+            break;
+        case bookaward::Step::Sparks:
+            burst(e.kind == Kind::Spell ? 0 : e.kind == Kind::Ability ? 3 : 2, lastHeight_);
+            break;
+        }
+    }
+    if (s.reward) {
+        lastReward_ = ctx.frame;
+    }
+    if (!s.flies) {
         return std::nullopt;
     }
     return entry;

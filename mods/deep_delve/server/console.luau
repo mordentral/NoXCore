@@ -2,7 +2,8 @@
 -- The host's console commands ("dd ..."): what the game is doing, and a few levers for testing a
 -- build (the tests drive the mod through these too). Each returns its reply lines.
 --
---   dd status            the area (its act, its weather), its map and monsters; each player's
+--   dd status            the area (its act, its weather: rolled as its map was built), its map
+--                        and monsters; each player's
 --                        character
 --   dd spots             where the area's and the town's places are
 --   dd save              every character's record written now
@@ -13,25 +14,34 @@
 --   dd ground            the items on the ground that spark (id, effect)
 --   dd go WHERE          the first player to: town, arrive, exit, guardian, boss, waypoint,
 --                        wayArrive, portal, pad (the town's waypoints pentagram), wayIn, actGate
---                        (a lair's gate spot), pack [N]
+--                        (a lair's gate spot), maps (the map table), pack [N]
 --   dd area N [HOW]      the game to area N, arriving at its start (HOW "waypoint": beside its
 --                        waypoint). N: the area's number on through the acts (act 1's 1-7, act
 --                        2's from 8), or "A-N": area N of act A
 --   dd trial SEED N      area N (as dd area names it) built now from game seed SEED (into a map
 --                        never played); "ok", or why it was refused or what it lacks (its act's
---                        town and every one of its stations too)
+--                        town and every one of its stations too); "dd trial SEED run BIOME RANK":
+--                        an expedition's map
 --   dd seed              the play's seed and which play of the game it is (an emptied game
 --                        starting over is a new play, with a new seed)
 --   dd town              the act's town: its look and name
 --   dd gate [take]       the lair's gate to the next act (its spot, open or shut, its swirl and
 --                        light); "take": the first player steps into it (the game on, or a vote)
+--   dd atlas [levels | free on|off | go BIOME RANK | run | slay]   the expeditions: the first
+--                        player's atlas; each rank's level; every rank open to everyone (testing);
+--                        an expedition asked for (as the map table's window does); the run being
+--                        played; its champion killed by the first player
 --   dd portal            the first player opens a town portal (as its UI's button does)
 --   dd waypoint N        the first player to area N's waypoint of the act being played ("A-N":
 --                        of act A; one it has found), as a click in the town's waypoints window
 --                        sends it (wherever it stands)
 --   dd progress          the first player's record: its version, its act progress, boss kills
 --   dd boss              the boss of this map: id, type, health, name
+--   dd fight [now]       the boss's fight (the barrow-king's: its phase, adds, charges, mists,
+--                        fists, graves); "now": its next blows on the next beat
 --   dd smite             the boss killed by the first player
+--   dd tiers             the difficulty tiers' level offset, tier I's last level, tier II's first
+--   dd number NAME [I]   one of the game's numbers (gamedata), by name and index
 --   dd check             every name in the data tables checked against thing.bin, every spell
 --                        against the game's spells (its number, its class, no linked group),
 --                        every creature the tree gives (its name the field guide's, its summon
@@ -56,8 +66,8 @@
 --   dd book             the spells, abilities and creatures its tree gives, and whether its
 --                        unit's book and field guide are exactly that ("server ok")
 --   dd sheet             its character sheet, "key value" lines
---   dd ui WINDOW [NAME]  a window opened on its UI (stash, vendor, waypoints: it's moved by the
---                        station); "sheet NAME": party member NAME's sheet, as its card's click
+--   dd ui WINDOW [NAME]  a window opened on its UI (stash, vendor, waypoints, maps: it's moved by
+--                        the station); "sheet NAME": party member NAME's sheet, as its card's click
 --   dd hits [clear]      the last hits cancelled (no damage within the party, no splash from a
 --                        hero's own Fireball): "why: target by source, weapon W, kind K, N
 --                        cancelled"; or the list emptied
@@ -97,7 +107,9 @@
 --                        code | enter CODE | unlink I | pcs" as its character select does
 
 local areas = require("areas")
+local atlas = require("atlas")
 local boss = require("boss")
+local expeditions = require("expeditions")
 local combat = require("combat")
 local decals = require("decals")
 local gate = require("gate")
@@ -126,6 +138,7 @@ local treeview = require("treeview")
 local vendor = require("vendor")
 local windows = require("windows")
 local acts = require("data/acts")
+local expeditionData = require("data/expeditions")
 local monsterData = require("data/monsters")
 local lootData = require("data/loot")
 local classes = require("data/classes")
@@ -271,6 +284,8 @@ local function place(s: any, name: string): any
 		portal = t.portal,
 		pad = t.waypoints,
 		wayIn = t.wayIn,
+		-- (the map table)
+		maps = t.maps,
 		-- (a lair's gate to the next act: its spot, whether or not it's open)
 		actGate = s.gate,
 	}
@@ -307,8 +322,10 @@ function commands.spots(_args: { string }): { string }
 	end
 	local out = {}
 	-- (one line a place: name, x, y, its thing's type or "-"; "none" for a place this area lacks)
-	local types: any = { portal = "InvisibleTeleportPentagram", pad = "InvisibleTeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram" }
-	for _, name in { "arrive", "back", "exit", "guardian", "boss", "waypoint", "wayArrive", "gate", "healer", "stash", "vendor", "portal", "pad", "wayIn", "actGate" } do
+	local types: any = { portal = "InvisibleTeleportPentagram", pad = "InvisibleTeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram",
+		maps = "Desk1" }
+	for _, name in { "arrive", "back", "exit", "guardian", "boss", "waypoint", "wayArrive", "gate", "healer", "stash", "vendor", "portal", "pad", "wayIn", "actGate",
+		"maps" } do
 		local p = place(s, name)
 		if p then
 			table.insert(out, string.format("%s %.1f %.1f %s", name, tonumber(p.x) or 0, tonumber(p.y) or 0, tostring(p.type or types[name] or "-")))
@@ -317,6 +334,10 @@ function commands.spots(_args: { string }): { string }
 		end
 	end
 	table.insert(out, string.format("packs %d", #s.packs))
+	-- (a barrow arena's graves: "grave X Y" each)
+	for _, g in s.graves or {} do
+		table.insert(out, string.format("grave %.1f %.1f", tonumber(g.x) or 0, tonumber(g.y) or 0))
+	end
 	return out
 end
 
@@ -340,16 +361,23 @@ end
 
 -- "dd trial SEED N": the area built; "ok" when it built with every spot its kind needs (a waypoint
 -- area's waypoint, by the start chamber when its data says so; a lair's boss and, with an act
--- after it, its gate spot; an area with a way on, its exit), else why.
+-- after it, its gate spot; an area with a way on, its exit; a run's champion's spot), else why.
+-- "dd trial SEED run BIOME RANK": an expedition's map, the same way.
 function commands.trial(args: { string }): { string }
 	local seed, place = tonumber(args[2]) or 1, placeNamed(args[3]) or 1
+	if args[3] == "run" then
+		place = expeditions.newRun(tostring(args[4]), tonumber(args[5]) or 1)
+		if not areas.info(place).expedition then
+			return { "no such biome " .. tostring(args[4]) }
+		end
+	end
 	local ok, result = areas.trial(place, seed)
 	if not ok then
 		return { string.format("seed %d area %d: %s", seed, place, tostring(result)) }
 	end
 	local info = areas.info(place)
 	local s: any = result
-	local missing = nil
+	local missing: string? = nil
 	if info.waypoint and not s.waypoint then
 		missing = "waypoint"
 	elseif info.waypointAt == "start" and s.waypoint
@@ -357,22 +385,26 @@ function commands.trial(args: { string }): { string }
 		missing = "waypoint by the start"
 	elseif info.lair and not s.boss then
 		missing = "boss"
+	elseif info.arena == "barrow" and (type(s.graves) ~= "table" or #s.graves < 3) then
+		missing = "graves"
 	elseif info.gate and not s.gate then
 		missing = "gate"
 	elseif not info.lair and not s.exit then
 		missing = "exit"
+	elseif info.expedition and not s.guardian then
+		missing = "champion's spot"
 	elseif not s.town or s.town.look ~= areas.townOf(info.act).look then
 		missing = "town of act " .. info.act
 	else
 		-- (the town's stations, every one, in every act's look)
-		for _, name in { "centre", "healer", "gate", "stash", "vendor", "portal", "waypoints", "wayIn" } do
+		for _, name in { "centre", "healer", "gate", "stash", "vendor", "portal", "waypoints", "wayIn", "maps" } do
 			if not missing and not s.town[name] then
 				missing = "town " .. name
 			end
 		end
 	end
 	if missing then
-		return { string.format("seed %d area %d: no %s", seed, place, missing) }
+		return { string.format("seed %d area %d: no %s", seed, place, tostring(missing)) }
 	end
 	return { "ok" }
 end
@@ -399,6 +431,80 @@ function commands.gate(args: { string }): { string }
 	local open: string = if g.open then "open" else "shut"
 	local act: number, x: number, y: number = g.act, g.x, g.y
 	return { string.format("gate act %d at %.1f %.1f %s swirl %s light %s", act, x, y, open, tostring(g.swirl or "-"), tostring(g.light or "-")) }
+end
+
+-- "dd atlas": the first player's atlas ("atlas open|shut, best B, top T, runs R, free on|off", then
+-- "BIOME r r..." for each biome with a clear). "dd atlas levels": the last act ("last act A, lair
+-- A-N, level L") and each rank's area level ("rank R level L"). "dd atlas
+-- free on|off": every rank open to everyone (testing; never kept). "dd atlas go BIOME RANK": the
+-- first player asks for an expedition, as the map table's window does (wherever it stands). "dd
+-- atlas run": the run being played. "dd atlas slay": its champion killed by the first player.
+function commands.atlas(args: { string }): { string }
+	local op = args[2]
+	if op == "levels" then
+		-- (first, the last act: its lair, as "dd area" names it, and the level the ladder stands on)
+		local out = { string.format("last act %d, lair %d-%d, level %d", #acts, #acts, #acts[#acts].areas, atlas.lastLevel()) }
+		for r = 1, atlas.ranks() do
+			table.insert(out, string.format("rank %d level %d", r, atlas.level(r)))
+		end
+		return out
+	elseif op == "free" then
+		expeditions.setFree(args[3] == "on")
+		return { "ok" }
+	elseif op == "run" or op == "slay" then
+		local c = expeditions.current()
+		if not c then
+			return { "no run" }
+		end
+		if op == "slay" then
+			local h = firstHero()
+			local id = c.champion
+			if not h or not id or not nox.living(id) then
+				return { "no champion standing" }
+			end
+			for _, e in { "ENCHANT_SHIELD", "ENCHANT_PROTECT_FROM_MAGIC", "ENCHANT_VAMPIRISM" } do
+				nox.enchant(id, e, -1)
+			end
+			for _ = 1, 40 do
+				local o = nox.object(id)
+				if not o or not nox.living(id) then
+					break
+				end
+				nox.damage(id, h.unit, o.health + 10, 0)
+			end
+			return { if nox.living(id) then "still standing" else "slain" }
+		end
+		local alive: string = if c.champion and nox.living(c.champion) then "alive" else "dead"
+		local done: string = if c.cleared then "cleared" else "not cleared"
+		local rank: number, level: number = tonumber(c.rank) or 0, tonumber(c.level) or 0
+		return { string.format("run %s rank %d level %d champion %s %s, %s", tostring(c.biome), rank, level, tostring(c.champion or "-"), alive, done) }
+	end
+	local h = firstHero()
+	if not h then
+		return { "no player" }
+	end
+	if op == "go" then
+		local ok, why = expeditions.start(h, tostring(args[3]), tonumber(args[4]) or 0)
+		return { if ok then (if why == "vote" then "vote" else "going") else "not: " .. tostring(why) }
+	end
+	local a = atlas.of(h.record)
+	local out = {
+		string.format("atlas %s, best %d, top %d, runs %d, free %s", if atlas.isOpen(h.record) then "open" else "shut", a.best, atlas.top(h.record), a.runs,
+			if expeditions.isFree() then "on" else "off"),
+	}
+	local names: { string } = {}
+	for name in a.cleared do
+		table.insert(names, tostring(name))
+	end
+	table.sort(names)
+	for _, name in names do
+		local ranks: { string } = {}
+		for _, r in a.cleared[name] do
+			table.insert(ranks, tostring(r))
+		end
+		table.insert(out, name .. " " .. table.concat(ranks, " "))
+	end
+	return out
 end
 
 function commands.portal(args: { string }): { string }
@@ -548,10 +654,10 @@ function commands.spawn(args: { string }): { string }
 	local fixed: any = nil
 	local thingType = args[4]
 	if tier == "champion" then
-		fixed = (monsterData.champions :: any)[s.biome] or monsterData.champions.Crypt
+		fixed = (monsterData.champions :: any)[s.roster] or monsterData.champions.Crypt
 		thingType = thingType or fixed.type
 	end
-	local roster: any = (monsterData.rosters :: any)[s.biome] or monsterData.rosters.Crypt
+	local roster: any = (monsterData.rosters :: any)[s.roster] or monsterData.rosters.Crypt
 	local out = {}
 	for i = 1, math.clamp(tonumber(args[3]) or 1, 1, 60) do
 		-- (a widening ring round the player)
@@ -669,6 +775,27 @@ function commands.smite(_args: { string }): { string }
 	return { "slain" }
 end
 
+-- "dd fight [now]": the boss's fight ("phase P awake|asleep, adds standing/raised, charges N (hits
+-- H), mists M, fists F, graves G"; the barrow-king's), "no fight" for one without such a state;
+-- "now": its next blows on the next beat.
+function commands.fight(args: { string }): { string }
+	return { boss.fight(args[2] == "now") or "no fight" }
+end
+
+-- "dd tiers": the difficulty tiers' level offset (data/acts.luau's tierOffset) and what it makes
+-- of tier I's last area and tier II's first: "offset O; tier I to level L; tier II from level F".
+function commands.tiers(_args: { string }): { string }
+	local last = areas.info(areas.count())
+	local first = areas.info(1)
+	return { string.format("offset %d; tier I to level %d; tier II from level %d", acts.tierOffset, last.level, first.level + acts.tierOffset) }
+end
+
+-- "dd number NAME [I]": one of the game's numbers (gamedata), for reading the spells' sizes.
+function commands.number(args: { string }): { string }
+	local v = nox.gameNumber(args[2] or "", tonumber(args[3]))
+	return { tostring(v) }
+end
+
 function commands.check(_args: { string }): { string }
 	local bad = {}
 	local function thing(name: string, where: string)
@@ -688,6 +815,18 @@ function commands.check(_args: { string }): { string }
 		thing(b.type, "boss " .. name)
 		for _, t in b.adds do
 			thing(t, "boss " .. name .. " adds")
+		end
+		for _, t in b.laterAdds or {} do
+			thing(t, "boss " .. name .. " later adds")
+		end
+		if b.fight ~= "warlord" and b.fight ~= "barrow" then
+			table.insert(bad, "boss " .. name .. ": no fight " .. tostring(b.fight))
+		end
+	end
+	-- (the barrow-king's spells: the game's)
+	for _, s in { "SPELL_TOXIC_CLOUD", "SPELL_FIST", "SPELL_EARTHQUAKE" } do
+		if not nox.spellId(s) then
+			table.insert(bad, "barrow-king: no spell " .. s)
 		end
 	end
 	for _, g in lootData.gear do
@@ -713,8 +852,9 @@ function commands.check(_args: { string }): { string }
 	for _, p in vendorData.potions do
 		thing(p.type, "vendor")
 	end
-	-- The acts: each act's boss in the bosses, each area's biome with a roster and its weather one
-	-- of the weathers (a known kind); the gate's swirl a thing.
+	-- The acts: each act's boss in the bosses, each area's roster (its own or its biome's) with its
+	-- champion; each sky's weathers among the weathers (a known kind), each with a weight; the
+	-- gate's swirl a thing.
 	local kinds = { rain = true, snow = true, storm = true, none = true }
 	for a, act in ipairs(acts) do
 		if not (monsterData.bosses :: any)[act.boss] then
@@ -723,18 +863,53 @@ function commands.check(_args: { string }): { string }
 		for i, spec in act.areas do
 			local s: any = spec
 			local where = "act " .. tostring(a) .. " area " .. tostring(i)
-			if not (monsterData.rosters :: any)[s.biome] then
-				table.insert(bad, where .. ": no roster for " .. tostring(s.biome))
+			local roster = s.roster or s.biome
+			if not (monsterData.rosters :: any)[roster] then
+				table.insert(bad, where .. ": no roster " .. tostring(roster))
+			elseif not s.lair and not (monsterData.champions :: any)[roster] then
+				table.insert(bad, where .. ": no champion for " .. tostring(roster))
 			end
-			if s.weather ~= nil then
-				local w = (acts.weathers :: any)[s.weather]
-				if not w or not kinds[w.kind] then
-					table.insert(bad, where .. ": no weather " .. tostring(s.weather))
-				end
+		end
+	end
+	for biome, list in (acts.skies :: any) do
+		for _, e in list do
+			local w = (acts.weathers :: any)[e[1]]
+			if not w or not kinds[w.kind] or type(e[2]) ~= "number" or e[2] <= 0 then
+				table.insert(bad, "skies " .. tostring(biome) .. ": no weather " .. tostring(e[1]))
 			end
 		end
 	end
 	thing(acts.gate.swirl, "gate")
+	-- The expeditions: the map table's pieces; each biome offered with a roster and a champion (the
+	-- acts' or its own), its skies' weathers known; the expeditions' own rosters' types.
+	thing("Desk1", "map table")
+	for biome, roster in (expeditionData.rosters :: any) do
+		for _, e in roster do
+			thing(e.type, "expedition roster " .. biome)
+		end
+	end
+	for biome, c in (expeditionData.champions :: any) do
+		thing(c.type, "expedition champion " .. biome)
+	end
+	for _, entry in expeditionData.biomes do
+		local b: any = entry
+		local where = "expedition " .. tostring(b.name)
+		if not ((monsterData.rosters :: any)[b.name] or (expeditionData.rosters :: any)[b.name]) then
+			table.insert(bad, where .. ": no roster")
+		end
+		if not ((monsterData.champions :: any)[b.name] or (expeditionData.champions :: any)[b.name]) then
+			table.insert(bad, where .. ": no champion")
+		end
+		if not acts[b.town] then
+			table.insert(bad, where .. ": no act " .. tostring(b.town) .. " for its town")
+		end
+		for _, e in b.skies or {} do
+			local w = (acts.weathers :: any)[e[1]]
+			if not w or not kinds[w.kind] or type(e[2]) ~= "number" or e[2] <= 0 then
+				table.insert(bad, where .. ": no weather " .. tostring(e[1]))
+			end
+		end
+	end
 	-- The missiles the tree's spells size (data/tree.luau's size).
 	for name in (treeData.rises :: any) do
 		local size = treeData.rise(name).size
@@ -1132,7 +1307,7 @@ function commands.ui(args: { string }): { string }
 		end
 		return { "no player " .. args[3] }
 	end
-	local spot = if name == "stash" or name == "vendor" or name == "waypoints" then name else nil
+	local spot = if name == "stash" or name == "vendor" or name == "waypoints" or name == "maps" then name else nil
 	if spot then
 		local at = town.spot(spot)
 		if at and nox.present(h.unit) then
@@ -1173,7 +1348,7 @@ function commands.help(_args: { string }): { string }
 	return {
 		"dd status | spots | save | xp N | award N | loot RARITY [N] | ground | monster ID | check",
 		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|actGate|pack [N] | area N|A-N [waypoint] | portal | waypoint N|A-N",
-		"dd progress | boss | smite | trial SEED N | gate [take] | seed | town",
+		"dd progress | boss | fight [now] | smite | trial SEED N | gate [take] | seed | town | tiers | number NAME [I]",
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L]",
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs] | icons | book | sheet | ui stash|vendor|waypoints|tree|sheet [NAME]",
 		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | plates | spawn TIER [N] [TYPE] | slay ID | portals | portal take | hud",

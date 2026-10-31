@@ -187,8 +187,10 @@ private:
     void chakramUpdate(ServerObject& m);
     /// ChakramInMotionCollide: caught, a hit, or a bounce off a body or a wall.
     void chakramHits(ServerObject& m, ServerObject* other, float nx, float ny);
-    /// The chakram it carries, out onto the ground where it is, and the carrier gone.
-    void chakramDrops(ServerObject& m, ServerObject& chakram);
+    /// The chakram it carries, out onto the ground where it is, and the carrier gone: `dropped` by
+    /// its DROP (Obj_DropAt: lost off a wall, or its thrower gone), else set down off a body
+    /// (Obj_RemoveFromInventory and createAt: no DROP, so no decay).
+    void chakramDrops(ServerObject& m, ServerObject& chakram, bool dropped);
     /// MagicMissileUpdate: its homing, and its burst at its time's end.
     void magicMissileUpdate(ServerObject& m);
     /// HarpoonUpdate: seeking, riding what it holds, letting go.

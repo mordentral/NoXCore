@@ -99,6 +99,7 @@ struct ScriptUiClient::Impl {
     bool hasDraw = false, hasClick = false, hasMessage = false, hasView = false, hasKey = false;
     bool hasDrag = false, hasMouseUp = false, hasWheel = false; ///< (API 3's hooks)
     bool hasTick = false;                                        ///< (API 4's)
+    bool hasLabelClick = false;                                  ///< (API 5's)
     std::vector<UiWindow> windows;
     UiWindow* drawing = nullptr; ///< (the window whose draw is running: draws go to it)
     std::deque<std::pair<std::uint8_t, std::vector<std::uint8_t>>> inbox; ///< data and views, oldest first
@@ -573,6 +574,18 @@ int uiBox(lua_State* L, UiDraw::Kind kind)
 int uiFill(lua_State* L) { return uiBox(L, UiDraw::Kind::Box); }
 int uiOutline(lua_State* L) { return uiBox(L, UiDraw::Kind::Outline); }
 
+/// (API 5) nox.text's and nox.textWidth's size at `idx`: 1-4 times the UI's text (none: 1; an
+/// API 4 UI's: 1 whatever it passes, as before).
+float textSizeArg(lua_State* L, int idx)
+{
+    if (implOf(L).runningApi < 5 || lua_isnoneornil(L, idx)) {
+        return 1;
+    }
+    const double v = luaL_checknumber(L, idx);
+    luaL_argcheck(L, v >= 1 && v <= 4, idx, "a text size is 1-4");
+    return static_cast<float>(v);
+}
+
 int uiText(lua_State* L)
 {
     UiWindow& w = drawingWindow(L);
@@ -584,6 +597,7 @@ int uiText(lua_State* L)
     d.x = static_cast<float>(luaL_checknumber(L, 2));
     d.y = static_cast<float>(luaL_checknumber(L, 3));
     d.color = colourArg(L, 4);
+    d.size = textSizeArg(L, 5);
     w.draws.push_back(std::move(d));
     return 0;
 }
@@ -594,7 +608,8 @@ int uiTextWidth(lua_State* L)
     size_t n = 0;
     const char* s = luaL_checklstring(L, 1, &n);
     const std::string_view text(s, std::min(n, kMaxText));
-    lua_pushinteger(L, impl.textWidth ? impl.textWidth(text) : static_cast<int>(text.size()) * 6);
+    const int width = impl.textWidth ? impl.textWidth(text) : static_cast<int>(text.size()) * 6;
+    lua_pushinteger(L, static_cast<int>(std::lround(static_cast<float>(width) * textSizeArg(L, 2))));
     return 1;
 }
 
@@ -888,6 +903,13 @@ int uiLabel(lua_State* L)
             l.keep = lua_toboolean(L, -1) != 0;
             lua_pop(L, 1);
         }
+        if (impl.runningApi >= 5) {
+            // (API 5's click: a left click on the label is the UI's.)
+            lua_getfield(L, 4, "click");
+            luaL_argcheck(L, lua_isnil(L, -1) || lua_isboolean(L, -1), 4, "click is a boolean");
+            l.click = lua_toboolean(L, -1) != 0;
+            lua_pop(L, 1);
+        }
     }
     impl.labelsOfThisMap(); // (a map loaded since the last frame: the old map's labels gone first)
     const auto it = std::ranges::find(impl.labels, l.object, &UiLabel::object);
@@ -1145,6 +1167,7 @@ void Impl::start()
     hasMouseUp = uiApi >= 3 && has("mouseUp");
     hasWheel = uiApi >= 3 && has("wheel");
     hasTick = uiApi >= 4 && has("tick");
+    hasLabelClick = uiApi >= 5 && has("labelClick");
     lua_pop(L, 1);
     if (begin("start") && !finish("start", 0, 0)) {
         return;
@@ -1702,6 +1725,15 @@ bool ScriptUiClient::wheel(std::string_view windowId, float x, float y, int step
         pushAt(L, windowId, x, y);
         lua_pushinteger(L, steps);
     });
+}
+
+void ScriptUiClient::labelClick(std::uint16_t object)
+{
+    Impl& impl = *impl_;
+    if (!impl.hasLabelClick) {
+        return;
+    }
+    callTaking(impl, "labelClick", 1, [&](lua_State* L) { lua_pushinteger(L, object); });
 }
 
 const UiWindow* ScriptUiClient::windowAt(float x, float y) const

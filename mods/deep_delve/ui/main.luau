@@ -14,7 +14,8 @@
 --           when they leave;
 --   hero    (the Character window) the character's name, level and experience, the area, the Town
 --           portal, Tree and Sheet buttons, the loot names option (shown while Alt is held, or
---           always; kept with the character), the act (cleared or not);
+--           always; kept with the character), the act (cleared or not), or on an expedition its
+--           rank (cleared or not);
 --   boss    while an act boss lives: a bar with its health under its name;
 --   stash   (touching the town's chest) the stash's tabs and what the character carries: a click
 --           moves an item across;
@@ -30,6 +31,10 @@
 --           the character) and area, the ones found to click (this area's: a step, no vote;
 --           another's, in any act listed: the party's vote, or at once when alone), the area being
 --           played marked;
+--   maps    (stepping on the pad at the town's map table: "Expeditions") the biomes offered, the
+--           rank ladder (each rank's area level, open, locked, or cleared in the biome picked), a
+--           biome and a rank picked by a click, and the way out (alone at once; in a party, the
+--           party's vote); while the table is shut to the character, why;
 --   chars   (a server that keeps the characters: character select) the account's characters, one
 --           of the class joined as to play, a new one, "Link another PC" (a code shown here alone),
 --           a code from another PC typed on its keys (or the number keys) at character select,
@@ -73,10 +78,13 @@ local ui = {}
 local W, H = 168, 104
 -- The Character window's corner: the screen's top left (a framed window's highest is y 20).
 local HERO_X, HERO_Y = 6, 20
-local BOSS_W, BOSS_H = 220, 26
--- The boss's bar: its frame below the party strip with its vote's row (the strip's top, its height,
--- a gap and the frame's title bar).
-local BOSS_Y = 90
+-- The boss's bar: a bare HUD piece (no frame, click-through) under the party strip with its vote's
+-- row: the boss's name as its title over the bar, in the boss's colour on a dark band, the bar
+-- under it. The title is drawn at text size BOSS_TITLE (UI API 5's nox.text size).
+local BOSS_W, BOSS_H = 300, 40
+local BOSS_Y = 76
+local BOSS_TITLE = 1.5
+local BOSS_BAR_Y = 25
 
 local shown: any = nil
 local bossShown: any = nil
@@ -422,8 +430,11 @@ local RETRY = 1000
 -- The character's option: "alt" (shown while Alt is held) or "always".
 local lootNames = "alt"
 
+-- (a loot label is clickable (its entry's `p`): a click on its name asks the server to pick it up,
+-- which it does by the game's own pickup when the hero is in reach (gold to the purse, a potion
+-- drunk). A name plate never is: a click on a clickable label is always the UI's, never the game's.)
 local function setLabel(code: number, l: any): boolean
-	return nox.label(code, l.t, LABEL_COLOUR[l.r] or LABEL_COLOUR.normal, { show = if lootNames == "always" then "always" else "alt", keep = true })
+	return nox.label(code, l.t, LABEL_COLOUR[l.r] or LABEL_COLOUR.normal, { show = if lootNames == "always" then "always" else "alt", keep = true, click = l.p == true })
 end
 
 -- A plate's label: always shown, kept while its monster is out of the client's world.
@@ -651,6 +662,11 @@ local function drawHero()
 	if shown.act then
 		local line: string = "Act " .. tostring(shown.act) .. (if shown.cleared then " cleared" else "")
 		nox.text(line, 4, 90, if shown.cleared then "gold" else "dim")
+	elseif type(shown.run) == "table" then
+		-- (an expedition's map: its rank, cleared once its champion is dead)
+		local run: any = shown.run
+		local line: string = "Expedition, rank " .. tostring(run.r) .. (if run.c then " cleared" else "")
+		nox.text(line, 4, 90, if run.c then "gold" else "dim")
 	end
 	-- (a server that keeps the characters: the account's characters, its PCs and a link code)
 	if shown.server then
@@ -665,11 +681,19 @@ local function drawBoss()
 	if not v then
 		return
 	end
-	local w = BOSS_W - 8
+	-- (a dark band, the name centred over the bar in the boss's colour, at the title size, with a
+	-- shadow under it; a client that draws one text size shows it plain, the same place)
+	nox.box(0, 0, BOSS_W, BOSS_H, { 0, 0, 0, 150 })
+	local name = tostring(v.name)
+	local colour: any = if type(v.c) == "table" then v.c else { 240, 70, 50 }
+	local tx = math.max(4, (BOSS_W - nox.textWidth(name, BOSS_TITLE)) // 2)
+	nox.text(name, tx + 1, 3, { 0, 0, 0 }, BOSS_TITLE)
+	nox.text(name, tx, 2, colour, BOSS_TITLE)
+	local w = BOSS_W - 12
 	local fill = math.floor(w * math.clamp(v.health / math.max(1, v.most), 0, 1))
-	nox.box(4, 6, w, 10, { 50, 10, 10 })
-	nox.box(4, 6, fill, 10, { 200, 30, 30 })
-	nox.outline(4, 6, w, 10, "dim")
+	nox.box(6, BOSS_BAR_Y, w, 10, { 50, 10, 10 })
+	nox.box(6, BOSS_BAR_Y, fill, 10, { 200, 30, 30 })
+	nox.outline(6, BOSS_BAR_Y, w, 10, "dim")
 end
 
 -- ---- The stash and the vendor
@@ -1537,6 +1561,143 @@ local function drawWaypoints()
 	end
 end
 
+-- ---- The map table (expeditions)
+
+local MW = 300
+local MAP_TOP = 24
+local MAP_ROW = 16
+local MAP_FOOT = 58
+local MAP_LEFT = 132
+-- The server's value ({ open, why, free, top, best, runs, biomes = { { n, c } }, ranks = { { r, l } },
+-- here }), nil until it comes; the biome and rank picked in the window (kept while it's closed).
+local mapsShown: any = nil
+local mapBiome: string? = nil
+local mapRank: number? = nil
+
+-- The window's height: the heading and the reason alone while the table is shut; else the ladder's
+-- rows (or the biomes', the longer) and the foot.
+local function mapsHeight(): number
+	local v = mapsShown
+	if not v or not v.open then
+		return MAP_TOP + 40
+	end
+	return MAP_TOP + 14 + math.max(#(v.biomes or {}), #(v.ranks or {})) * MAP_ROW + MAP_FOOT
+end
+
+-- The picks kept within what the value allows: a biome it lists (the run being played's, else the
+-- first), a rank at most the highest open (else the highest open).
+local function mapPicks(v: any)
+	local names: { [string]: boolean } = {}
+	for _, b in v.biomes or {} do
+		names[b.n] = true
+	end
+	if not mapBiome or not names[mapBiome] then
+		mapBiome = if v.here and names[v.here.b] then v.here.b elseif v.biomes and v.biomes[1] then v.biomes[1].n else nil
+	end
+	local top = tonumber(v.top) or 0
+	if not mapRank or mapRank > top or mapRank < 1 then
+		mapRank = if top >= 1 then top else nil
+	end
+end
+
+local function drawMaps()
+	local w = "maps"
+	closeBox(w, MW)
+	nox.image("tree/ui_waypoint", 4, 2, 18, 18)
+	nox.text("The map table", 26, 6, "gold")
+	local v = mapsShown
+	if not v then
+		nox.text("...", 4, MAP_TOP, "dim")
+		return
+	end
+	if not v.open then
+		drawWords(tostring(v.why or "The map table isn't open to you yet."), 6, MAP_TOP + 4, MW - 12, 2, "dim")
+		drawNote(w, 6, MAP_TOP + 26)
+		return
+	end
+	mapPicks(v)
+	local mx, my = mouseIn(w)
+	local hot: any = nil
+	local y0 = MAP_TOP + 14
+	nox.text("Biome", 8, MAP_TOP, "dim")
+	nox.text("Rank", MAP_LEFT + 12, MAP_TOP, "dim")
+	-- The biomes: each one's best rank cleared at its right.
+	local cleared: { number } = {}
+	for i, b in v.biomes or {} do
+		local y = y0 + (i - 1) * MAP_ROW
+		local picked = b.n == mapBiome
+		local isHot = over(mx, my, 4, y, MAP_LEFT - 8, MAP_ROW - 2)
+		nox.box(4, y, MAP_LEFT - 8, MAP_ROW - 2, if picked then { 60, 44, 24 } elseif isHot then { 40, 32, 22 } else { 26, 22, 17 })
+		nox.outline(4, y, MAP_LEFT - 8, MAP_ROW - 2, if picked then "gold" else { 90, 70, 40 })
+		nox.text(tostring(b.n), 10, y + 2, if picked then "bright" else "grey")
+		local best = 0
+		for _, r in b.c or {} do
+			best = math.max(best, tonumber(r) or 0)
+		end
+		if best > 0 then
+			local s = "best " .. best
+			nox.text(s, MAP_LEFT - 8 - nox.textWidth(s), y + 2, "dim")
+		end
+		if picked then
+			cleared = b.c or {}
+		end
+		local name = b.n
+		zone(w, 4, y, MAP_LEFT - 8, MAP_ROW - 2, function()
+			mapBiome = name
+		end)
+	end
+	-- The ladder: each rank's area level, open or locked, and cleared in the biome picked.
+	local top = tonumber(v.top) or 0
+	local rx, rw = MAP_LEFT + 4, MW - MAP_LEFT - 8
+	for i, e in v.ranks or {} do
+		local y = y0 + (i - 1) * MAP_ROW
+		local r = tonumber(e.r) or i
+		local open = r <= top
+		local picked = open and r == mapRank
+		local done = table.find(cleared, r) ~= nil
+		local isHot = open and over(mx, my, rx, y, rw, MAP_ROW - 2)
+		if isHot then
+			hot = { r = r, l = e.l }
+		end
+		nox.box(rx, y, rw, MAP_ROW - 2, if picked then { 60, 44, 24 } elseif isHot then { 40, 32, 22 } elseif open then { 26, 22, 17 } else { 16, 13, 10 })
+		nox.outline(rx, y, rw, MAP_ROW - 2, if picked then "gold" elseif open then { 90, 70, 40 } else { 50, 44, 34 })
+		nox.text("Rank " .. r, rx + 6, y + 2, if picked then "bright" elseif open then "grey" else { 90, 80, 66 })
+		local right = if not open then "locked" elseif done then "cleared, L" .. tostring(e.l) else "level " .. tostring(e.l)
+		nox.text(right, rx + rw - 6 - nox.textWidth(right), y + 2, if done then "gold" elseif open then "dim" else { 90, 80, 66 })
+		if open then
+			zone(w, rx, y, rw, MAP_ROW - 2, function()
+				mapRank = r
+			end)
+		end
+	end
+	-- The foot: what was picked, and the way out.
+	local rows = math.max(#(v.biomes or {}), #(v.ranks or {}))
+	local footY = y0 + rows * MAP_ROW + 2
+	nox.box(0, footY, MW, 1, { 90, 70, 40 })
+	local level = 0
+	for _, e in v.ranks or {} do
+		if e.r == mapRank then
+			level = tonumber(e.l) or 0
+		end
+	end
+	local can = mapBiome ~= nil and mapRank ~= nil
+	local what = if can then string.format("%s, rank %d: area level %d", tostring(mapBiome), mapRank or 0, level) else "Pick a biome and a rank."
+	nox.text(what, 6, footY + 5, if can then "bright" else "dim")
+	nox.text("A champion waits at its end; its fall opens the next rank.", 6, footY + 18, "dim")
+	local label = if #party >= 2 then "Ask the party" else "Set out"
+	local biome, rank = mapBiome, mapRank
+	button(w, MW - 100, footY + 31, 94, 15, label, can, function()
+		nox.send({ kind = "maps", op = "go", biome = biome, rank = rank })
+	end)
+	drawNote(w, 6, footY + 34)
+	if hot then
+		nox.tooltip({
+			{ string.format("Rank %d: area level %d", tonumber(hot.r) or 0, tonumber(hot.l) or 0), "bright" },
+			{ if #party >= 2 then "Setting out moves the whole party: everyone votes." else "You set out at once.", { 230, 190, 80 } },
+		})
+	end
+end
+
 -- ---- Character select (a server that keeps the characters)
 
 local CW = 300
@@ -1727,6 +1888,7 @@ local SPEC: { [string]: any } = {
 	tree = { title = "Passive tree", x = 20, y = 34, w = TW, h = TH },
 	sheet = { title = OWN_SHEET, x = 190, y = 60, w = HW, h = HH },
 	waypoints = { title = "Waypoints", x = 195, y = 60, w = WPW, h = 0 },
+	maps = { title = "Expeditions", x = 170, y = 60, w = MW, h = 0 },
 }
 
 -- A window's spec as it opens now: the sheet's title whoever's it shows, the waypoints' height
@@ -1739,6 +1901,9 @@ local function specOf(window: string): any
 	elseif window == "waypoints" then
 		spec = table.clone(spec)
 		spec.h = waypointsHeight()
+	elseif window == "maps" then
+		spec = table.clone(spec)
+		spec.h = mapsHeight()
 	end
 	return spec
 end
@@ -1759,7 +1924,7 @@ function ui.onMessage(value: any)
 	elseif kind == "boss" then
 		if value.most and value.most > 0 then
 			if not bossShown then
-				nox.window("boss", { title = value.name, anchor = "top", x = 320 - BOSS_W // 2, y = BOSS_Y, w = BOSS_W, h = BOSS_H })
+				nox.window("boss", { frame = false, clickThrough = true, hud = true, anchor = "top", x = 320 - BOSS_W // 2, y = BOSS_Y, w = BOSS_W, h = BOSS_H })
 			end
 			bossShown = value
 		elseif bossShown then
@@ -1823,6 +1988,11 @@ function ui.onMessage(value: any)
 		if opened.waypoints then
 			nox.window("waypoints", specOf("waypoints"))
 		end
+	elseif kind == "maps" then
+		mapsShown = value
+		if opened.maps then
+			nox.window("maps", specOf("maps"))
+		end
 	elseif kind == "treeState" then
 		whole[kind] = { header = value }
 	elseif kind == "note" then
@@ -1867,9 +2037,17 @@ function ui.draw(window: string)
 		drawSheet()
 	elseif window == "waypoints" then
 		drawWaypoints()
+	elseif window == "maps" then
+		drawMaps()
 	elseif window == "chars" then
 		drawChars()
 	end
+end
+
+-- A click on a ground item's name (a loot label, set clickable): the server picks it up when the
+-- hero is in reach, else says it's too far.
+function ui.labelClick(object: number)
+	nox.send({ kind = "pick", code = object })
 end
 
 -- A click: whatever was drawn there this frame (the last zone drawn on top wins).
