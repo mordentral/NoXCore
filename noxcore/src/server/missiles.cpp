@@ -535,6 +535,7 @@ bool Missiles::throwChakram(ServerObject& thrower, ServerObject& weapon)
         world.broadcasts().push_back({{0x4D, lo(weapon.extent), hi(weapon.extent), lo(weapon.type), hi(weapon.type)}, true, thrower.extent});
         std::erase(thrower.inventory, weapon.extent);
         weapon.holder = m.extent;
+        setOwner(world, &m, weapon);
         m.inventory.emplace_back(weapon.extent);
         m.chakram = ServerObject::Chakram{4, 2, {}, {}, thrower.x, thrower.y};  // (4 bounces, leg 2: outward)
         return true;
@@ -560,6 +561,7 @@ void Missiles::chakramDrops(ServerObject& m, ServerObject& chakram)
     // (Obj_DropAt: into the world where it is; a weapon not picked up at once; it decays.)
     std::erase(m.inventory, chakram.extent);
     chakram.holder = 0;
+    clearOwner(world, chakram); // (Obj_RemoveFromInventory: nobody's)
     chakram.flags = (chakram.flags & 0x35E9FEDBu) | ObjFlag::Active | ObjFlag::NoCollide;
     chakram.x = chakram.frameStartX = chakram.newX = m.x;
     chakram.y = chakram.frameStartY = chakram.newY = m.y;
@@ -716,6 +718,7 @@ void Missiles::chakramHits(ServerObject& m, ServerObject* other, float nx, float
         // Caught: back in its thrower's inventory, worn if nothing is.
         std::erase(m.inventory, chakram->extent);
         chakram->holder = 0;
+        clearOwner(world, *chakram); // (Obj_RemoveFromInventory; the inventory's put sets it again)
         if (other->player) {
             Items{world, things, modifiers, rng, frame}.receive(*other, *chakram);
         }
