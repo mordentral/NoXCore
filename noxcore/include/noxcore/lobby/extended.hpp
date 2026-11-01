@@ -15,14 +15,21 @@
 //           hash and n 0 when it adds no types]
 //          [version 5: then u64 its client key realm (a mode's "clientKeys": GameHost::Options::
 //           clientKeyRealm); only from a host that has one]
+//          [version 6: then u8 n, n bytes: the game mode's name in UTF-8 (GameHost::Options::
+//           modeName: a NoX Core mode's or a mod's, as the registry names it), sent up to
+//           kModeNameBytes, cut inside it only between characters; only from a host that names one]
 //
 // A query with no client features is version 1's, byte for byte, and one from a game whose
 // content packs add no object types is version 2's at most: version 3's tail is only there when
 // they do (and a reply's when the host's do), version 4's only from a client above level 0 (and
-// a reply's from a host above level 0 or asking for a level). A server from before version 2
+// a reply's from a host above level 0 or asking for a level; version 6's only from a host that
+// names its mode, the earlier tails then sent with their zeros). A server from before version 2
 // reads the token alone (it never looked at the version or past the token), and one from before
 // version 3 the features alone, so a newer tail costs nothing there; a client from before a
-// version asks without it, and reads a reply up to its feature bits (or its packs).
+// version asks without it, and reads a reply up to its feature bits (or its packs, its levels,
+// its realm): every reader stops after the last tail it knows, so a client from before version 6
+// reads a reply with a mode's name as it read the same host's reply before (its game list shows
+// the mode the game flags name). No client level goes with the name: nothing to take or refuse.
 //
 // A reply too short for its version's tail is no reply (decodeExtendedReply: nullopt); a query
 // too short for it names no types or level (extendedQueryTypesHash, extendedQueryClientLevel:
@@ -75,6 +82,10 @@ inline constexpr std::uint16_t kExtendedTypesVersion = 3;
 inline constexpr std::uint16_t kExtendedLevelVersion = 4;
 /// The version whose tail carries a client key realm (the reply) and a client's secret for it (the query).
 inline constexpr std::uint16_t kExtendedRealmVersion = 5;
+/// The version whose tail carries the game mode's name (the reply only).
+inline constexpr std::uint16_t kExtendedModeNameVersion = 6;
+/// The most of a mode's name a reply carries (bytes of UTF-8).
+inline constexpr std::size_t kModeNameBytes = 64;
 
 /// A NoX Core client's secret for one host realm (a mode's "clientKeys"): random, made by the client
 /// the first time it meets the realm and kept in its own folder; the host keeps only a key made
@@ -131,6 +142,9 @@ struct ExtendedServer {
     std::uint16_t minClientLevel = 0; ///< the lowest client level it lets in (version 4; 0: any)
     std::uint16_t clientLevel = 0;    ///< its own build's kClientLevel (version 4; 0 in an older one's)
     std::uint64_t realm = 0;          ///< its client key realm (version 5; 0: none)
+    /// its game mode's name, for the game list's Mode column (version 6; empty: none, the game
+    /// flags' mode shown). Sent up to kModeNameBytes.
+    std::string modeName;
     bool operator==(const ExtendedServer&) const = default;
 };
 

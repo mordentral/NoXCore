@@ -1879,6 +1879,11 @@ function ui.start()
 	-- (the game's buff icons draw down the screen's top left: by decision they start below this
 	-- window, its frame's bottom and a margin; UI API 5)
 	nox.hudReserve({ x = 0, y = 0, w = HERO_X + W + 4, h = HERO_Y + H + 4, anchor = "topleft" })
+	-- (by decision the party strip, the boss's bar, the name plates and the loot labels stay up
+	-- while the full map is open; a client without the call keeps the old hiding)
+	if nox.overMap then
+		nox.overMap(true)
+	end
 	placeStrip()
 end
 

@@ -141,6 +141,7 @@ struct ScriptUiClient::Impl {
         std::int8_t anchorX = 0, anchorY = 0;
     };
     std::optional<Reserve> reserve;
+    bool overMap = false; ///< (API 5) nox.overMap's: the HUD pieces and labels kept up with the full map
     std::vector<UiTooltipLine> tooltip; ///< (this frame's, or the last one's when a frame ran out of time first)
     bool tooltipSet = false;            ///< (nox.tooltip called in this frame)
     std::vector<UiLabel> labels;
@@ -195,6 +196,7 @@ struct ScriptUiClient::Impl {
         runningApi = 0;
         windows.clear();
         reserve.reset();
+        overMap = false;
         inbox.clear();
         big = BigData{};
         bigIn = 0;
@@ -473,6 +475,15 @@ int uiHudReserve(lua_State* L)
     r.box.h = num("h", 0, 480);
     readAnchor(L, 1, r.anchorX, r.anchorY);
     impl.reserve = r;
+    return 0;
+}
+
+int uiOverMap(lua_State* L)
+{
+    // (API 5) nox.overMap(on): true keeps the UI's HUD pieces (drawn and taking the mouse) and its
+    // labels up while the full map is open; false or nil: hidden with it, as the game's HUD hid them.
+    luaL_argcheck(L, lua_isnoneornil(L, 1) || lua_isboolean(L, 1), 1, "on is a boolean");
+    implOf(L).overMap = lua_toboolean(L, 1) != 0;
     return 0;
 }
 
@@ -1104,7 +1115,7 @@ void Impl::start()
         {"spellIcon", uiSpellIcon}, {"hitArea", uiHitArea},
     };
     static constexpr std::pair<const char*, lua_CFunction> kToolbox5[] = {
-        {"hudReserve", uiHudReserve},
+        {"hudReserve", uiHudReserve}, {"overMap", uiOverMap},
     };
     lua_createtable(L, 0,
                     static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3) + std::size(kToolbox4) + std::size(kToolbox5)) + 1);
@@ -1749,6 +1760,11 @@ void ScriptUiClient::setHudShown(bool shown)
 bool ScriptUiClient::hudShown() const noexcept
 {
     return impl_->hudShown;
+}
+
+bool ScriptUiClient::overMap() const noexcept
+{
+    return impl_->overMap && impl_->vm;
 }
 
 const std::vector<uimsg::Decal>& ScriptUiClient::decals() const noexcept

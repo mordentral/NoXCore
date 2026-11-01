@@ -91,11 +91,11 @@ const char* keyName(SDL_Keycode k)
     }
 }
 
-/// Whether the game hides its HUD now: the GUI off (F11, a cutscene), a shop or a dialog up, the
-/// full map, the console, a briefing.
-bool gameHudHidden(const App& app)
+/// Whether the game hides a mode's HUD now: the GUI off (F11, a cutscene), a shop or a dialog up,
+/// the full map (not for a UI kept over it: API 5's nox.overMap), the console, a briefing.
+bool gameHudHidden(const App& app, bool overMap)
 {
-    return !app.renderGui || (app.tradeScreens && app.tradeScreens->hidesHud()) || (app.minimap && app.minimap->shown()) ||
+    return !app.renderGui || (app.tradeScreens && app.tradeScreens->hidesHud()) || (!overMap && app.minimap && app.minimap->shown()) ||
            (app.console && app.console->isOpen()) || (app.cinematics && app.cinematics->screenUp());
 }
 
@@ -222,7 +222,8 @@ public:
     {
         placed_.clear(); // (none drawn this frame: none to click)
         placedFrame_ = app.frames;
-        if (!ui_ || ui_->api() < 3 || app.modeLabelSpots.empty() || !app.font || gameHudHidden(app)) {
+        // (Kept over the full map, nox.overMap: drawn with the world, under the map's half-dark square.)
+        if (!ui_ || ui_->api() < 3 || app.modeLabelSpots.empty() || !app.font || gameHudHidden(app, ui_->overMap())) {
             return;
         }
         drawLabels(app, renderer);
@@ -397,7 +398,7 @@ private:
         ui_->setViewMargins(originX_ / scale_, originY_ / scale_); // (the anchored windows' edges)
         mouse_ = {(hud.mouse.x - originX_) / scale_, (hud.mouse.y - originY_) / scale_};
         ui_->setMouse(std::pair{mouse_.x, mouse_.y});
-        ui_->setHudShown(!gameHudHidden(app));
+        ui_->setHudShown(!gameHudHidden(app, ui_->overMap()));
         ui_->frame(hud.nowMs);
         if (ui_->assets() != texturesOf_) {
             freeTextures(); // (a new set: its pictures made as they're drawn)

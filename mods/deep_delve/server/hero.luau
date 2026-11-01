@@ -12,9 +12,9 @@
 --          party strip and the ground's labels (party.luau, labels.luau); boardSig what this game
 --          last put of its records row (records.luau);
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
---          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), spellCost,
---          summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a hit's thing
---          type: a spell's own) };
+--          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), manaOnKill,
+--          spellCost, summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a
+--          hit's thing type: a spell's own) };
 --   regen  its passive regeneration's timer and state (regen.luau);
 --   open   its windows open (windows.luau); sheetOf the party member whose sheet its sheet window
 --          shows (nil: its own; sheet.luau); padAt the frame it last touched the town's
@@ -111,6 +111,7 @@ local function bonusOf(unit: number, rec: any)
 		resist = t.resist,
 		healthRegen = t.healthRegen,
 		manaRegen = t.manaRegen,
+		manaOnKill = t.manaOnKill,
 		spellCost = t.spellCost,
 		summonCost = t.summonCost,
 		summonHealth = t.summonHealth,
@@ -128,6 +129,8 @@ local function bonusOf(unit: number, rec: any)
 						b.health += a.value
 					elseif a.id == "mana" then
 						b.mana += a.value
+					elseif a.id == "manaRegen" then
+						b.manaRegen += a.value
 					end
 				end
 			end
@@ -416,7 +419,7 @@ function hero.join(p: any, chosen: any?)
 		record = record,
 		ready = false,
 		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-			spellCost = 0, summonCost = 0, summonHealth = 0, own = {} },
+			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = {} },
 		open = {},
 		need = hero.needFor(record.level.level),
 		since = nox.frame(),
@@ -542,7 +545,8 @@ function hero.gain(h: any, amount: number)
 	hud.hero(h)
 end
 
--- A kill's experience: split evenly between the heroes in play (at least 1 each).
+-- A kill's experience: split evenly between the heroes in play (at least 1 each). The killer's
+-- manaOnKill (the passive tree's) comes back to it, up to its most.
 function hero.award(amount: number, killer: number?)
 	local ready = {}
 	for _, h in byPeer do
@@ -557,6 +561,13 @@ function hero.award(amount: number, killer: number?)
 	local k = killer and byUnit[killer]
 	if k then
 		k.record.records.kills += 1
+		local gain = k.bonus.manaOnKill or 0
+		if gain > 0 and nox.living(k.unit) then
+			local mana, most = nox.mana(k.unit)
+			if mana < most then
+				nox.setMana(k.unit, math.min(most, mana + gain), most, "plain")
+			end
+		end
 	end
 end
 

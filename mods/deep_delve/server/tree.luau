@@ -346,7 +346,7 @@ local function addStats(sum: any, stats: any, times: number)
 end
 
 -- What the taken nodes add up to: { health, mana, strength, healthPct, manaPct, damage, resist,
--- healthRegen, manaRegen (a second), spellCost, summonCost, summonHealth (%), own }: each node's
+-- healthRegen, manaRegen (a second), manaOnKill, spellCost, summonCost, summonHealth (%), own }: each node's
 -- stats, the masteries of the spells and abilities the class has from them, and the stats' worth
 -- of each spell, ability or summon node it can't use (data.crossWorth); own: the % more damage a
 -- hit by a thing of each type deals (its spell's own bonus, data.rises), by type.
@@ -354,7 +354,7 @@ function tree.totals(rec: any): any
 	local class = classOf(rec)
 	local own: { [string]: number } = {}
 	local sum = { health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, damage = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-		spellCost = 0, summonCost = 0, summonHealth = 0, own = own }
+		manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = own }
 	local worth = (data.crossWorth :: any)[class] or {}
 	for id in tree.taken(rec) do
 		local n = nodes[id]
@@ -417,6 +417,7 @@ local STAT_WORDS: { { string } } = {
 	{ "resist", "%+d%% resistance" },
 	{ "healthRegen", "+%.1f health a second" },
 	{ "manaRegen", "+%.1f mana a second" },
+	{ "manaOnKill", "+%d mana for each kill" },
 	-- (a third word for a value below 0, said as its size)
 	{ "spellCost", "spells cost %d%% more mana", "spells cost %d%% less mana" },
 	{ "summonCost", "summonings cost %d%% more mana", "summonings cost %d%% less mana" },

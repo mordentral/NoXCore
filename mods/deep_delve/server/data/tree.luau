@@ -35,8 +35,9 @@
 --
 -- Stats (as items' affixes are applied): health, mana, strength (flat), healthPct, manaPct (% of
 -- the most), damage (% more dealt), resist (% less taken), healthRegen, manaRegen (a second, on top
--- of the class's base regeneration: regen.luau). Each class also has a short Renewal run of
--- regeneration nodes beside its root (at the end of `nodes`).
+-- of the class's base regeneration: regen.luau), manaOnKill (mana back to the killer for each kill
+-- it makes). Each class also has a short Renewal run of regeneration nodes beside its root (at the
+-- end of `nodes`); the wizard's branch notables give mana a second too (by decision 2026-10-31).
 --
 -- Cast-cost stats (keystones only; casts.luau and summons.luau): spellCost (% of a spell's mana
 -- price given back as the cast goes off; summonings aside), summonCost (the same for a summoning),
@@ -414,7 +415,7 @@ region("wizard", "The Wizard's Path", 3, -4, m3, {
 		A = "SPELL_FIREBALL",
 		B = "SPELL_BURN",
 		small = WIZARD_SMALL,
-		notable = { name = "Kindling", icon = "n_kindling", stats = { damage = 6, mana = 8 } },
+		notable = { name = "Kindling", icon = "n_kindling", stats = { damage = 6, mana = 8, manaRegen = 1 } },
 		keystone = { name = "Pyre Heart", icon = "k_pyre_heart", stats = { damage = 25, healthPct = -15 } },
 	},
 	{
@@ -426,7 +427,7 @@ region("wizard", "The Wizard's Path", 3, -4, m3, {
 		A = "SPELL_LIGHTNING",
 		B = "SPELL_SHOCK",
 		small = { WIZARD_SMALL[2], WIZARD_SMALL[1] },
-		notable = { name = "Static Mind", icon = "n_static_mind", stats = { mana = 15, damage = 3 } },
+		notable = { name = "Static Mind", icon = "n_static_mind", stats = { mana = 15, damage = 3, manaRegen = 1 } },
 		keystone = { name = "Overcharge", icon = "k_overcharge", stats = { manaPct = 25, damage = 10, resist = -10 } },
 	},
 	{
@@ -438,7 +439,7 @@ region("wizard", "The Wizard's Path", 3, -4, m3, {
 		A = "SPELL_MAGIC_MISSILE",
 		B = "SPELL_DEATH_RAY",
 		small = { WIZARD_SMALL[3], WIZARD_SMALL[1] },
-		notable = { name = "Focus", icon = "n_focus", stats = { mana = 10, resist = 3 } },
+		notable = { name = "Focus", icon = "n_focus", stats = { mana = 10, resist = 3, manaRegen = 1 } },
 		keystone = { name = "Mind over Body", icon = "k_mind_over_body", stats = { manaPct = 40, healthPct = -20 } },
 	},
 })
@@ -571,5 +572,10 @@ link(branchNode("wizard", "Arcana", 12), add({ x = 8, y = -17, kind = "keystone"
 	icon = "k_measured_words", stats = { spellCost = -30, damage = -15 } }))
 link(branchNode("conjurer", "Beasts", 11), add({ x = 11, y = 16, kind = "keystone", region = "conjurer", branch = "Beasts", name = "Thin Bonds",
 	icon = "k_thin_bonds", stats = { summonCost = -50, summonHealth = -30 } }))
+
+-- Siphon (by decision 2026-10-31; id 156): the wizard's, a second notable of its Renewal run, past
+-- Wellspring: mana back for each kill its taker makes.
+link(branchNode("wizard", "Renewal", 3), add({ x = 11, y = -4, kind = "notable", region = "wizard", branch = "Renewal", name = "Siphon",
+	icon = "s_mana", stats = { manaOnKill = 6, manaRegen = 0.5 } }))
 
 return data

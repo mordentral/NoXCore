@@ -110,6 +110,11 @@
 //                                    (1-4: 1.5, 2 for a title); nox.textWidth(text, size) its
 //                                    width at that size. A client before it ignores it (the text
 //                                    at the UI's size)
+//   nox.overMap(on)                  true: the full map open, the UI's HUD pieces stay drawn and
+//                                    take the mouse, and its labels stay drawn (and clickable);
+//                                    whatever else hides the game's HUD still hides them (overMap()).
+//                                    A client before it hasn't the function: call it as
+//                                    `if nox.overMap then nox.overMap(true) end`
 //
 // The program calls frame() once a frame and draws windows(); a click in one goes to click().
 // Without a server (the map editor's UI preview), runLocal starts a UI from its source, useAssets
@@ -347,6 +352,9 @@ public:
     /// mouse); true until told.
     void setHudShown(bool shown);
     bool hudShown() const noexcept;
+    /// (API 5) nox.overMap's: whether the full map leaves the UI's HUD pieces and labels up (the
+    /// program's not to count it in setHudShown). False with no UI running.
+    bool overMap() const noexcept;
     /// How far the view reaches past the 640 x 480 on each side, in its units (the program's fit:
     /// 0, 0 until told, as in a 4:3 view); anchored windows (UiWindow::anchorX/Y) moved by them.
     void setViewMargins(float x, float y);

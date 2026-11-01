@@ -2,6 +2,7 @@
 // looks (full screen, or framed inside the menus' game browser).
 #include "browser_screen.hpp"
 #include "client_level_gate.hpp"
+#include "mode_column.hpp"
 #include "pencil_icon.hpp"
 
 #include <algorithm>
@@ -355,8 +356,9 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
     const float w = area.w;
 
     // Columns: name, map, mode, players, ping, where it was found.
-    // (From has the most room after the name's: "NoX Core XWIS LAN" and the padlock beside it.)
-    const float cols[6] = {x0, x0 + w * 0.35f, x0 + w * 0.49f, x0 + w * 0.61f, x0 + w * 0.71f, x0 + w * 0.80f};
+    // (From has the most room after the name's: "NoX Core XWIS LAN" and the padlock beside it. Mode
+    // has a little more than Map, whose names are 8 letters at most: a mode's own name, "Undead Tide".)
+    const float cols[6] = {x0, x0 + w * 0.35f, x0 + w * 0.47f, x0 + w * 0.61f, x0 + w * 0.71f, x0 + w * 0.80f};
     const char* headers[6] = {"Name", "Map", "Mode", "Players", "Ping", "From"};
     const float headerY = l.top - l.rowHeight;
     for (int i = 0; i < 6; ++i) {
@@ -439,7 +441,12 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             cell(0, name, ty, text);
         }
         cell(1, g.map, ty, text);
-        cell(2, std::string(nox::lobby::gameModeName(g.gameFlags)), ty, text);
+        // (A NoX Core mode's own name when its host gave one, the game flags' otherwise; whole
+        // words kept when it's too wide: mode_column.hpp.)
+        cell(2,
+             mode_column::fitModeText(mode_column::modeText(e), cols[3] - cols[2] - 4,
+                                      [&](const std::string& s) { return font_.measure(s, l.size); }),
+             ty, text);
         cell(3, std::to_string(g.players) + "/" + std::to_string(g.maxPlayers), ty, text);
         cell(4, e.pingMs ? std::to_string(*e.pingMs) + " ms" : "-", ty, pingColor(e.pingMs));
         // `sources` is a bitmask of every place the game was found (it can be several).

@@ -205,9 +205,11 @@ std::vector<std::uint8_t> encodeExtendedReply(std::uint32_t token, const Extende
 {
     std::vector<std::uint8_t> out;
     const bool types = server.typesHash != 0;
-    const bool realm = server.realm != 0;
+    const bool modeName = !server.modeName.empty();
+    const bool realm = server.realm != 0 || modeName;
     const bool levels = server.minClientLevel != 0 || server.clientLevel != 0 || realm;
-    const std::uint16_t version = realm   ? std::max(server.version, kExtendedRealmVersion)
+    const std::uint16_t version = modeName ? std::max(server.version, kExtendedModeNameVersion)
+                                  : realm  ? std::max(server.version, kExtendedRealmVersion)
                                   : levels ? std::max(server.version, kExtendedLevelVersion)
                                   : types  ? std::max(server.version, kExtendedTypesVersion)
                                            : server.version;
@@ -237,8 +239,20 @@ std::vector<std::uint8_t> encodeExtendedReply(std::uint32_t token, const Extende
         put16(out, server.minClientLevel);
         put16(out, server.clientLevel);
     }
-    if (realm) {
+    if (realm) { // (version 5's tail: a version 6 one without a realm has 0)
         put64(out, server.realm);
+    }
+    if (modeName) {
+        // At most kModeNameBytes: cut between UTF-8 characters, never inside one.
+        const std::string_view name = server.modeName;
+        std::size_t n = std::min(name.size(), kModeNameBytes);
+        if (n < name.size()) {
+            while (n > 0 && (static_cast<unsigned char>(name[n]) & 0xC0) == 0x80) {
+                --n;
+            }
+        }
+        out.push_back(static_cast<std::uint8_t>(n));
+        out.insert(out.end(), name.begin(), name.begin() + static_cast<std::ptrdiff_t>(n));
     }
     return out;
 }
@@ -285,6 +299,15 @@ std::optional<ExtendedReply> decodeExtendedReply(std::span<const std::uint8_t> d
             return std::nullopt;
         }
         r.server.realm = get64(datagram, at);
+        at += 8;
+    }
+    if (h->first >= kExtendedModeNameVersion) {
+        // u8 n, n bytes: the mode's name (more than kModeNameBytes taken as sent).
+        if (datagram.size() < at + 1 || datagram.size() < at + 1 + datagram[at]) {
+            return std::nullopt;
+        }
+        const std::size_t n = datagram[at];
+        r.server.modeName.assign(reinterpret_cast<const char*>(datagram.data() + at + 1), n);
     }
     return r;
 }

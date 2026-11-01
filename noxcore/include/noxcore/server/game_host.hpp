@@ -268,6 +268,11 @@ public:
         /// noxcpp: feature bits a NoX Core mode adds to the extended reply (lobby/extended.hpp's
         /// ServerFeature, as CoopCampaign), for noxsdl's game list.
         std::uint32_t features = 0;
+        /// noxcpp: the game mode's name (a NoX Core mode's or a mod's: its registry entry's
+        /// ModeInfo::name, set by the host that makes it), told to NoX Core game lists in the
+        /// extended reply (version 6) for their Mode column. Empty: none (the game flags' mode
+        /// shown). Never in the server info or the WOL record: stock lists see the flags as before.
+        std::string modeName;
         /// noxcpp (a NoX Core-only mode's: mode.json's "stockClients": false): a stock client (one
         /// that didn't identify itself) is let in only to read `notice` (as the message of the day
         /// and a text line), held out of play as an observer (PlayerControl::heldOut), and put out
@@ -583,6 +588,8 @@ public:
     /// What the game list's extended reply says the server does (lobby/extended.hpp): high rates,
     /// and an edit session (a pencil in noxsdl's browser).
     std::uint32_t extendedFeatures() const;
+    /// The extended reply's own part (the update rate, the feature bits, the mode's name).
+    lobby::ExtendedServer extendedServer() const;
     /// The maps folder's network maps (as scanMaps finds them), strcmp order.
     std::vector<MapChoice> mapChoices();
     /// A mode's limits as the game began (its Options: nox.cfg's, --host-...): the window's Defaults.

@@ -252,7 +252,7 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
         access_.password = options_.password.substr(0, 9);
     }
     syncAccess();
-    transport_.setExtended({lobby::kExtendedVersion, static_cast<std::uint8_t>(options_.multiplier), extendedFeatures()});
+    transport_.setExtended(extendedServer());
     // The object types the content packs add: only games with the same ones are let in. (The
     // process's: its thing.bin loads once, with the installed packs, and every host shares it.)
     const content::NewThingTypes types = content::newThingTypes();
@@ -3209,7 +3209,7 @@ void GameHost::setHostSwitches(const HostSwitches& s)
     if (multiplier != options_.multiplier) {
         options_.multiplier = multiplier;
         server_.clock().setMultiplier(multiplier);
-        transport_.setExtended({lobby::kExtendedVersion, static_cast<std::uint8_t>(multiplier), extendedFeatures()});
+        transport_.setExtended(extendedServer());
     }
     // noxcpp's map vote: off, a vote under way ends without a result.
     options_.mapVote = s.mapVote;
@@ -4505,6 +4505,13 @@ std::uint32_t GameHost::extendedFeatures() const
            (options_.noxcppMessages.contains(static_cast<std::uint8_t>(net::Op::NoxcppEdit)) ? lobby::ServerFeature::EditSession : 0u) |
            (options_.stockRefusal ? lobby::ServerFeature::NoxCoreOnly : 0u) | // (noxsdl's browser marks it NoX Core only)
            (options_.pickupAnyClass ? lobby::ServerFeature::PickupAnyClass : 0u); // (World::pickupAnyClass: noxsdl's cursor no Caution then)
+}
+
+lobby::ExtendedServer GameHost::extendedServer() const
+{
+    lobby::ExtendedServer s{lobby::kExtendedVersion, static_cast<std::uint8_t>(options_.multiplier), extendedFeatures()};
+    s.modeName = options_.modeName; // (a mode's name: NoX Core lists show it in their Mode column)
+    return s;
 }
 
 void GameHost::setSandboxNoScoring(bool on)

@@ -62,11 +62,13 @@ loot.worth = { base = 300, perLevel = 120, most = 2500 }
 
 -- Deep Delve's own affixes (design 4.3), a rare's one or two: { id, text (%d its value), stat,
 -- low, high (its value at area level 1), perLevel (more each area level) }. Applied while worn:
--- "damage" scales the damage its wearer deals (combat.luau), "health" and "mana" raise its most.
+-- "damage" scales the damage its wearer deals (combat.luau), "health" and "mana" raise its most,
+-- "manaRegen" adds to its mana a second (regen.luau; by decision 2026-10-31).
 loot.affixes = {
 	{ id = "damage", text = "+%d%% damage", stat = "damage", low = 4, high = 8, perLevel = 0.6 },
 	{ id = "health", text = "+%d health", stat = "health", low = 4, high = 10, perLevel = 1.0 },
 	{ id = "mana", text = "+%d mana", stat = "mana", low = 4, high = 10, perLevel = 1.0 },
+	{ id = "manaRegen", text = "+%d mana a second", stat = "manaRegen", low = 1, high = 2, perLevel = 0.1 },
 }
 
 -- How each rarity shows on the ground (design 4.3): sparks in its colour (a point effect's

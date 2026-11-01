@@ -171,4 +171,14 @@ struct Mode {
     std::function<std::shared_ptr<void>(const std::filesystem::path& gameDir)> openRecords;
 };
 
+/// A host's set-up of the mode's server side it made (every host's, so each mode and mod gets
+/// it): the game told to NoX Core lists by the mode's name (GameHost::Options::modeName: a mod's
+/// mode.json "name"; a configure that sets its own keeps it), then the mode's own options
+/// (ServerMode::configure). What configure gives: the mode's lobby map, if it makes one.
+inline std::filesystem::path configureHost(const Mode& mode, ServerMode& server, server::GameHost::Options& o)
+{
+    o.modeName = mode.info.name;
+    return server.configure(o);
+}
+
 } // namespace nox::modes

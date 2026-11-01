@@ -330,7 +330,7 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
             .options = settings.modeOptions,
             .log = [id = modeId_](std::string_view line) { SDL_Log("%s: %.*s", id.c_str(), static_cast<int>(line.size()), line.data()); },
             .modData = noxsdl::modsFolderPath().parent_path() / "moddata"}); // (a mod's nox.store: beside mods\, never the game's folder)
-        if (const fs::path p = serverMode_->configure(o); !p.empty() && !settings.mapOverMode) {
+        if (const fs::path p = nox::modes::configureHost(*mode, *serverMode_, o); !p.empty() && !settings.mapOverMode) {
             path = p;
         }
     } else if (settings.editSession) {
