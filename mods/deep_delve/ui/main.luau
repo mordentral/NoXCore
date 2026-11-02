@@ -17,6 +17,8 @@
 --           always; kept with the character), the act (cleared or not), or on an expedition its
 --           rank (cleared or not);
 --   boss    while an act boss lives: a bar with its health under its name;
+--   rage    a warrior with the Rage skill: its rage bar, a bare HUD piece under the Character
+--           window (the server sends its value only as its whole number changes);
 --   stash   (touching the town's chest) the stash's tabs and what the character carries: a click
 --           moves an item across;
 --   vendor  (touching the town's anvil) its own stock and what the character carries: a click buys
@@ -27,7 +29,9 @@
 --           right click on one taken gives it back alone (anywhere, for gold); a node's
 --           tooltip says what it gives the hero's class; Respec by the fountain;
 --   sheet   the character sheet: one's own, or (from a card on the strip) a party member's, read
---           only, kept current while it shows;
+--           only, kept current while it shows; two pages by its tabs: Character (the numbers)
+--           and Gear (the worn affixes' totals; the worn uniques' powers and the worn sets'
+--           bonuses, on or not), the wheel scrolling a long Gear page;
 --   waypoints (stepping on the town's waypoints pentagram) the waypoints by act (each act open to
 --           the character) and area, the ones found to click (this area's: a step, no vote;
 --           another's, in any act listed: the party's vote, or at once when alone), the area being
@@ -92,8 +96,14 @@ local BOSS_Y = 76
 local BOSS_TITLE = 1.5
 local BOSS_BAR_Y = 25
 
+-- The Rage bar (a warrior's with the tree's Rage skill): a bare HUD piece under the Character
+-- window, click-through; the game's buff icons start below it while it shows.
+local RAGE_Y = HERO_Y + H + 6
+local RAGE_H = 14
+
 local shown: any = nil
 local bossShown: any = nil
+local rageShown: any = nil
 local opened: { [string]: boolean } = {}
 local notes: { [string]: any } = {}
 
@@ -729,6 +739,30 @@ local function drawHero()
 			nox.send({ kind = "chars", op = "open" })
 		end)
 	end
+end
+
+-- The rage bar: a dark band, the fill dark red rising to orange, "Rage" over it; full, it glows
+-- and says so.
+local RAGE_BACK = { 0, 0, 0, 150 }
+local RAGE_EMPTY = { 45, 12, 8 }
+local RAGE_FILL = { 200, 60, 25 }
+local RAGE_FULL = { 255, 140, 40 }
+local RAGE_EDGE = { 120, 60, 40 }
+
+local function drawRage()
+	local v = rageShown
+	if not v then
+		return
+	end
+	local most = math.max(1, tonumber(v.most) or 100)
+	local share = math.clamp((tonumber(v.v) or 0) / most, 0, 1)
+	local full = share >= 1
+	nox.box(0, 0, W, RAGE_H, RAGE_BACK)
+	local w = W - 4
+	nox.box(2, 2, w, RAGE_H - 4, RAGE_EMPTY)
+	nox.box(2, 2, math.floor(w * share), RAGE_H - 4, if full then RAGE_FULL else RAGE_FILL)
+	nox.outline(2, 2, w, RAGE_H - 4, if full and (nox.time() // 250) % 2 == 0 then "bright" else RAGE_EDGE)
+	nox.text(if full then "Rage: the next blow spins" else "Rage", 6, 2, if full then { 255, 240, 200 } else "bright")
 end
 
 local function drawBoss()
@@ -1502,6 +1536,91 @@ local HW, HH = 260, 343
 local OWN_SHEET = "Character sheet"
 local sheetTitle = OWN_SHEET
 
+-- Its two pages (by decision 2026-11-02): "stats" (the numbers) and "gear" (the worn affixes'
+-- totals, and the worn uniques and sets), picked by the tabs under the title; the gear page's lines
+-- scrolled by the wheel when they're more than it holds.
+local sheetPage = "stats"
+local SHEET_TOP = 32
+local GEAR_LINE = 11
+local gearScroll = 0
+-- The gear page's lines laid out once a value: { value, lines = { { text, colour, x } } }.
+local gearLaid: any = nil
+local GEAR_COLOUR: { [string]: any } = {
+	N = RARITY.unique,
+	u = TIP_COLOUR.u,
+	g = TIP_COLOUR.g,
+	v = TIP_COLOUR.v,
+	q = TIP_COLOUR.q,
+}
+
+local function layGear(v: any): { any }
+	local out: { any } = {}
+	local function add(text: string, colour: any, x: number)
+		for i, l in wrap(text, HW - 8 - x) do
+			table.insert(out, { l, colour, if i > 1 then x + 8 else x })
+		end
+	end
+	add("Affixes", "gold", 4)
+	local a = if type(v.a) == "table" then v.a else {}
+	if #a == 0 then
+		add("none worn", "dim", 8)
+	end
+	for _, l in a do
+		add(tostring(l), TIP_COLOUR.a, 8)
+	end
+	table.insert(out, { "", "dim", 4 })
+	add("Uniques and sets", "gold", 4)
+	local s = if type(v.s) == "table" then v.s else {}
+	if #s == 0 then
+		add("none worn", "dim", 8)
+	end
+	for _, l in s do
+		local tag, text = string.sub(l, 1, 1), string.sub(l, 2)
+		add(text, GEAR_COLOUR[tag] or "bright", if tag == "N" or tag == "g" then 8 else 14)
+	end
+	return out
+end
+
+-- How many of the gear page's lines show at once.
+local GEAR_ROWS = (HH - SHEET_TOP - 4) // GEAR_LINE
+
+local function drawGearPage()
+	local v = whole.sheetGear
+	if not v then
+		nox.text("...", 4, SHEET_TOP, "dim")
+		return
+	end
+	if not gearLaid or gearLaid.value ~= v then
+		gearLaid = { value = v, lines = layGear(v) }
+	end
+	local lines = gearLaid.lines
+	local most = math.max(0, #lines - GEAR_ROWS)
+	gearScroll = math.clamp(gearScroll, 0, most)
+	for i = 1, math.min(GEAR_ROWS, #lines - gearScroll) do
+		local l = lines[i + gearScroll]
+		nox.text(l[1], l[3], SHEET_TOP + (i - 1) * GEAR_LINE, l[2])
+	end
+	if most > 0 then
+		local hint = if gearScroll < most then "more: wheel" else "top: wheel"
+		nox.text(hint, HW - 6 - nox.textWidth(hint), SHEET_TOP - 13, "dim")
+	end
+end
+
+-- A tab under the sheet's title: lit when it's the page shown, else a click shows its page.
+local function sheetTab(x: number, label: string, page: string)
+	local on = sheetPage == page
+	local w = nox.textWidth(label) + 12
+	nox.box(x, 15, w, 13, if on then { 60, 44, 24 } else { 22, 18, 14 })
+	nox.outline(x, 15, w, 13, if on then { 200, 150, 60 } else { 90, 78, 60 })
+	nox.text(label, x + 6, 16, if on then "bright" else "dim")
+	if not on then
+		zone("sheet", x, 15, w, 13, function()
+			sheetPage = page
+		end)
+	end
+	return x + w + 3
+end
+
 local function drawSheet()
 	local w = "sheet"
 	closeBox(w, HW)
@@ -1513,6 +1632,11 @@ local function drawSheet()
 	-- (a party member's: read only, nothing on it acts on them)
 	local other = s.of ~= nil
 	nox.text(string.format("%s, level %d %s", s.name, s.level, s.class), 4, 2, if other then "bright" else "gold")
+	sheetTab(sheetTab(4, "Character", "stats"), "Gear", "gear")
+	if sheetPage == "gear" then
+		drawGearPage()
+		return
+	end
 	local rows = {
 		{ "Experience", string.format("%d / %d", s.experience, s.need) },
 		{ "Health", string.format("%d / %d", s.health, s.maxHealth) },
@@ -1535,11 +1659,11 @@ local function drawSheet()
 		{ "Time played", string.format("%d min", s.minutes or 0) },
 	}
 	for i, r in rows do
-		local y = 20 + (i - 1) * 13
+		local y = SHEET_TOP + (i - 1) * 13
 		nox.text(r[1], 4, y, "dim")
 		nox.text(r[2], 110, y, "bright")
 	end
-	local y = 20 + #rows * 13 + 4
+	local y = SHEET_TOP + #rows * 13 + 4
 	nox.text("Spells and abilities", 4, y, "gold")
 	drawWords(if s.skills ~= "" then s.skills elseif other then "none yet" else "none yet: take them in the Tree", 4, y + 13, HW - 8, 6, "bright")
 end
@@ -1962,6 +2086,7 @@ function ui.start()
 	-- (the game's buff icons draw down the screen's top left: by decision they start below this
 	-- window, its frame's bottom and a margin; UI API 5)
 	nox.hudReserve({ x = 0, y = 0, w = HERO_X + W + 4, h = HERO_Y + H + 4, anchor = "topleft" })
+	-- (and below the Rage bar while it shows: ui.onMessage's "rage")
 	-- (by decision the party strip, the boss's bar, the name plates and the loot labels stay up
 	-- while the full map is open; a client without the call keeps the old hiding)
 	if nox.overMap then
@@ -2052,6 +2177,19 @@ function ui.onMessage(value: any)
 			bossShown = nil
 			nox.closeWindow("boss")
 		end
+	elseif kind == "rage" then
+		-- (v below 0: no Rage skill, the bar closed)
+		if (tonumber(value.v) or -1) >= 0 then
+			if not rageShown then
+				nox.window("rage", { frame = false, clickThrough = true, hud = true, anchor = "topleft", x = HERO_X, y = RAGE_Y, w = W, h = RAGE_H })
+				nox.hudReserve({ x = 0, y = 0, w = HERO_X + W + 4, h = RAGE_Y + RAGE_H + 4, anchor = "topleft" })
+			end
+			rageShown = value
+		elseif rageShown then
+			rageShown = nil
+			nox.closeWindow("rage")
+			nox.hudReserve({ x = 0, y = 0, w = HERO_X + W + 4, h = HERO_Y + H + 4, anchor = "topleft" })
+		end
 	elseif kind == "open" and SPEC[value.window] then
 		opened[value.window] = true
 		nox.window(value.window, specOf(value.window))
@@ -2104,6 +2242,13 @@ function ui.onMessage(value: any)
 				nox.window("sheet", specOf("sheet"))
 			end
 		end
+	elseif kind == "sheetGear" then
+		-- (another's, or one's own again: from the top)
+		local was: any = whole.sheetGear
+		if not was or was.of ~= value.of then
+			gearScroll = 0
+		end
+		whole.sheetGear = value
 	elseif kind == "waypoints" then
 		waypointsShown = value
 		if opened.waypoints then
@@ -2150,6 +2295,8 @@ function ui.draw(window: string)
 		drawHero()
 	elseif window == "boss" then
 		drawBoss()
+	elseif window == "rage" then
+		drawRage()
 	elseif window == "stash" then
 		drawStash()
 	elseif window == "vendor" then
@@ -2238,10 +2385,14 @@ function ui.key(window: string, key: string): boolean
 	return false
 end
 
--- The wheel over the tree zooms it.
+-- The wheel over the tree zooms it; over the sheet's gear page it scrolls its lines.
 function ui.wheel(window: string, _x: number, _y: number, steps: number): boolean
 	if window == "tree" and steps ~= 0 then
 		setZoom(zoom + (if steps > 0 then 1 else -1))
+		return true
+	end
+	if window == "sheet" and sheetPage == "gear" and steps ~= 0 then
+		gearScroll = math.max(0, gearScroll - (if steps > 0 then 3 else -3))
 		return true
 	end
 	return false

@@ -198,6 +198,11 @@ numbers.mossChief = {
 --             each `spread` off the player at random, `warn` frames after the sparks there (`damage`
 --             crushing, whole within `full`, less to `reach`, as his own hits)
 --   enrage    below `at`: hasted for good
+--   storm     from his waking till his death (or the court left behind): the court's dust storm
+--             (data/acts.luau's weather `weather`) for each player within `reach` of the arena's
+--             middle (short of the town's floor: the arena's radius and the rock round the town are
+--             more), calm again (fading over `fade` frames) for one who goes further or as it ends.
+--             By decision (2026-11-02): the one lair with weather, his alone
 numbers.ruinWarden = {
 	beat = 15,
 	wake = 320,
@@ -207,6 +212,7 @@ numbers.ruinWarden = {
 	sand = { quake = 1, every = 30 * 14, enragedEvery = 30 * 10, lasts = 30 * 10, speed = 2.5, reach = 70, full = 40, slow = 30 * 2, damage = 2 },
 	masonry = { every = 30 * 6, count = 3, spread = 60, warn = 30, reach = 60, full = 30, damage = 20 },
 	enrage = { at = 0.3 },
+	storm = { weather = "dust", reach = 460, fade = 60 },
 }
 
 -- ---- The party (design 7)

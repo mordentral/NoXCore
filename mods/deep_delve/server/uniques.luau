@@ -236,9 +236,13 @@ function uniques.worn(b: any, worn: { any })
 	local powers: { [string]: any } = {}
 	local sets: { [string]: number } = {}
 	local pieces: { [string]: boolean } = {}
+	local ids: { string } = {}
 	for _, m in worn do
 		if m.unique then
 			local def = byId[m.unique]
+			if def and not table.find(ids, def.id) then
+				table.insert(ids, def.id)
+			end
 			if def and not powers[def.power.kind] then
 				powers[def.power.kind] = def.power
 			end
@@ -268,6 +272,31 @@ function uniques.worn(b: any, worn: { any })
 		end
 	end
 	b.powers, b.sets, b.pieces, b.setSig = powers, sets, pieces, table.concat(sig, " ")
+	b.uniques = ids
+end
+
+-- The sheet's block for a hero's worn uniques and sets (`b` its bonus), as tagged lines: each
+-- unique worn, its name (N) and its power (u); each set worn (in the data's order), its name and
+-- how many of it are worn (g), then each bonus, on (v) or not (q).
+function uniques.sheetLines(b: any): { string }
+	local out = {}
+	for _, id in b.uniques or {} do
+		local def = byId[id]
+		if def then
+			table.insert(out, "N" .. tostring(def.name))
+			table.insert(out, "u" .. uniques.powerText(def.power))
+		end
+	end
+	for _, s in data.sets :: { any } do
+		local n = b.sets and b.sets[s.id]
+		if n then
+			table.insert(out, "g" .. tostring(s.name) .. " (" .. tostring(n) .. " of " .. tostring(#s.pieces) .. " worn)")
+			for _, bonus in s.bonuses do
+				table.insert(out, (if n >= bonus.n then "v" else "q") .. string.format("(%d) %s", bonus.n, uniques.bonusText(bonus)))
+			end
+		end
+	end
+	return out
 end
 
 -- ---- Words
@@ -419,8 +448,12 @@ function uniques.check(known: any): { string }
 			end
 		end
 		for _, a in def.affixes or {} do
-			if not affixes.def(a.id) then
+			local ad = affixes.def(a.id)
+			if not ad then
 				table.insert(out, what .. ": no affix " .. tostring(a.id))
+			elseif not affixes.forClass(ad, class) then
+				-- (one the loot never gives that class: mana a second on a warrior's piece)
+				table.insert(out, what .. ": " .. tostring(a.id) .. " never goes to a " .. class)
 			end
 		end
 		local st = nox.itemStats(def.type)

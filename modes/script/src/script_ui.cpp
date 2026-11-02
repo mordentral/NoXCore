@@ -125,6 +125,27 @@ struct ScriptUiClient::Impl {
     static constexpr int kMaxBigIn = 8;
     /// (Client level 7) The server's ground decals (kDecal), at most uimsg::kMaxDecals.
     std::vector<uimsg::Decal> decals;
+    /// (Client level 8) The coloured lines the server told, not yet taken (at most kUiMaxTextLines).
+    std::vector<uimsg::TextLine> textLines;
+    /// (Client level 8) The leaps told (kLeap), each from the frame time it came at.
+    struct LeapNow {
+        std::uint16_t object = 0;
+        std::uint64_t startMs = 0;
+        std::uint64_t durationMs = 1;
+        std::uint8_t height = 0;
+    };
+    std::vector<LeapNow> leaps;
+    /// (Client level 8) The spins told (kSpin), each from the frame time it came at.
+    struct SpinNow {
+        std::uint16_t object = 0;
+        std::uint64_t startMs = 0;
+        std::uint64_t durationMs = 0;
+        std::int16_t rate16 = 0;
+    };
+    std::vector<SpinNow> spinning;
+    /// (Client level 8) The server's last ability bar (kAbilityBar) and when it came.
+    std::vector<uimsg::AbilitySlot> abilityBar;
+    std::uint64_t abilityBarAtMs = 0;
     std::uint64_t nowMs = 0;
     std::string error;
     // API 2's.
@@ -981,26 +1002,14 @@ int uiSpellIcon(lua_State* L)
     const float y = clampedFloat(luaL_checknumber(L, 3), -kFar, kFar, 0);
     const float dw = clampedFloat(luaL_optnumber(L, 4, 0), 0, 640, 0);
     const float dh = clampedFloat(luaL_optnumber(L, 5, 0), 0, 640, 0);
-    // A spell by the game's name, or a warrior's ability by its (tagged, as the bars keep them in
-    // a multiclass book); any other name draws nothing.
-    int index = -1;
-    if (name.starts_with("SPELL_")) {
-        if (const auto id = ::nox::things::spellId(name); id && *id != 0) {
-            index = static_cast<int>(*id);
-        }
-    } else if (name.starts_with("ABILITY_")) {
-        for (std::size_t i = 1; i < ::nox::client::kAbilityNames.size(); ++i) {
-            if (name == ::nox::client::kAbilityNames[i]) {
-                index = static_cast<int>(::nox::client::kAbilityTag | i);
-            }
-        }
-    }
-    if (index < 0) {
+    // A spell by the game's name, or a warrior's ability by its; any other name draws nothing.
+    const auto id = gameIconId(name);
+    if (!id) {
         return 0;
     }
     UiDraw d;
     d.kind = UiDraw::Kind::SpellIcon;
-    d.index = index;
+    d.index = static_cast<int>(*id);
     d.x = x;
     d.y = y;
     d.w = dw;
@@ -1511,6 +1520,43 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             }
         }
         break;
+    case uimsg::kText:
+        // (Client level 8; whatever the UI's state: a mode with no UI sends them too.) Past
+        // kUiMaxTextLines untaken: let go.
+        if (auto t = uimsg::decodeText(rest); t && textLines.size() < kUiMaxTextLines) {
+            textLines.push_back(std::move(*t));
+        }
+        break;
+    case uimsg::kLeap:
+        // (Client level 8; whatever the UI's state.) Timed from now; the same thing's again
+        // replaces it; past kUiMaxLeaps let go.
+        if (const auto l = uimsg::decodeLeap(rest)) {
+            const LeapNow now{l->object, nowMs, static_cast<std::uint64_t>(l->frames) * 1000 / 30, l->height};
+            if (const auto it = std::ranges::find(leaps, l->object, &LeapNow::object); it != leaps.end()) {
+                *it = now;
+            } else if (leaps.size() < kUiMaxLeaps) {
+                leaps.push_back(now);
+            }
+        }
+        break;
+    case uimsg::kSpin:
+        // (Client level 8; whatever the UI's state.) The same thing's again replaces it; 0 frames
+        // stops it; past kUiMaxSpins let go.
+        if (const auto s = uimsg::decodeSpin(rest)) {
+            std::erase_if(spinning, [&](const SpinNow& n) { return n.object == s->object; });
+            if (s->frames != 0 && s->rate16 != 0 && spinning.size() < kUiMaxSpins) {
+                spinning.push_back({s->object, nowMs, static_cast<std::uint64_t>(s->frames) * 1000 / 30, s->rate16});
+            }
+        }
+        break;
+    case uimsg::kAbilityBar:
+        // (Client level 8; whatever the UI's state.) The whole strip, in place of the last.
+        if (auto bar = uimsg::decodeAbilityBar(rest)) {
+            std::ranges::sort(*bar, {}, &uimsg::AbilitySlot::slot);
+            abilityBar = std::move(*bar);
+            abilityBarAtMs = nowMs;
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -1554,6 +1600,8 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
     Impl& impl = *impl_;
     impl.nowMs = nowMs;
     impl.pruneDrawScales(); // (a UI running or not: the server's draw scales are any script mode's)
+    std::erase_if(impl.leaps, [&](const Impl::LeapNow& l) { return nowMs >= l.startMs + l.durationMs; });
+    std::erase_if(impl.spinning, [&](const Impl::SpinNow& s) { return nowMs >= s.startMs + s.durationMs; });
     if (!impl.vm) {
         return;
     }
@@ -1822,6 +1870,70 @@ const std::vector<UiTooltipLine>* ScriptUiClient::itemTip(std::uint16_t item) co
 const std::vector<uimsg::Decal>& ScriptUiClient::decals() const noexcept
 {
     return impl_->decals;
+}
+
+std::vector<uimsg::TextLine> ScriptUiClient::takeTextLines()
+{
+    return std::exchange(impl_->textLines, {});
+}
+
+std::optional<std::uint32_t> gameIconId(std::string_view name)
+{
+    if (name.starts_with("SPELL_")) {
+        if (const auto id = ::nox::things::spellId(name); id && *id != 0) {
+            return *id;
+        }
+    } else if (name.starts_with("ABILITY_")) {
+        for (std::size_t i = 1; i < ::nox::client::kAbilityNames.size(); ++i) {
+            if (name == ::nox::client::kAbilityNames[i]) {
+                return ::nox::client::kAbilityTag | static_cast<std::uint32_t>(i); // (tagged, as the bars keep them in a multiclass book)
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::vector<UiAbility> ScriptUiClient::abilities() const
+{
+    std::vector<UiAbility> out;
+    out.reserve(impl_->abilityBar.size());
+    const std::uint64_t gone = impl_->nowMs > impl_->abilityBarAtMs ? (impl_->nowMs - impl_->abilityBarAtMs) * 30 / 1000 : 0;
+    for (const uimsg::AbilitySlot& a : impl_->abilityBar) {
+        out.push_back({a, static_cast<std::uint16_t>(a.left > gone ? a.left - gone : 0)});
+    }
+    return out;
+}
+
+void ScriptUiClient::useAbility(std::uint8_t slot, bool release, std::uint16_t x, std::uint16_t y)
+{
+    const auto m = uimsg::abilityUseMessage({slot, release, x, y});
+    const auto p = uimsg::parse(m);
+    impl_->send(uimsg::kUseAbility, p->second);
+}
+
+std::vector<UiSpin> ScriptUiClient::spins() const
+{
+    std::vector<UiSpin> out;
+    out.reserve(impl_->spinning.size());
+    for (const Impl::SpinNow& s : impl_->spinning) {
+        const std::uint64_t gone = impl_->nowMs > s.startMs ? impl_->nowMs - s.startMs : 0;
+        // (eighths = turns a second x 8 x seconds: rate16 / 16 x 8 x ms / 1000)
+        const auto eighths = static_cast<int>(static_cast<std::int64_t>(s.rate16) * static_cast<std::int64_t>(gone) / 2000);
+        out.push_back({s.object, eighths});
+    }
+    return out;
+}
+
+std::vector<UiLift> ScriptUiClient::lifts() const
+{
+    std::vector<UiLift> out;
+    out.reserve(impl_->leaps.size());
+    for (const Impl::LeapNow& l : impl_->leaps) {
+        const std::uint64_t gone = impl_->nowMs > l.startMs ? impl_->nowMs - l.startMs : 0;
+        const float t = std::min(1.0f, static_cast<float>(gone) / static_cast<float>(l.durationMs));
+        out.push_back({l.object, 4.0f * l.height * t * (1.0f - t), t});
+    }
+    return out;
 }
 
 std::optional<UiRect> ScriptUiClient::hudReserve() const

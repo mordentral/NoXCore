@@ -1990,6 +1990,17 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Ours:** kept by decision (`bookaward::showing`, `noxsdl/src/book_award.hpp`, played step by
   step by `Spellbook::event`).
 
+### OB-422: Accented letters in a chat or text message line are drawn as "?"
+- **Where:** the client's text message lines (MSG_TEXT_MESSAGE, a narrow line's bytes or a wide
+  line's characters): a character from 0x80 up isn't drawn as itself.
+- **Effect:** é, ü, ñ, ß and the like show as "?" in chat and in a host's or mode's lines.
+- **Ours:** fixed by the owner's decision (2026-11-02): NoX Core's client reads a narrow line's
+  bytes as the characters of those values and draws them (`HeadlessClient::onText`,
+  `noxcore/src/client/`), and the modes' and mods' text is decoded from UTF-8 on the server
+  (`strings::fromUtf8Cut`, used by `widen` in `modes/common/src/server/mode_shared.hpp` and the
+  scripts' text). The original client still shows its "?" for the same message; ASCII lines are
+  unchanged byte for byte. Mode plugins plan 12.1n.
+
 ## Menus
 
 ### OB-189: The game list's description box takes a LAN game's last weapons from its map's name

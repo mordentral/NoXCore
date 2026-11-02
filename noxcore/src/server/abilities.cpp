@@ -34,7 +34,26 @@ bool warrior(const ServerObject& o) { return o.player && o.player->usesAbilities
 /// servCompareTeams: on the same (real) team.
 bool sameTeam(const ServerObject& a, const ServerObject& b) { return a.team != 0 && a.team == b.team; }
 
+/// (noxcpp) An ability's news to a mode (ModeHooks::abilityNews): nothing without one. One end a
+/// harpoon's throw: while its bolt is out, its record's end by time, a reset or a death isn't
+/// told (the bolt's own end, endAbility's, is: broken, the pull done, missed).
+void tellNews(World& world, ServerObject& unit, int ability, AbilityPhase phase, AbilityEnd why = AbilityEnd::Other, ObjectKey other = 0)
+{
+    if (phase == AbilityPhase::End && ability == 3 && (why == AbilityEnd::Time || why == AbilityEnd::Cancel || why == AbilityEnd::Death) &&
+        unit.player && unit.player->harpoonBolt != 0) {
+        return;
+    }
+    if (world.modeHooks) {
+        world.modeHooks->abilityNews(world, unit, AbilityNews{ability, phase, why, other, unit.x, unit.y});
+    }
+}
+
 } // namespace
+
+void tellHarpoonHold(World& world, ServerObject& warrior, const ServerObject& target)
+{
+    tellNews(world, warrior, 3, AbilityPhase::Hooked, AbilityEnd::Other, target.extent);
+}
 
 // MSG_REPORT_ACTIVE_ABILITIES (0xCF): the ability, then 1 on or 0 off; to its client alone.
 void reportActiveAbility(World& world, const ServerObject& unit, int ability, bool active)
@@ -71,7 +90,7 @@ int abilityFlag(const World& world, const ServerObject& unit, int ability)
     return 0;
 }
 
-void endAbility(World& world, ServerObject& unit, int ability)
+void endAbility(World& world, ServerObject& unit, int ability, AbilityEnd why, ObjectKey other)
 {
     if (ability < 1 || 5 < ability) {
         return;
@@ -92,7 +111,10 @@ void endAbility(World& world, ServerObject& unit, int ability)
         return; // (Eye of the Wolf runs its time)
     }
     reportActiveAbility(world, unit, ability, false);
-    std::erase_if(world.activeAbilities(), [&](const ActiveAbility& a) { return a.unit == unit.extent && a.ability == ability; });
+    const auto gone = std::erase_if(world.activeAbilities(), [&](const ActiveAbility& a) { return a.unit == unit.extent && a.ability == ability; });
+    if (gone != 0 || ability == 3) { // (a harpoon's: its record may have run its time while the bolt held)
+        tellNews(world, unit, ability, AbilityPhase::End, why, other);
+    }
 }
 
 void cancelAbilities(World& world, ServerObject& unit)
@@ -105,7 +127,9 @@ void cancelAbilities(World& world, ServerObject& unit)
     for (auto it = world.activeAbilities().begin(); it != world.activeAbilities().end();) {
         if (it->unit == unit.extent) {
             reportActiveAbility(world, unit, it->ability, false);
+            const int ability = it->ability;
             it = world.activeAbilities().erase(it);
+            tellNews(world, unit, ability, AbilityPhase::End, AbilityEnd::Cancel);
         } else {
             ++it;
         }
@@ -126,6 +150,7 @@ void resetAbility(World& world, ServerObject& unit, int ability)
         if (it->unit == unit.extent && it->ability == ability) {
             reportActiveAbility(world, unit, ability, false);
             it = world.activeAbilities().erase(it);
+            tellNews(world, unit, ability, AbilityPhase::End, AbilityEnd::Cancel);
         } else {
             ++it;
         }
@@ -142,7 +167,7 @@ void releaseHarpoon(World& world, ServerObject& warrior, bool broken)
         return;
     }
     warrior.player->harpoonTarget = 0;
-    endAbility(world, warrior, 3);
+    endAbility(world, warrior, 3, broken ? AbilityEnd::Broken : AbilityEnd::Hit);
     if (ServerObject* bolt = world.byExtent(warrior.player->harpoonBolt)) {
         bolt->pendingDelete = true;
     }
@@ -210,6 +235,11 @@ void Abilities::tryExecute(ServerObject& unit, int ability)
         refuse(6);
         return;
     }
+    // (noxcpp, a mode's: not while it's busy, World::modeBusy: in a leap as in the air, 6; else 2.)
+    if (const World::ModeBusy* b = world.busyOf(unit)) {
+        refuse(world.stillNow(*b) ? 6 : 2);
+        return;
+    }
     if (!abilityKnown(world, p, ability)) {
         refuse(3);
         return;
@@ -245,6 +275,7 @@ void Abilities::tryExecute(ServerObject& unit, int ability)
     if (fight.things) {
         playSound(world, abilitySound(*fight.things, ability, 0), unit);
     }
+    tellNews(world, unit, ability, AbilityPhase::Start);
 }
 
 // An accepted ability's work (each one as abilities.hpp describes).
@@ -402,7 +433,11 @@ void Abilities::update()
     for (auto it = list.begin(); it != list.end();) {
         ServerObject* unit = world.byExtent(it->unit);
         if (!unit || (unit->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+            const int ability = it->ability;
             it = list.erase(it);
+            if (unit) {
+                tellNews(world, *unit, ability, AbilityPhase::End, AbilityEnd::Death);
+            }
             continue;
         }
         if (it->end < fight.frame) {
@@ -413,7 +448,9 @@ void Abilities::update()
             if (it->ability == 1) {
                 fight.setPlayerState(*unit, 0xD);
             }
+            const int ability = it->ability;
             it = list.erase(it);
+            tellNews(world, *unit, ability, AbilityPhase::End, AbilityEnd::Time);
             continue;
         }
         ++it;

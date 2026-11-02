@@ -16,16 +16,42 @@ secrets.chance = { room = 0.4, chests = 0.35, trapped = 0.35 }
 secrets.hoard = { "Chest1", "Chest2", "Chest3", "Chest4" }
 secrets.guards = { count = { 2, 3 }, leader = "magic", tier = "normal" }
 
+-- Locked secret rooms (by decision, 2026-11-02): in a biome with a door of its own (`doors`: the
+-- biome's door type, as the generated levels' locked doors take theirs; the outdoor biomes have
+-- none, so their rooms keep the secret wall and lever), `chance` of the secret rooms are shut by
+-- that door, locked with a silver key's lock, instead. The key is carried by a guard on the way near
+-- the room (`guard`: its tier and name, of the area's roster at its level; never charmed away) and
+-- dropped at its death. The key is looked after every `every` frames while it's out: gone while
+-- its holder stood within `used` of the door, the door took it (unlocked); gone anywhere else, a new
+-- one lies by the door's outside.
+secrets.locked = {
+	chance = 0.5,
+	doors = {
+		Crypt = "CryptDoor",
+		Dungeon = "CryptDoor",
+		Castle = "WoodAndSteelDoor",
+		Shop = "WoodAndSteelDoor",
+		Mines = "WoodenDoor",
+		Cave = "WoodenDoor",
+	},
+	key = "SilverKey",
+	guard = { tier = "champion", name = "Keybearer" },
+	every = 5,
+	used = 100,
+}
+
 -- What a chest holds when it's opened (the mod's loot: loot.drop, by the party's size as a
 -- death's): `rolls` loot rolls at the area level with `better` odds (as a tougher monster's
 -- drops: more gear, magic and rare more often).
---   hoard     the secret room's
+--   hoard     the secret room's; besides its rolls, `rare` sure pieces of rare gear at the area
+--             level (by decision, 2026-11-02: one; an item that takes no modifier can't be rare,
+--             so a few draws are tried, as an act boss's rare pieces are)
 --   chest     a side room's
 --   trapped   a side room's trapped one (the risk pays)
 -- (A monster's drop at the same level: 1 + its tier's drops rolls, `better` a quarter of its
 -- drops: a normal monster's 1 roll at 0.)
 secrets.loot = {
-	hoard = { rolls = 7, better = 1.5 },
+	hoard = { rolls = 7, better = 1.5, rare = 1 },
 	chest = { rolls = 2, better = 0.4 },
 	trapped = { rolls = 3, better = 0.8 },
 }

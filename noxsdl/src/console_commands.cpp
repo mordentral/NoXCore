@@ -372,6 +372,27 @@ std::vector<Console::Command> consoleCommands(App& app)
                      app.weatherTest = told;
                      con.print("weather " + kind + (app.weather ? "" : " (not drawn: no GPU shaders)"), Yellow);
                  }});
+    // (Tests) the rest of the line to the NoX Core mode we host, as its own console takes it
+    // (a mod's console: "mod dd status").
+    c.push_back({"mod", Console::kNoxsdl, "LINE: the line to the NoX Core mode this game hosts, its console's answer printed (tests)",
+                 [&app, &con](const Args& a) {
+                     if (!app.host) {
+                         con.print("a host's command: NoX Core isn't hosting this game", Grey);
+                         return;
+                     }
+                     std::string line;
+                     for (const auto& w : a) {
+                         line += (line.empty() ? "" : " ") + w;
+                     }
+                     app.host->modeCommand(line, [&con](const std::vector<std::string>& lines) {
+                         if (lines.empty()) {
+                             con.print("mod: no answer (no mode, or not its command)", Grey);
+                         }
+                         for (const auto& l : lines) {
+                             con.print(l, White);
+                         }
+                     });
+                 }});
 #endif
 
     // noxsdl's own: the command line's debug switches, at any time.

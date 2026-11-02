@@ -169,6 +169,13 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
             e.pendingView = std::clamp(std::atoi(line.c_str() + eq + 1), 0, 2);
         } else if (name == "WeatherEffects") {
             e.weather = std::clamp(std::atoi(line.c_str() + eq + 1), 0, 2);
+        } else if (name.size() == 14 && name.starts_with("ModAbilityKey") && name[13] >= '1' && name[13] <= '4') {
+            // (A key's name as nox.cfg has it; one the game doesn't know, or none: the default kept.)
+            std::string key = line.substr(eq + 1);
+            std::erase_if(key, [](char c) { return c == ' ' || c == '\t' || c == '\r'; });
+            if (nox::config::findKey(key)) {
+                e.modAbilityKeys[static_cast<std::size_t>(name[13] - '1')] = key;
+            }
         }
     }
     return e;
@@ -185,6 +192,9 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
         << "\nVSync = " << e.vsync << "\nServerUpdateRate = " << e.serverUpdateRate
         << "\nServerMapVote = " << e.serverMapVote << "\nExactMaths = " << e.exactMaths << "\nPendingChanges = " << e.pendingView
         << "\nWeatherEffects = " << e.weather << "\n";
+    for (std::size_t i = 0; i < e.modAbilityKeys.size(); ++i) {
+        out << "ModAbilityKey" << (i + 1) << " = " << e.modAbilityKeys[i] << "\n";
+    }
     if (!out) {
         SDL_Log("noxcore.cfg: couldn't write it");
     }
@@ -216,6 +226,7 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.exactMaths = app.exactMaths;
     e.pendingView = static_cast<int>(app.pendingView);
     e.weather = app.weatherEffects;
+    e.modAbilityKeys = app.modAbilityKeyNames;
     return e;
 }
 
@@ -396,6 +407,11 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     app.exactMaths = e.exactMaths;
     app.pendingView = static_cast<nox::mapedit::PendingView>(std::clamp(e.pendingView, 0, 2));
     app.weatherEffects = std::clamp(e.weather, 0, 2);
+    app.modAbilityKeyNames = e.modAbilityKeys;
+    for (std::size_t i = 0; i < e.modAbilityKeys.size(); ++i) {
+        const auto* key = nox::config::findKey(e.modAbilityKeys[i]);
+        app.modAbilityKeys[i] = key ? key->code : 0;
+    }
     if (e.display != app.display || e.vsync != app.vsync) {
         app.display = std::clamp(e.display, 0, 2);
         app.vsync = e.vsync;

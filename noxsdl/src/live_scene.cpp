@@ -478,6 +478,26 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
         if (const auto z = app.effects->drawableZ(netCode, d.typeId)) {
             p.z = *z; // a falling fist or meteor: its client update sets the height
         }
+        // A script mode's leap (App::modeLifts: nox.leap): drawn that much higher, looked up only
+        // while one is under way.
+        if (!app.modeLifts.empty()) {
+            const auto lf = std::ranges::lower_bound(app.modeLifts, netCode, {}, &App::ModeLift::object);
+            if (lf != app.modeLifts.end() && lf->object == netCode) {
+                p.z += lf->lift;
+            }
+        }
+        // A script mode's spin on it (App::modeSpins: nox.setSpin): that many eighths round its
+        // facings, clockwise on screen (the AnimDir grid's ring: up, upper right, right...).
+        if (!app.modeSpins.empty()) {
+            const auto sp = std::ranges::lower_bound(app.modeSpins, netCode, {}, &App::ModeSpin::object);
+            if (sp != app.modeSpins.end() && sp->object == netCode) {
+                static constexpr std::uint8_t kRing[8] = {1, 2, 5, 8, 7, 6, 3, 0};
+                if (const auto at = std::ranges::find(kRing, pose.direction); at != std::end(kRing)) {
+                    const int i = static_cast<int>(at - std::begin(kRing));
+                    pose.direction = kRing[static_cast<std::size_t>(((i + sp->eighths) % 8 + 8) % 8)];
+                }
+            }
+        }
         pose.direction = app.view3d.seenDirection(pose.direction, p.x, p.y); // (the 3D view: as its eye sees it)
         const float x = p.x - a->halfWidth;
         const float y = p.y - a->halfHeight - a->z - p.z;

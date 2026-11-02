@@ -126,7 +126,17 @@ struct ClientSecret {
 ///   7  a script mode's ground decals (nox.decal: MSG_NOXCPP_MODEUI's kDecal and kDecalRemove, a mod
 ///      asset drawn on the floor), sent only to a client of level 7 or above that runs the mode's UI
 ///      with its assets (ui_proto.hpp's kDecalLevel)
-inline constexpr std::uint16_t kClientLevel = 7;
+///   8  a script mode's lines in a colour (nox.textToAll and nox.tell with one: MSG_NOXCPP_MODEUI's
+///      kText), sent only to a client of level 8 or above that named ModeUi (ui_proto.hpp's
+///      kTextLevel); any other gets the plain MSG_TEXT_MESSAGE; and a script mode's leaps (nox.leap:
+///      MSG_NOXCPP_MODEUI's kLeap, the leaping thing drawn raised), sent only to a client of level 8
+///      or above that named ModeUi (kLeapLevel); any other sees it move along the ground; and a
+///      script mode's abilities (nox.grantAbility: MSG_NOXCPP_MODEUI's kAbilityBar, the strip of
+///      buttons, and the client's kUseAbility), sent only to a client of level 8 or above that
+///      named ModeUi (kAbilityLevel); any other has none; and a script mode's spins (nox.setSpin:
+///      MSG_NOXCPP_MODEUI's kSpin, a body drawn turning), sent only to a client of level 8 or
+///      above that named ModeUi (kSpinLevel)
+inline constexpr std::uint16_t kClientLevel = 8;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).
 inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.

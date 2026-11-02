@@ -22,6 +22,10 @@
 --   uniques.luau   unique items and item sets: their records, drops, worn bonuses, tooltip lines
 --   uniquepowers.luau the uniques' and set bonuses' powers at work (hits, kills, casts, prices,
 --                  a timer per hero wearing a timed one)
+--   warrior.luau   the warrior's passive skills from the tree at work (its blows, the hits it
+--                  takes, Second Wind, the Rage bar; a timer per hero with a timed one)
+--   actives.luau   the warrior's active abilities (Leap Slam, Whirlwind): granted by the tree,
+--                  their buttons on the strip over the quickbar (onModAbility, onLand)
 --   casts.luau     a hero's casts: its missiles larger at the tree levels that say so
 --                  (onSpellCast; Fireball 4 and 5); the cast-cost keystones' prices (castCost)
 --   summons.luau   the creatures the heroes summon: found as they come, watched
@@ -37,8 +41,8 @@
 --   portal.luau    the town portal (anyone's open portal takes the party back out, its owner gone
 --                  or not)
 --   decals.luau    the pads' rings on the floor (waypoints cyan, portals violet; nox.decal)
---   secrets.luau   secret rooms (a secret wall, a lever) and side rooms' chests, some trapped:
---                  their loot, their traps, their guards
+--   secrets.luau   secret rooms (a secret wall and a lever, or a locked door and its key guard)
+--                  and side rooms' chests, some trapped: their loot, their traps, their guards
 --   party.luau     the party strip's numbers; the party's size for the scaling
 --   scale.luau     party scaling: monsters' health, damage and experience, packs, loot
 --   labels.luau    ground loot's labels and named monsters' name plates on each player's UI
@@ -86,8 +90,11 @@ local offers = require("offers")
 local party = require("party")
 local portal = require("portal")
 local uniquePowers = require("uniquepowers")
+local warrior = require("warrior")
+local actives = require("actives")
 local roster = require("roster")
 local regen = require("regen")
+local secrets = require("secrets")
 local sheet = require("sheet")
 local stash = require("stash")
 local summons = require("summons")
@@ -135,6 +142,8 @@ end
 
 function mode.mapLoaded(name: string)
 	uniquePowers.reset()
+	warrior.reset()
+	actives.reset()
 	roster.mapLoaded()
 	areas.mapLoaded(name or nox.currentMap())
 end
@@ -184,6 +193,8 @@ end
 -- a vote, its sheet closed on the UIs showing it. (A server's game: open again to newcomers below
 -- its most; left empty, back to the first area a moment on.)
 function mode.onLeave(player: any)
+	-- (a locked room's key it carries dropped at its feet, before its things go with it)
+	secrets.left(player.unit)
 	portal.left(hero.byPeer(player.peer))
 	hero.leave(player)
 	roster.left(player.peer)
@@ -217,12 +228,14 @@ function mode.onKill(victim: number, _killer: number?, _assist: number?)
 end
 
 -- An item picked up (by the game's pickup, or a label's click): out of the ground's index, its
--- label cleared on every UI at once; a magic or better find told to its finder.
+-- label cleared on every UI at once; a magic or better find told to its finder, a unique or a set
+-- piece off the mod's ground to everyone.
 local function pickedUp(taker: number, item: number)
-	if loot.pickedUp(item) then
+	local fromGround = loot.pickedUp(item)
+	if fromGround then
 		labels.changed()
 	end
-	hero.pickedUp(taker, item)
+	hero.pickedUp(taker, item, fromGround)
 	tips.changed(taker)
 end
 
@@ -357,7 +370,11 @@ end
 function mode.onObjectKilled(e: any)
 	summons.killed(e.id)
 	local m = monsters.killed(e.id)
-	if not m then
+	-- (a locked secret room's key guard: its key dropped)
+	secrets.killed(e.id, e.x, e.y, m and m.name)
+	-- (a summoner's minion: no experience, no loot, no kill on the record, none of the killer's
+	-- worn powers on a kill; powers.luau)
+	if not m or m.minion then
 		return
 	end
 	hero.award(monsters.experienceOf(m), e.by)
@@ -386,12 +403,14 @@ function mode.onReflect(target: number, missile: number, front: boolean): boolea
 end
 
 -- A hero took a hit: its health's regeneration waits a moment (regen.luau); its worn pieces' wear
--- is looked at a frame on (its resilience affixes: affixes.luau).
+-- is looked at a frame on (its resilience affixes: affixes.luau); Second Wind below its share
+-- (warrior.luau).
 function mode.onDamaged(target: number, amount: number)
 	local h = hero.byUnit(target)
 	if h then
 		regen.hurt(h, amount)
 		affixes.worn(h)
+		warrior.hurt(h)
 	end
 end
 
@@ -422,6 +441,17 @@ end
 function mode.onEquip(unit: number, _item: number, _worn: boolean)
 	hero.equipChanged(unit)
 	tips.changed(unit)
+end
+
+-- A warrior's active ability used (its button or key): Leap Slam's leap, Whirlwind's spin and its
+-- end (actives.luau); false refuses a press.
+function mode.onModAbility(unit: number, id: string, x: number?, y: number?, phase: string): boolean?
+	return actives.used(unit, id, x, y, phase)
+end
+
+-- A leap came down: Leap Slam's slam where it landed (actives.luau).
+function mode.onLand(unit: number, x: number, y: number, cut: boolean)
+	actives.landed(unit, x, y, cut)
 end
 
 -- ---- The host's console ("dd help")

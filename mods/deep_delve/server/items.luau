@@ -9,6 +9,7 @@
 local loot = require("data/loot")
 local uniques = require("uniques")
 local uniqueData = require("data/uniques")
+local tipData = require("data/tips")
 
 local items = {}
 
@@ -28,11 +29,18 @@ function items.metaOf(rec: any): any
 	return { rarity = rec.rarity or "normal", affixes = rec.affixes, level = rec.level, unique = rec.unique, set = rec.set }
 end
 
--- An item's Deep Delve part kept; an item with affixes, a unique and a set piece are watched for
--- being put on and taken off (onEquip: its wearer's numbers and powers change with it).
+-- The kinds of item (data/tips.luau's) watched however plain: a melee weapon and a shield (the
+-- warrior's skills go by the weapon in hand and the shield worn: warrior.luau).
+local HELD_KINDS: { [string]: boolean } = { sword = true, mace = true, axe = true, hammer = true, staff = true, chakram = true, shield = true }
+
+-- An item's Deep Delve part kept; an item with affixes, a unique, a set piece, a melee weapon and
+-- a shield are watched for being put on and taken off (onEquip: its wearer's numbers, powers and
+-- skills change with it).
 function items.setMeta(id: number, m: any)
 	meta[id] = m
-	if (m.affixes and #m.affixes > 0) or m.unique or m.set then
+	local o = nox.object(id)
+	local tip = o and (tipData.items :: any)[o.type]
+	if (m.affixes and #m.affixes > 0) or m.unique or m.set or (tip and HELD_KINDS[tip.kind]) then
 		nox.watchEvents(id, nox.events.equip)
 	end
 end

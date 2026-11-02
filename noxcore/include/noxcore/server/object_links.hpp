@@ -608,6 +608,7 @@ struct Links<World> {
         NOX_LINK(S, tradeObjects, Fresh),
         NOX_LINK(S, walls_, Fresh),
         NOX_LINK(S, freeing_, Fresh),
+        NOX_LINK(S, modeBusy, Fresh), // (a mode's busy units, by unit: none on a new map)
     };
 };
 

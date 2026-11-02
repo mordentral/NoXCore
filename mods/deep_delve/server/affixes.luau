@@ -42,23 +42,48 @@ function affixes.kindOf(thingType: string): string?
 	return k
 end
 
--- The affixes that may roll on a type (those with no kinds, and those its kind is one of), in
--- data order; worked out once a type.
+-- Whether an affix may go to a class (`classes` none: any class), and whether it may go on a type:
+-- with `classes`, only on one of them may use by the game's record (a type with no record of its
+-- classes: any).
+function affixes.forClass(def: any, class: string?): boolean
+	return not def.classes or class == nil or (def.classes :: any)[class] == true
+end
+
+local function forType(def: any, thingType: string): boolean
+	if not def.classes then
+		return true
+	end
+	local st = nox.itemStats(thingType)
+	if not st or not st.classes then
+		return true
+	end
+	for class in def.classes :: any do
+		if (st.classes :: any)[class] then
+			return true
+		end
+	end
+	return false
+end
+
+-- The affixes that may roll on a type (those with no kinds, and those its kind is one of; with
+-- classes, only on gear one of them may use), in data order, for `class` (rolled for that class:
+-- only those it may have; nil: any); worked out once a type and class.
 local allowedOf: { [string]: { any } } = {}
 
-function affixes.allowed(thingType: string): { any }
-	local list = allowedOf[thingType]
+function affixes.allowed(thingType: string, class: string?): { any }
+	local key = if class then thingType .. "|" .. class else thingType
+	local list = allowedOf[key]
 	if list then
 		return list
 	end
 	local kind = affixes.kindOf(thingType)
 	list = {}
 	for _, def in data.affixes :: { any } do
-		if not def.kinds or (kind and (def.kinds :: any)[kind]) then
+		if (not def.kinds or (kind and (def.kinds :: any)[kind])) and forType(def, thingType) and affixes.forClass(def, class) then
 			table.insert(list, def)
 		end
 	end
-	allowedOf[thingType] = list
+	allowedOf[key] = list
 	return list
 end
 

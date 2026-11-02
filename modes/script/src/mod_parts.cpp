@@ -177,6 +177,8 @@ void addPartsToolbox(lua_State* L, bool store, bool records)
     addItemsToolbox(L);
     addWeatherToolbox(L);
     addDrawScaleToolbox(L);
+    addLeapToolbox(L);
+    addAbilityToolbox(L);
 }
 
 void applyHostOptions(lua_State* L, int t, server::GameHost::Options& o, const Generation& gen, const std::string& firstMap)

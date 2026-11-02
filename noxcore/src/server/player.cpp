@@ -1474,6 +1474,10 @@ void attackInput(ServerObject& unit, std::uint32_t frame, Fight& fight)
     if (enchanted(unit, Enchant::Freeze) || p.state == 0x17) {
         return;
     }
+    // (noxcpp, a mode's: none while it's busy, World::modeBusy, as while frozen.)
+    if (fight.world.busyOf(unit)) {
+        return;
+    }
     // (noxcpp, a mode's: no bare-handed punch either, World::noBareHands, as a chat
     // game's no attack; after the flagball's throw, as the exe orders them.)
     if ((fight.world.gameFlags & GameFlag::Chat) || throwBall(fight, unit) || (fight.world.noBareHands && p.weaponEquip == 0)) {
@@ -1573,8 +1577,14 @@ bool events(ServerObject& unit, std::uint32_t frame, Fight& fight)
     const bool forceOfNature = std::ranges::any_of(fight.world.durationSpells(), [&](const DurationSpell& s) {
         return s.spell == 0x1F && s.caster == unit.extent && !s.glyph && !s.cancelled;
     });
+    // (noxcpp, a mode's, World::modeBusy: busy, no attack, jump or gesture; still (a leap), no
+    // move or turn either.)
+    const World::ModeBusy* busy = fight.world.busyOf(unit);
     for (const auto& e : p.controls) {
         if (!e.active || (forceOfNature && e.code != 1)) {
+            continue;
+        }
+        if (busy && (fight.world.stillNow(*busy) || (e.code != 1 && (e.code < 2 || 5 < e.code)))) {
             continue;
         }
         switch (e.code) {
@@ -1762,7 +1772,7 @@ void updatePlayer(ServerObject& unit, std::uint32_t frame, const PlayerAnimation
     const bool walking = (p.state == 0 || p.state == 5) && canMove(unit, fight.world) && !overloaded(fight.world, unit);
     if (stateWork(unit, frame, animations, fight) && events(unit, frame, fight)) {
         if (walking && p.state != 0 && p.state != 5 && abilityActive(fight.world, unit, 4)) {
-            endAbility(fight.world, unit, 4);
+            endAbility(fight.world, unit, 4, AbilityEnd::Walk);
         }
     }
     // (updatePlayer, after Plr_UpdateState) Under RUN (buff 8) and not attacking: it runs (state 5,

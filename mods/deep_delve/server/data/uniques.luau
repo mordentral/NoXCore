@@ -297,4 +297,9 @@ u.beat = { every = 6 }
 -- lines may be before they're wrapped (letters).
 u.tip = { most = 22, wrap = 56 }
 
+-- The party's line for a find off the ground ("X found Y."), in the item's colour as its label
+-- and tooltip draw it (by rarity: a unique's orange, a set piece's green; NoX Core clients of
+-- level 8 draw it so, others plain).
+u.foundColour = { unique = { 245, 140, 40 }, set = { 80, 225, 80 } }
+
 return u

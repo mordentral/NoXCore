@@ -168,6 +168,8 @@ inline constexpr std::size_t kUiMaxTooltipText = 128;
 inline constexpr std::uint64_t kUiLabelWaitMs = 3000;
 /// (API 4) The most hit areas a window keeps a frame (nox.hitArea; more: let go).
 inline constexpr std::size_t kUiMaxHitAreas = 32;
+/// (Client level 8: ui_proto.hpp's kText) The most coloured lines that wait untaken (more: let go).
+inline constexpr std::size_t kUiMaxTextLines = 64;
 
 /// (Client level 5: ui_proto.hpp's kDrawScale) The most draw scales a client keeps (more: let go,
 /// those things drawn as their types), how long one waits for a thing the client hasn't been sent
@@ -239,6 +241,34 @@ enum class UiDrag : std::uint8_t { Start, Move, End };
 /// A box in a window's units (API 4's hit areas).
 struct UiRect {
     float x = 0, y = 0, w = 0, h = 0;
+};
+
+/// (Client level 8) A leaping thing's height now (ui_proto.hpp's kLeap: nox.leap).
+struct UiLift {
+    std::uint16_t object = 0; ///< its net code
+    float lift = 0;           ///< world units above the ground
+    float share = 0;          ///< how much of the leap is gone (0-1)
+};
+/// The most leaps a client keeps at once (more: let go).
+inline constexpr std::size_t kUiMaxLeaps = 64;
+
+/// The bars' id of a game icon by its name (nox.spellIcon's, an ability's icon): a spell's
+/// ("SPELL_FIREBALL"), or a warrior's ability's ("ABILITY_WARCRY", tagged as a multiclass book
+/// keeps them: Hud::icon draws either); none for any other name.
+std::optional<std::uint32_t> gameIconId(std::string_view name);
+
+/// (Client level 8) A spinning thing now (ui_proto.hpp's kSpin: nox.setSpin): how many eighths of
+/// a turn it has gone round since it began (negative: the other way).
+struct UiSpin {
+    std::uint16_t object = 0;
+    int eighths = 0;
+};
+inline constexpr std::size_t kUiMaxSpins = 64;
+
+/// (Client level 8) A mod ability on our strip (ui_proto.hpp's kAbilityBar: nox.grantAbility).
+struct UiAbility {
+    uimsg::AbilitySlot slot;
+    std::uint16_t left = 0; ///< cooldown frames left now (counted down from what the server sent)
 };
 
 /// (Client level 5) A thing's draw scale the server told (ui_proto.hpp's kDrawScale).
@@ -381,6 +411,23 @@ public:
     /// asset (assets()'s index) drawn flat on the floor under the things; their spin and pulse the
     /// program's to run. At most uimsg::kMaxDecals.
     const std::vector<uimsg::Decal>& decals() const noexcept;
+    /// (Client level 8) The server's coloured lines (ui_proto.hpp's kText: nox.textToAll and
+    /// nox.tell with a colour) since the last take, in order, for the program to show as the
+    /// server's plain lines are; at most kUiMaxTextLines wait (more: let go).
+    std::vector<uimsg::TextLine> takeTextLines();
+    /// (Client level 8) The things in a leap now (ui_proto.hpp's kLeap), each its height at the
+    /// last frame()'s time: 4 h t (1 - t) from the message's arrival. A leap over is let go in
+    /// frame(); a new one for the same thing replaces it.
+    std::vector<UiLift> lifts() const;
+    /// (Client level 8) The things spinning now (kSpin), at the last frame()'s time; one past its
+    /// frames is let go in frame(), a new one for the same thing replaces it, 0 frames stops it.
+    std::vector<UiSpin> spins() const;
+    /// (Client level 8) Our mod abilities (the server's last kAbilityBar), by slot, each cooldown
+    /// counted down at 30 frames a second from the last frame()'s time since the bar came.
+    std::vector<UiAbility> abilities() const;
+    /// (Client level 8) A use of the ability in `slot` sent to the server (kUseAbility): a press,
+    /// or a held one's release, at the cursor's world point (x, y).
+    void useAbility(std::uint8_t slot, bool release, std::uint16_t x, std::uint16_t y);
     /// (API 3) This frame's tooltip (empty: none).
     const std::vector<UiTooltipLine>& tooltip() const noexcept;
     /// (API 3) The labels, in the order set.

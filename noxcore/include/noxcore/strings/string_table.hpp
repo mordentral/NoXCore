@@ -76,5 +76,8 @@ private:
 std::string toUtf8(std::u16string_view s);
 /// UTF-8 to UTF-16 (malformed bytes become U+FFFD).
 std::u16string fromUtf8(std::string_view s);
+/// As fromUtf8, at most `units` UTF-16 units: the first character that wouldn't fit whole (a
+/// surrogate pair with one unit left) and all after it left out; never a sequence cut in half.
+std::u16string fromUtf8Cut(std::string_view s, std::size_t units);
 
 } // namespace nox::strings

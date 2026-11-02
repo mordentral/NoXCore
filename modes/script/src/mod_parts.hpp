@@ -3,9 +3,11 @@
 // (Internal to the script modes' sources.)
 #pragma once
 
+#include "mod_abilities.hpp"
 #include "mod_draw_scale.hpp"
 #include "mod_events.hpp"
 #include "mod_generate.hpp"
+#include "mod_leap.hpp"
 #include "mod_scheduler.hpp"
 #include "mod_store.hpp"
 #include "mod_weather.hpp"
@@ -28,6 +30,12 @@ struct Parts {
     Weather weather;
     /// nox.setDrawScale's: nothing sent till the mode first calls it.
     DrawScales drawScales;
+    /// nox.leap's: the leaps under way (stepped once a frame while there are any).
+    Leaps leaps;
+    /// nox.setSpin's: the spins under way (told to clients that come to know their things later).
+    Spins spins;
+    /// nox.defineAbility's and nox.grantAbility's: each player's strip (by peer).
+    ModAbilities abilities;
     /// nox.store's (opened at the first call; none while the host keeps no store).
     std::shared_ptr<ModStore> store;
     /// This game's locks' token (nox.store.lock).

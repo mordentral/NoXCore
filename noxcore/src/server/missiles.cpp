@@ -1243,6 +1243,7 @@ void Missiles::harpoonHits(ServerObject& m, ServerObject* other)
                 other->player->assistFrame = frame;
             }
             playSound(world, 999, *owner);
+            tellHarpoonHold(world, *owner, *other); // (noxcpp: a mode told, ModeHooks::abilityNews)
             return;
         }
         defaultDamageSound(world, *other, &m);
@@ -1252,7 +1253,7 @@ void Missiles::harpoonHits(ServerObject& m, ServerObject* other)
         cellBlow(m, m.newX, m.newY, static_cast<int>(world.number(kHarpoonDamage)), 0xB);
     }
     p.harpoonTarget = 0;
-    endAbility(world, *owner, 3);
+    endAbility(world, *owner, 3, AbilityEnd::Missed);
     m.pendingDelete = true;
     p.harpoonBolt = 0;
 }

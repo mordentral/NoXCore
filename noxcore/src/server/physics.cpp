@@ -242,7 +242,9 @@ struct Mover {
             return;
         }
         addContact(other.extent, self.extent, dx, dy);
-        const bool push = !(self.flags & ObjFlag::AllowOverlap) && !(other.flags & ObjFlag::AllowOverlap);
+        // (noxcpp, a mode's: a still unit, a leap's, passes bodies: World::passesBodies.)
+        const bool push = !(self.flags & ObjFlag::AllowOverlap) && !(other.flags & ObjFlag::AllowOverlap) &&
+                          (world.modeBusy.empty() || (!world.passesBodies(self) && !world.passesBodies(other)));
         // A creature isn't pushed by a NO_PUSH_CHARACTERS thing.
         if ((!(self.classes & 6) || !(other.flags & ObjFlag::NoPushCharacters)) && push) {
             const float nx = (X87(dx) / dist).f();
@@ -280,7 +282,8 @@ struct Mover {
             return;
         }
         addContact(circle.extent, box.extent, nx, ny);
-        const bool push = !(circle.flags & ObjFlag::AllowOverlap) && !(box.flags & ObjFlag::AllowOverlap);
+        const bool push = !(circle.flags & ObjFlag::AllowOverlap) && !(box.flags & ObjFlag::AllowOverlap) &&
+                          (world.modeBusy.empty() || !world.passesBodies(circle)); // (noxcpp: a leap's, World::passesBodies)
         if ((boxTakes || !(circle.classes & 6) || !(box.flags & ObjFlag::NoPushCharacters)) && push) {
             // (On the x87: 40 x the depth and the velocities' differences kept on the stack; the
             // slide stored, then times the lighter mass kept.)

@@ -609,6 +609,26 @@ struct App {
         float scale = 1;
     };
     std::vector<ModeDrawScale> modeDrawScales;
+    /// Live: a script mode's leaps (nox.leap, client level 8), sorted by net code, set each frame
+    /// before the scene (ModeUi::update): a drawable of that code is drawn that much higher
+    /// (liveSprites), its shadow on the floor under it. Empty: nothing looked up.
+    struct ModeLift {
+        std::uint16_t object = 0;
+        float lift = 0;
+    };
+    std::vector<ModeLift> modeLifts;
+    /// Live: a script mode's spins (nox.setSpin, client level 8), sorted by net code, set each
+    /// frame before the scene: a drawable of that code faces that many eighths of a turn round
+    /// from its own facing (liveSprites). Empty: nothing looked up.
+    struct ModeSpin {
+        std::uint16_t object = 0;
+        int eighths = 0;
+    };
+    std::vector<ModeSpin> modeSpins;
+    /// A mod's ability strip's keys (noxcore.cfg's ModAbilityKey1-4, Extras): their names and the
+    /// codes nox.cfg's names stand for (InputBindings::keyCode's; 0: none).
+    std::array<std::string, 4> modAbilityKeyNames{"3", "4", "5", "6"};
+    std::array<std::uint32_t, 4> modAbilityKeys{0x04, 0x05, 0x06, 0x07};
     std::unique_ptr<Font> font;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game
@@ -714,7 +734,7 @@ std::string chatLine(const App& app, const std::string& text, bool team);
 std::filesystem::path resolveMap(const std::filesystem::path& gameDir, const std::string& arg);
 std::size_t pickVariant(App& app, const nox::strings::StringEntry& e);
 std::string gameString(App& app, std::string_view label);
-void centredMessage(App& app, const std::string& text);
+void centredMessage(App& app, const std::string& text, std::optional<SDL_Color> colour = std::nullopt);
 bool soloGame(App& app);
 std::uint32_t gameFlags(App& app);
 int ownAnimState(App& app);

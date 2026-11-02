@@ -18,7 +18,9 @@
 // A UI of API 4 also draws the game's own spell and ability icons (Hud::icon), and a frameless
 // window that declares hit areas takes the mouse only inside them. With any script mode, a client
 // of level 5 draws the things the server gave a draw scale (App::modeDrawScales, the scene) and
-// their bursts (Effects::setBurstScale) at that scale.
+// their bursts (Effects::setBurstScale) at that scale. A client of level 8 draws the server's
+// leaps raised over a floor shadow (App::modeLifts) and shows its coloured lines, and keeps the
+// mod's abilities on a strip of buttons over the quickbar (their keys App::modAbilityKeys).
 #include "app.hpp"
 #include "audio.hpp"
 #include "chat_entry.hpp"
@@ -27,6 +29,7 @@
 #include "draw_box.hpp"
 #include "effects.hpp"
 #include "hud.hpp"
+#include "input.hpp"
 #include "inventory.hpp"
 #include "minimap.hpp"
 #include "mode_ui.hpp"
@@ -147,7 +150,11 @@ public:
         ui_ = dynamic_cast<ScriptUiClient*>(side);
         freeTextures(); // (the last game's pictures: gone with it)
         pointer_.reset();
+        held_.reset(); // (the last game's strip)
+        stripPressed_ = false;
         app_.modeDrawScales.clear();
+        app_.modeLifts.clear();
+        app_.modeSpins.clear();
         if (app_.effects) {
             // (Client level 5) A burst near a missile the server drew at a scale: drawn so too.
             if (ui_) {
@@ -172,6 +179,13 @@ public:
     {
         // (API 3) The release of a press the windows took, whoever has the pointer now: the drag's
         // end, then mouseUp over the window there unless a menu is up; it goes no further.
+        // (Client level 8) A press on the ability strip: its end the strip's (a held one let go).
+        if (event.button.button == SDL_BUTTON_LEFT && std::exchange(stripPressed_, false)) {
+            if (held_ && held_->byMouse) {
+                letGoHeld(app);
+            }
+            return true;
+        }
         if (!ui_) {
             pointer_.reset();
             return false;
@@ -182,9 +196,13 @@ public:
         return pointer_.release(*ui_, button, at.x, at.y, over);
     }
 
-    void inputLost(App&) override
+    void inputLost(App& app) override
     {
         pointer_.lost(ui_); // (a drag's end where the mouse last was)
+        stripPressed_ = false;
+        if (held_) {
+            letGoHeld(app); // (its key's or button's release goes elsewhere now)
+        }
     }
 
     void update(App& app) override
@@ -192,10 +210,28 @@ public:
         // (API 3) A drag's latest move, once a frame; then the labels' objects for the scene
         // (liveSprites), by net code: after the drag hook, which may change the labels.
         app.modeLabels.clear();
+        releaseHeldIfUp(app); // (client level 8: a held ability's key or button up, its release unseen)
         // (Client level 5) The draw scales the server told, by net code for the scene: whether a
         // UI runs or not (any script mode's things).
         app.modeDrawScales.clear();
+        app.modeLifts.clear();
+        app.modeSpins.clear();
         if (ui_) {
+            // (Client level 8) The leaps under way: each thing's height, by net code for the scene;
+            // and the spins, each thing's turn.
+            for (const nox::modes::script::UiLift& l : ui_->lifts()) {
+                app.modeLifts.push_back({l.object, l.lift});
+            }
+            std::ranges::sort(app.modeLifts, {}, &App::ModeLift::object);
+            for (const nox::modes::script::UiSpin& s : ui_->spins()) {
+                app.modeSpins.push_back({s.object, s.eighths});
+            }
+            std::ranges::sort(app.modeSpins, {}, &App::ModeSpin::object);
+            // (Client level 8) The server's coloured lines, shown as its plain ones are (a line
+            // from no one: centred), in their colours.
+            for (const nox::modes::script::uimsg::TextLine& t : ui_->takeTextLines()) {
+                centredMessage(app, chatLine(app, t.text, false), SDL_Color{t.r, t.g, t.b, 255});
+            }
             for (const nox::modes::script::UiDrawScale& s : ui_->drawScales()) {
                 if (!s.gone) {
                     app.modeDrawScales.push_back({s.object, s.type, s.scale});
@@ -231,13 +267,58 @@ public:
 
     bool clickableAt(const App& app, float x, float y) const override { return labelClickAt(app, x, y).has_value(); }
 
+    /// (Client level 8) A shadow on the floor under each thing in a leap (App::modeLifts): a dark
+    /// ellipse at its ground point, smaller and fainter the higher it is.
+    static void drawLeapShadows(App& app, SDL_Renderer* renderer)
+    {
+        if (app.modeLifts.empty()) {
+            return;
+        }
+        const auto& world = app.live->client().world();
+        const float zoom = app.camera.zoom;
+        constexpr int kSides = 16;
+        for (const App::ModeLift& l : app.modeLifts) {
+            const auto* d = world.drawable(l.object);
+            if (!d || l.lift < 0.5f) {
+                continue;
+            }
+            const auto p = app.interpolator.position(l.object, *d);
+            const float s = std::clamp(1.0f - l.lift / 150.0f, 0.5f, 1.0f);
+            const float rx = 14.0f * s * zoom, ry = 7.0f * s * zoom;
+            const float cx = (p.x - app.camera.left()) * zoom;
+            const float cy = (p.y - app.camera.top()) * zoom;
+            if (cx + rx < 0 || cy + ry < 0 || cx - rx > app.camera.viewWidth || cy - ry > app.camera.viewHeight) {
+                continue;
+            }
+            const SDL_FColor colour{0, 0, 0, 0.45f * s};
+            std::array<SDL_Vertex, kSides + 1> v{};
+            v[0] = {{cx, cy}, colour, {0, 0}};
+            for (int i = 0; i < kSides; ++i) {
+                const float a = 2.0f * 3.14159265f * static_cast<float>(i) / kSides;
+                v[static_cast<std::size_t>(i + 1)] = {{cx + rx * std::cos(a), cy + ry * std::sin(a)}, colour, {0, 0}};
+            }
+            std::array<int, kSides * 3> idx{};
+            for (int i = 0; i < kSides; ++i) {
+                idx[static_cast<std::size_t>(i * 3)] = 0;
+                idx[static_cast<std::size_t>(i * 3 + 1)] = i + 1;
+                idx[static_cast<std::size_t>(i * 3 + 2)] = (i + 1) % kSides + 1;
+            }
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_RenderGeometry(renderer, nullptr, v.data(), static_cast<int>(v.size()), idx.data(), static_cast<int>(idx.size()));
+        }
+    }
+
     /// (Client level 7) The server's ground decals: each its mod image flat on the floor, centred
     /// on its point (or on the thing it follows while we have it), `size` world units across at the
     /// camera's zoom, turned by its spin and swung by its pulse as time goes (nothing per frame from
     /// the server); tinted, additive when it glows. Off screen: not drawn.
     void drawFloor(App& app, SDL_Renderer* renderer) override
     {
-        if (!ui_ || ui_->decals().empty() || !app.live) {
+        if (!app.live) {
+            return;
+        }
+        drawLeapShadows(app, renderer);
+        if (!ui_ || ui_->decals().empty()) {
             return;
         }
         const double t = static_cast<double>(SDL_GetTicks()) / 1000.0;
@@ -294,6 +375,7 @@ public:
         if (!hud.renderGui || !app.font || !ui_->hudShown()) {
             return;
         }
+        drawAbilityStrip(app, renderer, hud); // (client level 8: a HUD piece of its own)
         // The HUD pieces, under every window (and the game's own windows drawn after them).
         drawWindows(app, renderer, true);
     }
@@ -348,6 +430,9 @@ public:
         }
         if (!ui_) {
             return false;
+        }
+        if (abilityEvent(app, event)) {
+            return true; // (client level 8: the ability strip's key or button)
         }
         if (ui_->api() >= 3) {
             // (API 3) Moves and the wheel (releases come through release, first).
@@ -797,6 +882,172 @@ private:
     /// another set at its address).
     std::map<int, SDL_Texture*> textures_;
     std::shared_ptr<const ModAssets> texturesOf_;
+
+    // ---- (client level 8) the ability strip: a mod's abilities (ScriptUiClient::abilities), a
+    // button each over the quickbar (Hud::modAbilitySlot), used by its key (App::modAbilityKeys:
+    // noxcore.cfg's ModAbilityKey1-4) or a left click, at the cursor's world point; a "hold" one
+    // let go with its key or button (or when the window loses the focus). The server checks every
+    // use and starts the cooldown; a press during the cooldown shown here isn't sent.
+    struct Held {
+        std::uint8_t slot = 0;
+        std::uint32_t key = 0; ///< (its key's code; 0: the mouse's)
+        SDL_Scancode scancode = SDL_SCANCODE_UNKNOWN;
+        bool byMouse = false;
+    };
+    std::optional<Held> held_;
+    bool stripPressed_ = false; ///< (a left press the strip took: its release is the strip's)
+
+    /// Whether the strip shows now (abilities granted, the GUI drawn and the HUD shown, a caster's
+    /// sets folded): only then does it take keys and clicks.
+    bool stripShown(const App& app) const
+    {
+        return ui_ && app.renderGui && !app.barsExpanded && ui_->hudShown() && !ui_->abilities().empty();
+    }
+
+    /// A held ability let go when its key or button is up though its release went elsewhere (the
+    /// chat, the in-game menu, a trade or the map vote took it): once a frame.
+    void releaseHeldIfUp(App& app)
+    {
+        if (!held_) {
+            return;
+        }
+        const bool up = held_->byMouse ? (SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_LMASK) == 0
+                                       : !SDL_GetKeyboardState(nullptr)[held_->scancode];
+        if (up) {
+            letGoHeld(app);
+        }
+    }
+
+    /// The cursor's world point (as the game's cursor is sent: the camera's left and top plus the
+    /// mouse over the zoom), kept to the map.
+    static std::pair<std::uint16_t, std::uint16_t> cursorWorld(const App& app)
+    {
+        const SDL_FPoint m = mousePos(app);
+        const float x = app.camera.left() + m.x / app.camera.zoom;
+        const float y = app.camera.top() + m.y / app.camera.zoom;
+        return {static_cast<std::uint16_t>(std::clamp(x, 0.0f, 5888.0f)), static_cast<std::uint16_t>(std::clamp(y, 0.0f, 5888.0f))};
+    }
+
+    /// The ability in `slot` used: a press sent (a "hold" one held); during its cooldown, the
+    /// "can't" sound only.
+    void pressAbility(App& app, const nox::modes::script::UiAbility& a, std::uint32_t key, SDL_Scancode scancode, bool byMouse)
+    {
+        if (a.left > 0 || held_) {
+            uiSound(app, 0xE7);
+            return;
+        }
+        const auto [x, y] = cursorWorld(app);
+        ui_->useAbility(a.slot.slot, false, x, y);
+        if (a.slot.target == nox::modes::script::uimsg::AbilityTarget::Hold) {
+            held_ = Held{a.slot.slot, key, scancode, byMouse};
+        }
+    }
+
+    void letGoHeld(App& app)
+    {
+        if (held_ && ui_) {
+            const auto [x, y] = cursorWorld(app);
+            ui_->useAbility(held_->slot, true, x, y);
+        }
+        held_.reset();
+    }
+
+    /// A key or a left press for the strip: taken (true) when it's one of its buttons' keys, the
+    /// release of the held one's, or a click on a button.
+    bool abilityEvent(App& app, const SDL_Event& event)
+    {
+        if (event.type == SDL_EVENT_KEY_UP) {
+            const auto code = InputBindings::keyCode(event.key.scancode);
+            if (held_ && !held_->byMouse && code && *code == held_->key) {
+                letGoHeld(app);
+                return true;
+            }
+            return false;
+        }
+        if (!stripShown(app)) {
+            return false;
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN) {
+            const auto code = InputBindings::keyCode(event.key.scancode);
+            if (!code) {
+                return false;
+            }
+            for (const auto& a : ui_->abilities()) {
+                if (app.modAbilityKeys[a.slot.slot] == *code) {
+                    if (!event.key.repeat) {
+                        pressAbility(app, a, *code, event.key.scancode, false);
+                    }
+                    return true; // (its key is the strip's while the button's there: no game control)
+                }
+            }
+            return false;
+        }
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+            for (const auto& a : ui_->abilities()) {
+                const SDL_FRect r = Hud::modAbilitySlot(app.camera.viewWidth, app.camera.viewHeight, a.slot.slot);
+                const SDL_FPoint p{event.button.x, event.button.y};
+                if (SDL_PointInRectFloat(&p, &r)) {
+                    stripPressed_ = true;
+                    pressAbility(app, a, 0, SDL_SCANCODE_UNKNOWN, true);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The strip: each button's frame, its icon (the mod's picture of that name, else the game's
+    /// icon of that name, else its title's first letters), the cooldown's dark part from the top as
+    /// the quickbar's, its key's name, and its title over it while the mouse is on it.
+    void drawAbilityStrip(App& app, SDL_Renderer* renderer, const HudFrame& hud)
+    {
+        if (!stripShown(app)) {
+            return;
+        }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        const int px = app.font->lineSize(10, hud.scale);
+        for (const auto& a : ui_->abilities()) {
+            const SDL_FRect r = Hud::modAbilitySlot(hud.width, hud.height, a.slot.slot);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 170);
+            SDL_RenderFillRect(renderer, &r);
+            bool drawn = false;
+            if (const ModAssets* set = ui_->assets().get(); set && !a.slot.icon.empty()) {
+                if (SDL_Texture* t = textureOf(renderer, set->find(a.slot.icon, ModAsset::Kind::Image))) {
+                    SDL_RenderTexture(renderer, t, nullptr, &r);
+                    drawn = true;
+                }
+            }
+            if (!drawn && app.hud && app.sprites) {
+                if (const auto id = nox::modes::script::gameIconId(a.slot.icon)) {
+                    const auto icon = app.hud->icon(*id, false);
+                    if (const Sprite* sp = icon ? app.sprites->get(*icon) : nullptr) {
+                        sp->scale = SDL_SCALEMODE_LINEAR;
+                        drawSprite(renderer, *sp, nullptr, r);
+                        drawn = true;
+                    }
+                }
+            }
+            if (!drawn) {
+                const std::string initials = fitted(a.slot.title, r.w - 4, px);
+                app.font->draw(initials, r.x + 2, r.y + (r.h - app.font->lineHeight(px)) / 2, px, SDL_Color{240, 180, 42, 255});
+            }
+            if (a.left > 0 && a.slot.cooldown > 0) {
+                const float share = std::min(1.0f, static_cast<float>(a.left) / static_cast<float>(a.slot.cooldown));
+                const SDL_FRect dark{r.x, r.y, r.w, std::round(r.h * share)};
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 150);
+                SDL_RenderFillRect(renderer, &dark);
+            }
+            const bool isHeld = held_ && held_->slot == a.slot.slot;
+            SDL_SetRenderDrawColor(renderer, isHeld ? 255 : 150, isHeld ? 236 : 128, isHeld ? 170 : 92, 255);
+            SDL_RenderRect(renderer, &r);
+            const std::string& key = app.modAbilityKeyNames[a.slot.slot];
+            app.font->draw(key, r.x + r.w - app.font->measure(key, px) - 2, r.y + r.h - app.font->lineHeight(px), px, SDL_Color{255, 255, 255, 255});
+            const SDL_FPoint m = hud.mouse;
+            if (SDL_PointInRectFloat(&m, &r) && !a.slot.title.empty()) {
+                app.font->draw(a.slot.title, r.x, r.y - app.font->lineHeight(px) - 2, px, SDL_Color{255, 236, 170, 255});
+            }
+        }
+    }
 };
 
 } // namespace

@@ -51,7 +51,16 @@ void Events::look(lua_State* L)
     };
     has_ = {.onObjectKilled = hasFn("onObjectKilled"), .onDestroyed = hasFn("onDestroyed"), .onDamage = hasFn("onDamage"),
             .onDamaged = hasFn("onDamaged"), .onPickup = hasFn("onPickup"), .onDrop = hasFn("onDrop"), .onEquip = hasFn("onEquip"),
-            .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost"), .onReflect = hasFn("onReflect")};
+            .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost"), .onReflect = hasFn("onReflect"),
+            .onAbility = hasFn("onAbility")};
+}
+
+void Events::ability(const server::ServerObject& unit, const server::AbilityNews& news)
+{
+    if (has_.onAbility && room()) {
+        queue_.push_back({.kind = Kind::Ability, .a = unit.extent, .b = news.other, .x = news.x, .y = news.y,
+                          .n = news.ability | static_cast<std::int32_t>(news.phase) << 8 | static_cast<std::int32_t>(news.why) << 16});
+    }
 }
 
 bool Events::room()
@@ -290,6 +299,32 @@ void Events::deliver(lua_State* L)
                 lua_pushnumber(L, e.a);
                 lua_pushnumber(L, e.b);
                 toolbox::callHook(L, "onDrop", 2, 0);
+            }
+            break;
+        case Kind::Ability:
+            if (toolbox::beginHook(L, "onAbility")) {
+                // onAbility(unit, ability, { event, reason (an end's), target, x, y }).
+                static constexpr const char* kAbilities[6] = {"", "BerserkerCharge", "WarCry", "Harpoon", "TreadLightly", "EyeOfTheWolf"};
+                static constexpr const char* kPhases[3] = {"start", "end", "hooked"};
+                static constexpr const char* kReasons[9] = {"other", "time", "wall", "hit", "broken", "missed", "walk", "cancel", "death"};
+                const int ability = std::clamp(e.n & 0xFF, 0, 5);
+                const int phase = std::clamp((e.n >> 8) & 0xFF, 0, 2);
+                const int why = std::clamp((e.n >> 16) & 0xFF, 0, 8);
+                lua_pushnumber(L, e.a);
+                lua_pushstring(L, kAbilities[ability]);
+                lua_createtable(L, 0, 5);
+                lua_pushstring(L, kPhases[phase]);
+                lua_setfield(L, -2, "event");
+                if (phase == 1) {
+                    lua_pushstring(L, kReasons[why]);
+                    lua_setfield(L, -2, "reason");
+                }
+                if (e.b) {
+                    setNumber(L, "target", e.b);
+                }
+                setNumber(L, "x", e.x);
+                setNumber(L, "y", e.y);
+                toolbox::callHook(L, "onAbility", 3, 0);
             }
             break;
         case Kind::Equipped:

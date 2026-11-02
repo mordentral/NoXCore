@@ -7,7 +7,7 @@
 -- How each works, all through the game's own spells, enchantments and effects:
 --   on it for good   swift (the game's Haste), mirrored (the reflective shield), burning's look
 --                    (the fire motes of fire protection)
---   its beat         burning, blinking, warding, festering: one timer per monster that has one,
+--   its beat         burning, blinking, warding, festering, summoner: one timer per monster that has one,
 --                    every powerBeat.every frames, doing nothing while no player is within
 --                    powerBeat.wake; each power then on its own clock. It reads the units near it
 --                    (nox.unitsNear, nox.countNear), never the world.
@@ -15,6 +15,14 @@
 --                    monster on a hero (the hit's final amount); the slow or the heal follows the
 --                    next frame (onDamage may change nothing in the world).
 --   its death        splitting, stormcharged: monsters.luau tells `died`.
+--
+-- A summoner's minions (by decision 2026-11-02) are made through monsters.luau as normal ones of the
+-- area's weakest types, their entries marked `minion` and `master` (the summoner's id): main.luau
+-- gives no experience or loot for them. Its own are kept in its entry (`minions`, a handful at
+-- most); they crumble away at its death, or once it's no longer the mod's.
+--
+-- Each power adds to its monster's experience (data's powerExperience) and its death's loot
+-- (powerLoot).
 --
 -- Damage a power deals goes through the engine with the monster as its source, so combat.luau
 -- scales it as the monster's own hits (its tier, level and the party) with the hero's resistance,
@@ -31,6 +39,7 @@ local MSG_BLUE_SPARKS = 0x81
 local MSG_YELLOW_SPARKS = 0x82
 local MSG_COUNTERSPELL_EXPLOSION = 0x87
 local MSG_TELEPORT = 0x89
+local MSG_SMOKE_BLAST = 0x8A
 
 local FLAME = 1
 local SHOCK = 9
@@ -46,7 +55,7 @@ for _, p in data.powers :: any do
 end
 
 -- The ones that act on the monster's own beat.
-local ACTIVE: { [string]: boolean } = { burning = true, blinking = true, warding = true, festering = true }
+local ACTIVE: { [string]: boolean } = { burning = true, blinking = true, warding = true, festering = true, summoner = true }
 
 -- The monsters with a power that acts by itself: id -> { entry, timer, at (power id -> the frame
 -- it may act next) }.
@@ -205,6 +214,87 @@ local function fester(id: number, def: any, x: number, y: number)
 	end
 end
 
+-- summoner: its minions still its own and alive (the list in its entry kept to those).
+local function minionsOf(id: number, e: any): { number }
+	local mine: { number } = {}
+	for _, m in e.minions or {} do
+		local c = host.info(m)
+		if c and c.master == id and nox.living(m) then
+			table.insert(mine, m)
+		end
+	end
+	e.minions = mine
+	return mine
+end
+
+-- summoner: while a foe is near, up to `count` minions round it (never past `most` alive); whether
+-- any came (its cooldown then starts).
+local function summon(id: number, e: any, def: any, x: number, y: number): boolean
+	if nox.countNear(x, y, def.reach, { enemiesOf = id, alive = true } :: any) == 0 then
+		return false
+	end
+	local mine = minionsOf(id, e)
+	local room = math.min(def.count, def.most - #mine)
+	local kinds: { string } = host.weakTypes(def.kinds)
+	if room <= 0 or #kinds == 0 then
+		return false
+	end
+	local made = 0
+	local party = scale.factor("health")
+	for k = 1, room do
+		local a = (k / room) * 2 * math.pi + roll(100) * 0.02
+		local cid = host.spawn(kinds[roll(#kinds)], x + def.ring * math.cos(a), y + def.ring * math.sin(a), "normal", e.level, nil, {})
+		local c = cid and host.info(cid)
+		if cid and c then
+			c.minion = true
+			c.master = id
+			c.experience = 0
+			c.drops = 0
+			local most = math.clamp(math.floor(c.base * def.health + 0.5), 1, 65535)
+			c.base = most
+			local now = math.clamp(math.floor(most * party + 0.5), 1, 65535)
+			nox.setHealth(cid, now, now)
+			nox.touch(cid)
+			local cx, cy = nox.position(cid)
+			nox.effect(MSG_SMOKE_BLAST, cx, cy)
+			table.insert(mine, cid)
+			made += 1
+		end
+	end
+	if made == 0 then
+		return false
+	end
+	local sound = nox.spellSound(def.sound, 0)
+	if sound then
+		nox.sound(id, sound)
+	end
+	count("calls")
+	count("minions", made)
+	return true
+end
+
+-- summoner: its minions crumble away (at its death, or once it's no longer the mod's): out of the
+-- index first, so nothing of their going counts.
+local function dismiss(id: number, e: any)
+	local list = e.minions
+	e.minions = nil
+	if not list then
+		return
+	end
+	for _, m in list do
+		local c = host.info(m)
+		if c and c.master == id then
+			host.forget(m)
+			if nox.present(m) then
+				local mx, my = nox.position(m)
+				nox.effect(MSG_SMOKE_BLAST, mx, my)
+				nox.delete(m)
+				count("dismissed")
+			end
+		end
+	end
+end
+
 local function think(id: number)
 	local st = live[id]
 	if not st then
@@ -239,6 +329,11 @@ local function think(id: number)
 			elseif p == "festering" then
 				st.at[p] = now + def.every
 				fester(id, def, x, y)
+			elseif p == "summoner" then
+				-- (no foe near, or its most out: looked at again on the next beat)
+				if summon(id, e, def, x, y) then
+					st.at[p] = now + def.every
+				end
 			end
 		end
 	end
@@ -262,6 +357,22 @@ local function draw(thingType: string, n: number): { string }
 	return out
 end
 
+-- The list with its `noun` powers last (their words nearest the name on the plate).
+local function nounsLast(list: { string }): { string }
+	local out: { string } = {}
+	for _, p in list do
+		if not byId[p].noun then
+			table.insert(out, p)
+		end
+	end
+	for _, p in list do
+		if byId[p].noun then
+			table.insert(out, p)
+		end
+	end
+	return out
+end
+
 -- The plate's text: the powers' words, then the name (64 bytes at most: a label's room).
 local function plateOf(e: any): string
 	local words: { string } = {}
@@ -277,9 +388,10 @@ local function plateOf(e: any): string
 end
 
 -- A monster just set up as its tier (monsters.applyTier): `n` powers rolled for it (or `want`'s,
--- every one there; {}: none), put on, its plate's text and its loot's share set in its entry.
+-- every one there; {}: none), put on, its plate's text and its loot's and experience's shares set in
+-- its entry.
 function powers.give(id: number, e: any, n: number, want: { string }?)
-	local list = if want then table.clone(want) else draw(e.type, n)
+	local list = nounsLast(if want then want else draw(e.type, n))
 	if #list == 0 then
 		return
 	end
@@ -298,6 +410,8 @@ function powers.give(id: number, e: any, n: number, want: { string }?)
 		end
 	end
 	e.drops += #list * data.powerLoot.drops
+	-- (each power `share` of the tier's experience more, added up)
+	e.experience = math.max(1, math.floor(e.experience * (1 + #list * data.powerExperience.share) + 0.5))
 	if e.name then
 		e.plate = plateOf(e)
 	end
@@ -404,6 +518,9 @@ function powers.died(id: number, e: any)
 	if not list then
 		return
 	end
+	if e.minions then
+		dismiss(id, e)
+	end
 	local o = nox.object(id)
 	if not o then
 		return
@@ -418,9 +535,13 @@ function powers.died(id: number, e: any)
 	end
 end
 
--- A monster no longer the mod's (charmed away, gone): its timer stopped.
-function powers.forgot(id: number)
+-- A monster no longer the mod's (charmed away, gone; `e` its entry): its timer stopped, its
+-- minions gone.
+function powers.forgot(id: number, e: any?)
 	stop(id)
+	if e and e.minions then
+		dismiss(id, e)
+	end
 end
 
 -- A new map: every timer stopped (the old monsters gone with their map).
@@ -433,13 +554,26 @@ end
 
 -- ---- For the console
 
--- "dd powers": each live powered monster ("id type tier powers drops D": D its death's loot
--- rolls past the first, its tier's and its powers'), then what they've done.
+-- "dd powers": each live powered monster ("id type tier powers drops D xp X [minions IDS]": D its
+-- death's loot rolls past the first, its tier's and its powers'; X its death's experience for one
+-- player, its powers' share in it; IDS a summoner's minions alive now, comma separated, or "-"),
+-- then what they've done.
 function powers.lines(): { string }
 	local out = {}
 	for id, e in host.all() do
 		if e.powers then
-			table.insert(out, table.concat({ tostring(id), tostring(e.type), tostring(e.tier), table.concat(e.powers, ","), "drops", tostring(e.drops) }, " "))
+			local words = { tostring(id), tostring(e.type), tostring(e.tier), table.concat(e.powers, ","), "drops", tostring(e.drops), "xp",
+				tostring(e.experience) }
+			if table.find(e.powers, "summoner") then
+				local mine = minionsOf(id, e)
+				local ids: { string } = {}
+				for _, m in mine do
+					table.insert(ids, tostring(m))
+				end
+				table.insert(words, "minions")
+				table.insert(words, if #ids > 0 then table.concat(ids, ",") else "-")
+			end
+			table.insert(out, table.concat(words, " "))
 		end
 	end
 	table.sort(out)

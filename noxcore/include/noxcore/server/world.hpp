@@ -1748,6 +1748,39 @@ public:
     /// noxcpp (a mode's): players have nothing to fight with by hand, a bare-handed punch too
     /// (the player's attack does nothing). Stock: off.
     bool noBareHands = false;
+    /// noxcpp (a mode's: nox.setBusy, nox.leap): a unit kept from acting till a frame. A player's
+    /// attacks, jumps, spells (by hand or book) and abilities are refused while it's busy, a
+    /// creature's AI paused; still (a leap's) refuses its moves and turns too, and bodies neither
+    /// push it nor are pushed by it (passesBodies: the physics' push alone; it's met, hit and
+    /// struck as ever). By unit, kMaxModeBusy at most, looked up only when there are any (busyOf);
+    /// a dead unit's entry counts for nothing (its mode lets it go, each frame). A mode keeps it,
+    /// stock never fills it.
+    struct ModeBusy {
+        std::uint32_t until = 0;      ///< busy while frameNow is before it
+        std::uint32_t stillUntil = 0; ///< still too (a leap's) while frameNow is before it
+    };
+    static constexpr std::size_t kMaxModeBusy = 256;
+    RefMap<ModeBusy> modeBusy;
+    /// `unit`'s busy entry now; null when it isn't busy (nor still), or it's dead.
+    const ModeBusy* busyOf(const ServerObject& unit) const
+    {
+        if (modeBusy.empty()) {
+            return nullptr;
+        }
+        const auto it = modeBusy.find(unit.extent);
+        if (it == modeBusy.end() || (unit.flags & ObjFlag::Dead)) {
+            return nullptr;
+        }
+        return frameNow < it->second.until || frameNow < it->second.stillUntil ? &it->second : nullptr;
+    }
+    /// Whether a busy entry is still now (its moves and turns refused too).
+    bool stillNow(const ModeBusy& b) const { return frameNow < b.stillUntil; }
+    /// Whether bodies pass `o` (a still unit's: a leap's), for the physics' push.
+    bool passesBodies(const ServerObject& o) const
+    {
+        const ModeBusy* b = busyOf(o);
+        return b && stillNow(*b);
+    }
     /// When a client came in at each player slot (0: none): 30 s on and
     /// still not in the quest, the others forget what they were told of it.
     std::array<std::uint32_t, 32> questSlotSeenAt{};

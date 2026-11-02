@@ -7,6 +7,7 @@
 #include "noxcore/server/game_host.hpp"
 #include "noxcore/server/which_map.hpp"
 #include "noxcore/server/world.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
@@ -66,11 +67,13 @@ inline int sweepMapsNamed(const std::filesystem::path& mapsDir, std::initializer
     return removed;
 }
 
-/// A line for MSG_TEXT_MESSAGE: at most 250 characters (its length is a byte, the end counted:
-/// a longer one is misread by every client).
+/// A line for MSG_TEXT_MESSAGE from UTF-8 text (a mode's or a script's): decoded (a malformed
+/// byte U+FFFD), at most 250 UTF-16 units, never a character cut in half (its length is a byte,
+/// the end counted: a longer one is misread by every client). ASCII comes out as it went in.
+/// (The owner's call, 2026-11-02: once each byte as a signed char, 0x80 up another character.)
 inline std::u16string widen(std::string_view s)
 {
-    return {s.begin(), s.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(s.size(), 250))};
+    return strings::fromUtf8Cut(s, 250);
 }
 
 /// A line to one player alone, as is (MSG_TEXT_MESSAGE from no one).

@@ -37,6 +37,10 @@
 --     arrow; the weapon's hits by the hit's cause); a hit on the hero may be capped (bulwark),
 --     paid partly from mana, survived at 1 health (undying) or answered (thorns: a monster's own
 --     blow). A flame a power made never hurts its own hero.
+--   * The warrior's passive skills (warrior.luau): its blow may be raised (Momentum, Execute,
+--     Ambush) and followed a frame on by what goes with it (Cleave, the bleeds, a shockwave, a
+--     push, the rage's spin), any party member's hit by Hunter's Mark; a monster's blow on it may
+--     be parried (0) or answered by a stagger. A skill's own hit is dealt as it is.
 --   * A flame hit on the troll chieftain (act 3's boss: mosschief.luau) is noted on him, with the
 --     hero behind it: fire keeps his wounds from closing. Nothing about the hit changes.
 --
@@ -51,6 +55,7 @@ local mosschief = require("mosschief")
 local affixes = require("affixes")
 local powers = require("powers")
 local uniquePowers = require("uniquepowers")
+local warrior = require("warrior")
 local numbers = require("data/numbers")
 local lootData = require("data/loot")
 
@@ -246,6 +251,7 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 		return 0
 	end
 	local factor = 1
+	local warriorHit = false
 	if victim then
 		local scaled = monsters.damageOf(who)
 		-- (a thing it owns, not its own blow: a boss's spells, times its own share)
@@ -266,8 +272,9 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			return 0
 		end
 		factor = scaled * hero.taken(victim)
-	elseif reflecting then
-		-- (a hit turned back: dealt as it was, the hero's bonuses no part of it)
+	elseif reflecting or warrior.quiet() then
+		-- (a hit turned back, or a warrior's skill's own hit: dealt as it was, the hero's bonuses no
+		-- part of it again)
 		return nil
 	else
 		local m = monsters.info(target)
@@ -281,6 +288,9 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			factor = hero.dealt(h, weapon)
 			-- (the worn uniques' and sets' powers on the hero's hit: uniquepowers.luau)
 			factor *= uniquePowers.dealt(h, target, m, weapon, kind, amount, factor, cause)
+			-- (the warrior's skills on the hit, and Hunter's Mark on any of the party's: warrior.luau)
+			factor *= warrior.dealt(h, target, m, source, weapon, amount, factor, cause, kind)
+			warriorHit = true
 			-- (the worn weapon's own hit: its grip, its frost's and dread's chances)
 			if affixes.byWeapon(h.bonus, h.unit, weapon, cause) then
 				factor += (h.bonus.grip or 0) / 100
@@ -298,11 +308,20 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 	end
 	local final = if factor == 1 then amount else math.max(if amount > 0 then 1 else 0, math.floor(amount * factor + 0.5))
 	local changed = factor ~= 1
-	-- (the hero's worn powers on the hit it takes: uniquepowers.luau)
+	-- (what follows a warrior's blow, by what it dealt: warrior.luau)
+	if warriorHit then
+		warrior.landed(final)
+	end
+	-- (the hero's worn powers on the hit it takes: uniquepowers.luau; then its skills: a parry, a
+	-- stagger, its rage, warrior.luau)
 	if victim then
 		local worn = uniquePowers.taken(victim, who, source, weapon, final, kind, cause)
 		if worn then
 			final, changed = worn, true
+		end
+		local skilled = warrior.taken(victim, who, source, weapon, final, cause)
+		if skilled then
+			final, changed = skilled, true
 		end
 	end
 	-- (a powered monster's hit on a hero: its frost or its thirst follows, powers.luau)

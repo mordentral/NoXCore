@@ -28,6 +28,11 @@ local cell, worldX, worldY = util.cell, util.worldX, util.worldY
 town.RADIUS = 12
 local CLEAR = 6
 
+-- The portal's and the waypoints' pads, { dx, dy } cells from the middle (the free cell nearest
+-- each): south-east of the fountain and south past the starts, both south of the way east to the
+-- map table (towns.mapTable), so walking to it crosses neither.
+local PADS = { portal = { 5, 3 }, waypoints = { 0, 8 } }
+
 -- Whether no open cell lies within the square of `reach` round (cx, cy).
 local function clearAround(open, cx: number, cy: number, reach: number): boolean
 	for dx = -reach, reach do
@@ -67,14 +72,15 @@ function town.site(open)
 	return nil
 end
 
--- The nearest open cell of the section to (x, y) that isn't used (rings outward); marked used.
-local function freeNear(section, used, x: number, y: number): number
-	for ring = 0, section.radius do
+-- The nearest open cell of the section to (x, y) that isn't used (rings outward), and that `ok`
+-- passes when given; marked used. `most`: no further than this many cells, else 0 (none).
+local function freeNear(section, used, x: number, y: number, ok: ((number) -> boolean)?, most: number?): number
+	for ring = 0, most or section.radius do
 		for dx = -ring, ring do
 			for dy = -ring, ring do
 				if math.max(math.abs(dx), math.abs(dy)) == ring then
 					local c = cell(x + dx, y + dy)
-					if section.open:has(c) and not used:has(c) then
+					if section.open:has(c) and not used:has(c) and (ok == nil or ok(c)) then
 						used:add(c)
 						return c
 					end
@@ -82,7 +88,9 @@ local function freeNear(section, used, x: number, y: number): number
 			end
 		end
 	end
-	gen.refuse("deep_delve: the town is full")
+	if most == nil then
+		gen.refuse("deep_delve: the town is full")
+	end
 	return 0
 end
 
@@ -128,10 +136,40 @@ local function run(section, out, x: number, y: number, tx: number, ty: number)
 	end
 end
 
+-- The cells of a run of side steps (the floor's own diagonals) from (x, y) to (tx, ty) (the same
+-- checkerboard colour), zigzagging where one axis is already reached, while they're the town's
+-- floor.
+local function diagonal(section, out, x: number, y: number, tx: number, ty: number)
+	local flip = 1
+	for _ = 1, 64 do
+		if x == tx and y == ty then
+			break
+		end
+		local sx, sy = math.sign(tx - x), math.sign(ty - y)
+		if sx == 0 then
+			sx = flip
+			flip = -flip
+		elseif sy == 0 then
+			sy = flip
+			flip = -flip
+		end
+		x += sx
+		y += sy
+		local c = cell(x, y)
+		if not section.open:has(c) then
+			break
+		end
+		table.insert(out, c)
+	end
+end
+
 -- The cells the look's worn paths run along (site: the map's backs and walls): from the middle west
--- to the stash, north to the vendor, east to the portal, south to the starts, and to the gate's
--- arch. Nothing is drawn or used: the same each time for the same section.
-function town.ways(section, site)
+-- to the stash, north to the vendor, east and south, to the gate's arch, and (along the floor's
+-- diagonals) to the portal's and waypoints' pads and the map table. Nothing is drawn or used: the
+-- same each time for the same section.
+-- The ways' cells: the four from the middle, the one to the gate's wall cell `wc` (when any), and
+-- the three to the pads and the table.
+local function waysTo(section, wc: number?)
 	local cx, cy = section.x, section.y
 	local out = {}
 	local reach = section.radius - 3
@@ -139,12 +177,18 @@ function town.ways(section, site)
 	run(section, out, cx, cy, cx, cy - reach)
 	run(section, out, cx, cy, cx + reach, cy)
 	run(section, out, cx, cy, cx, cy + reach)
-	local wc = gateWall(section, site)
 	if wc then
 		local gx, gy = util.xy(wc)
 		run(section, out, cx, cy, gx, gy)
 	end
+	for _, to in { PADS.portal, PADS.waypoints, towns.mapTable.at } do
+		diagonal(section, out, cx, cy, cx + to[1], cy + to[2])
+	end
 	return out
+end
+
+function town.ways(section, site)
+	return waysTo(section, gateWall(section, site))
 end
 
 -- The plain kinds of a list, in order.
@@ -156,6 +200,42 @@ local function plainOnly(w, list)
 		end
 	end
 	return out
+end
+
+-- Where the map table stands (towns.mapTable): the free floor cell of the section against a back
+-- wall nearest its place from the town's middle (the first of the map's back walls on a tie),
+-- marked used with a cell round it; `out` of a cell from the wall's line, the desk whose back is to
+-- that wall. Returns { x, y, type } and the wall's cell.
+local function deskAt(section, site, used): (any, number)
+	local mt = towns.mapTable
+	local wx, wy = section.x + mt.at[1], section.y + mt.at[2]
+	local best, bestWall, bestType, bestFar = 0, 0, "", math.huge
+	for i = 1, site.backs:count() do
+		local wc, c = site.backs:at(i)
+		if section.open:has(c) and not used:has(c) then
+			local d = c - wc
+			-- (the wall north-east of its floor: "\"; north-west: "/")
+			local kind = if util.SIDE_DY[d] == 1 and util.SIDE_DX[d] == -1 then mt.desk.ne
+				elseif util.SIDE_DY[d] == 1 and util.SIDE_DX[d] == 1 then mt.desk.nw
+				else nil
+			if kind then
+				local x, y = util.xy(c)
+				local far = (x - wx) * (x - wx) + (y - wy) * (y - wy)
+				if far < bestFar then
+					best, bestWall, bestType, bestFar = c, wc, kind, far
+				end
+			end
+		end
+	end
+	if best == 0 then
+		gen.refuse("deep_delve: no back wall in town for the map table")
+	end
+	used:addSquare(best, 1)
+	local d = best - bestWall
+	local reach = gen.f32(gen.f32(mt.out) * 23)
+	local x = gen.f32(worldX(bestWall) + gen.f32(reach * util.SIDE_DX[d]))
+	local y = gen.f32(worldY(bestWall) + gen.f32(reach * util.SIDE_DY[d]))
+	return { x = x, y = y, type = bestType }, bestWall
 end
 
 -- The town's stations, starts, lights and scenery (site: the section; backs, walls: the map's;
@@ -170,10 +250,12 @@ function town.dress(section, site, w, look)
 	-- The stations: the gate out an arch in the town's back wall, the healer's fountain in the
 	-- middle, the stash to the west, the vendor to the north.
 	local middle = cell(cx, cy)
+	local gateCell: number? = nil
 	for _, shape in { 1, 0 } do
-		local at = arch.place(w, site, shape, middle, section.radius + 4, {}, used)
+		local at, wc = arch.place(w, site, shape, middle, section.radius + 4, {}, used)
 		if at then
 			spots.gate = { x = at.x, y = at.y, type = if shape == 0 then "GauntletExitA" else "GauntletExitB" }
+			gateCell = wc
 			break
 		end
 	end
@@ -200,8 +282,10 @@ function town.dress(section, site, w, look)
 	for i = -4, 4 do
 		used:addSquare(cell(cx + i, cy + 5), 1)
 	end
-	-- The pentagrams. The portal's (east): back out through the portal a player opened. The
-	-- waypoints' (south-east): to the waypoints found. Both lead nowhere by themselves (the server
+	-- The pentagrams. The portal's (south-east): back out through the portal a player opened. The
+	-- waypoints' (south, past the starts): to the waypoints found. Both south of the way east from
+	-- the fountain to the map table, so walking to it crosses neither (by decision, 2026-11-02), and
+	-- their rings clear of each other and of the starts. Both lead nowhere by themselves (the server
 	-- watches their touches and decides), so both are invisible pentagrams (touched as the visible
 	-- kind is; the server draws a ring on the floor at each). And the waypoints' receiving end
 	-- (south-west), where a waypoint out in the area sends its travellers home: an invisible
@@ -212,22 +296,81 @@ function town.dress(section, site, w, look)
 		local p = point(c)
 		return p, w:thing(thingType, p.x, p.y, { transporter = { target = 0 } })
 	end
-	spots.portal = pentagram("InvisibleTeleportPentagram", 6, -1)
-	spots.waypoints = pentagram("InvisibleTeleportPentagram", 5, 3)
+	spots.portal = pentagram("InvisibleTeleportPentagram", PADS.portal[1], PADS.portal[2])
+	spots.waypoints = pentagram("InvisibleTeleportPentagram", PADS.waypoints[1], PADS.waypoints[2])
 	spots.wayIn, spots.wayInExtent = pentagram("InvisibleTeleportPentagram", -6, 3)
 	lights.put(w, "portal", spots.portal.x, spots.portal.y)
 	lights.put(w, "waypoint", spots.waypoints.x, spots.waypoints.y)
 	lights.put(w, "fountain", spots.healer.x, spots.healer.y)
 	-- The look's pair flanking the way to the vendor (braziers, torch poles), lit.
 	local flank = look.flank
+	local flanks = {}
 	for _, dx in { -3, 3 } do
 		local c = freeNear(section, used, cx + dx, cy - 4)
 		used:addSquare(c, 1)
 		town.put(w, flank.type, worldX(c), worldY(c))
 		lights.put(w, flank.light, worldX(c), worldY(c))
+		table.insert(flanks, point(c))
+	end
+	-- A little scenery by the stations.
+	for _, piece in look.props do
+		local c = freeNear(section, used, cx + piece[2], cy + piece[3])
+		town.put(w, piece[1], worldX(c), worldY(c))
+	end
+	-- The map table (the expeditions'): a scholar's desk that never moves, lit gold (the server draws
+	-- a gold ring on the floor round it, and touching it opens the window). At the same place in
+	-- every look (towns.mapTable): beside the portal's pad, its back to the back wall there, and
+	-- placed last, so nothing placed before it moves. Its spot carries its type, for the server.
+	local deskWall
+	spots.maps, deskWall = deskAt(section, site, used)
+	town.put(w, spots.maps.type, spots.maps.x, spots.maps.y)
+	lights.put(w, "maps", spots.maps.x, spots.maps.y)
+	-- The look's trees round the fountain (the oasis's palms), after everything else: each off the
+	-- worn ways (the paths between the stations and to the gate) and clear of the portal's and
+	-- waypoints' pads.
+	local grove = look.grove
+	if grove then
+		local ways = gen.cells()
+		for _, c in waysTo(section, gateCell) do
+			ways:add(c)
+		end
+		local far = grove.clear * 23
+		local pads = { spots.portal, spots.waypoints }
+		-- (what a tree's crown must leave in view: the stations, the pads, the gate and the lit pair
+		-- by the vendor's way)
+		local keep = { spots.healer, spots.stash, spots.vendor, spots.portal, spots.waypoints, spots.wayIn, spots.maps, spots.gate, flanks[1], flanks[2] }
+		local across, up = grove.crown.across * 23, grove.crown.up * 23
+		local function ok(c: number): boolean
+			if ways:has(c) then
+				return false
+			end
+			local x, y = worldX(c), worldY(c)
+			for _, p in pads do
+				if (x - p.x) * (x - p.x) + (y - p.y) * (y - p.y) < far * far then
+					return false
+				end
+			end
+			-- (a crown stands over what is north of its foot)
+			for _, p in keep do
+				if p.y <= y and y - p.y <= up and math.abs(p.x - x) < across then
+					return false
+				end
+			end
+			return true
+		end
+		for i, at in grove.at do
+			-- (the free cell nearest its place that passes, within `near` of it; none: no tree there)
+			local c = freeNear(section, used, cx + at[1], cy + at[2], ok, grove.near)
+			if c ~= 0 then
+				used:addSquare(c, 1)
+				town.put(w, grove.types[(i - 1) % #grove.types + 1], worldX(c), worldY(c))
+			end
+		end
 	end
 	-- The look's pieces on its back walls (every `every`-th: the ones the view looks at), `out` of
-	-- a cell from the wall as the generator's own stand (a torch a fifth).
+	-- a cell from the wall as the generator's own stand (a torch a fifth); none on the map table's
+	-- wall cell, where the desk stands. (Last: they take no cell, so their place is the same
+	-- wherever they're written.)
 	local pieces = look.wallPieces
 	local kinds = if pieces then plainOnly(w, pieces.types) else {}
 	if pieces and #kinds > 0 then
@@ -237,7 +380,7 @@ function town.dress(section, site, w, look)
 			local wc, c = site.backs:at(i)
 			if section.open:has(c) then
 				k += 1
-				if k % pieces.every == 1 % pieces.every then
+				if k % pieces.every == 1 % pieces.every and wc ~= deskWall then
 					local kind = kinds[(k // pieces.every) % #kinds + 1]
 					local d = c - wc
 					local reach = gen.f32(out * 23)
@@ -251,20 +394,6 @@ function town.dress(section, site, w, look)
 			end
 		end
 	end
-	-- A little scenery by the stations.
-	for _, piece in look.props do
-		local c = freeNear(section, used, cx + piece[2], cy + piece[3])
-		town.put(w, piece[1], worldX(c), worldY(c))
-	end
-	-- The map table (the expeditions'): a scholar's desk that never moves, lit gold (the server draws
-	-- a gold ring on the floor round it, and touching it opens the window). At the same place in
-	-- every look (towns.mapTable), and placed last, so nothing placed before it moves.
-	local mt = towns.mapTable
-	local tc = freeNear(section, used, cx + mt[1], cy + mt[2])
-	used:addSquare(tc, 1)
-	spots.maps = point(tc)
-	town.put(w, "Desk1", spots.maps.x, spots.maps.y)
-	lights.put(w, "maps", spots.maps.x, spots.maps.y)
 	return spots
 end
 

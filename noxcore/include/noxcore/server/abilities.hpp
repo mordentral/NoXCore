@@ -31,6 +31,7 @@
 #pragma once
 
 #include "noxcore/server/combat.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/world.hpp"
 
 #include <cstdint>
@@ -42,8 +43,11 @@ bool abilityActive(const World& world, const ServerObject& unit, int ability);
 /// Its record's flag (probablyWarcryCheck: 0 if none).
 int abilityFlag(const World& world, const ServerObject& unit, int ability);
 /// The ability ends early: Harpoon's rope cut (0x9E 14), Tread Lightly's SNEAK
-/// off, (Eye of the Wolf can't); MSG_REPORT_ACTIVE_ABILITIES off; its record gone.
-void endAbility(World& world, ServerObject& unit, int ability);
+/// off, (Eye of the Wolf can't); MSG_REPORT_ACTIVE_ABILITIES off; its record gone. (noxcpp: a
+/// mode told why, ModeHooks::abilityNews, when a record went; `other` what a charge hit.)
+void endAbility(World& world, ServerObject& unit, int ability, AbilityEnd why = AbilityEnd::Other, ObjectKey other = 0);
+/// (noxcpp) A harpoon's hold on `target` told to a mode (ModeHooks::abilityNews, Hooked).
+void tellHarpoonHold(World& world, ServerObject& warrior, const ServerObject& target);
 /// All its abilities stop and cool down no more (playerCancelAbils: at death;
 /// MSG_RESET_ABILITIES 6).
 void cancelAbilities(World& world, ServerObject& unit);

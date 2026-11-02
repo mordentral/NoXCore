@@ -33,6 +33,10 @@ vendor.prices = {
 	reroll = 0.6,
 }
 
+-- Repairs: the game's own price for a piece (its durability's, a staff's charges' from its spell's
+-- worth) times `factor`, rounded, at least 1 gold (by decision 2026-11-02).
+vendor.repair = { factor = 0.5 }
+
 -- How near a station (the stash's chest, the vendor's anvil, the fountain) a player must stand to
 -- use it, in world units; walking further closes its window.
 vendor.reach = 140

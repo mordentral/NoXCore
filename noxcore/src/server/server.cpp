@@ -1038,7 +1038,11 @@ void Server::updateWorld(std::uint32_t now)
         } else if (o->classes & things::ObjectClass::Door) {
             updateDoor(world_, *o, now);
         } else if (o->monster && o->updates) {
-            Monsters{f}.update(*o); // (MonsterUpdate: monsters.hpp)
+            // (noxcpp, a mode's: a creature busy, World::modeBusy, thinks and acts not at all
+            // while it lasts; a still one (a leap) is moved by its mode.)
+            if (!world_.busyOf(*o)) {
+                Monsters{f}.update(*o); // (MonsterUpdate: monsters.hpp)
+            }
         } else if (Objects::acts(*o)) {
             Objects{f, things_}.update(*o);
         }

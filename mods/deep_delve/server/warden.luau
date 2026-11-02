@@ -24,7 +24,12 @@
 -- His plates are a share on his monster entry (`taken`) that combat.luau reads for every blow the
 -- party lands; nothing walks the world but his beat's looks round him, the sand-devil and the
 -- players he picks.
+--
+-- From his waking the court is in a dust storm (the one lair with weather): each player in the
+-- court has it (nox.weather to that player), calm again on going out of it (to town, by a portal or
+-- a death) and for everyone as his fight ends (his death, the map left).
 
+local acts = require("data/acts")
 local monsters = require("monsters")
 local numbers = require("data/numbers")
 
@@ -323,6 +328,42 @@ local function masonry(c: any)
 	end
 end
 
+-- ---- The court's dust storm
+
+-- (anyone in the court, standing or fallen)
+local IN_COURT: any = { players = true }
+
+-- A player's sky calmed again (the lair's own: none).
+local function calm(peer: number)
+	nox.weather(peer, { kind = "none", fade = numbers.ruinWarden.storm.fade })
+end
+
+-- The storm on the beat: for each player in the court now, calm for each who left it.
+local function storm(c: any)
+	local k = c.k
+	local n = numbers.ruinWarden.storm
+	local inside: { [number]: boolean } = {}
+	for _, u in nox.unitsNear(k.middle.x, k.middle.y, n.reach, IN_COURT) do
+		local o = nox.object(u)
+		if o then
+			inside[o.peer] = true
+		end
+	end
+	local w: any = (acts.weathers :: any)[n.weather]
+	for peer in inside do
+		if not k.stormed[peer] then
+			k.stormed[peer] = true
+			nox.weather(peer, w)
+		end
+	end
+	for peer in k.stormed do
+		if not inside[peer] then
+			k.stormed[peer] = nil
+			calm(peer)
+		end
+	end
+end
+
 -- ---- The fight
 
 -- His fight begun (`c`: boss.luau's, his id, def and area info; `spots`: the lair's). His plates
@@ -357,6 +398,8 @@ function warden.start(c: any, spots: any)
 		wardensAt = 0,
 		sandAt = 0,
 		masonryAt = 0,
+		-- (the players in the court's storm, by peer)
+		stormed = {},
 	}
 	c.k.nextPiece = nox.random(#c.k.ring)
 	setTaken(c, nox.frame())
@@ -384,6 +427,7 @@ function warden.think(c: any)
 		k.poundAt = now + n.pound.every // 2
 		k.wardensAt = now + n.wardens.every // 3
 	end
+	storm(c)
 	local share = o.health / math.max(1, o.maxHealth)
 	-- (every plate left falls below its share: a party that can't make him miss still gets on)
 	if k.plates > 0 and share <= n.plates.bareAt then
@@ -424,16 +468,32 @@ function warden.think(c: any)
 	end
 end
 
--- His fight over (his death, or his map gone): nothing more of it runs.
+-- His fight over (his death, or his map gone): nothing more of it runs, and the storm calms for
+-- everyone it was on.
 function warden.stop(c: any)
 	c.over = true
-	if c.k then
-		c.k.devil = nil
+	local k = c.k
+	if k then
+		k.devil = nil
+		for peer in k.stormed do
+			calm(peer)
+		end
+		table.clear(k.stormed)
 	end
 end
 
+-- How many players the court's storm is on.
+local function stormCount(k: any): number
+	local n = 0
+	for _ in k.stormed do
+		n += 1
+	end
+	return n
+end
+
 -- What "dd fight" says: "phase P awake|asleep, plates N, plated|open|bare, pounds P (misses M,
--- hits H), reels R, adds standing/called, quakes Q, devils D (scoured S), stones N, ring R".
+-- hits H), reels R, adds standing/called, quakes Q, devils D (scoured S), stones N, ring R,
+-- storm N" (N: the players in its storm).
 function warden.line(c: any): string
 	local k = c.k
 	if not k then
@@ -445,7 +505,7 @@ function warden.line(c: any): string
 	return "phase " .. tostring(k.phase) .. " " .. awake .. ", plates " .. tostring(k.plates) .. ", " .. state .. ", pounds " .. tostring(k.pounds)
 		.. " (misses " .. tostring(k.misses) .. ", hits " .. tostring(k.hits) .. "), reels " .. tostring(k.reels) .. ", adds " .. tostring(standing)
 		.. "/" .. tostring(k.called) .. ", quakes " .. tostring(k.quakes) .. ", devils " .. tostring(k.devils) .. " (scoured " .. tostring(k.scoured)
-		.. "), stones " .. tostring(k.stones) .. ", ring " .. tostring(#k.ring)
+		.. "), stones " .. tostring(k.stones) .. ", ring " .. tostring(#k.ring) .. ", storm " .. tostring(stormCount(k))
 end
 
 -- The fight's next blows brought forward, for "dd fight now": each comes on the next beat.

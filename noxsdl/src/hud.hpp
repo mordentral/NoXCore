@@ -125,6 +125,9 @@ public:
 
     /// Output pixels per game pixel on a w x h screen.
     static float scale(int w, int h);
+    /// (Client level 8) A mod's ability strip's button `i` (0-3) on a w x h screen, in output
+    /// pixels: a row of four 34-pixel squares centred over the quickbar, above a trap tray's top.
+    static SDL_FRect modAbilitySlot(int w, int h, int i);
     /// A slot's top left in game pixels on a w x h screen: set `set`'s box (the bar itself unless
     /// the sets are all showing and it's one of the first four).
     static SDL_FPoint slotPosition(int w, int h, int set, int slot, bool expanded, int currentSet);

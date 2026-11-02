@@ -8,6 +8,7 @@
 #pragma once
 
 #include "noxcore/server/combat.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/world.hpp"
 
 #include <cstddef>
@@ -26,7 +27,8 @@ public:
 
     struct Has {
         bool onObjectKilled = false, onDestroyed = false, onDamage = false, onDamaged = false, onPickup = false,
-             onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false, onReflect = false;
+             onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false, onReflect = false,
+             onAbility = false;
     };
     /// Which of them the script's mode table (on top of L's stack) has (each load).
     void look(lua_State* L);
@@ -42,6 +44,9 @@ public:
     /// `made`: what the cast made (onSpellCast's sixth argument; kept only when the hook is there).
     void spellCast(const server::ServerObject& caster, std::uint32_t spell, const server::ServerObject* target, float x, float y,
                    std::span<const std::uint32_t> made);
+    /// A warrior's ability's news (ModeHooks::abilityNews): onAbility(unit, ability, { event,
+    /// reason (an end's), target, x, y }).
+    void ability(const server::ServerObject& unit, const server::AbilityNews& news);
 
     // ---- asked: the script's answer, at once
     /// onDamage(target, source, weapon, amount, kind, cause) -> amount (nil: kept; 0: the hit
@@ -65,7 +70,7 @@ public:
     bool idle() const noexcept { return queue_.empty() && overflow_ == 0; }
 
 private:
-    enum class Kind : std::uint8_t { Killed, Destroyed, Damaged, PickedUp, Dropped, Equipped, SpellCast };
+    enum class Kind : std::uint8_t { Killed, Destroyed, Damaged, PickedUp, Dropped, Equipped, SpellCast, Ability };
     struct Event {
         Kind kind;
         server::ObjectKey a = 0, b = 0; ///< the ids it names (0: none; this frame's: keys, not stored links)

@@ -578,4 +578,97 @@ link(branchNode("conjurer", "Beasts", 11), add({ x = 11, y = 16, kind = "keyston
 link(branchNode("wizard", "Renewal", 3), add({ x = 11, y = -4, kind = "notable", region = "wizard", branch = "Renewal", name = "Siphon",
 	icon = "s_mana", stats = { manaOnKill = 6, manaRegen = 0.5 } }))
 
+-- The warrior's skills (by decision 2026-11-02; ids 157 on): passive skills on nodes of their own
+-- beside the warrior's branches (data/warrior.luau's numbers, warrior.luau's work). Each names its
+-- skill (`skill`), a warrior's alone (tree.usable: another class gets crossWorth); taking another
+-- node of the same skill raises its rank. Their branch names are their own (a branch's 13 nodes
+-- stay its 13):
+--   Wrath   off Fury, to its north (y -5): Cleave, Momentum, Execute; Rage (y -7) joined to
+--           Momentum and Execute;
+--   Bastion off Guard: Shield Wall and Phalanx to its north (y -1, Phalanx joined to Shield Wall
+--           and Ironhide), Second Wind to its south (y 1);
+--   Quarry  off Hunt, to its south (y 5): Rend;
+--   Arms    a fourth branch from the root, to the south-west: five smalls (y 7, x -6 to -14),
+--           each with a weapon family's mastery under it (y 9) and that mastery's second rank
+--           (y 11), sword, hammer and mace, axe, chakram, staff in turn;
+--   the abilities' upgrades, at their last nodes: Ambush (Tread Lightly's, y 1 under Guard's
+--           last Tread Lightly) and Hunter's Mark (Eye of the Wolf's, y 2 over Hunt's last Eye of
+--           the Wolf).
+-- Kept free for what comes next (nothing there yet): each other ability's two upgrades beside its
+-- last node (Berserker Charge's at (-17, -6) and (-18, -6); War Cry's at (-16, -6) and (-15, -6);
+-- Harpoon's at (-17, 5) and (-18, 5)). Leap Slam and Whirlwind, the actives, are at the end.
+--
+-- Pictures: the existing ones where they fit, three spares (n_cleave, n_rend, n_second_wind) new.
+-- The node of the same name in the warrior's Renewal run (id 151) is Hale Heart now.
+nodes[branchNode("warrior", "Renewal", 3)].name = "Hale Heart"
+
+local function skillNode(n: any, from: { number }): number
+	n.region = "warrior"
+	local id = add(n)
+	for _, f in from do
+		link(f, id)
+	end
+	return id
+end
+
+do
+	local fury, guard, hunt = "Fury", "Guard", "Hunt"
+	skillNode({ x = -7, y = -5, kind = "notable", branch = "Wrath", name = "Cleave", icon = "n_cleave", skill = "cleave" }, { branchNode("warrior", fury, 2) })
+	local momentum = skillNode({ x = -10, y = -5, kind = "notable", branch = "Wrath", name = "Momentum", icon = "n_bloodlust", skill = "momentum" },
+		{ branchNode("warrior", fury, 5) })
+	local execute = skillNode({ x = -14, y = -5, kind = "notable", branch = "Wrath", name = "Execute", icon = "k_predator", skill = "execute" },
+		{ branchNode("warrior", fury, 9) })
+	skillNode({ x = -12, y = -7, kind = "notable", branch = "Wrath", name = "Rage", icon = "k_bloodrage", skill = "rage" }, { momentum, execute })
+	local wall = skillNode({ x = -9, y = -1, kind = "notable", branch = "Bastion", name = "Shield Wall", icon = "k_unbowed", skill = "shieldWall" },
+		{ branchNode("warrior", guard, 4) })
+	skillNode({ x = -12, y = -1, kind = "notable", branch = "Bastion", name = "Phalanx", icon = "n_ironhide", skill = "phalanx" },
+		{ wall, branchNode("warrior", guard, 6) })
+	skillNode({ x = -10, y = 1, kind = "notable", branch = "Bastion", name = "Second Wind", icon = "n_second_wind", skill = "secondWind" },
+		{ branchNode("warrior", guard, 5) })
+	skillNode({ x = -8, y = 5, kind = "notable", branch = "Quarry", name = "Rend", icon = "n_rend", skill = "rend" }, { branchNode("warrior", hunt, 3) })
+	-- (the abilities' upgrades: Tread Lightly's last node is Guard's 12th, Eye of the Wolf's Hunt's
+	-- 11th)
+	skillNode({ x = -17, y = 1, kind = "notable", branch = "Upgrades", name = "Ambush", icon = "k_predator", skill = "ambush", upgrades = 4 },
+		{ branchNode("warrior", guard, 12) })
+	skillNode({ x = -16, y = 2, kind = "notable", branch = "Upgrades", name = "Hunter's Mark", icon = "n_keen_eye", skill = "huntersMark", upgrades = 5 },
+		{ branchNode("warrior", hunt, 11) })
+	-- Arms: its smalls from the root, then each family's two mastery nodes under its small.
+	local wd = require("data/warrior")
+	local smalls = { WARRIOR_SMALL[3], WARRIOR_SMALL[2], WARRIOR_SMALL[1], WARRIOR_SMALL[4], WARRIOR_SMALL[3] }
+	local prev = data.roots.warrior
+	local spine: { number } = {}
+	for i, s in smalls do
+		prev = skillNode({ x = -4 - 2 * i, y = 7, kind = "small", branch = "Arms", name = s.name, icon = s.icon, stats = s.stats }, { prev })
+		table.insert(spine, prev)
+	end
+	local masteryIcon = { sword = "s_damage", hammer = "s_strength", axe = "n_bloodlust", chakram = "s_damage_resist", staff = "s_resist" }
+	for i, key in wd.masteryOrder do
+		local title = (wd.mastery :: any)[key].title
+		local first = skillNode({ x = -4 - 2 * i, y = 9, kind = "notable", branch = "Arms", name = title .. " Mastery", icon = masteryIcon[key], skill = key },
+			{ spine[i] })
+		skillNode({ x = -4 - 2 * i, y = 11, kind = "notable", branch = "Arms", name = title .. " Mastery II", icon = masteryIcon[key], skill = key, rank = 2 },
+			{ first })
+	end
+end
+
+-- The warrior's active abilities (by decision 2026-11-02; ids 182-185): Leap Slam over Rage
+-- (-12, -9), its second rank above it (-12, -11); Whirlwind at the Arms row's end (-16, 7), its
+-- second rank past it (-18, 7). Each a skill node (a warrior's alone) whose skill is an ability
+-- (data/warrior.luau's actives): taking it puts the ability's button on the warrior's strip,
+-- the second rank raises its numbers. Pictures: existing ones (k_unbowed, n_cleave) for now.
+do
+	local function at(x: number, y: number): number
+		for _, n in nodes do
+			if n.x == x and n.y == y then
+				return n.id
+			end
+		end
+		error("tree: no node at " .. x .. ", " .. y)
+	end
+	local leap = skillNode({ x = -12, y = -9, kind = "notable", branch = "Wrath", name = "Leap Slam", icon = "k_unbowed", skill = "leapSlam" }, { at(-12, -7) })
+	skillNode({ x = -12, y = -11, kind = "notable", branch = "Wrath", name = "Leap Slam II", icon = "k_unbowed", skill = "leapSlam", rank = 2 }, { leap })
+	local whirl = skillNode({ x = -16, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind", icon = "n_cleave", skill = "whirlwind" }, { at(-14, 7) })
+	skillNode({ x = -18, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind II", icon = "n_cleave", skill = "whirlwind", rank = 2 }, { whirl })
+end
+
 return data

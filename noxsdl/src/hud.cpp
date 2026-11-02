@@ -315,6 +315,15 @@ bool Hud::inBarArea(float x, float y, int w, int h)
     // From the bar's left to its right, 17 above it to the screen's bottom.
     return inside(x / l.s, y / l.s, l.barX(), l.barY() - 17, kBarW, kBarUp + 17);
 }
+SDL_FRect Hud::modAbilitySlot(int w, int h, int i)
+{
+    const Layout l = layoutFor(w, h);
+    constexpr float kSize = 34, kStep = 38;
+    const float x = l.barX() + (kBarW - (3 * kStep + kSize)) / 2 + kStep * static_cast<float>(i);
+    const float y = l.trayY() - kSize - 6; // (over the trap tray's top: a caster's tray stays clear)
+    return {x * l.s, y * l.s, kSize * l.s, kSize * l.s};
+}
+
 int Hud::manaCost(std::uint32_t spell) const
 {
     // spellManaCost's ordinary mode: thing.bin's cost; the summonings their creature's price (VD-34).

@@ -1812,11 +1812,19 @@ void HeadlessClient::onText(std::span<const std::uint8_t> m)
     const auto body = m.subspan(11);
     std::string text;
     // 0x0A: 8-bit text (2) or a string id (8); otherwise UTF-16.
-    if (flags & 0x0A) {
-        text = readAscii(body);
-        if (flags & 0x08) {
-            text = "[" + text + "]"; // a string-table id
+    if (flags & 0x08) {
+        text = "[" + readAscii(body) + "]"; // a string-table id
+    } else if (flags & 0x02) {
+        // Each byte one character, U+0000-00FF (the server sends a line narrow only when every
+        // character fits a byte: World::textMessage), up to its NUL: into UTF-8 as its code point.
+        std::u16string wide;
+        for (const std::uint8_t b : body) {
+            if (b == 0) {
+                break;
+            }
+            wide.push_back(static_cast<char16_t>(b));
         }
+        text = strings::toUtf8(wide);
     } else {
         text = strings::toUtf8(utf16Until(body));
     }

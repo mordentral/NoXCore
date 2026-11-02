@@ -23,6 +23,9 @@ tips.items = {
 	CrossBow = { name = "Crossbow", kind = "crossbow", ammo = "ArcherBolt" },
 	Quiver = { kind = "quiver" },
 	StaffWooden = { name = "Wooden Staff", kind = "staff" },
+	-- (thrown; none drops in Deep Delve yet: the kind names the warrior's chakram mastery)
+	RoundChakram = { kind = "chakram" },
+	FanChakram = { kind = "chakram" },
 	LesserFireballWand = { kind = "spell staff" },
 	SulphorousFlareWand = { kind = "spell staff" },
 	ForceWand = { kind = "spell staff" },

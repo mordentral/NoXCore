@@ -189,9 +189,14 @@ std::string toUtf8(std::u16string_view s)
 
 std::u16string fromUtf8(std::string_view s)
 {
+    return fromUtf8Cut(s, std::u16string::npos);
+}
+
+std::u16string fromUtf8Cut(std::string_view s, std::size_t units)
+{
     std::u16string out;
     std::size_t i = 0;
-    while (i < s.size()) {
+    while (i < s.size() && out.size() < units) {
         const auto b = static_cast<std::uint8_t>(s[i]);
         // Sequence length from the lead byte: 0xxxxxxx 1, 110xxxxx 2, 1110xxxx 3, 11110xxx 4, else invalid.
         const std::size_t len = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 0;
@@ -208,8 +213,12 @@ std::u16string fromUtf8(std::string_view s)
             continue;
         }
         i += len;
-        // Code points above the BMP become a surrogate pair.
+        // Code points above the BMP become a surrogate pair (never half of one: with one unit
+        // left it's left out, and the rest with it).
         if (cp >= 0x10000) {
+            if (units - out.size() < 2) {
+                break;
+            }
             cp -= 0x10000;
             out.push_back(static_cast<char16_t>(0xD800 + (cp >> 10)));
             out.push_back(static_cast<char16_t>(0xDC00 + (cp & 0x3FF)));

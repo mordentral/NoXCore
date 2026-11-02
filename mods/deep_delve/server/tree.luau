@@ -19,6 +19,7 @@
 -- (data.refund), and only a node whose going leaves every other node taken joined to the root.
 
 local data = require("data/tree")
+local warriorData = require("data/warrior")
 
 local tree = {}
 
@@ -165,15 +166,17 @@ function tree.usable(class: string, n: any): boolean
 	elseif n.kind == "summon" then
 		local c = (data.creatures :: any)[n.creature]
 		return c ~= nil and castable(class, c.spell)
-	elseif n.kind == "ability" then
+	elseif n.kind == "ability" or n.skill then
+		-- (an ability, or a warrior's passive skill: data/warrior.luau)
 		return class == "warrior"
 	end
 	return true
 end
 
--- Whether a node gives something of its own (a spell, ability or creature) that a class may lack.
+-- Whether a node gives something of its own (a spell, ability, creature or a warrior's skill) that
+-- a class may lack.
 local function givesSkill(n: any): boolean
-	return n.kind == "spell" or n.kind == "summon" or n.kind == "ability"
+	return n.kind == "spell" or n.kind == "summon" or n.kind == "ability" or n.skill ~= nil
 end
 
 -- The nodes taken, as a set (the class's root among them).
@@ -346,15 +349,18 @@ local function addStats(sum: any, stats: any, times: number)
 end
 
 -- What the taken nodes add up to: { health, mana, strength, healthPct, manaPct, damage, resist,
--- healthRegen, manaRegen (a second), manaOnKill, spellCost, summonCost, summonHealth (%), own }: each node's
--- stats, the masteries of the spells and abilities the class has from them, and the stats' worth
--- of each spell, ability or summon node it can't use (data.crossWorth); own: the % more damage a
--- hit by a thing of each type deals (its spell's own bonus, data.rises), by type.
+-- healthRegen, manaRegen (a second), manaOnKill, spellCost, summonCost, summonHealth (%), own,
+-- skills }: each node's stats, the masteries of the spells and abilities the class has from them,
+-- and the stats' worth of each spell, ability, summon or skill node it can't use (data.crossWorth);
+-- own: the % more damage a hit by a thing of each type deals (its spell's own bonus, data.rises),
+-- by type; skills: a warrior's passive skills (data/warrior.luau) by key, each its rank.
 function tree.totals(rec: any): any
 	local class = classOf(rec)
 	local own: { [string]: number } = {}
+	-- (skills: a warrior's passive skills, each its rank: how many of its nodes are taken)
+	local skills: { [string]: number } = {}
 	local sum = { health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, damage = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-		manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = own }
+		manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = own, skills = skills }
 	local worth = (data.crossWorth :: any)[class] or {}
 	for id in tree.taken(rec) do
 		local n = nodes[id]
@@ -362,6 +368,8 @@ function tree.totals(rec: any): any
 			addStats(sum, n.stats, 1)
 			if givesSkill(n) and not tree.usable(class, n) then
 				addStats(sum, worth, 1)
+			elseif n.skill then
+				skills[n.skill] = (skills[n.skill] or 0) + 1
 			end
 		end
 	end
@@ -476,6 +484,11 @@ function tree.describe(n: any): (string, string)
 		return n.name, "Where the " .. CLASS_TITLES[n.region] .. " starts (free for a " .. CLASS_TITLES[n.region] .. ")"
 	end
 	local kind = if n.kind == "keystone" then "Keystone: " elseif n.kind == "notable" then "Notable: " else ""
+	if n.skill then
+		-- (a warrior's skill: its words at the rank the node brings, then any stats of its own)
+		local stats = tree.statText(n.stats)
+		return n.name, kind .. warriorData.words(n.skill, n.rank or 1) .. (if stats ~= "" then ", " .. stats else "") .. " (the Warrior's)"
+	end
 	return n.name, kind .. tree.statText(n.stats)
 end
 

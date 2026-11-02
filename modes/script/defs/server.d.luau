@@ -57,10 +57,10 @@ declare nox: {
     hasUi: (peer: number) -> boolean,
     --- The key a player's NoX Core client proved for this host (mode.json's "clientKeys": 32 hex digits, the same for that PC every time); nil: none.
     clientKey: (peer: number) -> string?,
-    --- A text line to one player's unit alone, as the native modes tell one (250 characters at most).
-    tell: (unit: number, text: string) -> (),
-    --- A text line to everyone as the engine broadcasts one (250 characters at most).
-    textToAll: (text: string) -> (),
+    --- A text line to one player's unit alone, as the native modes tell one (250 characters at most); colour { r, g, b } or { r = , g = , b = } (0-255): drawn in it by NoX Core clients of level 8, plain to others.
+    tell: (unit: number, text: string, colour: { [any]: number }?) -> (),
+    --- A text line to everyone as the engine broadcasts one (250 characters at most); colour as nox.tell's.
+    textToAll: (text: string, colour: { [any]: number }?) -> (),
     --- # Views (say, choice, table)
     --- Says a line to one player: a say view to its UI, else a text line.
     say: (peer: number, text: string) -> (),
@@ -190,6 +190,24 @@ declare nox: {
     setBurstScale: (id: number, scale: number?) -> (),
     --- A thing drawn 0.5-3 x its size by NoX Core clients of client level 5 (its sprite and, a missile's, its burst); nil: as its type; nothing changes on the server.
     setDrawScale: (id: number, scale: number?) -> (),
+    --- Keeps a creature or player from acting for that many frames, till it dies (a player's attacks, jumps, spells and abilities refused, a creature's AI paused); 0 frees it; false when 256 units are busy.
+    setBusy: (unit: number, frames: number) -> boolean,
+    --- The frames a unit stays busy (nox.setBusy) or still (in a leap); 0: free.
+    busy: (unit: number) -> number,
+    --- Carries a creature or player to (x, y) over time frames (20), over bodies, short of a wall; still the while, hittable; NoX Core clients of level 8 draw it height (40) high; onLand when it's down. Where it lands and whether a wall cut it short; nil when it can't (dead, held, frozen, jumping, charging, leaping).
+    leap: (unit: number, x: number, y: number, opts: { time: number?, height: number? }?) -> (number?, number?, boolean?),
+    --- NoX Core clients of level 8 draw a thing's body turning through its facings, turnsPerSecond (-8 to 8; negative the other way) for frames (0-1800); 0 stops it; nothing changes on the server.
+    setSpin: (id: number, turnsPerSecond: number, frames: number) -> (),
+    --- Defines (or changes) an ability the mode can grant: a button on a NoX Core client's strip beside the quickbar (client level 8); spec { title, icon (a mod asset's name, or a game icon's: "ABILITY_...", "SPELL_..."), cooldown (frames), target "point" | "none" | "hold", hold (a held one's most frames, 60) }.
+    defineAbility: (id: string, spec: { title: string?, icon: string?, cooldown: number?, target: string?, hold: number? }) -> (),
+    --- Gives a player an ability: its button 1-4; nil when the strip's full or the player's client can't show one (stock, or a NoX Core client before level 8: nothing granted); onModAbility when it's used.
+    grantAbility: (unit: number, id: string) -> number?,
+    --- Takes an ability from a player; whether it had it.
+    revokeAbility: (unit: number, id: string) -> boolean,
+    --- The frames till a player's ability can be used again (0: ready, or not granted); a warrior's stock one by its name ("BerserkerCharge", "WarCry", "Harpoon", "TreadLightly", "EyeOfTheWolf") too.
+    abilityCooldown: (unit: number, id: string) -> number,
+    --- Sets a player's ability's cooldown in frames (0: ready now); whether it's granted. A stock one's: its client told ready (0) or not, as the game tells it (the bar's shading runs the game's own delay); one under way goes on.
+    setAbilityCooldown: (unit: number, id: string, frames: number) -> boolean,
     --- The engine's area damage about (x, y): whole within `full`, less towards `reach`; then the walls.
     damageAt: (x: number, y: number, reach: number, full: number, damage: number, damageType: number, source: number?, except: number?, spareSource: boolean?) -> (),
     --- Deletes a thing as the engine does (gone at the frame's end); never a player's unit.
@@ -446,4 +464,7 @@ declare function require(name: string): any
 --- @hook onSpellCast(caster, spell, target, x, y, made) | A spell was cast (its name; target nil: none; made: what was made while it went off, its missiles or creature and anything its kills made at once, not what comes on later frames, oldest first, nil: none; normally heard before its missiles first fly, but after a host stall they may have flown a frame at their type's size).
 --- @hook onExit(exit, player) | A player touched an exit: return false to hold them; changes nothing in the world.
 --- @hook castCost(caster, spell, cost, how) | A player's spell's price before it's paid (cost: the game's mana; how "cast", or "trap": into a glyph's trap, at its check and as it's paid): return mana, health (health a plain loss, never to below 1; short of either: refused, as short of mana; given back where the game gives a cast's price back) or nil for the game's; changes nothing in the world.
+--- @hook onAbility(unit, ability, info) | A warrior's stock ability ("BerserkerCharge", "WarCry", "Harpoon", "TreadLightly", "EyeOfTheWolf"): info { event = "start" (accepted) | "end" | "hooked" (a harpoon's hold: its pull runs from the next frame till the end), reason (an end's: "time", "wall", "hit" (a charge into a creature; a harpoon's pull done), "broken", "missed", "walk", "cancel" (a reset; a charge's kill readying it), "death", "other"; one end a harpoon's throw), target (what a charge hit, what a harpoon holds), x, y (the warrior's place then) }; told the next frame's start.
+--- @hook onModAbility(unit, id, x, y, phase) | A player used a granted ability (x, y: its cursor's world point; phase "press", or for a "hold" one "release" when it's let go and "end" when its hold ran out, x and y nil then): return false to refuse a press (no cooldown starts); a press is never heard during its cooldown or while the player is busy.
+--- @hook onLand(unit, x, y, cut) | A leap (nox.leap) came down at (x, y) (cut: a wall or ground no one stands on stopped it short); none for one that died or went mid-leap.
 --- @hook onGenerated(tag, ok, result) | A map nox.generate built ahead is written (ok), or failed (result: why).

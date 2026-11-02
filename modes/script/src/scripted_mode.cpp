@@ -409,6 +409,10 @@ struct ScriptedMode::Impl {
     // ---- the UI (ui_proto.hpp)
     void clientReady(std::uint8_t peer);
     void onUiMessage(std::uint8_t peer, std::span<const std::uint8_t> m);
+    /// A mod ability's use from `peer` (kUseAbility's payload): checked, asked of onModAbility.
+    void useAbility(std::uint8_t peer, std::span<const std::uint8_t> payload);
+    /// onModAbility's "end" for `peer`'s held `def` (its hold ran out, or its player left play).
+    void abilityEnded(std::uint8_t peer, int def);
     /// The UI's source to each player due it, a few blocks a frame.
     void pumpUi();
     /// Every player's UI dropped and sent again (a reload's new UI).
@@ -1737,52 +1741,109 @@ int noxMul32(lua_State* L)
     return 1;
 }
 
+/// A script's string as a line of the game's text (textToAll, tell, unitSay, a team's name): its
+/// UTF-8 decoded (a malformed byte U+FFFD), at most 250 UTF-16 units, never a character cut in
+/// half; as the native modes' (mode_shared.hpp's widen), byte for byte.
+std::u16string lineText(const char* s, size_t len)
+{
+    return strings::fromUtf8Cut(std::string_view(s, len), 250);
+}
+
+/// A line's colour (nox.textToAll's and nox.tell's last): none for nil, else { r, g, b } or
+/// { r = r, g = g, b = b } (a modifier's color), each kept to 0-255; a part left out is 255.
+std::optional<uimsg::TextLine> textColourArg(lua_State* L, int idx)
+{
+    if (lua_isnoneornil(L, idx)) {
+        return std::nullopt;
+    }
+    luaL_argcheck(L, lua_istable(L, idx), idx, "a colour { r, g, b }");
+    const auto part = [&](int i, const char* key) {
+        lua_rawgeti(L, idx, i);
+        if (!lua_isnumber(L, -1)) {
+            lua_pop(L, 1);
+            lua_rawgetfield(L, idx, key);
+        }
+        const double v = lua_isnumber(L, -1) ? lua_tonumber(L, -1) : 255.0;
+        lua_pop(L, 1);
+        return static_cast<std::uint8_t>(!(v >= 0) ? 0 : v > 255 ? 255 : static_cast<int>(v)); // (NaN: 0)
+    };
+    uimsg::TextLine t;
+    t.r = part(1, "r");
+    t.g = part(2, "g");
+    t.b = part(3, "b");
+    return t;
+}
+
+/// A line to the player at `extent` alone (its peer `peer`): in `colour` to a client of client
+/// level 8 that named ModeUi (kText), else, and with no colour, the plain MSG_TEXT_MESSAGE.
+void lineTo(Impl& impl, server::World& world, std::uint8_t peer, std::uint32_t extent, const std::u16string& text,
+            const std::optional<uimsg::TextLine>& colour)
+{
+    if (colour && (impl.host->clientFeatures(peer) & lobby::ClientFeature::ModeUi) != 0 &&
+        impl.host->clientLevel(peer) >= uimsg::kTextLevel) {
+        uimsg::TextLine t = *colour;
+        t.text = strings::toUtf8(text);
+        world.broadcasts().push_back({uimsg::textMessage(t), true, extent}); // (in order with the frame's other lines)
+        return;
+    }
+    world.broadcasts().push_back({server::World::textMessage(text, 0), true, extent});
+}
+
 int noxTextToAll(lua_State* L)
 {
     // A line to everyone as the engine broadcasts one (one message, every client): its bytes as
-    // they are, 250 at most.
+    // they are, 250 at most. With a colour, each client that takes one gets it in that colour.
     size_t len = 0;
     const char* s = luaL_checklstring(L, 1, &len);
+    const std::optional<uimsg::TextLine> colour = textColourArg(L, 2);
     server::World& world = worldOf(L);
     Impl& impl = implOf(L);
-    if (!impl.host->anyRefused()) {
+    if (!impl.host->anyRefused() && !colour) {
         if (!impl.chargeText(std::max(1, static_cast<int>(impl.host->players().size())))) {
             return 0; // (over the frame's text: dropped, reported)
         }
-        world.textToAll(std::u16string(s, s + std::min<size_t>(len, 250)));
+        world.textToAll(lineText(s, len));
         return 0;
     }
-    // (A stock player held out to be put out: to each of the others in the game alone, the same
-    // message; one not in yet never gets the broadcast either.)
-    std::vector<std::uint32_t> units;
+    // (A stock player held out to be put out, or a colour: to each of the others in the game alone;
+    // one not in yet never gets the broadcast either.)
+    std::vector<std::pair<std::uint8_t, std::uint32_t>> units;
     for (const auto& [peer, p] : impl.host->players()) {
         if (!impl.host->refused(peer) && p.joined) {
-            units.push_back(p.extent);
+            units.emplace_back(peer, p.extent);
         }
     }
     if (!impl.chargeText(std::max(1, static_cast<int>(units.size())))) {
         return 0;
     }
-    const auto m = server::World::textMessage(std::u16string(s, s + std::min<size_t>(len, 250)), 0);
-    for (const std::uint32_t e : units) {
-        world.broadcasts().push_back({m, true, e});
+    const std::u16string text = lineText(s, len);
+    for (const auto& [peer, e] : units) {
+        lineTo(impl, world, peer, e, text, colour);
     }
     return 0;
 }
 
 int noxTell(lua_State* L)
 {
-    // nox.tell(unit, text): a line to that player alone, as the native modes tell one (one
-    // MSG_TEXT_MESSAGE from no one, its bytes each a character as they are, 250 at most). Counted
-    // against the frame's text (over it: dropped, reported).
+    // nox.tell(unit, text [, colour]): a line to that player alone, as the native modes tell one
+    // (one MSG_TEXT_MESSAGE from no one, its bytes each a character as they are, 250 at most); in
+    // the colour to a client that takes one. Counted against the frame's text (over it: dropped,
+    // reported).
     const server::ServerObject& u = unitArg(L, 1);
     size_t len = 0;
     const char* s = luaL_checklstring(L, 2, &len);
+    const std::optional<uimsg::TextLine> colour = textColourArg(L, 3);
     server::World& world = worldOf(L);
-    if (implOf(L).hidden(u) || !implOf(L).chargeText(1)) {
+    Impl& impl = implOf(L);
+    if (impl.hidden(u) || !impl.chargeText(1)) {
         return 0; // (a stock player held out, or over the frame's text)
     }
-    const std::u16string text(s, s + std::min<size_t>(len, 250));
+    const std::u16string text = lineText(s, len);
+    const std::optional<std::uint8_t> peer = colour ? peerOfUnit(impl, u.extent) : std::nullopt;
+    if (peer) {
+        lineTo(impl, world, *peer, u.extent, text, colour);
+        return 0;
+    }
     world.broadcasts().push_back({server::World::textMessage(text, 0), true, u.extent});
     return 0;
 }
@@ -3064,7 +3125,7 @@ int noxUnitSay(lua_State* L)
     size_t len = 0;
     const char* s = luaL_checklstring(L, 2, &len);
     const int frames = wholeArg(L, 3, 0, 65535, "frames 0-65535");
-    const std::u16string text(s, s + std::min<size_t>(len, 250));
+    const std::u16string text = lineText(s, len);
     worldOf(L).unitSay(o, text, static_cast<std::uint16_t>(frames));
     return 0;
 }
@@ -3233,7 +3294,7 @@ int noxCreateTeam(lua_State* L)
         return 1;
     }
     t->color = static_cast<std::uint8_t>(colour);
-    server::setTeamName(*t, std::u16string(s, s + std::min<size_t>(len, 250)), false);
+    server::setTeamName(*t, lineText(s, len), false);
     world.broadcasts().push_back({server::teamMessage(world, *t), true, 0});
     lua_pushnumber(L, t->id);
     return 1;
@@ -3886,6 +3947,10 @@ void Impl::resendUi()
 void Impl::onUiMessage(std::uint8_t peer, std::span<const std::uint8_t> m)
 {
     const auto p = uimsg::parse(m);
+    if (p && p->first == uimsg::kUseAbility) {
+        useAbility(peer, p->second); // (any mode's player with a strip: a UI or none)
+        return;
+    }
     const auto u = ui.find(peer);
     if (!p || u == ui.end()) {
         return; // (only from a player we sent the UI)
@@ -3935,6 +4000,79 @@ void Impl::onUiMessage(std::uint8_t peer, std::span<const std::uint8_t> m)
     }
     default: break;
     }
+}
+
+void Impl::useAbility(std::uint8_t peer, std::span<const std::uint8_t> payload)
+{
+    // A mod ability's use (ui_proto.hpp's kUseAbility): only from a player sent a strip; checked
+    // here (granted, the rate, its cooldown, a release of what's held), then the player (in play,
+    // alive; a press not while busy), then asked of the mode, whose false refuses a press.
+    if (!host || !ModAbilities::reaches(*host, peer)) {
+        return;
+    }
+    const auto use = uimsg::decodeAbilityUse(payload);
+    if (!use) {
+        return;
+    }
+    server::World& world = host->server().world();
+    const auto asked = parts.abilities.heard(peer, *use, world.frameNow);
+    if (!asked) {
+        return;
+    }
+    const server::ServerObject* unit = world.byExtent(host->players().at(peer).extent);
+    if (!unit || unit->gone() || !unit->player || unit->player->observing || (unit->flags & server::ObjFlag::Dead)) {
+        if (asked->release) {
+            parts.abilities.letGo(peer);
+            abilityEnded(peer, asked->def); // (a hold let go by a player out of play: its "end")
+        }
+        return;
+    }
+    if (!asked->release && world.busyOf(*unit)) {
+        return;
+    }
+    if (asked->release) {
+        parts.abilities.letGo(peer);
+    }
+    bool allowed = true;
+    if (begin("onModAbility")) {
+        lua_State* L = vm->thread();
+        const std::string& id = parts.abilities.def(asked->def).id;
+        lua_pushnumber(L, unit->extent);
+        lua_pushlstring(L, id.data(), id.size());
+        // (A client's point kept to the map: a spoofed one never reaches the toolbox's checks.)
+        lua_pushnumber(L, std::min<int>(use->x, kMapExtent));
+        lua_pushnumber(L, std::min<int>(use->y, kMapExtent));
+        lua_pushstring(L, asked->release ? "release" : "press");
+        if (finish("onModAbility", 5, 1)) {
+            allowed = !(lua_isboolean(L, -1) && !lua_toboolean(L, -1));
+            lua_pop(L, 1);
+        } else {
+            allowed = false; // (it failed: nothing used)
+        }
+    }
+    if (!asked->release && allowed) {
+        parts.abilities.pressed(peer, asked->slot);
+    }
+}
+
+void Impl::abilityEnded(std::uint8_t peer, int def)
+{
+    // onModAbility(unit, id, nil, nil, "end"): a hold over without its release.
+    if (!host) {
+        return;
+    }
+    const auto it = host->players().find(peer);
+    if (it == host->players().end() || !begin("onModAbility")) {
+        return;
+    }
+    lua_State* L = vm->thread();
+    const std::string& id = parts.abilities.def(def).id;
+    lua_pushnumber(L, it->second.extent);
+    lua_pushlstring(L, id.data(), id.size());
+    lua_pushnil(L);
+    lua_pushnil(L);
+    lua_pushstring(L, "end");
+    finish("onModAbility", 5, 0);
 }
 
 void Impl::installToolbox()
@@ -4251,6 +4389,7 @@ void Impl::onLeave(std::uint8_t peer)
     ui.erase(peer);
     parts.weather.left(peer);
     parts.drawScales.left(peer);
+    parts.abilities.left(peer);
     if (has.onLeave && begin("onLeave")) {
         pushPlayer(vm->thread(), peer);
         finish("onLeave", 1, 0);
@@ -4294,6 +4433,8 @@ public:
     void mapLoaded(server::Server& server) override
     {
         impl_.clearDecals(); // (a map's decals are its own: the new map's come from its mapLoaded)
+        impl_.parts.leaps.reset(nullptr); // (forgotten: the new World has no busy units, nothing else was changed)
+        impl_.parts.spins.reset();        // (a map's things are new: their clients' spins go with them)
         if (impl_.has.mapLoaded) {
             impl_.guarded("mapLoaded", [&] {
                 if (impl_.begin("mapLoaded")) {
@@ -4396,6 +4537,12 @@ public:
     {
         if (!impl_.hidden(player)) {
             impl_.parts.events.equipped(player, item, worn);
+        }
+    }
+    void abilityNews(server::World&, server::ServerObject& unit, const server::AbilityNews& news) override
+    {
+        if (!impl_.hidden(unit)) {
+            impl_.parts.events.ability(unit, news); // (onAbility: recorded only when the mode has it)
         }
     }
     void spellCast(server::World&, server::ServerObject& caster, std::uint32_t spell, server::ServerObject* target, float x, float y,
@@ -4779,12 +4926,48 @@ void ScriptedMode::tick(server::GameHost& host, std::uint32_t)
     if (!impl.parts.generation.idle()) {
         impl.guarded("onGenerated", [&] { impl.parts.generation.poll(impl.vm->thread(), host.server().world().mapName); });
     }
+    // The busy units spent, dead or gone let go (a respawn is free; a key used again finds none).
+    if (!host.server().world().modeBusy.empty()) {
+        sweepBusy(host.server().world());
+    }
+    // The leaps carried on (nox.leap), each one down told to onLand(unit, x, y, cut).
+    if (impl.parts.leaps.active()) {
+        for (const Leaps::Landing& l : impl.parts.leaps.step(host.server().world())) {
+            impl.guarded("onLand", [&] {
+                if (impl.begin("onLand")) {
+                    lua_State* L = impl.vm->thread();
+                    lua_pushnumber(L, l.unit);
+                    lua_pushnumber(L, l.x);
+                    lua_pushnumber(L, l.y);
+                    lua_pushboolean(L, l.cut);
+                    impl.finish("onLand", 4, 0);
+                }
+            });
+        }
+    }
     impl.guarded("tick", [&] {
         if (impl.has.tick && impl.begin("tick")) {
             lua_pushnumber(impl.vm->thread(), frame);
             impl.finish("tick", 1, 0);
         }
     });
+    // The abilities' cooldowns and holds counted down (a hold run out told as "end"), then the
+    // bars that changed sent.
+    if (impl.parts.abilities.active()) {
+        // (A hold whose player is dead, watching or gone ends now, not at its time.)
+        const auto inPlay = [&](std::uint8_t peer) {
+            const auto it = host.players().find(peer);
+            const server::ServerObject* u = it != host.players().end() ? host.server().world().byExtent(it->second.extent) : nullptr;
+            return u && !u->gone() && u->player && !u->player->observing && !(u->flags & server::ObjFlag::Dead);
+        };
+        for (const auto& [peer, def] : impl.parts.abilities.step(inPlay)) {
+            impl.guarded("onModAbility", [&] { impl.abilityEnded(peer, def); });
+        }
+        impl.parts.abilities.flush(host);
+    }
+    if (impl.parts.spins.active()) {
+        impl.parts.spins.step(host); // (the spins under way told to clients that came to know their things)
+    }
     impl.pumpUi();
     if (impl.parts.weather.used()) {
         impl.parts.weather.flush(host); // (nox.weather's changes, once a frame)
@@ -4830,6 +5013,10 @@ void ScriptedMode::detach(server::GameHost& host)
     }
     parts.weather.reset(&host); // (none to every player it was sent to)
     parts.drawScales.reset();   // (the things keep theirs; nothing owed is sent)
+    parts.leaps.reset(&host.server().world()); // (each unit let go where it is)
+    parts.abilities.reset();
+    parts.spins.reset();
+    host.server().world().modeBusy.clear();
     impl_->host = nullptr;
     impl_->dropAssets(); // (the mod's assets kept only while it's hosted)
 }

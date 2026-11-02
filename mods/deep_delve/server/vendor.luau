@@ -2,7 +2,7 @@
 -- The vendor (design 4.4) at the town's anvil: it sells potions and quivers (always) and a few
 -- pieces of gear rolled at the area level, buys what a player carries for gold by its rarity and
 -- level, for gold rerolls a magic or rare piece's modifiers (and a rare's affixes) at its level,
--- and repairs what a player carries or wears at the game's own price.
+-- and repairs what a player carries or wears at the game's own price times a data factor.
 --
 -- Its stock is each player's own (by decision, for a party): each player sees and buys from a
 -- stock of their own. A stock is rolled anew as each area is entered and again when an act is
@@ -13,6 +13,7 @@
 -- the record written at once (as the stash's moves are: an item is never in two places, and gold
 -- never counted twice).
 
+local affixes = require("affixes")
 local hero = require("hero")
 local items = require("items")
 local loot = require("loot")
@@ -61,8 +62,11 @@ function vendor.rerollPrice(rec: any): number
 end
 
 -- One stock at the area level now: { { rec | type (a potion or a supply), price, potion | supply } }:
--- the potions and the supplies (always there, never sold out), then the gear rolled.
-local function rollStock(): { any }
+-- the potions and the supplies (always there, never sold out), then the gear rolled (any of the
+-- loot's gear, quivers too, each normal, magic or rare by data/vendor.luau's odds: a magic or rare
+-- quiver carries the modifiers that fit a quiver, as a dropped one does). `class`: rolled for a
+-- hero of that class, its affixes only those the class may have (none: for anyone).
+local function rollStock(class: string?): { any }
 	local stock = {}
 	for _, p in data.potions do
 		table.insert(stock, { type = p.type, price = p.price, potion = true })
@@ -90,21 +94,41 @@ local function rollStock(): { any }
 		end
 		local r = nox.random()
 		local rarity = if r < data.gear.rare then "rare" elseif r < data.gear.rare + data.gear.magic then "magic" else "normal"
-		local rec = loot.makeGear(pick.type, rarity, stockLevel)
+		local rec = loot.makeGear(pick.type, rarity, stockLevel, class)
 		table.insert(stock, { rec = rec, price = vendor.price(rec) })
 	end
 	return stock
 end
 
+-- Whether a stock rolled for anyone suits a class: none of its pieces has an affix the class may
+-- not have (mana a second for a warrior: by decision 2026-11-02).
+local function suits(list: { any }, class: string): boolean
+	for _, s in list do
+		for _, a in (s.rec and s.rec.affixes) or {} do
+			local def = affixes.def(a.id)
+			if def and not affixes.forClass(def, class) then
+				return false
+			end
+		end
+	end
+	return true
+end
+
 -- A hero's own stock: kept while it's of the restock now; else the restock's own stock when nobody
--- has taken it yet, else one rolled for it now.
+-- has taken it yet and it suits the hero's class, else one rolled for it (for its class) now.
 function vendor.stockOf(h: any): { any }
 	local mine = h.stock
 	if mine and mine.restock == restocks then
 		return mine.list
 	end
-	local list = fresh or rollStock()
-	fresh = nil
+	local class = h.record.identity.class
+	local list: { any }
+	if fresh and suits(fresh, class) then
+		list = fresh
+		fresh = nil
+	else
+		list = rollStock(class)
+	end
 	h.stock = { restock = restocks, list = list }
 	return list
 end
@@ -243,7 +267,8 @@ function vendor.reroll(h: any, item: number): (boolean, string?)
 	if gold < price then
 		return false, "not enough gold"
 	end
-	local fresh = loot.makeGear(rec.type, rec.rarity, rec.level or stockLevel)
+	-- (rolled for the hero's class: its affixes only those it may have)
+	local fresh = loot.makeGear(rec.type, rec.rarity, rec.level or stockLevel, h.record.identity.class)
 	if fresh.rarity ~= rec.rarity then
 		return false, "that piece can't be rerolled"
 	end
@@ -259,7 +284,17 @@ function vendor.reroll(h: any, item: number): (boolean, string?)
 end
 
 -- ---- Repairs (by decision 2026-11-01): the game's own shop repair (nox.repair: durability, and a
--- staff's charges, to their most), at the game's own price (nox.repairCost), paid in gold first.
+-- staff's charges, to their most), at the game's own price (nox.repairCost) times data/vendor.luau's
+-- repair factor (by decision 2026-11-02), paid in gold first.
+
+-- A piece's repair price: nil when it needs none.
+function vendor.repairCost(item: number): number?
+	local cost = nox.repairCost(item)
+	if not cost or cost <= 0 then
+		return nil
+	end
+	return math.max(1, math.floor(cost * data.repair.factor + 0.5))
+end
 
 -- The hero's pieces that need a repair, worn and carried, in its inventory's order: { { id, rec,
 -- facts, cost } }.
@@ -272,8 +307,8 @@ function vendor.damaged(h: any): { any }
 		local o = nox.object(it.id)
 		local f = nox.item(it.id)
 		if o and not o.pendingDelete and f then
-			local cost = nox.repairCost(it.id)
-			if cost and cost > 0 then
+			local cost = vendor.repairCost(it.id)
+			if cost then
 				local rec = items.recordOf(it.id)
 				if rec then
 					rec.worn = nil
@@ -328,7 +363,7 @@ function vendor.repair(h: any, item: number): (boolean, string?)
 	if not f or not o or o.pendingDelete or f.holder ~= h.unit then
 		return false, "you don't carry that"
 	end
-	local cost = nox.repairCost(item)
+	local cost = vendor.repairCost(item)
 	if not cost then
 		return false, "it needs no repair"
 	end
@@ -406,6 +441,24 @@ function vendor.message(h: any, v: any)
 	end
 end
 
+-- A hero's rolled gear in its stock as lines, "index type rarity effectiveness material primary
+-- secondary affixes" (nil for an empty slot; affixes "id:value,..." or "-"), for "dd vendor gear".
+function vendor.gearLines(h: any): { string }
+	local out = {}
+	for i, s in vendor.stockOf(h) do
+		local r = s.rec
+		if r then
+			local list = {}
+			for _, a in r.affixes or {} do
+				table.insert(list, a.id .. ":" .. tostring(a.value))
+			end
+			table.insert(out, string.format("%d %s %s %s %s %s %s %s", i, tostring(r.type), tostring(r.rarity), tostring(r.effectiveness), tostring(r.material),
+				tostring(r.primary), tostring(r.secondary), if #list > 0 then table.concat(list, ",") else "-"))
+		end
+	end
+	return out
+end
+
 -- A hero's stock as lines, "index type rarity price" (for "dd vendor").
 function vendor.lines(h: any): { string }
 	local out = { "level " .. stockLevel }
@@ -420,6 +473,6 @@ function vendor.lines(h: any): { string }
 end
 
 windows.register("vendor", { station = "vendor", view = vendor.view, price = vendor.sellPrice, reroll = vendor.rerollPrice,
-	repairs = vendor.sendRepairs, repairCost = nox.repairCost, withRepair = vendor.withRepair })
+	repairs = vendor.sendRepairs, repairCost = vendor.repairCost, withRepair = vendor.withRepair })
 
 return vendor

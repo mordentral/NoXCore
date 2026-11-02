@@ -14,8 +14,10 @@
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
 --          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), manaOnKill,
 --          spellCost, summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a
---          hit's thing type: a spell's own), frost, dread, grip, reflect, ward, resilience (%:
---          the worn affixes', affixes.luau), weapon (the worn weapon's id), ammo (its shot's type),
+--          hit's thing type: a spell's own), skills (a warrior's passive skills by key, each its
+--          rank: tree.totals), frost, dread, grip, reflect, ward, resilience (%: the worn
+--          affixes', affixes.luau), weapon (the worn weapon's id), ammo (its shot's type), shield
+--          (the worn shield's id),
 --          powers, sets, pieces, setSig (the worn uniques' powers and the worn sets: uniques.worn;
 --          their active bonuses' stats are in the numbers above) };
 --   powerState its worn powers' own state (uniquepowers.luau);
@@ -54,6 +56,9 @@ local uniques = require("uniques")
 local classes = require("data/classes")
 local numbers = require("data/numbers")
 local treeData = require("data/tree")
+local tipData = require("data/tips")
+local warriorData = require("data/warrior")
+local uniqueData = require("data/uniques")
 
 local hero = {}
 
@@ -122,17 +127,21 @@ local function bonusOf(unit: number, rec: any)
 		summonCost = t.summonCost,
 		summonHealth = t.summonHealth,
 		own = t.own,
+		skills = t.skills,
 	}
 	-- (each worn piece's affixes added to their stats, each up to its most; the worn weapon noted:
 	-- frost, dread and grip go with its hits alone, affixes.luau; the worn uniques' powers and the
 	-- worn sets' bonuses, uniques.luau)
 	local special = {}
+	-- (the worn affixes alone, by stat, each up to its most: the sheet's Affixes block)
+	local sums = {}
 	for _, it in nox.inventory(unit) do
 		local facts = nox.item(it.id)
 		if facts and facts.worn then
 			local m = items.meta(it.id)
 			if m and m.affixes then
 				affixes.add(b, m.affixes)
+				affixes.add(sums, m.affixes)
 			end
 			if m and (m.unique or m.set) then
 				table.insert(special, m)
@@ -140,10 +149,29 @@ local function bonusOf(unit: number, rec: any)
 			if affixes.kindOf(facts.type) == "weapon" then
 				affixes.noteWeapon(b, it.id, facts.type)
 			end
+			-- (a shield worn: the warrior's shield skills, warrior.luau)
+			local tip = (tipData.items :: any)[facts.type]
+			if tip and tip.kind == "shield" then
+				(b :: any).shield = it.id
+			end
 		end
 	end
 	uniques.worn(b, special)
+	-- (a warrior's skill whose stats count with a shield worn: Phalanx's)
+	local ab: any = b
+	if ab.shield then
+		for key in ab.skills do
+			local def = (warriorData.skills :: any)[key]
+			if def and def.withShield then
+				for stat, v in def.withShield do
+					ab[stat] = (ab[stat] or 0) + v
+				end
+			end
+		end
+	end
 	affixes.cap(b)
+	affixes.cap(sums)
+	b.affixSums = sums
 	return b
 end
 
@@ -464,7 +492,7 @@ function hero.join(p: any, chosen: any?)
 		record = record,
 		ready = false,
 		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = {}, powers = {}, sets = {}, pieces = {}, setSig = "" },
+			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = {}, skills = {}, powers = {}, sets = {}, pieces = {}, setSig = "" },
 		open = {},
 		need = hero.needFor(record.level.level),
 		since = nox.frame(),
@@ -627,8 +655,11 @@ end
 -- ---- Gear
 
 -- A unit picked an item up: a magic or better find is told to its finder (its modifiers and
--- affixes, which its label on the ground doesn't name).
-function hero.pickedUp(unit: number, item: number)
+-- affixes, which its label on the ground doesn't name). A unique or a set piece the mod put on the
+-- ground (`fromGround`: loot, not one a player dropped) is told to everyone in the game too, one
+-- line naming the finder and the item (by decision 2026-11-02), in the item's colour
+-- (data/uniques.luau's foundColour).
+function hero.pickedUp(unit: number, item: number, fromGround: boolean?)
 	local h = byUnit[unit]
 	local m = items.meta(item)
 	-- (a piece handed over from the stash or the vendor by the pickup: no find)
@@ -638,6 +669,10 @@ function hero.pickedUp(unit: number, item: number)
 	local rec = items.recordOf(item)
 	if rec then
 		nox.tell(unit, "You found: " .. items.describe(rec))
+		local name = uniques.nameOf(rec)
+		if fromGround and name then
+			nox.textToAll(string.format("%s found %s.", tostring(h.record.identity.name), name), (uniqueData.foundColour :: any)[rec.rarity])
+		end
 	end
 end
 

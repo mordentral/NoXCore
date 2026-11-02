@@ -149,6 +149,8 @@ function areas.info(place: number): any
 		-- (its biome's weathers, or the list it names (`sky`), rolled as its map is built: none for a
 		-- lair or indoors)
 		skies = if lair then nil else (acts.skies :: any)[spec.sky or spec.biome],
+		-- (its monsters' look by its biome, a lair's too: nil, the engine's own)
+		sight = (acts.sights :: any)[spec.biome],
 		segments = if lair then a.lair.segments else math.min(a.segments.most, math.floor(a.segments.base + a.segments.perLevel * level)),
 		packs = packs,
 		endRadius = if lair then a.lair.endRadius else a.endRadius,
@@ -425,6 +427,8 @@ local function enter()
 		touch.adopt(spots.exit.type, spots.exit.x, spots.exit.y, exitTouched, 15)
 	end
 	setWeather(state.sky[state.tag])
+	-- (how far every monster made in it looks: its biome's)
+	monsters.setSight(info.sight)
 	monsters.populate(spots, info)
 	-- (its chests watched, its secret room's guards in)
 	secrets.enter(spots, info, state.play)

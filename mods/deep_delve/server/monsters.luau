@@ -17,7 +17,10 @@
 
 --
 -- Powers (powers.luau): a rare rolls one, a champion two, as it's set up (applyTier); a powered
--- monster's death tells powers.luau (its splitting, its lightning), and a new map stops their beats.
+-- monster's death tells powers.luau (its splitting, its lightning, its minions gone), and a new map
+-- stops their beats. Each power adds to its experience (data's powerExperience). A summoner's
+-- minions are the mod's monsters too (the party rule, the scaling), their entries marked `minion`
+-- (and `master`, the summoner's id): main.luau gives no experience or loot for their deaths.
 
 local data = require("data/monsters")
 local numbers = require("data/numbers")
@@ -25,6 +28,9 @@ local powers = require("powers")
 local scale = require("scale")
 
 local monsters = {}
+
+-- A roster type and its monster.bin health (weakTypes).
+type Kind = { type: string, health: number }
 
 -- Each live monster the mod made: id -> { type, tier, name?, code (its net code), level, damage,
 -- experience, base (its most health for one player) }.
@@ -40,6 +46,23 @@ local packsMade = 0
 local packList: { any } = {}
 -- The end chamber's champion and its guards in the last area entered: { size, experience }, or nil.
 local guarded: any = nil
+-- The area the map's monsters were put in (populate's): { roster, area }, or nil before.
+local here: any = nil
+-- The roster's weakest types there (weakTypes), worked out once a map.
+local weakest: { string }? = nil
+-- How far the monsters made in this map look for the party (its area's biome's: data/acts.luau's
+-- sights), or nil: the engine's own.
+local sight: number? = nil
+
+-- The map's monsters' look (nil: the engine's own), for every one made from now.
+function monsters.setSight(range: number?)
+	sight = range
+end
+
+-- What it is now (for "dd sight").
+function monsters.sight(): number?
+	return sight
+end
 
 function monsters.info(id: number): any
 	return known[id]
@@ -170,8 +193,9 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	local opening: any = (a.opening :: any)[level]
 	local openHealth = if opening then opening.health else 1
 	local openDamage = if opening then opening.damage else 1
-	-- (a boss's own factor on its tier's: data/monsters.luau's bosses' `health`)
-	local own: number = if fixed and type(fixed.health) == "number" then fixed.health else 1
+	-- (a boss's own factor on its tier's: data/monsters.luau's bosses' `health`; else its type's,
+	-- data/monsters.luau's typeHealth)
+	local own: number = if fixed and type(fixed.health) == "number" then fixed.health else ((data.typeHealth :: any)[thingType] or 1)
 	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health * openHealth * own + 0.5), 1, 65535)
 	local alone = health
 	local party = scale.factor("health")
@@ -180,6 +204,18 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	end
 	nox.setHealth(id, health, health)
 	nox.touch(id)
+	-- Its look: the map's, when it has one and the monster moves (one that never moves keeps its
+	-- own reach). Set once, as it's made.
+	local reach = sight
+	if reach and not (data.powerKinds.still :: any)[thingType] then
+		-- (sightRange refuses what isn't a creature)
+		local ok, now = pcall(function(): number
+			return nox.sightRange(id)
+		end)
+		if ok and now < reach then
+			nox.sightRange(id, reach)
+		end
+	end
 	local entry: any = {
 		type = thingType,
 		tier = tierName,
@@ -252,6 +288,8 @@ monsters.spawn = spawn
 function monsters.populate(spots: any, area: any)
 	local rosterName = area.roster or area.biome
 	local roster = area.runRoster or (data.rosters :: any)[rosterName] or data.rosters.Crypt
+	here = { roster = roster, area = area }
+	weakest = nil
 	-- The opening's numbers at this level (numbers.areas.opening): smaller packs, the first stretch
 	-- of the route quieter still.
 	local opening: any = if area.lair then nil else (numbers.areas.opening :: any)[area.level]
@@ -339,6 +377,44 @@ function monsters.populate(spots: any, area: any)
 	end
 end
 
+-- The `n` weakest types of the roster where the monsters are now (by monster.bin's health, the
+-- lightest first; those the area has at its level or index, as packs draw them; none that rises
+-- again, none big or still: data's powerKinds), for a summoner's minions (powers.luau). Before any
+-- area (a monster made in town): the Crypt's at the first level. Worked out once a map.
+function monsters.weakTypes(n: number): { string }
+	local cached = weakest
+	if cached then
+		return cached
+	end
+	local roster: any = if here then here.roster else data.rosters.Crypt
+	local area: any = if here then here.area else { index = 1, level = 1 }
+	local index: number = area.rosterAt or area.index or 1
+	local kinds: any = data.powerKinds
+	local list: { Kind } = {}
+	local seen: { [string]: boolean } = {}
+	for _, e in roster do
+		local t: string = e.type
+		if ((e.at and e.at <= index) or (e.from and e.from <= area.level)) and not e.rises and not seen[t] and not kinds.big[t]
+			and not kinds.still[t] then
+			seen[t] = true
+			local info = nox.monsterInfo(t)
+			table.insert(list, { type = t, health = if info then info.health else math.huge })
+		end
+	end
+	table.sort(list, function(a: Kind, b: Kind): boolean
+		if a.health ~= b.health then
+			return a.health < b.health
+		end
+		return a.type < b.type
+	end)
+	local out: { string } = {}
+	for i = 1, math.min(n, #list) do
+		table.insert(out, list[i].type)
+	end
+	weakest = out
+	return out
+end
+
 -- A monster out of the index (and its plate's): its entry, or nil.
 local function drop(id: number): any
 	local e = known[id]
@@ -366,7 +442,7 @@ end
 function monsters.forget(id: number): any
 	local e = drop(id)
 	if e and e.powers then
-		powers.forgot(id)
+		powers.forgot(id, e)
 	end
 	return e
 end
@@ -456,6 +532,9 @@ end
 function monsters.reset()
 	table.clear(known)
 	table.clear(named)
+	here = nil
+	weakest = nil
+	sight = nil
 	powers.reset()
 end
 

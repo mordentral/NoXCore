@@ -53,6 +53,29 @@ enum class DeathStep : std::uint8_t {
     DeathState, ///< its dead state reached: the map's PlayerDeath functions run
 };
 
+/// A warrior's ability's news (ModeHooks::abilityNews): its start (accepted), its end, a harpoon's
+/// hold (its pull starts with the next frame and lasts till the end).
+enum class AbilityPhase : std::uint8_t { Start, End, Hooked };
+/// Why an ability ended.
+enum class AbilityEnd : std::uint8_t {
+    Other,  ///< (a start's or a hold's; a quest's map change, a script's)
+    Time,   ///< its time ran out
+    Wall,   ///< a Berserker Charge into a wall (or a solid thing that isn't a creature)
+    Hit,    ///< a Berserker Charge into a creature, or a harpoon's pull done (its target drawn in)
+    Broken, ///< a harpoon's chain broken (hurt, too far, out of sight, through a wall...)
+    Missed, ///< a harpoon's bolt that held nothing (a wall, an ally, no blow)
+    Walk,   ///< Tread Lightly ended by its warrior's walk or run coming to an end (Plr_UpdateState's)
+    Cancel, ///< every ability reset (cancelAbilities), or one (resetAbility: a Berserker Charge's kill readies it)
+    Death,  ///< its warrior dead or gone
+};
+struct AbilityNews {
+    int ability = 0; ///< 1 Berserker Charge, 2 War Cry, 3 Harpoon, 4 Tread Lightly, 5 Eye of the Wolf
+    AbilityPhase phase = AbilityPhase::Start;
+    AbilityEnd why = AbilityEnd::Other;
+    std::uint32_t other = 0; ///< what a charge hit, what a harpoon holds (an object's key; 0: none)
+    float x = 0, y = 0;      ///< the warrior's place then
+};
+
 /// The events an object opts into (ServerObject::modeEvents): with World::modeHooks set, the
 /// hooks named are asked or told for objects with the bit, never for the rest.
 namespace ModeEvent {
@@ -313,6 +336,14 @@ struct ModeHooks {
         (void)player;
         (void)item;
         (void)worn;
+    }
+    /// Told: a warrior's ability's news (abilities.cpp: its start when accepted, its end however it
+    /// ends, a harpoon's hold), every warrior's. The stock clients hear nothing of it.
+    virtual void abilityNews(World& world, ServerObject& unit, const AbilityNews& news)
+    {
+        (void)world;
+        (void)unit;
+        (void)news;
     }
 
     // ---- The map's script

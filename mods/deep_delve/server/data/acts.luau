@@ -20,7 +20,8 @@
 --
 -- The weather is no area's own: each time an outdoor area's map is built, it rolls one from its
 -- biome's list in `skies` below (or the list its `sky` names; a biome without a list, and every
--- lair, has none). Its town, in the same map, has the same.
+-- lair, has none: but the ruin-warden's court, which has his dust storm while his fight is on,
+-- warden.luau). Its town, in the same map, has the same.
 --
 -- An act's town: its name (as the healer's waters are told) and its look (the generator's
 -- gen/towns.luau, by name: the town's floors, lights and scenery; the stations are the same in
@@ -154,6 +155,18 @@ local skies = {
 	Steppe = { { "windy", 4 }, { "clear", 3 }, { "dust", 1 } },
 }
 
+-- How far the monsters of an area of each biome look for the party (nox.sightRange, set on each as
+-- it's made; a lair's too, by its biome). By decision (2026-11-02): 450 on the open outdoor maps;
+-- a biome not here (the catacombs, the mines, the caves) keeps the engine's own look of 250. A
+-- monster that never moves (data/monsters.luau's powerKinds.still) keeps its own.
+local sights = {
+	Grasslands = 450,
+	Swamp = 450,
+	Forest = 450,
+	Desert = 450,
+	Beach = 450,
+}
+
 -- The gate a lair's boss opens to the next act (gate.luau), at the lair's gate spot (the arena's
 -- back, away from its way in): how near a player comes to step through (`reach`), how often it's
 -- looked at (`every` frames), how soon one player's step is heard again (`again` frames), its
@@ -187,6 +200,7 @@ local tierOffset: number = last.base + #last.areas - 1
 local out: any = acts
 out.weathers = weathers
 out.skies = skies
+out.sights = sights
 out.tierOffset = tierOffset
 out.gate = gate
 -- (the town of an act that names none)

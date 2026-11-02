@@ -93,6 +93,9 @@ public:
         /// fewer particles and softer flashes (1 Reduced), or not at all (2 Off). Needs the GPU
         /// renderer's shaders.
         int weather = 0;
+        /// Not shown here: the keys of a mod's ability strip's four buttons (client level 8:
+        /// noxcore.cfg's ModAbilityKey1-4, nox.cfg's key names; the stock table leaves 3-6 free).
+        std::array<std::string, 4> modAbilityKeys{"3", "4", "5", "6"};
     };
     static constexpr int kMouseSpeedMin = 25, kMouseSpeedMax = 300;
     /// Sound effects, speech and music on (the checkboxes; not kept in nox.cfg, whose volumes say

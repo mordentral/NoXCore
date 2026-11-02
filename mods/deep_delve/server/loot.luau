@@ -49,6 +49,15 @@ local function index(id: number, rec: any, rarity: string, x: number, y: number,
 	byCode[o.netCode] = id
 end
 
+-- Another thing the mod put on the ground (a locked room's key) labelled as loot is: its type's
+-- name as words, `rarity`'s colour, `kind` its own word.
+function loot.mark(id: number, rarity: string, kind: string)
+	local o = nox.object(id)
+	if o then
+		index(id, { type = o.type }, rarity, o.x, o.y, kind)
+	end
+end
+
 -- The ground's index (labels.luau reads it; an entry whose item is gone is dropped there).
 function loot.ground(): { [number]: any }
 	return ground
@@ -242,9 +251,10 @@ local function affixValue(def: any, level: number): number
 end
 
 -- `n` of Deep Delve's own affixes for an item type, each a different one of those its kind may
--- carry (affixes.allowed: a weapon's, armour's, or any piece's), at the area level.
-local function rollAffixes(thingType: string, n: number, level: number): { any }
-	local defs = table.clone(affixes.allowed(thingType))
+-- carry (affixes.allowed: a weapon's, armour's, or any piece's; for `class`, only those it may
+-- have), at the area level.
+local function rollAffixes(thingType: string, n: number, level: number, class: string?): { any }
+	local defs = table.clone(affixes.allowed(thingType, class))
 	local out = {}
 	for _ = 1, math.min(#defs, n) do
 		local def: any = table.remove(defs, nox.random(#defs))
@@ -255,8 +265,10 @@ end
 
 -- A gear record of a type and rarity at the area level: its modifiers by the rarity's rule. An
 -- item no modifier of the game's fits at all (the staffs) carries its rarity in Deep
--- Delve's own affixes alone (by decision 2026-11-01): one for magic, two for a rare.
-function loot.makeGear(thingType: string, rarity: string, level: number): any
+-- Delve's own affixes alone (by decision 2026-11-01): one for magic, two for a rare. `class`: rolled
+-- for that class (a vendor's stock, a reroll), its affixes only those it may have; nil: for anyone
+-- (a drop on the ground).
+function loot.makeGear(thingType: string, rarity: string, level: number, class: string?): any
 	local rec: any = { type = thingType, rarity = rarity, level = level }
 	if rarity == "normal" then
 		return rec
@@ -273,7 +285,7 @@ function loot.makeGear(thingType: string, rarity: string, level: number): any
 		end
 	end
 	if #open == 0 then
-		rec.affixes = rollAffixes(thingType, if rarity == "rare" then 2 else 1, level)
+		rec.affixes = rollAffixes(thingType, if rarity == "rare" then 2 else 1, level, class)
 		return rec
 	end
 	local taken = {}
@@ -297,7 +309,7 @@ function loot.makeGear(thingType: string, rarity: string, level: number): any
 		for _, slot in open do
 			fill(slot)
 		end
-		rec.affixes = rollAffixes(thingType, nox.random(2), level)
+		rec.affixes = rollAffixes(thingType, nox.random(2), level, class)
 	end
 	-- An item that takes no modifier at all stays normal (its affixes with it).
 	if not (rec.effectiveness or rec.material or rec.primary or rec.secondary) then
@@ -439,17 +451,24 @@ end
 -- takes no modifier can't be), d.levelUp levels above the area's, then d.rolls loot rolls with
 -- d.better odds, then its own rolls for a unique and a set piece at the rare pieces' level (`boss`
 -- its id: its favoured uniques); the ids made.
+-- A piece of gear that is rare at `level` (or the item's best: one that takes no modifier can't
+-- be; up to eight draws), its record.
+function loot.rarePiece(level: number): any
+	local all, total = eligible(data.gear, level)
+	local rec = nil
+	for _ = 1, 8 do
+		rec = loot.makeGear(weighted(all, total).type, "rare", level)
+		if rec.rarity == "rare" then
+			break
+		end
+	end
+	return rec
+end
+
 function loot.bossDrop(x: number, y: number, level: number, d: any, boss: string?): { number }
 	local made = {}
-	local all, total = eligible(data.gear, level + d.levelUp)
 	for i = 1, d.rare do
-		local rec = nil
-		for _ = 1, 8 do
-			rec = loot.makeGear(weighted(all, total).type, "rare", level + d.levelUp)
-			if rec.rarity == "rare" then
-				break
-			end
-		end
+		local rec = loot.rarePiece(level + d.levelUp)
 		local a = i * 2.4
 		local px, py = nox.clearPointNear(x + 30 * math.cos(a), y + 30 * math.sin(a), 30)
 		local id = loot.place(rec, px, py)

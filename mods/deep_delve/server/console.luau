@@ -16,7 +16,8 @@
 --                        those it may drop on); "all": every modifier, "does" or "nothing" after
 --                        it; "dd modifiers TYPE": what fits each slot of TYPE, "SLOT NAME worth W
 --                        does|nothing"
---   dd monster ID        a monster's tier, name and health
+--   dd monster ID [xp]   a monster's tier, name and health ("xp": "xp N", its death's experience for
+--                        one player, "minion of ID" after it for a summoner's minion)
 --   dd ground            the items on the ground that spark (id, effect)
 --   dd go WHERE          the first player to: town, arrive, exit, guardian, boss, waypoint,
 --                        wayArrive, portal, pad (the town's waypoints pentagram), wayIn, actGate
@@ -31,6 +32,8 @@
 --   dd seed              the play's seed and which play of the game it is (an emptied game
 --                        starting over is a new play, with a new seed)
 --   dd town              the act's town: its look and name
+--   dd sight             how far the map's monsters look (its biome's, or the engine's own), and the
+--                        mod's live monsters' reach
 --   dd gate [take]       the lair's gate to the next act (its spot, open or shut, its swirl and
 --                        light); "take": the first player steps into it (the game on, or a vote)
 --   dd atlas [levels | free on|off | go BIOME RANK | run | slay]   the expeditions: the first
@@ -64,10 +67,16 @@
 --   dd stash [open | put N | take TAB SLOT | deposit | withdraw]   its stash (as its window
 --                        does: by the chest); alone, its contents "tab slot type rarity mods"
 --   dd vendor [open | buy I | sell N | reroll N | restock LEVEL | stock ITEM | repair ID |
---             repairall | repairs]   the vendor (by the anvil); "stock": ITEM (as dd give names
---                        it) put at the end of its stock; "repair": the piece of that item id
---                        (worn or carried) repaired; "repairs": what needs one, "id type cost
---                        worn|carried"; alone, its stock "index type rarity price"
+--             repairall | repairs | gear]   the vendor (by the anvil); "stock": ITEM (as dd give
+--                        names it) put at the end of its stock; "repair": the piece of that item
+--                        id (worn or carried) repaired; "repairs": what needs one, "id type cost
+--                        worn|carried"; "gear": its rolled gear, "index type rarity effectiveness
+--                        material primary secondary affixes"; alone, its stock "index type rarity
+--                        price"
+--   dd roll TYPE RARITY N [LEVEL] [CLASS]   N records of TYPE rolled at RARITY as the loot rolls
+--                        them (CLASS: rolled for that class, as a vendor's stock is), nothing made:
+--                        "rarity effectiveness material primary secondary affixes" each (N 250 at
+--                        most)
 --   dd give ITEM         an item into its inventory: TYPE RARITY [LEVEL] [SLOT=MODIFIER]...
 --                        [affix=ID:VALUE]... (SLOT effectiveness, material, primary, secondary);
 --                        or "unique ID [LEVEL]", "set PIECE [LEVEL]": a unique or a set piece
@@ -76,9 +85,11 @@
 --                        against the game; N deaths rolled; one put at the first player's feet;
 --                        the first player's worn sets and powers; its worn powers, how often each went
 --                        off, their state
---   dd affixes [TYPE N [LEVEL] | worn]   Deep Delve's affixes: each one's id, stat, kinds and
---                        numbers; N rare TYPEs rolled, each "rarity id:value,..."; or the first
---                        player's worn totals and its weapon
+--   dd affixes [TYPE N [LEVEL] [CLASS] | worn | allowed [TYPE]]   Deep Delve's affixes: each
+--                        one's id, stat, kinds and numbers; N rare TYPEs rolled (for CLASS), each
+--                        "rarity id:value,..."; the first player's worn totals and its weapon;
+--                        "allowed": each gear type (or TYPE) "TYPE kind classes ids" (classes: who
+--                        may use it, ids: the affixes that may roll on it)
 --   dd ward              the first player's ward: the harmful enchantments it cut short, when each
 --                        runs out ("NAME ends E full F", frames from now; "poison" for its step)
 --   dd tip carried N | stash TAB SLOT | stock I   an item's tooltip lines as its window gets them
@@ -96,7 +107,9 @@
 --                        game's icon's name for a spell, ability or summon (no player needed)
 --   dd book             the spells, abilities and creatures its tree gives, and whether its
 --                        unit's book and field guide are exactly that ("server ok")
---   dd sheet             its character sheet, "key value" lines
+--   dd sheet [gear]      its character sheet, "key value" lines; "gear": the sheet's Gear page,
+--                        its worn affixes' lines then "--" and its uniques' and sets' (tagged),
+--                        then "bytes N" (the value's size on the wire)
 --   dd ui WINDOW [NAME]  a window opened on its UI (stash, vendor, waypoints, maps: it's moved by
 --                        the station); "sheet NAME": party member NAME's sheet, as its card's click
 --   dd hits [clear]      the last hits cancelled (no damage within the party, no splash from a
@@ -128,7 +141,8 @@
 --                        player, of TYPE or the biome roster's first (a champion: its own; "-": that
 --                        one); POWERS: their powers, comma-separated ids, or "none" (else its tier's
 --                        rolled); "id code tier name"
---   dd powers [clear]    each live monster with powers ("id type tier powers drops D") and what the powers
+--   dd powers [clear]    each live monster with powers ("id type tier powers drops D xp X", a
+--                        summoner's then "minions IDS") and what the powers
 --                        have done ("done: ..."); "clear": those counts back to none
 --   dd slay ID           one of the mod's monsters killed by the first player
 --   dd portals           the open portals, "owner x y" ("owner(left)": its owner left the game)
@@ -140,8 +154,10 @@
 --   dd secrets [...]     the area's secret room and chests (secrets.luau): alone, "secret X Y lever
 --                        X Y|open|none walls N guards G alive A", its "wall X Y" cells, each "chest
 --                        I ID TYPE X Y kind K trap T shut|open [gave N]" (I 0: the secret room's);
---                        "trial SEED N" area N built and summed up; "go lever|room|chest I" the
---                        first player to it (against a chest: its touch opens it); "trap I KIND|
+--                        a locked room's (lever "lock") "lock", "door", "gap", "way" and
+--                        "keyguard" lines; "trial SEED N" area N built and summed up; "go lever|
+--                        room|chest I|door|keyguard|key" the first player to it (against a chest:
+--                        its touch opens it); "take [NAME]" the locked room's key picked up; "trap I KIND|
 --                        none" chest I's trap set; "odds KIND N [LEVEL]" N chests' loot counted
 --                        (KIND hoard, chest, trapped, monster); "sprung" the last traps gone off
 --   dd chars [...]       server characters (roster.luau): alone, each player's seat; "clock
@@ -183,6 +199,8 @@ local affixes = require("affixes")
 local uniques = require("uniques")
 local uniquePowers = require("uniquepowers")
 local uniqueConsole = require("uniqueconsole")
+local warrior = require("warrior")
+local actives = require("actives")
 local tips = require("tips")
 local tree = require("tree")
 local treeview = require("treeview")
@@ -303,6 +321,30 @@ function commands.loot(args: { string }): { string }
 	return out
 end
 
+-- N records of a type rolled at a rarity as the loot rolls them (for a class, as a vendor's stock
+-- is), nothing made: "rarity effectiveness material primary secondary affixes" each (dd roll).
+function commands.roll(args: { string }): { string }
+	local t, rarity = args[2], args[3]
+	if not t or not nox.thingType(t) then
+		return { "no such type " .. tostring(t) }
+	end
+	if rarity ~= "normal" and rarity ~= "magic" and rarity ~= "rare" then
+		return { "rarity normal, magic or rare" }
+	end
+	local level = tonumber(args[5]) or areas.status().level
+	local out = {}
+	for _ = 1, math.clamp(tonumber(args[4]) or 1, 1, 250) do
+		local rec = loot.makeGear(t, rarity, level, args[6])
+		local list = {}
+		for _, a in rec.affixes or {} do
+			table.insert(list, a.id .. ":" .. tostring(a.value))
+		end
+		table.insert(out, string.format("%s %s %s %s %s %s", rec.rarity, tostring(rec.effectiveness), tostring(rec.material), tostring(rec.primary),
+			tostring(rec.secondary), if #list > 0 then table.concat(list, ",") else "-"))
+	end
+	return out
+end
+
 function commands.modifiers(args: { string }): { string }
 	if args[2] and args[2] ~= "all" then
 		if not nox.thingType(args[2]) then
@@ -325,6 +367,10 @@ function commands.monster(args: { string }): { string }
 	local o = nox.object(id)
 	if not m or not o then
 		return { "not one of ours" }
+	end
+	-- ("dd monster ID xp": its death's experience for one player, and whether it's a minion)
+	if args[3] == "xp" then
+		return { "xp " .. tostring(m.experience) .. (if m.minion then " minion of " .. tostring(m.master) else "") }
 	end
 	return { string.format("%s %s %s %d/%d", tostring(m.type), tostring(m.tier), tostring(m.name or "-"), o.health, o.maxHealth) }
 end
@@ -385,8 +431,8 @@ function commands.spots(_args: { string }): { string }
 	end
 	local out = {}
 	-- (one line a place: name, x, y, its thing's type or "-"; "none" for a place this area lacks)
-	local types: any = { portal = "InvisibleTeleportPentagram", pad = "InvisibleTeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram",
-		maps = "Desk1" }
+	-- (the map table's spot names its own desk)
+	local types: any = { portal = "InvisibleTeleportPentagram", pad = "InvisibleTeleportPentagram", wayIn = "InvisibleTeleportPentagram", waypoint = "TeleportPentagram" }
 	for _, name in { "arrive", "back", "exit", "guardian", "boss", "waypoint", "wayArrive", "gate", "healer", "stash", "vendor", "portal", "pad", "wayIn", "actGate",
 		"maps" } do
 		local p = place(s, name)
@@ -419,6 +465,27 @@ end
 function commands.town(_args: { string }): { string }
 	local t = areas.status().town
 	return { string.format("town %s, %s", tostring(t.look), tostring(t.name)) }
+end
+
+-- "dd sight": how far the map's monsters look ("sight 450", or "sight engine": the engine's own),
+-- then the mod's live monsters' reach: "monsters N, reach LOW-HIGH" (each one's nox.sightRange).
+function commands.sight(_args: { string }): { string }
+	local s = monsters.sight()
+	local n, low, high = 0, math.huge, 0
+	for id in monsters.all() do
+		local ok, r = pcall(function(): number
+			return nox.sightRange(id)
+		end)
+		if ok and nox.living(id) then
+			n += 1
+			low = math.min(low, r)
+			high = math.max(high, r)
+		end
+	end
+	return {
+		"sight " .. (if s then tostring(s) else "engine"),
+		string.format("monsters %d, reach %d-%d", n, if n > 0 then math.floor(low + 0.5) else 0, math.floor(high + 0.5)),
+	}
 end
 
 function commands.area(args: { string }): { string }
@@ -945,6 +1012,13 @@ function commands.check(_args: { string }): { string }
 			table.insert(bad, where .. ": no thing " .. name)
 		end
 	end
+	-- (a type's own health factor: a thing, a factor above 0)
+	for t, f in (monsterData.typeHealth :: any) do
+		thing(t, "typeHealth")
+		if type(f) ~= "number" or f <= 0 then
+			table.insert(bad, "typeHealth " .. tostring(t) .. ": no factor")
+		end
+	end
 	for biome, roster in (monsterData.rosters :: any) do
 		for _, e in roster do
 			thing(e.type, "roster " .. biome)
@@ -982,12 +1056,14 @@ function commands.check(_args: { string }): { string }
 	for _, t in { "StatueRuin1", "StatueRuin2", "StatueRuin3", "StatueRuin4", "RuinsColumnOutdoor01", "RuinsColumnOutdoor02", "RuinsColumnOutdoor03",
 		"RuinsColumnOutdoor04", "RuinsColumnOutdoorRubble01", "RuinsColumnOutdoorRubble02", "RuinsColumnOutdoorRubble03", "RuinsColumnOutdoorRubble04",
 		"OutdoorTraderCart", "TraderAppleCrate", "OutdoorTraderHelmPoles", "WaterBarrel", "Well", "PlantFern3", "PlantFern4", "TreeGalava07",
-		"RuinsColumnOutdoorShort01", "PlantBarren1", "PlantBarren2", "PlantBarren3" } do
+		"RuinsColumnOutdoorShort01", "PlantBarren1", "PlantBarren2", "PlantBarren3", "TreeGalava06" } do
 		thing(t, "arena or town")
 	end
 	for _, g in lootData.gear do
 		thing(g.type, "gear")
 	end
+	-- (the warrior's weapon families: each kind some item type's, each thrown missile a thing)
+	warrior.check(bad, thing)
 	for _, p in lootData.potions do
 		thing(p.type, "potions")
 	end
@@ -1041,12 +1117,27 @@ function commands.check(_args: { string }): { string }
 			end
 		end
 	end
+	-- (the ruin-warden's storm: one of the weathers)
+	if not (acts.weathers :: any)[numbers.ruinWarden.storm.weather] then
+		table.insert(bad, "ruinWarden storm: no weather " .. tostring(numbers.ruinWarden.storm.weather))
+	end
+	-- (each biome's monsters' look: a reach past the engine's own 250)
+	for biome, r in (acts.sights :: any) do
+		if type(r) ~= "number" or r <= 250 then
+			table.insert(bad, "sights " .. tostring(biome) .. ": no reach past 250")
+		end
+	end
 	thing(acts.gate.swirl, "gate")
 	-- The secrets' chests, trap caster and trap spells.
 	secrets.check(bad)
 	-- The expeditions: the map table's pieces; each biome offered with a roster and a champion (the
 	-- acts' or its own), its skies' weathers known; the expeditions' own rosters' types.
-	thing("Desk1", "map table")
+	local loaded = areas.status().spots
+	local maps = loaded and loaded.town and loaded.town.maps
+	if maps then
+		-- (the desk the generator chose, by the wall it stands against: towns.mapTable)
+		thing(tostring(maps.type), "map table")
+	end
 	for biome, roster in (expeditionData.rosters :: any) do
 		for _, e in roster do
 			thing(e.type, "expedition roster " .. biome)
@@ -1377,6 +1468,8 @@ function commands.vendor(args: { string }): { string }
 			return { "not: " .. tostring(why) }
 		end
 		return { "ok " .. vendor.addStock(h, rec) }
+	elseif op == "gear" then
+		return vendor.gearLines(h)
 	end
 	return vendor.lines(h)
 end
@@ -1437,13 +1530,39 @@ function commands.affixes(args: { string }): { string }
 		end
 		table.insert(out, "weapon " .. tostring(h.bonus.weapon or "-") .. " " .. tostring(h.bonus.ammo or "-"))
 		return out
+	elseif args[2] == "allowed" then
+		local types: { string } = {}
+		if args[3] then
+			table.insert(types, args[3])
+		else
+			for _, g in lootData.gear do
+				table.insert(types, g.type)
+			end
+		end
+		for _, t in types do
+			local st = nox.itemStats(t)
+			local cls = {}
+			for c, yes in (if st and st.classes then st.classes else {}) :: any do
+				if yes then
+					table.insert(cls, c)
+				end
+			end
+			table.sort(cls)
+			local ids = {}
+			for _, def in affixes.allowed(t) do
+				table.insert(ids, def.id)
+			end
+			table.insert(out, string.format("%s %s %s %s", t, tostring(affixes.kindOf(t)), if #cls > 0 then table.concat(cls, ",") else "-",
+				if #ids > 0 then table.concat(ids, ",") else "-"))
+		end
+		return out
 	elseif args[2] then
 		if not nox.thingType(args[2]) then
 			return { "no such type " .. args[2] }
 		end
 		local level = tonumber(args[4]) or areas.status().level
 		for _ = 1, math.clamp(tonumber(args[3]) or 1, 1, 2000) do
-			local rec = loot.makeGear(args[2], "rare", level)
+			local rec = loot.makeGear(args[2], "rare", level, args[5])
 			local ids = {}
 			for _, a in rec.affixes or {} do
 				table.insert(ids, a.id .. ":" .. tostring(a.value))
@@ -1554,6 +1673,21 @@ function commands.tree(args: { string }): { string }
 			return { "refund " .. tree.refundCost(h.record) .. " gold", "leaves " .. (if #ids > 0 then table.concat(ids, " ") else "none") }
 		end
 		return reply(treeview.refund(h, tonumber(args[3]) or 0))
+	elseif op == "find" then
+		-- (each name's node id, the name's words joined by "_": "dd tree find Shield_Wall")
+		local out = {}
+		for i = 3, #args do
+			local want = string.gsub(args[i], "_", " ")
+			local found = "none"
+			for id = 1, tree.count() do
+				if tree.node(id).name == want then
+					found = tostring(id)
+					break
+				end
+			end
+			table.insert(out, found)
+		end
+		return out
 	elseif op == "nodes" then
 		local out = {}
 		for id = 1, tree.count() do
@@ -1638,10 +1772,21 @@ function commands.book(_args: { string }): { string }
 	return out
 end
 
-function commands.sheet(_args: { string }): { string }
+function commands.sheet(args: { string }): { string }
 	local h = firstHero()
 	if not h then
 		return { "no player" }
+	end
+	if args[2] == "gear" then
+		local g = sheet.gear(h)
+		local out = table.clone(g.a)
+		table.insert(out, "--")
+		for _, l in g.s do
+			table.insert(out, l)
+		end
+		-- (the value's size as the UI's channel counts it)
+		table.insert(out, "bytes " .. tostring(hud.sizeOf({ kind = "sheetGear", a = g.a, s = g.s })))
+		return out
 	end
 	return sheet.lines(h)
 end
@@ -1690,6 +1835,16 @@ function commands.hits(args: { string }): { string }
 	return if #out > 0 then out else { "none" }
 end
 
+-- The first hero's warrior skills (dd warrior [rage N | clear]): warrior.luau.
+function commands.warrior(args: { string }): { string }
+	return warrior.console(args, firstHero())
+end
+
+-- The first hero's active abilities (dd actives [clear | ready]): actives.luau.
+function commands.actives(args: { string }): { string }
+	return actives.console(args, firstHero())
+end
+
 function commands.summons(_args: { string }): { string }
 	local out = summons.lines()
 	return if #out > 0 then out else { "none" }
@@ -1712,13 +1867,14 @@ function commands.help(_args: { string }): { string }
 		"dd status | spots | save | xp N | award N | loot RARITY [N] [LEVEL] | modifiers [all | TYPE] | ground | monster ID | check | types",
 		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|actGate|pack [N] | area N|A-N [waypoint] | portal | waypoint N|A-N",
 		"dd progress | boss | fight [now] | smite | trial SEED N | gate [take] | seed | town | tiers | number NAME [I]",
-		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs]",
-		"dd give TYPE RARITY [LEVEL] [SLOT=MOD]... [affix=ID:N]... | tip carried N|stash T S|stock I | tips [on|off] | wire | affixes [TYPE N [L]|worn] | ward",
-		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs] | icons | book | sheet | ui stash|vendor|waypoints|tree|sheet [NAME]",
+		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs|gear] | roll TYPE RARITY N [L] [CLASS]",
+		"dd give TYPE RARITY [LEVEL] [SLOT=MOD]... [affix=ID:N]... | tip carried N|stash T S|stock I | tips [on|off] | wire | affixes [TYPE N [L] [CLASS]|worn|allowed [TYPE]] | ward",
+		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs|find NAME...] | icons | book | sheet [gear] | ui stash|vendor|waypoints|tree|sheet [NAME]",
+		"dd warrior [rage N | clear] | actives [clear | ready]",
 		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | plates | spawn TIER [N] [TYPE|-] [POWERS|none] | powers [clear] | slay ID | portals | portal take | hud",
 		"dd option [lootNames alt|always] | hits [clear] | summons | team",
 		"dd give unique ID [L] | give set PIECE [L] | uniques [list|check|odds N LEVEL TIER [BOSS]|drop unique|set ID [L]|worn|powers]",
-		"dd secrets [trial SEED N | go lever|room|chest I | trap I KIND|none | odds KIND N [LEVEL] | sprung]",
+		"dd secrets [trial SEED N | go lever|room|chest I|door|keyguard|key | take [NAME] | trap I KIND|none | odds KIND N [LEVEL] | sprung]",
 		"dd chars [clock S | lockat N|none | NAME list|play I|new|code|enter CODE|unlink I|pcs]",
 	}
 end

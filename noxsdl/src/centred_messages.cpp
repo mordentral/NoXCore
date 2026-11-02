@@ -6,14 +6,26 @@
 
 namespace noxsdl {
 
-void CentredMessages::print(std::string text, std::uint32_t frame)
+void CentredMessages::print(std::string text, std::uint32_t frame, std::optional<SDL_Color> colour)
 {
     if (text.empty()) {
         return;
     }
     // The next slot round, overwriting the oldest.
     index_ = (index_ + 1) % 3;
-    slots_[static_cast<std::size_t>(index_)] = {std::move(text), frame + kShowFrames};
+    slots_[static_cast<std::size_t>(index_)] = {std::move(text), frame + kShowFrames, colour};
+}
+
+SDL_Color CentredMessages::slotColour(const Slot& s, bool newest)
+{
+    if (!s.colour) {
+        return newest ? SDL_Color{255, 255, 255, 255} : SDL_Color{0xD4, 0xD4, 0xD4, 255};
+    }
+    if (newest) {
+        return {s.colour->r, s.colour->g, s.colour->b, 255};
+    }
+    const auto dim = [](Uint8 v) { return static_cast<Uint8>(v * 0xD4 / 255); };
+    return {dim(s.colour->r), dim(s.colour->g), dim(s.colour->b), 255};
 }
 
 void CentredMessages::clear()
@@ -48,8 +60,7 @@ void CentredMessages::draw(SDL_Renderer* renderer, Font* font, int screenWidth, 
             font->draw(s.text, x + static_cast<float>(d[0]) * shadow, y + static_cast<float>(d[1]) * shadow, size,
                        SDL_Color{0, 0, 0, 255});
         }
-        const SDL_Color color = n == 0 ? SDL_Color{255, 255, 255, 255} : SDL_Color{0xD4, 0xD4, 0xD4, 255};
-        font->draw(s.text, x, y, size, color);
+        font->draw(s.text, x, y, size, slotColour(s, n == 0));
         y -= lineHeight + std::round(4 * scale);
         at = at == 0 ? 2 : at - 1;
     }

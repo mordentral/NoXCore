@@ -363,6 +363,9 @@ bool Spells::start(ServerObject& caster, const std::array<std::uint32_t, 5>& spe
     if (!caster.player || (caster.flags & (ObjFlag::Dead | ObjFlag::Destroyed | ObjFlag::NoUpdate))) {
         return false;
     }
+    if (world.busyOf(caster)) {
+        return false; // (noxcpp, a mode's: not while it's busy, World::modeBusy)
+    }
     int count = 0;
     for (const std::uint32_t s : spells) {
         // Spell ids run up to 0x88.

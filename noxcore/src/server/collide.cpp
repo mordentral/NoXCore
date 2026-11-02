@@ -78,7 +78,7 @@ void playerCollide(Fight& fight, ServerObject& obj, ServerObject* other)
             // The ground shakes (earthquakeSend, 10): within 300, 10 at the centre, fading to 0 at
             // the edge.
             jiggle(world, obj.x, obj.y, 10);
-            endAbility(world, obj, 1);
+            endAbility(world, obj, 1, other && creature(*other) ? AbilityEnd::Hit : AbilityEnd::Wall, other ? other->extent : 0);
             bool stunned = false;
             if (!other) {
                 // A wall: unless it gives (a wall whose WALL flags lack 1 and 4).

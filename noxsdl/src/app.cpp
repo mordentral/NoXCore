@@ -129,12 +129,13 @@ std::string gameString(App& app, std::string_view label)
 
 /// Gui_PrintCenteredMessage: the line in the middle of the screen for 5 s of game
 /// frames (CentredMessages), and in the console in red as "GuiMsg.c:SystemMsg" ("system> %s").
-void centredMessage(App& app, const std::string& text)
+/// `colour`: a script mode's line's (client level 8), the centred one drawn in it.
+void centredMessage(App& app, const std::string& text, std::optional<SDL_Color> colour)
 {
     if (text.empty()) {
         return;
     }
-    app.centred.print(text, gameFrame(app));
+    app.centred.print(text, gameFrame(app), colour);
     if (app.console) {
         app.console->print(nox::client::inform::format(gameString(app, "GuiMsg.c:SystemMsg"), {text}), Red);
     }

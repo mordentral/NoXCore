@@ -119,6 +119,8 @@ function expeditions.info(place: number): any
 		gate = false,
 		-- (its weathers, rolled as its map is built: the acts' list for its biome, else its own)
 		skies = (acts.skies :: any)[b.name] or b.skies,
+		-- (its monsters' look by its biome, as an act's area's)
+		sight = (acts.sights :: any)[b.name],
 		segments = data.map.segments,
 		packs = packsAt(r.rank),
 		endRadius = data.map.endRadius,
@@ -244,14 +246,14 @@ end
 
 windows.register("maps", { station = "maps", view = expeditions.view })
 
--- A map's town entered (`spots`: the generator's): the map table set to work, its ring on the
--- floor round it.
+-- A map's town entered (`spots`: the generator's): the map table set to work (the desk of the type
+-- its spot names: the one facing out of its wall), its ring on the floor round it.
 function expeditions.place(spots: any)
 	local at = spots.town and spots.town.maps
 	if not at then
 		return
 	end
-	touch.adopt("Desk1", at.x, at.y, padTouched, PAD_EVERY)
+	touch.adopt(tostring(at.type), at.x, at.y, padTouched, PAD_EVERY)
 	decals.put("maps", at.x, at.y, data.table.ring)
 end
 

@@ -161,6 +161,16 @@ monsters.rosters = {
 	},
 }
 
+-- A type's own health factor, wherever the mod makes one (a roster's pack, a champion's guards, an
+-- expedition's, a boss's wardens): its most health times this, after its tier's and level's. None:
+-- 1. A champion or boss with a `health` of its own (data below) takes that in its place. By
+-- decision (2026-11-02): the golems' own 400 health made them far tougher than the rest of the
+-- waste (about 1,800 at level 31), so both come to 60% of that; their immunities stay.
+monsters.typeHealth = {
+	StoneGolem = 0.6,
+	MechanicalGolem = 0.6,
+}
+
 -- Monsters that rise again (the rosters' `rises`) are kept away from where players come in (by
 -- decision 2026-10-29: one getting up again is too hard that early):
 --   arrivalReach  never in a pack whose spot lies within this of a room players arrive in (an
@@ -192,8 +202,8 @@ monsters.tiers = {
 -- word in front of the monster's name on its plate ("Frostbound Grimmaw", "Burning Swift Mother of
 -- Graves"). In the order rolled from; each:
 --   id        the console's name for it ("dd spawn rare 1 Skeleton burning,swift")
---   name      its word on the plate
---   notOn     the kinds of monster it never goes on (powerKinds below)
+--   name      its word on the plate (in the order rolled; a `noun` one's last, nearest the name)
+--   notOn    the kinds of monster it never goes on (powerKinds below)
 --   perLevel  how much stronger it is each area level past the first (its damage, its share, its
 --             time; 0.03: 3% a level), on top of the monster's own scaling of the damage it deals
 -- Damage a power deals is the monster's own (its tier's, its level's and the party's factors,
@@ -226,6 +236,15 @@ monsters.powers = {
 	-- At its death blue sparks gather where it fell; `warn` frames later lightning bursts there:
 	-- `damage` (shock) to each hero within `reach`.
 	{ id = "stormcharged", name = "Stormcharged", warn = 24, reach = 110, damage = 12, perLevel = 0.03 },
+	-- (by decision 2026-11-02) While a foe is within `reach`, it calls `count` minions round it
+	-- (`ring` off), at most once every `every` frames and never past `most` of its own alive at
+	-- once. A minion is one of the `kinds` weakest types of the area's roster (by their health;
+	-- none that rises again, none big or still), a normal one with `health` of its most health. A
+	-- minion gives no experience and no loot, and counts as no kill. At the summoner's death (or
+	-- once it's no longer the mod's) its minions crumble away. `noun`: its word goes last on the
+	-- plate, nearest the name ("Burning Summoner Mother of Graves").
+	{ id = "summoner", name = "Summoner", every = 300, reach = 300, count = 2, most = 4, kinds = 3, health = 0.6, ring = 45,
+		perLevel = 0, noun = true, sound = "SPELL_SUMMON_BAT" },
 }
 
 -- The kinds of monster some powers stay off (a power's `notOn`): big ones (none splits) and the
@@ -242,7 +261,12 @@ monsters.powerKinds = {
 -- `better`), for each power it had: a harder monster's drop.
 monsters.powerLoot = { drops = 0.5 }
 
--- How often a monster with a power that acts by itself (burning, blinking, warding, festering)
+-- What a power adds to its monster's experience (by decision 2026-11-02): `share` of its tier's
+-- experience more for each power it had, added up (two powers: half as much again). The party's
+-- split of it is as any kill's.
+monsters.powerExperience = { share = 0.25 }
+
+-- How often a monster with a power that acts by itself (burning, blinking, warding, festering, summoner)
 -- thinks it over (frames), and how near a foe must be for it to bother.
 monsters.powerBeat = { every = 15, wake = 400 }
 

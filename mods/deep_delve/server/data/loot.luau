@@ -110,10 +110,13 @@ loot.effects = {
 -- Deep Delve's own affixes (design 4.3), a rare's one or two: { id, text (%d its value), stat,
 -- low, high (its value at area level 1), perLevel (more each area level), kinds (the gear kinds it
 -- may roll on, loot.gear's `kind`; none: any), most (what all the worn pieces' together count
--- for at most) }. Applied while worn, each piece's value added to its wearer's stat:
+-- for at most), classes (none: any; else it rolls only on gear one of these classes may use, by
+-- the game's record, and never on gear rolled for another class, as a vendor's stock is) }.
+-- Applied while worn, each piece's value added to its wearer's stat:
 --   damage      scales the damage its wearer deals (combat.luau);
 --   health, mana raise its most;
---   manaRegen   adds to its mana a second (regen.luau; by decision 2026-10-31).
+--   manaRegen   adds to its mana a second (regen.luau; by decision 2026-10-31); never on a
+--               warrior's own gear, nor on gear rolled for a warrior (by decision 2026-11-02).
 -- The game's six modifiers that fit no item, as affixes (by decision 2026-11-01; affixes.luau):
 --   frost       a weapon's: the chance (%) that its blow, or its arrow, chills one of the mod's
 --               monsters (the game's slow, loot.hits.frost);
@@ -131,7 +134,7 @@ loot.affixes = {
 	{ id = "damage", text = "+%d%% damage", stat = "damage", low = 4, high = 8, perLevel = 0.6 },
 	{ id = "health", text = "+%d health", stat = "health", low = 4, high = 10, perLevel = 1.0 },
 	{ id = "mana", text = "+%d mana", stat = "mana", low = 4, high = 10, perLevel = 1.0 },
-	{ id = "manaRegen", text = "+%d mana a second", stat = "manaRegen", low = 1, high = 2, perLevel = 0.1 },
+	{ id = "manaRegen", text = "+%d mana a second", stat = "manaRegen", low = 1, high = 2, perLevel = 0.1, classes = { wizard = true, conjurer = true } },
 	{ id = "frost", text = "Frost: %d%% chance to chill on a hit", stat = "frost", low = 8, high = 14, perLevel = 0.5, kinds = { weapon = true }, most = 50 },
 	{ id = "dread", text = "Dread: %d%% chance to frighten on a hit", stat = "dread", low = 4, high = 8, perLevel = 0.3, kinds = { weapon = true }, most = 30 },
 	{ id = "grip", text = "Grip: +%d%% damage with this weapon", stat = "grip", low = 5, high = 10, perLevel = 0.5, kinds = { weapon = true } },

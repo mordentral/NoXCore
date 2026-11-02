@@ -11,6 +11,12 @@
 -- chambers, the end and every other side room are still reached from the start; open, the room is
 -- reached through its branch again (the wall's cells are floor under it).
 --
+-- A locked secret room (by chance, in a biome with a door of its own): the line across its branch
+-- is plain wall with the biome's door in it, locked with a silver key's lock, as the generated
+-- levels' locked doors are built (a corridor four cells wide or more, three half the time, gets a
+-- pair: one key opens both). No lever: the key is carried by a guard on the way near it (its spot
+-- here; the server puts it in and drops the key at its death).
+--
 -- Side rooms' chests: each other side room a chest by chance, at its middle (the first free cell
 -- out from it), and each chest trapped by chance, its trap drawn by weight (the server sets it off
 -- when the chest is opened).
@@ -25,7 +31,8 @@
 --
 -- params.secrets: { chance (an area's secret room, 0-1), chests (a side room's chest, 0-1),
 -- trapped (a side-room chest's trap, 0-1), traps ({ {kind, weight}... }), hoard (the secret room's
--- chest types), guards ({ fewest, most }) }.
+-- chest types), guards ({ fewest, most }), locked (a secret room's lock in a biome with a door,
+-- 0-1), doors ({ [biome name] = door type }: the biomes a room may be locked in) }.
 
 local util = require("util")
 
@@ -126,7 +133,7 @@ local function plugFor(lay, i: number)
 					end
 				end
 				if fine then
-					return line, rc
+					return line, rc, k
 				end
 			end
 		end
@@ -135,10 +142,51 @@ local function plugFor(lay, i: number)
 	return nil
 end
 
+-- A locked room's door across side room i's branch at its line (`k`: the branch cell before the
+-- line's, from 0 as plugFor counts): the gap (the branch's cell in the line, and with a pair the
+-- next along the line), each leaf's hinge and shut direction, the line's walls (the line but the
+-- gap), and two branch cells either side of the gap (`outside` reached from the start shut, `inside`
+-- the room's side). As the generated levels' locked doors: a "/" line (the branch stepping
+-- (1, -1) or (-1, 1)) shuts its leaves at 8 / 0x18, a "\" one at 16 / 0.
+local function lockFor(lay, i: number, line: { number }, k: number, inside, rng, doorType: string)
+	local branch = lay.branches[i]
+	local here = branch[k + 1]
+	local d = branch[k + 2] - here
+	local slash = util.SIDE_DX[d] == util.SIDE_DY[d]
+	local along = if slash then util.ROW - 1 else util.ROW + 1
+	local gaps = { here }
+	if #line >= 4 or rng:next() % 2 == 0 then
+		if util.find(line, here + along) then
+			gaps[2] = here + along
+		elseif util.find(line, here - along) then
+			table.insert(gaps, 1, here - along)
+		end
+	end
+	local walls = {}
+	for _, c in line do
+		if not util.find(gaps, c) then
+			table.insert(walls, c)
+		end
+	end
+	local gx, gy = util.xy(gaps[1])
+	local leaves = { { direction = if slash then 8 else 16, hingeX = gx, hingeY = if slash then gy + 1 else gy } }
+	if #gaps == 2 then
+		local hx, hy = util.xy(gaps[2])
+		leaves[2] = { direction = if slash then 0x18 else 0, hingeX = hx + 1, hingeY = if slash then hy else hy + 1 }
+	end
+	-- (two branch cells off the gap either way; the one the shut floor holds is the inside)
+	local a, b = branch[math.max(1, k - 1)], branch[math.min(#branch, k + 3)]
+	if inside:has(a) then
+		a, b = b, a
+	end
+	return { type = doorType, gaps = gaps, walls = walls, leaves = leaves, outside = a, inside = b }
+end
+
 -- The plan (p: the area's params; `open`: the map's open floor, the area's and the town's): the
--- secret room's line taken out of both floors when an area has one. Returns the plan (nil in a
--- lair or with no numbers): { rng, numbers, room, index (its side room's), plug (the line's
--- cells), inside (the shut floor, gen.cells) }.
+-- secret room's line taken out of both floors when an area has one (a locked room's gap given back:
+-- its door stands there). Returns the plan (nil in a lair or with no numbers): { rng, numbers, room,
+-- index (its side room's), plug (the line's cells), inside (the shut floor, gen.cells), lock (a
+-- locked room's door: lockFor's) }.
 function secrets.plan(lay, open, p)
 	local s = p.secrets
 	if p.lair or type(s) ~= "table" then
@@ -154,8 +202,8 @@ function secrets.plan(lay, open, p)
 		end
 		rng:shuffle(order)
 		for _, i in order do
-			local line, inner = plugFor(lay, i)
-			if line and inner then
+			local line, inner, k = plugFor(lay, i)
+			if line and inner and k then
 				local room = lay.sideRooms[i]
 				lay.open:removeAll(line)
 				open:removeAll(line)
@@ -163,6 +211,14 @@ function secrets.plan(lay, open, p)
 				local n = inside:count()
 				if n > 0 and n <= MOST_INSIDE then
 					plan.room, plan.index, plan.plug, plan.inside = room, i, line, inside
+					-- Locked (by chance, in a biome with a door; the roll drawn only there): its gap
+					-- floor again, the door's.
+					local doorType = if type(s.doors) == "table" then s.doors[p.biome] else nil
+					if type(doorType) == "string" and chance(rng, s.locked) then
+						plan.lock = lockFor(lay, i, line, k, inside, rng, doorType)
+						lay.open:addAll(plan.lock.gaps)
+						open:addAll(plan.lock.gaps)
+					end
 					break
 				end
 				-- (too much behind it: put back, the next one tried)
@@ -210,18 +266,42 @@ end
 -- lever and the lever's handler. Its spot: { x, y (the room's middle), group, cells (the walls'
 -- cells as { x, y } on the wall grid), chest = { x, y, type }, lever = { x, y } (none: open from
 -- the start, nowhere for a lever), guards = { { x, y }... } }.
+--
+-- A locked room instead: its line plain wall (fitted with the area's walls), its door's leaves in
+-- the gap, shut and locked (a silver key's lock); no lever. Its spot's `lock` = { type, doors =
+-- { { x, y } each leaf's hinge }, gaps = { { x, y } on the wall grid }, outside, inside (world
+-- points either side of the gap), guard (the key guard's spot, on the way near it) }; `cells` the
+-- line's walls.
 local function placeRoom(plan, site, w)
 	local rng, s = plan.rng, plan.numbers
 	local lay, used = site.layout, site.used
 	local name = "DDSecret1"
-	for _, c in plan.plug do
-		w:secretWall(c, false)
-	end
-	w:wallGroup(name, plan.plug)
-	local spot: any = { group = name, cells = {}, guards = {} }
-	for _, c in plan.plug do
-		local cx, cy = util.xy(c)
-		table.insert(spot.cells, { x = cx, y = cy })
+	local lock = plan.lock
+	local spot: any = { cells = {}, guards = {} }
+	if lock then
+		spot.lock = { type = lock.type, doors = {}, gaps = {}, outside = point(lock.outside), inside = point(lock.inside) }
+		for _, leaf in lock.leaves do
+			w:thing(lock.type, leaf.hingeX * 23, leaf.hingeY * 23, { door = { direction = leaf.direction, lock = 1 } })
+			table.insert(spot.lock.doors, { x = leaf.hingeX * 23, y = leaf.hingeY * 23 })
+		end
+		for _, c in lock.gaps do
+			local cx, cy = util.xy(c)
+			table.insert(spot.lock.gaps, { x = cx, y = cy })
+		end
+		for _, c in lock.walls do
+			local cx, cy = util.xy(c)
+			table.insert(spot.cells, { x = cx, y = cy })
+		end
+	else
+		for _, c in plan.plug do
+			w:secretWall(c, false)
+		end
+		w:wallGroup(name, plan.plug)
+		spot.group = name
+		for _, c in plan.plug do
+			local cx, cy = util.xy(c)
+			table.insert(spot.cells, { x = cx, y = cy })
+		end
 	end
 	local rc = centre(plan.room)
 	local here = point(rc)
@@ -266,6 +346,27 @@ local function placeRoom(plan, site, w)
 			free:addSquare(c, 1)
 			table.insert(spot.guards, point(c))
 		end
+	end
+	-- A locked room's key guard: on the route a little way from the line, else further along it,
+	-- else the first free cell round the line (never inside: that's taken).
+	if lock then
+		local gc = nil
+		for _, r in { { 5, 16 }, { 3, 26 } } do
+			local list = gen.spotsNear(lay.path, mid, r[1], r[2], lay.open, used, start, 10)
+			if #list > 0 then
+				gc = list[rng:next() % #list + 1]
+				break
+			end
+		end
+		if not gc then
+			gc = gen.firstAround(mid, 2, 20, lay.open, used, true)
+		end
+		-- (nowhere at all: by the door's outside, never seen)
+		spot.lock.guard = if gc then point(gc) else spot.lock.outside
+		if gc then
+			used:addSquare(gc, 2)
+		end
+		return spot
 	end
 	-- The lever: on the route within a few cells of the line, else further along it, else the first
 	-- free cell round the line (never inside: that's taken).

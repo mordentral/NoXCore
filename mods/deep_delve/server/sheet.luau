@@ -4,7 +4,9 @@
 -- experience, health, mana and strength, regeneration (health and mana a second, the mod's), damage
 -- dealt and taken, resistance, gold carried and
 -- stashed, passive points, the act's progress, its spells (a warrior: its abilities; a conjurer
--- also its summons) and its records.
+-- also its summons) and its records. Its Gear page (by decision 2026-11-02): the worn affixes'
+-- totals, and the worn uniques' powers and the worn sets' pieces and bonuses, as a value of its own
+-- ("sheetGear") sent only when they change.
 --
 -- A party member's sheet: a click on its card on the party strip asks for it (the open message
 -- with the member's peer); the same window shows the member's numbers instead of its own, read
@@ -14,12 +16,15 @@
 
 local acts = require("data/acts")
 local classes = require("data/classes")
+local lootData = require("data/loot")
 local treeData = require("data/tree")
+local uniqueData = require("data/uniques")
 local hero = require("hero")
 local hud = require("hud")
 local progress = require("progress")
 local regen = require("regen")
 local tree = require("tree")
+local uniques = require("uniques")
 local windows = require("windows")
 
 local sheet = {}
@@ -105,6 +110,38 @@ function sheet.numbers(h: any): any
 	}
 end
 
+-- The sheet's Gear page for a hero (by decision 2026-11-02): { a = its worn affixes' totals as
+-- lines ("+12 mana", "Frost: 14% chance to chill on a hit"; the affixes in the loot's order, then
+-- the stats only uniques and sets carry; each up to its most, as it counts), s = its worn uniques
+-- and sets (uniques.sheetLines: tagged lines) }. Worked out again only when the hero's bonus is
+-- (each equip, set-up and tree change makes a new one).
+local affixOrder: { any } = {}
+for _, def in lootData.affixes :: { any } do
+	table.insert(affixOrder, def)
+end
+for _, def in uniqueData.stats :: { any } do
+	table.insert(affixOrder, def)
+end
+
+function sheet.gear(h: any): any
+	local b = h.bonus
+	local made = h.sheetGear
+	if made and made.bonus == b then
+		return made.value
+	end
+	local a = {}
+	local sums = (b and b.affixSums) or {}
+	for _, def in affixOrder do
+		local v = sums[def.stat]
+		if v and v ~= 0 and def.text then
+			table.insert(a, string.format(def.text, v))
+		end
+	end
+	local value = { a = a, s = if b then uniques.sheetLines(b) else {} }
+	h.sheetGear = { bonus = b, value = value }
+	return value
+end
+
 -- The order "dd sheet" lists them in.
 local ORDER = { "name", "class", "level", "experience", "need", "health", "maxHealth", "mana", "maxMana", "strength", "healthRegen", "manaRegen",
 	"damage", "dealt", "resist",
@@ -145,11 +182,16 @@ function sheet.view(h: any)
 	end
 	table.insert(parts, tostring(n.minutes))
 	local key = table.concat(parts, "|")
-	if key == h.shownSheet then
-		return
+	if key ~= h.shownSheet then
+		h.shownSheet = key
+		hud.send(h.peer, "sheet", n)
 	end
-	h.shownSheet = key
-	hud.send(h.peer, "sheet", n)
+	-- (the Gear page's blocks as a value of their own: sent only when they change, or whose they are)
+	local g = sheet.gear(who)
+	if h.shownGear ~= g or h.shownGearOf ~= who then
+		h.shownGear, h.shownGearOf = g, who
+		hud.send(h.peer, "sheetGear", { kind = "sheetGear", of = if who ~= h then who.peer else nil, a = g.a, s = g.s })
+	end
 end
 
 local function beat(h: any)
@@ -159,6 +201,7 @@ end
 windows.register("sheet", {
 	view = function(h: any)
 		h.shownSheet = nil
+		h.shownGear = nil
 		sheet.view(h)
 	end,
 	beat = beat,
@@ -178,6 +221,7 @@ function sheet.left(peer: number)
 		if h.sheetOf == peer then
 			h.sheetOf = nil
 			h.shownSheet = nil
+			h.shownGear = nil
 			if windows.isOpen(h, "sheet") then
 				windows.close(h, "sheet", true)
 			end
