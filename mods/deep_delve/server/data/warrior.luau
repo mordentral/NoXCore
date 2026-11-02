@@ -49,6 +49,33 @@ w.skills = {
 	-- sees (within `sight`, no wall between) deal `pct` more; the secret room's lever and the trapped
 	-- chests within `reveal` of the warrior are shown by a ring on the floor while it lasts.
 	huntersMark = { pct = 15, sight = 400, reveal = 600 },
+
+	-- The stock abilities' upgrades (by decision 2026-11-02; upgrades.luau), a choice of two on
+	-- each ability's last node (data/tree.luau's `excludes`: one of the pair at a time). Their hits
+	-- are shares (`pct`) of the warrior's blow, as the actives' (actives.blow x its damage bonus).
+	--
+	-- Berserker Charge's Trample: a charge stopped by a creature or a wall strikes the creature it
+	-- hit and every monster within `reach` of where it stopped for `pct` of the blow (crush), and
+	-- knocks them aside off the charge's line (the game's push, `force`; never a boss).
+	trample = { pct = 120, reach = 80, force = 45, kind = 2 },
+	-- Berserker Charge's Blood Rush: a kill by any blow of the warrior's within `seconds` of a
+	-- charge's end readies the charge again (once a charge). (The game's own: a kill by the charge
+	-- itself readies it.)
+	bloodRush = { seconds = 3 },
+	-- War Cry's Rallying Cry: every party member within `reach` of the warrior (the warrior too)
+	-- deals `damage`% more and takes `resist`% less for `seconds`, and is healed `heal`% of its
+	-- most health.
+	rallyingCry = { reach = 300, seconds = 8, damage = 15, resist = 10, heal = 10 },
+	-- War Cry's Terror: every monster within `reach` of the warrior flees for `seconds` (the dread
+	-- affix's fear, its spared tiers: never a boss).
+	terror = { reach = 300, seconds = 3 },
+	-- Harpoon's Reel and Rend: the creature it hooks bleeds `pct` of the blow over `seconds` (Rend's
+	-- bleed; the stronger runs), and once the pull ends is held `held` frames (a boss `bossHeld`).
+	reelAndRend = { pct = 60, seconds = 4, held = 30, bossHeld = 8 },
+	-- Harpoon's Chain: as it hooks a monster, the nearest other monster within `reach` of it is
+	-- struck for `pct` of the blow (blade, as the harpoon's own) and pulled toward the warrior
+	-- (the game's push reversed, `force`; never a boss).
+	chain = { pct = 50, reach = 120, force = 45, kind = 0 },
 }
 
 -- The weapon masteries: a family each, judged from the item type data (data/tips.luau's `kind`
@@ -161,6 +188,12 @@ w.fx = {
 	slam = 0x8A, -- (MSG_FX_SMOKE_BLAST: Leap Slam's dust where it lands)
 	slamHit = 0x8B, -- (MSG_FX_DAMAGE_POOF, at each monster the slam or the spin strikes)
 	whirl = 0x8A, -- (MSG_FX_SMOKE_BLAST: Whirlwind's dust at the warrior, every other turn)
+	trample = 0x86, -- (MSG_FX_LESSER_EXPLOSION: Trample's impact where the charge stopped)
+	trampleHit = 0x8B, -- (MSG_FX_DAMAGE_POOF, at each monster Trample or Chain strikes)
+	bloodRush = 0x84, -- (MSG_FX_VIOLET_SPARKS, at the warrior as its charge is ready again)
+	rally = 0x82, -- (MSG_FX_YELLOW_SPARKS, at each party member Rallying Cry reaches)
+	terror = 0x87, -- (MSG_FX_COUNTERSPELL_EXPLOSION, round the warrior as Terror goes off)
+	reel = 0x81, -- (MSG_FX_BLUE_SPARKS, at the creature Reel and Rend holds)
 }
 
 -- A skill's numbers at a rank: its ranks' (the highest it has, at most), or its own.
@@ -211,6 +244,26 @@ function w.words(key: string, rank: number): string
 			"Eye of the Wolf's upgrade: while it lasts, the party deals %d%% more to monsters you see, and hidden levers and trapped chests near you show",
 			s.huntersMark.pct
 		)
+	elseif key == "trample" then
+		local t = s.trample
+		return string.format(
+			"Berserker Charge's upgrade: where your charge stops against a creature or a wall, it and the monsters within %d take %d%% of your blow and are knocked aside",
+			t.reach, t.pct)
+	elseif key == "bloodRush" then
+		return string.format("Berserker Charge's upgrade: a kill within %d seconds of your charge's end readies the charge again", s.bloodRush.seconds)
+	elseif key == "rallyingCry" then
+		local r = s.rallyingCry
+		return string.format("War Cry's upgrade: you and the party near you deal %d%% more and take %d%% less for %d seconds, and heal %d%% of your health", r.damage,
+			r.resist, r.seconds, r.heal)
+	elseif key == "terror" then
+		return string.format("War Cry's upgrade: the monsters near you flee for %d seconds (never a boss)", s.terror.seconds)
+	elseif key == "reelAndRend" then
+		local r = s.reelAndRend
+		return string.format("Harpoon's upgrade: the creature it hooks bleeds %d%% of your blow over %d seconds and is stunned a moment once the pull ends", r.pct,
+			r.seconds)
+	elseif key == "chain" then
+		local c = s.chain
+		return string.format("Harpoon's upgrade: as it hooks a monster, the nearest other within %d takes %d%% of your blow and is pulled toward you", c.reach, c.pct)
 	end
 	local a: any = (w.actives :: any)[key]
 	if a then

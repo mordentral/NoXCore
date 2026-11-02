@@ -17,6 +17,10 @@
 --
 -- One node given back (by decision 2026-10-29): anywhere, for less gold than a respec
 -- (data.refund), and only a node whose going leaves every other node taken joined to the root.
+--
+-- A choice of two (by decision 2026-11-02; the stock abilities' upgrades): a node naming another
+-- (`excludes`, each the other's) is refused while that one is taken. Swapping is giving the one
+-- held back (alone, for gold, or by a respec), then taking the other.
 
 local data = require("data/tree")
 local warriorData = require("data/warrior")
@@ -210,6 +214,10 @@ function tree.canTake(rec: any, id: number): (boolean, string?)
 	local set = tree.taken(rec)
 	if set[id] then
 		return false, "taken already"
+	end
+	-- (one of a choice of two: refused while its other is taken)
+	if n.excludes and set[n.excludes] then
+		return false, "you have " .. tostring(nodes[n.excludes].name) .. ": one of the two (give it back to take this)"
 	end
 	local _, _, left = tree.points(rec)
 	if left < 1 then
@@ -487,7 +495,9 @@ function tree.describe(n: any): (string, string)
 	if n.skill then
 		-- (a warrior's skill: its words at the rank the node brings, then any stats of its own)
 		local stats = tree.statText(n.stats)
-		return n.name, kind .. warriorData.words(n.skill, n.rank or 1) .. (if stats ~= "" then ", " .. stats else "") .. " (the Warrior's)"
+		-- (one of a choice of two says so)
+		local choice = if n.excludes then ". One of two with " .. tostring(nodes[n.excludes].name) .. ": never both" else ""
+		return n.name, kind .. warriorData.words(n.skill, n.rank or 1) .. (if stats ~= "" then ", " .. stats else "") .. choice .. " (the Warrior's)"
 	end
 	return n.name, kind .. tree.statText(n.stats)
 end

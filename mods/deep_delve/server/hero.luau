@@ -21,6 +21,8 @@
 --          powers, sets, pieces, setSig (the worn uniques' powers and the worn sets: uniques.worn;
 --          their active bonuses' stats are in the numbers above) };
 --   powerState its worn powers' own state (uniquepowers.luau);
+--   rally  a warrior's Rallying Cry on it: { till (the frame it ends), damage, resist (%) }, counted
+--          by hero.dealt and hero.taken while it lasts (upgrades.luau);
 --   regen  its passive regeneration's timer and state (regen.luau);
 --   open   its windows open (windows.luau); sheetOf the party member whose sheet its sheet window
 --          shows (nil: its own; sheet.luau); padAt the frame it last touched the town's
@@ -216,13 +218,23 @@ end
 
 -- The share of damage a hero takes after its resistance (1: all of it).
 function hero.taken(h: any): number
-	return 1 - math.clamp(h.bonus.resist, treeData.resist.least, treeData.resist.most) / 100
+	local resist = h.bonus.resist
+	-- (a warrior's Rallying Cry on it while it lasts: upgrades.luau)
+	local r = h.rally
+	if r and nox.frame() < r.till then
+		resist += r.resist
+	end
+	return 1 - math.clamp(resist, treeData.resist.least, treeData.resist.most) / 100
 end
 
 -- The share of damage a hero deals (1: as the game has it); `weapon`: what the hit came by (a
 -- missile, a pixie), whose type may carry its spell's own bonus too (bonus.own).
 function hero.dealt(h: any, weapon: number?): number
 	local pct = h.bonus.damage
+	local r = h.rally
+	if r and nox.frame() < r.till then
+		pct += r.damage
+	end
 	if weapon and next(h.bonus.own) ~= nil then
 		local w = nox.object(weapon)
 		if w then

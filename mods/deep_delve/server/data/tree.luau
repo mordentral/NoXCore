@@ -594,9 +594,9 @@ link(branchNode("wizard", "Renewal", 3), add({ x = 11, y = -4, kind = "notable",
 --   the abilities' upgrades, at their last nodes: Ambush (Tread Lightly's, y 1 under Guard's
 --           last Tread Lightly) and Hunter's Mark (Eye of the Wolf's, y 2 over Hunt's last Eye of
 --           the Wolf).
--- Kept free for what comes next (nothing there yet): each other ability's two upgrades beside its
--- last node (Berserker Charge's at (-17, -6) and (-18, -6); War Cry's at (-16, -6) and (-15, -6);
--- Harpoon's at (-17, 5) and (-18, 5)). Leap Slam and Whirlwind, the actives, are at the end.
+-- The other abilities' two upgrades each (Berserker Charge's, War Cry's, Harpoon's) and Leap Slam
+-- and Whirlwind, the actives, are at the end. Kept free: a second choice beside Ambush (-18, 1)
+-- and beside Hunter's Mark (-15, 2).
 --
 -- Pictures: the existing ones where they fit, three spares (n_cleave, n_rend, n_second_wind) new.
 -- The node of the same name in the warrior's Renewal run (id 151) is Hale Heart now.
@@ -669,6 +669,32 @@ do
 	skillNode({ x = -12, y = -11, kind = "notable", branch = "Wrath", name = "Leap Slam II", icon = "k_unbowed", skill = "leapSlam", rank = 2 }, { leap })
 	local whirl = skillNode({ x = -16, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind", icon = "n_cleave", skill = "whirlwind" }, { at(-14, 7) })
 	skillNode({ x = -18, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind II", icon = "n_cleave", skill = "whirlwind", rank = 2 }, { whirl })
+end
+
+-- The stock abilities' upgrades (by decision 2026-11-02; ids 186-191), a choice of two beside each
+-- ability's last node, in the places kept for them: Berserker Charge's Trample (-17, -6) and Blood
+-- Rush (-18, -6) off Fury's 12th; War Cry's Rallying Cry (-16, -6) and Terror (-15, -6) off Fury's
+-- 11th; Harpoon's Reel and Rend (-17, 5) and Chain (-18, 5) off Hunt's 12th. Skill nodes (a
+-- warrior's alone; data/warrior.luau's numbers, upgrades.luau's work), `upgrades` the ability's
+-- number. A choice: each names its other (`excludes`), and tree.canTake refuses one while its
+-- other is taken; giving that one back (a node given back alone, or a respec) frees it.
+-- Pictures: existing ones for now.
+do
+	local function pair(ability: number, from: number, a: any, b: any)
+		a.kind, b.kind = "notable", "notable"
+		a.branch, b.branch = "Upgrades", "Upgrades"
+		a.upgrades, b.upgrades = ability, ability
+		local ia = skillNode(a, { from })
+		local ib = skillNode(b, { from })
+		nodes[ia].excludes = ib
+		nodes[ib].excludes = ia
+	end
+	pair(1, branchNode("warrior", "Fury", 12), { x = -17, y = -6, name = "Trample", icon = "n_stone_skin", skill = "trample" },
+		{ x = -18, y = -6, name = "Blood Rush", icon = "n_bloodlust", skill = "bloodRush" })
+	pair(2, branchNode("warrior", "Fury", 11), { x = -16, y = -6, name = "Rallying Cry", icon = "n_gentle_hands", skill = "rallyingCry" },
+		{ x = -15, y = -6, name = "Terror", icon = "k_predator", skill = "terror" })
+	pair(3, branchNode("warrior", "Hunt", 12), { x = -17, y = 5, name = "Reel and Rend", icon = "n_rend", skill = "reelAndRend" },
+		{ x = -18, y = 5, name = "Chain", icon = "n_pack_leader", skill = "chain" })
 end
 
 return data

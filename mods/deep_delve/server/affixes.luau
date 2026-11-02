@@ -148,22 +148,39 @@ end
 
 -- The chances rolled for a hit on one of the mod's monsters (m: monsters.info's) by the hero's
 -- weapon: the enchantments to put on it, a frame later.
+-- A frost's or dread's enchantment put on a living monster for `frames`: never shorter than it
+-- has, nor over one on for good.
+local function putOn(target: number, hit: any, frames: number)
+	if nox.living(target) then
+		local left = nox.enchantTime(target, hit.enchantment)
+		if not nox.enchanted(target, hit.enchantment) or (left > 0 and left < frames) then
+			nox.enchant(target, hit.enchantment, frames, hit.power)
+		end
+	end
+end
+
 function affixes.onWeaponHit(b: any, target: number, m: any)
 	for _, id in { "frost", "dread" } do
 		local chance = b[id] or 0
 		local hit = (data.hits :: any)[id]
 		if chance > 0 and hit and not (hit.spare and hit.spare[m.tier]) and nox.random() * 100 < chance then
 			nox.after(1, function()
-				if nox.living(target) then
-					local left = nox.enchantTime(target, hit.enchantment)
-					-- (never shorter than it has, nor over one on for good)
-					if not nox.enchanted(target, hit.enchantment) or (left > 0 and left < hit.frames) then
-						nox.enchant(target, hit.enchantment, hit.frames, hit.power)
-					end
-				end
+				putOn(target, hit, hit.frames)
 			end)
 		end
 	end
+end
+
+-- One of the mod's monsters (m: monsters.info's) frightened now as the dread affix frightens
+-- (its fear, its spared tiers: never a boss) for `frames`; whether it may be (War Cry's Terror,
+-- upgrades.luau).
+function affixes.frighten(target: number, m: any, frames: number): boolean
+	local hit = (data.hits :: any).dread
+	if not hit or (hit.spare and hit.spare[m.tier]) then
+		return false
+	end
+	putOn(target, hit, frames)
+	return true
 end
 
 -- ---- On a hit on the hero

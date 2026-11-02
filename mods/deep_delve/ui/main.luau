@@ -1126,6 +1126,11 @@ local function treeMarks(taken: string)
 			for _, near in nodeNear[id] or {} do
 				open = open or string.sub(taken, near, near) == "1"
 			end
+			-- (one of a choice of two: shut while its other is taken)
+			local other = n.e
+			if type(other) == "number" and string.sub(taken, other, other) == "1" then
+				open = false
+			end
 		end
 		nodeHave[id] = have
 		nodeOpen[id] = open
@@ -1362,9 +1367,17 @@ local function forYou(n: any, class: string?): string?
 end
 
 -- A node's tooltip lines (and the widest): its name, taken or not, what it does, what it gives
--- the hero's class, and, taken, whether a right click gives it back alone and for what.
+-- the hero's class, and, taken, whether a right click gives it back alone and for what. Its
+-- second line (yours, one of a choice of two whose other is yours, or one to take) is the foot's
+-- too.
 local function nodeTip(n: any, taken: boolean, state: any): ({ any }, number)
-	local tip: { any } = { { tostring(n.n), RARITY.rare }, { if taken then "(yours)" else "(click to take: 1 point)", TIP_STATUS } }
+	local status = if taken then "(yours)" else "(click to take: 1 point)"
+	local other = n.e
+	if not taken and type(other) == "number" and nodeHave[other] then
+		local o = nodeIndex[other]
+		status = "(you have " .. tostring(o and o.n or "its other") .. ": give it back to take this)"
+	end
+	local tip: { any } = { { tostring(n.n), RARITY.rare }, { status, TIP_STATUS } }
 	local function add(text: string, colour: any)
 		for _, l in wrap(text, 260) do
 			if #tip < 16 then
@@ -1492,7 +1505,11 @@ local function drawTree()
 	local hotTaken = hot ~= nil and nodeHave[hot.i] == true
 	if hot then
 		nox.text(hot.n, 4, CANVAS_H + 4, RARITY.rare)
-		nox.text(if hotTaken then "(yours)" else "(click to take: 1 point)", 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
+		-- (the tooltip's second line once it's made for this node, as it is)
+		local status = if hot == tipOf and hotTaken == tipTaken and tipLines[2] then tipLines[2][1]
+			elseif hotTaken then "(yours)"
+			else "(click to take: 1 point)"
+		nox.text(status, 8 + nox.textWidth(hot.n), CANVAS_H + 4, "dim")
 	else
 		nox.text(HINT, 4, CANVAS_H + 4, "dim")
 	end

@@ -26,6 +26,8 @@
 --                  takes, Second Wind, the Rage bar; a timer per hero with a timed one)
 --   actives.luau   the warrior's active abilities (Leap Slam, Whirlwind): granted by the tree,
 --                  their buttons on the strip over the quickbar (onModAbility, onLand)
+--   upgrades.luau  the stock abilities' upgrades from the tree (Trample, Blood Rush, Rallying
+--                  Cry, Terror, Reel and Rend, Chain): onAbility's news, a kill for Blood Rush
 --   casts.luau     a hero's casts: its missiles larger at the tree levels that say so
 --                  (onSpellCast; Fireball 4 and 5); the cast-cost keystones' prices (castCost)
 --   summons.luau   the creatures the heroes summon: found as they come, watched
@@ -92,6 +94,7 @@ local portal = require("portal")
 local uniquePowers = require("uniquepowers")
 local warrior = require("warrior")
 local actives = require("actives")
+local upgrades = require("upgrades")
 local roster = require("roster")
 local regen = require("regen")
 local secrets = require("secrets")
@@ -144,6 +147,7 @@ function mode.mapLoaded(name: string)
 	uniquePowers.reset()
 	warrior.reset()
 	actives.reset()
+	upgrades.reset()
 	roster.mapLoaded()
 	areas.mapLoaded(name or nox.currentMap())
 end
@@ -378,6 +382,8 @@ function mode.onObjectKilled(e: any)
 		return
 	end
 	hero.award(monsters.experienceOf(m), e.by)
+	-- (Blood Rush: a kill soon after the killer's charge readies it; upgrades.luau)
+	upgrades.killed(e)
 	-- (the killer's worn powers: a burst, a heal, a frenzy; uniquepowers.luau)
 	uniquePowers.killed(m, e)
 	if m.boss then
@@ -447,6 +453,12 @@ end
 -- end (actives.luau); false refuses a press.
 function mode.onModAbility(unit: number, id: string, x: number?, y: number?, phase: string): boolean?
 	return actives.used(unit, id, x, y, phase)
+end
+
+-- A warrior's stock ability's news (its start, end, a harpoon's hold): their upgrades from the tree
+-- (upgrades.luau).
+function mode.onAbility(unit: number, ability: string, info: any)
+	upgrades.used(unit, ability, info)
 end
 
 -- A leap came down: Leap Slam's slam where it landed (actives.luau).

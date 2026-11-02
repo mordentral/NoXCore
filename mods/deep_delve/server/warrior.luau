@@ -437,6 +437,9 @@ end
 
 -- An active's hit from the hero (quiet, as a skill's own; its share of a blow the monster takes).
 warrior.strike = strike
+-- A bleed of `total` over `seconds` on a monster from the hero (Rend's; the stronger runs): the
+-- Harpoon's Reel and Rend (upgrades.luau).
+warrior.bleed = bleed
 -- The mod's monsters within `reach` of (x, y), nearest first, at most `most`.
 warrior.monstersNear = monstersNear
 
@@ -622,7 +625,7 @@ local function beat(h: any)
 	end
 end
 
-local TIMED = { rage = true, rend = true, axe = true, secondWind = true, ambush = true, huntersMark = true }
+local TIMED = { rage = true, rend = true, axe = true, secondWind = true, ambush = true, huntersMark = true, reelAndRend = true }
 
 local function timed(h: any, s: any): boolean
 	for key in skills(h) do
@@ -769,6 +772,13 @@ function warrior.check(bad: { string }, thing: (string, string) -> ())
 			table.insert(bad, "tree node " .. id .. ": no skill " .. tostring(n.skill))
 		elseif n.skill then
 			onTree[n.skill] = true
+		end
+		-- (a choice of two: each the other's, upgrading the same ability)
+		if n.excludes then
+			local o = tree.node(n.excludes)
+			if not o or o.excludes ~= id or o.upgrades ~= n.upgrades or not n.upgrades then
+				table.insert(bad, "tree node " .. id .. ": its choice of two isn't a pair")
+			end
 		end
 	end
 	-- (each active on a node, its button's icon one of the game's ability icons the client knows)

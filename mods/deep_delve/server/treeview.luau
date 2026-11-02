@@ -36,8 +36,9 @@ local function nodeEntries(): { any }
 		-- keystone; si: the game's icon's name for a spell, ability or summon, for nox.spellIcon;
 		-- u: for a spell, ability or summon, the classes that may use it, 1 warrior + 2 wizard + 4
 		-- conjurer)
+		-- (e: one of a choice of two, its other's id: shut while that one is taken)
 		table.insert(list, { i = id, x = n.x, y = n.y, k = KIND[n.kind] or "s", c = REGION[n.region] or 0, n = name, d = what, l = links, ic = n.icon,
-			si = n.spellIcon, u = tree.usableMask(n) })
+			si = n.spellIcon, u = tree.usableMask(n), e = n.excludes })
 	end
 	entries = list
 	return list

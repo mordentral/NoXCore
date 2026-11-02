@@ -112,6 +112,9 @@
 --                        then "bytes N" (the value's size on the wire)
 --   dd ui WINDOW [NAME]  a window opened on its UI (stash, vendor, waypoints, maps: it's moved by
 --                        the station); "sheet NAME": party member NAME's sheet, as its card's click
+--   dd upgrades [clear]  its stock abilities' upgrades: each held ("upgrade KEY"), how often each
+--                        went off ("count WHAT N"), the charge's cooldown, its Rallying Cry, the
+--                        last Trample and Chain, what its harpoon holds; or the counts emptied
 --   dd hits [clear]      the last hits cancelled (no damage within the party, no splash from a
 --                        hero's own Fireball): "why: target by source, weapon W, kind K, N
 --                        cancelled"; or the list emptied
@@ -201,6 +204,7 @@ local uniquePowers = require("uniquepowers")
 local uniqueConsole = require("uniqueconsole")
 local warrior = require("warrior")
 local actives = require("actives")
+local upgrades = require("upgrades")
 local tips = require("tips")
 local tree = require("tree")
 local treeview = require("treeview")
@@ -1845,6 +1849,11 @@ function commands.actives(args: { string }): { string }
 	return actives.console(args, firstHero())
 end
 
+-- The first hero's stock abilities' upgrades (dd upgrades [clear]): upgrades.luau.
+function commands.upgrades(args: { string }): { string }
+	return upgrades.console(args, firstHero())
+end
+
 function commands.summons(_args: { string }): { string }
 	local out = summons.lines()
 	return if #out > 0 then out else { "none" }
@@ -1870,7 +1879,7 @@ function commands.help(_args: { string }): { string }
 		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs|gear] | roll TYPE RARITY N [L] [CLASS]",
 		"dd give TYPE RARITY [LEVEL] [SLOT=MOD]... [affix=ID:N]... | tip carried N|stash T S|stock I | tips [on|off] | wire | affixes [TYPE N [L] [CLASS]|worn|allowed [TYPE]] | ward",
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs|find NAME...] | icons | book | sheet [gear] | ui stash|vendor|waypoints|tree|sheet [NAME]",
-		"dd warrior [rage N | clear] | actives [clear | ready]",
+		"dd warrior [rage N | clear] | actives [clear | ready] | upgrades [clear]",
 		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | plates | spawn TIER [N] [TYPE|-] [POWERS|none] | powers [clear] | slay ID | portals | portal take | hud",
 		"dd option [lootNames alt|always] | hits [clear] | summons | team",
 		"dd give unique ID [L] | give set PIECE [L] | uniques [list|check|odds N LEVEL TIER [BOSS]|drop unique|set ID [L]|worn|powers]",
