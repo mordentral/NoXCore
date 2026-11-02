@@ -948,6 +948,12 @@ void drawChatBubbles(App& app, std::uint32_t frame)
 /// bars and meters, else an item on the ground under the mouse (cursorUpdate: windows first).
 std::string liveTooltip(App& app)
 {
+    app.tipItem = 0; // (set below where it's an item's name)
+    app.tipWhere = "";
+    const auto named = [&app](std::uint16_t nc, const char* where) {
+        app.tipItem = nc;
+        app.tipWhere = where;
+    };
     // None while a menu is up or a spell is being dragged.
     if (!app.live || !app.hud || menuWindowUp(app) || (app.book && app.book->dragging()) || app.barDrag) {
         return {};
@@ -991,6 +997,7 @@ std::string liveTooltip(App& app)
             return hover.text;
         }
         if (hover.item) {
+            named(*hover.item, "inventory");
             return itemName(*hover.item);
         }
         const auto guiText = [&](const char* id) { return tableText(app, id).value_or(std::string()); };
@@ -1003,6 +1010,7 @@ std::string liveTooltip(App& app)
             if (!hover.weapon) {
                 return guiText("guimeter.c:ToolTipCurWeapon");
             }
+            named(*hover.weapon, "weapon");
             std::string text = itemName(*hover.weapon);
             const auto& inv = world.self().inventory;
             const TypeArt* a = app.art->get(inv.at(*hover.weapon).typeId);
@@ -1024,6 +1032,7 @@ std::string liveTooltip(App& app)
         if (const auto* d = world.drawable(*app.cursorHovered)) {
             const TypeArt* a = app.art->get(d->typeId);
             if (a && (a->classes & nox::things::ObjectClass::Pickup)) {
+                named(*app.cursorHovered, "ground");
                 return itemName(*app.cursorHovered); // (cursorUpdate for an item the cursor's on)
             }
         }

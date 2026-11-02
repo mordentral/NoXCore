@@ -18,8 +18,27 @@
 --     owns, is cancelled): a boss's quake, mist or fist spares its own dead.
 --   * A hit on one of the mod's monsters from a player (or something it owns: a missile, a
 --     summoned creature) is scaled by the player's worn "damage" affixes and its passive tree
---     (and a spell's own bonus when the hit came by that spell's missile: hero.dealt).
+--     (and a spell's own bonus when the hit came by that spell's missile: hero.dealt), and by the
+--     share of a blow the monster takes (its entry's `taken`: the ruin-warden's plates, act 4's
+--     boss, warden.luau; none: all of it).
 --   * Monsters hurt the players' creatures as the game has it.
+--   * The worn affixes (affixes.luau): a hit on a monster by the hero's worn weapon (its blow or
+--     its bow's arrow, by the hit's cause) is up by its grip and may chill (frost) or frighten
+--     (dread) the monster. A monster's missile about to hit a hero may be turned (reflect,
+--     onReflect: the game turns it back, the hero's now); its hits are then dealt as its shooter's
+--     would have been on the hero, no bonus of the hero's on them. A spell's hit on a hero by a
+--     thing a monster owns with no missile (a boss's mist or fist) may be turned back too: cancelled
+--     here, its damage dealt to the monster a frame on. A weapon's hit has its wear looked at a
+--     frame on (resilience).
+--   * A hit on a hero by a monster with powers (powers.luau) is told to it as it lands (a
+--     frostbound one's slow, a vampiric one's heal: the next frame). Nothing about the hit changes.
+--   * The worn uniques' and sets' powers (uniquepowers.luau): the hero's hit on a monster may be
+--     raised (crit, frenzy) and set off what goes with it (leech, Chain Lightning, a hold, another
+--     arrow; the weapon's hits by the hit's cause); a hit on the hero may be capped (bulwark),
+--     paid partly from mana, survived at 1 health (undying) or answered (thorns: a monster's own
+--     blow). A flame a power made never hurts its own hero.
+--   * A flame hit on the troll chieftain (act 3's boss: mosschief.luau) is noted on him, with the
+--     hero behind it: fire keeps his wounds from closing. Nothing about the hit changes.
 --
 -- The watches: every player's unit, every monster the mod makes and every creature a player
 -- summons carry nox.events.damage (set in hero.luau, monsters.luau and summons.luau), so the hook
@@ -28,7 +47,12 @@
 local hero = require("hero")
 local monsters = require("monsters")
 local summons = require("summons")
+local mosschief = require("mosschief")
+local affixes = require("affixes")
+local powers = require("powers")
+local uniquePowers = require("uniquepowers")
 local numbers = require("data/numbers")
+local lootData = require("data/loot")
 
 local combat = {}
 
@@ -112,7 +136,78 @@ local function note(why: string, target: number, source: number?, weapon: number
 	end
 end
 
-function combat.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number): number?
+-- A hit turned back on the monster `who` (a frame after it was cancelled): the engine's damage from
+-- the hero, the hero's damage bonuses no part of it (`reflecting`).
+local reflecting = false
+local turned = 0
+
+local function turnBack(who: number, unit: number, amount: number, kind: number)
+	if amount <= 0 or not nox.living(who) or not monsters.info(who) or not nox.present(unit) then
+		return
+	end
+	reflecting = true
+	local ok, err = pcall(function()
+		nox.damage(who, unit, amount, kind)
+	end)
+	reflecting = false
+	if not ok then
+		nox.log("deep_delve: a hit not turned back: " .. tostring(err))
+	end
+end
+
+-- How many hits were turned back since the start (for "dd hits").
+function combat.turned(): number
+	return turned
+end
+
+-- The monsters' missiles a hero's reflection turned: missile id -> { hero (its owner now), scale
+-- (its shooter's on a hero) }, each kept loot.reflect.keep frames.
+local turnedMissiles: { [number]: any } = {}
+
+-- The turned missile a hit came by (the weapon, or the source: a burst), while still the hero's.
+local function turnedBy(source: number?, weapon: number?): any
+	for i = 1, 2 do
+		local id = if i == 1 then weapon else source
+		local t = if id then turnedMissiles[id] else nil
+		if t then
+			local o = nox.object(id :: number)
+			if o and o.owner == t.hero then
+				return t
+			end
+		end
+	end
+	return nil
+end
+
+-- A missile about to hit a watched thing (onReflect, an asked hook): a hero's reflection may turn
+-- one a monster owns. Never a party member's (no monster's), never on a monster.
+function combat.onReflect(target: number, missile: number, _front: boolean): boolean
+	local victim = hero.byUnit(target)
+	if not victim or not victim.bonus then
+		return false
+	end
+	local o = nox.object(missile)
+	local who = if o then o.owner else 0
+	if who == 0 or not monsters.info(who) or not affixes.reflects(victim.bonus) then
+		return false
+	end
+	note("turned back", target, who, missile, 0, 0)
+	turned += 1
+	local rec = { hero = target, scale = monsters.damageOf(who) * monsters.spellsOf(who) }
+	turnedMissiles[missile] = rec
+	nox.after(lootData.reflect.keep, function()
+		if turnedMissiles[missile] == rec then
+			turnedMissiles[missile] = nil
+		end
+	end)
+	return true
+end
+
+function combat.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): number?
+	-- (a power's own flame on its own hero: none, uniquepowers.luau)
+	if uniquePowers.spares(target, source, weapon) then
+		return 0
+	end
 	local victim = hero.byUnit(target)
 	if victim or summons.ownerOf(target) then
 		-- (the party's own: a player, or a creature one summoned)
@@ -133,9 +228,18 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			end
 		end
 	end
+	-- (fire on the troll chieftain keeps his wounds open: a flame hit from anything noted on him,
+	-- with the hero behind it; noted only, the hit goes on as it would)
+	if kind == mosschief.FLAME and not victim then
+		local m = monsters.info(target)
+		if m and m.scorchable then
+			mosschief.burnt(m, (heroBehind(source)))
+		end
+	end
 	local who = behind(source)
 	if not who then
-		return nil
+		-- (a hit from nothing, a trap's or poison's: only the hero's worn powers on it)
+		return if victim then uniquePowers.taken(victim, nil, source, weapon, amount, kind, cause) else nil
 	end
 	-- (the mod's monsters never hurt each other: a boss's own quake, mist or fist among its dead)
 	if not victim and monsters.info(target) and monsters.info(who) then
@@ -143,21 +247,75 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 	end
 	local factor = 1
 	if victim then
-		factor = monsters.damageOf(who) * hero.taken(victim)
+		local scaled = monsters.damageOf(who)
 		-- (a thing it owns, not its own blow: a boss's spells, times its own share)
 		if who ~= source then
-			factor *= monsters.spellsOf(who)
+			scaled *= monsters.spellsOf(who)
 		end
-	elseif monsters.info(target) then
-		local h = hero.byUnit(who)
-		if h then
+		-- (the hero's reflection on a spell's thing with no missile, a boss's mist or fist: turned
+		-- back, its damage as the hero would have had it before its resistance dealt to the monster
+		-- a frame on; a missile is turned by onReflect before it hits)
+		if cause == "spell" and monsters.info(who) and affixes.turnsBack(victim.bonus, who, weapon) then
+			local back = math.max(if amount > 0 then 1 else 0, math.floor(amount * scaled + 0.5))
+			note("turned back", target, source, weapon, amount, kind)
+			turned += 1
+			local unit = victim.unit
+			nox.after(1, function()
+				turnBack(who, unit, back, kind)
+			end)
+			return 0
+		end
+		factor = scaled * hero.taken(victim)
+	elseif reflecting then
+		-- (a hit turned back: dealt as it was, the hero's bonuses no part of it)
+		return nil
+	else
+		local m = monsters.info(target)
+		local h = if m then hero.byUnit(who) else nil
+		local t = if h then turnedBy(source, weapon) else nil
+		if t then
+			-- (a monster's missile a hero's reflection turned: dealt as its shooter's would have been
+			-- on the hero, the hero's bonuses no part of it)
+			factor = t.scale
+		elseif m and h then
 			factor = hero.dealt(h, weapon)
+			-- (the worn uniques' and sets' powers on the hero's hit: uniquepowers.luau)
+			factor *= uniquePowers.dealt(h, target, m, weapon, kind, amount, factor, cause)
+			-- (the worn weapon's own hit: its grip, its frost's and dread's chances)
+			if affixes.byWeapon(h.bonus, h.unit, weapon, cause) then
+				factor += (h.bonus.grip or 0) / 100
+				affixes.onWeaponHit(h.bonus, target, m)
+				-- (the blow wears the weapon: its resilience gives a share back a frame on)
+				affixes.worn(h)
+			end
+			-- (a monster that takes only a share of a blow, or more: the ruin-warden's plates and
+			-- his open moments, its entry's `taken`)
+			local taken = monsters.info(target).taken
+			if type(taken) == "number" then
+				factor *= taken
+			end
 		end
 	end
-	if factor == 1 then
+	local final = if factor == 1 then amount else math.max(if amount > 0 then 1 else 0, math.floor(amount * factor + 0.5))
+	local changed = factor ~= 1
+	-- (the hero's worn powers on the hit it takes: uniquepowers.luau)
+	if victim then
+		local worn = uniquePowers.taken(victim, who, source, weapon, final, kind, cause)
+		if worn then
+			final, changed = worn, true
+		end
+	end
+	-- (a powered monster's hit on a hero: its frost or its thirst follows, powers.luau)
+	if victim then
+		local m = monsters.info(who)
+		if m and m.powers then
+			powers.struck(m, who, target, final)
+		end
+	end
+	if not changed then
 		return nil
 	end
-	return math.max(if amount > 0 then 1 else 0, math.floor(amount * factor + 0.5))
+	return final
 end
 
 -- The last cancelled hits as lines, oldest first: "why: target by source, weapon W, kind K, N

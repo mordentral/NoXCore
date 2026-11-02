@@ -24,8 +24,9 @@ expeditions.biomes = {
 	{ name = "Cave", corridor = 3, town = 1 },
 	{ name = "Grasslands", corridor = 3, town = 2 },
 	{ name = "Swamp", corridor = 2, town = 2 },
-	{ name = "Forest", corridor = 3, town = 2, skies = { { "windy", 3 }, { "drizzle", 2 }, { "clear", 2 } } },
-	{ name = "Desert", corridor = 3, town = 2, skies = { { "windy", 3 }, { "clear", 3 } } },
+	{ name = "Forest", corridor = 3, town = 3 },
+	{ name = "Desert", corridor = 3, town = 4 },
+	{ name = "Beach", corridor = 3, town = 4 },
 }
 
 -- The rank ladder: how many ranks, rank 1's level above the last act's last area level, and the
@@ -55,34 +56,12 @@ expeditions.table = {
 	ring = { asset = "fx/waypoint", size = 80, spin = 8, pulse = 0.2, period = 4, colour = { 255, 200, 90, 255 } },
 }
 
--- Rosters for the biomes no act has yet, Forest and Desert (data/monsters.luau's fields; `from` 1:
--- every entry at every rank, since the ladder starts above the acts). No spellcaster (the party
--- rules' check of what can reach a player stands as it was).
-expeditions.rosters = {
-	Forest = {
-		{ type = "Wolf", from = 1, weight = 4 },
-		{ type = "BlackWolf", from = 1, weight = 3 },
-		{ type = "Bear", from = 1, weight = 2 },
-		{ type = "BlackBear", from = 1, weight = 1 },
-		{ type = "Wasp", from = 1, weight = 2 },
-		{ type = "CarnivorousPlant", from = 1, weight = 1 },
-		{ type = "Troll", from = 1, weight = 1 },
-	},
-	Desert = {
-		{ type = "Scorpion", from = 1, weight = 4 },
-		{ type = "Skeleton", from = 1, weight = 3 },
-		{ type = "SkeletonLord", from = 1, weight = 2 },
-		{ type = "Imp", from = 1, weight = 2 },
-		{ type = "GruntAxe", from = 1, weight = 2 },
-		{ type = "StoneGolem", from = 1, weight = 1 },
-		{ type = "MechanicalGolem", from = 1, weight = 1 },
-	},
-}
+-- Rosters for the biomes no act has yet (data/monsters.luau's fields; `from` 1: every entry at
+-- every rank, since the ladder starts above the acts): none now. The Forest's are act 3's (its
+-- roster and its champion, Old Bramblehide), the Desert's and the Beach's act 4's (data/monsters.luau).
+expeditions.rosters = {}
 
-expeditions.champions = {
-	Forest = { name = "Old Bramblehide", type = "BlackBear", enchantments = { "ENCHANT_SHIELD", "ENCHANT_VAMPIRISM" }, guards = 3 },
-	Desert = { name = "The Sand-Worn Sentinel", type = "StoneGolem", enchantments = { "ENCHANT_SHIELD", "ENCHANT_PROTECT_FROM_MAGIC" }, guards = 3 },
-}
+expeditions.champions = {}
 
 -- The biome named `name` (its entry above), or nil.
 function expeditions.biome(name: string): any

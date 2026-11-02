@@ -946,6 +946,16 @@ const Swing* swingOf(std::uint32_t weaponEquip)
     return nullptr; // (bows, crossbows: not yet)
 }
 
+} // namespace
+
+std::optional<std::uint8_t> meleeDamageType(std::uint32_t weaponBit)
+{
+    const Swing* s = weaponBit != 0 ? swingOf(weaponBit) : nullptr;
+    return s ? std::optional<std::uint8_t>(s->type) : std::nullopt;
+}
+
+namespace {
+
 /// A weapon's swing frame: it lands at the animation's middle; false when the swing's done.
 bool swinging(ServerObject& unit, std::uint32_t frame, const PlayerAnimations& animations, Fight& fight)
 {

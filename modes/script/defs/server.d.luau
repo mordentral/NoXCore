@@ -6,7 +6,13 @@
 type NoxPlayer = { peer: number, name: string, unit: number, identified: boolean, clientKey: string?, account: string?, class: string?, level: number?, experience: number? }
 type NoxItemSpec = { effectiveness: string?, material: string?, primary: string?, secondary: string?, durability: number?, charges: number? }
 type NoxItemFacts = { type: string, effectiveness: string?, material: string?, primary: string?, secondary: string?, durability: number, maxDurability: number, charges: number, maxCharges: number, worn: boolean, holder: number? }
-type NoxModifier = { name: string, section: string, position: string, color: { r: number, g: number, b: number }, worth: number, desc: string }
+-- text and identify: desc's and IDENTIFYDESC's words from the string table (none without nox.csf); effects: each effect's number by its function's name.
+type NoxModifier = { name: string, section: string, position: string, color: { r: number, g: number, b: number }, worth: number, desc: string, text: string?, identify: string?, effects: { [string]: number } }
+-- name: the game's name for it (UTF-8; none without nox.csf); durability, charges: its most (0: none); damageMin,
+-- damageCoefficient, requiredStrength, range: a weapon record's (a hit: damageMin + (strength - requiredStrength) x
+-- damageCoefficient); damageType: a melee swing's; armor: an armour record's ARMOR_VALUE (the fraction it takes off);
+-- classes: who may use or wear it (a multiclass player: anything).
+type NoxItemStats = { type: string, name: string?, durability: number, charges: number, damageMin: number?, damageCoefficient: number?, requiredStrength: number?, range: number?, damageType: string?, armor: number?, classes: { warrior: boolean, wizard: boolean, conjurer: boolean } }
 type NoxEvents = { death: number, destroyed: number, damage: number, damaged: number, drop: number, equip: number }
 type NoxWeather = { kind: string, strength: number?, wind: { angle: number?, speed: number? }?, fade: number? }
 type NoxGenerate ={ map: string, module: string?, fn: string?, params: any?, arena: { [string]: any }?, seed: number?, title: string?, ahead: boolean? }
@@ -152,6 +158,12 @@ declare nox: {
     clearDecals: () -> (),
     --- An enchantment's frames left on a thing (0: on for good, or not on).
     enchantTime: (id: number, enchantment: string | number) -> number,
+    --- An enchantment that's on given that many frames left (0: for good), silently; whether it was on.
+    setEnchantTime: (id: number, enchantment: string | number, frames: number) -> boolean,
+    --- A creature's or player's poison level (0: none) and the frames till it falls a step.
+    poison: (unit: number) -> (number, number),
+    --- Sets a creature's or player's poison level as the game does (0 cures it quietly); frames: till its first step down.
+    setPoison: (unit: number, level: number, frames: number?) -> (),
     --- A gamedata.bin number as this game reads it (index from 0); nil for a name it hasn't.
     gameNumber: (name: string, index: number?) -> number?,
     --- Whether no wall stands between two points; blocked by a wall, also where it met it and its cell.
@@ -337,8 +349,10 @@ declare nox: {
     --- # Items and modifiers
     --- An item's facts (type, modifiers by slot, durability, charges, worn, holder); nil when gone or not an item.
     item: (id: number) -> NoxItemFacts?,
-    --- A modifier.bin entry by name as { name, section, position, color, worth, desc }; nil when none.
+    --- A modifier.bin entry by name as { name, section, position, color, worth, desc, text, identify, effects }; nil when none.
     modifier: (name: string) -> NoxModifier?,
+    --- A type's (name or number) base stats: its name, most durability and charges, weapon or armour record, damage type, classes; nil for no such type.
+    itemStats: (thingType: string | number) -> NoxItemStats?,
     --- Every modifier's name in a section ("effectiveness", "material" or "enchantment"), in modifier.bin's order.
     modifiers: (section: string) -> { string },
     --- Whether a modifier fits a slot ("effectiveness", "material", "primary", "secondary") of an item type.
@@ -347,6 +361,12 @@ declare nox: {
     equip: (unit: number, item: number) -> (boolean, string?),
     --- Takes off an item the player's unit wears; whether it came off.
     unequip: (unit: number, item: number) -> boolean,
+    --- The game's shop repair price for an item (durability and a staff's charges; a stock keeper's); nil when it needs none.
+    repairCost: (item: number) -> number?,
+    --- The game's shop repair without gold: durability and a staff's charges to their most, its holder's client told; whether it needed one.
+    repair: (item: number) -> boolean,
+    --- Sets an item's durability, 1 to its most (more is its most), its holder's client told; false for a thing without durability.
+    setDurability: (item: number, durability: number) -> boolean,
     --- # Player levels
     --- Sets a player's level (1-10), its numbers worked out again.
     setLevel: (unit: number, level: number) -> (),
@@ -417,7 +437,8 @@ declare function require(name: string): any
 --- @hook collide(thing, other) | A thing it watches (nox.watchCollide) was touched by another (ids; nil: no thing).
 --- @hook onObjectKilled(e) | A watched thing died ({ id, type, x, y, by }); told the next frame's start.
 --- @hook onDestroyed(e) | A watched thing was destroyed ({ id, type, x, y }).
---- @hook onDamage(target, source, weapon, amount, kind) | Before a watched thing takes a hit: return a new amount (0 cancels) or nil; changes nothing in the world.
+--- @hook onDamage(target, source, weapon, amount, kind, cause) | Before a watched thing takes a hit (cause: "blow", "missile", "spell" or "other"): return a new amount (0 cancels) or nil; changes nothing in the world.
+--- @hook onReflect(target, missile, front) | A missile about to hit a watched thing (front: met at its front): return true to turn it as a reflective shield does (back, the target's now) instead of the hit; changes nothing in the world.
 --- @hook onDamaged(target, amount) | A watched thing took a hit.
 --- @hook onPickup(taker, item, x, y) | Something picked an item up from (x, y).
 --- @hook onDrop(holder, item) | A holder dropped a watched item.

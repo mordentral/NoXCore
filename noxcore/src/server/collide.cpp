@@ -44,7 +44,7 @@ void touchEffects(Fight& fight, ServerObject& a, ServerObject& b)
         const int power = enchantPower(a, Enchant::Shock);
         playSound(fight.world, 0x87, a);
         disenchant(fight.world, a, Enchant::Shock);
-        fight.damage(b, &a, a.extent, static_cast<int>(fight.world.number("ShockDamage", static_cast<std::size_t>(power - 1))), 9);
+        fight.damage(b, &a, a.extent, static_cast<int>(fight.world.number("ShockDamage", static_cast<std::size_t>(power - 1))), 9, HitCause::Spell);
     }
     if ((b.classes & 0x20006u) && !(b.flags & (ObjFlag::Dead | ObjFlag::Destroyed)) && !(a.team != 0 && a.team == b.team)) {  // a creature or a generator
         disenchant(fight.world, a, Enchant::Invisible);
@@ -112,7 +112,7 @@ void playerCollide(Fight& fight, ServerObject& obj, ServerObject* other)
                     other->vy = (keep2 * v2y + give2 * v1y).f();
                     other->vx = (keep2 * v2x + give2 * v1x).f();
                 }
-                f.damage(*other, fight.parentPlayer(&obj), obj.extent, static_cast<int>(world.number("BerserkerDamage")), 2);
+                f.damage(*other, fight.parentPlayer(&obj), obj.extent, static_cast<int>(world.number("BerserkerDamage")), 2, HitCause::Blow);
                 if (!(other->classes & 0x20006u)) {  // a creature or a generator doesn't stun it
                     stunned = true;
                 }
@@ -565,7 +565,7 @@ void collideOf(Fight& fight, ServerObject& obj, ServerObject* other)
     case NameId::FistCollide:
         // FistCollide: on the ground, its damage (type 2) from its caster.
         if (obj.z <= 0 && other) {
-            fight.damage(*other, fight.parentPlayer(&obj), obj.extent, obj.value, 2);
+            fight.damage(*other, fight.parentPlayer(&obj), obj.extent, obj.value, 2, HitCause::Spell);
         }
         break;
     case NameId::TeleportWakeCollide: {
@@ -692,10 +692,10 @@ void collideOf(Fight& fight, ServerObject& obj, ServerObject* other)
             const int hp = other->health;
             const int points = it->value;
             if (hp < points) {
-                fight.damage(*other, fight.parentPlayer(&obj), obj.extent, hp, 6);
+                fight.damage(*other, fight.parentPlayer(&obj), obj.extent, hp, 6, HitCause::Spell);
                 it->value = points - hp;
             } else if (points != 0) {
-                fight.damage(*other, fight.parentPlayer(&obj), obj.extent, points, 6);
+                fight.damage(*other, fight.parentPlayer(&obj), obj.extent, points, 6, HitCause::Spell);
                 obj.pendingDelete = true;
                 it->value -= points;
             } else {
@@ -791,7 +791,8 @@ void collideOf(Fight& fight, ServerObject& obj, ServerObject* other)
         // type, from its caster.
         if (other && other->maxHealth != 0) {
             const int amount = obj.collideArg == 1 && (fight.frame & 1u) ? 1 : obj.collideArg >> 1;
-            fight.damage(*other, fight.parentPlayer(&obj), obj.extent, amount, obj.collideType);
+            // (A caster's lasting flame a spell's for a mode; a map's own, no caster's, not.)
+            fight.damage(*other, fight.parentPlayer(&obj), obj.extent, amount, obj.collideType, obj.owner != 0 ? HitCause::Spell : HitCause::Other);
         }
         break;
     case NameId::ModeCollide: // (noxcpp: a mode's own object, its COLLIDE the mode's)

@@ -139,6 +139,76 @@ numbers.barrowKing = {
 	enrage = { at = 0.3, quake = 1, fistEvery = 30 * 6, fistPower = 1 },
 }
 
+-- Act 3's troll chieftain (mosschief.luau; data/monsters.luau's mosschief). Frames at 30 a second.
+--   beat      his thinking beat (his phases, his mending, the next blow chosen, his bar)
+--   wake      a player within this of him wakes him
+--   mend      his wounds closing: `share` of his most health a second (`enraged` once he is), given
+--             on the beat while he's awake and hurt, unless he's scorched: a flame hit on him (any
+--             source: a spell, a burning blade, a fire pit) or standing within `fireReach` of one of
+--             the glade's fire pits scorches him for `scorch` frames. `say`: his cry at a new
+--             scorch at most this often
+--   kin       every `every` frames `count` of his kin (`count` + `enraged` once he is) run in at the
+--             glade's way in, `warn` frames after the smoke there; at most `most` of them standing;
+--             of tier `tier`
+--   hurl      every `every` frames (`enragedEvery` once enraged) a stone (the urchins' ThrowingStone,
+--             his) at a player `near`-`far` from him with a clear line, drawn `scale` times larger,
+--             its hit a circle of `hit`; enraged, `fan` of them `spread` steps (of 256) apart
+--   roots     below `at` of his health: every `every` frames the wood's Force of Nature (the game's,
+--             his, at `power`) at a player, `warn` frames after green sparks at its feet
+--   pull      below the roots' share: every `every` frames the last player who burnt him (else the
+--             one furthest off) within `far` hauled toward him (`force`, pulling)
+--   stomp     enraged (below `enrage.at`): every `every` frames, with a player within `range`, a
+--             ring of sparks round him and `warn` frames later a blow round him (`damage` crushing,
+--             whole within `full`, less to `reach`, scaled as his own hits are), the players in
+--             reach thrown back (`force`)
+numbers.mossChief = {
+	beat = 15,
+	wake = 300,
+	mend = { share = 0.006, enraged = 0.012, scorch = 30 * 5, fireReach = 60, say = 30 * 8 },
+	kin = { every = 30 * 14, count = 2, enraged = 1, warn = 24, most = 6, tier = "normal" },
+	hurl = { every = 30 * 7, enragedEvery = 30 * 5, near = 140, far = 520, scale = 2.2, hit = 10, fan = 3, spread = 10 },
+	roots = { at = 0.65, every = 30 * 11, power = 3, warn = 20 },
+	pull = { every = 30 * 9, far = 600, force = 110 },
+	stomp = { every = 30 * 6, range = 130, warn = 24, reach = 120, full = 60, damage = 18, force = 60 },
+	enrage = { at = 0.3 },
+}
+
+-- Act 4's ruin-warden (warden.luau; data/monsters.luau's warden). Frames at 30 a second.
+--   beat      his thinking beat (his phases, the next blow chosen, his bar)
+--   wake      a player within this of him wakes him
+--   plates    his stone plates: `count` of them; while any holds he takes `taken` of every blow from
+--             the party. A pound that strikes no player shakes one off: he reels (held `stagger`
+--             frames) and takes `exposed` of every blow for `exposedFor` frames; each plate lost
+--             draws him `shrink` smaller. Below `bareAt` of his health every plate left falls at
+--             once. Bare (no plate left), a pound that strikes nobody still leaves him reeling
+--             (`staggerBare`) and open
+--   pound     every `every` frames (`enragedEvery` once enraged) at a player within `range` of him:
+--             a ring of sparks where the player stands, and `warn` frames later the ground heaves
+--             there (`damage` crushing, whole within `full`, less to `reach`, scaled as his own hits
+--             are; whoever stands in it thrown back, `force`)
+--   wardens   every `every` frames `count` (`count` + `enraged` once he is) of the court's statues
+--             and columns flare and `warn` frames later a warden stands at each (his first list
+--             while plated, the second once bare); at most `most` standing; of tier `tier`
+--   sand      bare: the game's Earthquake (at `quake`) as his last plate falls; then every `every`
+--             frames (`enragedEvery` once enraged) a sand-devil loosed at the arena's middle for
+--             `lasts` frames, drifting `speed` units a frame after the nearest player; whoever is
+--             within `reach` of it is slowed for `slow` frames and scoured (`damage`, whole within
+--             `full`, less to `reach`, as his own hits), every beat
+--   masonry   enraged: every `every` frames the court's stones fall round `count` players (at most),
+--             each `spread` off the player at random, `warn` frames after the sparks there (`damage`
+--             crushing, whole within `full`, less to `reach`, as his own hits)
+--   enrage    below `at`: hasted for good
+numbers.ruinWarden = {
+	beat = 15,
+	wake = 320,
+	plates = { count = 4, taken = 0.35, bareAt = 0.5, stagger = 30 * 3, staggerBare = 45, exposed = 1.5, exposedFor = 30 * 4, shrink = 0.05 },
+	pound = { every = 30 * 7, enragedEvery = 30 * 5, range = 320, warn = 33, reach = 80, full = 40, damage = 22, force = 60 },
+	wardens = { every = 30 * 15, count = 2, enraged = 1, warn = 30, most = 4, tier = "normal" },
+	sand = { quake = 1, every = 30 * 14, enragedEvery = 30 * 10, lasts = 30 * 10, speed = 2.5, reach = 70, full = 40, slow = 30 * 2, damage = 2 },
+	masonry = { every = 30 * 6, count = 3, spread = 60, warn = 30, reach = 60, full = 30, damage = 20 },
+	enrage = { at = 0.3 },
+}
+
 -- ---- The party (design 7)
 
 -- Party scaling, counted from the players in the game (each extra player beyond the first adds

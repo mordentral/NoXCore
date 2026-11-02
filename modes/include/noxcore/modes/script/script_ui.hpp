@@ -115,6 +115,12 @@
 //                                    whatever else hides the game's HUD still hides them (overMap()).
 //                                    A client before it hasn't the function: call it as
 //                                    `if nox.overMap then nox.overMap(true) end`
+//   ui.itemTip(code, where)          each frame the game would name an item under the mouse: its
+//                                    net code and "inventory" (the inventory's items, worn ones
+//                                    too), "weapon" (the weapon panel's) or "ground"; nox.tooltip
+//                                    in it puts its lines in the name's place (after the game's own
+//                                    pause), none leaves the game's name. A client before it never
+//                                    calls it (the game's name, as before)
 //
 // The program calls frame() once a frame and draws windows(); a click in one goes to click().
 // Without a server (the map editor's UI preview), runLocal starts a UI from its source, useAssets
@@ -355,6 +361,15 @@ public:
     /// (API 5) nox.overMap's: whether the full map leaves the UI's HUD pieces and labels up (the
     /// program's not to count it in setHudShown). False with no UI running.
     bool overMap() const noexcept;
+    /// (API 5) The item the game would name under the mouse now (its net code, 0: none) and where
+    /// ("inventory", "weapon", "ground"): the next frame() asks the UI's itemTip hook about it.
+    void setItemHover(std::uint16_t item, std::string_view where);
+    /// (API 5) Whether the UI has an itemTip hook it hasn't been asked about `item` with yet (the
+    /// game's name for it best held back a frame, till it has).
+    bool itemTipPending(std::uint16_t item) const noexcept;
+    /// (API 5) The tooltip the itemTip hook gave for `item` in the last frame (null: none, so the
+    /// game's own name stays).
+    const std::vector<UiTooltipLine>* itemTip(std::uint16_t item) const noexcept;
     /// How far the view reaches past the 640 x 480 on each side, in its units (the program's fit:
     /// 0, 0 until told, as in a 4:3 view); anchored windows (UiWindow::anchorX/Y) moved by them.
     void setViewMargins(float x, float y);

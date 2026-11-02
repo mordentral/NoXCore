@@ -1,7 +1,8 @@
 --!strict
--- The vendor (design 4.4) at the town's anvil: it sells potions (always) and a few pieces of gear
--- rolled at the area level, buys what a player carries for gold by its rarity and level, and for
--- gold rerolls a magic or rare piece's modifiers (and a rare's affixes) at its level.
+-- The vendor (design 4.4) at the town's anvil: it sells potions and quivers (always) and a few
+-- pieces of gear rolled at the area level, buys what a player carries for gold by its rarity and
+-- level, for gold rerolls a magic or rare piece's modifiers (and a rare's affixes) at its level,
+-- and repairs what a player carries or wears at the game's own price.
 --
 -- Its stock is each player's own (by decision, for a party): each player sees and buys from a
 -- stock of their own. A stock is rolled anew as each area is entered and again when an act is
@@ -28,15 +29,19 @@ local restocks = 0
 local stockLevel = 1
 local fresh: { any }? = nil
 
+-- The potions' and supplies' own prices, by type (a plain one's: a magic or rare quiver is gear).
 local potionPrice: { [string]: number } = {}
 for _, p in data.potions do
+	potionPrice[p.type] = p.price
+end
+for _, p in data.supplies do
 	potionPrice[p.type] = p.price
 end
 
 -- A piece's price at the vendor (what it sells it for).
 function vendor.price(rec: any): number
 	local p = potionPrice[rec.type]
-	if p then
+	if p and (rec.rarity or "normal") == "normal" then
 		return p
 	end
 	local pr = data.prices
@@ -55,11 +60,15 @@ function vendor.rerollPrice(rec: any): number
 	return math.max(1, math.floor(vendor.price(rec) * data.prices.reroll))
 end
 
--- One stock at the area level now: { { rec | type (a potion), price, potion } }.
+-- One stock at the area level now: { { rec | type (a potion or a supply), price, potion | supply } }:
+-- the potions and the supplies (always there, never sold out), then the gear rolled.
 local function rollStock(): { any }
 	local stock = {}
 	for _, p in data.potions do
 		table.insert(stock, { type = p.type, price = p.price, potion = true })
+	end
+	for _, p in data.supplies do
+		table.insert(stock, { type = p.type, price = p.price, supply = true })
 	end
 	local all: { any } = {}
 	local total = 0
@@ -114,12 +123,23 @@ function vendor.restock(level: number)
 	end
 end
 
+-- A piece put at the end of a hero's stock at its price (for testing: "dd vendor stock"); its
+-- index.
+function vendor.addStock(h: any, rec: any): number
+	local stock = vendor.stockOf(h)
+	table.insert(stock, { rec = rec, price = vendor.price(rec) })
+	if windows.isOpen(h, "vendor") then
+		vendor.view(h)
+	end
+	return #stock
+end
+
 -- The stock shown.
 function vendor.view(h: any)
 	local stock = vendor.stockOf(h)
 	local list = {}
 	for i, s in stock do
-		local e = if s.potion then windows.entry({ type = s.type, rarity = "normal" }) else windows.entry(s.rec)
+		local e = if s.potion or s.supply then windows.entry(h, { type = s.type, rarity = "normal" }) else windows.entry(h, s.rec)
 		e.i = i
 		e.p = s.price
 		table.insert(list, e)
@@ -158,12 +178,15 @@ function vendor.buy(h: any, i: number): (boolean, string?)
 	if gold < s.price then
 		return false, "not enough gold"
 	end
-	local id = if s.potion then items.give(h.unit, { type = s.type, rarity = "normal" }, false) else items.give(h.unit, s.rec, false)
+	-- (one its class may not use by the pickup, as any class may pick anything up; refused, no gold
+	-- is taken and the piece stays for sale)
+	local always = s.potion or s.supply
+	local id, why = items.hand(h.unit, if always then { type = s.type, rarity = "normal" } else s.rec)
 	if not id then
-		return false, "it couldn't be given"
+		return false, why
 	end
 	nox.setGold(h.unit, gold - s.price, true)
-	if not s.potion then
+	if not always then
 		table.remove(stock, math.floor(i))
 	end
 	after(h, "vendor")
@@ -224,13 +247,129 @@ function vendor.reroll(h: any, item: number): (boolean, string?)
 	if fresh.rarity ~= rec.rarity then
 		return false, "that piece can't be rerolled"
 	end
-	local id = items.give(h.unit, fresh, false)
+	local id, why = items.hand(h.unit, fresh)
 	if not id then
-		return false, "it couldn't be given"
+		return false, why
 	end
 	items.forget(item)
 	nox.delete(item)
 	nox.setGold(h.unit, gold - price, true)
+	after(h, "vendor")
+	return true, nil
+end
+
+-- ---- Repairs (by decision 2026-11-01): the game's own shop repair (nox.repair: durability, and a
+-- staff's charges, to their most), at the game's own price (nox.repairCost), paid in gold first.
+
+-- The hero's pieces that need a repair, worn and carried, in its inventory's order: { { id, rec,
+-- facts, cost } }.
+function vendor.damaged(h: any): { any }
+	local out = {}
+	if not nox.present(h.unit) then
+		return out
+	end
+	for _, it in nox.inventory(h.unit) do
+		local o = nox.object(it.id)
+		local f = nox.item(it.id)
+		if o and not o.pendingDelete and f then
+			local cost = nox.repairCost(it.id)
+			if cost and cost > 0 then
+				local rec = items.recordOf(it.id)
+				if rec then
+					rec.worn = nil
+					table.insert(out, { id = it.id, rec = rec, facts = f, cost = cost })
+				end
+			end
+		end
+	end
+	return out
+end
+
+-- A tooltip's lines with its repair price ("pRepair: N gold") after its durability and charges.
+function vendor.withRepair(lines: { string }, cost: number): { string }
+	local at = #lines + 1
+	for i, l in lines do
+		local tag = string.sub(l, 1, 1)
+		if tag == "y" or tag == "x" then
+			at = i
+			break
+		end
+	end
+	table.insert(lines, at, "pRepair: " .. tostring(cost) .. " gold")
+	return lines
+end
+
+-- The pieces needing a repair to the vendor's window ({ i = id, t, r, tl, c = cost } each, worn
+-- ones too), and their summed cost in the header; sent with the carried list while the window is
+-- open.
+function vendor.sendRepairs(h: any)
+	local list = {}
+	local total = 0
+	for _, d in vendor.damaged(h) do
+		local e = windows.entry(h, d.rec, d.facts)
+		e.tl = vendor.withRepair(e.tl, d.cost)
+		e.i = d.id
+		e.c = d.cost
+		e.w = if d.facts.worn then true else nil
+		total += d.cost
+		table.insert(list, e)
+	end
+	hud.parts(h.peer, "repairs", windows.serial(), list, { total = total })
+end
+
+-- A piece the hero carries or wears repaired for its price; whether it was, else why.
+function vendor.repair(h: any, item: number): (boolean, string?)
+	local ok, why = ready(h)
+	if not ok then
+		return false, why
+	end
+	local f = nox.item(item)
+	local o = nox.object(item)
+	if not f or not o or o.pendingDelete or f.holder ~= h.unit then
+		return false, "you don't carry that"
+	end
+	local cost = nox.repairCost(item)
+	if not cost then
+		return false, "it needs no repair"
+	end
+	local gold = nox.gold(h.unit)
+	if gold < cost then
+		return false, "not enough gold"
+	end
+	if not nox.repair(item) then
+		return false, "it needs no repair"
+	end
+	nox.setGold(h.unit, gold - cost, true)
+	after(h, "vendor")
+	return true, nil
+end
+
+-- Every piece the hero carries or wears that needs one repaired, for their summed price (refused
+-- whole when the gold is short; only what was repaired is paid); whether any was, else why.
+function vendor.repairAll(h: any): (boolean, string?)
+	local ok, why = ready(h)
+	if not ok then
+		return false, why
+	end
+	local list = vendor.damaged(h)
+	if #list == 0 then
+		return false, "nothing needs a repair"
+	end
+	local total = 0
+	for _, d in list do
+		total += d.cost
+	end
+	local gold = nox.gold(h.unit)
+	if gold < total then
+		return false, "not enough gold (" .. tostring(total) .. ")"
+	end
+	local paid = 0
+	for _, d in list do
+		if nox.repair(d.id) then
+			paid += d.cost
+		end
+	end
+	nox.setGold(h.unit, gold - paid, true)
 	after(h, "vendor")
 	return true, nil
 end
@@ -244,7 +383,7 @@ function vendor.touched(unit: number)
 end
 
 -- A message from the vendor's window: { op = "buy", index } | { op = "sell", item } |
--- { op = "reroll", item }.
+-- { op = "reroll", item } | { op = "repair", item } | { op = "repairAll" }.
 function vendor.message(h: any, v: any)
 	if not windows.isOpen(h, "vendor") then
 		return
@@ -257,6 +396,10 @@ function vendor.message(h: any, v: any)
 		ok, why = vendor.sell(h, item)
 	elseif v.op == "reroll" and item then
 		ok, why = vendor.reroll(h, item)
+	elseif v.op == "repair" and item then
+		ok, why = vendor.repair(h, item)
+	elseif v.op == "repairAll" then
+		ok, why = vendor.repairAll(h)
 	end
 	if not ok then
 		windows.note(h, "vendor", tostring(why))
@@ -267,8 +410,8 @@ end
 function vendor.lines(h: any): { string }
 	local out = { "level " .. stockLevel }
 	for i, s in vendor.stockOf(h) do
-		if s.potion then
-			table.insert(out, tostring(i) .. " " .. tostring(s.type) .. " potion " .. tostring(s.price))
+		if s.potion or s.supply then
+			table.insert(out, tostring(i) .. " " .. tostring(s.type) .. (if s.potion then " potion " else " supply ") .. tostring(s.price))
 		else
 			table.insert(out, tostring(i) .. " " .. tostring(s.rec.type) .. " " .. tostring(s.rec.rarity) .. " " .. tostring(s.price))
 		end
@@ -276,6 +419,7 @@ function vendor.lines(h: any): { string }
 	return out
 end
 
-windows.register("vendor", { station = "vendor", view = vendor.view, price = vendor.sellPrice, reroll = vendor.rerollPrice })
+windows.register("vendor", { station = "vendor", view = vendor.view, price = vendor.sellPrice, reroll = vendor.rerollPrice,
+	repairs = vendor.sendRepairs, repairCost = nox.repairCost, withRepair = vendor.withRepair })
 
 return vendor

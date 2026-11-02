@@ -2799,7 +2799,7 @@ bool Monsters::strike(ServerObject& o)
                fight.applyPoison(t, def.poisonStrength, def.poisonMax);
     };
     const auto blow = [&](ServerObject& t) {
-        fight.damage(t, &o, o.extent, def.meleeDamage, def.meleeDamageType);
+        fight.damage(t, &o, o.extent, def.meleeDamage, def.meleeDamageType, HitCause::Blow);
     };
     const auto knock = [&](ServerObject& t) {
         if (0.0f < def.meleeImpact) {

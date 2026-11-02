@@ -8,6 +8,7 @@
 #include "noxcore/server/enchant.hpp"
 #include "noxcore/server/items.hpp"
 #include "noxcore/server/item_effects.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/physics.hpp"
@@ -775,6 +776,24 @@ ServerObject* Missiles::shooterPlayer(const ServerObject& m)
 // By the missile's COLLIDE function's name.
 void Missiles::collide(ServerObject& m, ServerObject* other, float nx, float ny)
 {
+    // (noxcpp: a mode watching hits on what it meets may turn it first, as a reflective shield
+    // turns a missile in PlayerDamage; then nothing of its COLLIDE happens. Not its own owner's.)
+    if (other && world.modeHooks && (other->modeEvents & ModeEvent::Damage) && other->extent != m.owner &&
+        !(other->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+        Fight fight{world, rng, frame, &things, modifiers};
+        const bool front = facingSides(other->x, other->y, other->direction, m.x, m.y) & 1;
+        if (world.modeHooks->reflect(fight, *other, m, front)) {
+            reflectMissile(m, *other);
+            if (m.subclasses & 2u) {
+                turnSpellMissile(world, m, *other, frame);
+            }
+            if (!(m.subclasses & 0x40u)) {
+                setOwner(world, other, m); // (unitClearOwner / unitSetOwner)
+            }
+            playSound(world, 0x7A, *other);
+            return;
+        }
+    }
     const NameId f = m.collideFn.id(); // (by the name's id)
     switch (f) {
     case NameId::ArrowCollide:
@@ -966,7 +985,7 @@ void Missiles::sparkExplosion(ServerObject& m, ServerObject* other)
 }
 
 void Missiles::damageAround(float x, float y, float reach, float full, int damage, int type, ServerObject* source, const ServerObject* except,
-                            bool spareSource)
+                            bool spareSource, HitCause cause)
 {
     // The units in the square of the larger of reach and full about it (getUnitsInRect, by the
     // grid), each struck as it's found (which asks nothing of its health: DefaultDamage
@@ -991,7 +1010,7 @@ void Missiles::damageAround(float x, float y, float reach, float full, int damag
         // (Within the larger of the two, its harm falling off past `full` to it.)
         if (d <= X87(m) && world.traceRay(x, y, o.x, o.y, Trace::Doors)) {
             const int dealt = full <= df ? util::ftol((X87(1.0f) - (X87(df) - full) / (X87(m) - full)) * X87::fromDouble(damage)) : damage;
-            fight.damage(o, source, 0, dealt, type);
+            fight.damage(o, source, 0, dealt, type, cause);
         }
     });
     // Then the walls in the box about it (mapDamageToWalls: its cells, the

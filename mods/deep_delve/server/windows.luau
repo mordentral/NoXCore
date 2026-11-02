@@ -5,7 +5,8 @@
 -- (stash.luau, vendor.luau, treeview.luau, sheet.luau) registers how it's shown.
 --
 -- The stash and the vendor both show what the player carries (not what it wears): one list,
--- with the vendor's price for each while the vendor is open.
+-- with the vendor's price for each while the vendor is open (and its repair's, with the list of the
+-- pieces worn or carried that need one).
 --
 -- One beat runs while anyone has a window open: a station window closes when its player walks
 -- away from the station, a changed inventory is shown again, and an open sheet or tree is kept
@@ -14,13 +15,15 @@
 local hero = require("hero")
 local hud = require("hud")
 local items = require("items")
+local tips = require("tips")
 local town = require("town")
 local vendorData = require("data/vendor")
 
 local windows = {}
 
 -- A window's module: { station = the town spot it needs (nil: none), view = fn(h) sends it,
--- beat = fn(h) (optional) keeps it current, price and reroll = fn(rec) (the vendor's) }.
+-- beat = fn(h) (optional) keeps it current, price and reroll = fn(rec), repairCost = fn(id),
+-- withRepair = fn(lines, cost) and repairs = fn(h) (the vendor's) }.
 local kinds: { [string]: any } = {}
 local serial = 0
 local beat: number? = nil
@@ -57,7 +60,8 @@ function windows.note(h: any, window: string, text: string)
 	hud.send(h.peer, "note:" .. window, { kind = "note", window = window, text = text })
 end
 
--- What the hero carries, not worn and not going: { { id, rec } } in its inventory's order.
+-- What the hero carries, not worn and not going: { { id, rec, facts } } in its inventory's order
+-- (facts: nox.item's).
 function windows.carried(h: any): { any }
 	local out = {}
 	if not nox.present(h.unit) then
@@ -70,23 +74,17 @@ function windows.carried(h: any): { any }
 			local rec = items.recordOf(it.id)
 			if rec then
 				rec.worn = nil
-				table.insert(out, { id = it.id, rec = rec })
+				table.insert(out, { id = it.id, rec = rec, facts = f })
 			end
 		end
 	end
 	return out
 end
 
--- An item's line for a window: { t = type, r = rarity, d = what it is (at most 160 letters) }.
-function windows.entry(rec: any): any
-	local d = items.describe(rec)
-	if rec.level then
-		d ..= ", level " .. tostring(rec.level)
-	end
-	if #d > 160 then
-		d = string.sub(d, 1, 157) .. "..."
-	end
-	return { t = rec.type, r = rec.rarity or "normal", d = d }
+-- An item's entry for a window, shown to hero `h`: { t = type, r = rarity, tl = its tooltip's
+-- lines (tips.luau) }; `facts` a live item's (nox.item's), nil for a record (stashed, stocked).
+function windows.entry(h: any, rec: any, facts: any?): any
+	return { t = rec.type, r = rec.rarity or "normal", tl = tips.lines(rec, facts, h) }
 end
 
 -- The inventory's ids as one string (whether it changed since it was shown).
@@ -106,18 +104,27 @@ function windows.sendCarried(h: any)
 	local list = {}
 	local priced = windows.isOpen(h, "vendor") and kinds.vendor
 	for _, c in windows.carried(h) do
-		local e = windows.entry(c.rec)
+		local e = windows.entry(h, c.rec, c.facts)
 		e.i = c.id
 		if priced then
 			e.p = kinds.vendor.price(c.rec)
 			if c.rec.rarity == "magic" or c.rec.rarity == "rare" then
 				e.q = kinds.vendor.reroll(c.rec)
 			end
+			-- (its repair's price, when it needs one: a line of its tooltip)
+			local cost = kinds.vendor.repairCost(c.id)
+			if cost then
+				e.tl = kinds.vendor.withRepair(e.tl, cost)
+			end
 		end
 		table.insert(list, e)
 	end
 	h.shownCarried = signature(h)
 	hud.parts(h.peer, "carried", windows.serial(), list, { gold = if nox.present(h.unit) then nox.gold(h.unit) else 0 })
+	-- (the vendor's: the pieces worn or carried that need a repair)
+	if priced then
+		kinds.vendor.repairs(h)
+	end
 end
 
 local function anyOpen(): boolean

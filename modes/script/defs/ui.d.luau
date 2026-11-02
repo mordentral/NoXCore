@@ -33,7 +33,7 @@ declare nox: {
     textWidth: (text: string, size: number?) -> number,
     --- Draws a line from (x1, y1) to (x2, y2) in the window being drawn, width 1-8 (UI API 3).
     line: (x1: number, y1: number, x2: number, y2: number, colour: NoxColour?, width: number?) -> (),
-    --- Shows { { text, colour? }, ... } (16 lines, 128 bytes each) at the mouse over everything this frame, kept on the screen (inside ui.draw; UI API 3).
+    --- Shows { { text, colour? }, ... } (16 lines, 128 bytes each) at the mouse over everything this frame, kept on the screen (inside ui.draw, UI API 3; inside ui.itemTip, UI API 5: the item's, in the game's name's place).
     tooltip: (lines: { NoxTooltipLine }) -> (),
     --- Draws the game's own icon for a spell ("SPELL_FIREBALL") or a warrior's ability ("ABILITY_WARCRY") at its top left, its size or w x h; an unknown name draws nothing (UI API 4).
     spellIcon: (name: string, x: number, y: number, w: number?, h: number?) -> (),
@@ -88,5 +88,6 @@ declare nox: {
 --- @hook mouseUp(window, x, y, button) | (UI API 3) A button let go over a window (pressed in one of the UI's windows), in its units.
 --- @hook wheel(window, x, y, steps) | (UI API 3) The wheel over a window: steps > 0 up, < 0 down (the UI's, taken or not).
 --- @hook labelClick(object) | (UI API 5) A left click on a label set with click = true (the topmost where labels overlap): its object's net code. The click never reaches the game.
+--- @hook itemTip(code, where) | (UI API 5) Each frame the game would name an item under the mouse: its net code and "inventory", "weapon" (the weapon panel) or "ground"; nox.tooltip in it shows those lines in the name's place, none keeps the game's name.
 --- @hook onMessage(value) | A value the server script sent (nox.send).
 --- @hook onView(view) | A view as data ({ kind = "say" | "choice" | "table", ... }): true draws it (else it's shown as text).

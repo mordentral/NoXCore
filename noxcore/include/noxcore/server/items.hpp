@@ -39,6 +39,10 @@ namespace nox::server {
 /// its enchantment slots' ReadinessEffect; 0 for none, or with no modifier.bin).
 int readiness(const ServerObject& item, const things::ModifierDb* modifiers);
 
+/// itemClassUseMask's answer for one class (0 warrior, 1 wizard, 2 conjurer) and an item, as
+/// Items::classMay asks it of a single-class player (a multiclass player may use anything).
+bool classMayUse(std::uint8_t classId, const ServerObject& item, const things::ModifierDb* modifiers);
+
 /// delayedDeleteObject: once; a held thing out of its holder's inventory at once
 /// (Obj_RemoveFromInventory: taken off, MSG_REPORT_DROP to a player holder); the lasting spells it
 /// cast cancelled (playerCancelSpells); then gone at the frame's end

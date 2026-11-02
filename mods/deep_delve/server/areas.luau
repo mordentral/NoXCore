@@ -29,7 +29,8 @@
 --
 -- An area is entered once both its map has loaded and its spots (the generator's result) are in:
 -- its stations, pentagrams and exits set to work (the pads' rings drawn under them), the vendor's
--- stock rolled at its level, its monsters (and boss) put in, its weather set (an outdoor area's,
+-- stock rolled at its level, its monsters (and boss) put in, its chests watched and a secret room's
+-- guards put in (secrets.luau), its weather set (an outdoor area's,
 -- rolled from its biome's list as its map was built, so each visit may differ and a visit keeps
 -- its own; none again on coming back indoors), its players set up.
 
@@ -46,6 +47,7 @@ local items = require("items")
 local labels = require("labels")
 local monsters = require("monsters")
 local portal = require("portal")
+local secrets = require("secrets")
 local stash = require("stash")
 local summons = require("summons")
 local town = require("town")
@@ -144,8 +146,9 @@ function areas.info(place: number): any
 		arena = if lair then spec.arena else nil,
 		-- (a lair with an act after it: its boss's death opens the gate on)
 		gate = lair and acts[p.act + 1] ~= nil,
-		-- (its biome's weathers, rolled as its map is built: none for a lair or indoors)
-		skies = if lair then nil else (acts.skies :: any)[spec.biome],
+		-- (its biome's weathers, or the list it names (`sky`), rolled as its map is built: none for a
+		-- lair or indoors)
+		skies = if lair then nil else (acts.skies :: any)[spec.sky or spec.biome],
 		segments = if lair then a.lair.segments else math.min(a.segments.most, math.floor(a.segments.base + a.segments.perLevel * level)),
 		packs = packs,
 		endRadius = if lair then a.lair.endRadius else a.endRadius,
@@ -197,6 +200,8 @@ function areas.request(place: number, tag: string, ahead: boolean, retry: number
 			lair = info.lair,
 			arena = info.arena,
 			gate = info.gate,
+			-- (its secret room's and side rooms' chests' numbers: none in a lair)
+			secrets = secrets.params(info),
 		},
 	}
 end
@@ -421,6 +426,8 @@ local function enter()
 	end
 	setWeather(state.sky[state.tag])
 	monsters.populate(spots, info)
+	-- (its chests watched, its secret room's guards in)
+	secrets.enter(spots, info, state.play)
 	expeditions.enter(spots, info)
 	if info.lair then
 		boss.enter(spots, info)
@@ -464,6 +471,7 @@ function areas.mapLoaded(name: string)
 	windows.reset()
 	votes.reset()
 	expeditions.reset()
+	secrets.reset()
 	hero.mapChanging()
 	state.entered = false
 	local tag = nil

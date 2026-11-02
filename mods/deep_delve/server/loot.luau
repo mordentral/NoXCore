@@ -3,9 +3,12 @@
 -- ground until it's picked up.
 --
 -- Rarity rules: normal gear has no modifiers; magic one or two of the item's four modifier slots;
--- rare all of the slots the item takes, plus one or two of Deep Delve's own affixes. A modifier is
--- only ever one that fits the slot of that item (nox.modifierFits: the game's own rule), and no
--- dearer than the area level allows (data/loot.luau's worth).
+-- rare all of the slots the item takes, plus one or two of Deep Delve's own affixes (only those its
+-- kind may carry: affixes.luau). A modifier is
+-- only ever one that fits the slot of that item (nox.modifierFits: the game's own rule), does
+-- something (loot.does: an effect the engine runs) and is no dearer than the area level allows
+-- (data/loot.luau's worth). Rarely a loot roll's gear is a unique or a set piece instead, and a
+-- champion and an act boss roll for one of each besides (uniques.luau, data/uniques.luau).
 
 --
 -- Every item the mod puts on the ground (gear, gold, potions) is kept in one index while it lies
@@ -14,8 +17,10 @@
 -- (scale.luau's loot factor).
 
 local data = require("data/loot")
+local affixes = require("affixes")
 local items = require("items")
 local scale = require("scale")
+local uniques = require("uniques")
 
 local loot = {}
 
@@ -38,7 +43,8 @@ local function index(id: number, rec: any, rarity: string, x: number, y: number,
 		return
 	end
 	local words = (data.words :: any)[rarity] or ""
-	local text = if rarity == "gold" then "Gold" else ((if words ~= "" then words .. " " else "") .. spaced(rec.type))
+	-- (a unique or a set piece by its own name)
+	local text = if rarity == "gold" then "Gold" else (uniques.nameOf(rec) or ((if words ~= "" then words .. " " else "") .. spaced(rec.type)))
 	ground[id] = { code = o.netCode, text = text, rarity = rarity, kind = kind, x = x, y = y }
 	byCode[o.netCode] = id
 end
@@ -93,6 +99,27 @@ end
 local pools: { [string]: any } = {}
 local sectionOf: { [string]: string } = { effectiveness = "effectiveness", material = "material", primary = "enchantment", secondary = "enchantment" }
 
+-- Whether a modifier does anything: one of its effects is one the engine runs (data/loot's
+-- effects). Read once a modifier.
+local doesCache: { [string]: boolean } = {}
+
+function loot.does(name: string): boolean
+	local known = doesCache[name]
+	if known ~= nil then
+		return known
+	end
+	local m = nox.modifier(name)
+	local yes = false
+	for fn in (if m then m.effects else {}) :: { [string]: number } do
+		if (data.effects :: any)[fn] then
+			yes = true
+			break
+		end
+	end
+	doesCache[name] = yes
+	return yes
+end
+
 local function poolFor(thingType: string): any
 	local pool = pools[thingType]
 	if pool then
@@ -102,7 +129,8 @@ local function poolFor(thingType: string): any
 	for _, slot in items.SLOTS do
 		local fits = {}
 		for _, name in nox.modifiers(sectionOf[slot]) do
-			if nox.modifierFits(thingType, slot, name) then
+			-- (only one that fits the slot, as the game's rule has it, and does something)
+			if nox.modifierFits(thingType, slot, name) and loot.does(name) then
 				local m = nox.modifier(name)
 				table.insert(fits, { name = name, worth = if m then m.worth else 0 })
 			end
@@ -111,6 +139,57 @@ local function poolFor(thingType: string): any
 	end
 	pools[thingType] = pool
 	return pool
+end
+
+-- Each modifier of a worth that does nothing (loot.does), as "dd modifiers" lists them: "NAME
+-- worth W fits F drops N" (F: the gear types it fits a slot of by the game's rule; N: those it may
+-- drop on, does and worth allowing: 0 for every one listed), sorted; with `all`, every modifier of
+-- the three sections, "does" or "nothing" after its line.
+function loot.modifierLines(all: boolean?): { string }
+	local out = {}
+	for _, section in { "effectiveness", "material", "enchantment" } do
+		for _, name in nox.modifiers(section) do
+			local m = nox.modifier(name)
+			local worth = if m then m.worth else 0
+			local does = loot.does(name)
+			if all or (not does and worth > 0) then
+				local fits, drops = 0, 0
+				for _, g in data.gear do
+					local fit = false
+					for _, slot in items.SLOTS do
+						if sectionOf[slot] == section and nox.modifierFits(g.type, slot, name) then
+							fit = true
+						end
+					end
+					if fit then
+						fits += 1
+						if does and worth > 0 and worth <= data.worth.most then
+							drops += 1
+						end
+					end
+				end
+				table.insert(out, string.format("%s worth %d fits %d drops %d", name, worth, fits, drops) .. (if all then (if does then " does" else " nothing") else ""))
+			end
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+-- What fits each slot of a type by the game's rule, as "dd modifiers TYPE" lists it: "SLOT NAME
+-- worth W does|nothing", in modifier.bin's order.
+function loot.fitLines(thingType: string): { string }
+	local out = {}
+	for _, slot in items.SLOTS do
+		for _, name in nox.modifiers(sectionOf[slot]) do
+			if nox.modifierFits(thingType, slot, name) then
+				local m = nox.modifier(name)
+				table.insert(out, string.format("%s %s worth %d %s", slot, name, if m then m.worth else 0,
+					if loot.does(name) then "does" else "nothing"))
+			end
+		end
+	end
+	return out
 end
 
 -- A modifier for the slot at the area level: one of those the level's worth allows, else the
@@ -162,7 +241,21 @@ local function affixValue(def: any, level: number): number
 	return math.floor(lo + nox.random() * (hi - lo) + 0.5)
 end
 
--- A gear record of a type and rarity at the area level: its modifiers by the rarity's rule.
+-- `n` of Deep Delve's own affixes for an item type, each a different one of those its kind may
+-- carry (affixes.allowed: a weapon's, armour's, or any piece's), at the area level.
+local function rollAffixes(thingType: string, n: number, level: number): { any }
+	local defs = table.clone(affixes.allowed(thingType))
+	local out = {}
+	for _ = 1, math.min(#defs, n) do
+		local def: any = table.remove(defs, nox.random(#defs))
+		table.insert(out, { id = def.id, value = affixValue(def, level) })
+	end
+	return out
+end
+
+-- A gear record of a type and rarity at the area level: its modifiers by the rarity's rule. An
+-- item no modifier of the game's fits at all (the staffs) carries its rarity in Deep
+-- Delve's own affixes alone (by decision 2026-11-01): one for magic, two for a rare.
 function loot.makeGear(thingType: string, rarity: string, level: number): any
 	local rec: any = { type = thingType, rarity = rarity, level = level }
 	if rarity == "normal" then
@@ -171,9 +264,17 @@ function loot.makeGear(thingType: string, rarity: string, level: number): any
 	local pool = poolFor(thingType)
 	local open = {}
 	for _, slot in items.SLOTS do
-		if #pool[slot] > 0 then
-			table.insert(open, slot)
+		-- (a slot with a modifier that may drop: one of a worth, and not past the most)
+		for _, m in pool[slot] do
+			if m.worth > 0 and m.worth <= data.worth.most then
+				table.insert(open, slot)
+				break
+			end
 		end
+	end
+	if #open == 0 then
+		rec.affixes = rollAffixes(thingType, if rarity == "rare" then 2 else 1, level)
+		return rec
 	end
 	local taken = {}
 	local function fill(slot: string)
@@ -196,12 +297,7 @@ function loot.makeGear(thingType: string, rarity: string, level: number): any
 		for _, slot in open do
 			fill(slot)
 		end
-		local defs = table.clone(data.affixes)
-		rec.affixes = {}
-		for _ = 1, math.min(#defs, nox.random(2)) do
-			local def: any = table.remove(defs, nox.random(#defs))
-			table.insert(rec.affixes, { id = def.id, value = affixValue(def, level) })
-		end
+		rec.affixes = rollAffixes(thingType, nox.random(2), level)
 	end
 	-- An item that takes no modifier at all stays normal (its affixes with it).
 	if not (rec.effectiveness or rec.material or rec.primary or rec.secondary) then
@@ -226,6 +322,11 @@ function loot.rollOne(level: number, better: number?): any
 	end
 	roll -= r.potion
 	if roll < r.gear * (1 + (better or 0)) then
+		-- (rarely a unique or a set piece in its place: uniques.luau)
+		local special = uniques.rollGear(level, better)
+		if special then
+			return { kind = "gear", record = special }
+		end
 		local all, total = eligible(data.gear, level)
 		local g = weighted(all, total)
 		return { kind = "gear", record = loot.makeGear(g.type, loot.rollRarity(level, better), level) }
@@ -282,7 +383,7 @@ function loot.place(rec: any, x: number, y: number): number?
 		nox.log("deep_delve: loot not made: " .. tostring(rec.type) .. " (" .. tostring(id) .. ")")
 		return nil
 	end
-	items.setMeta(id, { rarity = rec.rarity or "normal", affixes = rec.affixes, level = rec.level })
+	items.setMeta(id, items.metaOf(rec))
 	showOnGround(id, rec.rarity or "normal", x, y)
 	index(id, rec, rec.rarity or "normal", x, y, "gear")
 	return id
@@ -318,10 +419,27 @@ function loot.drop(x: number, y: number, level: number, rolls: number, better: n
 	return made
 end
 
+-- A champion's or an act boss's own rolls for a unique and a set piece (uniques.rollSpecial;
+-- `tier` "champion" or "boss", `boss` the boss's id: its favoured uniques), put round (x, y); the
+-- ids made.
+function loot.dropSpecial(x: number, y: number, level: number, tier: string, boss: string?): { number }
+	local made = {}
+	for i, rec in uniques.rollSpecial(level, tier, boss) do
+		local a = i * 2.1 + 1
+		local px, py = nox.clearPointNear(x + 26 * math.cos(a), y + 26 * math.sin(a), 30)
+		local id = loot.place(rec, px, py)
+		if id then
+			table.insert(made, id)
+		end
+	end
+	return made
+end
+
 -- An act boss's drop at (x, y): d.rare pieces of gear that are rare (or the item's best: one that
 -- takes no modifier can't be), d.levelUp levels above the area's, then d.rolls loot rolls with
--- d.better odds; the ids made.
-function loot.bossDrop(x: number, y: number, level: number, d: any): { number }
+-- d.better odds, then its own rolls for a unique and a set piece at the rare pieces' level (`boss`
+-- its id: its favoured uniques); the ids made.
+function loot.bossDrop(x: number, y: number, level: number, d: any, boss: string?): { number }
 	local made = {}
 	local all, total = eligible(data.gear, level + d.levelUp)
 	for i = 1, d.rare do
@@ -340,6 +458,9 @@ function loot.bossDrop(x: number, y: number, level: number, d: any): { number }
 		end
 	end
 	for _, id in loot.drop(x, y, level, loot.rollsFor(d.rolls), d.better) do
+		table.insert(made, id)
+	end
+	for _, id in loot.dropSpecial(x, y, level + d.levelUp, "boss", boss) do
 		table.insert(made, id)
 	end
 	return made

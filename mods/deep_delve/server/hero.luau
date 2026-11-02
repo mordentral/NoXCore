@@ -14,7 +14,11 @@
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
 --          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), manaOnKill,
 --          spellCost, summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a
---          hit's thing type: a spell's own) };
+--          hit's thing type: a spell's own), frost, dread, grip, reflect, ward, resilience (%:
+--          the worn affixes', affixes.luau), weapon (the worn weapon's id), ammo (its shot's type),
+--          powers, sets, pieces, setSig (the worn uniques' powers and the worn sets: uniques.worn;
+--          their active bonuses' stats are in the numbers above) };
+--   powerState its worn powers' own state (uniquepowers.luau);
 --   regen  its passive regeneration's timer and state (regen.luau);
 --   open   its windows open (windows.luau); sheetOf the party member whose sheet its sheet window
 --          shows (nil: its own; sheet.luau); padAt the frame it last touched the town's
@@ -45,6 +49,8 @@ local book = require("book")
 local team = require("team")
 local regen = require("regen")
 local records = require("records")
+local affixes = require("affixes")
+local uniques = require("uniques")
 local classes = require("data/classes")
 local numbers = require("data/numbers")
 local treeData = require("data/tree")
@@ -117,26 +123,42 @@ local function bonusOf(unit: number, rec: any)
 		summonHealth = t.summonHealth,
 		own = t.own,
 	}
+	-- (each worn piece's affixes added to their stats, each up to its most; the worn weapon noted:
+	-- frost, dread and grip go with its hits alone, affixes.luau; the worn uniques' powers and the
+	-- worn sets' bonuses, uniques.luau)
+	local special = {}
 	for _, it in nox.inventory(unit) do
-		local m = items.meta(it.id)
-		if m and m.affixes then
-			local facts = nox.item(it.id)
-			if facts and facts.worn then
-				for _, a in m.affixes do
-					if a.id == "damage" then
-						b.damage += a.value
-					elseif a.id == "health" then
-						b.health += a.value
-					elseif a.id == "mana" then
-						b.mana += a.value
-					elseif a.id == "manaRegen" then
-						b.manaRegen += a.value
-					end
-				end
+		local facts = nox.item(it.id)
+		if facts and facts.worn then
+			local m = items.meta(it.id)
+			if m and m.affixes then
+				affixes.add(b, m.affixes)
+			end
+			if m and (m.unique or m.set) then
+				table.insert(special, m)
+			end
+			if affixes.kindOf(facts.type) == "weapon" then
+				affixes.noteWeapon(b, it.id, facts.type)
 			end
 		end
 	end
+	uniques.worn(b, special)
+	affixes.cap(b)
 	return b
+end
+
+-- Called with the hero each time its bonus is worked out again (its set-up, an equip, its tree):
+-- uniquepowers.luau's, which starts or stops what its worn powers need.
+local bonusHooks: { (any) -> () } = {}
+
+function hero.onBonus(fn: (any) -> ())
+	table.insert(bonusHooks, fn)
+end
+
+local function bonusChanged(h: any)
+	for _, fn in bonusHooks do
+		fn(h)
+	end
 end
 
 -- The most health, most mana and strength a hero has from its level, worn affixes and tree:
@@ -203,7 +225,8 @@ end
 
 -- ---- Records and the unit
 
--- The unit's state into the record: its gear (worn and carried), its gold, the time played.
+-- The unit's state into the record: its gear (worn and carried, with any piece its set-up held
+-- back), its gold, the time played.
 function hero.snapshot(h: any)
 	if not h.ready or not nox.present(h.unit) then
 		return
@@ -221,6 +244,10 @@ function hero.snapshot(h: any)
 				table.insert(inventory, rec)
 			end
 		end
+	end
+	-- (a piece its set-up couldn't hand over stays the record's, carried)
+	for _, rec in h.heldBack or {} do
+		table.insert(inventory, rec)
 	end
 	local r = h.record
 	r.equipment, r.inventory = equipment, inventory
@@ -280,12 +307,28 @@ function hero.setUp(h: any, at: any, keep: boolean?)
 			items.forget(it.id)
 			nox.delete(it.id)
 		end
+		-- (each piece given back as the game gives its gear; one its class may not use, which the game
+		-- won't give, made at its feet and taken into its inventory (items.hand). One that still can't be
+		-- made is held back: kept in the record as carried (hero.snapshot), tried again at the next
+		-- set-up, never dropped)
+		local heldBack = {}
 		for _, rec in h.record.equipment do
-			items.give(h.unit, rec, true)
+			local id = items.hand(h.unit, rec, true)
+			if id then
+				nox.equip(h.unit, id) -- (false and why when the class can't: then it's carried)
+			else
+				table.insert(heldBack, rec)
+			end
 		end
 		for _, rec in h.record.inventory do
-			items.give(h.unit, rec, false)
+			if not items.hand(h.unit, rec, true) then
+				table.insert(heldBack, rec)
+			end
 		end
+		if #heldBack > 0 then
+			nox.log("deep_delve: " .. h.record.identity.name .. ": " .. #heldBack .. " piece(s) held back in the record, not carried now")
+		end
+		h.heldBack = heldBack
 		nox.setGold(h.unit, h.record.gold.carried, true)
 	end
 	if here then
@@ -293,6 +336,8 @@ function hero.setUp(h: any, at: any, keep: boolean?)
 	end
 	h.bonus = bonusOf(h.unit, h.record)
 	applyStats(h, true)
+	affixes.noteWear(h)
+	bonusChanged(h)
 	-- Only the tree's spells (a warrior: its abilities).
 	book.apply(h)
 	-- The hits it takes: the mod's monsters' scaled, the party's and its own Fireball's cancelled
@@ -419,7 +464,7 @@ function hero.join(p: any, chosen: any?)
 		record = record,
 		ready = false,
 		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = {} },
+			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = {}, powers = {}, sets = {}, pieces = {}, setSig = "" },
 		open = {},
 		need = hero.needFor(record.level.level),
 		since = nox.frame(),
@@ -453,7 +498,15 @@ function hero.leave(p: any)
 	if not h then
 		return
 	end
-	hero.save(h, "leaving")
+	local saved = hero.save(h, "leaving")
+	-- (what it carries and wears is its record's now: gone with it, so the game doesn't drop a copy
+	-- of each piece where it stood for anyone to pick up, the player too when it's back)
+	if saved and nox.present(h.unit) then
+		for _, it in nox.inventory(h.unit) do
+			items.forget(it.id)
+			nox.delete(it.id)
+		end
+	end
 	regen.stop(h)
 	if h.key then
 		store.release(h.key)
@@ -578,7 +631,8 @@ end
 function hero.pickedUp(unit: number, item: number)
 	local h = byUnit[unit]
 	local m = items.meta(item)
-	if not h or not m or m.rarity == "normal" then
+	-- (a piece handed over from the stash or the vendor by the pickup: no find)
+	if items.wasHanded(item) or not h or not m or m.rarity == "normal" then
 		return
 	end
 	local rec = items.recordOf(item)
@@ -595,6 +649,8 @@ function hero.equipChanged(unit: number)
 	end
 	h.bonus = bonusOf(unit, h.record)
 	applyStats(h, false)
+	affixes.noteWear(h)
+	bonusChanged(h)
 end
 
 -- The hero's passive tree changed (a node taken, a respec): its numbers and book again, the record
@@ -603,6 +659,7 @@ function hero.treeChanged(h: any, why: string)
 	if h.ready and nox.present(h.unit) then
 		h.bonus = bonusOf(h.unit, h.record)
 		applyStats(h, false)
+		bonusChanged(h)
 		book.apply(h)
 	end
 	hero.save(h, why)

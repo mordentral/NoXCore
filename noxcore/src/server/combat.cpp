@@ -363,7 +363,7 @@ bool Fight::strike(ServerObject& a, const Attack& atk, ServerObject*& struck)
         }
         if (world.traceRay(a.x, a.y, t.x, t.y, Trace::Doors | Trace::ThroughWindows)) {
             preHitEffects(*this, t, &a, atk.weapon ? world.byExtent(atk.weapon) : nullptr); // (playerPreAttackEffects)
-            damage(t, &a, atk.weapon, roundedDamage(atk.damage), atk.type);
+            damage(t, &a, atk.weapon, roundedDamage(atk.damage), atk.type, HitCause::Blow);
             // A solo game's player striking a thing (not a creature) with health left, not deleted
             // (0x20: ours pendingDelete): a puff where it stands (MSG_FX_DAMAGE_POOF,
             // netSendPointFx(0x8B)).
@@ -592,12 +592,18 @@ float Fight::metalFactor(const ServerObject& t) const
     return f;
 }
 
-int Fight::damage(ServerObject& t, ServerObject* source, std::uint32_t weapon, int amount, int type)
+int Fight::damage(ServerObject& t, ServerObject* source, std::uint32_t weapon, int amount, int type, HitCause cause)
 {
     ServerObject* obj3 = weapon ? world.byExtent(weapon) : nullptr;
-    // (noxcpp: a mode watching hits on it may change the amount or cancel the hit.)
-    if (world.modeHooks && (t.modeEvents & ModeEvent::Damage) && !world.modeHooks->damage(*this, t, source, obj3, amount, type)) {
-        return 0;
+    // (noxcpp: a mode watching hits on it may change the amount or cancel the hit; told what dealt
+    // it, a missile's own hit or burst by the thing itself.)
+    if (world.modeHooks && (t.modeEvents & ModeEvent::Damage)) {
+        if (cause == HitCause::Other && ((obj3 && (obj3->classes & oc::Missile)) || (source && (source->classes & oc::Missile)))) {
+            cause = HitCause::Missile;
+        }
+        if (!world.modeHooks->damage(*this, t, source, obj3, amount, type, cause)) {
+            return 0;
+        }
     }
     if (t.player || t.damageFn == NameId::PlayerDamage) { // (the NPC's DAMAGE too)
         return playerDamage(t, source, obj3, amount, type);
@@ -1010,7 +1016,7 @@ int Fight::defaultDamage(ServerObject& t, ServerObject* src, ServerObject* obj3,
     if (src && enchanted(t, Enchant::Shock) && creature(*src) && obj3 && handToHand(*src, obj3)) {
         playSound(world, 0x87, *src); // (at the striker)
         disenchant(world, t, Enchant::Shock);
-        damage(*src, &t, 0, static_cast<int>(world.number("ShockDamage", 4)), 9);
+        damage(*src, &t, 0, static_cast<int>(world.number("ShockDamage", 4)), 9, HitCause::Spell);
         if (src->player) {
             setPlayerState(*src, 0x17);
         }

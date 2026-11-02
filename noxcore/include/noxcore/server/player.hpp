@@ -123,6 +123,11 @@ void mapChangePlayer(Fight& fight, ServerObject& unit, bool keep);
 /// point (0x1B, then 0x1C held a moment, 0x1D); anything else nothing.
 void social(World& world, ServerObject& unit, std::uint8_t gesture, std::uint32_t frame);
 
+/// The damage type a melee weapon's swing deals (playerAttack's branch for its weapon class bit,
+/// things::weaponBitOf): 0 the blades and axes, 2 the hammer and mace; none for a weapon that
+/// doesn't swing (staffs, wands, chakrams, bows: their missiles' own).
+std::optional<std::uint8_t> meleeDamageType(std::uint32_t weaponBit);
+
 /// playerAddGold / playerSubGold: a player's gold up, or down (not
 /// below 0); its client told on the frame's report (MSG_REPORT_GOLD).
 void addGold(ServerObject& unit, std::int32_t amount);

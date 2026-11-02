@@ -116,6 +116,13 @@ public:
         (void)y;
         return false;
     }
+    /// Whether the game's name for the item under the mouse (App::tipItem) gives way this frame:
+    /// the mode shows its own tooltip for it (drawOver), or is about to.
+    virtual bool hidesItemName(const App& app) const
+    {
+        (void)app;
+        return false;
+    }
     /// Each frame once the camera's set from our own player (it may move it: a scene's view).
     virtual void cameraSet(App& app) { (void)app; }
     /// A join of `game` refused (`joinError`, net::JoinError's): what the game list says, when

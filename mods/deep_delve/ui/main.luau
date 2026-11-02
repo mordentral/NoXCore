@@ -20,7 +20,8 @@
 --   stash   (touching the town's chest) the stash's tabs and what the character carries: a click
 --           moves an item across;
 --   vendor  (touching the town's anvil) its own stock and what the character carries: a click buys
---           or sells, a right click rerolls a magic or rare piece;
+--           or sells, a right click rerolls a magic or rare piece; a row of what needs a repair
+--           (worn or carried): a click repairs one, "Repair all" every one;
 --   tree    the passive tree: nodes and the lines between them, panned by dragging (or the arrows,
 --           on screen or the keys) and zoomed by the wheel (or 1-3); a click takes a node, a
 --           right click on one taken gives it back alone (anywhere, for gold); a node's
@@ -49,9 +50,14 @@
 -- spell, ability or summon node is the game's own icon for it (nox.spellIcon; the server names
 -- it, "si": a SPELL_* or ABILITY_* name, a summon's spell), framed the same way.
 --
--- An item's words are a tooltip at the mouse; a tree node's are drawn in the tree's window,
--- beside its picture. The loot lying near the player is named over each item in its rarity's
--- colour while Alt is held, or always as the character's option has it (nox.label by the item's
+-- An item's stats are a tooltip at the mouse in the stash and the vendor (the server's lines: its
+-- name in its rarity's colour, its rarity, kind and area level, its base damage or armour, what
+-- each of its modifiers does, its affixes in their own colour, its durability and charges, whether
+-- the class can use it, and the price); a tree node's are drawn in the tree's window, beside its
+-- picture. The same lines tip the game's own inventory and weapon panel for whatever the hero
+-- holds, by net code, and a ground item gets its loot label's name (ui.itemTip, UI API 5).
+--
+-- The loot lying near the player is named over each item in its rarity's colour while Alt is held, or always as the character's option has it (nox.label by the item's
 -- net code; the server sends the list as it changes). Each label is set once, as its item comes
 -- into the list, kept while the item is out of the client's world (keep), and cleared as it
 -- leaves the list (picked up, gone, or out of reach) or another map's list comes.
@@ -121,15 +127,17 @@ local function takePart(v: any)
 	end
 end
 
-local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, treeData = true, labels = true, plates = true, chars = true }
+local PARTS: { [string]: boolean } = { carried = true, stash = true, stock = true, repairs = true, treeData = true, labels = true, plates = true, chars = true }
 
 -- ---- Drawing helpers
 
+-- (a unique orange, a set piece green: by decision 2026-11-01)
 local RARITY: { [string]: { number } } = {
 	normal = { 150, 138, 112 },
 	magic = { 100, 150, 245 },
 	rare = { 240, 205, 70 },
-	unique = { 195, 120, 255 },
+	unique = { 245, 140, 40 },
+	set = { 80, 225, 80 },
 }
 
 -- How a picture is dimmed (a tree node that can't be taken yet, a button that can't be used): a
@@ -230,20 +238,66 @@ local function drawWords(text: string?, x: number, y: number, width: number, lin
 	end
 end
 
--- An item's tooltip at the mouse: its words in its rarity's colour, and `extra` (a price) under
--- them.
-local function tipItem(e: any, extra: string?)
+-- An item's tooltip: the server's lines for it (server/tips.luau), each a string whose first
+-- letter says what it is: n its name (in its rarity's colour), k its rarity, kind and area
+-- level, b its base damage or armour, m a game modifier, a a Deep Delve affix, s its durability,
+-- charges or use, y / x whether the class can use it, p its repair's price (the vendor's); a
+-- unique's power u; a set piece's set g, its pieces w (worn) and o (not), its bonuses v (on) and q
+-- (not). Each letter's colour:
+local TIP_PRICE = { 230, 190, 80 }
+local TIP_COLOUR: { [string]: { number } } = {
+	p = TIP_PRICE,
+	k = { 165, 155, 135 },
+	b = { 225, 220, 205 },
+	m = { 170, 190, 235 },
+	a = { 110, 215, 120 },
+	s = { 205, 195, 170 },
+	y = { 190, 185, 165 },
+	x = { 230, 95, 80 },
+	u = { 255, 185, 105 },
+	g = { 80, 225, 80 },
+	w = { 120, 235, 120 },
+	o = { 115, 125, 105 },
+	v = { 80, 225, 80 },
+	q = { 125, 120, 108 },
+}
+local TIP_MOST = 23
+
+-- The tooltip's lines for an entry ({ t, r, tl }), `extra` (a price, what a click does) last;
+-- made once for an entry and an extra, kept on the entry (a new list brings new entries).
+local function itemLines(e: any, extra: string?): { any }
+	local made = e.tipMade
+	if made and e.tipExtra == extra then
+		return made
+	end
 	local lines: { any } = {}
-	for _, l in wrap(e.d or e.t or "", 250) do
-		if #lines < 12 then
-			table.insert(lines, { l, RARITY[e.r] or RARITY.normal })
+	if type(e.tl) == "table" then
+		for _, l in e.tl do
+			if #lines >= TIP_MOST - (if extra then 1 else 0) then
+				break
+			end
+			local tag, text = string.sub(l, 1, 1), string.sub(l, 2)
+			table.insert(lines, { text, if tag == "n" then RARITY[e.r] or RARITY.normal else TIP_COLOUR[tag] or "bright" })
 		end
+	else
+		table.insert(lines, { tostring(e.t or "?"), RARITY[e.r] or RARITY.normal })
 	end
 	if extra then
-		table.insert(lines, { extra, { 230, 190, 80 } })
+		table.insert(lines, { extra, TIP_PRICE })
 	end
-	nox.tooltip(lines)
+	e.tipMade, e.tipExtra = lines, extra
+	return lines
 end
+
+-- An item's tooltip at the mouse.
+local function tipItem(e: any, extra: string?)
+	nox.tooltip(itemLines(e, extra))
+end
+
+-- What the hero holds, worn or not, by net code ({ n, r, tl }): sent by the server once this UI
+-- asks for it, the first time the client hands it an item to tip (ui.itemTip).
+local heldTips: { [number]: any } = {}
+local askedTips = false
 
 -- ---- The party strip
 
@@ -405,7 +459,8 @@ local LABEL_COLOUR: { [string]: { number } } = {
 	normal = { 225, 222, 210 },
 	magic = { 110, 160, 255 },
 	rare = { 250, 220, 80 },
-	unique = { 200, 130, 255 },
+	unique = { 255, 150, 50 },
+	set = { 100, 240, 100 },
 	gold = { 225, 175, 60 },
 }
 -- The newest list (net code -> { t = text, r = rarity }), and the labels set on the client now
@@ -841,9 +896,37 @@ local function drawVendor()
 		end
 	end)
 	nox.box(0, 302, SW, 1, { 90, 70, 40 })
-	local hot = hotStock or hotCarried
+	-- What needs a repair, worn or carried: a click repairs one, the button all of them.
+	local rp = whole.repairs
+	local damaged = rp and rp.items or {}
+	local total = rp and rp.header.total or 0
+	nox.text(if #damaged > 0 then "Needs a repair (click to repair it)" else "Nothing needs a repair", 4, 322, if #damaged > 0 then "gold" else "dim")
+	local hotRepair: any = nil
+	for k = 1, 10 do
+		local cx = 4 + (k - 1) * CELL
+		local e = damaged[k]
+		if e then
+			local isHot = over(mx, my, cx, 334, CELL - 2, CELL - 2)
+			if isHot then
+				hotRepair = e
+			end
+			cell(cx, 334, CELL - 2, e, isHot, e.c)
+			zone(w, cx, 334, CELL - 2, CELL - 2, function(b: number)
+				if b == 1 then
+					nox.send({ kind = "vendor", op = "repair", item = e.i })
+				end
+			end)
+		else
+			emptyCell(cx, 334, CELL - 2)
+		end
+	end
+	button(w, 446, 334, 118, 16, if total > 0 then string.format("Repair all (%d gold)", total) else "Repair all", total > 0 and total <= gold, function()
+		nox.send({ kind = "vendor", op = "repairAll" })
+	end)
+	local hot = hotStock or hotCarried or hotRepair
 	if hot then
 		local line = if hotStock then "Buy for " .. tostring(hot.p) .. " gold"
+			elseif hotRepair then "Repair for " .. tostring(hot.c) .. " gold" .. (if hot.w then " (worn)" else "")
 			else "Sells for " .. tostring(hot.p) .. " gold" .. (if hot.q then "; reroll " .. tostring(hot.q) .. " gold" else "")
 		tipItem(hot, line)
 		nox.text(line, 4, 306, "gold")
@@ -1887,6 +1970,39 @@ function ui.start()
 	placeStrip()
 end
 
+-- A ground item's tooltip: its loot label's words in the label's colour (made once a label).
+local function groundTip(l: any): { any }
+	local made = l.tipMade
+	if not made then
+		made = { { tostring(l.t), LABEL_COLOUR[l.r] or LABEL_COLOUR.normal } }
+		l.tipMade = made
+	end
+	return made
+end
+
+-- An item the game would name under the mouse (UI API 5; each frame it's there): its net code,
+-- and where ("inventory", "weapon": the weapon panel, "ground"). A held one's tooltip is the
+-- server's lines for it; a ground item's, its loot label's words in its rarity's colour. Nothing
+-- known of it yet: the game's own name stays. The first call asks the server for the held items'
+-- lines (a client without this hook never calls it, so never costs those sends).
+function ui.itemTip(code: number, where: string)
+	if not askedTips then
+		askedTips = true
+		nox.send({ kind = "tips", on = true })
+	end
+	if where == "ground" then
+		local l = wanted[code]
+		if l then
+			nox.tooltip(groundTip(l))
+		end
+		return
+	end
+	local e = heldTips[code]
+	if e then
+		nox.tooltip(itemLines(e, nil))
+	end
+end
+
 local SPEC: { [string]: any } = {
 	stash = { title = "Stash", x = 36, y = 34, w = SW, h = SH },
 	vendor = { title = "Vendor", x = 36, y = 34, w = SW, h = SH },
@@ -1998,6 +2114,8 @@ function ui.onMessage(value: any)
 		if opened.maps then
 			nox.window("maps", specOf("maps"))
 		end
+	elseif kind == "tip" and type(value.n) == "number" then
+		heldTips[value.n] = if type(value.tl) == "table" then value else nil
 	elseif kind == "treeState" then
 		whole[kind] = { header = value }
 	elseif kind == "note" then

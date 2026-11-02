@@ -136,9 +136,9 @@ struct Missiles {
     void pushFrom(float x, float y, float reach, float full, float force) { pushAround(x, y, reach, full, force, nullptr); }
     /// mapDamageUnitsAround (see damageAround).
     void damageAt(float x, float y, float reach, float full, int damage, int type, ServerObject* source, const ServerObject* except,
-                  bool spareSource)
+                  bool spareSource, HitCause cause = HitCause::Other)
     {
-        damageAround(x, y, reach, full, damage, type, source, except, spareSource);
+        damageAround(x, y, reach, full, damage, type, source, except, spareSource, cause);
     }
     /// What a spell flying from `missile` goes after (spellFlySearchTarget with a
     /// hostile spell's flag): the nearest live creature, enemy to it, within `range` of (x, y)
@@ -217,8 +217,9 @@ private:
     /// within `reach` of (x, y), no wall between, less past `full` (linearly, none at the edge);
     /// not `except`. The source itself too, unless `spareSource` (the exe's flag that
     /// gameSetWallsDamage sets, back to 1 after each call: Death Ray's 0 spares it, Mana Bomb's 1 doesn't).
+    /// `cause`: what dealt it, for a mode (HitCause).
     void damageAround(float x, float y, float reach, float full, int damage, int type, ServerObject* source, const ServerObject* except,
-                      bool spareSource = false);
+                      bool spareSource = false, HitCause cause = HitCause::Other);
     /// mapPushUnitsAround: the movable within `reach` of (x, y), no wall between,
     /// pushed off it by `force` x 10 / their mass, less past `full` (none at the edge).
     void pushAround(float x, float y, float reach, float full, float force, const ServerObject* source);

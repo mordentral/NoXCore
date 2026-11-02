@@ -8,9 +8,11 @@
 -- world. The share of a point each beat is worth is kept until it makes a whole point. Nothing
 -- comes back while the hero is dead or between maps (not set up), and nothing carries over that
 -- pause. Health waits numbers.regen.afterHurt frames after a hit the hero took (heard by its
--- unit's damaged event), as the game's own refill does; mana doesn't wait.
+-- unit's damaged event), as the game's own refill does; mana doesn't wait. The same beat runs the
+-- hero's ward affixes (affixes.ward).
 
 local numbers = require("data/numbers")
+local affixes = require("affixes")
 
 local regen = {}
 
@@ -39,6 +41,8 @@ local function beat(h: any)
 	if not o then
 		return
 	end
+	-- (its ward affixes cut the harmful enchantments on it short: affixes.luau)
+	affixes.ward(h)
 	local every = numbers.regen.every
 	local healthRate, manaRate = regen.rates(h)
 	if healthRate > 0 and o.health < o.maxHealth and nox.frame() - s.hurtAt >= numbers.regen.afterHurt then

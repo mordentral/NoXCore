@@ -85,6 +85,11 @@ inline float boltDamage(const World& world, const things::EquipDef* def, int str
 /// plus the double 0.5, __ftol (rounded, halves up).
 inline int roundedDamage(float damage) { return util::ftol(util::X87(damage) + util::X87::fromDouble(0.5)); }
 
+/// noxcpp: what dealt a hit, told to a mode watching it (ModeHooks::damage); nothing of the game's
+/// reads it. Other is anything not marked (a trap, a fall, the floor, poison, a script); a hit by a
+/// missile, or from one (a burst), is Missile without being marked.
+enum class HitCause : std::uint8_t { Other, Blow, Missile, Spell };
+
 struct Fight {
     World& world;
     std::minstd_rand& rng;
@@ -96,8 +101,8 @@ struct Fight {
     bool attack(ServerObject& attacker, const Attack& attack);
     /// `amount` of `type` from `source` (and `weapon`, the thing that hit) to `target`, by its
     /// Damage function (a player's PlayerDamage, else DefaultDamage); what that returns (0: it
-    /// took none at all).
-    int damage(ServerObject& target, ServerObject* source, std::uint32_t weapon, int amount, int type);
+    /// took none at all). `cause`: what dealt it, for a mode (HitCause).
+    int damage(ServerObject& target, ServerObject* source, std::uint32_t weapon, int amount, int type, HitCause cause = HitCause::Other);
     /// Its health down by `amount`, and at 0 dead (unitDamageClear).
     void takeHealth(ServerObject& target, int amount);
     /// Brings a dead player back (Plr_Respawn). (noxcpp: `keepItems`, a NoX Core mode's respawn

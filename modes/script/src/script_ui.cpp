@@ -99,7 +99,15 @@ struct ScriptUiClient::Impl {
     bool hasDraw = false, hasClick = false, hasMessage = false, hasView = false, hasKey = false;
     bool hasDrag = false, hasMouseUp = false, hasWheel = false; ///< (API 3's hooks)
     bool hasTick = false;                                        ///< (API 4's)
-    bool hasLabelClick = false;                                  ///< (API 5's)
+    bool hasLabelClick = false, hasItemTip = false;              ///< (API 5's)
+    /// (API 5) The item the game would name under the mouse (setItemHover: 0 none, and where), the
+    /// one the itemTip hook was last asked about, and the tooltip it gave for it (nox.tooltip in
+    /// the hook; none: the game's own name stays).
+    std::uint16_t hoverItem = 0, itemTipAsked = 0;
+    std::string hoverWhere;
+    bool inItemTip = false;
+    bool itemTipSet = false;
+    std::vector<UiTooltipLine> itemTip;
     std::vector<UiWindow> windows;
     UiWindow* drawing = nullptr; ///< (the window whose draw is running: draws go to it)
     std::deque<std::pair<std::uint8_t, std::vector<std::uint8_t>>> inbox; ///< data and views, oldest first
@@ -204,6 +212,10 @@ struct ScriptUiClient::Impl {
         tooltip.clear();
         labels.clear();
         drawing = nullptr;
+        inItemTip = false;
+        itemTipSet = false;
+        itemTipAsked = 0;
+        itemTip.clear();
     }
 
     /// (API 3) A map loaded since the labels were set: they all go (the new map's objects are
@@ -834,13 +846,15 @@ int uiLine(lua_State* L)
 int uiTooltip(lua_State* L)
 {
     Impl& impl = implOf(L);
-    if (!impl.drawing) {
-        luaL_error(L, "a tooltip only in ui.draw");
+    if (!impl.drawing && !impl.inItemTip) {
+        luaL_error(L, "a tooltip only in ui.draw or ui.itemTip");
     }
     luaL_checktype(L, 1, LUA_TTABLE);
-    // (Each call this frame replaces the last: one tooltip a frame.)
-    impl.tooltip.clear();
-    impl.tooltipSet = true;
+    // (Each call this frame replaces the last: one tooltip a frame. In ui.itemTip (API 5): the
+    // item's, in the game's name's place.)
+    std::vector<UiTooltipLine>& out = impl.inItemTip ? impl.itemTip : impl.tooltip;
+    out.clear();
+    (impl.inItemTip ? impl.itemTipSet : impl.tooltipSet) = true;
     const int n = std::min(lua_objlen(L, 1), static_cast<int>(kUiMaxTooltipLines));
     for (int i = 1; i <= n; ++i) {
         lua_rawgeti(L, 1, i);
@@ -866,7 +880,7 @@ int uiTooltip(lua_State* L)
             luaL_argerror(L, 1, "a tooltip's line is { text, colour? }");
         }
         lua_pop(L, 1);
-        impl.tooltip.push_back(std::move(t));
+        out.push_back(std::move(t));
     }
     return 0;
 }
@@ -1094,6 +1108,9 @@ void Impl::start()
     error.clear();
     sounds.clear();
     tooltip.clear();
+    itemTip.clear();
+    itemTipSet = false;
+    itemTipAsked = 0;
     labels.clear();
     labelsLoad = client ? client->mapLoads() : 0;
     ++runs;
@@ -1179,6 +1196,7 @@ void Impl::start()
     hasWheel = uiApi >= 3 && has("wheel");
     hasTick = uiApi >= 4 && has("tick");
     hasLabelClick = uiApi >= 5 && has("labelClick");
+    hasItemTip = uiApi >= 5 && has("itemTip");
     lua_pop(L, 1);
     if (begin("start") && !finish("start", 0, 0)) {
         return;
@@ -1554,6 +1572,22 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
             lua_pushnumber(impl.vm->thread(), static_cast<double>(nowMs));
             impl.finish("tick", 1, 0);
         }
+        // (API 5) The item under the mouse the game would name: the UI's tooltip for it, if it
+        // gives one (nox.tooltip in the hook), in the name's place. Asked each frame it's there.
+        impl.itemTipAsked = 0;
+        impl.itemTipSet = false;
+        impl.itemTip.clear();
+        if (impl.vm && impl.hasItemTip && impl.hoverItem != 0 && inTime() && impl.begin("itemTip")) {
+            lua_State* T = impl.vm->thread();
+            lua_pushinteger(T, impl.hoverItem);
+            lua_pushlstring(T, impl.hoverWhere.data(), impl.hoverWhere.size());
+            impl.inItemTip = true;
+            const bool ran = impl.finish("itemTip", 2, 0);
+            impl.inItemTip = false;
+            if (ran) {
+                impl.itemTipAsked = impl.hoverItem;
+            }
+        }
         for (int n = 0; impl.vm && !impl.inbox.empty() && n < 32 && inTime(); ++n) {
             auto [sub, bytes] = std::move(impl.inbox.front());
             impl.inbox.pop_front();
@@ -1765,6 +1799,24 @@ bool ScriptUiClient::hudShown() const noexcept
 bool ScriptUiClient::overMap() const noexcept
 {
     return impl_->overMap && impl_->vm;
+}
+
+void ScriptUiClient::setItemHover(std::uint16_t item, std::string_view where)
+{
+    impl_->hoverItem = item;
+    impl_->hoverWhere.assign(item != 0 ? where : std::string_view());
+}
+
+bool ScriptUiClient::itemTipPending(std::uint16_t item) const noexcept
+{
+    const Impl& impl = *impl_;
+    return item != 0 && impl.vm && impl.hasItemTip && impl.itemTipAsked != item;
+}
+
+const std::vector<UiTooltipLine>* ScriptUiClient::itemTip(std::uint16_t item) const noexcept
+{
+    const Impl& impl = *impl_;
+    return item != 0 && impl.vm && impl.itemTipAsked == item && impl.itemTipSet && !impl.itemTip.empty() ? &impl.itemTip : nullptr;
 }
 
 const std::vector<uimsg::Decal>& ScriptUiClient::decals() const noexcept

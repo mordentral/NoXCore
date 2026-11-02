@@ -23,6 +23,10 @@ local KINDS = {
 	arena = { intensity = 46, color = { 255, 70, 35 }, intensityKeys = { 46, 40, 48, 42 }, intensityStep = 5 },
 	-- The barrow-king's arena: a cold grave-green glow, slowly breathing.
 	barrow = { intensity = 44, color = { 110, 255, 150 }, intensityKeys = { 44, 36, 46, 38 }, intensityStep = 10 },
+	-- The troll chieftain's glade: firelight from his pits, warm and restless.
+	glade = { intensity = 48, color = { 255, 140, 40 }, intensityKeys = { 48, 41, 50, 44 }, intensityStep = 4 },
+	-- The ruin-warden's court: braziers' sun-gold glow on old stone, slowly breathing.
+	court = { intensity = 46, color = { 255, 200, 110 }, intensityKeys = { 46, 40, 48, 42 }, intensityStep = 8 },
 	-- The gate to the next act (switched on by the server as the lair's boss dies): a pale blue
 	-- glow that swells slowly.
 	gate = { intensity = 52, color = { 120, 190, 255 }, intensityKeys = { 52, 46, 56, 48 }, intensityStep = 9 },

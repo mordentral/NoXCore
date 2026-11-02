@@ -1369,7 +1369,8 @@ void toxicCloudUpdate(Fight& fight, ServerObject& o, float reach, bool harms)
         // (unitsGetInCircle, by the grid; each as it's found: toxicCloudPoison)
         world.unitsInCircle(o.x, o.y, reach, [&](ServerObject& t) {
             if ((t.classes & (oc::Monster | oc::Player)) && world.traceRay(o.x, o.y, t.x, t.y, Trace::Doors | Trace::ThroughWindows)) { // (no 0x20 test)
-                fight.damage(t, from, o.extent, harms ? nox::util::uniform_int_distribution<int>(3, 10)(fight.rng) : 0, 5);
+                fight.damage(t, from, o.extent, harms ? nox::util::uniform_int_distribution<int>(3, 10)(fight.rng) : 0, 5,
+                             o.owner != 0 ? HitCause::Spell : HitCause::Other); // (a caster's cloud a spell's for a mode)
                 if (from && isEnemy(world, *from, t)) {
                     fight.applyPoison(t, 1, 1);
                 }
@@ -1644,7 +1645,8 @@ void Objects::update(ServerObject& o)
                 world.spawn(things, "MeteorExplode", o.x, o.y).flags |= ObjFlag::Active;
             }
             ServerObject* from = fight.parentPlayer(&o);
-            Missiles{world, things, fight.modifiers, fight.rng, fight.frame}.damageAt(o.x, o.y, 80.0f, 30.0f, o.value, 7, from, nullptr, false);
+            Missiles{world, things, fight.modifiers, fight.rng, fight.frame}.damageAt(o.x, o.y, 80.0f, 30.0f, o.value, 7, from, nullptr, false,
+                                                                                      HitCause::Spell);
             o.pendingDelete = true; // (the walls about it too: damageAt)
         }
         break;

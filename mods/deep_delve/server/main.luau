@@ -16,7 +16,12 @@
 --   gate.luau      the gate in a lair to the next act: opened by its boss's death, kept for a
 --                  character who has killed it
 --   combat.luau    the damage tiers and affixes change, no damage within the party, no splash
---                  from a hero's own Fireball (onDamage)
+--                  from a hero's own Fireball (onDamage); reflection's turn (onReflect)
+--   affixes.luau   Deep Delve's affixes: which gear kind each rolls on, and the six from the
+--                  game's modifiers (frost, dread, grip, reflect, ward, resilience) at work
+--   uniques.luau   unique items and item sets: their records, drops, worn bonuses, tooltip lines
+--   uniquepowers.luau the uniques' and set bonuses' powers at work (hits, kills, casts, prices,
+--                  a timer per hero wearing a timed one)
 --   casts.luau     a hero's casts: its missiles larger at the tree levels that say so
 --                  (onSpellCast; Fireball 4 and 5); the cast-cost keystones' prices (castCost)
 --   summons.luau   the creatures the heroes summon: found as they come, watched
@@ -32,6 +37,8 @@
 --   portal.luau    the town portal (anyone's open portal takes the party back out, its owner gone
 --                  or not)
 --   decals.luau    the pads' rings on the floor (waypoints cyan, portals violet; nox.decal)
+--   secrets.luau   secret rooms (a secret wall, a lever) and side rooms' chests, some trapped:
+--                  their loot, their traps, their guards
 --   party.luau     the party strip's numbers; the party's size for the scaling
 --   scale.luau     party scaling: monsters' health, damage and experience, packs, loot
 --   labels.luau    ground loot's labels and named monsters' name plates on each player's UI
@@ -39,6 +46,8 @@
 --   tree.luau     the passive tree's rules (points, nodes taken, respec, what it adds and gives)
 --   book.luau      the spells (a warrior: the abilities) the tree gives, on the unit and its client
 --   windows.luau   the bigger windows: which are open, the carried list, their beat
+--   tips.luau      items' tooltip lines (the stash's, the vendor's, the carried list's); the held
+--                  items' by net code for a UI that tips the game's inventory
 --   stash.luau     the stash at the town's chest
 --   vendor.luau    the vendor at the town's anvil
 --   treeview.luau  the passive tree's window
@@ -63,6 +72,7 @@
 -- passive tree grants is all a character can cast or use, and a spell is cast at its tree level.
 
 local areas = require("areas")
+local affixes = require("affixes")
 local boss = require("boss")
 local casts = require("casts")
 local combat = require("combat")
@@ -75,12 +85,14 @@ local monsters = require("monsters")
 local offers = require("offers")
 local party = require("party")
 local portal = require("portal")
+local uniquePowers = require("uniquepowers")
 local roster = require("roster")
 local regen = require("regen")
 local sheet = require("sheet")
 local stash = require("stash")
 local summons = require("summons")
 local team = require("team")
+local tips = require("tips")
 local treeview = require("treeview")
 local vendor = require("vendor")
 local votes = require("votes")
@@ -95,7 +107,8 @@ local mode = {}
 
 -- ---- The game
 
--- Before the game: the first area's map, generated now; a dead player keeps its things; the book
+-- Before the game: the first area's map, generated now; monsters that see all about them; a dead
+-- player keeps its things; the book
 -- is the mod's (bookIsTheMod: a player starts with no spell, ability or field guide creature, may
 -- use only what the tree grants, at the level granted, and the engine's own books and pedestals
 -- give nothing).
@@ -103,7 +116,9 @@ function mode.configure(ctx: any)
 	-- (a server that keeps the characters, the bot server's pool: listed as the game, not the mod's
 	-- longer name, which a listing cuts at 15 letters)
 	local listed = if nox.option("characters") == "server" then "Deep Delve" else nil
-	return { generate = areas.configure(ctx), keepThingsOnDeath = true, bookIsTheMod = true, serverName = listed }
+	-- (monstersAlert: the monsters look for foes all about them, not only ahead, as Delving Mode's
+	-- do; without it one facing away stood still until it was hit)
+	return { generate = areas.configure(ctx), keepThingsOnDeath = true, bookIsTheMod = true, monstersAlert = true, serverName = listed }
 end
 
 function mode.start()
@@ -119,6 +134,7 @@ function mode.stop()
 end
 
 function mode.mapLoaded(name: string)
+	uniquePowers.reset()
 	roster.mapLoaded()
 	areas.mapLoaded(name or nox.currentMap())
 end
@@ -207,6 +223,7 @@ local function pickedUp(taker: number, item: number)
 		labels.changed()
 	end
 	hero.pickedUp(taker, item)
+	tips.changed(taker)
 end
 
 -- A click on a ground item's label (its net code): picked up by the game's own pickup (gold into
@@ -277,6 +294,9 @@ function mode.onUiMessage(player: any, value: any)
 		expeditions.message(h, value)
 	elseif kind == "pick" then
 		pick(h, value.code)
+	elseif kind == "tips" then
+		-- (a UI that shows its own tooltips over the game's inventory: the held items' lines)
+		tips.want(h, value.on == true)
 	elseif kind == "option" then
 		if type(value.name) == "string" and type(value.value) == "string" then
 			hero.setOption(h, value.name, value.value)
@@ -341,37 +361,57 @@ function mode.onObjectKilled(e: any)
 		return
 	end
 	hero.award(monsters.experienceOf(m), e.by)
+	-- (the killer's worn powers: a burst, a heal, a frenzy; uniquepowers.luau)
+	uniquePowers.killed(m, e)
 	if m.boss then
 		boss.killed(e.id, e.x, e.y)
 	else
 		loot.drop(e.x, e.y, m.level, loot.rollsFor(1 + m.drops), m.drops * 0.25)
+		-- (a champion's own rolls for a unique and a set piece)
+		if m.tier == "champion" then
+			loot.dropSpecial(e.x, e.y, m.level, "champion")
+		end
 		-- (an expedition's champion: the run cleared, its reward)
 		expeditions.killed(m, e.x, e.y)
 	end
 end
 
-function mode.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number): number?
-	return combat.onDamage(target, source, weapon, amount, kind)
+function mode.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): number?
+	return combat.onDamage(target, source, weapon, amount, kind, cause)
 end
 
--- A hero took a hit: its health's regeneration waits a moment (regen.luau).
+-- A missile about to hit a watched thing: a hero's reflection may turn a monster's (combat.luau).
+function mode.onReflect(target: number, missile: number, front: boolean): boolean
+	return combat.onReflect(target, missile, front)
+end
+
+-- A hero took a hit: its health's regeneration waits a moment (regen.luau); its worn pieces' wear
+-- is looked at a frame on (its resilience affixes: affixes.luau).
 function mode.onDamaged(target: number, amount: number)
 	local h = hero.byUnit(target)
 	if h then
 		regen.hurt(h, amount)
+		affixes.worn(h)
 	end
 end
 
 -- A player's spell's price before it's paid: the cast-cost keystones' (casts.luau); nil the game's.
 function mode.castCost(caster: number, spell: string, cost: number, _how: string): (number?, number?)
-	return casts.cost(caster, spell, cost)
+	local mana, health = casts.cost(caster, spell, cost)
+	-- (a worn power that pays it in health: uniquepowers.luau)
+	local m2, h2 = uniquePowers.cost(caster, mana or cost, health)
+	if m2 then
+		return m2, h2
+	end
+	return mana, health
 end
 
 -- A spell cast (a player's; `made` what it made this frame): a hero's missiles sized by its tree
 -- level (casts.luau); a hero's summoning watched for its creature (summons.luau).
-function mode.onSpellCast(caster: number, spell: any, _target: number?, _x: number, _y: number, made: { number }?)
+function mode.onSpellCast(caster: number, spell: any, target: number?, x: number, y: number, made: { number }?)
 	casts.cast(caster, spell, made)
 	summons.cast(caster, spell)
+	uniquePowers.cast(caster, spell, target, x, y)
 end
 
 -- An item picked up: out of the ground's index, its label cleared on every UI at once.
@@ -381,6 +421,7 @@ end
 
 function mode.onEquip(unit: number, _item: number, _worn: boolean)
 	hero.equipChanged(unit)
+	tips.changed(unit)
 end
 
 -- ---- The host's console ("dd help")

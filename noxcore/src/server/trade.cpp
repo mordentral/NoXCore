@@ -1096,6 +1096,35 @@ int itemCost(const World& world, const things::ModifierDb* modifiers, int mode, 
     return chop(worth);
 }
 
+bool needsRepair(const ServerObject& item)
+{
+    const bool charge = (item.classes & oc::Wand) && (item.subclasses & 0x47F0000u) && item.charges < item.maxCharges && item.maxCharges != 0;  // a magical staff short of charges
+    return (item.maxHealth != 0 && item.health != item.maxHealth) || charge;
+}
+
+void repairItem(World& world, ServerObject& item, const ServerObject* holder)
+{
+    item.health = item.maxHealth; // (unitSetHP)
+    item.touch();
+    const std::uint16_t code = netCodeOf(item);
+    if (holder && item.maxHealth != 0) { // (SrvNet_SendReportItemHealth)
+        tell(world, *holder, {0x44, lo(code), hi(code), lo(item.health), hi(item.health), lo(item.maxHealth), hi(item.maxHealth)});
+    }
+    if ((item.classes & oc::Wand) && (item.subclasses & 0x47F0000u) && recharge(item, 100) && holder) {  // a magical staff: recharged too
+        tell(world, *holder, {0x64, lo(code), hi(code), item.charges, item.maxCharges}); // (SrvNet_SendReportCharges)
+    }
+}
+
+void setItemHealth(World& world, ServerObject& item, std::uint16_t health, const ServerObject* holder)
+{
+    item.health = health;
+    item.touch();
+    const std::uint16_t code = netCodeOf(item);
+    if (holder && item.maxHealth != 0) {
+        tell(world, *holder, {0x44, lo(code), hi(code), lo(item.health), hi(item.health), lo(item.maxHealth), hi(item.maxHealth)});
+    }
+}
+
 TradeSession* tradeSession(World& world, std::uint32_t id)
 {
     if (id == 0) {
@@ -1375,15 +1404,7 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
             break;
         }
         subGold(unit, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 2, s, *item)));
-        item->health = item->maxHealth; // (unitSetHP)
-        item->touch();
-        const std::uint16_t code = netCodeOf(*item);
-        if (item->maxHealth != 0) { // (SrvNet_SendReportItemHealth)
-            tell(world, unit, {0x44, lo(code), hi(code), lo(item->health), hi(item->health), lo(item->maxHealth), hi(item->maxHealth)});
-        }
-        if ((item->classes & oc::Wand) && (item->subclasses & 0x47F0000u) && recharge(*item, 100)) {  // a magical staff: recharged too
-            tell(world, unit, {0x64, lo(code), hi(code), item->charges, item->maxCharges}); // (SrvNet_SendReportCharges)
-        }
+        repairItem(world, *item, &unit);
         reportGold(world, unit);
         playSound(world, 0x323, unit, 2, unit.extent);
         break;
@@ -1404,8 +1425,7 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         if (!item) {
             break;
         }
-        const bool charge = (item->classes & oc::Wand) && (item->subclasses & 0x47F0000u) && item->charges < item->maxCharges && item->maxCharges != 0;  // a magical staff short of charges
-        if ((item->maxHealth != 0 && item->health != item->maxHealth) || charge) {
+        if (needsRepair(*item)) {
             std::vector<std::uint8_t> r = {0xC9, 0x1F, lo(code), hi(code)};
             putU32(r, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 2, s, *item)));
             tell(world, unit, std::move(r));

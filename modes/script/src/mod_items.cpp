@@ -4,12 +4,15 @@
 #include "mod_parts.hpp"
 #include "toolbox.hpp"
 
+#include "noxcore/mapedit/content.hpp"
 #include "noxcore/server/game_host.hpp"
 #include "noxcore/server/items.hpp"
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/rewards.hpp"
 #include "noxcore/server/server.hpp"
+#include "noxcore/server/trade.hpp"
 #include "noxcore/server/world.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/modifier.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/thing_db.hpp"
@@ -100,6 +103,23 @@ void setNumber(lua_State* L, const char* name, double v)
     lua_setfield(L, -2, name);
 }
 
+/// A string id's text (UTF-8) as field `name`; nothing for no id, no table or no such entry.
+void setText(lua_State* L, const strings::StringTable* table, const char* name, const std::string& id)
+{
+    if (!table || id.empty()) {
+        return;
+    }
+    if (const auto t = table->text(id)) {
+        const std::string s = strings::toUtf8(*t);
+        lua_pushlstring(L, s.data(), s.size());
+        lua_setfield(L, -2, name);
+    }
+}
+
+/// The damage types by number (the game's table, in order), as a script names them.
+constexpr std::array<const char*, 18> kDamageTypes = {"blade",  "flame",   "crush", "impale",    "drain",    "poison",   "dispelUndead", "explosion", "bite",
+                                                      "electric", "claw", "impact", "lava", "deathMagic", "plasma", "manaBomb", "zapRay", "airborneElectric"};
+
 // ---- nox.item, nox.modifier, nox.modifiers, nox.modifierFits
 
 int noxItem(lua_State* L)
@@ -156,6 +176,71 @@ int noxModifier(lua_State* L)
     setNumber(L, "worth", m->worth);
     lua_pushlstring(L, m->desc.data(), m->desc.size());
     lua_setfield(L, -2, "desc");
+    // Its words as the game shows them (the string table's: none without nox.csf), and its effects'
+    // numbers by function name.
+    const strings::StringTable* table = toolbox::worldOf(L).strings;
+    setText(L, table, "text", m->desc);
+    setText(L, table, "identify", m->identifyDesc);
+    lua_createtable(L, 0, static_cast<int>(m->effects.size()));
+    for (const auto& [name, value] : m->effects) {
+        lua_pushnumber(L, value);
+        lua_setfield(L, -2, name.c_str());
+    }
+    lua_setfield(L, -2, "effects");
+    return 1;
+}
+
+int noxItemStats(lua_State* L)
+{
+    // nox.itemStats(type): a type's base stats as the game makes and reads it (nil: no such type).
+    const things::ThingDb& db = toolbox::thingsOf(L);
+    const things::ThingDef* def = nullptr;
+    if (lua_type(L, 1) == LUA_TNUMBER) {
+        const double n = lua_tonumber(L, 1);
+        def = n >= 1 && n <= static_cast<double>(db.things.size()) && n == std::floor(n) ? &db.things[static_cast<std::size_t>(n) - 1] : nullptr;
+    } else {
+        def = db.findThing(luaL_checkstring(L, 1));
+    }
+    if (!def) {
+        lua_pushnil(L);
+        return 1;
+    }
+    server::World& world = toolbox::worldOf(L);
+    const things::ModifierDb* mods = toolbox::modifiersOf(L);
+    // (The type as made: its durability and charges as nox.create's would have them.)
+    const server::ServerObject o = server::describeType(world, db, def->name);
+    lua_createtable(L, 0, 12);
+    lua_pushlstring(L, def->name.data(), def->name.size());
+    lua_setfield(L, -2, "type");
+    if (const std::string name = mapedit::thingDisplayName(*def, world.strings, mods); !name.empty()) {
+        lua_pushlstring(L, name.data(), name.size());
+        lua_setfield(L, -2, "name");
+    }
+    setNumber(L, "durability", o.maxHealth);
+    setNumber(L, "charges", o.maxCharges);
+    // Its weapon or armour record (modifier.bin), by the class the game asks it by.
+    const bool weaponLike = (o.classes & (oc::Weapon | oc::Wand | oc::Flag)) != 0;
+    const things::EquipDef* equip = !mods ? nullptr : weaponLike ? mods->findWeapon(def->name) : (o.classes & oc::Armor) ? mods->findArmor(def->name) : nullptr;
+    if (equip && weaponLike) {
+        setNumber(L, "damageMin", equip->damageMin);
+        setNumber(L, "damageCoefficient", equip->damageCoefficient);
+        setNumber(L, "requiredStrength", equip->requiredStrength);
+        setNumber(L, "range", equip->range);
+        if (const auto type = server::meleeDamageType(things::weaponBitOf(def->name)); type && *type < kDamageTypes.size()) {
+            lua_pushstring(L, kDamageTypes[*type]);
+            lua_setfield(L, -2, "damageType");
+        }
+    } else if (equip) {
+        setNumber(L, "armor", equip->armorValue);
+    }
+    // Which class may use or wear it (a multiclass player: any).
+    lua_createtable(L, 0, 3);
+    static constexpr const char* kClasses[] = {"warrior", "wizard", "conjurer"};
+    for (std::uint8_t c = 0; c < 3; ++c) {
+        lua_pushboolean(L, server::classMayUse(c, o, mods));
+        lua_setfield(L, -2, kClasses[c]);
+    }
+    lua_setfield(L, -2, "classes");
     return 1;
 }
 
@@ -198,6 +283,68 @@ int noxModifierFits(lua_State* L)
     probe.subclasses = things::thingSubclasses(*def);
     probe.modifiers[static_cast<std::size_t>(slot)] = m->id;
     lua_pushboolean(L, modifiersFit(probe, mods));
+    return 1;
+}
+
+// ---- nox.repairCost, nox.repair, nox.setDurability
+
+server::ServerObject& itemArg(lua_State* L, int idx)
+{
+    server::ServerObject& item = toolbox::objectArg(L, idx);
+    luaL_argcheck(L, isItem(item), idx, "an item");
+    return item;
+}
+
+/// The unit holding it (its client is told), or null.
+const server::ServerObject* holderOf(server::World& world, const server::ServerObject& item)
+{
+    return item.holder != 0 ? world.byExtent(item.holder) : nullptr;
+}
+
+int noxRepairCost(lua_State* L)
+{
+    // nox.repairCost(item): the game's shop's repair price (a keeper's own multiplier aside: a stock
+    // keeper's 1); nil when it needs none.
+    const server::ServerObject& item = itemArg(L, 1);
+    if (!server::needsRepair(item)) {
+        lua_pushnil(L);
+        return 1;
+    }
+    lua_pushnumber(L, server::itemCost(toolbox::worldOf(L), toolbox::modifiersOf(L), 2, nullptr, item));
+    return 1;
+}
+
+int noxRepair(lua_State* L)
+{
+    // nox.repair(item): the shop's repair, no gold taken (durability and a staff's charges to their
+    // most, told to its holder's client); whether it needed one (nothing done when not).
+    toolbox::refuseInsideAsked(L, "nox.repair");
+    server::ServerObject& item = itemArg(L, 1);
+    if (!server::needsRepair(item)) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    server::World& world = toolbox::worldOf(L);
+    server::repairItem(world, item, holderOf(world, item));
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+int noxSetDurability(lua_State* L)
+{
+    // nox.setDurability(item, n): its durability, 1 to its most (more is its most), told to its
+    // holder's client as a repair tells it; false for a thing without durability.
+    toolbox::refuseInsideAsked(L, "nox.setDurability");
+    server::ServerObject& item = itemArg(L, 1);
+    const double n = luaL_checknumber(L, 2);
+    luaL_argcheck(L, n >= 1 && n <= 65535 && n == std::floor(n), 2, "a whole number from 1");
+    if (item.maxHealth == 0) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    server::World& world = toolbox::worldOf(L);
+    server::setItemHealth(world, item, static_cast<std::uint16_t>(std::min<double>(n, item.maxHealth)), holderOf(world, item));
+    lua_pushboolean(L, 1);
     return 1;
 }
 
@@ -373,8 +520,9 @@ void addPlayerFacts(lua_State* L, const server::HostedPlayer& p, const server::S
 void addItemsToolbox(lua_State* L)
 {
     static constexpr std::pair<const char*, lua_CFunction> kFns[] = {
-        {"item", noxItem},           {"modifier", noxModifier},     {"modifiers", noxModifiers},
+        {"item", noxItem},           {"modifier", noxModifier},     {"modifiers", noxModifiers},  {"itemStats", noxItemStats},
         {"modifierFits", noxModifierFits}, {"equip", noxEquip},     {"unequip", noxUnequip},
+        {"repairCost", noxRepairCost}, {"repair", noxRepair},       {"setDurability", noxSetDurability},
         {"setLevel", noxSetLevel},   {"setExperience", noxSetExperience}, {"giveExperience", noxGiveExperience},
     };
     for (const auto& [name, fn] : kFns) {

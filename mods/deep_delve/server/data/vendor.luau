@@ -11,6 +11,12 @@ vendor.potions = {
 	{ type = "CurePoisonPotion", price = 8 },
 }
 
+-- Supplies, always in stock after the potions as they are: { type, price } (gold). A plain quiver
+-- of arrows (a bow or crossbow shoots only with one worn; by decision 2026-11-01).
+vendor.supplies = {
+	{ type = "Quiver", price = 15 },
+}
+
 -- The gear it sells: `count` pieces drawn from the loot's gear list at the area level (none
 -- above it), each magic at `magic` odds and rare at `rare` (else normal). Rolled again as each
 -- area is entered and when an act is cleared.
@@ -22,7 +28,7 @@ vendor.gear = { count = 8, magic = 0.35, rare = 0.05 }
 vendor.prices = {
 	base = 20,
 	perLevel = 6,
-	rarity = { normal = 1, magic = 2.5, rare = 6, unique = 12 },
+	rarity = { normal = 1, magic = 2.5, rare = 6, unique = 12, set = 10 },
 	sell = 0.25,
 	reroll = 0.6,
 }

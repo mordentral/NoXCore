@@ -451,6 +451,10 @@ struct App {
     std::string tooltip;
     int tooltipStill = 0;
     SDL_FPoint tooltipMouse{};
+    /// The item `tooltip` names this frame (liveTooltip: its net code, 0 none) and where: "inventory",
+    /// "weapon" (the weapon panel's) or "ground" (a script UI's itemTip hook is told of it).
+    std::uint16_t tipItem = 0;
+    const char* tipWhere = "";
     std::uint64_t tooltipStepMs = 0;
     bool screenshotWanted = false;  ///< F12 (ScreenShot): this frame to nox<n>.bmp
     int screenshotNumber = 0;       ///< g_ScreenshotPrefix_: the last number used

@@ -7,6 +7,7 @@
 // (Internal to the script modes' sources.)
 #pragma once
 
+#include "noxcore/server/combat.hpp"
 #include "noxcore/server/world.hpp"
 
 #include <cstddef>
@@ -25,7 +26,7 @@ public:
 
     struct Has {
         bool onObjectKilled = false, onDestroyed = false, onDamage = false, onDamaged = false, onPickup = false,
-             onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false;
+             onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false, onReflect = false;
     };
     /// Which of them the script's mode table (on top of L's stack) has (each load).
     void look(lua_State* L);
@@ -43,10 +44,12 @@ public:
                    std::span<const std::uint32_t> made);
 
     // ---- asked: the script's answer, at once
-    /// onDamage(target, source, weapon, amount, kind) -> amount (nil: kept; 0: the hit cancelled).
-    /// False: cancel it.
+    /// onDamage(target, source, weapon, amount, kind, cause) -> amount (nil: kept; 0: the hit
+    /// cancelled); cause "blow", "missile", "spell" or "other". False: cancel it.
     bool damage(lua_State* L, const server::ServerObject& target, const server::ServerObject* source,
-                const server::ServerObject* weapon, int& amount, int type);
+                const server::ServerObject* weapon, int& amount, int type, server::HitCause cause);
+    /// onReflect(target, missile, front) -> true turns the missile as a reflective shield does.
+    bool reflect(lua_State* L, const server::ServerObject& target, const server::ServerObject& missile, bool front);
     /// onExit(exit, player) -> false holds the player at the exit.
     bool exitTouched(lua_State* L, const server::ServerObject& exit, const server::ServerObject& player);
     /// castCost(caster, spell, cost, how) -> nil (the game's price) | mana [, health]: a player's

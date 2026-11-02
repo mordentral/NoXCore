@@ -51,7 +51,7 @@ void Events::look(lua_State* L)
     };
     has_ = {.onObjectKilled = hasFn("onObjectKilled"), .onDestroyed = hasFn("onDestroyed"), .onDamage = hasFn("onDamage"),
             .onDamaged = hasFn("onDamaged"), .onPickup = hasFn("onPickup"), .onDrop = hasFn("onDrop"), .onEquip = hasFn("onEquip"),
-            .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost")};
+            .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost"), .onReflect = hasFn("onReflect")};
 }
 
 bool Events::room()
@@ -126,17 +126,19 @@ bool Events::ask(lua_State* L, const char* hook, int nargs, int nresults)
 }
 
 bool Events::damage(lua_State* L, const server::ServerObject& target, const server::ServerObject* source,
-                    const server::ServerObject* weapon, int& amount, int type)
+                    const server::ServerObject* weapon, int& amount, int type, server::HitCause cause)
 {
     if (!has_.onDamage || !toolbox::beginHook(L, "onDamage")) {
         return true;
     }
+    static constexpr const char* kCauses[] = {"other", "blow", "missile", "spell"};
     lua_pushnumber(L, target.extent);
     pushId(L, source ? source->extent : 0);
     pushId(L, weapon ? weapon->extent : 0);
     lua_pushnumber(L, amount);
     lua_pushnumber(L, type);
-    if (!ask(L, "onDamage", 5, 1)) {
+    lua_pushstring(L, kCauses[static_cast<std::size_t>(cause)]);
+    if (!ask(L, "onDamage", 6, 1)) {
         return true; // (a failing hook changes nothing)
     }
     bool keep = true;
@@ -153,6 +155,22 @@ bool Events::damage(lua_State* L, const server::ServerObject& target, const serv
     }
     lua_pop(L, 1);
     return keep;
+}
+
+bool Events::reflect(lua_State* L, const server::ServerObject& target, const server::ServerObject& missile, bool front)
+{
+    if (!has_.onReflect || !toolbox::beginHook(L, "onReflect")) {
+        return false;
+    }
+    lua_pushnumber(L, target.extent);
+    lua_pushnumber(L, missile.extent);
+    lua_pushboolean(L, front);
+    if (!ask(L, "onReflect", 3, 1)) {
+        return false; // (a failing hook changes nothing)
+    }
+    const bool turned = lua_toboolean(L, -1) != 0;
+    lua_pop(L, 1);
+    return turned;
 }
 
 bool Events::exitTouched(lua_State* L, const server::ServerObject& exit, const server::ServerObject& player)

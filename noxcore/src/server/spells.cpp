@@ -951,7 +951,7 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
             if (&o != &source && !(o.flags & ObjFlag::Airborne) && o.health != 0) { // (no 0x20 test: a deleted one shaken too)
                 // (The share stored; the damage on the stack, chopped by __ftol.)
                 const float share = (X87(1.0f) - X87(edgeDistance(o, source)) / range).f();
-                fight.damage(o, from, source.extent, util::ftol(X87(most) * share), 0xB);
+                fight.damage(o, from, source.extent, util::ftol(X87(most) * share), 0xB, HitCause::Spell);
             }
         });
         jiggle(source.x, source.y, static_cast<int>(world.number("EarthquakeJiggle", level)));
@@ -964,7 +964,8 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
             return unseen();
         }
         Missiles{world, things, modifiers, rng, frame}.damageAt(x, y, world.number("DeathRayOutRadius"), world.number("DeathRayInRadius"),
-                                                              static_cast<int>(world.number("DeathRayDamage")), 0x10, &caster, nullptr, true);
+                                                              static_cast<int>(world.number("DeathRayDamage")), 0x10, &caster, nullptr, true,
+                                                              HitCause::Spell);
         const auto i16 = [](float v) { return static_cast<std::uint16_t>(static_cast<int>(v)); };
         const std::uint16_t ray[4] = {i16(source.x), i16(source.y), i16(x), i16(y)};
         std::vector<std::uint8_t> fx = {0x94}; // MSG_FX_DEATH_RAY (to those who see the line)
@@ -1218,7 +1219,7 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         case 0x47: // Shock (useShock); a glyph's: ShockTrapDamage at once (type 9)
             if (source.typeName == "Glyph") {
                 Fight{world, rng, frame, &things, modifiers}.damage(*target, &caster, caster.extent,
-                                                                    static_cast<int>(world.number("ShockTrapDamage", level)), 9);
+                                                                    static_cast<int>(world.number("ShockTrapDamage", level)), 9, HitCause::Spell);
                 break;
             }
             onTarget(Enchant::Shock, frames("ShockEnchantDuration"));
@@ -2771,7 +2772,7 @@ int Spells::chainLightning(DurationSpell& s, ServerObject* caster)
                 return;
             }
             if (world.traceRay(s.x, s.y, o.x, o.y, Trace::Doors | Trace::NearWindows)) {
-                fight.damage(o, nullptr, 0, static_cast<int>(world.number("LightningGlyphDamage")), 17);
+                fight.damage(o, nullptr, 0, static_cast<int>(world.number("LightningGlyphDamage")), 17, HitCause::Spell);
                 pointFx(0x81, o.x, o.y);
                 playSound(world, spellSound(things, 0x2B, 0), o); // (Chain Lightning's, at each struck)
             }
@@ -2877,7 +2878,7 @@ int Spells::chainLightning(DurationSpell& s, ServerObject* caster)
         }
         if (ServerObject* t = world.byExtent(to)) {
             if (0 < whole) {
-                fight.damage(*t, caster, 0, whole, 17);
+                fight.damage(*t, caster, 0, whole, 17, HitCause::Spell);
             }
             if (t->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
                 pointFx(0x81, t->x, t->y);
@@ -3304,7 +3305,7 @@ int Spells::lastingUpdate(DurationSpell& s)
             rayFx(world, s, true, target->extent);
         }
         const bool hecubah = target->typeName == "Hecubah" || target->typeName == "HecubahWithOrb";
-        fight.damage(*target, caster, 0, static_cast<int>(world.number(hecubah ? "PlasmaDamageHecubah" : "PlasmaDamage")), 0xE);
+        fight.damage(*target, caster, 0, static_cast<int>(world.number(hecubah ? "PlasmaDamageHecubah" : "PlasmaDamage")), 0xE, HitCause::Spell);
         if (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
             pointFx(0x83, target->x, target->y);
         }
@@ -3436,7 +3437,7 @@ int Spells::lastingUpdate(DurationSpell& s)
         // out to ManaBombOutRadius, as mana-bomb harm (15), from its caster: the caster too
         // (gameSetWallsDamage(1): its source not spared).
         Missiles{world, things, modifiers, rng, frame}.damageAt(bx, by, world.number("ManaBombOutRadius"), world.number("ManaBombInRadius"),
-                                                                 power, 15, caster, nullptr, false);
+                                                                 power, 15, caster, nullptr, false, HitCause::Spell);
         jiggle(bx, by, static_cast<int>(world.number("ManaBombShakeMag")));
         pointFx(0x81, bx, by);
         pointFx(0x9A, bx, by);
@@ -3510,7 +3511,7 @@ int Spells::lastingUpdate(DurationSpell& s)
         if (s.glyph) { // a glyph's: one strike at the nearest enemy, and done
             if (ServerObject* t = boltTarget(s.x, s.y, range, caster, true)) {
                 ServerObject* source = s.source ? world.byExtent(s.source) : nullptr;
-                fight.damage(*t, source, 0, static_cast<int>(world.number("EnergyBoltGlyphDamage")), 17);
+                fight.damage(*t, source, 0, static_cast<int>(world.number("EnergyBoltGlyphDamage")), 17, HitCause::Spell);
                 pointFx(0x82, t->x, t->y);
                 playSound(world, spellSound(things, 0x18, 0), *t);
             }
@@ -3556,7 +3557,7 @@ int Spells::lastingUpdate(DurationSpell& s)
             }
             rayFx(world, s, true, s.target);
         }
-        fight.damage(*target, caster, 0, whole, 17);
+        fight.damage(*target, caster, 0, whole, 17, HitCause::Spell);
         if (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
             pointFx(0x82, target->x, target->y);
         }

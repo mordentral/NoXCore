@@ -15,8 +15,13 @@
 -- and the experience it gives are multiplied by the party's factors when they're used; an area
 -- entered with more players gets extra packs at the generator's spots.
 
+--
+-- Powers (powers.luau): a rare rolls one, a champion two, as it's set up (applyTier); a powered
+-- monster's death tells powers.luau (its splitting, its lightning), and a new map stops their beats.
+
 local data = require("data/monsters")
 local numbers = require("data/numbers")
+local powers = require("powers")
 local scale = require("scale")
 
 local monsters = {}
@@ -38,6 +43,11 @@ local guarded: any = nil
 
 function monsters.info(id: number): any
 	return known[id]
+end
+
+-- Every live monster the mod made (id -> entry); the index itself, read only.
+function monsters.all(): { [number]: any }
+	return known
 end
 
 -- The live named monsters (id -> entry: its name, tier and net code); the index itself, read only.
@@ -147,9 +157,10 @@ local function rollTier(level: number): string
 	return "normal"
 end
 
--- Sets a made monster up as `tier` at the area level: health, enchantments, its name; registered
--- and watched (its death, the mod's loot and experience).
-function monsters.applyTier(id: number, thingType: string, tierName: string, level: number, fixed: any): any
+-- Sets a made monster up as `tier` at the area level: health, enchantments, its name, its powers
+-- (`want`: these powers' ids, {} none; nil: its tier's count rolled); registered and watched (its
+-- death, the mod's loot and experience).
+function monsters.applyTier(id: number, thingType: string, tierName: string, level: number, fixed: any, want: { string }?): any
 	local tier = (data.tiers :: any)[tierName]
 	local a = numbers.areas
 	local base = nox.monsterInfo(thingType)
@@ -205,6 +216,10 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	if tier.named then
 		entry.name = if fixed then fixed.name else rareName()
 	end
+	-- Its powers (a rare's one, a champion's two), their words on its plate.
+	if want or tier.powers then
+		powers.give(id, entry, tier.powers or 0, want)
+	end
 	known[id] = entry
 	if entry.name then
 		named[id] = entry
@@ -215,16 +230,16 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	return entry
 end
 
--- One monster of a type at (x, y), set up as `tier` (`fixed`: a champion's or boss's own set);
--- its id.
-local function spawn(thingType: string, x: number, y: number, tierName: string, level: number, fixed: any?): number?
+-- One monster of a type at (x, y), set up as `tier` (`fixed`: a champion's or boss's own set;
+-- `want`: its powers, applyTier's); its id.
+local function spawn(thingType: string, x: number, y: number, tierName: string, level: number, fixed: any?, want: { string }?): number?
 	local px, py = nox.clearPointNear(x, y, 40)
 	local id = nox.create(thingType, px, py)
 	if not id then
 		nox.log("deep_delve: no monster type " .. thingType)
 		return nil
 	end
-	monsters.applyTier(id, thingType, tierName, level, fixed)
+	monsters.applyTier(id, thingType, tierName, level, fixed, want)
 	return id
 end
 monsters.spawn = spawn
@@ -324,8 +339,8 @@ function monsters.populate(spots: any, area: any)
 	end
 end
 
--- A watched monster's death: its entry (forgotten here), or nil when it wasn't one of the mod's.
-function monsters.killed(id: number): any
+-- A monster out of the index (and its plate's): its entry, or nil.
+local function drop(id: number): any
 	local e = known[id]
 	known[id] = nil
 	if named[id] then
@@ -335,10 +350,25 @@ function monsters.killed(id: number): any
 	return e
 end
 
+-- A watched monster's death: its entry (forgotten here), or nil when it wasn't one of the mod's. A
+-- powered one's death powers go off (powers.luau).
+function monsters.killed(id: number): any
+	local e = drop(id)
+	if e and e.powers then
+		powers.died(id, e)
+	end
+	return e
+end
+
 -- A monster that's no longer the mod's (a hero charmed it: summons.luau): forgotten, so its death
--- gives no experience or loot and the party's size no longer scales it; its entry, or nil.
+-- gives no experience or loot and the party's size no longer scales it, and its powers' beat
+-- stops; its entry, or nil.
 function monsters.forget(id: number): any
-	return monsters.killed(id)
+	local e = drop(id)
+	if e and e.powers then
+		powers.forgot(id)
+	end
+	return e
 end
 
 -- The damage multiplier of a monster dealing a hit (1 for anything the mod didn't make), the
@@ -426,6 +456,9 @@ end
 function monsters.reset()
 	table.clear(known)
 	table.clear(named)
+	powers.reset()
 end
+
+powers.attach(monsters)
 
 return monsters

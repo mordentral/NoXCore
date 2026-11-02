@@ -8,6 +8,7 @@
 -- account is what the client gave at its join (a label on a local host, design 5.2); none, "local".
 -- Players' own .plr files are never written: the record is the character.
 
+local acts = require("data/acts")
 local classes = require("data/classes")
 local progress = require("progress")
 local atlas = require("atlas")
@@ -39,7 +40,10 @@ local store = {}
 --      tier (deepest and each waypoint found, + ACT2_OPENING), so a found waypoint is the same
 --      area's and the deepest the same place; world.deepest follows.
 --   7  atlas = { open, best, runs, cleared = { [biome] = { ranks } } }: the expeditions cleared
---      (atlas.luau). Version 6's records get an empty atlas, open when they cleared the last act.
+--      (atlas.luau). Version 6's records get an empty atlas, open when they cleared the last act
+--      of the day (act 2) or any after it.
+--   (Act 3, appended after act 2, needed no version: no act's indices moved, and a record that
+--   cleared act 2 has act 3 opened as it's read, progress.openAfterCleared.)
 store.VERSION = 7
 
 -- How many areas version 6 put in front of act 2's (data/acts.luau's act 2: Old Workings, Cave
@@ -273,10 +277,18 @@ local function toVersion6(rec: any)
 	rec.version = 6
 end
 
--- Version 6 -> 7: an empty atlas, the map table open when it has cleared the last act.
+-- Version 6 -> 7: an empty atlas, the map table open when it has cleared the last act of version
+-- 7's day (act 2, VERSION7_LAST) or any act after it: a version 6 record that cleared act 2 keeps
+-- the table version 7 gave it, though act 3 has come since.
+local VERSION7_LAST = 2
 local function toVersion7(rec: any)
-	rec.atlas = atlas.fresh()
-	atlas.note(rec)
+	local a = atlas.fresh()
+	rec.atlas = a
+	for act = VERSION7_LAST, #acts do
+		if progress.isCleared(rec, act) then
+			a.open = true
+		end
+	end
 	rec.version = 7
 end
 

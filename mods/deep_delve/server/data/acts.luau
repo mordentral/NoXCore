@@ -5,8 +5,9 @@
 -- and look) is here too.
 --
 -- The acts go by biome, a journey upward and onward: act 1 the catacombs, act 2 up out of them
--- into the open fields. An act without a `base` carries on from the act before it (that act's
--- base plus its areas), so a later act's levels follow whatever the earlier acts are tuned to.
+-- into the open fields, act 3 on into the forest, act 4 out into the desert. An act without a
+-- `base` carries on from the act before it (that act's base plus its areas), so a later act's
+-- levels follow whatever the earlier acts are tuned to.
 -- Killing an act's boss opens the gate in its lair to the next act's first area (`gate` below);
 -- the last act's boss opens none.
 --
@@ -14,11 +15,12 @@
 -- the area has a waypoint), waypointAt ("start": in its start chamber, else off the route's
 -- middle), lair (true: the act boss's lair, the act's last area), title (its name, when not the
 -- biome's), roster (data/monsters.luau's roster and champion it draws from, when not its biome's),
--- arena (a lair's look: the generator's gen/area.luau arenas, by name; none: "pyre").
+-- arena (a lair's look: the generator's gen/area.luau arenas, by name; none: "pyre"), sky (the
+-- list in `skies` its weather is rolled from, when not its biome's).
 --
 -- The weather is no area's own: each time an outdoor area's map is built, it rolls one from its
--- biome's list in `skies` below (a biome without a list, and every lair, has none). Its town, in
--- the same map, has the same.
+-- biome's list in `skies` below (or the list its `sky` names; a biome without a list, and every
+-- lair, has none). Its town, in the same map, has the same.
 --
 -- An act's town: its name (as the healer's waters are told) and its look (the generator's
 -- gen/towns.luau, by name: the town's floors, lights and scenery; the stations are the same in
@@ -26,7 +28,9 @@
 --
 -- A record keeps an area by its index in its act (progress.luau), so areas put into an act before
 -- others move the later ones' indices: store.luau's record version 6 moved act 2's on by its two
--- opening areas. Another such change needs a record version of its own.
+-- opening areas. Another such change needs a record version of its own. An act appended after
+-- the others moves no index (acts 3 and 4 needed none: a record that cleared the act before has
+-- the new one opened as it's read, progress.luau).
 
 local acts: { any } = {
 	{
@@ -69,6 +73,58 @@ local acts: { any } = {
 		},
 		boss = "barrowking",
 	},
+	{
+		-- On from the barrow fields into the old wood: the fields' last hedgerows where the trees
+		-- begin, then the forest itself, deep under the leaves, with black mires in its hollows, to
+		-- the troll chieftain's glade.
+		name = "The Greenwood",
+		-- (a woodcutters' camp in a clearing; outdoors, so the area's weather falls on it too)
+		town = { name = "Fernhollow", look = "camp" },
+		areas = {
+			-- The wood's edge: the last of the fields (grass and field stone) as the trees thicken,
+			-- its beasts the fields' and the wood's; its waypoint by the start, found as the party
+			-- comes through act 2's gate.
+			{ biome = "Grasslands", corridor = 3, title = "Wood's Edge", roster = "Edge", waypoint = true, waypointAt = "start" },
+			{ biome = "Forest", corridor = 3, title = "Greenwood" },
+			{ biome = "Forest", corridor = 3, title = "Greenwood", waypoint = true },
+			-- (the mires in the wood's hollows: a Swamp map with a roster of its own)
+			{ biome = "Swamp", corridor = 2, title = "Mire", roster = "Mire" },
+			{ biome = "Forest", corridor = 3, title = "Greenwood", waypoint = true },
+			{ biome = "Forest", corridor = 3, title = "Greenwood" },
+			{ biome = "Swamp", corridor = 2, title = "Mire", roster = "Mire", waypoint = true },
+			{ biome = "Forest", corridor = 3, title = "Greenwood" },
+			-- The troll chieftain's glade: a clearing ringed by his camp's skull posts and logs, fire
+			-- pits at its quarters.
+			{ biome = "Forest", corridor = 3, lair = true, title = "Chieftain's Glade", arena = "glade" },
+		},
+		boss = "mosschief",
+	},
+	{
+		-- Out of the greenwood into the waste: a dry steppe where the trees give out, then the
+		-- dunes, the ruins half buried in them and a bitter shore of a dead sea, under a hard sky of
+		-- wind and dust (never rain), to the court of stone where the ruin-warden stands.
+		name = "The Sunscorched Waste",
+		-- (a caravan stop round an oasis well; outdoors, so the area's wind blows through it too)
+		town = { name = "the Last Well", look = "oasis" },
+		areas = {
+			-- The dry steppe: the last grass (field stone, yellowed patches) as the sand begins, its
+			-- beasts the wood's edge's and the waste's; its own dry sky (`sky`: no rain); its waypoint
+			-- by the start, found as the party comes through act 3's gate.
+			{ biome = "Grasslands", corridor = 3, title = "Dry Steppe", roster = "Steppe", sky = "Steppe", waypoint = true, waypointAt = "start" },
+			{ biome = "Desert", corridor = 3, title = "Dunes" },
+			{ biome = "Desert", corridor = 3, title = "Dunes", waypoint = true },
+			-- (the bitter shore of a dead sea: a Beach map)
+			{ biome = "Beach", corridor = 3, title = "Bitter Shore" },
+			{ biome = "Desert", corridor = 3, title = "Dunes", waypoint = true },
+			{ biome = "Desert", corridor = 3, title = "Dunes" },
+			{ biome = "Beach", corridor = 3, title = "Bitter Shore", waypoint = true },
+			{ biome = "Desert", corridor = 3, title = "Dunes" },
+			-- The ruined court: a sunken square of the old ruins, statues and broken columns round its
+			-- edge, braziers at its quarters, the ruin-warden at its heart.
+			{ biome = "Desert", corridor = 3, lair = true, title = "Ruined Court", arena = "court" },
+		},
+		boss = "warden",
+	},
 }
 
 -- The weathers an outdoor area may have (nox.weather's tables), drawn by NoX Core clients; they
@@ -78,6 +134,8 @@ local weathers = {
 	drizzle = { kind = "rain", strength = 0.35, wind = { angle = 70, speed = 0.25 }, fade = 90 },
 	rain = { kind = "rain", strength = 0.65, wind = { angle = 60, speed = 0.4 }, fade = 90 },
 	windy = { kind = "none", wind = { angle = 80, speed = 0.55 }, fade = 90 },
+	-- (a hard wind off the waste: the client draws its gusts' dust thick, no rain)
+	dust = { kind = "none", wind = { angle = 100, speed = 0.9 }, fade = 120 },
 	clear = { kind = "none", fade = 90 },
 }
 
@@ -87,6 +145,13 @@ local weathers = {
 local skies = {
 	Grasslands = { { "drizzle", 3 }, { "windy", 3 }, { "clear", 2 }, { "rain", 1 } },
 	Swamp = { { "rain", 4 }, { "drizzle", 3 }, { "windy", 1 }, { "clear", 1 } },
+	-- (the wood: rain through the leaves, the wind in the tree tops)
+	Forest = { { "rain", 3 }, { "drizzle", 3 }, { "windy", 3 }, { "clear", 1 } },
+	-- (the waste: wind and dust, or a still, hard sky; never rain)
+	Desert = { { "windy", 3 }, { "dust", 3 }, { "clear", 2 } },
+	Beach = { { "windy", 4 }, { "clear", 3 }, { "dust", 1 } },
+	-- (act 4's dry steppe, a Grasslands map that names this list: no rain)
+	Steppe = { { "windy", 4 }, { "clear", 3 }, { "dust", 1 } },
 }
 
 -- The gate a lair's boss opens to the next act (gate.luau), at the lair's gate spot (the arena's

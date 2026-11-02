@@ -62,6 +62,65 @@ towns.hamlet = {
 	},
 }
 
+-- Act 3, the Greenwood: Fernhollow, a woodcutters' camp in a clearing: dense grass round a
+-- trodden dirt yard, dirt paths to the stations and the gate, torch poles by the vendor's tent and
+-- bow racks, the logs and stumps of the woodcutting, a cold fire ring south of the starts, ferns
+-- and foliage along its walls.
+towns.camp = {
+	floor = "GrassDense",
+	square = { floor = "DirtDark2", radius = 3 },
+	paths = "DirtDark2",
+	flank = { type = "TorchPole", light = "torch" },
+	wallPieces = { types = { "FoliageDense1", "PlantFern2", "Bush6" }, every = 2, out = 0.5 },
+	props = {
+		{ "OutdoorTraderPupTent", 3, -7 },
+		{ "TraderBowRack1", -2, -7 },
+		{ "TraderBowRack2", -4, -6 },
+		{ "ForestLog01", -7, 2 },
+		{ "Stump4", -7, -2 },
+		{ "ForestLog03", -8, 0 },
+		{ "CampFireUnused", 0, 8 },
+		{ "Stump1", -2, 8 },
+		{ "Stump2", 2, 8 },
+		-- (as the hamlet's: nothing within five cells of the portal's and waypoints' pads, east of
+		-- the fountain)
+		{ "TreeForest02", -5, -5 },
+		{ "Stump3", -5, 6 },
+		{ "Mushroom4", -3, -2 },
+		{ "PlantFern1", -3, 2 },
+	},
+}
+
+-- Act 4, the Sunscorched Waste: the Last Well, a caravan stop at an oasis: sand wall to wall, a
+-- green of dense grass round the fountain's waters, worn paths to the stations and the gate,
+-- braziers by the vendor's way, the traders' cart, crates and helm poles behind the anvil, water
+-- barrels by the stash, the old well south of the starts between ferns, a tree and a broken column
+-- in the corners, dry plants along its walls.
+towns.oasis = {
+	floor = "DirtSand",
+	square = { floor = "GrassDense", radius = 3 },
+	paths = "DirtLight2",
+	flank = { type = "Brazier", light = "brazier" },
+	wallPieces = { types = { "PlantBarren1", "PlantFern4", "PlantBarren2" }, every = 2, out = 0.5 },
+	props = {
+		{ "OutdoorTraderCart", 3, -7 },
+		{ "TraderAppleCrate", -2, -7 },
+		{ "OutdoorTraderHelmPoles", -4, -6 },
+		{ "WaterBarrel", -7, 2 },
+		{ "Barrel", -7, -2 },
+		{ "WaterBarrel", -8, 0 },
+		{ "Well", 0, 8 },
+		{ "PlantFern3", -2, 8 },
+		{ "PlantFern2", 2, 8 },
+		-- (as the other looks': nothing within five cells of the portal's and waypoints' pads, east
+		-- of the fountain)
+		{ "TreeGalava07", -5, -5 },
+		{ "RuinsColumnOutdoorShort01", -5, 6 },
+		{ "PlantBarren3", -3, -2 },
+		{ "PlantFern4", -3, 2 },
+	},
+}
+
 -- The map table (the expeditions'), the same in every look: its place, { dx, dy } cells from the
 -- town's middle (the free cell nearest it, placed after everything else): south of the waypoints'
 -- pad, clear of its ring.

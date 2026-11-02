@@ -315,14 +315,30 @@ public:
 
     void drawOver(App& app, SDL_Renderer* renderer, const HudFrame& hud) override
     {
+        if (!ui_ || stepFrame_ != app.frames || !app.font || menuUp(app)) {
+            return;
+        }
+        // (API 5) The UI's tooltip for the item the game would name (the inventory's too, a game
+        // window over the mod's): in the name's place, after the game's own pause.
+        if (const auto* lines = ui_->itemTip(app.tipItem)) {
+            if (app.tooltipStill > 9) {
+                place(hud);
+                drawTooltip(app, renderer, *lines);
+            }
+            return;
+        }
         // (Only in a frame the UI's frame ran, at Stage::InGame: not over a map's load. For API 3,
         // not where a game window drawn over the mod's has the pointer.)
-        if (!ui_ || stepFrame_ != app.frames || ui_->tooltip().empty() || !app.font || menuUp(app) ||
-            (ui_->api() >= 3 && gameWindowOver(app, hud.mouse.x, hud.mouse.y, false))) {
+        if (ui_->tooltip().empty() || (ui_->api() >= 3 && gameWindowOver(app, hud.mouse.x, hud.mouse.y, false))) {
             return;
         }
         place(hud);
-        drawTooltip(app, renderer);
+        drawTooltip(app, renderer, ui_->tooltip());
+    }
+
+    bool hidesItemName(const App& app) const override
+    {
+        return ui_ && (ui_->itemTip(app.tipItem) || ui_->itemTipPending(app.tipItem));
     }
 
     bool handleEvent(App& app, const SDL_Event& event, int, int, float) override
@@ -399,6 +415,7 @@ private:
         mouse_ = {(hud.mouse.x - originX_) / scale_, (hud.mouse.y - originY_) / scale_};
         ui_->setMouse(std::pair{mouse_.x, mouse_.y});
         ui_->setHudShown(!gameHudHidden(app, ui_->overMap()));
+        ui_->setItemHover(app.tipItem, app.tipWhere); // (API 5: last frame's, for its itemTip hook)
         ui_->frame(hud.nowMs);
         if (ui_->assets() != texturesOf_) {
             freeTextures(); // (a new set: its pictures made as they're drawn)
@@ -464,10 +481,9 @@ private:
         }
     }
 
-    /// (API 3) The tooltip at the mouse, whole on the screen.
-    void drawTooltip(App& app, SDL_Renderer* renderer)
+    /// (API 3) A tooltip's lines at the mouse, whole on the screen.
+    void drawTooltip(App& app, SDL_Renderer* renderer, const std::vector<nox::modes::script::UiTooltipLine>& lines)
     {
-        const auto& lines = ui_->tooltip();
         const int px = textSize();
         const float lineH = app.font->lineHeight(px) / scale_; // (UI units)
         float widest = 0;

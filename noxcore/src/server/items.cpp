@@ -89,10 +89,15 @@ bool Items::classMay(const ServerObject& player, const ServerObject& item) const
     if (player.player->multiclass) {
         return true; // (noxcpp: a multiclass player, a mode's, wields any class's weapons and wears any armour)
     }
+    return classMayUse(player.player->classId, item, modifiers);
+}
+
+bool classMayUse(std::uint8_t classId, const ServerObject& item, const things::ModifierDb* modifiers)
+{
     if (!(item.classes & (oc::Weapon | oc::Wand | oc::Armor))) {
         // (itemClassUseMask: a food's ~(SUBCLASS >> 5) | 0xFE, so only the warrior's bit drops
         // out, for a mana potion, SUBCLASS bit 5; anything else any class.)
-        return !(item.classes & oc::Food) || !(item.subclasses & 0x20u) || player.player->classId != 0;
+        return !(item.classes & oc::Food) || !(item.subclasses & 0x20u) || classId != 0;
     }
     if (!modifiers) {
         return true; // (noxcpp: a server without modifier.bin, a test's: no record to ask)
@@ -102,7 +107,7 @@ bool Items::classMay(const ServerObject& player, const ServerObject& item) const
     // Chainmail), nor with a record that has no CLASSUSE line, its byte left zeroed (Dagger and the
     // stub wands: MissileWand, DemonsBreathWand, SummoningWand).)
     const things::EquipDef* def = (item.classes & (oc::Weapon | oc::Wand)) ? modifiers->findWeapon(item.typeName) : modifiers->findArmor(item.typeName);
-    return def && def->classUse && (*def->classUse & (1u << player.player->classId)) != 0;
+    return def && def->classUse && (*def->classUse & (1u << classId)) != 0;
 }
 
 void Items::setModifiers(ServerObject& item, const std::array<std::uint8_t, 4>& mods)

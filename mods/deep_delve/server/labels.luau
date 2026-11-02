@@ -106,10 +106,11 @@ end
 
 -- ---- Name plates
 
--- A named monster's plate: { o = net code, t = its name, c = its tier's colour }.
+-- A named monster's plate: { o = net code, t = its name (its powers' words in front, powers.luau),
+-- c = its tier's colour }.
 local function plateOf(e: any): any
 	local tier: any = (monsterData.tiers :: any)[e.tier]
-	return { o = e.code, t = e.name, c = if tier then tier.colour else nil }
+	return { o = e.code, t = e.plate or e.name, c = if tier then tier.colour else nil }
 end
 
 local function sendPlates(h: any, list: { any }, sig: string)
@@ -295,14 +296,15 @@ function labels.lines(h: any?): { string }
 	return out
 end
 
--- For "dd plates": the named monsters ("id code tier r,g,b name") and the codes last sent to `h`.
+-- For "dd plates": the named monsters ("id code tier r,g,b plate", the plate as shown: its powers'
+-- words and its name) and the codes last sent to `h`.
 function labels.plateLines(h: any?): { string }
 	local out = {}
 	for id, e in monsters.named() do
 		local p: any = plateOf(e)
 		local c: any = p.c or {}
 		local rgb = tostring(c[1]) .. "," .. tostring(c[2]) .. "," .. tostring(c[3])
-		table.insert(out, table.concat({ tostring(id), tostring(e.code), tostring(e.tier), rgb, tostring(e.name) }, " "))
+		table.insert(out, table.concat({ tostring(id), tostring(e.code), tostring(e.tier), rgb, tostring(p.t) }, " "))
 	end
 	table.sort(out)
 	if h then

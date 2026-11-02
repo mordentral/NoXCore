@@ -40,6 +40,16 @@ struct Fight;
 /// what it lacks. In the exe's floats (its x87 in chop mode). `modifiers` modifier.bin (its
 /// modifiers' WORTH; null: none).
 int itemCost(const World& world, const things::ModifierDb* modifiers, int mode, const TradeSession* session, const ServerObject& item);
+/// Shop_OnAskRepairCost's test: whether `item` wants a repair (its durability short of its most,
+/// or a magical staff short of charges).
+bool needsRepair(const ServerObject& item);
+/// Shop_OnRepairItem's work, no gold taken: durability to its most and a magical staff
+/// recharged (rechargeItem 100), told to `holder`'s client (a player's; null: no one): its
+/// durability (MSG_REPORT_ITEM_HEALTH) and, when they changed, its charges (MSG_REPORT_CHARGES).
+void repairItem(World& world, ServerObject& item, const ServerObject* holder);
+/// `item`'s durability set to `health` (its caller keeps it within 1 and its most), told to
+/// `holder`'s client as a repair tells it (null: no one).
+void setItemHealth(World& world, ServerObject& item, std::uint16_t health, const ServerObject* holder);
 /// ItemIsDroppable (nonzero: kept): a quest item of the table.
 bool questItem(const ServerObject& o);
 

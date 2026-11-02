@@ -10,6 +10,12 @@
 --                later where the warning was);
 --       barrow   act 2's barrow-king (barrowking.luau): his dead from the graves round the arena,
 --                his charge, the grave-mist, and enraged the quake and the sky's fist;
+--       chief    act 3's troll chieftain (mosschief.luau): wounds that close unless fire touched
+--                him, his stones, his kin from the way in, the wood's Force of Nature and his
+--                haul, and enraged the stomp;
+--       warden   act 4's ruin-warden (warden.luau): stone plates that take most of a blow, shaken
+--                off by his pounds that strike nobody, the court's wardens, bare the quake and the
+--                sand-devils, and enraged the court's falling masonry;
 --   * its health shown on every player's UI (a bar under its name, in the boss's colour);
 --   * its death: a guaranteed better drop (rare gear above the area's level, and more rolls with
 --     better odds), the act marked cleared in every character's record (a passive point the first
@@ -20,6 +26,8 @@ local acts = require("data/acts")
 local data = require("data/monsters")
 local numbers = require("data/numbers")
 local barrowking = require("barrowking")
+local mosschief = require("mosschief")
+local warden = require("warden")
 local gate = require("gate")
 local hero = require("hero")
 local hud = require("hud")
@@ -109,17 +117,41 @@ local function warlord(c: any)
 	end
 end
 
+-- The fights of their own (data/monsters.luau's `fight`), each a module with start, think, stop,
+-- line and hurry; "warlord" is this module's own.
+local FIGHTS: { [string]: any } = {
+	barrow = barrowking,
+	chief = mosschief,
+	warden = warden,
+}
+
+-- Each fight's beat (frames).
+local BEATS: { [string]: number } = {
+	barrow = numbers.barrowKing.beat,
+	chief = numbers.mossChief.beat,
+	warden = numbers.ruinWarden.beat,
+}
+
 local function think()
 	local c = current
 	if not c or not nox.living(c.id) then
 		return
 	end
-	if c.def.fight == "barrow" then
-		barrowking.think(c)
+	local fight = FIGHTS[c.def.fight]
+	if fight then
+		fight.think(c)
 	else
 		warlord(c)
 	end
 	show(c)
+end
+
+-- A fight of its own over (its death, or its map gone).
+local function stopFight(c: any)
+	local fight = FIGHTS[c.def.fight]
+	if fight then
+		fight.stop(c)
+	end
 end
 
 -- The lair entered: its boss made at the arena's middle, its guards round it.
@@ -153,11 +185,11 @@ function boss.enter(spots: any, info: any)
 		slamAt = nox.frame() + numbers.boss.slam.every,
 		shown = -1,
 	}
-	if def.fight == "barrow" then
-		barrowking.start(current, spots)
+	local fight = FIGHTS[def.fight]
+	if fight then
+		fight.start(current, spots)
 	end
-	local beat = if def.fight == "barrow" then numbers.barrowKing.beat else numbers.boss.beat
-	current.beat = nox.every(beat, think)
+	current.beat = nox.every(BEATS[def.fight] or numbers.boss.beat, think)
 	show(current)
 end
 
@@ -168,10 +200,10 @@ function boss.killed(id: number, x: number, y: number)
 		return
 	end
 	nox.cancelTimer(c.beat)
-	barrowking.stop(c)
+	stopFight(c)
 	current = nil
 	local d = numbers.boss.drop
-	loot.bossDrop(x, y, c.info.level, d)
+	loot.bossDrop(x, y, c.info.level, d, acts[c.info.act].boss)
 	nox.effect(0x85, x, y) -- (MSG_FX_EXPLOSION)
 	local act = acts[c.info.act]
 	for _, h in hero.all() do
@@ -208,24 +240,26 @@ function boss.current(): any
 	return { id = c.id, name = c.def.name, type = c.def.type }
 end
 
--- "dd fight": its fight's state (the barrow-king's), or nil; `hurry`: its next blows brought to
--- the next beat.
+-- "dd fight": its fight's state (the barrow-king's, the troll chieftain's, the ruin-warden's), or
+-- nil; `hurry`: its
+-- next blows brought to the next beat.
 function boss.fight(hurry: boolean?): string?
 	local c = current
-	if not c or c.def.fight ~= "barrow" then
+	local fight = c and FIGHTS[c.def.fight]
+	if not c or not fight then
 		return nil
 	end
 	if hurry then
-		barrowking.hurry(c)
+		fight.hurry(c)
 	end
-	return barrowking.line(c)
+	return fight.line(c)
 end
 
 -- A new map: the old one's boss went with it.
 function boss.reset()
 	if current then
 		nox.cancelTimer(current.beat)
-		barrowking.stop(current)
+		stopFight(current)
 		current = nil
 		hud.boss(nil)
 	end

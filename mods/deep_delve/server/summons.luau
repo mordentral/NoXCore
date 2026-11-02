@@ -73,11 +73,21 @@ end
 
 local MONSTERS: any = { monsters = true }
 
+-- Called with each creature found and its owner's unit (uniquepowers.luau: its owner's worn powers).
+local foundHooks: { (number, number) -> () } = {}
+
+function summons.onFound(fn: (number, number) -> ())
+	table.insert(foundHooks, fn)
+end
+
 -- A creature found: watched, on the party's team; a summoned one's health by its owner's tree.
 local function found(id: number, c: any, o: any)
 	known[id] = c.caster
 	nox.watchEvents(id, nox.events.damage + nox.events.death)
 	team.join(id)
+	for _, fn in foundHooks do
+		fn(id, c.caster)
+	end
 	if c.charm then
 		monsters.forget(id)
 		return
@@ -152,6 +162,26 @@ function summons.ownerOf(id: number): number?
 	end
 	known[id] = nil
 	return nil
+end
+
+-- A creature the mod summoned for a hero itself (nox.summon: a unique's companion) taken in as a
+-- summoned one is when it's found.
+function summons.adopt(id: number, owner: number)
+	local o = nox.object(id)
+	if o then
+		found(id, { caster = owner }, o)
+	end
+end
+
+-- The creatures known of a hero's unit (its own, by id), for its worn powers.
+function summons.of(owner: number): { number }
+	local out = {}
+	for id in known do
+		if summons.ownerOf(id) == owner then
+			table.insert(out, id)
+		end
+	end
+	return out
 end
 
 -- A watched creature died.

@@ -2160,6 +2160,65 @@ int noxEnchantTime(lua_State* L)
     return 1;
 }
 
+int noxSetEnchantTime(lua_State* L)
+{
+    toolbox::refuseInsideAsked(L, "nox.setEnchantTime");
+    // nox.setEnchantTime(id, enchantment, frames): an enchantment that's on given that many frames
+    // left (0: for good), silently (no sound, nothing told: no client is sent its time); whether it
+    // was on.
+    server::ServerObject& o = objectArg(L, 1);
+    const int e = enchantArg(L, 2);
+    const double frames = luaL_checknumber(L, 3);
+    luaL_argcheck(L, frames >= 0 && frames <= 65535 && frames == std::floor(frames), 3, "whole frames 0-65535 (0: for good)");
+    if (!server::enchanted(o, e)) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    o.buffTime[static_cast<std::size_t>(e)] = static_cast<std::uint16_t>(frames);
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/// A creature or player (poison is theirs).
+server::ServerObject& creatureArg(lua_State* L, int idx)
+{
+    server::ServerObject& o = objectArg(L, idx);
+    luaL_argcheck(L, (o.classes & (things::ObjectClass::Monster | things::ObjectClass::Player)) != 0, idx, "a creature or player");
+    return o;
+}
+
+int noxPoison(lua_State* L)
+{
+    // nox.poison(unit): its poison's level (0: none) and the frames till it falls a step.
+    const server::ServerObject& o = creatureArg(L, 1);
+    lua_pushnumber(L, o.poison);
+    lua_pushnumber(L, o.poison != 0 ? std::max<int>(o.poisonTimer, 0) : 0);
+    return 2;
+}
+
+int noxSetPoison(lua_State* L)
+{
+    toolbox::refuseInsideAsked(L, "nox.setPoison");
+    // nox.setPoison(unit, level, frames): its poison set as the game sets it (told: a player's
+    // status, a creature's look; 0 cures it, quietly), falling a step every 1000 frames, the
+    // first after `frames` when given (the count a slowness shares).
+    server::ServerObject& o = creatureArg(L, 1);
+    const double level = luaL_checknumber(L, 2);
+    luaL_argcheck(L, level >= 0 && level <= 255 && level == std::floor(level), 2, "a whole level 0-255");
+    const double frames = luaL_optnumber(L, 3, 0);
+    luaL_argcheck(L, lua_isnoneornil(L, 3) || (frames >= 1 && frames <= 32767 && frames == std::floor(frames)), 3, "whole frames 1-32767");
+    server::Fight f = fightOf(L);
+    if (level == 0) {
+        f.removePoison(o);
+        return 0;
+    }
+    f.setPoison(o, static_cast<int>(level));
+    if (!lua_isnoneornil(L, 3)) {
+        o.poisonTimer = static_cast<std::int16_t>(frames);
+    }
+    return 0;
+}
+
 int noxGameNumber(lua_State* L)
 {
     // nox.gameNumber(name, index): gamedata.bin's number as this game reads it (the SOLO / ARENA
@@ -3899,6 +3958,7 @@ void Impl::installToolbox()
         {"nearestFoes", noxNearestFoes}, {"applyForce", noxApplyForce}, {"attack", noxAttack}, {"direction", noxDirection},
         {"directionOf", noxDirectionOf}, {"directionVector", noxDirectionVector}, {"newMark", noxNewMark}, {"madeSince", noxMadeSince},
         {"spellInfo", noxSpellInfo}, {"setCharmable", noxSetCharmable}, {"decal", noxDecal}, {"removeDecal", noxRemoveDecal}, {"clearDecals", noxClearDecals}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
+        {"setEnchantTime", noxSetEnchantTime}, {"poison", noxPoison}, {"setPoison", noxSetPoison},
         {"shoot", noxShoot},   {"summon", noxSummon},   {"abilitySound", noxAbilitySound}, {"setPosition", noxSetPosition},
         {"setVelocity", noxSetVelocity}, {"setOwner", noxSetOwner}, {"setTeam", noxSetTeam}, {"setNoCollide", noxSetNoCollide},
         {"setHitRadius", noxSetHitRadius}, {"setBurstScale", noxSetBurstScale},
@@ -4346,14 +4406,23 @@ public:
         }
     }
     bool damage(server::Fight&, server::ServerObject& target, server::ServerObject* source, server::ServerObject* weapon, int& amount,
-                int type) override
+                int type, server::HitCause cause) override
     {
         if (!impl_.parts.events.has().onDamage || impl_.hidden(target) || (source && impl_.hidden(*source))) {
             return true;
         }
         bool hit = true; // (the game's own, whatever goes wrong in the script)
-        impl_.guarded("onDamage", [&] { hit = impl_.parts.events.damage(impl_.vm->thread(), target, source, weapon, amount, type); });
+        impl_.guarded("onDamage", [&] { hit = impl_.parts.events.damage(impl_.vm->thread(), target, source, weapon, amount, type, cause); });
         return hit;
+    }
+    bool reflect(server::Fight&, server::ServerObject& target, server::ServerObject& missile, bool front) override
+    {
+        if (!impl_.parts.events.has().onReflect || impl_.hidden(target)) {
+            return false;
+        }
+        bool turned = false; // (the game's own, whatever goes wrong in the script)
+        impl_.guarded("onReflect", [&] { turned = impl_.parts.events.reflect(impl_.vm->thread(), target, missile, front); });
+        return turned;
     }
     std::optional<CastPrice> castPrice(server::World&, const server::ServerObject& caster, std::uint32_t spell, int mana, bool trap) override
     {

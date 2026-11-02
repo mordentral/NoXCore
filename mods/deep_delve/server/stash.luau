@@ -60,7 +60,7 @@ function stash.view(h: any, tab: number?)
 	for slot = 1, stash.SIZE do
 		local rec = s.tabs[t][slot]
 		if rec then
-			local e = windows.entry(rec)
+			local e = windows.entry(h, rec)
 			e.s = slot
 			table.insert(list, e)
 		end
@@ -144,9 +144,11 @@ function stash.take(h: any, tab: number, slot: number): (boolean, string?)
 	if not rec then
 		return false, "nothing there"
 	end
-	local id = items.give(h.unit, rec, false)
+	-- (one its class may not use by the pickup, as any class may pick anything up; refused, the
+	-- record stays in its slot)
+	local id, why = items.hand(h.unit, rec)
 	if not id then
-		return false, "it couldn't be given"
+		return false, why
 	end
 	t[math.floor(slot)] = nil
 	after(h, "stash")

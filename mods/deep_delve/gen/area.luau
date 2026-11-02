@@ -15,7 +15,9 @@
 --     town's receiving pentagram;
 --   * the act's lair (its last area): no exit on; its end chamber is the boss's arena in its look
 --     (ARENAS below: braziers and red light round its floor; or a cold green light and a ring of
---     graves, the barrow-king's), the boss's spot in its middle, and (with an act after it) the
+--     graves, the barrow-king's; or fire pits in firelight and a ring of skull posts and logs, the
+--     troll chieftain's; or braziers in sun-gold light and a ring of ruined statues and columns,
+--     the ruin-warden's), the boss's spot in its middle, and (with an act after it) the
 --     spot at the arena's back where the boss's death opens the gate on, its light written there.
 --
 -- An outdoor biome (grass, marsh: the built-in biomes' Open and Natural styles, their hedge,
@@ -29,10 +31,15 @@
 -- Returns the spots (world points), all plain numbers:
 --   { arrive, back (with its arch's type), exit (too; none in a lair), guardian (none in a lair),
 --     boss (a lair's), gate (a lair's with an act after it), graves (an arena look with graves:
---     each grave's point), waypoint and wayArrive (a waypoint
+--     each grave's point), ring (the glade's posts and logs, the court's statues and columns: each
+--     one's point), fires (the glade's
+--     fire pits), kin (the glade's way in: a few points on it), waypoint and wayArrive (a waypoint
 --     area's: the pentagram, and where travellers to it arrive), packs = { {x, y}... },
+--     secret (a secret room's: secrets.luau), chests (the side rooms' chests: secrets.luau),
 --     town = { centre, healer, gate (with its type), stash, vendor, portal, waypoints, wayIn,
 --     look (its look's name) } }
+-- A non-lair area may also hide a secret room and chests in its side rooms (secrets.luau, by
+-- params.secrets).
 
 local util = require("util")
 local layout = require("layout")
@@ -43,6 +50,7 @@ local arch = require("arch")
 local ground = require("ground")
 local scenery = require("scenery")
 local lights = require("lights")
+local secrets = require("secrets")
 
 local area = {}
 
@@ -51,15 +59,48 @@ local centre, worldX, worldY = util.centre, util.worldX, util.worldY
 -- A lair's arena looks (params.arena, by name; none: "pyre"):
 --   quarter  what stands at its four quarters, each with a light of kind `light` (gen/lights.luau);
 --            a glow of `light` over the boss's spot too
---   graves   (when there are any) the graves set round the arena's edge, at most `count` of them,
---            one to each of eight sectors round its middle (and the outermost others, apart, up
---            to `least` in a small arena), each a type of the list in turn, kept off the way in
---            (the boss's dead climb out of them: spots.graves)
+--   fires    (true) the quarters' points are kept as spots.fires (the fire pits the boss's fight
+--            knows of)
+--   ring     (when there is one) the pieces set round the arena's edge: { types, count, least,
+--            spot, rubble }: at most `count` of them, one to each of eight sectors round its middle
+--            (and the outermost others, apart, up to `least` in a small arena), each a type of the
+--            list in turn, kept off the way in; their points kept as spots[spot] (the barrow-king's
+--            dead climb out of his graves: spots.graves); `rubble` (when given): a piece of it (in
+--            turn, a plain one: walked over) a cell inward from each
+--   kin      (true) where the route comes into the arena, a few points on it kept as spots.kin
+--            (the boss's kin run in there, behind the party)
 local ARENAS = {
 	-- (act 1's: braziers lit red)
 	pyre = { quarter = "Brazier", light = "arena" },
 	-- (act 2's barrow-king's mound: braziers in a cold green, a ring of graves and stones)
-	barrow = { quarter = "Brazier", light = "barrow", graves = { "Tombstone1", "Monument1", "Tombstone5" }, count = 8, least = 5 },
+	barrow = {
+		quarter = "Brazier",
+		light = "barrow",
+		ring = { types = { "Tombstone1", "Monument1", "Tombstone5" }, count = 8, least = 5, spot = "graves" },
+	},
+	-- (act 3's troll chieftain's glade: his fire pits at the quarters in firelight, his camp's skull
+	-- posts, logs and stumps round its edge, the way in his kin's)
+	glade = {
+		quarter = "OgreFirePit",
+		light = "glade",
+		fires = true,
+		ring = { types = { "OgrePostSkull1", "ForestLog01", "OgrePostSkull2", "Stump4", "OgreHutMeat" }, count = 8, least = 5, spot = "ring" },
+		kin = true,
+	},
+	-- (act 4's ruined court: braziers at the quarters in a warm sun-gold light, the old ruins'
+	-- statues and broken columns round its edge, where the ruin-warden's wardens rise, rubble
+	-- strewn inward from each)
+	court = {
+		quarter = "Brazier",
+		light = "court",
+		ring = {
+			types = { "StatueRuin1", "RuinsColumnOutdoor01", "StatueRuin3", "RuinsColumnOutdoor03", "StatueRuin2", "RuinsColumnOutdoor02", "StatueRuin4", "RuinsColumnOutdoor04" },
+			count = 8,
+			least = 5,
+			spot = "ring",
+			rubble = { "RuinsColumnOutdoorRubble01", "RuinsColumnOutdoorRubble02", "RuinsColumnOutdoorRubble03", "RuinsColumnOutdoorRubble04" },
+		},
+	},
 }
 
 local function point(c: number)
@@ -212,6 +253,15 @@ function area.build(p, w)
 		gen.refuse("deep_delve: no layout with straight back walls for its ways")
 	end
 
+	-- ---- Secrets (secrets.luau; none in a lair): a secret room's line of wall out of the floor,
+	-- the walls fitted again round it (far from the start and end chambers, so their ways are
+	-- found as before).
+	local secret = secrets.plan(lay, open, p)
+	if secret and secret.plug then
+		walls = gen.wallsAround(open)
+		backs = gen.backWalls(walls, open, gen.cells(secrets.walls(secret)))
+	end
+
 	-- ---- Walls and floors (the town's by its look)
 	local plan = ground.build({
 		layout = lay,
@@ -232,6 +282,8 @@ function area.build(p, w)
 	-- Cells nothing goes on: nothing on a harming floor or beside it.
 	local used = gen.cells()
 	used:addAroundFloors(plan.floor, plan.harming, 1)
+	-- (the secret room's floor kept for its own pieces)
+	secrets.reserve(secret, used)
 	local site = { backs = backs, walls = walls }
 	-- The exit on: an arch ("/", else "\") in a back wall of the end chamber (a lair has none: the
 	-- boss is the end).
@@ -260,7 +312,8 @@ function area.build(p, w)
 		gen.refuse("deep_delve: no straight back wall for the way home")
 	end
 	local roomy = gen.roomy(lay.open)
-	local path, sideRooms = lay.path, lay.sideRooms
+	-- (the secret room is none of the area's side rooms: no waypoint or pack goes in it)
+	local path, sideRooms = lay.path, secrets.others(secret, lay.sideRooms)
 	if p.lair then
 		-- The boss in the arena's middle (the open cell nearest it: some chambers have a pillar
 		-- there), room kept round it; braziers at its four quarters, lit red, and a glow over it.
@@ -273,6 +326,7 @@ function area.build(p, w)
 		used:addSquare(at, 3)
 		local fx, fy = util.xy(finish)
 		local k = math.max(3, lay.finish.radius - 3)
+		local quarters = {}
 		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
 			-- (the open cell nearest the quarter's point, from it toward the middle)
 			for step = k, 2, -1 do
@@ -281,9 +335,13 @@ function area.build(p, w)
 					used:addSquare(c, 1)
 					town.put(w, arena.quarter, worldX(c), worldY(c))
 					lights.put(w, arena.light, worldX(c), worldY(c))
+					table.insert(quarters, point(c))
 					break
 				end
 			end
+		end
+		if arena.fires then
+			spots.fires = quarters
 		end
 		lights.put(w, arena.light, spots.boss.x, spots.boss.y)
 		-- The gate's spot (a lair with an act after it): at the arena's back, away from its way
@@ -304,13 +362,14 @@ function area.build(p, w)
 			used:addSquare(gc, 2)
 			lights.put(w, "gate", spots.gate.x, spots.gate.y)
 		end
-		-- The graves round the arena (a look with graves): the floor within its reach (an open cell
-		-- with open sides, from 4 cells off its middle to a cell past its nominal edge) parted into
-		-- eight sectors round its middle (east, south-east, south...), and in each the outermost
-		-- cell (the lowest cell number of equals) that isn't on the way in (a cell round the
-		-- route) or by anything placed; written as the look's types in turn. No draw, so the rest of
-		-- the map is as it would be without them.
-		if arena.graves then
+		-- The ring round the arena (a look with one: graves, skull posts): the floor within its reach
+		-- (an open cell with open sides, from 4 cells off its middle to a cell past its nominal edge)
+		-- parted into eight sectors round its middle (east, south-east, south...), and in each the
+		-- outermost cell (the lowest cell number of equals) that isn't on the way in (a cell round
+		-- the route) or by anything placed; written as the look's types in turn. No draw, so the
+		-- rest of the map is as it would be without them.
+		local ring = arena.ring
+		if ring then
 			local way = gen.cells()
 			for _, c in path do
 				way:addSquare(c, 1)
@@ -353,25 +412,26 @@ function area.build(p, w)
 				end
 				return a.c < b.c
 			end)
-			spots.graves = {}
+			local pieces = {}
+			spots[ring.spot] = pieces
 			local placed: { number } = {}
 			local function grave(c: number)
 				used:addSquare(c, 1)
 				table.insert(placed, c)
 				local at = point(c)
-				town.put(w, arena.graves[(#placed - 1) % #arena.graves + 1], at.x, at.y)
-				table.insert(spots.graves, at)
+				town.put(w, ring.types[(#placed - 1) % #ring.types + 1], at.x, at.y)
+				table.insert(pieces, at)
 			end
 			-- (in a fixed order round the arena)
 			for _, k in { 7, 8, 5, 2, 1, 0, 3, 6 } do
 				local b = best[k]
-				if b and #placed < arena.count and roomyFree(lay.open, used, b.c) then
+				if b and #placed < ring.count and roomyFree(lay.open, used, b.c) then
 					grave(b.c)
 				end
 			end
 			-- (too few: the outermost others, two cells from any placed)
 			for _, e in all do
-				if #placed >= arena.least then
+				if #placed >= ring.least then
 					break
 				end
 				local apart = roomyFree(lay.open, used, e.c)
@@ -380,6 +440,42 @@ function area.build(p, w)
 				end
 				if apart then
 					grave(e.c)
+				end
+			end
+			-- (rubble a cell inward from each piece, when the look strews it: after every piece is
+			-- placed, so the pieces stand where they would without it)
+			if ring.rubble then
+				for i, c in placed do
+					local px, py = util.xy(c)
+					local sx = if fx > px then 1 elseif fx < px then -1 else 0
+					local sy = if fy > py then 1 elseif fy < py then -1 else 0
+					local rc = util.cell(px + sx, py + sy)
+					if lay.open:has(rc) and not used:has(rc) then
+						used:add(rc)
+						local at = point(rc)
+						town.put(w, ring.rubble[(i - 1) % #ring.rubble + 1], at.x, at.y)
+					end
+				end
+			end
+		end
+		-- The way in (a look whose boss's kin come by it): walking the route back from the arena's
+		-- middle, the first cell past the arena's edge, and the route cells 3 and 6 further back,
+		-- as spots.kin. Nothing written, no draw.
+		if arena.kin then
+			spots.kin = {}
+			local edge = nil
+			for i = #path, 1, -1 do
+				if util.chebyshev(path[i], finish) > lay.finish.radius then
+					edge = i
+					break
+				end
+			end
+			if edge then
+				for _, back in { 0, 3, 6 } do
+					local c = path[math.max(1, edge - back)]
+					if lay.open:has(c) then
+						table.insert(spots.kin, point(c))
+					end
 				end
 			end
 		end
@@ -442,6 +538,9 @@ function area.build(p, w)
 		spots.waypoint = point(wc)
 		spots.wayArrive = point(ac)
 	end
+	-- The secret room's walls, chest, guards' spots and lever, and the side rooms' chests (before
+	-- the packs, which keep clear of them).
+	spots.secret, spots.chests = secrets.place(secret, { layout = lay, used = used, biome = biome }, w)
 	-- The packs: a quarter in the side rooms, the rest along the route past its first fifth; each
 	-- at least ten cells from the start, kept apart. `ramp` (0 or more) thins them out near the
 	-- start: a route pack's place along the way is drawn with a density rising as (place) ^ ramp,

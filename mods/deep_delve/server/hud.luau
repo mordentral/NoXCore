@@ -122,6 +122,19 @@ hud.sizeOf = sizeOf
 -- exact).
 local MOST = 128 * 1024
 
+-- Each peer's last list of each kind as sent: its entries' bytes (sizeOf's), entries and parts.
+local listSizes: { [number]: { [string]: { bytes: number, entries: number, parts: number } } } = {}
+
+-- A peer's lists' sizes as last sent ("dd wire"): "kind bytes entries parts" each, sorted.
+function hud.listSizes(peer: number): { string }
+	local out = {}
+	for kind, s in listSizes[peer] or {} do
+		table.insert(out, string.format("%s %d %d %d", kind, s.bytes, s.entries, s.parts))
+	end
+	table.sort(out)
+	return out
+end
+
 -- A list to a player's UI in parts: each part { kind, serial, part, parts, list, ...header },
 -- as many of `list`'s entries in each as fit. The UI keeps the parts of the newest serial.
 function hud.parts(peer: number, kind: string, serial: number, list: { any }, header: any?)
@@ -133,6 +146,7 @@ function hud.parts(peer: number, kind: string, serial: number, list: { any }, he
 	local chunks: { { any } } = {}
 	local cur: { any } = {}
 	local used = 0
+	local total = 0
 	for _, e in list do
 		local s = sizeOf(e) + 9 + 1 -- (its index key, a little slack)
 		if used + s > room and #cur > 0 then
@@ -141,6 +155,7 @@ function hud.parts(peer: number, kind: string, serial: number, list: { any }, he
 		end
 		table.insert(cur, e)
 		used += s
+		total += s
 	end
 	if #cur > 0 or #chunks == 0 then
 		table.insert(chunks, cur)
@@ -157,6 +172,12 @@ function hud.parts(peer: number, kind: string, serial: number, list: { any }, he
 		end
 	end
 	sent[kind] = #chunks
+	local sizes = listSizes[peer]
+	if not sizes then
+		sizes = {}
+		listSizes[peer] = sizes
+	end
+	sizes[kind] = { bytes = total, entries = #list, parts = #chunks }
 	for i, chunk in chunks do
 		local v = table.clone(base)
 		v.part, v.parts, v.list = i, #chunks, chunk
@@ -238,6 +259,7 @@ function hud.forget(peer: number)
 	owed[peer] = nil
 	partsSent[peer] = nil
 	sentIn[peer] = nil
+	listSizes[peer] = nil
 end
 
 return hud

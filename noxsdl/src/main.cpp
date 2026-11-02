@@ -4395,11 +4395,18 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         // A briefing or the load menu, over the windows.
         app->cinematics->drawScreens(app->renderer, app->camera.viewWidth, app->camera.viewHeight);
     }
+    app->tipItem = 0; // (liveTooltip's to set)
     if (app->options && app->options->isOpen()) {
         app->tooltip = app->options->tooltip(); // noxsdl's switches, in the menus and in a game
         drawTooltip(*app, true);
     } else if (app->live && app->renderGui && !briefing) {
         app->tooltip = liveTooltip(*app);
+        // (A mode's own tooltip for the item, shown by its drawOver: the game's name gives way.)
+        for (auto& [id, ui] : app->modeUis) {
+            if (app->tipItem != 0 && ui->hidesItemName(*app)) {
+                app->tooltip.clear();
+            }
+        }
         drawTooltip(*app);
         // A mode's tooltip over everything this frame: as the game's own is, never over a menu or
         // the game's windows drawn over the mode's, and not beside the game's own.

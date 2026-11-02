@@ -28,6 +28,7 @@ class Vm;
 namespace nox::server {
 
 class HostClient;
+enum class HitCause : std::uint8_t; // (combat.hpp)
 class ScriptHost;
 class Server;
 class World;
@@ -240,8 +241,8 @@ struct ModeHooks {
     }
     /// Asked: a hit on `target` (with ModeEvent::Damage) before anything of the game's (its
     /// DAMAGE function, armour...): `amount` may be changed; false cancels the hit (the damage
-    /// call returns 0, nothing done).
-    virtual bool damage(Fight& fight, ServerObject& target, ServerObject* source, ServerObject* weapon, int& amount, int type)
+    /// call returns 0, nothing done). `cause`: what dealt it (a blow, a missile, a spell).
+    virtual bool damage(Fight& fight, ServerObject& target, ServerObject* source, ServerObject* weapon, int& amount, int type, HitCause cause)
     {
         (void)fight;
         (void)target;
@@ -249,7 +250,19 @@ struct ModeHooks {
         (void)weapon;
         (void)amount;
         (void)type;
+        (void)cause;
         return true;
+    }
+    /// Asked, at once: `missile` about to hit `target` (with ModeEvent::Damage), before its COLLIDE
+    /// does anything; `front`: met at its front (the reflective shield's side). true turns it as a
+    /// reflective shield does (back the way it came, the target's now, 0x7A) and it doesn't hit.
+    virtual bool reflect(Fight& fight, ServerObject& target, ServerObject& missile, bool front)
+    {
+        (void)fight;
+        (void)target;
+        (void)missile;
+        (void)front;
+        return false;
     }
     /// Asked (noxcpp): what a player's spell costs, the game's mana price `mana` given; `trap`: a
     /// spell put into a glyph's trap (at its check, and again as it's paid). nullopt: the game's
