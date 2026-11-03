@@ -1061,7 +1061,8 @@ local function treeNodes(): any
 		for _, n in d.items do
 			nodeIndex[n.i] = n
 			if type(n.ic) == "string" then
-				nodeIcon[n.i] = "tree/" .. n.ic
+				-- (a name with a "/" is the picture's whole name: an active's button picture)
+				nodeIcon[n.i] = if string.find(n.ic, "/", 1, true) then n.ic else "tree/" .. n.ic
 			elseif type(n.si) == "string" then
 				nodeSpell[n.i] = n.si
 			end
@@ -1126,10 +1127,10 @@ local function treeMarks(taken: string)
 			for _, near in nodeNear[id] or {} do
 				open = open or string.sub(taken, near, near) == "1"
 			end
-			-- (one of a choice of two: shut while its other is taken)
+			-- (one of a choice of two whose other is taken: open, a click swaps the two)
 			local other = n.e
 			if type(other) == "number" and string.sub(taken, other, other) == "1" then
-				open = false
+				open = true
 			end
 		end
 		nodeHave[id] = have
@@ -1375,7 +1376,7 @@ local function nodeTip(n: any, taken: boolean, state: any): ({ any }, number)
 	local other = n.e
 	if not taken and type(other) == "number" and nodeHave[other] then
 		local o = nodeIndex[other]
-		status = "(you have " .. tostring(o and o.n or "its other") .. ": give it back to take this)"
+		status = "(click to swap for " .. tostring(o and o.n or "its other") .. ": free)"
 	end
 	local tip: { any } = { { tostring(n.n), RARITY.rare }, { status, TIP_STATUS } }
 	local function add(text: string, colour: any)

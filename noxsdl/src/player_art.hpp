@@ -62,6 +62,7 @@ struct PlayerLayer {
     nox::things::ImageRef image;
     LayerSource source = LayerSource::Body;
     std::uint32_t bit = 0; ///< armour or weapon class bit
+    bool lent = false;     ///< a weapon a script mode's animation lent it (PlayerLook::lentWeapon)
 };
 
 struct PlayerLook {
@@ -72,6 +73,10 @@ struct PlayerLook {
     /// pose.animState is the player state picked for it (npcPlayerState). Set, the state isn't
     /// swapped for SNEAK nor, without frames, for IDLE (NPCDraw).
     std::optional<std::uint8_t> drawableState;
+    /// A script mode's animation's weapon (nox.playAnim's weapon: its class bit, set in
+    /// weaponEquip in place of what's held): its layer, when no worn one's record colours it,
+    /// drawn in its item's own colours (its definition's, no modifiers). 0: none.
+    std::uint32_t lentWeapon = 0;
 };
 
 /// The layers to draw, back to front, for a player in `pose`.

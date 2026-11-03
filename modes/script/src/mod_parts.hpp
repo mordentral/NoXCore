@@ -34,6 +34,9 @@ struct Parts {
     Leaps leaps;
     /// nox.setSpin's: the spins under way (told to clients that come to know their things later).
     Spins spins;
+    /// nox.playAnim's: the animations under way (told to clients that come to know their things
+    /// later).
+    Anims anims;
     /// nox.defineAbility's and nox.grantAbility's: each player's strip (by peer).
     ModAbilities abilities;
     /// nox.store's (opened at the first call; none while the host keeps no store).

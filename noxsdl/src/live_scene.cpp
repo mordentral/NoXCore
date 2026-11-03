@@ -253,6 +253,20 @@ void overheadIcons(App& app, std::uint16_t netCode, std::uint32_t buffs, double 
     }
 }
 
+/// A script mode's animation's share for a state of `frames` frames (Pose::share): its share gone,
+/// or the middle of the frame it holds (its last for kHoldLast; past the last, the last).
+float modeAnimShare(const App::ModeAnim& anim, std::size_t frames)
+{
+    if (anim.hold == 0xFF || frames == 0) {
+        return anim.share;
+    }
+    if (anim.hold == 0xFE) {
+        return 1.0f;
+    }
+    const std::size_t i = std::min<std::size_t>(anim.hold, frames - 1);
+    return (static_cast<float>(i) + 0.5f) / static_cast<float>(frames);
+}
+
 } // namespace
 
 /// Live: the world's drawables as scene sprites.
@@ -498,6 +512,34 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
                 }
             }
         }
+        // A script mode's animation on it (App::modeAnims: nox.playAnim): a player or creature drawn
+        // in that state of its own at that share of its frames, if its art has the state; not while
+        // it dies or lies dead (its death is drawn). An NPC's turns into a player state below.
+        const App::ModeAnim* modeAnim = nullptr;
+        if (!app.modeAnims.empty()) {
+            const auto an = std::ranges::lower_bound(app.modeAnims, netCode, {}, &App::ModeAnim::object);
+            if (an != app.modeAnims.end() && an->object == netCode) {
+                using nox::things::DrawKind;
+                const auto& draw = a->draw;
+                if (!an->creature && draw.kind == DrawKind::Player) {
+                    if (d.animState != 1 && d.animState != 2 && an->state < draw.playerStates.size() &&
+                        draw.playerStates[an->state] && draw.playerStates[an->state]->frames > 0) {
+                        modeAnim = &*an;
+                    }
+                } else if (an->creature && d.animState != 9 && d.animState != 10 &&
+                           (a->drawFn == DrawFn::NPC ||
+                            (draw.kind == DrawKind::Monster && an->state < draw.monsterStates.size() && draw.monsterStates[an->state]))) {
+                    modeAnim = &*an;
+                }
+            }
+            if (modeAnim && a->drawFn != DrawFn::NPC) {
+                pose.animState = modeAnim->state;
+                const std::size_t n = a->draw.kind == nox::things::DrawKind::Player
+                                          ? a->draw.playerStates[modeAnim->state]->frames
+                                          : a->draw.monsterStates[modeAnim->state]->animation.directions[0].size();
+                pose.share = modeAnimShare(*modeAnim, n);
+            }
+        }
         pose.direction = app.view3d.seenDirection(pose.direction, p.x, p.y); // (the 3D view: as its eye sees it)
         const float x = p.x - a->halfWidth;
         const float y = p.y - a->halfHeight - a->z - p.z;
@@ -556,8 +598,21 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
                 }
                 Pose npcPose = pose;
                 npcPose.animState = pick.state;
+                std::uint8_t drawableState = d.animState;
+                if (modeAnim) {
+                    // A script mode's animation: its creature state turned into the player state as
+                    // its own are (the first of a choice), if that has frames; else as it is.
+                    std::uint8_t choice = pick.choice;
+                    const std::uint8_t s = nox::client::npcPlayerState(modeAnim->state, npc->weaponEquip, npc->armorEquip, 0, choice,
+                                                                       [](int low, int) { return low; });
+                    if (s < body->draw.playerStates.size() && body->draw.playerStates[s] && body->draw.playerStates[s]->frames > 0) {
+                        npcPose.animState = s;
+                        npcPose.share = modeAnimShare(*modeAnim, body->draw.playerStates[s]->frames);
+                        drawableState = modeAnim->state;
+                    }
+                }
                 PlayerLook look{npc->armorEquip, npc->weaponEquip, d.buffs};
-                look.drawableState = d.animState;
+                look.drawableState = drawableState;
                 layers = playerLayers(body->draw, npcPose, look);
                 materials = layerMaterials(layers, npcWearer(*npc), app.modifiers, d.buffs, frame);
             }
@@ -657,7 +712,14 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
                     overlay(netCode, d, *a, p.x, p.y, p.z, [&bars, bar](SDL_Renderer*, const Camera&) { bars.push_back(bar); });
                 }
             }
-            const auto layers = playerLayers(a->draw, pose, look);
+            PlayerLook drawn = look;
+            if (modeAnim && modeAnim->weapon < 32) {
+                // A script mode's animation's weapon: its layer in place of the weapons held (the
+                // flag and the quiver kept).
+                drawn.lentWeapon = 1u << modeAnim->weapon;
+                drawn.weaponEquip = (look.weaponEquip & 3u) | drawn.lentWeapon;
+            }
+            const auto layers = playerLayers(a->draw, pose, drawn);
             const auto materials = layerMaterials(layers, player, app.modifiers, d.buffs, frame);
             Anchor anchor{p.x, p.y, x, y, std::nullopt, d.typeId, p.z, d.direction, d.buffs, d.animState, true,
                           effectsShown(client, netCode, d)};

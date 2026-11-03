@@ -57,13 +57,29 @@ struct Links<modes::script::Spins> {
 };
 
 template <>
+struct Links<modes::script::Anims::Anim> {
+    using S = modes::script::Anims::Anim;
+    static constexpr std::string_view name = "Anims::Anim";
+    static constexpr auto fields = std::tuple{NOX_LINK(S, unit, Keep)};
+};
+
+template <>
+struct Links<modes::script::Anims> {
+    using S = modes::script::Anims;
+    static constexpr std::string_view name = "Anims";
+    static constexpr auto fields = std::tuple{NOX_LINK(S, anims_, Keep)}; // (a map's load lets them all go: Anims::reset)
+};
+
+template <>
 struct Links<modes::script::Parts> {
     using S = modes::script::Parts;
     static constexpr std::string_view name = "Parts";
-    static constexpr auto fields = std::tuple{NOX_LINK(S, drawScales, Keep), NOX_LINK(S, leaps, Keep), NOX_LINK(S, spins, Keep)};
+    static constexpr auto fields =
+        std::tuple{NOX_LINK(S, drawScales, Keep), NOX_LINK(S, leaps, Keep), NOX_LINK(S, spins, Keep), NOX_LINK(S, anims, Keep)};
     /// Every struct of the script modes' with a table (the test walks them).
     using structs = LinkStructs<modes::script::DrawScales::Owed, modes::script::DrawScales, modes::script::Leaps::Leap,
-                                modes::script::Leaps, modes::script::Spins::Spin, modes::script::Spins, modes::script::Parts>;
+                                modes::script::Leaps, modes::script::Spins::Spin, modes::script::Spins, modes::script::Anims::Anim,
+                                modes::script::Anims, modes::script::Parts>;
 };
 
 namespace detail {

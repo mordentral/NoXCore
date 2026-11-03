@@ -18,15 +18,19 @@ local placed: { [number]: any } = {}
 
 -- A pad's ring of `kind` ("waypoint" or "portal", numbers.decals'; or `def`, a ring of the same
 -- fields and maybe a colour, under a kind of its own: the map table's) at (x, y); its id, or nil
--- when the map holds its 64 already.
-function decals.put(kind: string, x: number, y: number, def: any?): number?
+-- when the map holds its 64 already. `follow`: a thing it goes with (Whirlwind's swirl, its
+-- warrior), drawn where that thing is while a client has it; `def.scale`: its pulse swings its
+-- size, not its light.
+function decals.put(kind: string, x: number, y: number, def: any?, follow: number?): number?
 	local k: any = def or (numbers.decals :: any)[kind]
 	if not k then
 		return nil
 	end
 	local size: number, spin: number, amount: number, period: number = k.size, k.spin, k.pulse, k.period
 	local colour: { number }? = k.colour
-	local id = nox.decal(tostring(k.asset), x, y, { size = size, glow = true, spin = spin, pulse = { amount = amount, period = period }, colour = colour })
+	local scale: boolean? = k.scale
+	local id = nox.decal(tostring(k.asset), x, y,
+		{ size = size, glow = true, spin = spin, pulse = { amount = amount, period = period, scale = scale }, colour = colour, follow = follow })
 	if id then
 		placed[id] = { kind = kind, x = x, y = y }
 	end

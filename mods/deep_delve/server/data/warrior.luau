@@ -114,6 +114,9 @@ w.mastery = {
 -- now (the tooltip's "Damage"; bare-handed or with a bow, `bare`), times its damage bonus (the
 -- tree's and the worn affixes'). Execute and Hunter's Mark count on each hit; the hits fill the
 -- rage (`rage` each landing or turn that hits something) but never spend it.
+--
+-- `icon`: the button's picture, the mod's own (assets\abilities\<name>.png, 64 x 64); the
+-- active's tree nodes name the same picture.
 w.actives = {
 	-- Leap to the cursor's point (at most `range` away: the point on the line at that reach),
 	-- `time` frames in the air, drawn `height` high; on landing every monster within `radius`
@@ -122,7 +125,7 @@ w.actives = {
 	-- `bossHeld`), `holdAfter` frames on.
 	leapSlam = {
 		title = "Leap Slam",
-		icon = "ABILITY_BERSERKER_CHARGE",
+		icon = "abilities/leap_slam",
 		target = "point",
 		cooldown = 180,
 		range = 250,
@@ -131,6 +134,8 @@ w.actives = {
 		kind = 2, -- (the damage type: crush)
 		holdAfter = 6, -- (the hold put on once the throw has carried them: the hold stops motion)
 		rage = 8,
+		-- (the body drawn swinging a hammer over the leap, whatever it holds: nox.playAnim)
+		anim = { name = "HAMMER_STRIKE", weapon = "HAMMER" },
 		ranks = {
 			{ pct = 150, radius = 90, held = 20, bossHeld = 6, force = 40 },
 			{ pct = 200, radius = 115, held = 25, bossHeld = 8, force = 50 },
@@ -141,7 +146,7 @@ w.actives = {
 	-- the blow. Let go (or its hold run out), it stops and its `cooldown` runs from then.
 	whirlwind = {
 		title = "Whirlwind",
-		icon = "ABILITY_WARCRY",
+		icon = "abilities/whirlwind",
 		target = "hold",
 		hold = 75,
 		cooldown = 240,
@@ -149,6 +154,8 @@ w.actives = {
 		turns = 3, -- (the body's turns a second as it spins: drawn only)
 		kind = 0, -- (the damage type: blade)
 		rage = 3,
+		-- (the body held in its own strike's last frame as it spins, its weapon out: nox.playAnim)
+		anim = { name = "ATTACK", hold = "last" },
 		ranks = { { pct = 35, reach = 100 }, { pct = 50, reach = 115 } },
 	},
 }
@@ -175,6 +182,13 @@ w.reveal = {
 	trapped = { asset = "fx/portal", size = 50, spin = -30, pulse = 0.4, period = 1.2, colour = { 255, 70, 50, 255 } },
 }
 
+-- Whirlwind's swirl on the floor while the warrior spins (decals.luau's, following the warrior;
+-- removed as the spin stops): `across` times the turn's reach wide (so it shows the reach),
+-- turning `spin` degrees a second the same way as the body (nox.setSpin's turns: both clockwise
+-- on screen; the engine's most is 720), its size swinging by `pulse` over `period` seconds
+-- (`scale`), drawn additive (glow) in its own colours, `colour` a tint.
+w.swirl = { asset = "fx/whirl", across = 2, spin = 720, pulse = 0.15, period = 0.33, scale = true, colour = { 255, 255, 255, 255 } }
+
 -- The point effects (nox.effect's MSG_FX_* codes) a skill shows.
 w.fx = {
 	cleave = 0x8B, -- (MSG_FX_DAMAGE_POOF, at each monster cleaved)
@@ -186,8 +200,9 @@ w.fx = {
 	secondWind = 0x9A, -- (MSG_FX_WHITE_FLASH, at the warrior)
 	rageFull = 0x84, -- (MSG_FX_VIOLET_SPARKS, at the warrior as its rage fills)
 	slam = 0x8A, -- (MSG_FX_SMOKE_BLAST: Leap Slam's dust where it lands)
-	slamHit = 0x8B, -- (MSG_FX_DAMAGE_POOF, at each monster the slam or the spin strikes)
-	whirl = 0x8A, -- (MSG_FX_SMOKE_BLAST: Whirlwind's dust at the warrior, every other turn)
+	slamHit = 0x8B, -- (MSG_FX_DAMAGE_POOF, at each monster the slam strikes)
+	whirl = 0x86, -- (MSG_FX_LESSER_EXPLOSION: Whirlwind's orange burst at the warrior, each turn)
+	whirlHit = 0x96, -- (MSG_FX_RICOCHET: sparks at each monster a turn of Whirlwind strikes)
 	trample = 0x86, -- (MSG_FX_LESSER_EXPLOSION: Trample's impact where the charge stopped)
 	trampleHit = 0x8B, -- (MSG_FX_DAMAGE_POOF, at each monster Trample or Chain strikes)
 	bloodRush = 0x84, -- (MSG_FX_VIOLET_SPARKS, at the warrior as its charge is ready again)

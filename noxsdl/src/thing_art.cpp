@@ -132,6 +132,9 @@ std::size_t animationFrame(nox::things::AnimPlayback kind, std::size_t frames, s
     if (frames == 0) {
         return 0;
     }
+    if (pose.share >= 0) {
+        return std::min(static_cast<std::size_t>(pose.share * static_cast<float>(frames)), frames - 1);
+    }
     const double step = frameDelay + 1.0;
     switch (kind) {
     case nox::things::AnimPlayback::OneShot:

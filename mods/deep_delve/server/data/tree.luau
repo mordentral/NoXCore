@@ -53,8 +53,10 @@
 --
 -- Pictures: a root, small, notable or keystone names its icon (`icon`, the mod's picture
 -- assets\tree\<icon>.png, sent to the UI as "ic"): a root "root_<class>", a notable "n_<name>", a
--- keystone "k_<name>", a small by its stats ("s_health", "s_damage_resist"...). A new node of those
--- kinds names one that is there (a test checks every one). A spell, ability or summon node is drawn
+-- keystone "k_<name>", a small by its stats ("s_health", "s_damage_resist"...); a name with a "/"
+-- is a picture elsewhere in assets\, whole (the warrior's actives' nodes: "abilities/<name>", their
+-- buttons' pictures). A new node of those kinds names one that is there (a test checks every one).
+-- A spell, ability or summon node is drawn
 -- with the game's own icon instead (`spellIcon`, sent to the UI as "si", drawn by nox.spellIcon):
 -- a spell's its SPELL_* name, an ability's its ABILITY_* name (data.abilities' `icon`), a summon's
 -- its creature's summon spell ("dd check" and a test prove each is a name the client knows).
@@ -655,7 +657,8 @@ end
 -- (-12, -9), its second rank above it (-12, -11); Whirlwind at the Arms row's end (-16, 7), its
 -- second rank past it (-18, 7). Each a skill node (a warrior's alone) whose skill is an ability
 -- (data/warrior.luau's actives): taking it puts the ability's button on the warrior's strip,
--- the second rank raises its numbers. Pictures: existing ones (k_unbowed, n_cleave) for now.
+-- the second rank raises its numbers. Pictures: the ability's own button picture (the mod's
+-- assets\abilities\, its `icon` in data/warrior.luau's actives), both ranks.
 do
 	local function at(x: number, y: number): number
 		for _, n in nodes do
@@ -665,10 +668,10 @@ do
 		end
 		error("tree: no node at " .. x .. ", " .. y)
 	end
-	local leap = skillNode({ x = -12, y = -9, kind = "notable", branch = "Wrath", name = "Leap Slam", icon = "k_unbowed", skill = "leapSlam" }, { at(-12, -7) })
-	skillNode({ x = -12, y = -11, kind = "notable", branch = "Wrath", name = "Leap Slam II", icon = "k_unbowed", skill = "leapSlam", rank = 2 }, { leap })
-	local whirl = skillNode({ x = -16, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind", icon = "n_cleave", skill = "whirlwind" }, { at(-14, 7) })
-	skillNode({ x = -18, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind II", icon = "n_cleave", skill = "whirlwind", rank = 2 }, { whirl })
+	local leap = skillNode({ x = -12, y = -9, kind = "notable", branch = "Wrath", name = "Leap Slam", icon = "abilities/leap_slam", skill = "leapSlam" }, { at(-12, -7) })
+	skillNode({ x = -12, y = -11, kind = "notable", branch = "Wrath", name = "Leap Slam II", icon = "abilities/leap_slam", skill = "leapSlam", rank = 2 }, { leap })
+	local whirl = skillNode({ x = -16, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind", icon = "abilities/whirlwind", skill = "whirlwind" }, { at(-14, 7) })
+	skillNode({ x = -18, y = 7, kind = "notable", branch = "Arms", name = "Whirlwind II", icon = "abilities/whirlwind", skill = "whirlwind", rank = 2 }, { whirl })
 end
 
 -- The stock abilities' upgrades (by decision 2026-11-02; ids 186-191), a choice of two beside each
@@ -676,8 +679,8 @@ end
 -- Rush (-18, -6) off Fury's 12th; War Cry's Rallying Cry (-16, -6) and Terror (-15, -6) off Fury's
 -- 11th; Harpoon's Reel and Rend (-17, 5) and Chain (-18, 5) off Hunt's 12th. Skill nodes (a
 -- warrior's alone; data/warrior.luau's numbers, upgrades.luau's work), `upgrades` the ability's
--- number. A choice: each names its other (`excludes`), and tree.canTake refuses one while its
--- other is taken; giving that one back (a node given back alone, or a respec) frees it.
+-- number. A choice: each names its other (`excludes`); taking one while its other is held swaps
+-- the two for free (tree.take).
 -- Pictures: existing ones for now.
 do
 	local function pair(ability: number, from: number, a: any, b: any)

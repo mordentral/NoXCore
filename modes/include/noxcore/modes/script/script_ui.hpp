@@ -265,6 +265,18 @@ struct UiSpin {
 };
 inline constexpr std::size_t kUiMaxSpins = 64;
 
+/// (Client level 9) A thing in a script's animation now (ui_proto.hpp's kAnim: nox.playAnim): its
+/// state of `kind`'s table, how much of it is gone (or the frame held), and the weapon layer lent it.
+struct UiAnim {
+    std::uint16_t object = 0;
+    uimsg::AnimKind kind = uimsg::AnimKind::Player;
+    std::uint8_t state = 0;
+    std::uint8_t weapon = uimsg::kNoWeaponLayer; ///< a weapon class bit's index; kNoWeaponLayer: none
+    std::uint8_t hold = uimsg::kNoHold;          ///< the frame held: its index, kHoldLast its last; kNoHold: none
+    float share = 0; ///< 0-1
+};
+inline constexpr std::size_t kUiMaxAnims = 64;
+
 /// (Client level 8) A mod ability on our strip (ui_proto.hpp's kAbilityBar: nox.grantAbility).
 struct UiAbility {
     uimsg::AbilitySlot slot;
@@ -422,6 +434,10 @@ public:
     /// (Client level 8) The things spinning now (kSpin), at the last frame()'s time; one past its
     /// frames is let go in frame(), a new one for the same thing replaces it, 0 frames stops it.
     std::vector<UiSpin> spins() const;
+    /// (Client level 9) The things in an animation now (kAnim), at the last frame()'s time; one
+    /// past its frames is let go in frame(), a new one for the same thing replaces it, 0 frames
+    /// stops it.
+    std::vector<UiAnim> anims() const;
     /// (Client level 8) Our mod abilities (the server's last kAbilityBar), by slot, each cooldown
     /// counted down at 30 frames a second from the last frame()'s time since the bar came.
     std::vector<UiAbility> abilities() const;

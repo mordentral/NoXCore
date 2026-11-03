@@ -4435,6 +4435,7 @@ public:
         impl_.clearDecals(); // (a map's decals are its own: the new map's come from its mapLoaded)
         impl_.parts.leaps.reset(nullptr); // (forgotten: the new World has no busy units, nothing else was changed)
         impl_.parts.spins.reset();        // (a map's things are new: their clients' spins go with them)
+        impl_.parts.anims.reset();        // (and their animations)
         if (impl_.has.mapLoaded) {
             impl_.guarded("mapLoaded", [&] {
                 if (impl_.begin("mapLoaded")) {
@@ -4968,6 +4969,9 @@ void ScriptedMode::tick(server::GameHost& host, std::uint32_t)
     if (impl.parts.spins.active()) {
         impl.parts.spins.step(host); // (the spins under way told to clients that came to know their things)
     }
+    if (impl.parts.anims.active()) {
+        impl.parts.anims.step(host); // (and the animations; a dying thing's stopped)
+    }
     impl.pumpUi();
     if (impl.parts.weather.used()) {
         impl.parts.weather.flush(host); // (nox.weather's changes, once a frame)
@@ -5016,6 +5020,7 @@ void ScriptedMode::detach(server::GameHost& host)
     parts.leaps.reset(&host.server().world()); // (each unit let go where it is)
     parts.abilities.reset();
     parts.spins.reset();
+    parts.anims.reset();
     host.server().world().modeBusy.clear();
     impl_->host = nullptr;
     impl_->dropAssets(); // (the mod's assets kept only while it's hosted)

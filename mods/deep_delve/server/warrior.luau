@@ -781,17 +781,21 @@ function warrior.check(bad: { string }, thing: (string, string) -> ())
 			end
 		end
 	end
-	-- (each active on a node, its button's icon one of the game's ability icons the client knows)
-	local icons: { [string]: boolean } = {}
-	for _, a in require("data/tree").abilities do
-		icons[a.icon] = true
-	end
+	-- (each active on a node, its button's icon a mod picture in assets\abilities\ (a test proves
+	-- it's there), and each of its nodes drawn with that picture)
 	for key, a in data.actives :: any do
 		if not onTree[key] then
 			table.insert(bad, "active " .. key .. ": on no tree node")
 		end
-		if not icons[a.icon] then
-			table.insert(bad, "active " .. key .. ": icon " .. tostring(a.icon) .. " isn't a game ability's")
+		if type(a.icon) ~= "string" or string.sub(a.icon, 1, 10) ~= "abilities/" then
+			table.insert(bad, "active " .. key .. ": icon " .. tostring(a.icon) .. " isn't a picture in assets\\abilities")
+		end
+	end
+	for id = 1, tree.count() do
+		local n = tree.node(id)
+		local a: any = n.skill and (data.actives :: any)[n.skill]
+		if a and n.icon ~= a.icon then
+			table.insert(bad, "tree node " .. id .. ": its picture " .. tostring(n.icon) .. " isn't its active's " .. tostring(a.icon))
 		end
 	end
 end

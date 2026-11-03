@@ -120,7 +120,9 @@ std::vector<PlayerLayer> playerLayers(const nox::things::DrawSpec& draw, const P
     const auto weapons = [&] {
         for (std::size_t i = 2; i < state.weapons.size(); ++i) {
             if (look.weaponEquip & (1u << i)) {
-                add(state.weapons[i], LayerSource::Weapon, 1u << i);
+                if (add(state.weapons[i], LayerSource::Weapon, 1u << i) && look.lentWeapon == (1u << i)) {
+                    out.back().lent = true;
+                }
             }
         }
     };
@@ -277,7 +279,12 @@ std::vector<SpriteCache::Materials> layerMaterials(const std::vector<PlayerLayer
                 const auto name = armor ? nox::things::armorItemName(layer.bit) : nox::things::weaponItemName(layer.bit);
                 applyItemColours(current, armor ? modifiers.findArmor(name) : modifiers.findWeapon(name), &it->second,
                                  modifiers);
+            } else if (layer.lent) {
+                // (A lent weapon no record colours: its item's own colours.)
+                applyItemColours(current, modifiers.findWeapon(nox::things::weaponItemName(layer.bit)), nullptr, modifiers);
             }
+        } else if (layer.lent) {
+            applyItemColours(current, modifiers.findWeapon(nox::things::weaponItemName(layer.bit)), nullptr, modifiers);
         }
         out.push_back(current);
     }

@@ -12,13 +12,17 @@
 #include "noxcore/server/play_from_here.hpp"
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/world.hpp"
+#include "noxcore/things/draw.hpp"
 #include "noxcore/things/object_class.hpp"
 
 #include "lua.h"
 #include "lualib.h"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cmath>
+#include <string_view>
 
 namespace nox::modes::script {
 
@@ -138,6 +142,86 @@ void Spins::step(server::GameHost& host)
     });
     for (Spin& s : spins_) {
         tellNew(host, world, s);
+    }
+}
+
+namespace {
+
+/// Whether `peer`'s client is told an animation: in the game, not held out, ModeUi named, kAnimLevel.
+bool animReaches(const server::GameHost& host, std::uint8_t peer)
+{
+    return !host.refused(peer) && (host.clientFeatures(peer) & lobby::ClientFeature::ModeUi) != 0 &&
+           host.clientLevel(peer) >= uimsg::kAnimLevel;
+}
+
+} // namespace
+
+void Anims::tellNew(server::GameHost& host, server::World& world, Anim& a)
+{
+    const std::uint32_t gone = world.frameNow - a.start;
+    if (gone >= a.frames) {
+        return;
+    }
+    std::optional<std::vector<std::uint8_t>> m;
+    for (const auto& [peer, p] : host.players()) {
+        const std::uint32_t bit = 1u << (p.slot & 31);
+        if ((a.told & bit) || !animReaches(host, peer) || !(p.extent == a.unit || p.knows.contains(a.unit))) {
+            continue;
+        }
+        if (!m) {
+            m = uimsg::animMessage({static_cast<std::uint16_t>(a.unit.key()), static_cast<uimsg::AnimKind>(a.kind), a.state,
+                                    static_cast<std::uint16_t>(a.frames), static_cast<std::uint16_t>(gone), a.weapon, a.hold});
+        }
+        world.broadcasts().push_back({*m, true, p.extent});
+        a.told |= bit;
+    }
+}
+
+void Anims::tellStop(server::GameHost& host, server::World& world, server::ObjectKey object)
+{
+    // (Every client that takes them and knows it: one told nothing ignores it.)
+    const auto m = uimsg::animMessage({static_cast<std::uint16_t>(object), uimsg::AnimKind::Player, 0, 0, 0, uimsg::kNoWeaponLayer, uimsg::kNoHold});
+    for (const auto& [peer, p] : host.players()) {
+        if (animReaches(host, peer) && (p.extent == object || p.knows.contains(object))) {
+            world.broadcasts().push_back({m, true, p.extent});
+        }
+    }
+}
+
+void Anims::set(server::GameHost* host, server::World& world, const server::ServerObject& o, std::uint8_t kind, std::uint8_t state,
+                int frames, std::uint8_t weapon, std::uint8_t hold)
+{
+    std::erase_if(anims_, [&](const Anim& a) { return a.unit == o.extent; });
+    if (!host) {
+        return;
+    }
+    if (frames == 0) {
+        tellStop(*host, world, o.extent);
+        return;
+    }
+    Anim a{server::ObjectRef{o.extent}, kind, state, weapon, hold, world.frameNow, static_cast<std::uint32_t>(frames), 0};
+    tellNew(*host, world, a);
+    if (anims_.size() < kMax) {
+        anims_.push_back(a);
+    }
+}
+
+void Anims::step(server::GameHost& host)
+{
+    server::World& world = host.server().world();
+    std::erase_if(anims_, [&](const Anim& a) {
+        const server::ServerObject* o = world.byExtent(a.unit);
+        if (!o || o->gone() || world.frameNow - a.start >= a.frames) {
+            return true;
+        }
+        if (o->flags & server::ObjFlag::Dead) {
+            tellStop(host, world, a.unit); // (its death drawn, not the animation; nor after, if it's raised)
+            return true;
+        }
+        return false;
+    });
+    for (Anim& a : anims_) {
+        tellNew(host, world, a);
     }
 }
 
@@ -382,10 +466,121 @@ int noxSetSpin(lua_State* L)
     return 0;
 }
 
+/// `name`'s index in `table`, whatever its letters' case; none: not there.
+template <std::size_t N>
+std::optional<std::uint8_t> nameIndex(const std::array<std::string_view, N>& table, std::string_view name, std::size_t from = 0)
+{
+    for (std::size_t i = from; i < N; ++i) {
+        const std::string_view t = table[i];
+        if (t.size() == name.size() && std::ranges::equal(t, name, [](char a, char b) {
+                return std::toupper(static_cast<unsigned char>(a)) == std::toupper(static_cast<unsigned char>(b));
+            })) {
+            return static_cast<std::uint8_t>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+/// A player's strike with what it holds (its weapon class bits): the player animation whose
+/// layers draw that weapon swung (kPlayerStates' index); bare hands, PUNCH_RIGHT.
+std::uint8_t heldStrike(std::uint32_t weaponEquip)
+{
+    struct Strike {
+        std::uint32_t bits;
+        std::uint8_t state;
+    };
+    static constexpr Strike kStrikes[] = {
+        {0x7FF8000u, 29}, // the staffs (the Oblivion ones too): STAFF_STRIKE
+        {0x4u, 33},       // BOW: SHOOT_BOW
+        {0x8u, 34},       // CROSSBOW: SHOOT_CROSSBOW
+        {0xC0u, 44},      // CHAKRAM, SHURIKEN: CHAKRAM_STRIKE (no shuriken drawn in it)
+        {0x200u, 28},     // LONG_SWORD: LONG_SWORD_STRIKE
+        {0x100u, 27},     // SWORD: SWORD_STRIKE
+        {0x400u, 37},     // GREAT_SWORD: GREAT_SWORD_STRIKE
+        {0x4000u, 39},    // HAMMER: HAMMER_STRIKE
+        {0x800u, 26},     // MACE: MACE_STRIKE
+        {0x1000u, 35},    // AXE: AXE_STRIKE
+        {0x2000u, 39},    // OGRE_AXE: HAMMER_STRIKE (AXE_STRIKE has no layer of it)
+    };
+    for (const Strike& s : kStrikes) {
+        if (weaponEquip & s.bits) {
+            return s.state;
+        }
+    }
+    return 24;
+}
+
+int noxPlayAnim(lua_State* L)
+{
+    // nox.playAnim(unit, name, frames, { weapon = layer, hold = frame }): NoX Core clients of client
+    // level 9 that named ModeUi and know the thing (now, or later while it lasts) draw its body in
+    // its own animation `name` (a player's: "HAMMER_STRIKE", "WARCRY"..., or "ATTACK", the strike
+    // with what it holds now; a creature's: "ATTACK", "CAST_SPELL"...), its frames spread over
+    // `frames`, then as the server has it again; 0 stops it. `hold` ("first", "last" or a frame
+    // number from 1) holds that one frame the while instead. A player's `weapon` (a weapon layer:
+    // "HAMMER", "OGRE_AXE"...) is drawn in place of what it holds the while. Every layer follows
+    // the body's frame and facing (a spin's too). Nothing changes on the server, nor for any other
+    // client; a dead unit's is none (one that dies the while stops).
+    toolbox::refuseInsideAsked(L, "nox.playAnim");
+    const server::ServerObject& o = toolbox::objectArg(L, 1);
+    const bool player = (o.classes & oc::Player) != 0;
+    luaL_argcheck(L, player || (o.classes & oc::Monster) != 0, 1, "a creature or player");
+    std::size_t len = 0;
+    const char* s = luaL_checklstring(L, 2, &len);
+    const std::string_view name(s, len);
+    std::optional<std::uint8_t> state;
+    if (player && nameIndex(std::array<std::string_view, 1>{"ATTACK"}, name)) {
+        state = heldStrike(o.player ? o.player->weaponEquip : 0);
+    } else {
+        state = player ? nameIndex(things::kPlayerStates, name) : nameIndex(things::kMonsterStates, name);
+    }
+    if (!state) {
+        luaL_argerror(L, 2, player ? "a player's animation (\"ATTACK\", \"HAMMER_STRIKE\", \"WARCRY\"...)"
+                                   : "a creature's animation (\"ATTACK\", \"CAST_SPELL\"...)");
+    }
+    const double frames = luaL_checknumber(L, 3);
+    luaL_argcheck(L, frames >= 0 && frames <= uimsg::kMaxAnimFrames && frames == std::floor(frames), 3, "whole frames 0-1800");
+    std::uint8_t weapon = uimsg::kNoWeaponLayer;
+    std::uint8_t hold = uimsg::kNoHold;
+    if (!lua_isnoneornil(L, 4)) {
+        luaL_checktype(L, 4, LUA_TTABLE);
+        lua_rawgetfield(L, 4, "weapon");
+        if (!lua_isnil(L, -1)) {
+            luaL_argcheck(L, player, 4, "weapon: a player's only");
+            std::size_t wlen = 0;
+            const char* w = luaL_checklstring(L, -1, &wlen);
+            const auto layer = nameIndex(things::kWeaponParts, std::string_view(w, wlen), 2); // (not the flag, nor the quiver)
+            luaL_argcheck(L, layer.has_value(), 4, "weapon: a weapon layer (\"HAMMER\", \"SWORD\"...)");
+            weapon = *layer;
+        }
+        lua_pop(L, 1);
+        lua_rawgetfield(L, 4, "hold");
+        if (lua_isstring(L, -1) && !lua_isnumber(L, -1)) {
+            const std::string_view h = lua_tostring(L, -1);
+            luaL_argcheck(L, h == "first" || h == "last", 4, "hold: \"first\", \"last\" or a frame number 1-254");
+            hold = h == "first" ? 0 : uimsg::kHoldLast;
+        } else if (!lua_isnil(L, -1)) {
+            const double v = luaL_checknumber(L, -1);
+            luaL_argcheck(L, v >= 1 && v <= 254 && v == std::floor(v), 4, "hold: \"first\", \"last\" or a frame number 1-254");
+            hold = static_cast<std::uint8_t>(v - 1);
+        }
+        lua_pop(L, 1);
+    }
+    if (frames > 0 && (o.gone() || (o.flags & server::ObjFlag::Dead))) {
+        return 0;
+    }
+    toolbox::partsOf(L).anims.set(toolbox::hostOf(L), toolbox::worldOf(L), o,
+                                  static_cast<std::uint8_t>(player ? uimsg::AnimKind::Player : uimsg::AnimKind::Creature), *state,
+                                  static_cast<int>(frames), weapon, hold);
+    return 0;
+}
+
 } // namespace
 
 void addLeapToolbox(lua_State* L)
 {
+    lua_pushcfunction(L, noxPlayAnim, "playAnim");
+    lua_setfield(L, -2, "playAnim");
     lua_pushcfunction(L, noxSetSpin, "setSpin");
     lua_setfield(L, -2, "setSpin");
     lua_pushcfunction(L, noxSetBusy, "setBusy");

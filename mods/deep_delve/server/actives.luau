@@ -1,20 +1,25 @@
 --!strict
 -- The warrior's active abilities (by decision 2026-11-02): Leap Slam and Whirlwind, mod abilities
 -- (nox.defineAbility), a button each on a NoX Core client's strip over the quickbar (client level
--- 8, the mod's minClientLevel). Their numbers are data/warrior.luau's `actives`, their tree nodes
--- data/tree.luau's (skill nodes: a warrior's alone, any other class gets the stats' worth).
+-- 8; their bodies' animations level 9, the mod's minClientLevel). Their numbers are
+-- data/warrior.luau's `actives`, their tree nodes data/tree.luau's (skill nodes: a warrior's
+-- alone, any other class gets the stats' worth).
 --
 --   Granted: each time a hero's bonus is worked out again (hero.onBonus: its set-up at a login
 --     and at each map, an equip, a node taken or given back, a respec) each active its skills
 --     hold is granted and any other taken back. The engine keeps a player's grants by peer through
 --     map changes, never in the record: the tree is the record, and each set-up grants again.
 --   Leap Slam: a press (onModAbility, at the cursor's point) leaps the warrior there (nox.leap;
---     at most `range` away, along the line); onLand: the slam about where it came down (a wall
---     may cut the leap short: it slams there).
+--     at most `range` away, along the line), its body drawn swinging a hammer over the leap
+--     (nox.playAnim, data's `anim`: whatever it holds); onLand: the slam about where it came down
+--     (a wall may cut the leap short: it slams there).
 --   Whirlwind: a press spins the warrior (nox.setBusy: no blows, spells or abilities; slowed; its
---     body drawn turning, nox.setSpin), a timer turning every `every` frames and striking the
+--     body drawn turning, nox.setSpin, held in its own strike's last frame so its weapon is out,
+--     nox.playAnim), a timer turning every `every` frames and striking the
 --     monsters about it; its release or its hold's end stops it, and its cooldown runs from then
---     (nox.setAbilityCooldown).
+--     (nox.setAbilityCooldown). While it spins a glowing swirl of blades turns on the floor under
+--     the warrior, following it (decals.luau's, data/warrior.luau's `swirl`), gone at every stop;
+--     each turn flashes at the warrior and sparks at each monster struck.
 --
 -- Their hits are the warrior's skill hits (warrior.strike: quiet, the mod's monsters alone, so
 -- never a party member or its creatures); Execute and Hunter's Mark count on each, and a landing
@@ -22,6 +27,7 @@
 
 local data = require("data/warrior")
 local tipData = require("data/tips")
+local decals = require("decals")
 local hero = require("hero")
 local items = require("items")
 local monsters = require("monsters")
@@ -76,9 +82,9 @@ function actives.blow(h: any): number
 	return math.max(data.bare.least, math.floor(strength * data.bare.perStrength + 0.5))
 end
 
--- Strikes every monster within `reach` of (x, y) for `pct` of the blow; how many it struck and
--- what they took.
-local function strikeAll(h: any, x: number, y: number, reach: number, pct: number, kind: number): (number, number, number)
+-- Strikes every monster within `reach` of (x, y) for `pct` of the blow, the effect `fx` at each;
+-- how many it struck and what they took.
+local function strikeAll(h: any, x: number, y: number, reach: number, pct: number, kind: number, fx: number): (number, number, number)
 	local base = actives.blow(h) * hero.dealt(h, nil) * pct / 100
 	local hit, dealt = 0, 0
 	for _, id in warrior.monstersNear(x, y, reach, nil, 32) do
@@ -88,7 +94,7 @@ local function strikeAll(h: any, x: number, y: number, reach: number, pct: numbe
 		warrior.strike(h, id, base * warrior.factor(h, id), kind)
 		local after = nox.object(id)
 		dealt += math.max(0, was - (if after then after.health else 0))
-		nox.effect(data.fx.slamHit, ox, oy)
+		nox.effect(fx, ox, oy)
 		hit += 1
 	end
 	return hit, dealt, base
@@ -117,6 +123,8 @@ local function leap(h: any, s: any, x: number, y: number): boolean
 		return false
 	end
 	s.leap = { rank = rank, at = nox.frame(), x = lx, y = ly }
+	local anim: any = LEAP.anim
+	nox.playAnim(unit, anim.name, LEAP.time, { weapon = anim.weapon })
 	nox.sound(unit, data.sounds.leap)
 	count(s, "leap")
 	return true
@@ -134,7 +142,7 @@ function actives.landed(unit: number, x: number, y: number, cut: boolean)
 	local n = data.numbers("leapSlam", l.rank)
 	nox.effect(data.fx.slam, x, y)
 	nox.sound(unit, data.sounds.slam)
-	local hit, dealt, base = strikeAll(h, x, y, n.radius, n.pct, LEAP.kind)
+	local hit, dealt, base = strikeAll(h, x, y, n.radius, n.pct, LEAP.kind, data.fx.slamHit)
 	-- (each one struck and still standing: thrown back, then held a moment once the throw has
 	-- carried it (the game's hold stops a thing's motion); one held already is kept held, unthrown;
 	-- a boss never thrown, held less)
@@ -163,12 +171,28 @@ end
 
 -- ---- Whirlwind
 
--- The warrior's body turning while it spins (nox.setSpin: drawn by NoX Core clients of level 8,
--- nothing changes on the server): `frames` at its start, 0 at its stop.
+-- The warrior's body turning while it spins, held in its own strike's last frame so its weapon is
+-- out (nox.setSpin and nox.playAnim: drawn by NoX Core clients, nothing changes on the server):
+-- `frames` at its start, 0 at its stop.
 local function spinBody(unit: number, frames: number)
 	nox.setSpin(unit, if frames > 0 then WHIRL.turns else 0, frames)
+	local anim: any = WHIRL.anim
+	local opts: any = { hold = anim.hold }
+	nox.playAnim(unit, anim.name, frames, opts)
 end
 
+-- The swirl under a spinning warrior (data's `swirl`: as wide as the turn's reach shows, turning
+-- the body's way, following it); its decal's id, nil when the map holds its 64 (no swirl, the
+-- spin the same).
+local function putSwirl(unit: number, reach: number): number?
+	local sw: any = data.swirl
+	local x, y = nox.position(unit)
+	local def = { asset = sw.asset, size = reach * sw.across, spin = sw.spin, pulse = sw.pulse, period = sw.period, scale = sw.scale, colour = sw.colour }
+	return decals.put("swirl", x, y, def, unit)
+end
+
+-- A spin stopped (`why`: "release", "end", "time", "down", "taken back", "map"): its swirl gone
+-- with it, but for a map's load, which cleared the old map's decals itself (the id is stale).
 local function stopSpin(h: any, s: any, why: string)
 	local spin = s.spin
 	if not spin then
@@ -176,6 +200,13 @@ local function stopSpin(h: any, s: any, why: string)
 	end
 	s.spin = nil
 	nox.cancelTimer(spin.timer)
+	if spin.swirl then
+		if why ~= "map" then
+			decals.remove(spin.swirl)
+			count(s, "swirlGone")
+		end
+		spin.swirl = nil
+	end
 	local unit = h.unit
 	if nox.present(unit) then
 		nox.setBusy(unit, 0)
@@ -196,11 +227,9 @@ local function turn(h: any, s: any, spin: any)
 	local n = data.numbers("whirlwind", spin.rank)
 	local x, y = nox.position(unit)
 	spin.turns += 1
-	if spin.turns % 2 == 1 then
-		nox.effect(data.fx.whirl, x, y)
-	end
+	nox.effect(data.fx.whirl, x, y)
 	nox.sound(unit, data.sounds.turn)
-	local hit, dealt = strikeAll(h, x, y, n.reach, n.pct, WHIRL.kind)
+	local hit, dealt = strikeAll(h, x, y, n.reach, n.pct, WHIRL.kind, data.fx.whirlHit)
 	spin.hits += hit
 	spin.dealt += dealt
 	count(s, "turn")
@@ -228,6 +257,10 @@ local function spin(h: any, s: any): boolean
 	s.spin = sp
 	count(s, "spin")
 	spinBody(unit, frames)
+	sp.swirl = putSwirl(unit, data.numbers("whirlwind", rank).reach)
+	if sp.swirl then
+		count(s, "swirl")
+	end
 	turn(h, s, sp)
 	sp.timer = nox.every(WHIRL.every, function()
 		if s.spin ~= sp then
@@ -302,7 +335,8 @@ function actives.reset()
 end
 
 -- "dd actives": the first hero's actives (rank, cooldown), the blow they're shares of, the counts,
--- the last slam and spin; "clear": the counts emptied; "ready": both cooldowns ended.
+-- the last slam, whether it spins now (and its swirl's decal) and the last spin; "clear": the
+-- counts emptied; "ready": both cooldowns ended.
 function actives.console(args: { string }, h: any): { string }
 	if not h then
 		return { "no player" }
@@ -337,7 +371,9 @@ function actives.console(args: { string }, h: any): { string }
 		table.insert(out, string.format("slam %d %d hit %d dealt %d base %d cut %s", math.floor(l.x :: number), math.floor(l.y :: number), l.hit :: number, l.dealt :: number, math.floor((l.base :: number) + 0.5),
 			tostring(l.cut)))
 	end
-	table.insert(out, "spinning " .. (if s.spin then "yes" else "no") .. " busy " .. tostring(nox.busy(h.unit)))
+	-- (the swirl under a spin: its decal's id, "none" without a spin or past the map's 64)
+	local swirl = if s.spin and s.spin.swirl then tostring(s.spin.swirl) else "none"
+	table.insert(out, "spinning " .. (if s.spin then "yes" else "no") .. " busy " .. tostring(nox.busy(h.unit)) .. " swirl " .. swirl)
 	local p: any = s.lastSpin
 	if p then
 		table.insert(out, string.format("spun %d turns %d hits dealt %d frames %d %s", p.turns :: number, p.hits :: number, p.dealt :: number, p.frames :: number, tostring(p.why)))

@@ -32,8 +32,9 @@ local function nodeEntries(): { any }
 		for _, other in n.links do
 			table.insert(links, other)
 		end
-		-- (ic: its picture's short name, the asset "tree/<ic>", for a root, small, notable or
-		-- keystone; si: the game's icon's name for a spell, ability or summon, for nox.spellIcon;
+		-- (ic: its picture's short name, the asset "tree/<ic>" (or, with a "/", the asset's whole
+		-- name: an active's button picture), for a root, small, notable or keystone; si: the
+		-- game's icon's name for a spell, ability or summon, for nox.spellIcon;
 		-- u: for a spell, ability or summon, the classes that may use it, 1 warrior + 2 wizard + 4
 		-- conjurer)
 		-- (e: one of a choice of two, its other's id: shut while that one is taken)

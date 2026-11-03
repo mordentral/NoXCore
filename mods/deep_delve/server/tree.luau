@@ -19,8 +19,9 @@
 -- (data.refund), and only a node whose going leaves every other node taken joined to the root.
 --
 -- A choice of two (by decision 2026-11-02; the stock abilities' upgrades): a node naming another
--- (`excludes`, each the other's) is refused while that one is taken. Swapping is giving the one
--- held back (alone, for gold, or by a respec), then taking the other.
+-- (`excludes`, each the other's) is never held with that one. Taking it while the other is held
+-- swaps the two (by decision 2026-11-02: free, the point moved across), so long as nothing else
+-- hangs on the one given up.
 
 local data = require("data/tree")
 local warriorData = require("data/warrior")
@@ -205,39 +206,54 @@ function tree.points(rec: any): (number, number, number)
 	return total, spent, total - spent
 end
 
--- Whether node `id` may be taken now, else why.
-function tree.canTake(rec: any, id: number): (boolean, string?)
+-- Whether node `id` may be taken now, else why; and, for one of a choice of two whose other is
+-- held, that other (taking it swaps the two, for no point and no gold).
+function tree.canTake(rec: any, id: number): (boolean, string?, number?)
 	local n = nodes[id]
 	if not n then
-		return false, "no such node"
+		return false, "no such node", nil
 	end
 	local set = tree.taken(rec)
 	if set[id] then
-		return false, "taken already"
+		return false, "taken already", nil
 	end
-	-- (one of a choice of two: refused while its other is taken)
+	-- (one of a choice of two whose other is held: a swap, if nothing else hangs on that one)
+	local swap: number? = nil
 	if n.excludes and set[n.excludes] then
-		return false, "you have " .. tostring(nodes[n.excludes].name) .. ": one of the two (give it back to take this)"
-	end
-	local _, _, left = tree.points(rec)
-	if left < 1 then
-		return false, "no points left"
+		swap = n.excludes
+		local ok = tree.canRefund(rec, n.excludes)
+		if not ok then
+			return false, "other nodes you have hang on " .. tostring(nodes[n.excludes].name), nil
+		end
+		set[n.excludes] = nil
+	else
+		local _, _, left = tree.points(rec)
+		if left < 1 then
+			return false, "no points left", nil
+		end
 	end
 	for _, other in near[id] or {} do
 		if set[other] then
-			return true, nil
+			return true, nil, swap
 		end
 	end
-	return false, "not joined to a node you have"
+	return false, "not joined to a node you have", nil
 end
 
--- Node `id` taken (the record only); whether it was, else why.
+-- Node `id` taken (the record only; one of a choice of two in its other's place); whether it was,
+-- else why.
 function tree.take(rec: any, id: number): (boolean, string?)
-	local ok, why = tree.canTake(rec, id)
+	local ok, why, swap = tree.canTake(rec, id)
 	if not ok then
 		return false, why
 	end
-	table.insert(tree.of(rec).nodes, id)
+	local list = tree.of(rec).nodes
+	local at = if swap then table.find(list, swap) else nil
+	if at then
+		list[at] = id
+	else
+		table.insert(list, id)
+	end
 	return true, nil
 end
 
@@ -496,7 +512,7 @@ function tree.describe(n: any): (string, string)
 		-- (a warrior's skill: its words at the rank the node brings, then any stats of its own)
 		local stats = tree.statText(n.stats)
 		-- (one of a choice of two says so)
-		local choice = if n.excludes then ". One of two with " .. tostring(nodes[n.excludes].name) .. ": never both" else ""
+		local choice = if n.excludes then ". One of two with " .. tostring(nodes[n.excludes].name) .. ": never both, swapped for free" else ""
 		return n.name, kind .. warriorData.words(n.skill, n.rank or 1) .. (if stats ~= "" then ", " .. stats else "") .. choice .. " (the Warrior's)"
 	end
 	return n.name, kind .. tree.statText(n.stats)

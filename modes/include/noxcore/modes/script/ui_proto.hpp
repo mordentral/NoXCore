@@ -67,6 +67,16 @@
 // thing then, a script's spin (nox.setSpin: the body drawn turning through its facings):
 //   kSpin         u16 the thing's net code, i16 turns a second x 16 (- anticlockwise on screen),
 //                 u16 frames (server frames; 0: stop now)                     (6 bytes)
+// and, only to a client at client level 9 or above (kAnimLevel) that named ModeUi and knows the
+// thing then, a script's animation (nox.playAnim: the body drawn in one of its own animations):
+//   kAnim         u16 the thing's net code, u8 kind (0 a player's state, 1 a creature's), u8 the
+//                 state (kPlayerStates' or kMonsterStates' index), u16 frames (server frames; 0:
+//                 stop now), u16 frames of it already gone (a client told late), u8 the weapon
+//                 layer drawn in place of what it holds (a weapon class bit's index; 0xFF: none,
+//                 what it holds), u8 the frame held (0xFF: none, played through; 0xFE: its
+//                 last; else its index, past the last the last)              (10 bytes)
+//                 (the animation's frames spread over the frames, whatever its own speed; or the
+//                 one held the while)
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -118,6 +128,7 @@ enum Sub : std::uint8_t {
     kAbilityBar = 22,
     kUseAbility = 23,
     kSpin = 24,
+    kAnim = 25,
 };
 
 /// The most UI source a server sends, and a client takes (section 10.3's cap).
@@ -399,6 +410,61 @@ inline std::optional<Spin> decodeSpin(std::span<const std::uint8_t> payload)
         return std::nullopt;
     }
     return s;
+}
+
+/// (Client level 9) A script's animation (nox.playAnim): kAnim's payload, 10 bytes: u16 net code,
+/// u8 kind, u8 state, u16 frames (0: stop), u16 frames gone, u8 weapon layer (kNoWeaponLayer:
+/// none), u8 the frame held (kNoHold: none; kHoldLast: its last; else its index).
+inline constexpr std::uint16_t kAnimLevel = 9;
+inline constexpr int kMaxAnimFrames = 30 * 60; ///< a minute
+inline constexpr std::uint8_t kNoWeaponLayer = 0xFF;
+inline constexpr std::uint8_t kNoHold = 0xFF;
+inline constexpr std::uint8_t kHoldLast = 0xFE;
+enum class AnimKind : std::uint8_t { Player = 0, Creature = 1 };
+struct Anim {
+    std::uint16_t object = 0;
+    AnimKind kind = AnimKind::Player;
+    std::uint8_t state = 0;
+    std::uint16_t frames = 0;
+    std::uint16_t gone = 0;
+    std::uint8_t weapon = kNoWeaponLayer;
+    std::uint8_t hold = kNoHold;
+    bool operator==(const Anim&) const = default;
+};
+
+inline std::vector<std::uint8_t> animMessage(const Anim& a)
+{
+    const std::uint8_t payload[10] = {static_cast<std::uint8_t>(a.object), static_cast<std::uint8_t>(a.object >> 8),
+                                      static_cast<std::uint8_t>(a.kind),   a.state,
+                                      static_cast<std::uint8_t>(a.frames), static_cast<std::uint8_t>(a.frames >> 8),
+                                      static_cast<std::uint8_t>(a.gone),   static_cast<std::uint8_t>(a.gone >> 8),
+                                      a.weapon,                            a.hold};
+    return message(kAnim, payload);
+}
+
+/// A kAnim payload read (bytes past the 10 left for later versions), kept to its bounds (frames to
+/// kMaxAnimFrames, gone short of them); none: cut short, no object, or a kind or state no table
+/// has (kPlayerStates' 55, kMonsterStates' 16; a weapon layer past kWeaponParts' 27 is none).
+inline std::optional<Anim> decodeAnim(std::span<const std::uint8_t> payload)
+{
+    if (payload.size() < 10) {
+        return std::nullopt;
+    }
+    Anim a;
+    a.object = static_cast<std::uint16_t>(payload[0] | payload[1] << 8);
+    if (a.object == 0 || payload[2] > 1) {
+        return std::nullopt;
+    }
+    a.kind = static_cast<AnimKind>(payload[2]);
+    a.state = payload[3];
+    if (a.state >= (a.kind == AnimKind::Player ? 55 : 16)) {
+        return std::nullopt;
+    }
+    a.frames = static_cast<std::uint16_t>(std::min<int>(payload[4] | payload[5] << 8, kMaxAnimFrames));
+    a.gone = static_cast<std::uint16_t>(std::min<int>(payload[6] | payload[7] << 8, a.frames > 0 ? a.frames - 1 : 0));
+    a.weapon = payload[8] < 27 && a.kind == AnimKind::Player ? payload[8] : kNoWeaponLayer;
+    a.hold = payload[9];
+    return a;
 }
 
 /// (Client level 8) A player's mod abilities (nox.grantAbility): kAbilityBar's entries, at most

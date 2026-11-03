@@ -155,6 +155,7 @@ public:
         app_.modeDrawScales.clear();
         app_.modeLifts.clear();
         app_.modeSpins.clear();
+        app_.modeAnims.clear();
         if (app_.effects) {
             // (Client level 5) A burst near a missile the server drew at a scale: drawn so too.
             if (ui_) {
@@ -216,9 +217,10 @@ public:
         app.modeDrawScales.clear();
         app.modeLifts.clear();
         app.modeSpins.clear();
+        app.modeAnims.clear();
         if (ui_) {
             // (Client level 8) The leaps under way: each thing's height, by net code for the scene;
-            // and the spins, each thing's turn.
+            // and the spins, each thing's turn; (9) the animations, each thing's state and share.
             for (const nox::modes::script::UiLift& l : ui_->lifts()) {
                 app.modeLifts.push_back({l.object, l.lift});
             }
@@ -227,6 +229,10 @@ public:
                 app.modeSpins.push_back({s.object, s.eighths});
             }
             std::ranges::sort(app.modeSpins, {}, &App::ModeSpin::object);
+            for (const nox::modes::script::UiAnim& a : ui_->anims()) {
+                app.modeAnims.push_back({a.object, a.kind == nox::modes::script::uimsg::AnimKind::Creature, a.state, a.weapon, a.hold, a.share});
+            }
+            std::ranges::sort(app.modeAnims, {}, &App::ModeAnim::object);
             // (Client level 8) The server's coloured lines, shown as its plain ones are (a line
             // from no one: centred), in their colours.
             for (const nox::modes::script::uimsg::TextLine& t : ui_->takeTextLines()) {

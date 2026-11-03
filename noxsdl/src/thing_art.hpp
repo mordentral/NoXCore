@@ -119,13 +119,16 @@ struct Pose {
     double animStart = 0;       ///< game frame the current state began (one-shot animations)
     bool enabled = true;        ///< ConditionalAnimateDraw: on, its first animation; off, its second
     std::uint32_t xStatus = 0;  ///< AnimateStateDraw: which state's animation (MSG_REPORT_X_STATUS)
+    /// A script mode's animation's share gone (nox.playAnim: 0-1): the frame at that share of the
+    /// animation's frames, whatever its playback. Negative: none (by its playback).
+    float share = -1;
 };
 
 /// Frame index within an animation of `frames` frames, as the game picks it:
 /// OneShot and OneShotRemove run once from the state's start and hold the last frame, Loop cycles
 /// (offset by net code), Slave shows `variant`, Random picks per game frame, anything else
 /// (LoopAndFade) the first frame. A frame lasts
-/// frameDelay + 1 game frames.
+/// frameDelay + 1 game frames. With a share (Pose::share), the frame at that share instead.
 std::size_t animationFrame(nox::things::AnimPlayback kind, std::size_t frames, std::uint8_t frameDelay, const Pose& pose);
 
 /// An AnimateDraw thing's LoopAndFade (smoke, the toxic cloud's puffs): its frames loop

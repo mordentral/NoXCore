@@ -625,6 +625,20 @@ struct App {
         int eighths = 0;
     };
     std::vector<ModeSpin> modeSpins;
+    /// Live: a script mode's animations (nox.playAnim, client level 9), sorted by net code, set
+    /// each frame before the scene: a drawable of that code is drawn in that state of its own
+    /// (a player's or a creature's, by `creature`), at that share of its frames or on the frame
+    /// held, a player with `weapon`'s layer in place of what it holds (liveSprites). Empty:
+    /// nothing looked up.
+    struct ModeAnim {
+        std::uint16_t object = 0;
+        bool creature = false;
+        std::uint8_t state = 0;
+        std::uint8_t weapon = 0xFF; ///< a weapon class bit's index; 0xFF: none (what it holds)
+        std::uint8_t hold = 0xFF;   ///< the frame held: its index (0xFE its last); 0xFF: none
+        float share = 0;
+    };
+    std::vector<ModeAnim> modeAnims;
     /// A mod's ability strip's keys (noxcore.cfg's ModAbilityKey1-4, Extras): their names and the
     /// codes nox.cfg's names stand for (InputBindings::keyCode's; 0: none).
     std::array<std::string, 4> modAbilityKeyNames{"3", "4", "5", "6"};

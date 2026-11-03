@@ -8,7 +8,8 @@
 // struck, hit and found as ever, no flag of the game's changed); NoX Core clients of client level
 // 8 that named ModeUi draw it raised (ui_proto.hpp's kLeap, one message a leap), every other sees
 // it move along the ground. Down, the mode's onLand(unit, x, y, cut) runs. Nothing on the server
-// reads a height. (Internal to the script modes' sources.)
+// reads a height. nox.setSpin and nox.playAnim are the clients' only (Spins, Anims): nothing on
+// the server changes. (Internal to the script modes' sources.)
 #pragma once
 
 #include "noxcore/server/object_key.hpp"
@@ -115,13 +116,53 @@ private:
     std::vector<Spin> spins_;
 };
 
+/// nox.playAnim's animations under way (ui_proto.hpp's kAnim): each told to the level 9 ModeUi
+/// clients that know its thing when it's set, and (once a frame, step) to one that comes to know it
+/// later, with its frames gone; one past its frames, or whose thing is gone, let go; one whose
+/// thing dies stopped (each client told).
+class Anims {
+    /// (script_links.hpp: an animation names its thing.)
+    template <class>
+    friend struct server::Links;
+
+public:
+    static constexpr std::size_t kMax = 64;
+    /// `o` drawn in state `state` of kind `kind` (uimsg::AnimKind) for `frames`, `weapon` the
+    /// weapon layer lent it (uimsg::kNoWeaponLayer: none), `hold` the frame held (uimsg::kNoHold:
+    /// none); 0 frames stops it, every client that knows it told so. Past kMax a new one isn't
+    /// kept (it's still sent now).
+    void set(server::GameHost* host, server::World& world, const server::ServerObject& o, std::uint8_t kind, std::uint8_t state,
+             int frames, std::uint8_t weapon, std::uint8_t hold);
+    /// Once a frame while active: the spent and the gone let go, the dead stopped, the ones a
+    /// client has come to know since told to it.
+    void step(server::GameHost& host);
+    bool active() const noexcept { return !anims_.empty(); }
+    void reset() { anims_.clear(); }
+
+private:
+    struct Anim {
+        server::ObjectRef unit;
+        std::uint8_t kind = 0, state = 0, weapon = 0, hold = 0;
+        std::uint32_t start = 0;  ///< (frameNow at its start)
+        std::uint32_t frames = 0;
+        std::uint32_t told = 0;   ///< the players' slots told (HostedPlayer::slot's bits)
+    };
+    /// `a` to each client it reaches that knows its thing and hasn't been told.
+    static void tellNew(server::GameHost& host, server::World& world, Anim& a);
+    /// A stop for `object` to every client it reaches that knows it.
+    static void tellStop(server::GameHost& host, server::World& world, server::ObjectKey object);
+
+    std::vector<Anim> anims_;
+};
+
 /// `unit` busy for `frames` more (0: no longer; a leap's stillness stays); false when
 /// World::kMaxModeBusy units are busy. The world's spent entries are let go on the way.
 bool setBusy(server::World& world, const server::ServerObject& unit, int frames);
 /// The world's busy entries spent (past their frames) or whose unit is dead or gone let go.
 void sweepBusy(server::World& world);
 
-/// nox.setBusy, nox.busy, nox.leap set in the `nox` table on top of L's stack.
+/// nox.setBusy, nox.busy, nox.leap, nox.setSpin and nox.playAnim set in the `nox` table on top of
+/// L's stack.
 void addLeapToolbox(lua_State* L);
 
 } // namespace nox::modes::script

@@ -136,7 +136,10 @@ struct ClientSecret {
 ///      named ModeUi (kAbilityLevel); any other has none; and a script mode's spins (nox.setSpin:
 ///      MSG_NOXCPP_MODEUI's kSpin, a body drawn turning), sent only to a client of level 8 or
 ///      above that named ModeUi (kSpinLevel)
-inline constexpr std::uint16_t kClientLevel = 8;
+///   9  a script mode's animations (nox.playAnim: MSG_NOXCPP_MODEUI's kAnim, a body drawn in one of
+///      its own animations for some frames), sent only to a client of level 9 or above that named
+///      ModeUi (ui_proto.hpp's kAnimLevel); any other draws it as the server's state has it
+inline constexpr std::uint16_t kClientLevel = 9;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).
 inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.

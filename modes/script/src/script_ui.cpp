@@ -143,6 +143,18 @@ struct ScriptUiClient::Impl {
         std::int16_t rate16 = 0;
     };
     std::vector<SpinNow> spinning;
+    /// (Client level 9) The animations told (kAnim), each from the frame time it began at (its
+    /// frames already gone when it came taken off).
+    struct AnimNow {
+        std::uint16_t object = 0;
+        std::uint64_t startMs = 0;
+        std::uint64_t durationMs = 1;
+        uimsg::AnimKind kind = uimsg::AnimKind::Player;
+        std::uint8_t state = 0;
+        std::uint8_t weapon = uimsg::kNoWeaponLayer;
+        std::uint8_t hold = uimsg::kNoHold;
+    };
+    std::vector<AnimNow> anims;
     /// (Client level 8) The server's last ability bar (kAbilityBar) and when it came.
     std::vector<uimsg::AbilitySlot> abilityBar;
     std::uint64_t abilityBarAtMs = 0;
@@ -1549,6 +1561,18 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             }
         }
         break;
+    case uimsg::kAnim:
+        // (Client level 9; whatever the UI's state.) The same thing's again replaces it; 0 frames
+        // stops it; past kUiMaxAnims let go.
+        if (const auto a = uimsg::decodeAnim(rest)) {
+            std::erase_if(anims, [&](const AnimNow& n) { return n.object == a->object; });
+            if (a->frames != 0 && anims.size() < kUiMaxAnims) {
+                const std::uint64_t goneMs = static_cast<std::uint64_t>(a->gone) * 1000 / 30;
+                anims.push_back({a->object, nowMs > goneMs ? nowMs - goneMs : 0, static_cast<std::uint64_t>(a->frames) * 1000 / 30,
+                                 a->kind, a->state, a->weapon, a->hold});
+            }
+        }
+        break;
     case uimsg::kAbilityBar:
         // (Client level 8; whatever the UI's state.) The whole strip, in place of the last.
         if (auto bar = uimsg::decodeAbilityBar(rest)) {
@@ -1602,6 +1626,7 @@ void ScriptUiClient::frame(std::uint64_t nowMs)
     impl.pruneDrawScales(); // (a UI running or not: the server's draw scales are any script mode's)
     std::erase_if(impl.leaps, [&](const Impl::LeapNow& l) { return nowMs >= l.startMs + l.durationMs; });
     std::erase_if(impl.spinning, [&](const Impl::SpinNow& s) { return nowMs >= s.startMs + s.durationMs; });
+    std::erase_if(impl.anims, [&](const Impl::AnimNow& a) { return nowMs >= a.startMs + a.durationMs; });
     if (!impl.vm) {
         return;
     }
@@ -1920,6 +1945,18 @@ std::vector<UiSpin> ScriptUiClient::spins() const
         // (eighths = turns a second x 8 x seconds: rate16 / 16 x 8 x ms / 1000)
         const auto eighths = static_cast<int>(static_cast<std::int64_t>(s.rate16) * static_cast<std::int64_t>(gone) / 2000);
         out.push_back({s.object, eighths});
+    }
+    return out;
+}
+
+std::vector<UiAnim> ScriptUiClient::anims() const
+{
+    std::vector<UiAnim> out;
+    out.reserve(impl_->anims.size());
+    for (const Impl::AnimNow& a : impl_->anims) {
+        const std::uint64_t gone = impl_->nowMs > a.startMs ? impl_->nowMs - a.startMs : 0;
+        const float share = std::min(1.0f, static_cast<float>(gone) / static_cast<float>(a.durationMs));
+        out.push_back({a.object, a.kind, a.state, a.weapon, a.hold, share});
     }
     return out;
 }
