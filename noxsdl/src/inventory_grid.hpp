@@ -82,4 +82,22 @@ private:
     Stackable stackable_;
 };
 
+/// Where a drag from a cell ends (Inventory::mouseUp).
+enum class DragEnd : std::uint8_t {
+    Outside,      ///< out of the panel: dropped on the ground
+    QuickClick,   ///< a quick click where it was taken: used, worn or taken off
+    Doll,         ///< onto the doll: worn
+    SecondaryBox, ///< onto the secondary weapon's box
+    Cell,         ///< into a cell: moved within the inventory
+    Panel,        ///< anywhere else on the panel: back in its cell
+};
+
+/// Whether the secondary weapon, taken from its cell, stops being the secondary where its drag
+/// ends: dropped out, used or worn. (noxcpp: moved within the inventory, or put back, it stays
+/// one. The exe made it none as the drag began, whatever came of it: OB-156, fixed.)
+constexpr bool endsSecondary(DragEnd end)
+{
+    return end == DragEnd::Outside || end == DragEnd::QuickClick || end == DragEnd::Doll;
+}
+
 } // namespace noxsdl

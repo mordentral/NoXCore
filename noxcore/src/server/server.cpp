@@ -303,8 +303,8 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     std::vector<std::uint32_t> carriedOver;
     const bool fromSave = (old || startedFromSave) && world_.switchToSolo; // (a visited map's saved copy)
     if (old) {
-        // (The thaws and trades: mapChangeTrades above, before the load.)
-        world_.freezeLock = old->freezeLock; // (a global, as the thaws left it)
+        // (The thaws and trades: mapChangeTrades above, before the load. Each player's freeze lock
+        // goes with it, as the thaws left it.)
         // The players and what they hold stay (the
         // teams with them), their links to the old map's things gone: the wall they touched,
         // frozen, their marks, the crown frame, their last attacker.

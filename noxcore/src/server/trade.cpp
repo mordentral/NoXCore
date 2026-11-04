@@ -932,10 +932,19 @@ bool buy(Fight& fight, ServerObject& player, TradeSession& s, std::uint32_t gold
         Items items = itemsOf(fight);
         const bool viaPickup = stack ? !item->pickup.empty() : !(item->classes & 0x110u) && !item->pickup.empty();  // a single buy puts food and books (0x110) straight in the inventory
         if (viaPickup) {
-            // Its PICKUP's answer isn't looked at: refused, the thing is in no list (lost) and the
-            // gold taken all the same (an original bug).
+            // (noxcpp: its PICKUP's refusal is looked at: nothing paid, the stock thing back in the
+            // shop's keeping (a quest's new gem or ankh gone again), its stock entry and record
+            // left. The exe takes the gold and loses the thing: OB-099, fixed.)
             const std::uint32_t id = s.id;
-            items.pickupFunction(player, *item, true);
+            const bool taken = items.pickupFunction(player, *item, true);
+            if (!taken && item->holder == 0 && !item->pendingDelete) {
+                if (e == stockThing.extent && tradeSession(world, id)) {
+                    keep(world, e);
+                } else {
+                    item->pendingDelete = true;
+                }
+                return false;
+            }
             if (item->holder == 0 && !item->pendingDelete) {
                 item->pendingDelete = true;
             }
@@ -1343,13 +1352,12 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         }
         break;
     }
-    case 0x17: { // buy a stack (Shop_OnBuyStack): by type, its gold read once (the 1.2b bug)
+    case 0x17: { // buy a stack (Shop_OnBuyStack): by type
         if (!s) {
             break;
         }
         const std::uint32_t type = u16(2);
         const std::uint32_t count = m.size() > 4 ? m[4] : 0;
-        const std::uint32_t gold = p.gold;
         for (std::uint32_t n = 0; n < count; ++n) {
             ServerObject* o = nullptr;
             for (const auto& item : s->stock) {
@@ -1358,7 +1366,9 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
                     break;
                 }
             }
-            if (!o || !buy(fight, unit, *s, gold, *o, true)) {
+            // (noxcpp: each one against the gold left. The exe reads the gold once, before the
+            // first: one affordable bought as many as asked, the gold down to 0, OB-098, fixed.)
+            if (!o || !buy(fight, unit, *s, p.gold, *o, true)) {
                 break;
             }
         }
@@ -1372,7 +1382,10 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         }
         break;
     }
-    case 0x19: { // sell a stack (Shop_OnSellStack): by type, anything (equipped, quest items, glyphs)
+    case 0x19: { // sell a stack (Shop_OnSellStack): by type
+        // (noxcpp: worn things passed over, and a quest item or a glyph refused as a single sale
+        // refuses it, which ends the stack. The exe sells the first `count` of the type whatever
+        // they are, equipped things, quest items and glyphs too: OB-100, fixed.)
         if (!s) {
             break;
         }
@@ -1382,12 +1395,12 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         for (std::uint32_t n = 0; n < count; ++n) {
             ServerObject* item = nullptr;
             for (const std::uint32_t e : unit.inventory) {
-                if (ServerObject* o = world.byExtent(e); o && o->type == type) {
+                if (ServerObject* o = world.byExtent(e); o && o->type == type && !(o->flags & ObjFlag::Equipped)) {
                     item = o;
                     break;
                 }
             }
-            if (!item) {
+            if (!item || refuseSale(world, unit, *item)) {
                 all = false; // (out of them: returns before the sound)
                 break;
             }
@@ -1398,12 +1411,25 @@ void onTradeMessage(Fight& fight, ServerObject& unit, std::span<const std::uint8
         }
         break;
     }
-    case 0x1A: { // repair or recharge (Shop_OnRepairItem): neither its need nor the gold checked
+    case 0x1A: { // repair or recharge (Shop_OnRepairItem)
         ServerObject* item = s ? heldByCode(world, unit, u16(2)) : nullptr;
         if (!item) {
             break;
         }
-        subGold(unit, static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 2, s, *item)));
+        // (noxcpp: only what needs it, as the cost's ask answers (0x39D for none), and only with
+        // the gold to pay (short: TRADE 0x1B with what it lacks, as a buy says). The exe checks
+        // neither: a whole thing "mended" for 1, a repair free with the gold short, OB-101, fixed.)
+        const auto cost = static_cast<std::uint32_t>(itemCost(world, fight.modifiers, 2, s, *item));
+        if (!needsRepair(*item)) {
+            playSound(world, 0x39D, unit);
+            break;
+        }
+        if (p.gold < cost) {
+            const auto shortBy = static_cast<std::uint16_t>(static_cast<std::uint16_t>(cost) - static_cast<std::uint16_t>(p.gold));
+            tell(world, unit, {0xC9, 0x1B, lo(shortBy), hi(shortBy)}); // (SrvNet_SendShopNotEnoughGold)
+            break;
+        }
+        subGold(unit, cost);
         repairItem(world, *item, &unit);
         reportGold(world, unit);
         playSound(world, 0x323, unit, 2, unit.extent);

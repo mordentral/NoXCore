@@ -4236,8 +4236,9 @@ void Monsters::dies(ServerObject& o)
     // (The solo game's kill bookkeeping: with it.)
     if (world.quest()) {
         unlinkSpawn(world, o); // (not a zombie's)
-        // The kill to the player behind what last hurt it.
-        if (ServerObject* by = o.hurtBy ? fight.parentPlayer(world.byExtent(o.hurtBy)) : nullptr; by && by->player) {
+        // The kill to the player behind what last hurt it. (noxcpp: killCredit, the exe's
+        // parentPlayer: OB-023, fixed.)
+        if (ServerObject* by = o.hurtBy ? fight.killCredit(world.byExtent(o.hurtBy)) : nullptr; by && by->player) {
             questKill(*by);
         }
     }

@@ -113,12 +113,13 @@ void broadcastSound(World& world)
 
 } // namespace
 
-// A line of console output; with test commands on, also sent in chat to the sysop whose command
-// printed it.
+// A line of console output; also sent in chat to the remote sysop whose command printed it.
+// (noxcpp: the exe prints a sysop's command's lines on the host's screen alone, so the sysop saw
+// nothing back: OB-048, fixed.)
 void GameHost::printText(std::string text)
 {
     console_.push_back(text);
-    if (echoTo_ != 0 && options_.testCommands) { // (noxcpp: a sysop sees its command's lines)
+    if (echoTo_ != 0) {
         if (const ServerObject* u = server_.world().byExtent(echoTo_)) {
             server_.world().broadcasts().push_back({World::textMessage(wide(text), 0), true, u->extent});
         }
@@ -656,9 +657,9 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
             print("staffs");
             return;
         }
-        if (is(1, "monsters")) { // option 4; "respawn": option 8, on and off alike
+        if (is(1, "monsters")) { // option 4; "respawn": option 8
             if (w.size() == 4 && is(2, "respawn") && onOff(3) >= 0) {
-                setOption(8, true); // (both set it: an original bug)
+                setOption(8, onOff(3) == 1); // (noxcpp: off clears it; the exe sets it for both, OB-047, fixed)
                 print("monsterrespawn");
             } else if (w.size() == 3 && onOff(2) >= 0) {
                 setOption(4, onOff(2) == 1);
@@ -698,10 +699,9 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         }
         if ((is(1, "weapon") || is(1, "armor") || is(1, "staff")) && w.size() == 4) {
             // A type allowed or not (its dd10;
-            // turned off, those about go). "weapon respawn": option 2, on and
-            // off alike.
+            // turned off, those about go). "weapon respawn": option 2.
             if (is(1, "weapon") && is(2, "respawn") && onOff(3) >= 0) {
-                setOption(2, true); // (both set it: an original bug)
+                setOption(2, onOff(3) == 1); // (noxcpp: off clears it; the exe sets it for both, OB-047, fixed)
                 print("weaponsrespawn");
                 return;
             }

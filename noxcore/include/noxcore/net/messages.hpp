@@ -5840,7 +5840,7 @@ struct BuyItem {
     bool operator==(const BuyItem&) const = default;
 };
 
-/// TRADE 0x17 (C->S): buy stack. 5 bytes. 1.2b bug: gold is read once, so a player who can afford one item gets the whole stack
+/// TRADE 0x17 (C->S): buy stack. 5 bytes. (1.2b bug: gold is read once, so a player who can afford one item gets the whole stack; the NoX Core server checks each, OB-098)
 struct BuyStack {
     static constexpr Op kOp = Op::Trade;
     static constexpr std::uint8_t kSub = 0x17;

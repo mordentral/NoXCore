@@ -21,6 +21,7 @@
 #include "menus.hpp"
 
 #include "console.hpp"
+#include "menu_rules.hpp"
 
 #include <algorithm>
 
@@ -344,9 +345,19 @@ void Menus::userLine(int index)
 
 void Menus::removeUserLine(int index)
 {
-    // The line taken out (0x400E). (Its "no longer have a user selected" never shows: an original bug.)
-    if (gui::Window* list = screen_ ? screen_->find(kChatUsers) : nullptr) {
-        eraseLine(*list, index);
+    // The line taken out (0x400E); the last user picked for private messages gone,
+    // WolUser.c:LostSelection and 0xE2. (noxcpp: said. The exe's test of the pick never holds, so
+    // what's typed next went to the lobby unannounced: OB-190, fixed.)
+    gui::Window* list = screen_ ? screen_->find(kChatUsers) : nullptr;
+    if (!list) {
+        return;
+    }
+    const bool picked = index >= 0 && index < static_cast<int>(list->lines.size()) && list->lines[static_cast<std::size_t>(index)].marked;
+    eraseLine(*list, index);
+    const bool anyPicked = std::any_of(list->lines.begin(), list->lines.end(), [](const auto& l) { return l.marked; });
+    if (lostSelection(picked, anyPicked)) {
+        chatLine(gui_.text("WolUser.c:LostSelection"), kSystemColor);
+        gui_.resources().sound(0xE2);
     }
 }
 
@@ -458,19 +469,19 @@ bool Menus::onChat(int message, gui::Window& from)
     }
     switch (from.id) {
     case kChatChannels: {
-        // 0x4010: a lobby clicked; out of ours into it. In none, the
-        // join goes to joinLobby as 0: nothing joined (an original bug).
+        // 0x4010: a lobby clicked; out of ours into it, or (in none) into it. (noxcpp: the one
+        // clicked. In none the exe's join goes to joinLobby as 0: nothing joined, "Updating channel
+        // list..." left up, OB-191, fixed.)
         const int i = from.selectedLine;
         if (i >= 0 && i < static_cast<int>(from.lines.size()) && !from.lines[static_cast<std::size_t>(i)].text.empty() &&
             i < static_cast<int>(wolLists_.lobbies().size())) {
             const int current = wolLists_.current();
-            if (current < 0) {
-                joinLobby(-1);
-            } else if (lobbyText(i) != lobbyText(current)) {
-                if (wol_) {
+            const int join = lobbyToJoin(i, current, current >= 0 && lobbyText(i) == lobbyText(current));
+            if (join >= 0) {
+                if (current >= 0 && wol_) {
                     wol_->session().requestChannelLeave();
                 }
-                joinLobby(i);
+                joinLobby(join);
             }
         }
         focusChatEntry();

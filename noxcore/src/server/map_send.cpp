@@ -118,12 +118,12 @@ void GameHost::mapSendReset(MapSender& s)
 
 void GameHost::mapSendPeerGone(std::uint8_t peer)
 {
-    // (noxcpp's) A fast send to a player who left ends with it: nothing more to its closed
-    // stream, the count down, the sender free for whoever takes the slot next. A stock send goes
-    // on as the exe's does (OB-163).
+    // (noxcpp's) A send to a player who left ends with it: nothing more to its closed stream, the
+    // count down, the sender free for whoever takes the slot next. (The exe leaves its sender
+    // sending: the rest of the old download went to the slot's next player, OB-163, fixed.)
     fastMapRequests_.erase(peer);
     const auto it = mapSenders_.find(peer);
-    if (it == mapSenders_.end() || !it->second.fast || it->second.state != 1) {
+    if (it == mapSenders_.end() || it->second.state != 1) {
         return;
     }
     if (mapSendsInProgress_ != 0) {

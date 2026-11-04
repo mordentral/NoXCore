@@ -129,15 +129,18 @@ public:
 
     /// Calls `function` with these objects (extents; 0 none) as caller and trigger
     /// (script_callByIndex, as the timers, the dialogs, the entry points and the console's call
-    /// do: the stack keeps what the function leaves, and the strings it makes stay).
+    /// do: the strings it makes stay). (noxcpp: a call made with no script running leaves the
+    /// stack empty, what the function returns dropped. The exe leaves that word, and every
+    /// handler after it waited for good: OB-204, fixed.)
     bool call(std::uint32_t function, std::uint32_t caller = 0, std::uint32_t trigger = 0);
     /// A handler's call (scriptCallByEventBlock): none for one that has run once already or
     /// names no function (the exe's NULL; a once-only one is marked run before it's called).
     /// With a script mid-way (the stack not empty: a builtin set this off) it's put off, at most
     /// 32 waiting, and gives 0. Else it's called, what it returns kept (0 for nothing), the
     /// stack emptied and every string made at run time dropped; then it's off the waiting list
-    /// and the first one still waiting is called the same way. What the last call of that chain
-    /// kept is the result (the exe's one shared word).
+    /// and the first one still waiting is called the same way (noxcpp: one refused there dropped
+    /// from the list, the next tried; the exe's stays first and holds up the rest: OB-202, fixed).
+    /// What the last call of that chain kept is the result (the exe's one shared word).
     std::optional<std::uint32_t> callBlock(ServerObject::ScriptBlock& block, std::uint32_t caller, std::uint32_t trigger);
     /// The handlers put off, oldest first (handler, caller, trigger).
     struct QueuedBlock {
@@ -237,6 +240,10 @@ private:
     std::vector<std::uint8_t> stopLogged_; ///< by function: a bit per script::Vm::Stop already logged
     /// A top-level call that the budget stopped: logged once per function and reason.
     void logStop(std::uint32_t function);
+    /// call()'s run, the stack as the function leaves it (callBlock reads what it returns).
+    bool run(std::uint32_t function, std::uint32_t caller, std::uint32_t trigger);
+    /// Whether callBlock would run `block` now rather than refuse it (run once, no function).
+    bool runnable(const ServerObject::ScriptBlock& block) const;
     std::mt19937 rng_;
     std::minstd_rand wallRng_{1}; ///< a broken wall's debris
 };

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <exception>
 #include <fstream>
 #include <system_error>
@@ -28,8 +29,15 @@ int countSaveFiles(const fs::path& saveRoot)
     std::error_code ec;
     fs::create_directory(saveRoot / "Save", ec); // (CreateDirectoryA)
     int count = fs::exists(saveRoot / "Save" / "AUTOSAVE" / "Player.plr", ec) ? 1 : 0; // (_access(path, 0))
-    // (The 13 "%s\Save\SAVE%04d\Player.plr" given only the folder: SAVE<the caller's EDI>, not a
-    // slot: nothing more counted.)
+    // The numbered slots SAVE0001-SAVE0013. (noxcpp: each counted. The exe's "%s\Save\SAVE%04d\Player.plr"
+    // is given only the folder, so its %04d reads no slot's number and none counts: OB-151, fixed.)
+    for (int slot = 1; slot <= 13; ++slot) {
+        char name[16];
+        std::snprintf(name, sizeof name, "SAVE%04d", slot);
+        if (fs::exists(saveRoot / "Save" / name / "Player.plr", ec)) {
+            ++count;
+        }
+    }
     return count;
 }
 

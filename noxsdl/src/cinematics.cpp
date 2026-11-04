@@ -4,6 +4,7 @@
 #include "cinematics.hpp"
 
 #include "console.hpp"
+#include "menu_rules.hpp"
 
 #include "noxcore/client/movies.hpp"
 #include "noxcore/player/player_file.hpp"
@@ -1524,8 +1525,9 @@ void Cinematics::fillLoadMenu()
     // a line in each list per slot, in its colour: 0x1FE " ", 0x1FF the date and
     // time, 0x200 "<name> the <class>" with " - " and the place its stage names (AUTOSAVE: " "
     // and "Auto Save"); an empty one " " / EmptySlot / EmptySlot, grey (AUTOSAVE's " " all
-    // three). Cancel and Load on with a saved game, both off without (Save as it was); the newest
-    // selected in the three.
+    // three). Load on with a saved game, off without (Save as it was); the newest selected in the
+    // three. (noxcpp: Cancel / Quit always on. The exe turns it off with no saved game too, so
+    // after a death screen the menu couldn't be left: OB-148, fixed.)
     gui::Window* lists = loadMenu_->find(kLists);
     gui::Window* dates = loadMenu_->find(kNames);
     gui::Window* names = loadMenu_->find(kInfo);
@@ -1562,8 +1564,9 @@ void Cinematics::fillLoadMenu()
         dates->lines.push_back({nox::client::solo_saves::whenText(slot.info.time), c});
         names->lines.push_back({line, c});
     }
-    enable(loadMenu_, kCancel, saved > 0);
-    enable(loadMenu_, kLoad, saved > 0);
+    const LoadMenuButtons buttons = loadMenuButtons(saved);
+    enable(loadMenu_, kCancel, buttons.cancel);
+    enable(loadMenu_, kLoad, buttons.load);
     const int newest = nox::client::solo_saves::latest(slots_);
     if (newest != -1) {
         lists->selectedLine = dates->selectedLine = names->selectedLine = newest;
@@ -1671,21 +1674,22 @@ void Cinematics::loadSlot()
 {
     // savegame_sub: the selected slot (by its path's folder) loaded on
     // our host (its load plays the map intro through its host client); failing, an error
-    // box, which the Gui_Dialog_Close after closes at once (an original bug); after a briefing
-    // the fade out of it; the menu shut.
+    // box; after a briefing the fade out of it; the menu shut. (noxcpp: the question closed before
+    // the error box is put up, not the box after it. The exe closes the box it just made, so a
+    // failed load said nothing: OB-147, fixed.)
     const int i = selected();
     if (i < 0 || i >= static_cast<int>(slots_.size()) || !slots_[static_cast<std::size_t>(i)].exists) {
         return;
     }
     const std::string name = slots_[static_cast<std::size_t>(i)].name;
     const bool ok = hooks_.loadGame && hooks_.loadGame(name);
+    dialogClose();
     if (!ok) {
         dialog(DialogParent::None, gui_.text("SaveErrorTitle", "GUISave.c"), gui_.text("SaveErrorTitle", "GUISave.c"), 0x21, {}, {});
     }
     if (briefed_ && brief_.shown) {
         fadeOutOfBriefing();
     }
-    dialogClose();
     closeLoadMenu();
 }
 
@@ -1741,6 +1745,7 @@ void Cinematics::dialog(DialogParent parent, const std::string& title, const std
     dialogState_.onOk = std::move(onOk);
     dialogState_.onCancel = std::move(onCancel);
     dialogState_.flags = flags;
+    ++dialogState_.serial;
     if (!dialog_) {
         dialog_ = gui_.load(gameDir_ / "window" / "dlg.wnd", [this](gui::Window&, int msg, gui::Window& from) {
             if (msg != gui::Clicked) {
@@ -1778,18 +1783,21 @@ void Cinematics::dialog(DialogParent parent, const std::string& title, const std
 void Cinematics::dialogAnswer(bool ok)
 {
     // windowDlgProc: the click told to the parent, the answer's callback, then
-    // closed when the flags (as they are now) say so.
+    // closed when the flags say so. (noxcpp: only the box answered. The exe closes whatever box is
+    // up by then, so the error box a failed load put up in the answer was shut at once: OB-147,
+    // fixed.)
     if (!dialog_) {
         return;
     }
     if (dialogState_.parent == DialogParent::SaveMenu && loadMenu_) {
         res_.sound(0x2FE); // (savegame_sub's ButtonPress)
     }
+    const std::uint32_t answered = dialogState_.serial;
     auto then = ok ? dialogState_.onOk : dialogState_.onCancel;
     if (then) {
         then();
     }
-    if (dialogState_.flags & 0x20u) {  // 0x20: closed after an answer
+    if (closesAfterAnswer(dialogState_.flags, answered, dialogState_.serial)) {  // 0x20: closed after an answer
         dialogClose();
     }
 }

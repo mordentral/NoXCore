@@ -42,6 +42,7 @@ bool Xfers::send(std::uint8_t peer, std::uint8_t action, std::string_view type, 
     s.peer = peer;
     s.recvId = 0;
     s.state = 1;
+    s.acceptBy = 0; // (set by the next frame: a send has no frame of its own)
     s.size = static_cast<std::uint32_t>(data.size());
     s.action = action;
     s.type = std::string(type);
@@ -63,9 +64,10 @@ bool Xfers::send(std::uint8_t peer, std::uint8_t action, std::string_view type, 
 
 Xfers::SendStream* Xfers::sendStream(std::uint8_t peer, std::uint8_t recvId)
 {
-    // (by connection and the receiver's id, whatever its state)
+    // (by connection and the receiver's id; noxcpp: an accepted one, so a send not yet accepted,
+    // its receiver's id still 0, is never taken for another)
     for (SendStream& s : sends_) {
-        if (s.peer == peer && s.recvId == recvId) {
+        if (s.state == 2 && s.peer == peer && s.recvId == recvId) {
             return &s;
         }
     }
@@ -81,6 +83,14 @@ void Xfers::sendChunk(const SendStream& s, const Chunk& c)
     out_(s.peer, std::move(m), false);
 }
 
+void Xfers::ended(const SendStream& s, bool done)
+{
+    if (ended_.size() == kEndedKept) {
+        ended_.erase(ended_.begin());
+    }
+    ended_.push_back({s.peer, s.action, done});
+}
+
 void Xfers::giveUp(std::uint8_t peer, std::uint8_t recvId, std::uint8_t reason)
 {
     // XFER 5 with the reason, the send's end, the stream freed.
@@ -89,7 +99,7 @@ void Xfers::giveUp(std::uint8_t peer, std::uint8_t recvId, std::uint8_t reason)
         return;
     }
     out_(peer, {kOp, 5, recvId, reason}, true);
-    ended_.push_back({s->peer, s->action, false});
+    ended(*s, false);
     if (active_ != 0) {
         --active_;
     }
@@ -125,8 +135,10 @@ std::optional<Xfers::Received> Xfers::receive(std::uint8_t peer, std::span<const
         out_(peer, {kOp, 1, id, m[0x88]}, true); // (accept)
         return std::nullopt;
     }
-    case 1: { // accept (Net_Xfer_OnSendAccept: the stream by its id, the connection unchecked)
-        if (m.size() >= 4 && m[3] < sends_.size()) {
+    case 1: { // accept (Net_Xfer_OnSendAccept)
+        // (noxcpp: only a send to that connection, not yet accepted. The exe takes the stream by its
+        // id alone: OB-078, fixed.)
+        if (m.size() >= 4 && m[3] < sends_.size() && sends_[m[3]].state == 1 && sends_[m[3]].peer == peer) {
             sends_[m[3]].recvId = m[2];
             sends_[m[3]].state = 2;
         }
@@ -141,7 +153,9 @@ std::optional<Xfers::Received> Xfers::receive(std::uint8_t peer, std::span<const
         // XFER 3 (ack): the stream's id, 0, u16 the chunk's number.
         out_(peer, {kOp, 3, m[2], 0, static_cast<std::uint8_t>(chunk), static_cast<std::uint8_t>(chunk >> 8)}, true);
         const auto bytes = m.subspan(8, std::min<std::size_t>(size, m.size() - 8));
-        if (size == 0 || m[2] >= recvs_.size() || recvs_[m[2]].size == 0) {
+        // (noxcpp: only the connection's own stream. The exe takes it by its id alone, so anyone
+        // could feed or finish another's transfer: OB-078, fixed.)
+        if (size == 0 || m[2] >= recvs_.size() || recvs_[m[2]].size == 0 || recvs_[m[2]].peer != peer) {
             return std::nullopt;
         }
         RecvStream& r = recvs_[m[2]];
@@ -175,9 +189,8 @@ std::optional<Xfers::Received> Xfers::receive(std::uint8_t peer, std::span<const
             }
         }
         if (r.have == r.size) {
-            // Done to the stream's connection; the file handed over as
-            // the data message's sender's (connId - 1): the stream is taken by its id alone, so
-            // the two differ when another connection sends the last chunk (an original bug).
+            // Done to the stream's connection, the file handed over as its (the data message's
+            // sender is that connection: above).
             const auto id = static_cast<std::uint8_t>(&r - recvs_.data());
             out_(r.peer, {kOp, 4, id}, true);
             Received done{peer, r.action, r.type, std::move(r.data)};
@@ -200,21 +213,27 @@ std::optional<Xfers::Received> Xfers::receive(std::uint8_t peer, std::span<const
     }
     case 4: { // done (Net_Xfer_OnSendDone)
         if (SendStream* s = m.size() >= 3 ? sendStream(peer, m[2]) : nullptr) {
-            ended_.push_back({s->peer, s->action, true});
+            ended(*s, true);
             --active_;
             *s = SendStream{};
         }
         return std::nullopt;
     }
-    case 5: { // cancel (Net_Xfer_OnRecvCancel: the stream by its id alone)
-        if (m.size() >= 4 && m[2] < recvs_.size()) {
+    case 5: { // cancel (Net_Xfer_OnRecvCancel)
+        // (noxcpp: only the connection's own stream; the exe's by its id alone: OB-078, fixed.)
+        if (m.size() >= 4 && m[2] < recvs_.size() && recvs_[m[2]].size != 0 && recvs_[m[2]].peer == peer) {
             recvs_[m[2]] = RecvStream{};
         }
         return std::nullopt;
     }
-    case 6: { // abort (Net_Xfer_OnSendAbort: the sends under way not counted down)
+    case 6: { // abort (Net_Xfer_OnSendAbort)
+        // (noxcpp: the sends under way counted down, as a done or a give-up does. The exe's
+        // doesn't, and its frame's send walk runs on for good after: OB-078, fixed.)
         if (SendStream* s = m.size() >= 4 ? sendStream(peer, m[2]) : nullptr) {
-            ended_.push_back({s->peer, s->action, false});
+            ended(*s, false);
+            if (active_ != 0) {
+                --active_;
+            }
             *s = SendStream{};
         }
         return std::nullopt;
@@ -229,6 +248,18 @@ void Xfers::frame(std::uint32_t frame)
     // the first two chunks of each accepted send not yet acknowledged.
     if (active_ != 0) {
         for (SendStream& s : sends_) {
+            if (s.state == 1 && s.acceptBy == 0) {
+                // (noxcpp: the wait for its accept starts with the first frame that sees it.)
+                s.acceptBy = frame + kAcceptFrames + 1;
+            } else if (s.state == 1 && s.acceptBy <= frame) {
+                // (noxcpp: a send its receiver never accepted, let go, its stream free again. The
+                // receiver has no stream of ours to cancel, so nothing is sent. The exe keeps it
+                // for good, one of its 0x20 streams lost: OB-078, fixed.)
+                ended(s, false);
+                --active_;
+                s = SendStream{};
+                continue;
+            }
             if (s.state != 2) {
                 continue;
             }
@@ -264,6 +295,13 @@ void Xfers::peerGone(std::uint8_t peer)
     for (SendStream& s : sends_) {
         if (s.state == 2 && s.peer == peer) {
             giveUp(peer, s.recvId, 1);
+        } else if (s.state == 1 && s.peer == peer) {
+            // (noxcpp: one never accepted let go with it, unannounced: OB-078, fixed.)
+            ended(s, false);
+            if (active_ != 0) {
+                --active_;
+            }
+            s = SendStream{};
         }
     }
 }

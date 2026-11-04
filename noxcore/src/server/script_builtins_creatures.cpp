@@ -172,17 +172,18 @@ std::pair<float, float> dropSpotNear(Fight& f, const ServerObject& holder)
 void freezeUnit(Fight& fight, ServerObject& o, int lock)
 {
     // unitFreeze: NO_UPDATE; a player: the lock noted (the first
-    // freezer's), MSG_REPORT_PLAYER_STATUS, standing (Plr_SetState 0xD), down to the floor
-    // (unitRaise), the path grid's obstacles marked afresh at the next search, its summoned
-    // creatures frozen; a live monster idles over what it did.
+    // freezer's; noxcpp: the player's own, PlayerControl::freezeLock), MSG_REPORT_PLAYER_STATUS,
+    // standing (Plr_SetState 0xD), down to the floor (unitRaise), the path grid's obstacles marked
+    // afresh at the next search, its summoned creatures frozen; a live monster idles over what it
+    // did.
     World& world = fight.world;
     if (o.flags & ObjFlag::NoUpdate) {
         return;
     }
     o.flags |= ObjFlag::NoUpdate;
     if (o.classes & oc::Player) {
-        if (world.freezeLock == 0) {
-            world.freezeLock = static_cast<std::uint32_t>(lock);
+        if (o.player && o.player->freezeLock == 0) {
+            o.player->freezeLock = static_cast<std::uint8_t>(lock);
         }
         reportPlayerStatus(world, o);
         if (o.player) {
@@ -202,9 +203,9 @@ void freezeUnit(Fight& fight, ServerObject& o, int lock)
 
 void unfreezeUnit(Fight& fight, ServerObject& o, int lock)
 {
-    // unitUnFreeze: a player stays frozen while another's lock holds and this one
-    // has none (a dialog's end under a script's Frozen); else the lock cleared, NO_UPDATE off, its
-    // client told, its summoned creatures thawed. A live monster's IDLE popped.
+    // unitUnFreeze: a player stays frozen while its lock holds and this one has none (a dialog's
+    // end under a script's Frozen); else the lock cleared, NO_UPDATE off, its client told, its
+    // summoned creatures thawed. A live monster's IDLE popped.
     World& world = fight.world;
     if (!(o.flags & ObjFlag::NoUpdate)) {
         return;
@@ -212,10 +213,12 @@ void unfreezeUnit(Fight& fight, ServerObject& o, int lock)
     if (!(o.classes & oc::Player)) {
         o.flags &= ~ObjFlag::NoUpdate;
     } else {
-        if (world.freezeLock != 0 && lock == 0) {
+        if (o.player && o.player->freezeLock != 0 && lock == 0) {
             return;
         }
-        world.freezeLock = 0;
+        if (o.player) {
+            o.player->freezeLock = 0;
+        }
         o.flags &= ~ObjFlag::NoUpdate;
         reportPlayerStatus(world, o);
         for (ServerObject* c : ownedCreatures(world, o)) {

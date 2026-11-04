@@ -320,7 +320,7 @@ The new timer's id (1 to 32000, then counting from 1 again); pass it to CancelTi
 [edge]
 - A negative wait is already past: the timer runs at the next timer pass.
 - A timer started from inside a timer's function with a wait of 0 runs in the same pass, straight after.
-- The callback must not return a value: a timer function that does leaves it on the script stack and from then on every object handler of the map is put off (OB-204). The editor's lint warns about it.
+- The callback must not return a value: on a stock server a timer function that does leaves it on the script stack and from then on every object handler of the map is put off (OB-204; a NoX Core server drops it). The editor's lint warns about it.
 - A function with parameters given to FrameTimer reads 0 for its first one.
 [example]
 int spinStep;
@@ -1197,7 +1197,7 @@ The new timer's id (1 to 32000, then counting from 1 again); pass it to CancelTi
 - Pass a real id (GetTrigger(), GetCaller(), Object(...)), not self or other: those are stand-ins that mean nothing inside the timer's function.
 - An object id passed as the value stays just a number: if the object is deleted meanwhile, builtins given it do nothing.
 - A string made at run time (IntToString, a joined string) is freed after the next object handler, so don't pass one as the value (OB-201).
-- The callback must not return a value (OB-204).
+- The callback must not return a value (OB-204: on a stock server it holds up every later handler).
 [example]
 void TorchLit()
 {
@@ -1229,7 +1229,7 @@ The new timer's id (1 to 32000, then counting from 1 again); pass it to CancelTi
 - A function with no parameter never sees the value; one with two or more reads stray stack words for the rest (the editor's lint checks).
 - Pass a real id (GetTrigger(), GetCaller(), Object(...)), not self or other: those are stand-ins that mean nothing inside the timer's function.
 - A string made at run time is freed after the next object handler, so don't pass one as the value (OB-201).
-- The callback must not return a value (OB-204).
+- The callback must not return a value (OB-204: on a stock server it holds up every later handler).
 [example]
 void PlateOnePressed()
 {
@@ -2019,7 +2019,7 @@ In a solo game, when the player's inventory is full the cheapest thing it may dr
 - An item already in someone's inventory, even the taker's own, gives 0: Drop it first.
 - A dead taker, or one that can't carry anything, gives 0.
 - In a solo game the original tests the taker's type, not the item's, for gold, so giving gold to a player with a full pack still drops its cheapest item (OB-135, kept).
-- The item's pickup handler set off while the script is mid-way may be put off until the next handler call (OB-202).
+- The item's pickup handler set off while the script is mid-way may be put off until the next handler call; it then never runs, and on a stock server it holds up every handler put off after it (OB-202; a NoX Core server drops it and runs the rest).
 [example]
 void RewardHero()
 {
@@ -3181,7 +3181,7 @@ Nothing.
 - Only creatures can have a dialog; other objects (and unknown ones) are ignored.
 - An unknown type name counts as "NORMAL" (some stock maps pass "FALSE", which is just that).
 - A YESNONEXT dialog's answer is always 0 (OB-128, kept): use YESNO when you need the answer.
-- The start and end functions must not return a value: a returned value left behind stops every later handler of the map (OB-204).
+- The start and end functions must not return a value: on a stock server a returned value left behind stops every later handler of the map (OB-204; a NoX Core server drops it).
 [example]
 void MapInitialize()
 {

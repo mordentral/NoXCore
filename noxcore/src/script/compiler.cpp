@@ -1245,8 +1245,9 @@ private:
         for (const std::string& name : functionOrder_) {
             const FunctionInfo& f = functions_.at(name);
             if (f.defined && f.returns != Type::Void && isEntryPointName(name)) {
-                warning(f.loc, "the entry point " + name + " returns a value: the game calls it without taking the value, which "
-                               "stays on the stack and holds up every handler after it (OB-204); declare it void");
+                warning(f.loc, "the entry point " + name + " returns a value: the game calls it without taking the value, which on a "
+                               "stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); "
+                               "declare it void");
             }
             // Object variables where the game calls with no object (self).
             if (f.defined && isEntryPointName(name)) {
@@ -2545,7 +2546,8 @@ private:
         }
         if (lint_ && f.returns != Type::Void && currentBuiltin_ != *findBuiltin("SetCallback")) {
             warning(loc, "the function " + name + " returns a value: the game calls a timer's or a dialog's function without "
-                         "taking the value, which stays on the stack and holds up every handler after it (OB-204); declare it void");
+                         "taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; "
+                         "NoX Core drops it); declare it void");
         }
     }
 

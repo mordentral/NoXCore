@@ -81,8 +81,9 @@ std::optional<player::PlayerFile> buildQuestFile(Fight& fight, ServerObject& pla
 std::vector<std::uint8_t> savePlayerData(Fight& fight, ServerObject& player);
 /// SrvNet_SendSaveDataToClient's "SAVEDATA" for a file Plr_SaveServerPlayerData wrote: its
 /// decrypted bytes as far as computeServerPlayerDataBufferSize counts (its server
-/// sections), that count's low 16 bits (an original bug); empty, nothing sent.
-std::vector<std::uint8_t> saveDataSent(const player::PlayerFile& file);
+/// sections), that count's low 16 bits, as a stock client keeps them (OB-089); empty, nothing
+/// sent. `whole` (noxcpp: for a NoX Core client) all of the count, however large.
+std::vector<std::uint8_t> saveDataSent(const player::PlayerFile& file, bool whole = false);
 
 /// cliPlrInfoLoadFromFile: `file` (a whole .plr, encrypted) applied to `player`.
 /// False where the exe's fails (a section's reader fails; and a file that isn't a .plr), with

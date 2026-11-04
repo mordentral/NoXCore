@@ -63,6 +63,17 @@ std::pair<float, float> launchPoint(const ServerObject& caster, float fx, float 
     return {(x + caster.vx).f(), (X87(y) + caster.vy).f()};
 }
 
+/// What a spell makes from `source` (Burn's flame, the fist, a fireball, a cleansing ring) is the
+/// source's. (noxcpp: a glyph's kills are credited to its caster, creditTo; only the credit,
+/// Fight::killCredit. The exe's credit no one: the glyph is freed the same frame, so their owners
+/// end with them: OB-023, fixed.)
+void creditFrom(ServerObject& made, const ServerObject& source, const ServerObject& caster)
+{
+    if (source.trap.has_value() && source.typeName == NameId::Glyph) {
+        made.creditTo = caster.extent;
+    }
+}
+
 } // namespace
 
 void walkPhoneme(const things::ThingDb& things, std::optional<std::vector<std::uint8_t>>& node, int phoneme)
@@ -547,9 +558,16 @@ void Spells::update()
         p.castY = p.cursorY;
         p.spellTarget = c.targetSelf ? caster->extent : p.cursorObject;
         const std::uint32_t casterExtent = caster->extent;
+        const bool trap = c.trap;
         finishCast(*caster);
         p.castStart = 0;
         p.hearsOwnPhonemes = false;
+        // (noxcpp: a trap whose Glyph wasn't laid (castGlyph empties the queue as it lays one) has
+        // its spells given back, refundTrap. The exe's queue is cleared, their mana lost: OB-022,
+        // fixed.)
+        if (trap && p.trapCount != 0) {
+            refundTrap(*caster);
+        }
         p.trapCount = 0;
         p.chant.reset();
         // Off the list (found again: the cast may have changed it); the walk goes on from its next.
@@ -1024,6 +1042,9 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         ServerObject& o = burnOnGlyph ? world.spawn(things, kind, source.x, source.y) : world.spawn(things, kind, x, y);
         // (Burn's flame and the fist are the source's, the rest the caster's.)
         o.owner = spell == 0x05 || spell == 0x1D ? source.extent : caster.extent;
+        if (spell == 0x05 || spell == 0x1D) {
+            creditFrom(o, source, caster);
+        }
         o.born = frame;
         o.flags |= ObjFlag::Active;
         o.touch();
@@ -1350,7 +1371,8 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
             if (const auto e = things.findThing(kFlames[index])->lastAttribute("EXTENT"); e && e->starts_with("CIRCLE")) {
                 radius = textNumber(e->substr(6));
             }
-            // (From the source, and the source's: a glyph's ring isn't the caster's.)
+            // (From the source, and the source's: a glyph's ring isn't the caster's; its kills
+            // are credited to it, creditFrom.)
             // (On the x87: the reach kept on the stack for both; each place one store.)
             const X87 reach = X87(radius) + source.radius + 4.0f;
             const float fx = (reach * dx + source.x).f();
@@ -1360,6 +1382,7 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
             }
             ServerObject& f = world.spawn(things, kFlames[index], fx, fy);
             f.owner = source.extent;
+            creditFrom(f, source, caster);
             f.born = frame;
             f.direction = static_cast<std::uint16_t>(way);
             f.vx = dx * 4.0f;
@@ -1491,8 +1514,8 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         if (!things.findThing(kind)) {
             return true;
         }
-        // From the source (its own: a glyph's fireball is the glyph's): twice its radius ahead,
-        // and its motion on; at it if a wall's between.
+        // From the source (its own: a glyph's fireball is the glyph's; its kills credited to the
+        // caster, creditFrom): twice its radius ahead, and its motion on; at it if a wall's between.
         // (Twice the radius kept on the stack; x's sum stored before its velocity's added, y's
         // kept.)
         const auto [fx, fy] = directionVector(source.direction & 0xFF);
@@ -1505,6 +1528,7 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         }
         ServerObject& m = world.spawn(things, kind, sx, sy);
         m.owner = source.extent;
+        creditFrom(m, source, caster);
         m.team = caster.team;
         m.born = frame;
         m.flags |= ObjFlag::Active;

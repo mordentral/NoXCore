@@ -177,10 +177,10 @@ bool monsterCanMelee(const ServerObject& m);
 bool monsterCanShoot(const ServerObject& m);
 /// unitFreeze (the script's Frozen, a dialog, a shop): NO_UPDATE; a player its
 /// client told (MSG_REPORT_PLAYER_STATUS), standing (state 0xD) on the floor, its summoned
-/// creatures frozen with it, `lock` kept as World::freezeLock unless one is; a live monster
-/// idles (IDLE pushed). Nothing when it's frozen already.
+/// creatures frozen with it, `lock` kept as its PlayerControl::freezeLock unless one is; a live
+/// monster idles (IDLE pushed). Nothing when it's frozen already.
 void freezeUnit(Fight& fight, ServerObject& o, int lock);
-/// unitUnFreeze: NO_UPDATE off (a player not while World::freezeLock holds and
+/// unitUnFreeze: NO_UPDATE off (a player not while its PlayerControl::freezeLock holds and
 /// `lock` is 0: a dialog's end under the script's Frozen), the lock cleared, its client told, its
 /// summoned creatures thawed; a live monster's top action (the IDLE) popped.
 void unfreezeUnit(Fight& fight, ServerObject& o, int lock);

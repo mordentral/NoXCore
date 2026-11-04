@@ -493,6 +493,7 @@ struct Links<ServerObject> {
         NOX_LINK(S, player, Nested),
         NOX_LINK(S, monster, Nested),
         NOX_LINK(S, flyCaster, Carry), // (a turned spell projectile's first caster: a kept pixie's)
+        NOX_LINK(S, creditTo, Carry),  // (a glyph's spell's caster: its kill credit)
         NOX_LINK(S, modSize, Nested),
         NOX_LINK(S, owner, Carry),
         NOX_LINK(S, seekTarget, Clear), // (a homing missile's: of what stays, only a pixie's can be set; its target forgotten)

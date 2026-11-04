@@ -600,7 +600,7 @@ void awardKillXP(Fight& fight, ServerObject& victim)
     if (!by) {
         return;
     }
-    const ServerObject* top = fight.parentPlayer(by);
+    const ServerObject* top = fight.killCredit(by); // (noxcpp: the exe's parentPlayer, OB-023 fixed)
     ServerObject* player = top ? world.byExtent(top->extent) : nullptr;
     if (!player || !(player->classes & things::ObjectClass::Player)) {
         return;

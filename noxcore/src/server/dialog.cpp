@@ -160,6 +160,13 @@ void dialogAnswer(Fight& fight, ServerObject& player, std::uint8_t answer)
     unfreezeUnit(fight, player, 0);
     ServerObject* npc = player.player->dialogWith ? world.byExtent(player.player->dialogWith) : nullptr;
     if (!npc || !npc->monster || npc->monster->dialogStart == -1 || npc->monster->dialogEnd == -1) {
+        // (noxcpp: a dialog cancelled meanwhile (CancelDialog), or its NPC gone, ends for the
+        // player all the same, without the end function: MSG_DIALOG 4, no longer talking. The exe
+        // does neither, leaving the player talking for good: OB-129, fixed.)
+        if (player.player->dialogWith != 0) {
+            world.broadcasts().push_back({{0xD0, 4}, true, player.extent});
+            player.player->dialogWith = 0;
+        }
         return;
     }
     ServerObject::Monster& m = *npc->monster;

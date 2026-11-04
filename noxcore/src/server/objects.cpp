@@ -1250,7 +1250,8 @@ void Objects::moverUpdate(ServerObject& o)
     // waypoint at its speed x 0.25; moving (1, on), once its velocity (both parts non-zero:
     // an original bug) shows it past its waypoint, it takes the next: none, it's done (3)
     // and its object is put on the waypoint; one link, that; several, one at random that isn't
-    // where it came from; then its velocity points at the waypoint at its speed. Off it pauses
+    // where it came from (noxcpp: all of them back there, back); then its velocity points at the
+    // waypoint at its speed. Off it pauses
     // (2), on again it goes on from its object. Done, or its object gone, it updates no more.
     World& world = fight.world;
     if (!o.mover) {
@@ -1316,11 +1317,15 @@ void Objects::moverUpdate(ServerObject& o)
                 m.previous = m.target;
                 m.target = to->links[0];
             } else {
-                std::int32_t next = 0;
-                do {
-                    next = to->links[static_cast<std::size_t>(
-                        nox::util::uniform_int_distribution<int>(0, static_cast<int>(to->links.size()) - 1)(fight.rng))];
-                } while (next == m.previous);
+                // (noxcpp: every link back where it came from, it goes back, no draw. The exe draws
+                // for good there, the server hung: OB-032, fixed. Any other fork draws as the exe.)
+                std::int32_t next = m.previous;
+                if (std::ranges::any_of(to->links, [&](auto l) { return l != m.previous; })) {
+                    do {
+                        next = to->links[static_cast<std::size_t>(
+                            nox::util::uniform_int_distribution<int>(0, static_cast<int>(to->links.size()) - 1)(fight.rng))];
+                    } while (next == m.previous);
+                }
                 m.previous = m.target;
                 m.target = next;
             }

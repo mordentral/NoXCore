@@ -110,6 +110,11 @@ struct Fight {
     void respawn(ServerObject& player, bool keepItems = false);
     /// Up its owners to a player, or the last of them (findParentChainPlayer).
     ServerObject* parentPlayer(ServerObject* o);
+    /// Who a kill by `o` is credited to: parentPlayer, but where its owners end short of a player,
+    /// the first credit link up them (ServerObject::creditTo). (noxcpp: only the kill's credit
+    /// reads it, never the harm. A glyph's spells are the glyph's, which is gone the same frame, so
+    /// the exe credits no one: OB-023, fixed.)
+    ServerObject* killCredit(ServerObject* o);
     /// A player's state change (Plr_SetState: player.hpp's setPlayerState).
     void setPlayerState(ServerObject& player, std::uint8_t state);
     /// Poisons it (Obj_ApplyPoison): not the frozen-out, the INVULNERABLE, an

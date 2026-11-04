@@ -2,6 +2,8 @@
 // over it.
 #include "quit_menu.hpp"
 
+#include "menu_rules.hpp"
+
 namespace noxsdl {
 
 namespace {
@@ -59,6 +61,12 @@ void QuitMenu::layout(bool solo)
     const bool campaign = solo && callbacks_.campaignHost && callbacks_.campaignHost();
     show(kAutoLoad, solo);
     show(kAutoSave, solo);
+    // (noxcpp: AutoSave, turned off by a press while dead, on again once the player isn't: after a
+    // load. The exe's stays off for the rest of the game, loads too: OB-149, fixed.)
+    if (gui::Window* autoSave = menu_->find(kAutoSave);
+        autoSave && autoSaveOn((autoSave->status & nox::gui::status::Enabled) != 0, callbacks_.deadFlag && callbacks_.deadFlag())) {
+        autoSave->status |= nox::gui::status::Enabled;
+    }
     show(kObserve, !solo);
     show(kGameplay, !solo || campaign);
     show(kVote, !solo);
@@ -107,8 +115,8 @@ void QuitMenu::layout(bool solo)
 
 void QuitMenu::newGame()
 {
-    // game_guiInit makes the window anew for each game: AutoSave on again (a DEAD
-    // refusal turns it off for the rest of the game, loads too).
+    // game_guiInit makes the window anew for each game: AutoSave on again (a DEAD refusal turns it
+    // off; noxcpp: till the player isn't dead, layout).
     close();
     if (gui::Window* autoSave = menu_->find(kAutoSave)) {
         autoSave->status |= nox::gui::status::Enabled;

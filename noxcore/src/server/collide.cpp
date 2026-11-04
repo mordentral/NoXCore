@@ -595,14 +595,14 @@ void collideOf(Fight& fight, ServerObject& obj, ServerObject* other)
     case NameId::ManaDrainCollide:
         // collideManadrain (blue flames): a player with mana loses its amount
         // (playerManaSub, not below 0), and its hiss (0xE4) at most every half
-        // second: the frame kept in a u16 and compared sign-extended, so past frame 0x8000 it
-        // hisses every frame (an original bug, kept).
+        // second. (noxcpp: the whole frame kept. The exe keeps it in a u16 and compares it
+        // sign-extended, so past frame 0x8000 it hissed every frame: OB-050, fixed.)
         if (other && (other->classes & oc::Player) && other->player && other->player->mana != 0) {
             other->player->mana = static_cast<std::uint16_t>(std::max(0, other->player->mana - obj.collideArg));
-            const auto since = fight.frame - static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(obj.soundFrame)));
+            const std::uint32_t since = fight.frame - obj.soundFrame;
             if (15u < since) { // (gameFPS >> 1)
                 playSound(fight.world, 0xE4, obj);
-                obj.soundFrame = static_cast<std::uint16_t>(fight.frame);
+                obj.soundFrame = fight.frame;
             }
         }
         break;

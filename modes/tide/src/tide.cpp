@@ -735,7 +735,7 @@ void TideDirector::addOwnerFunctions(modes::script::ScriptedMode& s)
             }
         }
         Fight fight = scriptHost_->server().fight();
-        const ServerObject* p = by ? fight.parentPlayer(by) : nullptr;
+        const ServerObject* p = by ? fight.killCredit(by) : nullptr;
         if (p && p->player) {
             lua_pushnumber(L, p->extent);
         } else {

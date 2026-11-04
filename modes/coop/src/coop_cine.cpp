@@ -521,7 +521,7 @@ void CoopDirector::joinScene(const Member& m)
     // Held as the party is (a script's Frozen on the host holds the others too).
     const server::ServerObject* h = server::hostPlayer(world());
     server::ServerObject* u = host_->unitOf(m.peer);
-    if (h && u && world().freezeLock == 1 && (h->flags & server::ObjFlag::NoUpdate) && !(u->flags & server::ObjFlag::NoUpdate)) {
+    if (h && u && h->player && h->player->freezeLock == 1 && (h->flags & server::ObjFlag::NoUpdate) && !(u->flags & server::ObjFlag::NoUpdate)) {
         server::Fight f = host_->server().fight();
         server::freezeUnit(f, *u, 1);
     }

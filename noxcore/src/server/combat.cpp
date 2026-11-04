@@ -511,6 +511,22 @@ ServerObject* Fight::parentPlayer(ServerObject* o)
     return o;
 }
 
+ServerObject* Fight::killCredit(ServerObject* o)
+{
+    ServerObject* top = parentPlayer(o);
+    if (!top || (top->classes & oc::Player)) {
+        return top;
+    }
+    for (int guard = 0; o && guard < 16; ++guard) {
+        if (o->creditTo != 0) {
+            ServerObject* by = parentPlayer(world.byExtent(o->creditTo));
+            return by ? by : top;
+        }
+        o = o->owner != 0 ? world.byExtent(o->owner) : nullptr;
+    }
+    return top;
+}
+
 float Fight::protection(const ServerObject& t, int e, const char* table) const
 {
     // (checkFireProtect / checkElectrProtect) Worn items'
@@ -1418,7 +1434,13 @@ void Fight::takeHealth(ServerObject& t, int amount)
                 awardKillXP(*this, t);
             }
             if (!t.player && world.modeHooks && (t.modeEvents & ModeEvent::Death)) {
-                world.modeHooks->objectKilled(*this, t, world.byExtent(t.hurtBy)); // (noxcpp: told a mode)
+                // (noxcpp: told a mode; a kill credited past what hurt it, killCredit, told as the
+                // credited one's)
+                ServerObject* by = world.byExtent(t.hurtBy);
+                if (ServerObject* credit = killCredit(by); credit != parentPlayer(by)) {
+                    by = credit;
+                }
+                world.modeHooks->objectKilled(*this, t, by);
             }
             if (t.player) {
                 playerDies(t);
@@ -1444,7 +1466,7 @@ void Fight::playerDies(ServerObject& u)
         requestSave(world, false, 0, 0, frame);
     }
     ServerObject* hurter = world.byExtent(u.hurtBy);
-    const ServerObject* k = parentPlayer(hurter);
+    const ServerObject* k = killCredit(hurter); // (noxcpp: killCredit, the exe's parentPlayer: OB-023, fixed)
     const auto victim = static_cast<std::uint16_t>(u.extent);
     // The kill feed, in a network game (INFORM 0x0E: killer, assist, victim, what killed it):
     // a monster by its type; a thing a monster owns (ObjOwner: its arrow) by the

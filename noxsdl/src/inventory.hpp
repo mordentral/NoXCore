@@ -111,8 +111,9 @@ public:
     std::optional<std::uint16_t> bottleItem(int slot) const { return bottles_.item(grid_, slot); }
     /// Snd_PlaySound, for the panel's own sounds (taking an item, setting it down).
     void setSound(std::function<void(std::uint32_t)> play) { playSound_ = std::move(play); }
-    /// clientSetAltWeapon(0): what taking the secondary weapon's cell's thing out
-    /// does (at a drag's start: the secondary none, the server told).
+    /// clientSetAltWeapon(0): the secondary none, the server told; called when the secondary
+    /// weapon taken from its cell is dropped out of the inventory, worn or quick-clicked (the exe's
+    /// drag start did it at once, a move within the inventory too: OB-156, fixed).
     void setClearSecondary(std::function<void()> clear) { clearSecondary_ = std::move(clear); }
     /// The drag's cancel (Gui_CancelDragAndDrop's): a thing dragged from a cell put back at its
     /// stack's end; the drag over.
@@ -217,6 +218,7 @@ private:
         std::optional<int> fromCell; ///< else from the doll; out of the cell while dragged
         SDL_FPoint pressed{};         ///< in game pixels, relative to the panel
         std::uint32_t atMs = 0;
+        bool secondary = false;       ///< (noxcpp) it was the secondary weapon as it was taken (OB-156)
     };
     /// The dragged thing back at the end of its cell's stack (at the click cell);
     /// the cell holding another type by then, filed as a new pickup with `fileAnew`

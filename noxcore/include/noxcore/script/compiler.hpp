@@ -100,8 +100,9 @@ struct CompileOptions {
     bool embedSource = false;
     /// Lint warnings (the editor's and the CLI's --lint; they never change the code):
     /// - a function that returns a value given to a timer or SetDialog, or named as an entry
-    ///   point (MapInitialize...): the game calls those without taking the value, which leaves
-    ///   the stack non-empty and puts every later handler off (OB-204);
+    ///   point (MapInitialize...): the game calls those without taking the value, which on a
+    ///   stock server leaves the stack non-empty and puts every later handler off (OB-204; a NoX
+    ///   Core server drops it);
     /// - a built string (a concatenation, IntToString, FloatToString) stored in a global: the
     ///   game drops such strings at the end of the next handler and gives their ids out again,
     ///   so the global later reads another string (OB-201); the same for a local given a built

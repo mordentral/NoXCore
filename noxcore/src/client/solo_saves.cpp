@@ -267,9 +267,11 @@ KeptSave keepSaveData(const fs::path& saveDir, const fs::path& plr, std::span<co
     }
     std::error_code ec;
     fs::create_directory(saveDir, ec); // (CreateDirectoryA: its failure not looked at)
-    // Written a byte at a time: the low 16 bits of the size (a short), each whole
-    // block enciphered as it fills; the close fills the last with zeros.
-    std::vector<std::uint8_t> bytes(data.begin(), data.begin() + static_cast<std::ptrdiff_t>(data.size() & 0xFFFFu));
+    // Written whole, each whole block enciphered as it fills; the close fills the last with zeros.
+    // (noxcpp: all of it. The stock client writes the size's low 16 bits of it (a short), so a
+    // save of 64 KiB or more was cut short: OB-089, fixed. A NoX Core host sends such a save
+    // whole; a stock one sends only those 16 bits' worth.)
+    std::vector<std::uint8_t> bytes(data.begin(), data.end());
     bytes.resize((bytes.size() + kBlock - 1) / kBlock * kBlock, 0);
     crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(bytes);
     std::ofstream f(plr, std::ios::binary | std::ios::trunc);

@@ -7,12 +7,14 @@
 //     goes (XFER 2, unreliable), one sent more than 90 frames ago goes again, at most 20 times;
 //     then the transfer is given up (XFER 5 with reason 2). XFER 3 (ack) drops a
 //     chunk, XFER 4 (done) ends the stream, XFER 6 (abort) drops it. A connection gone, its open
-//     streams are given up with reason 1 (one never accepted stays: an original bug).
+//     streams are given up with reason 1. (noxcpp: a send never accepted is let go kAcceptFrames
+//     after the first frame that sees it, or with its connection; an accept, a data message and a cancel count only
+//     from the stream's own connection; an abort counts the send down. OB-078, fixed.)
 //   - Receiving (Net_Xfer_OnRecvStart / Data): a free receive stream (of 0x20) for a start with a
 //     size, XFER 1 back; every data message acknowledged at once (SrvNet_OnPacket, whatever the
 //     stream); the next chunk appended, any other kept aside and the kept ones walked once in the
 //     order they came; all of it in, XFER 4 and the file handed over. 900 frames without data, the
-//     stream dropped with XFER 6, reason 3. XFER 5 drops a stream by its id alone.
+//     stream dropped with XFER 6, reason 3. XFER 5 drops a stream.
 #pragma once
 
 #include <array>
@@ -38,6 +40,12 @@ public:
     /// can have the host set aside its 32 streams' gigabytes (the exe allocates whatever the
     /// start's u32 says).
     static constexpr std::uint32_t kMaxReceive = 1u << 20;
+    /// How long a send waits for its receiver's accept (noxcpp): 900 frames, a receive's own wait
+    /// for data. A stock receiver accepts as the start comes.
+    static constexpr std::uint32_t kAcceptFrames = 900;
+    /// How many ended sends takeEnded keeps (noxcpp): older ones are dropped, so a host that never
+    /// asks keeps no more than this.
+    static constexpr std::size_t kEndedKept = 0x20;
 
     /// What goes out: to a connection, the message, reliable (Net_Send's flag 3) or not (flag 0).
     using Out = std::function<void(std::uint8_t peer, std::vector<std::uint8_t> bytes, bool reliable)>;
@@ -66,7 +74,7 @@ public:
     void frame(std::uint32_t frame);
     /// A connection gone (Plr_OnDisconnect): `peer`'s open sends given up, reason 1.
     void peerGone(std::uint8_t peer);
-    /// The sends that ended since the last call.
+    /// The sends that ended since the last call (noxcpp: the last kEndedKept of them).
     std::vector<Ended> takeEnded() { return std::exchange(ended_, {}); }
     /// Sends under way.
     int sending() const noexcept { return active_; }
@@ -82,6 +90,7 @@ private:
         std::uint8_t peer = 0;
         std::uint8_t recvId = 0;
         std::uint16_t state = 0; ///< 0 free, 1 started, 2 accepted
+        std::uint32_t acceptBy = 0; ///< (noxcpp) let go unaccepted from this frame (0: no frame yet)
         std::uint32_t size = 0;
         std::uint8_t action = 0;
         std::string type;
@@ -107,6 +116,7 @@ private:
     SendStream* sendStream(std::uint8_t peer, std::uint8_t recvId);
     void giveUp(std::uint8_t peer, std::uint8_t recvId, std::uint8_t reason);
     void sendChunk(const SendStream& s, const Chunk& c);
+    void ended(const SendStream& s, bool done);
 
     Out out_;
     std::array<SendStream, 0x20> sends_{};

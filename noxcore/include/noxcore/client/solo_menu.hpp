@@ -35,9 +35,9 @@ namespace nox::client::solo_menu {
 /// checkHasSoloMaps: maps\con01a\con01a.map under the game's folder.
 bool hasSoloMaps(const std::filesystem::path& gameDir);
 
-/// client_countSaveFiles (Save\ made first): AUTOSAVE's Player.plr if it's there. Its
-/// 13 "SAVE%04d" checks are given no number (the format reads the caller's EDI instead), so they
-/// look for one path that isn't there and count nothing: an original bug.
+/// client_countSaveFiles (Save\ made first): AUTOSAVE's Player.plr and SAVE0001-SAVE0013's that
+/// are there. (noxcpp: the numbered ones too. The exe's 13 "SAVE%04d" checks are given no number,
+/// so they count nothing: OB-151, fixed.)
 int countSaveFiles(const std::filesystem::path& saveRoot);
 
 /// The class's first map, as windowSelCharProc and the class screen's Accept name it: War01a, Wiz01a, Con01a

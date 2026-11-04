@@ -489,9 +489,9 @@ sent them.
   two noxcore.exe in 0.24 s instead of 6.5 s (a Deep Delve area's 14 KB in 36 ms); in the tests'
   pretend network 0.53 s instead of 6.6 at a 100 ms round trip, 1.33 s instead of 11.6 at
   300 ms, and quicker than the stock stream through loss and reordering too (8.1 s against 9.3
-  with a seventh of the datagrams lost and a fifth reordered). A fast send whose player leaves
-  stops there (a stock one goes on into the closed stream, OB-163). Stock clients and NoX Core
-  clients below level 4 get the stock stream, byte for byte and frame for frame.
+  with a seventh of the datagrams lost and a fifth reordered). A send whose player leaves stops
+  there, fast or stock (VD-60, OB-163). Stock clients and NoX Core clients below level 4 get the
+  stock stream, byte for byte and frame for frame.
 - **Why:** generated maps download at every area change; the party waits for its slowest.
 - **Risk:** none for stock clients, but a stock player in slot 30, whose download waits on another
   stream's map packets (OB-162), waits on a fast send's up to its length (only in a 31-player
@@ -620,6 +620,42 @@ frames and sound are its decoder's (noxcore video/vqa.hpp). Where noxsdl differs
 - **Revert:** switch HD Spell FX off (or `--stock-effects`, the console's `stockeffects on`): each
   is drawn exactly as the original's sprites. In code, leave `fxdraw::spellFx` unset in
   applyExtras (noxsdl/src/app_settings.cpp).
+
+### VD-64: The solo menus, the inventory's secondary weapon and the chat's lobbies, fixed
+
+By the owner's decision (2026-11-04), seven of the original client's own bugs, none of them on the
+wire but the secondary weapon's report (MSG_REPORT_SECONDARY_WEAPON, sent less):
+
+- **The main menu's Solo counts the numbered saves (OB-151):** the original's count looks for
+  AUTOSAVE alone (its SAVE%04d checks get no number), so saves in SAVE0001-SAVE0013 without an
+  AUTOSAVE couldn't be reached from the main menu. Ours counts all fourteen
+  (`noxcore/src/client/solo_menu.cpp`, `countSaveFiles`).
+- **The secondary weapon stays one when it's moved within the inventory (OB-156):** the original
+  makes it none as soon as it's taken from its cell, the server told. Ours does that only where the
+  drag ends with it dropped out of the inventory, worn on the doll or quick-clicked (used or worn);
+  moved to another cell, put back or dropped on its own box, it stays the secondary
+  (`noxsdl/src/inventory.cpp`, `endsSecondary` in inventory_grid.hpp).
+- **A failed load says so (OB-147):** the original's save menu puts up the error box and closes it
+  at once, and an AutoLoad answered Yes closes the box its failure put up. Ours closes the question
+  first and keeps the error box; an answer closes only the box answered
+  (`noxsdl/src/cinematics.cpp`, `loadSlot` and `dialogAnswer`).
+- **The save menu can always be left (OB-148):** with no saved game the original turns Cancel
+  (Quit after a briefing or a death screen) off too, so after a death with no save the menu
+  couldn't be closed. Ours leaves it on; Load is still off without a save (`fillLoadMenu`).
+- **AutoSave comes back (OB-149):** pressed while dead, the in-game menu's AutoSave goes grey for
+  the rest of the game in the original. Ours turns it on again when the menu opens with the player
+  alive, after a load (`noxsdl/src/quit_menu.cpp`, `layout`).
+- **The chat warns when the one whispered to leaves (OB-190):** ours says
+  WolUser.c:LostSelection (and plays 0xE2) when the last user picked for private messages leaves
+  the lobby, as the original meant to; what's typed next goes to the lobby
+  (`noxsdl/src/menus_wolchat.cpp`, `removeUserLine`).
+- **Clicking a lobby while in none joins it (OB-191):** the original joins lobby 0 (nothing) and
+  leaves "Updating channel list..." up. Ours joins the lobby clicked (`Menus::onChat`).
+
+The decisions are in `noxsdl/src/menu_rules.hpp`.
+- **Revert:** each in its place: count AUTOSAVE alone; clear the secondary at the drag's start;
+  close the box after the load and after any 0x20 answer; tie Cancel to a saved game; leave
+  AutoSave off; no LostSelection; join -1 from none.
 
 ## Sound (no effect on the wire)
 
@@ -1332,6 +1368,193 @@ The engine's logic is the exe's; these are where the output differs.
   `o->born <= best->born` with `o->born > best->born` (the original's order, the list's head
   first).
 
+### VD-49: Picking up and working things wants them within reach
+
+- **Vanilla:** MSG_TRY_GET (picking a thing up) and MSG_TRY_COLLIDE (working a lever, button,
+  chain or sign) act on whatever the code names, wherever it is (SrvNet_OnPacket's 0x73 and 0x7B;
+  OB-007, OB-009). The stock client offers both only within 75 of where it shows its player.
+- **Ours:** the thing must be within `GameHost::kServerReach` (300) of the player's unit, centre
+  to centre: the client's 75 and a margin of 225 for what changed while the ask was on its way (the
+  client's view lags the server's by a round trip and more; a warrior runs 8.4 a frame, 10.5
+  hasted, so the margin is over 0.7 s of a hasted run). Past it the ask does nothing, as one
+  refused for another reason does
+  (`noxcore/src/server/game_host.cpp`, `withinReach`). A mode's own pickups (`nox.pickUp`) are the
+  mode's to place, unchanged.
+- **Why:** by the owner's decision (2026-11-04): a modified client picked up items and threw levers
+  anywhere on the map. A stock client's ask is never past the reach.
+- **Revert:** drop the `withinReach` tests in the TryGet and TryCollide cases.
+
+### VD-50: A player's creatures and team are its own
+
+- **Vanilla:** MSG_TRY_CREATURE_COMMAND (0x78) orders or watches whatever creature its code names,
+  anyone's or a map's monster (OB-042); MSG_TEAM_MSG's join (10) and switch (11) move whoever the
+  code names, other players and monsters too (OB-037).
+- **Ours:** a creature named by its code must be the sender's own (owned by its unit, or one it
+  controls: `controls`); the order to all its creatures (code 0) is as before. A team join or switch
+  must name the sender's own unit. Anything else does nothing. The stock client only ever names its
+  own creatures (its creature window lists those it was told of) and its own player (the
+  scoreboard's team flags and a team's news; the host's GUI moves the host alone), so it sees no
+  change.
+- **Why:** by the owner's decision (2026-11-04): a modified client could order or watch anyone's
+  creatures and move other players between teams.
+- **Revert:** drop the owner test in the TryCreatureCommand case and the own-unit test in the
+  TeamMsg case (`noxcore/src/server/game_host.cpp`).
+
+### VD-51: Shops: a stack buy pays as it goes, a refused buy costs nothing, a stack sell refuses as a sale does, a repair needs the need and the gold
+
+- **Vanilla:** a stack buy reads the player's gold once and checks each item against that (OB-098,
+  1.2b); a buy whose pickup refuses the item (carrying too much) takes the gold and loses the item
+  (OB-099); a stack sell sells the first of the type whatever they are, quest items, glyphs and worn
+  things too (OB-100); a repair charges its price (at least 1) and mends the item whether it needs
+  it or the player can pay (OB-101).
+- **Ours (`noxcore/src/server/trade.cpp`):**
+  - a stack buy checks each item against the gold left; short, the buy stops with TRADE 0x1B (not
+    enough gold), as a single buy does;
+  - a buy the pickup refuses takes nothing: the stock item goes back into the shop's keeping, its
+    stock entry and the keeper's record stay (a quest's new gem or ankh is let go); the player
+    hears the pickup's own refusal;
+  - a stack sell passes over worn things, and a quest item or a glyph is refused as a single sale
+    refuses it ("CantSellQuestItem" / "CantSellItem", 0x39D), which ends the stack;
+  - a repair of something that needs none plays 0x39D (as the cost's ask does) and charges
+    nothing; with the gold short it sends TRADE 0x1B with what's lacking and mends nothing.
+- **Why:** by the owner's decision (2026-11-04): a modified client bought stacks for one item's
+  gold, sold quest items, glyphs and worn things, and repaired for free; an ordinary player lost
+  gold on a buy it couldn't carry. The stock client asks the repair's cost first and buys stacks it
+  can pay for, so its normal play is unchanged.
+- **Revert:** in `onTradeMessage`, pass the gold read before the loop to `buy` (0x17), drop the
+  Equipped and `refuseSale` tests (0x19) and the two tests before the repair (0x1A); in `buy`, drop
+  the `taken` branch.
+
+### VD-52: File transfers are tied to their connection
+
+- **Vanilla:** a transfer's accept, data and cancel (MSG_XFER 1, 2, 5) take the stream by its id
+  alone, so any client could open, feed, finish or cancel another's transfer (the finished file
+  then counted as its own); a send its receiver never accepts holds one of the 0x20 send streams
+  for good; an abort (6) doesn't count the send down, so the frame's send walk runs on for good
+  (OB-078).
+- **Ours (`noxcore/src/server/xfer.cpp`):** an accept counts only from the send's own connection
+  and for a send not yet accepted; data and a cancel only for the connection's own receive stream;
+  an ack, done or abort only for an accepted send. A send not accepted within
+  `Xfers::kAcceptFrames` (900 frames, as a receive waits for its data, counted from the first frame
+  that sees the send), or whose connection leaves, is let go unannounced (its receiver has no
+  stream of ours to cancel). An abort counts the send down. The acknowledgements of data are sent
+  as before. The list of ended sends keeps only the last `Xfers::kEndedKept`.
+- **Why:** by the owner's decision (2026-11-04): a modified client could tamper with other players'
+  transfers (their saved characters). A stock client accepts at once and uses its own streams only.
+- **Revert:** in `Xfers::receive`, drop the peer and state tests of subs 1, 2 and 5 and the count
+  down in 6; in `Xfers::frame` and `peerGone`, drop the unaccepted sends' branch; in `sendStream`,
+  drop the state test.
+
+### VD-53: Each player has its own freeze holder
+
+- **Vanilla:** who froze a player (a script's Frozen 1, a dialog's or shop's 0) is kept in one
+  global for every player: while it's set, a dialog's thaw does nothing for anyone, so a script's
+  Frozen on one player kept another frozen after its dialog ended (OB-130).
+- **Ours:** each player keeps its own (`PlayerControl::freezeLock`; `freezeUnit` /
+  `unfreezeUnit`): a dialog's end under the player's own script freeze still doesn't thaw it, and
+  another player's freeze no longer matters. The co-op party, frozen together by a scene, is frozen
+  player by player as before.
+- **Why:** by the owner's decision (2026-11-04): a bug ordinary players hit in quests and co-op.
+- **Revert:** keep the lock in one `World` field again, as before.
+
+### VD-54: An answer to a dialog cancelled meanwhile ends the talk
+
+- **Vanilla:** a dialog's answer ends the talk (MSG_DIALOG 4, no longer talking) only while its NPC
+  still has both functions; a script's CancelDialog while the dialog was open, or the NPC gone, left
+  the player talking for good: no exits, no picking up, dropping or working things (OB-129).
+- **Ours (`noxcore/src/server/dialog.cpp`, `dialogAnswer`):** such an answer still sends MSG_DIALOG
+  4 and ends the talk, without calling the end function (there is none). A CancelDialog doesn't
+  close a dialog that's open (stock maps cancel one in its start function); the player's answer
+  ends it.
+- **Why:** by the owner's decision (2026-11-04): a bug ordinary players hit.
+- **Revert:** in `dialogAnswer`, return without the MSG_DIALOG 4 and the clear for an NPC without
+  its functions.
+
+### VD-55: A quest save of 64 KiB or more reaches a NoX Core client whole
+
+- **Vanilla:** the server keeps the count of a saved player's server sections in 16 bits and sends
+  only that many bytes; the stock client writes only the size's low 16 bits of what it's sent
+  anyway. A save of 64 KiB or more (a very full inventory) arrives cut short and won't load; at a
+  multiple of 64 KiB nothing is sent (OB-089).
+- **Ours:** an identified NoX Core client is sent all of it (`saveDataSent(.., whole)`), and the
+  NoX Core client writes all it's sent (`solo_saves::keepSaveData`); the transfer's size is 32 bits
+  on the wire, as the stock one's is. A stock client is sent what it was (it would keep only those
+  16 bits whatever it got): its saves under 64 KiB are as ever, and one of 64 KiB or more still
+  arrives cut short, the stock client's own limit.
+- **Why:** by the owner's decision (2026-11-04): a bug ordinary players hit.
+- **Revert:** pass `whole` false in `GameHost::savedPlayer`, and keep the size's low 16 bits in
+  `keepSaveData`.
+
+### VD-56: Death's end counts one elimination death
+
+- **Vanilla:** when a player's Death enchantment runs out it's killed, and its death is counted
+  again after (playerIncrementElimDeath): in elimination the kill's scoring counted it already, so
+  the player lost two lives (OB-056).
+- **Ours (`noxcore/src/server/enchant.cpp`):** in an elimination game (not an arena or KotR) the
+  extra count is made only when the kill's scoring didn't count one: the player loses one life.
+  Every other game counts as before: with no killer the end's count is the only one; an arena
+  death with an assist is counted by both, as the exe's is. The lesson report is sent as before.
+- **Why:** by the owner's decision (2026-11-04).
+- **Revert:** call `addDeath` whatever the game and the deaths before.
+
+### VD-57: A glyph's Fireball, Burn, Fist and Cleansing Flame kills are credited to its caster
+
+- **Vanilla:** a glyph going off casts its spells from itself; Fireball, Burn's flame, Fist of
+  Vengeance and Cleansing Flame's ring are made the glyph's, which is freed the same frame, so they
+  harm on with no owner and the wizard isn't credited with the kill (OB-023). Its Meteor, Meteor
+  Shower, Toxic Cloud, Magic Missile and Pixie Swarm are the caster's.
+- **Ours (`noxcore/src/server/spells.cpp`, `creditFrom`; `Fight::killCredit`):** those four stay
+  the glyph's, as in the exe, and carry a credit link to the caster (`ServerObject::creditTo`).
+  Only a kill's credit reads it, where the owners end short of a player: the player's death
+  (`playerDies`: the kill feed's killer, the mode's scoring and `playerKilled`), a solo game's kill
+  experience (`awardKillXP`), a quest's kill count, the mode's `objectKilled` and Undead Tide's
+  slayer. Harm, sides, friendly fire, self-damage, the "one at a time" checks, monster AI, hit
+  causes and the removal of a leaving player's things go by the owner, as in the exe.
+- **Why:** by the owner's decision (2026-11-04): the credit only.
+- **Revert:** drop the `creditFrom` calls (or make `killCredit` return `parentPlayer`).
+
+### VD-58: A trap whose Glyph isn't laid gives its spells' mana back
+
+- **Vanilla:** each spell of a trap is paid for (at its trap price) as it's spoken; when the Glyph
+  is cast its queue is cleared, laid or not, and only the Glyph's own cost (0) is given back when it
+  fails (too many traps or bombers by then, no room for the bomber) (OB-022).
+- **Ours (`Spells::refundTrap`):** a trap chant that ends with its spells still queued (the Glyph
+  not laid) gives each one's trap price back; so does a conjurer's whose bomber couldn't be
+  summoned.
+- **Why:** by the owner's decision (2026-11-04).
+- **Revert:** clear `trapCount` instead of calling `refundTrap`.
+
+### VD-59: Blue flames hiss twice a second for good
+
+- **Vanilla:** blue flames (ManaDrainCollide) keep their last hiss's frame in 16 bits and compare
+  it sign-extended: from frame 0x8000 (about 18 minutes in) they hiss every frame (OB-050).
+- **Ours (`noxcore/src/server/collide.cpp`):** the whole frame is kept (`ServerObject::soundFrame`,
+  32 bits in the padding the 16 used): a hiss at most every half second for the whole game, the
+  same as before the 18th minute.
+- **Why:** by the owner's decision (2026-11-04).
+- **Revert:** keep the frame's low 16 bits and compare them sign-extended.
+
+### VD-60: A player's map download ends when it leaves
+
+- **Vanilla:** a player leaving mid-download leaves its map sender sending: blocks go to its closed
+  stream till the file is done, and a player who joins the slot meanwhile is sent the rest of the
+  old download (OB-163).
+- **Ours (`GameHost::mapSendPeerGone`):** the sender is let go and the count of sends under way
+  goes down, as a cancel does, for the stock send as for the fast one (VD-45).
+- **Why:** by the owner's decision (2026-11-04).
+- **Revert:** let it go only when it's fast, as before.
+
+### VD-61: The console's respawn switches turn off; a remote sysop sees its command's output
+
+- **Vanilla:** "set monsters respawn on|off" and "set weapon respawn on|off" set the server
+  option (8, 2) for both words (OB-047); a remote sysop's command (MSG_SERVER_CMD 2) prints its
+  lines on the host's screen alone (OB-048).
+- **Ours (`noxcore/src/server/host_console.cpp`):** "off" clears the option. A sysop's command's
+  lines are also sent to the sysop as text messages (MSG_TEXT_MESSAGE), as they were with the test
+  commands on; the host's console gets them as before.
+- **Why:** by the owner's decision (2026-11-04).
+- **Revert:** set the options for both words; echo to the sysop only with `testCommands`.
+
 ## Menus: Westwood Online (no effect on the wire)
 
 ### VD-25: The WOL connection is let go for a game, and made again after it
@@ -1560,3 +1783,32 @@ The engine's logic is the exe's; these are where the output differs.
   `noxcore/include/noxcore/script/vm.hpp`. No value matches the original exactly: it has no limit
   and hangs. The depth limits (Vm::kMaxDepth, kMaxNested) are best kept: without them a map can
   crash the server.
+
+### VD-62: A mover at a fork whose every link leads back goes back
+
+- **Vanilla:** a mover at a waypoint with two or more links draws a random one that isn't where it
+  came from, in a loop with no way out: when every link leads back (a custom map's waypoint linked
+  twice to the same one) the server hangs (OB-032).
+- **Ours (`Objects::moverUpdate`):** with every link back where it came from it goes back there,
+  drawing nothing. Any other fork draws exactly as before, so stock maps' movers (and the random
+  draws after them) are unchanged.
+- **Why:** by the owner's decision (2026-11-04): a hung server is no behaviour to keep.
+- **Revert:** none wanted (it would hang the server).
+
+### VD-63: A script call with nothing running leaves the stack empty; a refused waiting handler is dropped
+
+- **Vanilla:** a timer's, dialog's, entry point's or the console's call (script_callByIndex)
+  leaves the value a function declared to return one on the script stack; from then on every
+  handler finds the stack not empty and is put off, and none runs again (OB-204). A handler put off
+  that's refused at its turn (a once-only one, marked run before it was put off; a pickup handler,
+  whose function is cleared right after) stays first on the waiting list, so no handler behind it
+  ever runs (OB-202).
+- **Ours (`ScriptHost::call`, `ScriptHost::callBlock`):** a call made with no script running
+  empties the stack after it (a call nested in a running script leaves its words to that script, as
+  before). A waiting handler that would be refused is dropped from the list at its turn (the shared
+  result zeroed, as its refused call did) and the next one waiting is called. The refused one still
+  doesn't run. No stock map's timer, dialog or entry-point function returns a value, so stock maps
+  run as before. The editor's lints for such functions stay, for maps run on stock servers.
+- **Why:** by the owner's decision (2026-11-04): either stopped a custom map's handlers for good.
+- **Revert:** in `ScriptHost::call`, drop the `resetStack`; in `callBlock`, call the first waiting
+  handler whatever it is.

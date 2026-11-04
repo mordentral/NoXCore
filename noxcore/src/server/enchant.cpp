@@ -111,13 +111,19 @@ void stepEnchantments(ServerObject& o, Fight& fight)
         } else if (e == Enchant::Death) {
             o.hurtBy = 0;
             o.hurtType = 0xD;
+            const int deaths = o.player ? o.player->deaths : 0;
             fight.takeHealth(o, 9999999);
             playSound(fight.world, 0x30B, o);
-            // A player's death counted here as well (playerIncrementElimDeath,
-            // reported): its scoring at the death counted it too in elimination
-            // (an original bug).
+            // A player's death counted here as well (playerIncrementElimDeath), and reported.
+            // (noxcpp: in an elimination game, counted only when its scoring at the death didn't
+            // count it already. There the exe counts it twice, two lives lost: OB-056, fixed. Any
+            // other game counts it here as the exe does.)
             if (o.classes & things::ObjectClass::Player) {
-                addDeath(fight, o);
+                const bool elimination = (fight.world.gameFlags & GameFlag::Elimination) &&
+                                         !(fight.world.gameFlags & (GameFlag::Arena | GameFlag::KingOfTheRealm));
+                if (!elimination || !o.player || o.player->deaths == deaths) {
+                    addDeath(fight, o);
+                }
                 reportLesson(fight.world, o);
             }
         }

@@ -491,6 +491,14 @@ public:
     /// (noxcpp's: questSaves off) The SAVEDATA a quitting client is sent instead of its unit's:
     /// short of the client's 700 bytes, so it writes nothing and its .plr stays.
     static constexpr std::size_t kRefusedSaveBytes = 8;
+    /// How far a player may be from what it picks up (MSG_TRY_GET) or works (MSG_TRY_COLLIDE),
+    /// centre to centre. The stock client offers both within 75 of where it shows its player; its
+    /// view lags the server's by a round trip and more, so the server allows a margin past that for
+    /// the player's run meanwhile (a run is 8.4 a frame, hasted 10.5: the margin is over 0.7 s of
+    /// it): a stock client's ask is never refused, and a modified client can't reach across the map.
+    static constexpr float kClientReach = 75.0f;
+    static constexpr float kReachMargin = 225.0f;
+    static constexpr float kServerReach = kClientReach + kReachMargin;
     /// Whether `peer` identified itself (a noxsdl).
     bool identified(std::uint8_t peer) const { return transport_.identified(peer); }
     /// What an identified client said it takes (lobby::ClientFeature); 0 for any other.
@@ -1139,8 +1147,8 @@ private:
     // kFastMapBlock bytes, up to kFastMapBlocksPerFrame of them every frame (kFastMapBlocksPerFrameAll
     // to all of them together)
     // while the client's unacknowledged reliable packets (all of them, not only the map's) number
-    // fewer than its window (kFastMapStartWindow-kFastMapWindow, halved when late); a fast sender
-    // whose player leaves is let go.
+    // fewer than its window (kFastMapStartWindow-kFastMapWindow, halved when late). A sender whose
+    // player leaves is let go (noxcpp, OB-163).
     struct MapSender {                   ///< (g_mapSenders[i])
         std::uint16_t state = 0;         ///< 1 sending
         bool privateCopy = false;        ///< its own copy of an older map's file

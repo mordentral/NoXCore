@@ -139,6 +139,9 @@ struct Spells {
     /// Spell_CastGlyph: `owner`'s queued trap spells into a Glyph at `source`
     /// (a conjurer's: a Bomber carrying it, with the summons), aimed at (x, y).
     bool castGlyph(ServerObject& owner, ServerObject& source, float x, float y);
+    /// (noxcpp) A trap's queued spells given back, each at its trap price, and the queue emptied:
+    /// its Glyph wasn't laid (OB-022).
+    void refundTrap(ServerObject& owner);
     /// A glyph going off (GlyphCollide's, GlyphDie's, the chain's): gone, its
     /// spells cast from it at what set it off (`by`; null: the nearest within GlyphRange), the
     /// glyphs about it set off next frame.

@@ -412,6 +412,7 @@ private:
         DialogParent parent = DialogParent::None; ///< g_guiDialogParent
         std::uint32_t flags = 0;
         std::function<void()> onOk, onCancel;      ///< g_guiDialogOnOk / OnCancel
+        std::uint32_t serial = 0; ///< (noxcpp) counts the boxes made, so an answer closes only its own (OB-147)
     } dialogState_;
     std::vector<nox::client::solo_saves::Slot> slots_; ///< savegame_arr
     std::string overwrite_;                            ///< the slot to save over

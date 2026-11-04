@@ -1136,15 +1136,13 @@ bool Inventory::mouseDown(float x, float y, int w, int h, const nox::client::Wor
     if (const auto cell = cellAt(px, py)) {
         const auto& c = grid_.cell(*cell);
         if (!c.items.empty() && inv.count(c.items.front())) {
-            // cliInventorySpriteUpd: its first taken out; the
-            // secondary weapon's cell so emptied, the secondary is none, the server told
-            // (clientSetAltWeapon(0): an original bug).
+            // cliInventorySpriteUpd: its first taken out. (noxcpp: the secondary weapon stays
+            // the secondary while it's dragged, and after a move within the inventory; it stops
+            // being one only where it's dropped out, worn or quick-clicked (mouseUp). The exe's
+            // take-out makes it none at once, the server told: OB-156, fixed.)
             const std::uint16_t typeId = c.typeId;
             const auto nc = grid_.take(*cell);
-            drag_ = Drag{*nc, typeId, *cell, {px, py}, nowMs};
-            if (*nc == world.self().secondaryWeapon && clearSecondary_) {
-                clearSecondary_();
-            }
+            drag_ = Drag{*nc, typeId, *cell, {px, py}, nowMs, *nc == world.self().secondaryWeapon};
             sound(0x317); // InventoryPickup
         }
     }
@@ -1183,12 +1181,20 @@ bool Inventory::mouseUp(float x, float y, int w, int h, const nox::client::World
     const float s = Hud::scale(w, h);
     const float px = x / s;
     const float py = y / s - static_cast<float>(slide_);
+    // (noxcpp, OB-156) The secondary weapon no longer one where the drag ends so (endsSecondary:
+    // dropped out, worn, or quick-clicked), as the exe's take-out made it none, the server told.
+    const auto ended = [&](DragEnd end) {
+        if (d.secondary && endsSecondary(end) && clearSecondary_) {
+            clearSecondary_();
+        }
+    };
 
     // Outside the panel: onto the ground at the cursor (CliNet_SendDropDraggedItem); a stack asks
     // how many first (the amount box, DropLabel, its most the cell's count with the dragged one).
     // Either way it's back in its cell till the server says it's dropped (the inventory window's put-back);
     // the box's answer drops that many of the cell holding it then, from its first.
     if (!contains(x, y, w, h)) {
+        ended(DragEnd::Outside);
         const SDL_Point at = toWorld(x, y);
         const std::size_t rest = d.fromCell ? grid_.cell(*d.fromCell).items.size() : 0;
         putBack(d, false);
@@ -1220,6 +1226,7 @@ bool Inventory::mouseUp(float x, float y, int w, int h, const nox::client::World
     const float dy = d.pressed.y - py;
     if (nowMs - d.atMs < 333 && dx * dx + dy * dy < 100) {  // a third of a second, within 10 pixels
         putBack(d, false); // (back at its stack's end)
+        ended(DragEnd::QuickClick);
         if (!wearable) {
             if (actions.use) {
                 actions.use(d.netCode);
@@ -1261,6 +1268,7 @@ bool Inventory::mouseUp(float x, float y, int w, int h, const nox::client::World
     if (in(kDoll, px, py)) {
         putBack(d, false);
         if (d.fromCell && wearable && !item.equipped && actions.equip) {
+            ended(DragEnd::Doll);
             actions.equip(d.netCode);
         }
         return true;

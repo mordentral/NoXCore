@@ -171,6 +171,23 @@ void ScriptHost::runEntryPoints(std::string_view prefix)
 
 bool ScriptHost::call(std::uint32_t function, std::uint32_t caller, std::uint32_t trigger)
 {
+    const bool ran = run(function, caller, trigger);
+    // (noxcpp: no script was running, so nothing reads what it left: dropped, the next handler not
+    // put off for it. The exe leaves a returned word there, and every handler after it waited for
+    // good: OB-204, fixed. A call nested in a running script leaves its words to that script.)
+    if (!vm_.running()) {
+        vm_.resetStack();
+    }
+    return ran;
+}
+
+bool ScriptHost::runnable(const ServerObject::ScriptBlock& block) const
+{
+    return !(block.flags & 1u) && !block.mode && !block.function.empty() && vm_.file().find(block.function);
+}
+
+bool ScriptHost::run(std::uint32_t function, std::uint32_t caller, std::uint32_t trigger)
+{
     const bool ran = vm_.call(function, caller, trigger);
     if (!ran) {
         ++stopped_;
@@ -268,14 +285,14 @@ std::optional<std::uint32_t> ScriptHost::callBlock(ServerObject::ScriptBlock& bl
     // A script mid-way (its stack not empty: one of its builtins set this off): put off till the
     // end of the next handler call made with the stack empty. (A once-only one is marked run
     // already, and a pickup handler loses its function right after this call, so when its turn
-    // comes it's refused and stays first, holding up the rest: an original bug.)
+    // comes it's refused: dropped from the list below.)
     if (vm_.stackTop() != 0) {
         if (queued_.size() < kMaxQueuedBlocks) {
             queued_.push_back({&block, ObjectRef{caller}, ObjectRef{trigger}});
         }
         return blockResult_;
     }
-    call(static_cast<std::uint32_t>(*index), caller, trigger);
+    run(static_cast<std::uint32_t>(*index), caller, trigger);
     // What it returns, popped; then the stack emptied and the strings it (and any timer, dialog
     // or entry point since the last handler) made dropped.
     if (vm_.file().functions[*index].returns != 0) {
@@ -287,9 +304,18 @@ std::optional<std::uint32_t> ScriptHost::callBlock(ServerObject::ScriptBlock& bl
     // still waiting called: its call sets the shared result again (an original bug: the
     // deciding handler's caller then reads that).
     std::erase_if(queued_, [&](const QueuedBlock& q) { return q.block == &block && q.caller == caller && q.trigger == trigger; });
-    if (!queued_.empty()) {
+    // (noxcpp: a waiting one its call would refuse is dropped, the shared word zeroed as that call
+    // would, and the next tried. The exe calls it, is refused, and leaves it first on the list:
+    // no handler behind it ever ran, OB-202, fixed.)
+    while (!queued_.empty()) {
         const QueuedBlock next = queued_.front();
+        if (!runnable(*next.block)) {
+            queued_.erase(queued_.begin());
+            blockResult_ = 0;
+            continue;
+        }
         callBlock(*next.block, next.caller, next.trigger);
+        break;
     }
     return blockResult_;
 }

@@ -131,7 +131,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 ### OB-007: Picking things up has no reach check
 - **Where:** SrvNet_OnPacket's MSG_TRY_GET (0x73) calls the pickup with no distance check.
 - **Effect:** a modified client can pick up items anywhere on the map.
-- **Ours:** game_host.cpp's TryGet, the same.
+- **Ours:** game_host.cpp's TryGet wants the item within `GameHost::kServerReach` (the stock
+  client's 75 and a margin for the round trip; a stock client's pickup is never refused).
+- **Fixed** 2026-11-04 by the owner's decision (VD-49).
 
 ### OB-008: A gold pile made with no players about divides 0 by 0
 - **Where:** GoldInit averages the players' experience (read from each one's unit) as
@@ -146,7 +148,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   player's unit, checking only that the player isn't an observer or in a dialog or trade.
 - **Effect:** a modified client can throw levers, press buttons and pull chains anywhere on the
   map (the stock client sends it only within 75).
-- **Ours:** game_host.cpp's TryCollide, the same.
+- **Ours:** game_host.cpp's TryCollide wants the object within `GameHost::kServerReach` (75 and a
+  margin, as TryGet's).
+- **Fixed** 2026-11-04 by the owner's decision (VD-49).
 
 ### OB-010: A trigger's once-only deciding handler, after its run
 - **Where:** TriggerCollide reads the result of scriptCallByEventBlock for its touch handler
@@ -247,7 +251,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   back only the Glyph's own cost (0) when Spell_CastGlyph fails (MaxTrapCount reached meanwhile,
   a conjurer at MaxBomberCount or its summon limit).
 - **Effect:** the trap's spells are paid for and gone, with no glyph.
-- **Ours:** spells.cpp's update and glyphs.cpp's castGlyph, the same.
+- **Ours:** the queued spells' trap prices are given back when the Glyph isn't laid
+  (`Spells::refundTrap`, from spells.cpp's update and glyphs.cpp's castGlyph).
+- **Fixed** 2026-11-04 by the owner's decision (VD-58).
 
 ### OB-023: A glyph's Fireball, Burn, Fist and Cleansing Flame lose their owner
 - **Where:** a glyph going off casts its spells with the glyph as their source; Fireball, Burn,
@@ -257,7 +263,10 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   Missile and Pixie Swarm are owned by the caster and keep it.)
 - **Effect:** after the first frame those four's harm comes from no one: whatever looks up their
   owner (the kill credit, the owner's side) finds none, so the wizard isn't credited.
-- **Ours:** the same (their owner the glyph's extent, gone with it).
+- **Ours:** the four stay the glyph's, as the exe's (their harm, sides and limits unchanged); a
+  credit link to the caster (spells.cpp's `creditFrom`, `ServerObject::creditTo`) gives the caster
+  the kill (`Fight::killCredit`, read only where a kill is credited).
+- **Fixed** 2026-11-04 by the owner's decision (VD-57): the credit only.
 
 ### OB-024: A map glyph with more than five spells
 - **Where:** GlyphXfer reads a u8 count and that many spell names straight into the glyph's
@@ -327,7 +336,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   loop with no way out.
 - **Effect:** a waypoint with two or more links that all lead back where the mover came from
   loops forever.
-- **Ours:** the same.
+- **Ours:** there it goes back where it came from, drawing nothing; any other fork draws as the
+  exe (objects.cpp's moverUpdate).
+- **Fixed** 2026-11-04 by the owner's decision (VD-62).
 
 ### OB-033: A flagball game tied at its time limit crashes the server
 - **Where:** Game_OnTimeLimitExpired's flagball check calls SrvNet_BroadcastFlagBallWinner(NULL)
@@ -365,7 +376,10 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   from the client and act on whatever the code names, unchecked.
 - **Effect:** a modified client can move other players (or monsters) between teams, and
   (switching, outside chat) back to a player start.
-- **Ours:** game_host.cpp, the same.
+- **Ours:** game_host.cpp's TeamMsg case takes only the sender's own unit. The stock client's
+  senders (the scoreboard's team flags, a team's news) name only its own player, and the host's GUI
+  only the host, so no host or sysop exception is wanted.
+- **Fixed** 2026-11-04 by the owner's decision (VD-50).
 
 ### OB-038: An NPC's blow takes its stamina the wrong way round
 - **Where:** mobActionMelee1, for an NPC (subclass 0x10): when the weapon's stamina
@@ -402,7 +416,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** a modified client can set anyone's creatures, or a map's monsters, idle, guarding,
   escorting it or hunting, and watch any of them (order 1: the camera on a monster anywhere,
   playerObserveMonster).
-- **Ours:** game_host.cpp's 0x78 and monsters.cpp's orderCreatures, the same.
+- **Ours:** game_host.cpp's 0x78 takes one creature only of the sender's own (owned, or one it
+  controls); the order to all its creatures is as the exe's (monsters.cpp's orderCreatures).
+- **Fixed** 2026-11-04 by the owner's decision (VD-50).
 
 ### OB-043: A monster drinks a health potion twice
 - **Where:** mobActionPickupObject (and the main AI's eating, monsterMainAIFn) calls
@@ -440,15 +456,17 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Where:** the console's "set monsters respawn on|off" and "set weapon respawn on|off" set the
   server option bit (8, 2) for both "on" and "off"; only the printed line differs.
 - **Effect:** once on, monster and weapon respawning stay on whatever the host types.
-- **Ours:** host_console.cpp, the same.
+- **Ours:** host_console.cpp's "off" clears the bit.
+- **Fixed** 2026-11-04 by the owner's decision (VD-61).
 
 ### OB-048: Remote sysop commands answer on the host's screen
 - **Where:** SrvNet_OnServerCmd's case 2 runs the sysop's line through server_parseCmdText, whose
   lines go to the host's console (Gui_Console_Printf).
 - **Effect:** a sysop typing a command sees nothing back (the host's screen gets "RemoteSysop" and
   the result).
-- **Ours:** the same (GameHost::takeConsole); with the server's test commands on, the lines are
-  also sent to the sysop as text messages, for testing.
+- **Ours:** the lines go to the host's console as before (GameHost::takeConsole) and to the sysop
+  as text messages (GameHost::printText).
+- **Fixed** 2026-11-04 by the owner's decision (VD-61).
 
 ### OB-049: A point on a polygon's corner-to-corner line can read as outside
 - **Where:** the point-in-polygon test (polygon) counts the crossings of a ray from the point to
@@ -467,7 +485,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** from frame 0x8000 (about 18 minutes at 30 frames a second) the stored frame no longer
   matches the frame (negative, then wrapped), the difference is always large, and a player standing
   in blue flames hears the hiss every frame instead of twice a second, for the rest of the game.
-- **Ours:** the same (ServerObject::soundFrame, the ManaDrainCollide in collide.cpp).
+- **Ours:** the whole frame is kept (ServerObject::soundFrame, 32 bits; the ManaDrainCollide in
+  collide.cpp): twice a second for good.
+- **Fixed** 2026-11-04 by the owner's decision (VD-59).
 
 ### OB-051: A blow on a player sounds like the armour in its pack
 - **Where:** PlayerDamageSound goes through the whole inventory for body armour (class 0x2000000,
@@ -515,7 +535,10 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** in elimination (playerHandleElimDeath counts every death) the player loses two lives
   to it. (In an arena PlayerDie's scoring, with no killer, takes a lesson as for a suicide and
   counts no death, so the one there is the only one; in KotR, none either.)
-- **Ours:** the same (stepEnchantments in enchant.cpp).
+- **Ours:** in an elimination game, stepEnchantments in enchant.cpp counts it only when the kill's
+  scoring didn't: one life. Every other game counts as before (an arena death with an assist, which
+  the scoring counts too, still twice).
+- **Fixed** 2026-11-04 by the owner's decision (VD-56).
 
 ### OB-057: A script timer that cancels the next one sends the timer walk through freed timers
 - **Where:** the script timers' pass frees each due timer (onto the activators' free list) and
@@ -725,8 +748,12 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   then counted as its own); a chunk past the size writes over the heap, and a size past the packet
   copies whatever follows it in the receive buffer; a send never accepted holds its stream (one of
   0x20) for good; the frame's send walk runs on after an abort.
-- **Ours:** the same (xfer.cpp), but a chunk past the size isn't written (the file never ends
-  whole and times out, as the exe's would) and a message past its packet isn't read (framing.cpp).
+- **Ours:** xfer.cpp takes an accept only from the send's own connection, data and a cancel only
+  for the connection's own stream; a send never accepted is let go `Xfers::kAcceptFrames` after the
+  first frame that sees it, or with its connection; an abort counts the send down. A chunk past the size isn't written (the
+  file never ends whole and times out, as the exe's would) and a message past its packet isn't
+  read (framing.cpp).
+- **Fixed** 2026-11-04 by the owner's decision (VD-52).
 
 ### OB-365: A file transfer's start sets aside whatever size it names
 - **Where:** Net_Xfer_OnRecvStart allocates the receive buffer at the start message's u32 size,
@@ -827,7 +854,11 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** a player whose server sections come to 64 KiB or more (a very full inventory) gets
   "SAVEDATA" with only the count's low 16 bits of them, which won't load; at a multiple of 64 KiB
   nothing is sent (and the follow-up sends MSG_GAUNTLET 0x1C {0} after its {1}).
-- **Ours:** the same (player_save.cpp `saveDataSent`).
+- **Ours:** a NoX Core client is sent all of it and writes all of it (player_save.cpp
+  `saveDataSent(.., whole)`, solo_saves.cpp `keepSaveData`); the transfer's size is 32 bits on the
+  wire. A stock client writes only the size's low 16 bits of whatever it's sent, so it's sent what
+  the exe sends: its saves of 64 KiB or more still arrive cut short.
+- **Fixed** 2026-11-04 by the owner's decision, for NoX Core clients (VD-55).
 
 ### OB-090: A map change's pixie branch tests the player instead of the pixie
 - **Where:** a map loaded, come by an exit: for each player's owned thing not isUnit, the test
@@ -904,7 +935,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   loop and checks each item's price against that, never the gold left; playerSubGold stops at 0.
 - **Effect:** a player who can pay for one of a stack gets as many as it asks (up to the stock), its
   gold down to 0.
-- **Ours:** the same (trade.cpp's 0x17).
+- **Ours:** trade.cpp's 0x17 checks each against the gold left (short: TRADE 0x1B, the stack
+  stops).
+- **Fixed** 2026-11-04 by the owner's decision (VD-51).
 
 ### OB-099: A shop's sale ignores its pickup's refusal
 - **Where:** Shop_OnBuyItem and Shop_OnBuyStack call the item's PICKUP function and don't look at
@@ -912,7 +945,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** an item a pickup refuses (carrying too much: DefaultPickup's
   "pickup.c:CarryingTooMuch") is paid for and lost: it was never in the world, and isn't in the
   inventory.
-- **Ours:** the same (the thing deleted: trade.cpp's `buy`).
+- **Ours:** trade.cpp's `buy` takes no gold for a refused one, and the stock thing goes back into
+  the shop's keeping, its stock entry and record left.
+- **Fixed** 2026-11-04 by the owner's decision (VD-51).
 
 ### OB-100: Selling a stack sells anything of the type
 - **Where:** Shop_OnSellStack (MSG_TRADE 0x19) takes the first `count` inventory things of the
@@ -920,7 +955,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   "CantSellItem"), worn or not; its sound only when it found all `count`.
 - **Effect:** a client asking for a stack sale can sell quest items (keys, the orbs, Oblivion) and
   glyphs, and equipped things.
-- **Ours:** the same (trade.cpp's 0x19).
+- **Ours:** trade.cpp's 0x19 passes over worn things and refuses a quest item or a glyph as a
+  single sale does, which ends the stack.
+- **Fixed** 2026-11-04 by the owner's decision (VD-51).
 
 ### OB-101: A repair checks neither the need nor the gold
 - **Where:** Shop_OnRepairItem (MSG_TRADE 0x1A) charges shopGetItemCost's repair price (at least
@@ -929,7 +966,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** a whole item costs 1 to "repair"; a player without the gold gets the repair free
   (its gold to 0). The stock client asks the cost first (0x1E: 0x39D for a whole thing), so only a
   modified client does either.
-- **Ours:** the same.
+- **Ours:** trade.cpp's 0x1A plays 0x39D for a thing that needs no repair and sends TRADE 0x1B with
+  the gold short; neither is charged or mended.
+- **Fixed** 2026-11-04 by the owner's decision (VD-51).
 
 ### OB-102: A repair of a thing without health data crashes the server
 - **Where:** Shop_OnRepairItem passes `obj->HealthData->Max` to unitSetHP (it reads HealthData
@@ -1163,9 +1202,11 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** a script that cancels an NPC's dialog while its dialog is open leaves the player
   "talking" for good: no exits (the exit's check), no picking up, dropping or working things
   (SrvNet_OnPacket 0x72 / 0x73 / 0x7B), IsTalking 1; its dialog window open.
-- **Ours:** the same; an NPC no longer there counts as one without functions (dialog.cpp). A map
-  change carries the player's dialogWith to the NPC carried with it or, left behind, to none
-  there: still talking (Server::loadMapKeeping).
+- **Ours:** an answer to such a dialog still sends MSG_DIALOG 4 and ends the talk, without the end
+  function (dialog.cpp's dialogAnswer); an NPC no longer there counts as one without functions. A
+  map change carries the player's dialogWith to the NPC carried with it or, left behind, to none
+  there, which the player's answer then ends (Server::loadMapKeeping).
+- **Fixed** 2026-11-04 by the owner's decision (VD-54).
 
 ### OB-130: One freeze holder for every player
 - **Where:** unitFreeze / unitUnFreeze keep who froze a player in one global (the script's
@@ -1176,7 +1217,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   swallowed while the holder is set, and the script's later thaw of the first clears the holder
   but doesn't thaw the second. It stays frozen till something unfreezes it itself, or a map
   switch thaws every player.
-- **Ours:** the same (World::freezeLock, monsters.hpp freezeUnit / unfreezeUnit).
+- **Ours:** each player keeps its own (PlayerControl::freezeLock, monsters.hpp freezeUnit /
+  unfreezeUnit).
+- **Fixed** 2026-11-04 by the owner's decision (VD-53).
 
 ### OB-131: A field guide of no known creature is used up
 - **Where:** Obj_FieldGuideUse calls Plr_AwardFieldGuide with the guide's creature index
@@ -1338,7 +1381,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** a slot whose load fails (Player.plr missing or unreadable after the copy) leaves the
   menu shut and the game as it was, without a word. Only AutoLoad while dying or dead (no question
   asked) shows the box.
-- **Ours:** the same (cinematics.cpp loadSlot / autoLoadNow and its one message box).
+- **Ours:** the error box stays: loadSlot closes the question before it, and an answer closes only
+  the box answered (cinematics.cpp loadSlot / autoLoadNow / dialogAnswer, menu_rules.hpp).
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-148: With no saved game the save menu can't be left
 - **Where:** the save menu's fill: with no slot read, Cancel (0x1F7) and Load (0x1F6) are turned
@@ -1347,15 +1392,18 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   only Escape could close it (consoleEsc's close of the menu, if the key gets past the menu's
   window procedure, which takes everything), onto a dead game. From the in-game menu Save still
   works (and shuts it).
-- **Ours:** the same (cinematics.cpp fillLoadMenu); noxsdl formerly kept Cancel on after a
-  briefing.
+- **Ours:** Cancel (Quit) is always on, Load only with a saved game (cinematics.cpp fillLoadMenu,
+  menu_rules.hpp loadMenuButtons).
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-149: AutoSave stays off for the rest of the game
 - **Where:** menuGameOnButton's 0x232A: our drawable flagged DEAD turns the button off (the
   window's enable set to 0); nothing turns it back on but the window made anew at the next
   game's GUI set-up (game_guiInit).
 - **Effect:** pressing AutoSave while dead leaves it greyed after a load too, for the game.
-- **Ours:** the same (quit_menu.cpp; QuitMenu::newGame at each game).
+- **Ours:** on again when the menu opens with the player alive (quit_menu.cpp's layout,
+  menu_rules.hpp autoSaveOn; QuitMenu::newGame at each game as before).
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-150: A .plr's Music section can hold more saved tracks than the level's six
 - **Where:** plr_rwMusic's read: the count (an i32 from the file) is the loop's bound with no
@@ -1377,7 +1425,8 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   cursorUpdate's, a window pointer or 0 at the click, never 1-13).
 - **Effect:** with saves in SAVE0001-SAVE0013 but no AUTOSAVE, Solo goes straight to a new
   character (the class screen) and the saved games can't be reached from the main menu.
-- **Ours:** client/solo_menu.cpp countSaveFiles counts AUTOSAVE only.
+- **Ours:** client/solo_menu.cpp countSaveFiles counts AUTOSAVE and SAVE0001-SAVE0013.
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-152: Delete on an empty slot after AUTOSAVE says AUTOSAVE can't be deleted
 - **Where:** windowSelCharProc's 0x1F7 (Delete) in a solo game: the folder-name helper takes the
@@ -1428,7 +1477,10 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** taking the secondary weapon from its cell (to move it; a quick click wears it)
   makes it no secondary weapon, the server told (MSG_REPORT_SECONDARY_WEAPON 0); only dropping it
   on the secondary weapon's box makes it one again. A save meanwhile writes none.
-- **Ours:** the same (noxsdl Inventory::mouseDown).
+- **Ours:** it stays the secondary while dragged and after a move within the inventory; it's made
+  none only when dropped out, worn or quick-clicked (noxsdl Inventory::mouseUp, inventory_grid.hpp
+  endsSecondary).
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-157: SAVE_SERVER of a .plr it can't read sends 4 bytes never written
 - **Where:** CliNet_SendSaveServerXfer: computeServerPlayerDataBufferSize returns 0 for a file
@@ -1504,7 +1556,8 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   "downloaddone": no player). A player who joins the slot meanwhile is sent the rest of the old
   download as MSG_MAP_SEND_PACKETs it never asked for (Cli_MapDownload_OnBlock takes them,
   ungated: buffered, or one written to its download file when its number is the next).
-- **Ours:** GameHost::leave leaves the sender as it is too.
+- **Ours:** GameHost::leave lets the sender go (GameHost::mapSendPeerGone), as a cancel does.
+- **Fixed** 2026-11-04 by the owner's decision (VD-60).
 
 ### OB-164: A 15-letter game name typed in the Server Settings overwrites slot 1's first spells byte
 - **Where:** guiServerOptionsProcPre's 0x4003 for 0x2775 (the name field left): the field's
@@ -2020,7 +2073,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   wndListboxProcWithData10) 0x4014 returns a pointer to the picked indices, never -1, where the
   helper beside it rightly reads its first.
 - **Effect:** the warning never shows; what's typed next goes to the lobby instead, unannounced.
-- **Ours:** Menus::removeUserLine (menus_wolchat.cpp) doesn't warn either.
+- **Ours:** Menus::removeUserLine (menus_wolchat.cpp) warns: the line and 0xE2 when the last
+  picked user goes (menu_rules.hpp lostSelection).
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-191: Clicking a lobby while in none joins nothing and leaves "Updating channel list..." up
 - **Where:** the chat window's 0x4010 for the lobby list: with no current lobby (the current
@@ -2029,7 +2084,8 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   "Updating channel list..." box.
 - **Effect:** after leaving or being kicked from a lobby, clicking one only shows the box (Escape
   closes it); Refresh, which joins one by itself, is the way back in.
-- **Ours:** Menus::onChat calls joinLobby(-1) the same way.
+- **Ours:** Menus::onChat joins the lobby clicked (menu_rules.hpp lobbyToJoin).
+- **Fixed** 2026-11-04 by the owner's decision (VD-64).
 
 ### OB-192: A thing over more than four of the map grid's cells is left out of the others
 - **Where:** the map grid's link puts an object's collision box in each grid cell (85 units) it
@@ -2137,8 +2193,10 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** it never runs, and it stays first: every handler waiting behind it never runs
   either, more are added until the 32 are full, and the rest are dropped. A waiting handler's
   object freed meanwhile is still on the list, read through freed memory.
-- **Ours:** the same jam (`ScriptHost::callBlock`); a deleted object's waiting handlers are taken
-  off the list (`ScriptHost::forgetObject`) rather than read freed.
+- **Ours:** at its turn a handler that would be refused is dropped from the list and the next one
+  called (`ScriptHost::callBlock`); the refused one still doesn't run. A deleted object's waiting
+  handlers are taken off the list (`ScriptHost::forgetObject`) rather than read freed.
+- **Fixed** 2026-11-04 by the owner's decision (VD-63).
 
 ### OB-203: A handler's result is overwritten by the next waiting handler's call
 - **Where:** the handler call returns a pointer to one shared result word, set to 0 at the start
@@ -2159,7 +2217,9 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** from then on no handler of the map runs (triggers, monster events, polygons...):
   the first 32 wait, the rest are dropped. No stock map's timer, dialog or entry-point function
   returns a value (1765 timer, 1558 dialog and 294 entry-point uses checked).
-- **Ours:** the same (`ScriptHost::call` leaves the word, `ScriptHost::callBlock` waits).
+- **Ours:** `ScriptHost::call` made with no script running empties the stack after it, so no
+  handler waits on such a word.
+- **Fixed** 2026-11-04 by the owner's decision (VD-63).
 
 ### OB-205: A group name stored without its terminator reads whatever follows it
 - **Where:** the map loader's GroupData reader copies a group name's stored bytes into a

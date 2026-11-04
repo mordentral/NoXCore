@@ -1291,7 +1291,7 @@ bool applyFile(Fight& fight, ServerObject& unit, const player::PlayerFile& file,
 
 } // namespace
 
-std::vector<std::uint8_t> saveDataSent(const player::PlayerFile& file)
+std::vector<std::uint8_t> saveDataSent(const player::PlayerFile& file, bool whole)
 {
     std::vector<std::uint8_t> plain = player::serializePlayerFile(file);
     // computeServerPlayerDataBufferSize: the server sections (id, its padding, the
@@ -1316,9 +1316,13 @@ std::vector<std::uint8_t> saveDataSent(const player::PlayerFile& file)
         }
         pos = end;
     }
-    // SrvNet_SendSaveDataToClient keeps the count's low 16 bits (TEST SI,SI; AND ESI,0xFFFF: an
-    // original bug, a save of 64 KiB or more goes cut short, one of a multiple of it not at all).
-    total &= 0xFFFFu;
+    // SrvNet_SendSaveDataToClient keeps the count's low 16 bits (TEST SI,SI; AND ESI,0xFFFF), so a
+    // save of 64 KiB or more goes cut short, one of a multiple of it not at all. A stock client
+    // writes only the size's low 16 bits of what it's sent anyway, so it's sent so. (noxcpp: a NoX
+    // Core client, `whole`, is sent all of it: OB-089, fixed for it.)
+    if (!whole) {
+        total &= 0xFFFFu;
+    }
     plain.resize(std::min(total, plain.size()));
     return plain;
 }

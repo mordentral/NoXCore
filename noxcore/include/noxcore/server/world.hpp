@@ -147,6 +147,10 @@ struct PlayerControl {
     ObjectRef dialogWith;           ///< (DialogWith) the NPC it's talking to (dialog.hpp; 0 none; kLostLink one left behind)
     std::uint32_t statusFlags = 0;  ///< (Player->statusFlags) 1 observing, 0x20 eliminated, 0x400 poisoned...
     std::uint8_t creatureOrder = 4; ///< (SummonOrderAll) its creatures' standing order: 4 escort
+    /// Who froze it (unitFreeze's lock: 1 the script's Frozen, 0 a dialog's or a shop's). (noxcpp:
+    /// each player's own. The exe keeps one for every player, so one player's Frozen swallowed
+    /// another's thaw: OB-130, fixed.)
+    std::uint8_t freezeLock = 0;
     /// The creatures in its field guide (by guide index): what it may summon or charm in
     /// a co-op or quest game.
     std::array<bool, 41> fieldGuide{};
@@ -480,7 +484,7 @@ struct ServerObject {
     // (The rest.)
     float bounce = 0; ///< a bouncer's bounce (0.1 x it of its fall back up)
     std::uint32_t timer = 0; ///< its own next or last frame (a cloud's tick, a shower's meteor)
-    std::uint16_t soundFrame = 0; ///< the frame of its last repeated sound (blue flames' hiss)
+    std::uint32_t soundFrame = 0; ///< the frame of its last repeated sound (blue flames' hiss)
     float destX = 0;         ///< a TeleportWake's destination (its CollideData)
     float destY = 0;
     float homeX = 0;         ///< its own spot: a cleansing flame's origin, the shaft it's falling down
@@ -495,6 +499,10 @@ struct ServerObject {
     /// A spell projectile's (Magic) first caster, kept when it's
     /// turned (its owner changes); its spell is castBy, its power value.
     ObjectRef flyCaster;
+    /// noxcpp: who a kill by it is credited to when its owners end short of a player
+    /// (Fight::killCredit; never read for harm, sides or limits): a glyph's Fireball, Burn flame,
+    /// Fist and Cleansing Flame ring, the glyph's caster. 0: none, as every other thing's.
+    ObjectRef creditTo;
     /// noxcpp: the mode events it opted into (mode_hooks.hpp ModeEvent: Death, Damage...): asked
     /// or told to World::modeHooks for it alone. 0: none, as every object of the game's. (In the
     /// padding before `value`: the object's size is the same.)
@@ -1968,9 +1976,6 @@ public:
     /// The frame a monster went to FIGHT (frameCounterSetCopy):
     /// every monster looks about afresh that frame.
     std::uint32_t monstersLookAt = 0;
-    /// Who froze the players (unitFreeze's lock, 1 the script's
-    /// Frozen, 0 a dialog's or a shop's; reset at a new game's first map).
-    std::uint32_t freezeLock = 0;
     /// The game frame now (gameFrame__), as the server's frame began.
     std::uint32_t frameNow = 0;
     /// Creatures put in an owner's list so far (ServerObject::ownedOrder).

@@ -81,8 +81,8 @@ bool Spells::castGlyph(ServerObject& owner, ServerObject& source, float x, float
         // A conjurer: a Bomber carrying the glyph (a count of its bombers against
         // MaxBomberCount, room among its summons (the guide's fifth, the Bomber), summoned
         // (unitDoSummonAt) within 50 of the source facing as the conjurer does).
-        // (A summons failing: the glyph never placed, the queue spent all the same.) 0x16F at the
-        // source either way.
+        // (A summons failing: the glyph never placed; noxcpp: the queue's spells given back,
+        // refundTrap.) 0x16F at the source either way.
         const auto bombers = std::ranges::count_if(world.objects(), [&](const auto& e) {
             return e.second.owner == owner.extent && (e.second.classes & oc::Monster) && (e.second.subclasses & 0x2000u) && !e.second.gone();
         });
@@ -114,7 +114,7 @@ bool Spells::castGlyph(ServerObject& owner, ServerObject& source, float x, float
         playSound(world, spellSound(things, 0x22, 0), source);
     }
     if (!made) {
-        p.trapCount = 0;
+        refundTrap(owner);
         return true;
     }
     ServerObject& g = *made;
@@ -136,6 +136,21 @@ bool Spells::castGlyph(ServerObject& owner, ServerObject& source, float x, float
         ++p.curTraps;
     }
     return true;
+}
+
+void Spells::refundTrap(ServerObject& owner)
+{
+    // (noxcpp) Each queued spell's trap price back (Spells::update took it as the spell went in).
+    // The exe keeps the mana when the Glyph isn't laid (too many traps or bombers by then, no room
+    // for the bomber): OB-022, fixed.
+    if (!owner.player) {
+        return;
+    }
+    PlayerControl& p = *owner.player;
+    for (const std::uint32_t s : std::span(p.trapSpells).first(p.trapCount)) {
+        refund(owner, castPrice(owner, s, true));
+    }
+    p.trapCount = 0;
 }
 
 bool Spells::setsOff(const ServerObject& glyph, const ServerObject& by) const
