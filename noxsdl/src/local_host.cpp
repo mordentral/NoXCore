@@ -228,7 +228,8 @@ private:
 LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::ModifierDb* modifiers, const nox::things::GameData& gameData,
                      const nox::strings::StringTable* strings, const fs::path& gameDir, const HostSettings& settings)
 {
-    fs::path path = settings.map;
+    // (in any case, as on Windows: the solo screens' maps/War01a/War01a.map is maps/war01a/... in some installs)
+    fs::path path = nox::resolveNoCase(settings.map);
     if (!fs::exists(path)) { // a map's name: the game's maps folder
         path = gameDir / "maps" / settings.map / (settings.map + ".map");
     }
