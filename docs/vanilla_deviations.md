@@ -657,6 +657,23 @@ The decisions are in `noxsdl/src/menu_rules.hpp`.
   close the box after the load and after any 0x20 answer; tie Cancel to a saved game; leave
   AutoSave off; no LostSelection; join -1 from none.
 
+### VD-66: Keys are named as the player's keyboard prints them; the spell bar shows its bindings
+
+- **Vanilla:** keys are read by their place on the keyboard (DirectInput's codes, which nox.cfg's
+  key names stand for), and named by a fixed table of a US keyboard's names. The spell bar's letters are default.cfg's A S D F G and the
+  potions' X C Z whatever the bindings. On an AZERTY keyboard, the key printed A is nox.cfg's Q
+  (ToggleInventory), while the bar shows "A" over the first slot, whose key is printed Q.
+- **Ours:** keys still go by place, so every layout plays as the original. A key that types a
+  character is named as the player's layout prints it (`InputBindings::layoutName`, by SDL's
+  keymap; the rest keep the game's names), in the Controls window, the "press a key to chat"
+  notice and on the HUD. The bar's slots and the potions show the key each is bound to
+  (`InputBindings::slotLabels` / `potionLabels`: the control's first single-key binding; a
+  combination or no binding shows nothing), so a rebinding shows there too. AZERTY's bar reads
+  Q S D F G and its potions X C W.
+- **Why:** by the owner's decision (2026-11-06), after a French player pressed A to cast and got the
+  inventory.
+- **Revert:** `layoutName` returning nothing, and hud.cpp's `kSlotKeys` / `kPotionKeys` drawn again.
+
 ## Sound (no effect on the wire)
 
 The engine's logic is the exe's; these are where the output differs.

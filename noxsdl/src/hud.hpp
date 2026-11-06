@@ -108,6 +108,10 @@ struct QuickbarState {
     bool multiclass = false;
     /// The meters' bottle slots (the inventory's): what each holds and how many it shows.
     const BottleSlots* bottles = nullptr;
+    /// The slots' and potions' keys as bound and as this keyboard prints them
+    /// (InputBindings::slotLabels / potionLabels); nullptr: default.cfg's letters.
+    const std::array<std::string, 5>* slotKeys = nullptr;
+    const std::array<std::string, 3>* potionKeys = nullptr;
 };
 
 class Hud {

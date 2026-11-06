@@ -142,6 +142,48 @@ void InputBindings::configChanged()
     }
     const auto translucent = config_.setting("TranslucentConsole");
     translucentConsole_ = !translucent || std::atoi(translucent->c_str()) != 0;
+    labelsChanged();
+}
+
+std::string InputBindings::layoutName(std::uint32_t code)
+{
+    for (const auto& [sdl, c] : kKeys) {
+        if (c != code) {
+            continue;
+        }
+        // (Keys the game reads by place, as DirectInput did; the name is what this layout types there.)
+        const SDL_Keycode key = SDL_GetKeyFromScancode(sdl, SDL_KMOD_NONE, false);
+        if (key == SDLK_UNKNOWN || (key & SDLK_SCANCODE_MASK) || key <= SDLK_SPACE || key == SDLK_DELETE) {
+            return {};
+        }
+        const char* name = SDL_GetKeyName(key);
+        return name ? name : "";
+    }
+    return {};
+}
+
+std::string InputBindings::labelFor(std::string_view control) const
+{
+    for (const auto* b : config_.bindingsFor(control)) {
+        if (b->keys.size() != 1) {
+            continue; // (a combination doesn't fit a slot's label)
+        }
+        if (std::string name = layoutName(b->keys.front()); !name.empty()) {
+            return name;
+        }
+        if (const auto* k = cfg::findKey(b->keys.front())) {
+            return std::string(k->name);
+        }
+    }
+    return {};
+}
+
+void InputBindings::labelsChanged()
+{
+    for (std::size_t i = 0; i < slotLabels_.size(); ++i) {
+        slotLabels_[i] = labelFor("InvokeSlot" + std::to_string(i + 1));
+    }
+    potionLabels_ = {labelFor("QuickHealth"), labelFor("QuickMana"), labelFor("QuickCurePoison")};
 }
 
 std::uint32_t InputBindings::pickupButton() const

@@ -365,7 +365,8 @@ void chatMapNotice(App& app)
     std::string key;
     if (app.input) {
         if (const auto bound = app.input->config().bindingsFor("Chat"); !bound.empty() && !bound.front()->keys.empty()) {
-            if (const auto* k = nox::config::findKey(bound.front()->keys.front())) {
+            key = InputBindings::layoutName(bound.front()->keys.front()); // (as this keyboard prints it: VD-66)
+            if (const auto* k = nox::config::findKey(bound.front()->keys.front()); key.empty() && k) {
                 key = gameString(app, k->title.empty() ? k->name : k->title);
             }
         }
@@ -1127,6 +1128,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         return SDL_APP_FAILURE;
     }
     setWindowIcon(app->window); // (window_icon.hpp: on Windows the exe's own icon is the class's already)
+    if (app->input) {
+        app->input->layoutChanged(); // (the key labels by this keyboard's layout, known now SDL's up)
+    }
     if (opts.useGpu) {
         // SDL's GPU renderer, on Direct3D 12 on Windows unless told otherwise (our shaders are
         // DXIL there); elsewhere on SDL's choice (Vulkan, for which they're SPIR-V).
@@ -2761,6 +2765,9 @@ SDL_AppResult editorFrame(App& app)
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 {
     auto* app = static_cast<App*>(appstate);
+    if (event->type == SDL_EVENT_KEYMAP_CHANGED && app->input) {
+        app->input->layoutChanged(); // (another keyboard layout: the keys' labels as it prints them)
+    }
     // The play-test's game has the window; F2 goes back to the editor (and the editor's Play keys:
     // Release Mouse, Stop, Pause).
     if (app->editor && app->playTestInGame) {

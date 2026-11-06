@@ -15,6 +15,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <set>
@@ -67,15 +68,31 @@ public:
     /// The mouse button that picks items up (MousePickup), as a code.
     std::uint32_t pickupButton() const;
 
+    /// A key's name as printed on this keyboard (its layout's: the code's position is AZERTY's Q
+    /// for nox.cfg's "A"), for a key that types a character; empty for the rest (Ctrl, F1, the
+    /// arrows, the keypad), whose names are the game's own.
+    static std::string layoutName(std::uint32_t code);
+    /// The spell bar's five slots' and the potions' (health, mana, cure poison) labels: each
+    /// control's first single-key binding by layoutName, else the game's name for the key; empty
+    /// when it has none. Kept, worked out again with the config or the keyboard layout.
+    const std::array<std::string, 5>& slotLabels() const { return slotLabels_; }
+    const std::array<std::string, 3>& potionLabels() const { return potionLabels_; }
+    /// The keyboard layout changed (SDL_EVENT_KEYMAP_CHANGED): the labels again.
+    void layoutChanged() { labelsChanged(); }
+
 private:
     /// What's worked out from the config again whenever it changes: each control's bindings (by its
-    /// place in the control table) and TranslucentConsole.
+    /// place in the control table), TranslucentConsole and the labels.
     void configChanged();
+    void labelsChanged();
+    std::string labelFor(std::string_view control) const;
 
     nox::config::Config config_;
     std::set<std::uint32_t> down_;
     std::vector<std::vector<std::size_t>> bindingsByControl_; ///< indexes in config_.bindings
     bool translucentConsole_ = true;
+    std::array<std::string, 5> slotLabels_;
+    std::array<std::string, 3> potionLabels_;
 };
 
 } // namespace noxsdl

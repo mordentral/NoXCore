@@ -97,6 +97,10 @@ QuickbarState quickbarState(const App& app)
     q.trapSlide = static_cast<float>(app.trapSlide);
     q.multiclass = multiclass(app);
     q.bottles = app.inventory ? &app.inventory->bottles() : nullptr;
+    if (app.input) {
+        q.slotKeys = &app.input->slotLabels();
+        q.potionKeys = &app.input->potionLabels();
+    }
     return q;
 }
 

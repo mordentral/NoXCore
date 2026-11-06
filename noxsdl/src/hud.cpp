@@ -538,8 +538,10 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
     nuggets(bars.row, true);
     drawNamed(qb.bookOpen ? "SpellbookButtonLit" : "SpellbookButton", bx - 1, by + 35);
     for (int i = 0; i < kSlots; ++i) {
-        // The slot's key, on its plate's child at (13, 39).
-        text(kSlotKeys[static_cast<std::size_t>(i)], l.slotX(i) + 13, l.slotY() + 29, {255, 255, 255, 255});
+        // The slot's key, on its plate's child at (13, 39): the key it's bound to as this keyboard
+        // prints it (the game's own letters are default.cfg's, whatever the binding or layout: VD-66).
+        const auto at = static_cast<std::size_t>(i);
+        text(qb.slotKeys ? (*qb.slotKeys)[at] : kSlotKeys[at], l.slotX(i) + 13, l.slotY() + 29, {255, 255, 255, 255});
     }
     // ---- the meters (guiHealthManaInit)
     const float mx = l.meterX();
@@ -656,7 +658,8 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
             // The count's cell 10 less the small font's height (9) down, the key's 0x21 less it.
             text(std::to_string(count), px - 2, py + 10 - 9, {255, 255, 255, 255});
         }
-        text(kPotionKeys[static_cast<std::size_t>(kind)], px - 2, py + 0x21 - 9, {255, 255, 255, 255});
+        const auto at = static_cast<std::size_t>(kind);
+        text(qb.potionKeys ? (*qb.potionKeys)[at] : kPotionKeys[at], px - 2, py + 0x21 - 9, {255, 255, 255, 255});
     }
 
     // The small bars beside us, when a tube's been clicked (drawHealthManaBar).

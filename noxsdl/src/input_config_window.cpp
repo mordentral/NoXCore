@@ -116,6 +116,10 @@ std::string InputConfigWindow::keyTitle(std::optional<std::uint32_t> code) const
     if (!code) {
         return {};
     }
+    // A key that types a character: as this keyboard prints it (the game's names are a US keyboard's: VD-66).
+    if (std::string printed = InputBindings::layoutName(*code); !printed.empty()) {
+        return printed;
+    }
     if (const auto* k = nox::config::findKey(*code)) {
         return gui_.text(std::string(k->title));
     }
