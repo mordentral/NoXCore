@@ -270,8 +270,20 @@ int CoopDirector::moveParty(server::ScriptHost& script, std::uint32_t id, script
         server::setPosition(w, *u, x, y, script.frame());
     }
     // (A script's move of the host onto an exit, as Wiz03A's after Horvath's talk, is the map's way
-    // on: in the solo game it goes as the host lands. exitTouched lets it go for the party at once.)
+    // on: in the solo game it goes as the host lands. exitTouched lets it go for the party at once.
+    // A host the script froze first never touches it (Wiz03A's GotoWiz03b: Blind, the party frozen,
+    // then the move): the exit it landed on is the next tick's to take (gatherTick). One of the
+    // known traps' moves of the frozen host onto no exit (Wiz03C's GotoWiz03b, OB-423) is taken as
+    // the move onto the exit it meant.)
     scriptMovedAt_ = w.ticks;
+    const server::ServerObject* exit = nullptr;
+    if (livingUnits().size() >= 2) {
+        exit = exitUnder(*h);
+        if (!exit) {
+            exit = trapExitFor(*h);
+        }
+    }
+    scriptedExit_ = exit ? exit->extent : 0;
     return r;
 }
 

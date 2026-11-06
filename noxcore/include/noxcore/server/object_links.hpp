@@ -406,6 +406,7 @@ struct Links<PlayerControl> {
         NOX_LINK(S, cameraFollow, Clear),
         NOX_LINK(S, assistBy, Clear),
         NOX_LINK(S, currentWeapon, Carry),    // (the exe's ud->currentWeapon: the same thing after the switch)
+        NOX_LINK(S, shieldTakenOff, Carry),   // (a shield carried across)
         NOX_LINK(S, spellTarget, Carry),
     };
 };

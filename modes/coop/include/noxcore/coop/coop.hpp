@@ -202,8 +202,8 @@ public:
     bool mayUnpause(server::PauseReason why) override;
     server::HostClient* hostClient(server::HostClient* own) override;
     /// The party gathers at an exit: the first player on it starts a 30 s countdown; the exit
-    /// goes when every living player stands on it, when the countdown's over, or at the host's
-    /// "?go". Alone (or the only one alive): as the game.
+    /// goes when every living player is at it (gatherTick's rule), when the countdown's over, or at
+    /// the host's "?go". Alone (or the only one alive): as the game.
     bool exitTouched(server::Fight& fight, server::ServerObject& exit, server::ServerObject& player) override;
     /// Only a party wipe loses: a player who dies while another lives keeps the pending save, runs
     /// no PlayerDeath functions and is back by the party's checkpoint 10 s on; the last one's
@@ -233,6 +233,9 @@ public:
     std::optional<std::pair<float, float>> checkpoint() const noexcept { return checkpoint_; }
     /// An exit's gathering under way (the exit's extent).
     std::optional<std::uint32_t> gathering() const noexcept { return gather_ ? std::optional<std::uint32_t>(gather_->exit) : std::nullopt; }
+    /// A player who touched a gathering's way on is at it till, free to walk, it's farther than
+    /// this from every exit of the gathering it touched (walkedOff).
+    static constexpr float kGatherAway = 150.0f;
     /// The map numbers (with the high bit) a guest's own file draws that the world no longer has
     /// (as of the last guest's CLIENT_READY).
     const std::vector<std::uint16_t>& hiddenStatics() const noexcept { return hidden_; }
@@ -387,10 +390,41 @@ private:
     void joinScene(const Member& m);
     /// A line to every player (its notice; a stock one's as the server's line).
     void noticeAll(coopmsg::Notice kind, std::string_view text);
-    /// Each tick: the players due back respawned by the checkpoint; a gathering nobody stands on
-    /// any more given up.
+    /// Each tick: the players due back respawned by the checkpoint.
     void respawnDue();
+    /// Each tick (issue #5): the gathering's players who walked off dropped; the party taken through
+    /// once every living player is at it, its 30 s are up or the host said "?go" (not only at a
+    /// touch: a solid exit, a lift's shaft or a pit's landing is touched only now and then), but
+    /// not while a script's freeze holds the host (its save would wait for good); one nobody is at
+    /// any more given up; an exit a script put the host on taken at once.
     void gatherTick();
+    /// The living units of the party.
+    std::vector<server::ServerObject*> livingUnits();
+    /// Whether a player who touched the gathering's way on has left it: free to walk (mayAct, on
+    /// the floor: not falling, down a shaft, on a lift or in the air) and farther than
+    /// kGatherAway from every exit of the gathering it touched. Anyone else stays where it was.
+    bool walkedOff(const server::ServerObject& unit);
+    /// Whether the party may go through `exit` now (exitCollide's checks that aren't the
+    /// toucher's: no save asked for, the world not paused, a warp gate only while they're on,
+    /// somewhere to go), with the host on its feet (a dead host's save would put its body at the
+    /// exit's way out on this map).
+    bool mayGoThrough(const server::ServerObject& exit);
+    /// The party on through a way on (the one go step of a touch and of the tick): the gathering
+    /// over; every talk closed as an answer closes it; each player's glyphs on the ground gone
+    /// (exitCollide's, for every player); `thaw`: the party let go of a script's freeze (the map
+    /// change's own thaw, a moment early: the save waits for the host to be free). With `exit`,
+    /// exitCollide's solo go asked here too (cameByExit, the WORKING save with the exit); a touch's
+    /// is asked by the exit's own collide.
+    void partyGoes(server::Fight& fight, server::ServerObject* exit, bool thaw);
+    /// The exit the unit's centre is on (a box's inside, a circle's within its radius and the
+    /// unit's; none: null). (A scan of the map's things: only at a script's MoveObject of the host.)
+    server::ServerObject* exitUnder(const server::ServerObject& unit);
+    /// This map's known script trap (coop_party.cpp's kScriptTraps: a scene's move of the frozen host
+    /// onto no exit, OB-423), looked up as the map loads: its waypoint and the exit it meant.
+    void readScriptTrap();
+    /// The exit the map's trap meant, when `host` stands frozen by a script at its waypoint (none:
+    /// null).
+    server::ServerObject* trapExitFor(const server::ServerObject& host);
     /// The things a client draws from the map's own file (by map number): pristine_, at the map's load.
     void readPristine(server::Server& server);
     /// Those of them the world no longer has (a visited map's saved copy, or gone before a guest
@@ -512,12 +546,18 @@ private:
         std::string to;                   ///< where it leads (its key: side-by-side exits are one way)
         std::uint64_t since = 0;          ///< the world's ticks as it began
         std::uint64_t lastTouch = 0;
-        server::RefMap<std::uint64_t> standing; ///< each player's last touch (by extent)
+        /// Each player at it (by extent): its last touch. One who touched stays till it walks off
+        /// (walkedOff), leaves or the gathering ends.
+        server::RefMap<std::uint64_t> standing;
+        std::vector<std::pair<float, float>> at; ///< where its exits touched stand
         bool warned = false;              ///< the "10 s left" told
     };
     std::optional<Gather> gather_;
-    bool goNow_ = false;                  ///< the host's "?go"
+    bool goNow_ = false;                  ///< the host's "?go" (the next tick takes the party)
     std::optional<std::uint64_t> scriptMovedAt_; ///< the world's ticks of a script's last MoveObject of the party
+    server::ObjectRef scriptedExit_;      ///< an exit a script's MoveObject put the host on (the next tick takes the party)
+    std::optional<std::pair<float, float>> trapAt_; ///< this map's script trap's waypoint (readScriptTrap)
+    server::ObjectRef trapExit_;          ///< the exit it meant
     std::map<std::uint8_t, std::uint64_t> downs_; ///< a dead player's peer -> the tick it's back
     bool wipe_ = false;
     server::ObjectRef wipeBy_;            ///< the last one down (its PlayerDeath functions the party's)

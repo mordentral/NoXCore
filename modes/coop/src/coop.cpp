@@ -143,7 +143,7 @@ bool CoopDirector::onChat(server::GameHost& host, std::uint8_t peer, std::u16str
     if (lower == "?skip" && !reading_.empty()) {
         releaseChapter();
     } else if (lower == "?go" && gather_) {
-        goNow_ = true; // (the next touch takes the party)
+        goNow_ = true; // (the next tick takes the party: gatherTick)
     } else if (lower == "?go") {
         notice(*it, coopmsg::Notice::Info, "Nobody's at a way on: ?go takes the party once someone stands at one.");
     }
@@ -161,6 +161,7 @@ void CoopDirector::attach(server::GameHost& host)
     a.maxPlayers = options_.maxPlayers;
     host.setAccessSettings(a);
     readPristine(host.server()); // (the first map's load came before us)
+    readScriptTrap();
     // The saves: the party's beside the game's (the core's save wrapped); the runners a continued
     // campaign knows.
     coreSave_ = host.server().saveGameHook();
@@ -352,7 +353,9 @@ void CoopDirector::mapLoaded(server::Server& server)
     gather_.reset();
     goNow_ = false;
     scriptMovedAt_.reset();
+    scriptedExit_ = 0;
     readPristine(server);
+    readScriptTrap();
     // The new map's monsters by the party's size.
     copies_.clear();
     sceneViewers_.clear();

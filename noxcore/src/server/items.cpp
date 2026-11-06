@@ -756,10 +756,11 @@ bool Items::equipWeapon(ServerObject& player, ServerObject& item, bool everyone,
     engageEffects(world, modifiers, player, item); // (itemApplyEngageEffect)
     if (bit & 0x7FFE40Cu) {
         // Two-handed (bows, crossbows, the great sword, staves): the shields worn off
-        // (armour bits 0x3000000).
+        // (armour bits 0x3000000). (noxcpp, VD-65: the one taken off remembered.)
         for (const std::uint32_t e : keysOf(player.inventory)) {
             ServerObject* o = world.byExtent(e);
             if (o && (o->classes & oc::Armor) && (o->flags & ObjFlag::Equipped) && (things::armorBitOf(o->typeName) & 0x3000000u)) {
+                p.shieldTakenOff = o->extent;
                 takeOff(player, *o, true, true);
             }
         }
@@ -767,7 +768,34 @@ bool Items::equipWeapon(ServerObject& player, ServerObject& item, bool everyone,
     if (world.modeHooks && (item.modeEvents & ModeEvent::Equip)) {
         world.modeHooks->equipped(world, player, item, true); // (noxcpp: told a mode)
     }
+    if (bit != 2 && !(bit & 0x7FFE40Cu) && p.shieldTakenOff != 0) {
+        putShieldBack(player, everyone); // (noxcpp, VD-65: a weapon that goes with a shield)
+    }
     return true;
+}
+
+void Items::putShieldBack(ServerObject& player, bool everyone)
+{
+    // (noxcpp, VD-65; the exe leaves it off.) Still carried, not worn, and no shield nor armour of
+    // its kind worn meanwhile: worn again as any shield is (equipArmor: class, strength, reports).
+    // Still a shield (armour bits 0x3000000, as the two-hander's took it off): a shield deleted in
+    // the pack leaves its key here, and a freed key is handed out again once the dynamic ones run
+    // out.
+    PlayerControl& p = *player.player;
+    ServerObject* shield = world.byExtent(p.shieldTakenOff);
+    p.shieldTakenOff = 0;
+    if (!shield || shield->pendingDelete || shield->holder != player.extent || !(shield->classes & oc::Armor) ||
+        !(things::armorBitOf(shield->typeName) & 0x3000000u) || (shield->flags & ObjFlag::Equipped)) {
+        return;
+    }
+    for (const std::uint32_t e : player.inventory) {
+        const ServerObject* o = world.byExtent(e);
+        if (o && o != shield && (o->classes & oc::Armor) && (o->flags & ObjFlag::Equipped) &&
+            ((o->subclasses & 2u) || o->subclasses == shield->subclasses)) {
+            return;
+        }
+    }
+    equipArmor(player, *shield, everyone);
 }
 
 bool Items::equipArmor(ServerObject& player, ServerObject& item, bool everyone, bool failSound)
@@ -807,7 +835,9 @@ bool Items::equipArmor(ServerObject& player, ServerObject& item, bool everyone, 
     engageEffects(world, modifiers, player, item); // (itemApplyEngageEffect)
     if (item.subclasses & 2u) {
         // A shield (subclass 2): the two-handed weapons in hand off (weapon bits
-        // 0x7FFE40C, bows, crossbows, the great sword, staves; playerDequipWeapon).
+        // 0x7FFE40C, bows, crossbows, the great sword, staves; playerDequipWeapon). (noxcpp, VD-65:
+        // the one a two-hander took off no longer put back.)
+        p.shieldTakenOff = 0;
         for (const std::uint32_t e : keysOf(player.inventory)) {
             ServerObject* o = world.byExtent(e);
             if (o && (o->flags & ObjFlag::Equipped) && (o->classes & (oc::Weapon | oc::Wand)) && (things::weaponBitOf(o->typeName) & 0x7FFE40Cu)) {
@@ -1352,6 +1382,9 @@ void Items::removeFromInventory(ServerObject& player, ServerObject& item)
     takeOff(player, item, false, everyone);
     if (player.player) { // (a chest's or a creature's: no client)
         tell(player, {0x4D, lo(item.extent), hi(item.extent), lo(item.type), hi(item.type)});
+        if (player.player->shieldTakenOff == item.extent) {
+            player.player->shieldTakenOff = 0; // (noxcpp, VD-65: not put back)
+        }
     }
     std::erase(player.inventory, item.extent);
     item.holder = 0;

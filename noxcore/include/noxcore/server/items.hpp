@@ -176,6 +176,10 @@ private:
     void tell(const ServerObject& player, std::vector<std::uint8_t> bytes);
     void tellEveryone(std::vector<std::uint8_t> bytes);
     void recalculateArmor(ServerObject& player);
+    /// (noxcpp, VD-65) The shield a two-hander took off (PlayerControl::shieldTakenOff) worn again
+    /// through equipArmor, while it's still carried and nothing is worn in its place; forgotten
+    /// either way.
+    void putShieldBack(ServerObject& player, bool everyone);
 };
 
 } // namespace nox::server

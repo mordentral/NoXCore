@@ -10,17 +10,22 @@
 #include "noxcore/server/modes.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
+#include "noxcore/server/physics.hpp"
 #include "noxcore/server/server.hpp"
 #include "noxcore/server/solo.hpp"
 #include "noxcore/server/teleport.hpp"
 #include "noxcore/server/world.hpp"
+#include "noxcore/things/object_class.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <exception>
+#include <iterator>
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace nox::coop {
 
@@ -37,6 +42,14 @@ std::string exitMapName(std::string_view exitMap)
     return std::string(exitMap.substr(0, exitMap.find('.')));
 }
 
+/// Whether a unit is held by a script's freeze (Frozen's lock: a scene, Wiz03A's GotoWiz03b), which
+/// closing a talk doesn't let go. A gathering's go waits while the host is: the exit's save waits for
+/// a free host, and while it waited a scripted move onto a way on would find the save busy.
+bool scriptFrozen(const server::ServerObject& u)
+{
+    return (u.flags & server::ObjFlag::NoUpdate) && u.player && u.player->freezeLock != 0;
+}
+
 /// Where an exit leads, as one gathering's key (its map, any case).
 std::string destination(std::string_view exitMap)
 {
@@ -46,6 +59,33 @@ std::string destination(std::string_view exitMap)
     }
     return s;
 }
+
+bool sameText(std::string_view a, std::string_view b)
+{
+    return std::ranges::equal(a, b, [](char x, char y) {
+        return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+    });
+}
+
+/// A map script's scene that leaves the host frozen in the dark where no way on is (OB-423): its
+/// MoveObject of the host, frozen, to `waypoint` was meant to take the player through `exit`. With a
+/// party in, the party goes through that exit there, as through one such a move lands the host on.
+/// Alone the solo game's: the player stays where the script left it.
+struct ScriptTrap {
+    std::string_view map;      ///< (any case)
+    std::string_view waypoint; ///< the script's move's
+    std::string_view exit;     ///< the way on it meant: an exit's string (any case)
+};
+
+constexpr ScriptTrap kScriptTraps[] = {
+    // Wiz03C's GotoWiz03b (its ExitTrig, in a corner of the cave the player comes down into): a copy
+    // of Wiz03A's, whose waypoint is on a hidden exit to Wiz03B; here it's out in the rock. The way
+    // back up to Wiz03B, the two exits by the landing.
+    {"wiz03c", "Wiz03bExitWP", "Wiz03b.map:HideoutRearWP"},
+};
+
+/// How near the trap's waypoint the moved host is on it (MoveObject puts it there).
+constexpr float kTrapNear = 2.0f;
 
 } // namespace
 
@@ -69,22 +109,31 @@ void CoopDirector::noticeAll(coopmsg::Notice kind, std::string_view text)
 
 // ---- the exit's gathering
 
+std::vector<server::ServerObject*> CoopDirector::livingUnits()
+{
+    std::vector<server::ServerObject*> living = partyUnits();
+    std::erase_if(living, [](const server::ServerObject* u) { return (u->flags & server::ObjFlag::Dead) != 0; });
+    return living;
+}
+
 bool CoopDirector::exitTouched(server::Fight& fight, server::ServerObject& exit, server::ServerObject& player)
 {
     if (!host_) {
         return true;
     }
-    std::vector<server::ServerObject*> living;
-    for (server::ServerObject* u : partyUnits()) {
-        if (!(u->flags & server::ObjFlag::Dead)) {
-            living.push_back(u);
-        }
-    }
+    const std::vector<server::ServerObject*> living = livingUnits();
     if (living.size() < 2) {
         gather_.reset();
         return true; // (alone, or the only one alive: as the game)
     }
     const std::uint64_t now = world().ticks;
+    // The host put on it by the script a moment ago (a scene's MoveObject onto the map's way on,
+    // under black, often out of the map where nobody could walk back from): the party goes at once,
+    // as the solo game's host does.
+    if (isHostUnit(&player) && scriptMovedAt_ && now - *scriptMovedAt_ <= 2u) {
+        partyGoes(fight, nullptr, false); // (the exit's own collide asks the save)
+        return true;
+    }
     // One gathering at a time, by where it leads (a wide way is often several exits side by side);
     // another way's touch waits for it to be over or given up.
     const std::string to = destination(exit.exitMap);
@@ -92,52 +141,219 @@ bool CoopDirector::exitTouched(server::Fight& fight, server::ServerObject& exit,
         return false;
     }
     if (!gather_) {
-        gather_ = Gather{server::ObjectRef{exit.extent}, to, now, now, {}, false};
+        gather_ = Gather{};
+        gather_->exit = exit.extent;
+        gather_->to = to;
+        gather_->since = now;
         noticeAll(coopmsg::Notice::Info, nameOf(player) + " is at the way to " + exitMapName(exit.exitMap) +
                                              ". Everyone there, or the party goes in 30 seconds (the host: ?go).");
     }
     gather_->standing[server::ObjectRef{player.extent}] = now;
     gather_->lastTouch = now;
-    // Everyone alive on it now (touched this tick or the last), the time's up, or the host says go.
-    const bool all = std::ranges::all_of(living, [&](const server::ServerObject* u) {
-        const auto it = gather_->standing.find(u->extent);
-        return it != gather_->standing.end() && now - it->second <= 1u;
-    });
-    // The host put on it by the script a moment ago (a scene's MoveObject onto the map's way on,
-    // under black, often out of the map where nobody could walk back from): the party goes at once,
-    // as the solo game's host does.
-    const bool scripted = isHostUnit(&player) && scriptMovedAt_ && now - *scriptMovedAt_ <= 2u;
-    if (all || goNow_ || scripted || now - gather_->since >= 30u * 30u) {
-        scriptMovedAt_.reset();
-        gather_.reset();
-        goNow_ = false;
-        // A player still talking (frozen in it, so not on the exit) has its talk closed as an
-        // answer closes it, without the end function: on the next map nothing could close it.
-        for (server::ServerObject* u : partyUnits()) {
-            if (u->player && u->player->dialogWith != 0) {
-                world().broadcasts().push_back({{0xD0, 4}, true, u->extent});
-                u->player->dialogWith = 0;
-                server::unfreezeUnit(fight, *u, 0);
-            }
-        }
+    if (const std::pair<float, float> p{exit.x, exit.y}; std::ranges::find(gather_->at, p) == gather_->at.end()) {
+        gather_->at.push_back(p);
+    }
+    // Everyone alive at it (each touched it and hasn't walked off since: gatherTick), the time's
+    // up, or the host says go; never while the host is down or held by a script's freeze.
+    const bool all = std::ranges::all_of(living, [&](const server::ServerObject* u) { return gather_->standing.contains(u->extent); });
+    const server::ServerObject* host = server::hostPlayer(world());
+    const bool hostUp = host && !(host->flags & server::ObjFlag::Dead) && !scriptFrozen(*host);
+    if (hostUp && (all || goNow_ || now - gather_->since >= 30u * 30u)) {
+        partyGoes(fight, nullptr, false); // (the exit's own collide asks the save)
         return true;
     }
     return false;
 }
 
+bool CoopDirector::walkedOff(const server::ServerObject& unit)
+{
+    server::World& w = world();
+    if (!server::mayAct(w, unit, host_->server().clock().frame()) ||
+        (unit.flags & (server::ObjFlag::Falling | server::ObjFlag::InHole | server::ObjFlag::OnObject)) || unit.z > 0.0f) {
+        return false; // (held, or carried: where the way on took it, or will)
+    }
+    return std::ranges::none_of(gather_->at, [&](const std::pair<float, float>& p) {
+        return std::hypot(unit.x - p.first, unit.y - p.second) <= kGatherAway;
+    });
+}
+
+bool CoopDirector::mayGoThrough(const server::ServerObject& exit)
+{
+    const server::World& w = world();
+    const server::ServerObject* host = server::hostPlayer(world());
+    return !exit.gone() && !exit.pendingDelete && !server::saveBusy(w) && !(w.gameFlags & server::GameFlag::Paused) &&
+           !((exit.subclasses & 2u) && !w.warpGatesOn) && !exit.exitMap.empty() && exit.exitMap[0] != '\0' && host &&
+           !(host->flags & server::ObjFlag::Dead);
+}
+
+void CoopDirector::partyGoes(server::Fight& fight, server::ServerObject* exit, bool thaw)
+{
+    server::World& w = world();
+    scriptMovedAt_.reset();
+    scriptedExit_ = 0;
+    gather_.reset();
+    goNow_ = false;
+    std::vector<server::ObjectKey> glyphLayers;
+    for (server::ServerObject* u : partyUnits()) {
+        // A player still talking (frozen in it, so not on the exit) has its talk closed as an
+        // answer closes it, without the end function: on the next map nothing could close it.
+        if (u->player && u->player->dialogWith != 0) {
+            w.broadcasts().push_back({{0xD0, 4}, true, u->extent});
+            u->player->dialogWith = 0;
+            server::unfreezeUnit(fight, *u, 0);
+        }
+        if (thaw) {
+            server::unfreezeUnit(fight, *u, 1); // (with its creatures, as the map change thaws them)
+        }
+        if (u->player && u->player->laysGlyphs()) {
+            glyphLayers.push_back(u->extent);
+        }
+    }
+    // Each one's glyphs on the ground gone, its count of them down (exitCollide's for the one who
+    // touched; the others' would stay counted on the next map).
+    if (!glyphLayers.empty()) {
+        for (auto& [extent, o] : w.objects()) {
+            const server::ObjectKey by = o.owner;
+            if (o.typeName == "Glyph" && o.holder == 0 && !o.pendingDelete && std::ranges::find(glyphLayers, by) != glyphLayers.end()) {
+                o.pendingDelete = true;
+                if (server::ServerObject* layer = w.byExtent(by); layer && layer->player && layer->player->curTraps != 0) {
+                    --layer->player->curTraps;
+                }
+            }
+        }
+    }
+    if (exit) {
+        // (exitCollide's go in a solo game, as a co-op campaign is: the WORKING save first, the
+        // exit's map after it, at the server's tick end.)
+        w.cameByExit = true;
+        w.saveName = "WORKING";
+        server::requestSave(w, true, exit->extent, 0, fight.frame);
+    }
+}
+
+server::ServerObject* CoopDirector::exitUnder(const server::ServerObject& unit)
+{
+    // (Whether it's on or off: ExitCollide doesn't ask, nor does the contact that calls it.)
+    for (auto& [extent, o] : world().objects()) {
+        if (!(o.classes & things::ObjectClass::Exit) || o.gone() || o.pendingDelete) {
+            continue;
+        }
+        bool on = false;
+        if (o.shape == server::ShapeKind::Box) {
+            on = server::insideBox(o, o.x, o.y, unit.x, unit.y);
+        } else {
+            on = std::hypot(unit.x - o.x, unit.y - o.y) <= (o.shape == server::ShapeKind::Circle ? o.radius : 0.0f) + unit.radius;
+        }
+        if (on) {
+            return &o;
+        }
+    }
+    return nullptr;
+}
+
+void CoopDirector::readScriptTrap()
+{
+    trapAt_.reset();
+    trapExit_ = 0;
+    if (!host_) {
+        return;
+    }
+    server::World& w = world();
+    const auto trap = std::ranges::find_if(kScriptTraps, [&](const ScriptTrap& t) { return sameText(w.mapName, t.map); });
+    if (trap == std::end(kScriptTraps)) {
+        return;
+    }
+    const server::ServerWaypoint* wp = w.waypointMatching(trap->waypoint);
+    if (!wp) {
+        return;
+    }
+    // (Of the exits with its string, the nearest the waypoint: side by side, they're one way.)
+    const server::ServerObject* best = nullptr;
+    float bestD = 0.0f;
+    for (const auto& [extent, o] : w.objects()) {
+        if (!(o.classes & things::ObjectClass::Exit) || o.gone() || o.pendingDelete ||
+            !sameText(std::string_view(o.exitMap).substr(0, std::string_view(o.exitMap).find('\0')), trap->exit)) {
+            continue;
+        }
+        if (const float d = std::hypot(o.x - wp->x, o.y - wp->y); !best || d < bestD) {
+            best = &o;
+            bestD = d;
+        }
+    }
+    if (best) {
+        trapAt_ = std::pair{wp->x, wp->y};
+        trapExit_ = best->extent;
+    }
+}
+
+server::ServerObject* CoopDirector::trapExitFor(const server::ServerObject& host)
+{
+    if (!trapAt_ || !scriptFrozen(host) || std::hypot(host.x - trapAt_->first, host.y - trapAt_->second) > kTrapNear) {
+        return nullptr;
+    }
+    server::ServerObject* exit = world().byExtent(trapExit_);
+    return exit && !exit->gone() && !exit->pendingDelete ? exit : nullptr;
+}
+
 void CoopDirector::gatherTick()
 {
+    if (!host_) {
+        return;
+    }
+    server::World& w = world();
+    // An exit a script put the host on (frozen, as Wiz03A's GotoWiz03b leaves it, it never touches
+    // it), or the one a known trap's move meant (kScriptTraps): the party through it at once, thawed
+    // (the save waits for a free host).
+    if (scriptedExit_) {
+        server::ServerObject* exit = w.byExtent(scriptedExit_);
+        if (!exit || exit->gone()) {
+            scriptedExit_ = 0;
+        } else if (mayGoThrough(*exit)) {
+            server::Fight f = host_->server().fight();
+            partyGoes(f, exit, true);
+            return;
+        }
+    }
     if (!gather_) {
         goNow_ = false;
         return;
     }
-    const std::uint64_t now = world().ticks;
-    if (now - gather_->lastTouch > 60u) {
-        // (Nobody on it for two seconds: given up.)
+    const std::uint64_t now = w.ticks;
+    // Who touched it and has walked off since isn't at it any more (a touch puts it back).
+    for (auto it = gather_->standing.begin(); it != gather_->standing.end();) {
+        const server::ServerObject* u = w.byExtent(it->first);
+        if (!u || u->gone() || walkedOff(*u)) {
+            it = gather_->standing.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    const std::vector<server::ServerObject*> living = livingUnits();
+    const auto at = [&](const server::ServerObject* u) { return gather_->standing.contains(u->extent); };
+    if (std::ranges::none_of(living, at) && now - gather_->lastTouch > 60u) {
+        // (Everyone who came to it has walked off, none touching it for two seconds: given up.)
         gather_.reset();
         goNow_ = false;
         noticeAll(coopmsg::Notice::Info, "Nobody's at the way on: the party stays.");
         return;
+    }
+    // Every living player at it, the time's up, or the host's "?go": the party goes (at a solid
+    // exit, a shaft or a pit's landing nobody may be touching it just now).
+    if (!living.empty() && (std::ranges::all_of(living, at) || goNow_ || now - gather_->since >= 30u * 30u)) {
+        server::ServerObject* exit = w.byExtent(gather_->exit);
+        if (!exit || exit->gone()) {
+            gather_.reset(); // (its exit gone with the map's change of it: nothing to take)
+            goNow_ = false;
+            return;
+        }
+        // (Not while a script's freeze holds the host: its scene's end, or its move onto a way on
+        // above, decides.)
+        const server::ServerObject* host = server::hostPlayer(w);
+        if (mayGoThrough(*exit) && host && !scriptFrozen(*host)) {
+            server::Fight f = host_->server().fight();
+            partyGoes(f, exit, false);
+            return;
+        }
     }
     if (!gather_->warned && now - gather_->since >= 20u * 30u) {
         gather_->warned = true;

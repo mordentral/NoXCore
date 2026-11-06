@@ -305,6 +305,10 @@ struct PlayerControl {
     std::uint32_t weaponEquip = 0;
     std::uint32_t armorEquip = 0;
     ObjectRef currentWeapon;
+    /// (noxcpp, VD-65: the exe forgets it.) The shield a two-handed weapon took off, put back on
+    /// when a weapon that goes with a shield is next worn (Items::equipWeapon); forgotten when it
+    /// leaves the inventory, when a shield is worn, at a death and a respawn. Never saved.
+    ObjectRef shieldTakenOff;
     float armorValue = 0;
     float armorSent = 0; ///< what its client was last told (MSG_REPORT_ARMOR_VALUE)
     std::uint8_t itemBuffsSent = 0; ///< its unit's itemBuffs its client was last told

@@ -930,6 +930,31 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   wasn't checked.
 - **Ours:** the same (the exits go where their strings say).
 
+### OB-423: Wiz03A's and Wiz03C's GotoWiz03b leave the player frozen in the dark (map scripts)
+- **Where:** wiz03a.map's and wiz03c.map's GotoWiz03b (their trigger ExitTrig, near the ways back
+  to Wiz03B): Blind, 30 frames on Frozen(GetHost(), true), 60 frames on MoveObject of the host to
+  Wiz03bExitWP; nothing thaws it. On Wiz03A that waypoint is on a hidden exit to Wiz03B, but
+  ExitCollide takes only a player free to act (not frozen); on Wiz03C it's on no exit at all.
+- **Effect:** on Wiz03A a player who crosses the trigger and isn't into the cave mouth beside it
+  within a second (walking, or stopped) stands frozen on the hidden exit under black for good;
+  running on into the mouth takes it first. On Wiz03C crossing the trigger always ends that way
+  (only a load gets out).
+  Wiz03C's trigger is against the north-west wall of the cave the player comes down into, about
+  240 from where it lands and on no way anywhere (only a player pressing into that corner touches
+  it); the way back up, two exits to "Wiz03b.map:HideoutRearWP", is 130 - 190 south-west of
+  the landing. Its Wiz03bExitWP is out in the rock, no floor near it. The script is
+  Wiz03A's copied, whose waypoint is on a hidden exit going where the cave mouth beside it goes:
+  it meant the way back up to Wiz03B. (Wiz03B's GotoWiz03a has the same shape, its Wiz03aExitWP
+  on no exit, but its trigger is 150 from the floor the way in from Wiz03A reaches: out of
+  reach.)
+- **Ours:** the same in a solo game, and for a lone player in a co-op game. The co-op campaign
+  takes the party through an exit a script's move put the host on at once, thawed (VD-39), which
+  covers Wiz03A's (issue #5). Wiz03C's: with two or more alive, as the move puts the frozen host
+  at Wiz03bExitWP the party takes Wiz03C's way back up to Wiz03B (its exit to
+  "Wiz03b.map:HideoutRearWP" nearest the waypoint), thawed, as Wiz03A's goes (modes/coop's
+  kScriptTraps).
+- **Fixed** in co-op only (Wiz03C's), solo kept, 2026-11-05 by the owner's decision (VD-39).
+
 ### OB-098: Buying a stack reads the gold once (1.2b)
 - **Where:** Shop_OnBuyStack (MSG_TRADE 0x17) reads the player's gold (playerGetGold) before its
   loop and checks each item's price against that, never the gold left; playerSubGold stops at 0.

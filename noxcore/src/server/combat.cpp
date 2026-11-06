@@ -1511,6 +1511,7 @@ void Fight::playerDies(ServerObject& u)
     p.hearsOwnPhonemes = false;
     p.trapSpells = {};
     p.trapCount = 0;
+    p.shieldTakenOff = 0; // (noxcpp, VD-65: not put back after a death)
     // The mode's scoring (modes.hpp): its killer's top owner, the assist's unit. Past
     // elimination's lives its spawned things go (playerRemoveSpawnedStuff).
     scoreDeath(*this, u, const_cast<ServerObject*>(k), assist ? world.byExtent(assist) : nullptr);
@@ -1598,6 +1599,7 @@ void Fight::respawn(ServerObject& u, bool keepItems)
     p.trapSpells = {};
     p.trapCount = 0;
     p.harpoonBolt = p.harpoonTarget = 0;
+    p.shieldTakenOff = 0; // (noxcpp, VD-65)
     // Clears DEAD, SHORT, ALLOW_OVERLAP, AIRBORNE, IN_HOLE and ON_OBJECT.
     u.flags &= 0xFFEB3FE7u;
     p.previousState = p.state;

@@ -1220,12 +1220,26 @@ The engine's logic is the exe's; these are where the output differs.
     The world running meanwhile, a second level-up within another's moment (or during the host's
     award flight) gets no LevelUp effect, sound or text (its level is given).
   - The party gathers at an exit: the first player on it holds it and everyone is told; it takes the
-    party when every living player stands on it, 30 s after the first came (told at 10 s left), or
-    at the host's "?go"; nobody on it for two seconds gives it up. Exits that lead to the same map
-    are one gathering; one to another map waits till it's over. Alone, or the only one alive: as
-    the game. An exit the host lands on by a script's MoveObject (a scene's way on, often under
-    Blind and out of the map: Wiz03A's after Horvath's talk, the SEG2 switches, MapSwitch, ...)
-    takes the party at once, as the solo game's host goes.
+    party when every living player is at it, 30 s after the first came (told at 10 s left), or at
+    the host's "?go" (any time in those 30 s), never while the host is down or held by a script's
+    freeze (a scene: it goes once the scene lets the host go, or by the scene's own move onto a way
+    on, below). A player who touched it is at it till it walks off: free to walk (not held by a scene or a talk, not falling, down a
+    shaft, on a lift or in the air) and over 150 from it. So a solid cave mouth two can push at
+    once, a pit dropping the party onto the next map's way on one at a time and a lift's shaft
+    that carries each one off it all gather (issue #5). The party goes from the server's tick,
+    not only at a touch: as the exit's own touch would (its WORKING save, every talk closed, each
+    player's glyphs on the ground gone). Given up only once everyone who came to it has walked
+    off and nobody has touched it for two seconds. Exits that lead to the same map are one
+    gathering; one to another map waits till it's over. Alone, or the only one alive: as the
+    game. An exit the host lands on by a script's MoveObject (a scene's way on, often under Blind
+    and out of the map: Wiz03A's after Horvath's talk, the SEG2 switches, MapSwitch, ...) takes
+    the party at once, as the solo game's host goes; when the script froze the party first
+    (Wiz03A's GotoWiz03b: the solo game's frozen host never takes it, OB-423) the party is let go
+    of the freeze as it goes, as the map change would. A known scene whose move puts the frozen
+    host on no exit (modes/coop's kScriptTraps, by map and waypoint: Wiz03C's GotoWiz03b, its
+    Wiz03bExitWP out in the rock, OB-423) takes the party through the exit it meant the same way
+    (Wiz03C's way back up to Wiz03B, "Wiz03b.map:HideoutRearWP"), by the owner's decision of
+    2026-11-05; alone, the solo game's player stays frozen in the dark there.
   - Every player is told each other player's health as a quest's server tells its players
     (MSG_TEAM_MSG 0x0C, its share, whenever it changes): stock guests (under the quest's flags) and
     NoX Core clients draw the bar over each other player, as the quest does, while their own
@@ -1554,6 +1568,28 @@ The engine's logic is the exe's; these are where the output differs.
   commands on; the host's console gets them as before.
 - **Why:** by the owner's decision (2026-11-04).
 - **Revert:** set the options for both words; echo to the sysop only with `testCommands`.
+
+### VD-65: A shield a two-handed weapon took off goes back on with a one-handed weapon
+
+- **Vanilla:** wearing a two-handed weapon (a bow, a crossbow, the great sword, the war hammer, the
+  ogre axe, a staff) takes off the shield worn (Obj_PlayerEquipWeapon), and nothing remembers it:
+  going back to a one-handed weapon, by the swap key or from the inventory, leaves the shield in the
+  pack till the player wears it by hand (GitHub issue #8). The client's only re-equip of this kind is
+  a bow's quiver.
+- **Ours (`noxcore/src/server/items.cpp`, `Items::equipWeapon` and `putShieldBack`):** the server
+  remembers the shield a two-hander took off (`PlayerControl::shieldTakenOff`). When the player next
+  wears a weapon that goes with a shield (not a quiver, not another two-hander), it's worn again
+  through `equipArmor`, with its class and strength checks and its equip reports, so a stock
+  client's inventory shows it worn as it does a shield picked up and worn. Both swap orders do it:
+  the two-hander taken off and the one-hander worn (the swap key), or the one-hander worn straight
+  over it. It isn't put back once it has left the inventory (dropped, sold, traded, broken), once
+  a shield or armour of its kind has been worn meanwhile, or after a death or a respawn; another
+  two-hander worn in between keeps it waiting. It's kept across a map change with the shield, and
+  never saved. A NoX Core server does this for stock clients too: they're sent only the shield's
+  ordinary equip report.
+- **Why:** by the owner's decision (2026-11-05): it feels unintended. A player swapping weapons
+  lost the shield's protection without noticing.
+- **Revert:** drop the `putShieldBack` call in `equipWeapon`.
 
 ## Menus: Westwood Online (no effect on the wire)
 
