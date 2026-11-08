@@ -1180,6 +1180,10 @@ The engine's logic is the exe's; these are where the output differs.
   - One key ring: a door locked with a key takes any party member's key of its kind (used up as
     the toucher's would be); a leaving player's keys go to the host; a chapter's start takes
     every player's keys and journal entries of its kinds, as the game does the host's.
+  - A leaving guest's things leave with it, as a quest's leaver's do, never dropped as a solo
+    game's: its character (kept in the Party folder, or its own file) has them, and a drop left a
+    copy on the floor at each leave (issue #12). Its keys, War01A's sponsorship letter and the
+    Oblivion staves go to the host first (left about it with no host on its feet).
   - A spell book, ability book or field guide used up as it's picked up is put back where it lay
     (the same book) while another of the party hasn't had it yet (a spell book: is below the level
     the taker reached); a put-back spell book can't be taken by one already at that level.
@@ -1210,7 +1214,13 @@ The engine's logic is the exe's; these are where the output differs.
     guest leaving has its character kept there at once.
   - A player the campaign knows (by account and name) gets its campaign character back as it
     joins (its own file isn't asked for), and every guest gets its own after the host loads a
-    saved game (where it stood, its creatures its own again). A new player below the party's
+    saved game (where it stood, its creatures its own again). A guest the loaded save keeps no
+    character for is taken as a player joining then (issue #12, the owner's decision of
+    2026-11-07): the host's .plr's load empties every player's spells, field guide and abilities
+    (the solo game's god-mode reset, which tells no client), so it gets its level's numbers and
+    abilities from its experience, as a character's load gives them, then the catch-up below (the
+    party's lowest level, the party's book); its things, experience and health stay its own, and
+    it's put by the host. A new player below the party's
     lowest level is given the experience to it (catch-up, a level at a time), and every new player
     is given the party's book: each spell, creature and ability another player knows, at the best
     level any has it (told without sound or flight, as a character's load tells them: its book
@@ -1256,7 +1266,12 @@ The engine's logic is the exe's; these are where the output differs.
     host on no exit (modes/coop's kScriptTraps, by map and waypoint: Wiz03C's GotoWiz03b, its
     Wiz03bExitWP out in the rock, OB-423) takes the party through the exit it meant the same way
     (Wiz03C's way back up to Wiz03B, "Wiz03b.map:HideoutRearWP"), by the owner's decision of
-    2026-11-05; alone, the solo game's player stays frozen in the dark there.
+    2026-11-05; alone, the solo game's player stays frozen in the dark there. An exit touched,
+    while a script's black is up (Blind or ImmediateBlind, not yet UnBlind / ImmediateUnBlind), by
+    the player whose trigger put it up takes the party at once the same way (issue #12: War02B's
+    lift, whose trigger freezes the party and blinds it, then carries its rider down onto the way
+    out; the others, in the dark wherever they were, could never come to it, and the lift took the
+    rider back up into the freeze); another player's touch in the dark gathers as above.
   - Every player is told each other player's health as a quest's server tells its players
     (MSG_TEAM_MSG 0x0C, its share, whenever it changes): stock guests (under the quest's flags) and
     NoX Core clients draw the bar over each other player, as the quest does, while their own

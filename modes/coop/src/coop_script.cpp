@@ -31,6 +31,15 @@ server::ServerObject* CoopDirector::scriptObject(script::Vm& vm, std::int32_t va
 
 std::optional<int> CoopDirector::builtin(server::ScriptHost& script, std::uint32_t id, script::Vm& vm)
 {
+    // (The script's black and whose trigger put it up: exitTouched's. The game's own builtin runs.)
+    if (id == ids_.blind || id == ids_.immediateBlind) {
+        blind_ = true;
+        const server::ServerObject* caller = host_ && vm.caller() ? world().byExtent(vm.caller()) : nullptr;
+        blindBy_ = caller && caller->player ? caller->extent : 0;
+    } else if (id == ids_.unBlind || id == ids_.immediateUnBlind) {
+        blind_ = false;
+        blindBy_ = 0;
+    }
     if (!host_ || party_.size() < 2) {
         return std::nullopt; // (alone: the game's own)
     }

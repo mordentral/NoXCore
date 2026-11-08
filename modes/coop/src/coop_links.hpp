@@ -45,6 +45,7 @@ struct Links<coop::CoopDirector> {
         NOX_LINK(S, wipeBy_, Keep),
         NOX_LINK(S, gather_, Keep),       // (mapLoaded: none)
         NOX_LINK(S, scriptedExit_, Keep), // (mapLoaded: none)
+        NOX_LINK(S, blindBy_, Keep),      // (mapLoaded: none)
         NOX_LINK(S, trapExit_, Keep),     // (mapLoaded: the new map's, readScriptTrap)
         NOX_LINK(S, mirrorNpc_, Keep),    // (the mirrored talk's: watchDialog closes it as the talk ends)
         NOX_LINK(S, mirrorTalker_, Keep),

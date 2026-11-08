@@ -22,6 +22,7 @@
 #include <iterator>
 #include <locale>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace nox::coop {
@@ -332,6 +333,20 @@ void CoopDirector::restoreParty()
         if (restored) {
             continue; // (placed by its record)
         }
+        // None kept for it (issue #12, the owner's decision of 2026-11-07): the host's .plr's load
+        // emptied every player's book (the solo game's god-mode reset), so it's taken as a player
+        // joining now: its level's numbers and abilities from its experience (as a character's
+        // load gives them), then the late joiner's catch-up at the tick (the party's lowest level,
+        // the party's book). Its things and experience stay its own.
+        {
+            const std::uint16_t health = u->health; // (its health and mana as they were: a dead one stays down)
+            const auto mana = u->player->mana;
+            server::relevel(world(), *u);
+            u->health = std::min(health, u->maxHealth);
+            u->player->mana = std::min(mana, u->player->maxMana);
+        }
+        m.caughtUp = false;
+        m.catchUpAfterLoad = true;
         if (const server::ServerObject* h = server::hostPlayer(world())) {
             const auto [x, y] = server::clearPointNear(world(), rng_, h->x, h->y, 50.0f);
             server::setPosition(world(), *u, x, y, host_->server().clock().frame());
@@ -372,7 +387,8 @@ void CoopDirector::characterIn(server::GameHost& host, std::uint8_t peer, bool l
 void CoopDirector::catchUp(Member& m, server::ServerObject& unit)
 {
     m.caughtUp = true;
-    if (!options_.catchUp || m.restored || !unit.player) {
+    const bool afterLoad = std::exchange(m.catchUpAfterLoad, false);
+    if (!options_.catchUp || (m.restored && !afterLoad) || !unit.player) {
         return;
     }
     // The party's lowest level but this player's (the host's among them).

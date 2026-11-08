@@ -152,7 +152,8 @@ server::ServerObject* CoopDirector::sharedKey(server::Fight& fight, server::Serv
 void CoopDirector::keysToHost(server::ServerObject& unit)
 {
     // A leaving player's keys to the host (as a quest's go to the others), "GainedKey" and its
-    // sound; none to give to: left about it.
+    // sound; none to give to: left about it. The party's one-of-a-kind story things the same way
+    // (issue #12: its other things leave with it), without the key's line.
     server::ServerObject* h = server::hostPlayer(world());
     server::Fight f = host_->server().fight();
     if (!f.things) {
@@ -161,19 +162,38 @@ void CoopDirector::keysToHost(server::ServerObject& unit)
     server::Items items{world(), *f.things, f.modifiers, f.rng, f.frame};
     for (const std::uint32_t e : keysOf(unit.inventory)) {
         server::ServerObject* key = world().byExtent(e);
-        if (!key || !(key->classes & oc::Key) || key->pendingDelete) {
+        if (!key || !((key->classes & oc::Key) || isPartyUnique(*key)) || key->pendingDelete) {
             continue;
         }
+        const bool isKey = (key->classes & oc::Key) != 0;
         items.removeFromInventory(unit, *key);
         if (h && h != &unit && !(h->flags & server::ObjFlag::Dead)) {
             items.receive(*h, *key);
-            world().broadcasts().push_back({server::informStringBytes("GeneralPrint:GainedKey"), true, h->extent});
-            server::playSound(world(), 0x334, *h);
+            if (isKey) {
+                world().broadcasts().push_back({server::informStringBytes("GeneralPrint:GainedKey"), true, h->extent});
+                server::playSound(world(), 0x334, *h);
+            }
         } else {
             const auto [x, y] = server::clearPointNear(world(), rng_, unit.x, unit.y, 60.0f);
             items.place(*key, x, y);
         }
     }
+}
+
+void CoopDirector::thingsLeaveWith(server::ServerObject& unit)
+{
+    // (A quest's leaver's things are deleted with it, GameHost::leave's; a solo game's are dropped.)
+    // Its keys and the party's one-of-a-kind story things went to the host first (keysToHost).
+    for (const std::uint32_t e : keysOf(unit.inventory)) {
+        if (server::ServerObject* item = world().byExtent(e); item && !item->pendingDelete) {
+            server::deleteObject(world(), *item);
+        }
+    }
+}
+
+bool CoopDirector::isPartyUnique(const server::ServerObject& item)
+{
+    return item.typeName == "SponsorshipLetter" || item.typeName.starts_with("Oblivion");
 }
 
 void CoopDirector::keysGone(server::ServerObject& unit)
@@ -256,7 +276,7 @@ bool CoopDirector::isSharedReward(const server::ServerObject& item)
     if ((item.classes & (oc::Player | oc::Monster)) || isRewardBook(item) || item.pickup.empty()) {
         return false; // (not a thing to carry, or a book: rewardToParty's)
     }
-    if ((item.classes & oc::Key) || item.typeName == "SponsorshipLetter" || item.typeName.starts_with("Oblivion")) {
+    if ((item.classes & oc::Key) || isPartyUnique(item)) {
         return false; // (the party's one: shared by the key ring, or a later talk's, or unique)
     }
     return true;

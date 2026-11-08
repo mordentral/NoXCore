@@ -134,6 +134,18 @@ bool CoopDirector::exitTouched(server::Fight& fight, server::ServerObject& exit,
         partyGoes(fight, nullptr, false); // (the exit's own collide asks the save)
         return true;
     }
+    // A way on touched, under the script's black, by the player whose trigger put it up: the
+    // scene's way out of the map (issue #12: War02B's lift, whose trigger's ExitSewers freezes the
+    // party and blinds it, then the lift carries its rider down onto the way on; the others, in the
+    // dark wherever they were, could never come to it, and the lift takes the rider back up into the
+    // freeze again). As a script's move onto a way on: the party through it at once, thawed (the
+    // next tick's: the save waits for a free host).
+    if (blind_ && blindBy_ == player.extent) {
+        gather_.reset();
+        goNow_ = false;
+        scriptedExit_ = exit.extent;
+        return false;
+    }
     // One gathering at a time, by where it leads (a wide way is often several exits side by side);
     // another way's touch waits for it to be over or given up.
     const std::string to = destination(exit.exitMap);

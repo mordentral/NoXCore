@@ -94,6 +94,10 @@ CoopDirector::CoopDirector(Options options)
     ids_.changeGold = builtinId("ChangeGold");
     ids_.getGold = builtinId("GetGold");
     ids_.pickup = builtinId("Pickup");
+    ids_.blind = builtinId("Blind");
+    ids_.unBlind = builtinId("UnBlind");
+    ids_.immediateBlind = builtinId("ImmediateBlind");
+    ids_.immediateUnBlind = builtinId("ImmediateUnBlind");
 }
 
 std::filesystem::path CoopDirector::configure(server::GameHost::Options& o)
@@ -275,13 +279,17 @@ void CoopDirector::leaving(server::GameHost& host, std::uint8_t peer, server::Se
         const util::RoundingScope rounding(host.server().exactMaths());
         world().script->runEntryPoints("PlayerDeath");
     }
-    // Its keys to the host (the party's doors), then its campaign character kept (WORKING's Party):
-    // back to it if it comes again (the next save takes it along).
+    // Its keys to the host (the party's doors; the party's one-of-a-kind story things too), then its
+    // campaign character kept (WORKING's Party): back to it if it comes again (the next save takes it
+    // along). What else it carries leaves with it, as a quest's leaver's does (issue #12): the game's
+    // drop of a solo game's leaver would leave a copy of its things on the floor beside the
+    // character it takes along (its kept one, or its own file).
     if (const auto it = std::ranges::find_if(party_, [&](const Member& x) { return x.peer == peer; }); it != party_.end() && !it->host) {
         keysToHost(unit);
         if (!keepGuest(*it, unit).empty()) {
             writeRecords();
         }
+        thingsLeaveWith(unit);
     }
     std::erase_if(party_, [&](const Member& x) { return x.peer == peer; });
     std::erase_if(toldAt_, [&](const auto& t) { return t.first.first == unit.extent; });
@@ -354,6 +362,8 @@ void CoopDirector::mapLoaded(server::Server& server)
     goNow_ = false;
     scriptMovedAt_.reset();
     scriptedExit_ = 0;
+    blind_ = false;
+    blindBy_ = 0;
     readPristine(server);
     readScriptTrap();
     // The new map's monsters by the party's size.
@@ -412,12 +422,13 @@ void CoopDirector::tick(server::GameHost& host, std::uint32_t nowMs)
     for (const std::uint8_t peer : otherClass) {
         host.kickPeer(peer); // (leaving: party_ changes)
     }
-    // A new player behind the party caught up, once its own character is in (or none came: 10 s).
+    // A new player behind the party caught up, once its own character is in (or none came: 10 s);
+    // one a saved game's load kept no character for, as the load's map runs.
     for (Member& m : party_) {
         if (m.host || !m.welcomed || m.caughtUp) {
             continue;
         }
-        if (m.characterIn || m.restored || world().ticks - m.welcomedAt > 10u * 30u) {
+        if (m.characterIn || m.restored || m.catchUpAfterLoad || world().ticks - m.welcomedAt > 10u * 30u) {
             if (server::ServerObject* u = host.unitOf(m.peer); u && u->player) {
                 catchUp(m, *u);
             }

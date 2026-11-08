@@ -257,7 +257,7 @@ public:
     // saved game's load; a new one behind the party is caught up; each save sends a NoX Core
     // guest its campaign character to keep.
     /// The host's client's saved game's load (CineRelay::gameLoaded): the party taken from it as
-    /// its map comes in.
+    /// its map comes in (restoreParty).
     void gameLoaded();
     /// A player's own character loaded from its file (GameHost::Options::onCharacter).
     void characterIn(server::GameHost& host, std::uint8_t peer, bool loaded);
@@ -299,6 +299,8 @@ public:
         bool restored = false; ///< its campaign character given back (a returning player)
         bool characterIn = false; ///< its own character loaded from its file
         bool caughtUp = false;    ///< its catch-up looked at
+        /// A saved game's load kept no character for it: caught up as a late joiner (restoreParty).
+        bool catchUpAfterLoad = false;
         std::uint64_t welcomedAt = 0; ///< (the world's ticks)
         /// Its character of another class than the campaign's: told so at these ticks, let go 3 s
         /// on (0: not).
@@ -324,6 +326,10 @@ private:
         std::uint32_t changeGold = 0;
         std::uint32_t getGold = 0;
         std::uint32_t pickup = 0;
+        std::uint32_t blind = 0;
+        std::uint32_t unBlind = 0;
+        std::uint32_t immediateBlind = 0;
+        std::uint32_t immediateUnBlind = 0;
     };
 
     server::World& world();
@@ -458,8 +464,14 @@ private:
     void rescale(bool force);
     /// Every monster's health at `health` times its own (1: the game's own, as a save writes them).
     void applyScale(float health);
-    /// A leaving player's keys to the host.
+    /// A leaving player's keys and the party's one-of-a-kind story things to the host.
     void keysToHost(server::ServerObject& unit);
+    /// A leaving guest's other things gone with it (its character, kept or its own, has them):
+    /// none left on the floor (issue #12).
+    void thingsLeaveWith(server::ServerObject& unit);
+    /// A one-of-a-kind story thing the party keeps single (War01A's sponsorship letter, the Oblivion
+    /// staves).
+    static bool isPartyUnique(const server::ServerObject& item);
     /// A guest's keys gone at a chapter's start (StartupScreen's, the host's done by the game).
     void keysGone(server::ServerObject& unit);
     struct Base {
@@ -556,6 +568,11 @@ private:
     bool goNow_ = false;                  ///< the host's "?go" (the next tick takes the party)
     std::optional<std::uint64_t> scriptMovedAt_; ///< the world's ticks of a script's last MoveObject of the party
     server::ObjectRef scriptedExit_;      ///< an exit a script's MoveObject put the host on (the next tick takes the party)
+    /// The script's black is up (Blind or ImmediateBlind, not yet UnBlind / ImmediateUnBlind, this
+    /// map), and the player whose trigger called it (its call's caller; none: a timer's or the
+    /// map's). A way on that player touches meanwhile is the scene's way out (exitTouched).
+    bool blind_ = false;
+    server::ObjectRef blindBy_;
     std::optional<std::pair<float, float>> trapAt_; ///< this map's script trap's waypoint (readScriptTrap)
     server::ObjectRef trapExit_;          ///< the exit it meant
     std::map<std::uint8_t, std::uint64_t> downs_; ///< a dead player's peer -> the tick it's back
