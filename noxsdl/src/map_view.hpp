@@ -14,9 +14,9 @@
 // tile + edge stack once into a texture.
 //
 // Walls (drawWalls) sit on the 23-unit wall grid. The sprite is the WALL entry's
-// image[slot][direction][variant] (slot 0 unless the wall is in front of the player or flagged
-// 8), drawn with the image's own offset at (23x - 50 + dx, 23y - 72 - dy), where (dx, dy) is
-// the image's thing.bin offset.
+// image[slot][direction][variant] (slot 0; +1 for a wall in front of the player, +2 for one that
+// can be broken, flag 8: wall_slot.hpp), drawn with the image's own offset at
+// (23x - 50 + dx, 23y - 72 - dy), where (dx, dy) is the image's thing.bin offset.
 //
 // Objects (the map's top-level ObjectData records) draw a still of their type (see thing_art.hpp),
 // or its animation for AnimateDraw types (flames, torches).
@@ -518,6 +518,7 @@ private:
     std::unordered_map<std::uint16_t, std::size_t> wallByKey_; ///< walls_ by wallKey (the last there), with them
     std::vector<nox::map::Wall> mapWalls_;  ///< as the map places them
     std::vector<std::uint16_t> breakable_;  ///< DestructableWalls cells (wallKey), by wall id
+    std::set<std::uint16_t> breakableStanding_; ///< breakable_'s cells whose map wall stands (setWallState)
     std::vector<std::pair<std::uint16_t, bool>> secret_; ///< SecretWalls cells and "starts open", by id
     std::set<std::uint16_t> windows_;
     std::vector<Object> objects_;

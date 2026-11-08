@@ -6,6 +6,7 @@
 #include "effects.hpp"
 #include "effects_draw.hpp"
 #include "player_art.hpp"
+#include "wall_slot.hpp"
 
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/util/random.hpp"
@@ -953,8 +954,8 @@ void View3D::addWallFace(const Sprite& s, float sx0, float sy0, float ax, float 
 
 const nox::things::WallImage* View3D::wallImage(const Frame& f, const nox::map::Wall& w)
 {
-    // As drawScene picks it: the windowed pieces for window walls; the back image always (there's
-    // no front in 3D).
+    // As drawScene picks it: the windowed pieces for window walls, the cracked one for a wall that
+    // can be broken; the back image always (there's no front in 3D).
     const auto& walls = f.view.things_.walls;
     if (w.material >= walls.size()) {
         return nullptr;
@@ -971,7 +972,8 @@ const nox::things::WallImage* View3D::wallImage(const Frame& f, const nox::map::
     if (dir >= dirs.size() || variant >= dirs[dir].size()) {
         return nullptr;
     }
-    return &dirs[dir][variant][0];
+    const auto& slots = dirs[dir][variant];
+    return &slots[wallSlot(slots, false, f.view.breakableStanding_.contains(MapView::wallKey(w.x, w.y)))];
 }
 
 const Sprite* View3D::wallSprite(const Frame& f, const nox::map::Wall& w,

@@ -981,10 +981,8 @@ void Menus::startLogin()
         dialog(title, gui_.text("Wolreg.c:ErrNickFirstLetter"), 1, {});
         return;
     }
-    if (typed.empty()) {
-        dialog(title, gui_.text("Wolreg.c:ErrPasswordLength"), 1, {});
-        return;
-    }
+    // No password is allowed, as in the game: WOLAPI encodes the empty one like any other
+    // ("aaaaaaaa"), the account XWIS made for a login without one.
     // A password filled in from the saved login is already encoded; anything typed isn't.
     const auto& picked = logins_[static_cast<std::size_t>(loginSlot_)];
     const bool savedPassword = !picked.password.empty() && typed == picked.password && nick == picked.nick;

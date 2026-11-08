@@ -7,6 +7,7 @@
 
 #include "pending_look.hpp"
 #include "player_art.hpp"
+#include "wall_slot.hpp"
 
 #include "noxcore/audio/sound_names.hpp"
 #include "noxcore/io/byte_reader.hpp"
@@ -698,6 +699,14 @@ void MapView::setWallState(const std::set<std::uint16_t>& destroyed, const std::
         w.y = static_cast<std::uint8_t>(cell.second);
         walls_.push_back(w);
     }
+    // The breakable walls still standing as the map has them (a Wall-spell wall raised in a broken
+    // one's cell is a new wall: not breakable).
+    breakableStanding_.clear();
+    for (const auto key : breakable_) {
+        if (!gone.contains(key) && !raised.contains(key)) {
+            breakableStanding_.insert(key);
+        }
+    }
     wallByKey_.clear();
     for (std::size_t i = 0; i < walls_.size(); ++i) {
         wallByKey_[wallKey(walls_[i].x, walls_[i].y)] = i; // (a later wall in a cell over an earlier)
@@ -1256,8 +1265,9 @@ void MapView::drawScene(SDL_Renderer* renderer, const Camera& camera, SpriteCach
         // drawWalls) at half alpha, so what's behind it shows (TranslucentFrontWalls, always on
         // here), unless its kind is see-through already (WALL flag 4: fences, cages).
         const bool translucent = front && !(things_.walls[w.material].flags & 4);
-        const auto& slots = *images;
-        const auto& image = front && slots[1].image.index >= 0 ? slots[1] : slots[0];
+        // A wall that can be broken draws its cracked images (slots 2 and 3: wall flag 8).
+        const bool breakable = !pending && breakableStanding_.contains(wallKey(w.x, w.y));
+        const auto& image = (*images)[wallSlot(*images, front, breakable)];
         if (prepare) {
             sprites.get(image.image);
             return;

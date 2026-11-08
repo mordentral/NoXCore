@@ -1082,7 +1082,9 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
             return false;
         }
         for (const char16_t c : nox::strings::fromUtf8(event.text.text)) {
-            if (c >= 0x20 && focus_->entry.size() < focus_->entryMax) {  // printable characters only, up to the field's limit
+            // Printable characters only, one fewer than the field's limit as the game's edit box
+            // (its last place is the terminator: 8 for the login's 9, 9 for the nick's 10).
+            if (c >= 0x20 && focus_->entry.size() + 1 < focus_->entryMax) {
                 focus_->entry.push_back(c);
             }
         }

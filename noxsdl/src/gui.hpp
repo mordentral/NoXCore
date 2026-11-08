@@ -166,7 +166,8 @@ public:
     int thumbLength = 10;
     // Progress bars: 0-100 (message 0x4020).
     int progress = 0;
-    // Entry fields: the typed text, at most `entryMax` characters (the DATA's maxLength).
+    // Entry fields: the text, at most `entryMax` characters (the DATA's maxLength); typing stops one
+    // short of it, as in the game.
     std::u16string entry;
     std::size_t entryMax = 256;
     /// What the exe keeps in a widget's data word for windows it draws itself (SelColor's
