@@ -1010,6 +1010,8 @@ void Cinematics::drawBriefing(SDL_Renderer* renderer, int width, int height)
     const int chapterLineHeight = p.fontHeight(true); // blank lines position the chapter labels
     if (brief_.chapter == 0xFF) {
         p.setHdFontScale(1.35f);
+    } else if (brief_.chapter < 0xFE && brief_.variant == 1) {
+        p.setHdFontScale(1.275f);
     } else if (brief_.questMode == 0 || brief_.questMode == 2) {
         p.setHdFontScale(1.5f);
     }
