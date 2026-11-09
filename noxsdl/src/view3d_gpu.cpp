@@ -49,7 +49,7 @@ std::unique_ptr<DepthPass> DepthPass::create(SDL_Renderer* renderer)
         SDL_GPUShaderCreateInfo info{};
         info.code = code.code;
         info.code_size = code.size;
-        info.entrypoint = "main";
+        info.entrypoint = code.entrypoint;
         info.format = format;
         info.stage = stage;
         info.num_samplers = samplers;

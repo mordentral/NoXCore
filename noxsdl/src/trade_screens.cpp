@@ -794,6 +794,16 @@ void TradeScreens::askAmount(const std::string& label, std::uint16_t typeId, con
     openAmount(label, gui_.layoutPoint(at.x, at.y, w, h), std::move(a));
 }
 
+SDL_FPoint TradeScreens::pointer() const
+{
+    if (actions_.pointer) {
+        return actions_.pointer();
+    }
+    SDL_FPoint m{};
+    SDL_GetMouseState(&m.x, &m.y);
+    return m;
+}
+
 void TradeScreens::closeAmount()
 {
     amount_.reset();
@@ -919,8 +929,7 @@ void TradeScreens::update(const nox::client::World& world, std::uint64_t nowMs, 
                 };
                 a.no = [this] { shop_.sellBoxOpen = false; };
                 shop_.sellBoxOpen = true;
-                SDL_FPoint m{};
-                SDL_GetMouseState(&m.x, &m.y);
+                const SDL_FPoint m = pointer();
                 openAmount(text("SellLabel", "GUIShop.c"), gui_.layoutPoint(m.x, m.y, w, h), std::move(a));
             }
         }
@@ -945,8 +954,7 @@ void TradeScreens::update(const nox::client::World& world, std::uint64_t nowMs, 
                     };
                     a.no = [this] { shop_.repairBoxOpen = false; };
                     shop_.repairBoxOpen = true;
-                    SDL_FPoint m{};
-                    SDL_GetMouseState(&m.x, &m.y);
+                    const SDL_FPoint m = pointer();
                     openAmount(text("RepairLabel", "GUIShop.c"), gui_.layoutPoint(m.x, m.y, w, h), std::move(a));
                 } else {
                     notEnoughGold(t.repairOffer->second - gold_);
@@ -1135,8 +1143,7 @@ bool TradeScreens::handleEvent(const SDL_Event& event, const nox::client::World&
             return true;
         }
         if (event.type == SDL_EVENT_MOUSE_WHEEL) {
-            SDL_FPoint m{};
-            SDL_GetMouseState(&m.x, &m.y);
+            const SDL_FPoint m = pointer();
             const SDL_FPoint l = gui_.layoutPoint(m.x, m.y, w, h);
             const int dir = event.wheel.y > 0 ? -1 : event.wheel.y < 0 ? 1 : 0;  // wheel up scrolls up (negative step)
             if (shop_.open && shop_.mode == 2 && inRect(l, rectOf(shop_.window))) {

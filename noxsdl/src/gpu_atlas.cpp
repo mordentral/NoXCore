@@ -18,8 +18,7 @@ constexpr int kLabelDemandPageSide = 1024; // 1 MB
 constexpr int kBlock = 4;            // BC7's block side
 constexpr int kBlockBytes = 16;
 constexpr int kGutter = 4;           // one clear block
-constexpr std::uint32_t kRowPitch = 256;   // Direct3D 12's texture row pitch alignment
-constexpr std::uint32_t kPlacement = 512;  // and its upload placement alignment
+constexpr std::uint32_t kPlacement = 512;  // Direct3D 12's upload placement alignment (rows: rowPitch_)
 // Staged uploads go up once they reach this, whatever else comes (so the transfer buffer stays
 // this size, plus one big image at most).
 constexpr std::size_t kFlushAt = std::size_t{16} << 20;
@@ -40,7 +39,7 @@ constexpr std::uint32_t roundUp(std::uint32_t v, std::uint32_t to)
 
 } // namespace
 
-std::unique_ptr<GpuAtlas> GpuAtlas::create(SDL_Renderer* renderer, SDL_GPUShader* labelShader)
+std::unique_ptr<GpuAtlas> GpuAtlas::create(SDL_Renderer* renderer, SDL_GPUShader* labelShader, std::uint32_t rowPitch)
 {
     SDL_GPUDevice* device = SDL_GetGPURendererDevice(renderer);
     if (!device) {
@@ -54,6 +53,7 @@ std::unique_ptr<GpuAtlas> GpuAtlas::create(SDL_Renderer* renderer, SDL_GPUShader
     std::unique_ptr<GpuAtlas> out(new GpuAtlas);
     out->renderer_ = renderer;
     out->device_ = device;
+    out->rowPitch_ = std::max<std::uint32_t>(rowPitch, 1);
     out->labelShader_ = labelShader;
     SDL_GPUSamplerCreateInfo sampler{};
     sampler.min_filter = SDL_GPU_FILTER_NEAREST;
@@ -232,7 +232,7 @@ void GpuAtlas::stage(const Page& page, const Level& level, SDL_Point at)
         const int ph = roundUp(level.height, kBlock);
         const int bw = pw / kBlock + 2;
         const int bh = ph / kBlock + 2;
-        const std::uint32_t pitch = roundUp(static_cast<std::uint32_t>(bw * kBlockBytes), kRowPitch);
+        const std::uint32_t pitch = rowpitch::padded(static_cast<std::uint32_t>(bw * kBlockBytes), rowPitch_);
         staging_.resize(offset + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(bh));
         std::uint8_t* out = staging_.data() + offset;
         const std::size_t rowBytes = static_cast<std::size_t>(pw / kBlock) * kBlockBytes;
@@ -254,7 +254,7 @@ void GpuAtlas::stage(const Page& page, const Level& level, SDL_Point at)
         u.w = bw * kBlock;
         u.h = bh * kBlock;
     } else {
-        const std::uint32_t pitch = roundUp(static_cast<std::uint32_t>(level.width), kRowPitch);
+        const std::uint32_t pitch = rowpitch::padded(static_cast<std::uint32_t>(level.width), rowPitch_);
         staging_.resize(offset + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(level.height));
         for (int r = 0; r < level.height; ++r) {
             std::memcpy(staging_.data() + offset + static_cast<std::size_t>(r) * pitch,

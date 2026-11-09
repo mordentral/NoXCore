@@ -50,6 +50,7 @@
 #include "new_game.hpp"
 #include "predicted_drop.hpp"
 #include "snapshot_pacing.hpp"
+#include "window_density.hpp"
 #if NOX_PRIVATE_TOOLS
 #include "dev_hooks.hpp"
 #endif
@@ -2872,8 +2873,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         app->editor->handleEvent(*event);
         return SDL_APP_CONTINUE;
     }
-    // In a letterboxed game the mouse is in the game's area: its coordinates from there.
-    if (app->letterboxed) {
+    // The mouse in the game's output pixels (a letterboxed game's from its area's corner).
+    if (mapsPointer(*app)) {
         switch (event->type) {
         case SDL_EVENT_MOUSE_MOTION:
             intoGameArea(*app, event->motion.x, event->motion.y);
@@ -3282,6 +3283,9 @@ bool windowHasMouse(const App& app)
 /// letterboxed to its resolution's shape (gameArea); a game's zoom fixed by its Options.
 void layoutView(App& app, bool embedded)
 {
+    // (SDL's mouse is in window points, the view in output pixels: pointer_map.hpp,
+    // window_density.hpp. The editor lays its Map panel out in points.)
+    app.pixelDensity = embedded ? 1.0f : windowPixelDensity(app.window);
     if (embedded) {
         playTestLayout(app); // (the game's area in the editor's Map panel)
     } else {

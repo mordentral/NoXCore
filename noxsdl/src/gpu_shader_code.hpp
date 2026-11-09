@@ -24,6 +24,9 @@ enum class ShaderId {
 struct ShaderCode {
     const unsigned char* code = nullptr;
     std::size_t size = 0;
+    /// Its entry point: "main" for ours; a format whose compiler names it otherwise (one a build
+    /// adds of its own) says so here, and every caller passes it on.
+    const char* entrypoint = "main";
 };
 
 /// The format of ours that `device` takes: DXIL when it takes DXIL and the build has it, else

@@ -2,6 +2,8 @@
 // string table's texts, the centred messages, the game's flags as the client reads them.
 #include "app.hpp"
 
+#include "pointer_map.hpp"
+
 #include "noxcore/client/inform_text.hpp"
 #include "noxcore/server/solo.hpp"
 #include "noxcore/util/random.hpp"
@@ -18,12 +20,18 @@ namespace fs = std::filesystem;
 
 namespace noxsdl {
 
-/// A window point in the game's area (letterboxed: from its corner, the bars aside), kept on it as
-/// the game kept the mouse on its screen.
+bool mapsPointer(const App& app)
+{
+    return pointermap::needed(app.pixelDensity, app.letterboxed);
+}
+
+/// A window point in the game's output pixels (pointer_map.hpp: times the pixel density), and
+/// letterboxed in the game's area (from its corner, the bars aside), kept on it as the game kept
+/// the mouse on its screen.
 void intoGameArea(const App& app, float& x, float& y)
 {
-    x = std::clamp(x - app.gameArea.x, 0.0f, std::max(app.gameArea.w - 1, 0.0f));
-    y = std::clamp(y - app.gameArea.y, 0.0f, std::max(app.gameArea.h - 1, 0.0f));
+    pointermap::toGame(x, y, app.pixelDensity,
+                       pointermap::Area{app.gameArea.x, app.gameArea.y, app.gameArea.w, app.gameArea.h}, app.letterboxed);
 }
 
 /// The mouse in window pixels (or --mouse's point).
@@ -35,9 +43,7 @@ SDL_FPoint mousePos(const App& app)
     SDL_FPoint m{};
 #if NOX_PRIVATE_TOOLS
     if (devhooks::pointer(m.x, m.y)) { // (a recorded walkthrough's pointer: the desktop's mouse left alone)
-        if (app.letterboxed) {
-            intoGameArea(app, m.x, m.y);
-        }
+        intoGameArea(app, m.x, m.y);
         return m;
     }
 #endif
@@ -56,9 +62,7 @@ SDL_FPoint mousePos(const App& app)
         SDL_GetMouseState(&m.x, &m.y);
         break;
     }
-    if (app.letterboxed) {
-        intoGameArea(app, m.x, m.y);
-    }
+    intoGameArea(app, m.x, m.y);
     return m;
 }
 

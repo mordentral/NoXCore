@@ -13,13 +13,16 @@
 // take their extra textures when they're made).
 //
 // Uploads are staged on the CPU and go up together in one copy pass a flush, each row padded to
-// Direct3D 12's 256-byte pitch and each region to its 512-byte placement, so SDL never copies them
-// again. A flush is its own command buffer, submitted before the renderer's frame (at present),
-// so the GPU has the pixels before anything drawn from them.
+// the atlas's row pitch (Direct3D 12's 256 bytes unless create is told otherwise) and each region
+// to its 512-byte placement, so SDL never copies them again. A flush is its own command buffer,
+// submitted before the renderer's frame (at present), so the GPU has the pixels before anything
+// drawn from them.
 //
 // Pages are filled in pools (the session's, the map's, the rest), so a page holds images that go
 // together; a page is let go whole (SpriteCache decides which). Render thread only.
 #pragma once
+
+#include "gpu_row_pitch.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -41,13 +44,20 @@ public:
     enum class Pool : std::uint8_t { Session, Map, Demand };
     static constexpr int kPools = 3;
 
+    /// The row pitch staged uploads are padded to by default (gpu_row_pitch.hpp).
+    static constexpr std::uint32_t kDefaultRowPitch = rowpitch::kDefault;
+
     /// The atlas on the renderer's GPU device, or nullptr: not the GPU renderer, or its device
     /// can't sample BC7 (logged). `labelShader`: the material shader that takes the material
-    /// bytes as a second texture (nullptr: no Labels pages).
-    static std::unique_ptr<GpuAtlas> create(SDL_Renderer* renderer, SDL_GPUShader* labelShader);
+    /// bytes as a second texture (nullptr: no Labels pages). `rowPitch`: what each staged row is
+    /// padded to, in bytes (1: rows packed tight, for a backend whose upload reads them so).
+    static std::unique_ptr<GpuAtlas> create(SDL_Renderer* renderer, SDL_GPUShader* labelShader,
+                                            std::uint32_t rowPitch = kDefaultRowPitch);
     ~GpuAtlas();
     /// Whether it makes Labels pages (a material shader to read them).
     bool takesLabels() const { return labelShader_ != nullptr; }
+    /// The row pitch it was made with.
+    std::uint32_t rowPitch() const { return rowPitch_; }
     GpuAtlas(const GpuAtlas&) = delete;
     GpuAtlas& operator=(const GpuAtlas&) = delete;
 
@@ -148,6 +158,7 @@ private:
 
     SDL_Renderer* renderer_ = nullptr;
     SDL_GPUDevice* device_ = nullptr;
+    std::uint32_t rowPitch_ = kDefaultRowPitch;
     SDL_GPUShader* labelShader_ = nullptr;
     SDL_GPUSampler* nearest_ = nullptr;
     std::vector<Page> pages_;

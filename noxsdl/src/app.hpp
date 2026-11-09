@@ -443,7 +443,11 @@ struct App {
     /// window in the menus (they centre their own layout).
     SDL_FRect gameArea{0, 0, 0, 0};
     bool letterboxed = false; ///< gameArea is less than the window
-    NetStat netStat;                ///< F10 (ToggleNetstat)
+    /// The window's output pixels to a point of SDL's mouse coordinates (pointer_map.hpp,
+    /// window_density.hpp): 1 unless the window was made with SDL_WINDOW_HIGH_PIXEL_DENSITY (not
+    /// noxsdl's) on a display with more pixels than points; the editor's Map panel keeps 1.
+    float pixelDensity = 1.0f;
+    NetStat netStat;               ///< F10 (ToggleNetstat)
     std::unique_ptr<ItemNames> itemNames; ///< items' tooltip names (ToolTip.c)
     /// The tooltip (cursorSetTooltip, drawn by client_drawCursorAndTooltips): this frame's text, and
     /// how many frames (30 a second) the mouse has kept still, under 2 pixels
@@ -745,6 +749,8 @@ inline bool playing(const nox::client::HeadlessClient& client)
 }
 
 // app.cpp
+/// Whether intoGameArea changes a window point (letterboxed, or the pixel density over 1).
+bool mapsPointer(const App& app);
 void intoGameArea(const App& app, float& x, float& y);
 SDL_FPoint mousePos(const App& app);
 std::optional<std::string> tableText(const App& app, std::string_view id);

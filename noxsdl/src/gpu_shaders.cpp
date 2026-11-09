@@ -17,7 +17,7 @@ bool GpuShaders::add(SDL_Renderer* renderer, const char* name, ShaderId id, std:
     SDL_GPUShaderCreateInfo info{};
     info.code = code.code;
     info.code_size = code.size;
-    info.entrypoint = "main";
+    info.entrypoint = code.entrypoint;
     info.format = format_;
     info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     info.num_samplers = 1; // the texture SDL binds for every textured draw
@@ -83,7 +83,7 @@ std::unique_ptr<GpuShaders> GpuShaders::create(SDL_Renderer* renderer)
     SDL_GPUShaderCreateInfo split{};
     split.code = splitCode.code;
     split.code_size = splitCode.size;
-    split.entrypoint = "main";
+    split.entrypoint = splitCode.entrypoint;
     split.format = format;
     split.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     split.num_samplers = 2; // the BC7 page SDL binds, the material page

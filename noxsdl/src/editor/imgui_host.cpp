@@ -3,6 +3,7 @@
 #include "editor/imgui_host.hpp"
 #include "editor/panel_textures.hpp"
 #include "editor/theme_colours.hpp"
+#include "window_density.hpp"
 
 #include "noxcore/io/file.hpp"
 #include "noxcore/io/png.hpp"
@@ -122,6 +123,37 @@ void showWindow(ImGuiViewport* viewport)
     }
     if (g_showWindow) g_showWindow(viewport);
 }
+
+/// While it lives, the renderer's scale is the draw data's framebuffer scale, then it's put back.
+/// ImGui lays out in window points and imgui_impl_sdlrenderer3 passes the vertex positions to
+/// SDL as they are (it scales only the clip rectangles, and those only at a render scale of 1),
+/// so on a window with more pixels than points SDL scales both. Only for a window whose pixel
+/// density counts (window_density.hpp: made with SDL_WINDOW_HIGH_PIXEL_DENSITY) and a scale
+/// other than 1: noxsdl's windows aren't, so here it does nothing.
+class FramebufferScaleScope {
+public:
+    FramebufferScaleScope(SDL_Renderer* renderer, SDL_Window* window, const ImDrawData* data)
+        : renderer_(data && windowPixelDensity(window) != 1.0f &&
+                            (data->FramebufferScale.x != 1.0f || data->FramebufferScale.y != 1.0f)
+                        ? renderer
+                        : nullptr)
+    {
+        if (!renderer_) return;
+        SDL_GetRenderScale(renderer_, &oldX_, &oldY_);
+        SDL_SetRenderScale(renderer_, data->FramebufferScale.x, data->FramebufferScale.y);
+    }
+    ~FramebufferScaleScope()
+    {
+        if (renderer_) SDL_SetRenderScale(renderer_, oldX_, oldY_);
+    }
+    FramebufferScaleScope(const FramebufferScaleScope&) = delete;
+    FramebufferScaleScope& operator=(const FramebufferScaleScope&) = delete;
+
+private:
+    SDL_Renderer* renderer_;
+    float oldX_ = 1.0f;
+    float oldY_ = 1.0f;
+};
 
 /// The draw data moved to its window's own coordinates: with multi-viewports ImGui draws in the
 /// desktop's, each viewport's DisplayPos its window's top left; imgui_impl_sdlrenderer3 passes
@@ -593,7 +625,10 @@ void ImGuiHost::renderViewport(ImGuiViewport* viewport)
         SDL_RenderClear(r);
     }
     toWindowCoordinates(viewport->DrawData);
-    drawData(viewport->DrawData, r);
+    {
+        const FramebufferScaleScope pixels(r, sdlWindowOf(viewport), viewport->DrawData);
+        drawData(viewport->DrawData, r);
+    }
     if (!shootBase_.empty()) saveShot(r);
 }
 
@@ -745,7 +780,11 @@ void ImGuiHost::drawData(ImDrawData* data, SDL_Renderer* renderer)
 
 void ImGuiHost::refreshDpi()
 {
-    const float s = SDL_GetWindowDisplayScale(window_);
+    // The display scale less the window's pixel density: the layout is in window points, and the
+    // density is the framebuffer scale's (FramebufferScaleScope), so it isn't counted twice. The
+    // density is 1 unless the window was made with SDL_WINDOW_HIGH_PIXEL_DENSITY (window_density.hpp:
+    // not noxsdl's), so here it's the display scale as it was.
+    const float s = SDL_GetWindowDisplayScale(window_) / windowPixelDensity(window_);
     dpi_ = s > 0 ? std::clamp(s, 0.5f, 4.0f) : 1.0f;
 }
 
@@ -909,7 +948,10 @@ void ImGuiHost::render()
     ImGui::Render();
     syncTextures(); // (before the backend below acts on the textures' status)
     toWindowCoordinates(ImGui::GetDrawData());
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer_);
+    {
+        const FramebufferScaleScope pixels(renderer_, window_, ImGui::GetDrawData());
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer_);
+    }
     // The floating windows: made, moved or closed to match the panels, then drawn and presented.
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();

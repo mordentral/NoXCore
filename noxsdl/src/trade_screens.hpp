@@ -78,6 +78,9 @@ public:
         std::function<void(const std::string&)> centredMessage;
         /// MSG_INFO_BOOK_DATA for a book's tooltip (HeadlessClient::askBook).
         std::function<void(std::uint16_t, std::uint8_t)> askBook;
+        /// The pointer where the game has it, in the same pixels as its events (mousePos); unset,
+        /// SDL's mouse as it is.
+        std::function<SDL_FPoint()> pointer;
     };
 
     TradeScreens(gui::Resources res, std::filesystem::path windowDir, Inventory& inventory, ItemNames& names,
@@ -109,6 +112,9 @@ public:
                    SDL_FPoint at, int w, int h, std::function<void(int)> yes);
 
 private:
+    /// Actions::pointer's point.
+    SDL_FPoint pointer() const;
+
     struct StockSlot {
         std::uint16_t typeId = 0;
         std::array<std::uint8_t, 4> modifiers{0xFF, 0xFF, 0xFF, 0xFF};
