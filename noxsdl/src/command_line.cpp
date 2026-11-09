@@ -233,7 +233,7 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             opts.predictMovement = a == "--predict-movement"; // our own movement predicted (an experiment)
         } else if (a == "--smoothing") {
             const std::string_view v = next(); // Options' Smoothing for this run
-            opts.smoothing = v == "network" ? 2 : v == "movement" ? 1 : v == "lock30" ? 3 : 0;
+            opts.smoothing = v == "network" ? 2 : v == "movement" ? 1 : v == "lock30" ? 3 : v == "server" ? 4 : 0;
         } else if (a == "--display") {
             const std::string_view v = next(); // Options' Display for this run
             opts.display = v == "fullscreen" ? 2 : v == "borderless" ? 1 : 0;

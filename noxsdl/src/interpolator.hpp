@@ -31,6 +31,7 @@
 //                     about half a server frame behind on average, never past where the server
 //                     put it (a late snapshot holds, a teleport snaps);
 //   Smooth Network    (the default) everything drawn on the clock above, between snapshots.
+//   Match Server      Off, with frames drawn as each snapshot comes, including movement substeps.
 // With
 // --predict-movement (an experiment) our own player and the camera come from the MovePredictor
 // instead: ahead of the server, not behind it.

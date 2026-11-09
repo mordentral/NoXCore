@@ -23,7 +23,7 @@
 //                         effects, HD spell effects, HD images, the kill feed, Windows' mouse
 //                         acceleration and VSync (Extras), in the panel's own checkbox style; the mouse's speed, a
 //                         slider; then two drop-downs: Smoothing (Off / Smooth Movement / Smooth
-//                         Network / Lock to 30 FPS) and Display (Windowed / Fullscreen Windowed /
+//                         Network / Lock to 30 FPS / Match Server) and Display (Windowed / Fullscreen Windowed /
 //                         Fullscreen); and on More, Weather Effects (On / Reduced / Off).
 //   the panel's tabs      (noxsdl's) General and More along its top, in the game's tab look (the
 //                         Server Settings' tabs, servopts.wnd): More has the rarely changed
@@ -62,7 +62,8 @@ public:
         bool hdSpellFx = false;
         /// Smoothing: 0 off (as vanilla), 1 Smooth Movement (everything eased to each new position
         /// over a server frame), 2 Smooth Network (everything drawn between server snapshots: the
-        /// default), 3 Lock to 30 FPS (off, a frame drawn as each server update comes).
+        /// default), 3 Lock to 30 FPS (off, a frame drawn as each server update comes),
+        /// 4 Match Server (off, a frame drawn as each update comes, including movement substeps).
         int smoothing = 2;
         bool hdImages = false;     ///< images from the HD image pack (.nxp) instead of video.bag
         bool hdAvailable = false;  ///< whether there's a pack to use (the switch is greyed without)

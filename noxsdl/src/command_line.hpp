@@ -44,7 +44,7 @@ struct StartOptions {
     std::string gpuDriver;    ///< --gpu-driver: its API (direct3d12 by default on Windows; SDL's choice, Vulkan, elsewhere)
     bool stockEffects = false; ///< --stock-effects: the effects' pixel shapes and sprites (Smooth FX and HD Spell FX off)
     bool noBloom = false;      ///< --no-bloom: no halo round the bright effects
-    std::optional<int> smoothing; ///< --smoothing off|movement|network|lock30
+    std::optional<int> smoothing; ///< --smoothing off|movement|network|lock30|server
     std::optional<int> display;   ///< --display windowed|borderless|fullscreen
     std::optional<bool> vsync;    ///< --vsync / --no-vsync
     bool noSmoothMotion = false; ///< --no-smooth-motion: no drawing between snapshots
