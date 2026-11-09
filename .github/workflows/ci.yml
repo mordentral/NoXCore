@@ -51,6 +51,11 @@ jobs:
         run: cmake --preset msvc-release -DNOX_PRIVATE_TOOLS=OFF -DNOX_WARNINGS_AS_ERRORS=OFF
       - name: Build
         run: cmake --build --preset msvc-release
+      - name: Mouse ownership tests
+        run: |
+          cmake -S noxsdl/tests/mouse_handover -B build/mouse_handover-tests
+          cmake --build build/mouse_handover-tests --config Release
+          ctest --test-dir build/mouse_handover-tests -C Release --output-on-failure --no-tests=error
       - name: Test
         run: ctest --preset msvc-release --output-on-failure
 
@@ -77,5 +82,10 @@ jobs:
         run: cmake --preset linux-release -DNOX_PRIVATE_TOOLS=OFF
       - name: Build
         run: cmake --build --preset linux-release -j 4
+      - name: Mouse ownership tests
+        run: |
+          cmake -S noxsdl/tests/mouse_handover -B build/mouse_handover-tests
+          cmake --build build/mouse_handover-tests --config Release
+          ctest --test-dir build/mouse_handover-tests -C Release --output-on-failure --no-tests=error
       - name: Test
         run: ctest --preset linux-release --output-on-failure

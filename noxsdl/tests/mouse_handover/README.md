@@ -24,3 +24,5 @@ Desktop acceptance checks (windowed mode, with game assets):
 
 The automated checks cover ownership policy; the desktop checks require a real
 window system and are not established by those tests alone.
+
+The Windows and Linux CI jobs run this standalone suite on every push and pull request.
