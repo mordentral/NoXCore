@@ -1273,7 +1273,7 @@ void MapView::drawScene(SDL_Renderer* renderer, const Camera& camera, SpriteCach
             return;
         }
         if (!pending) {
-            seenWalls_.set(wallKey(w.x, w.y)); // for the minimap (drawWalls sets wall byte 0xC)
+            seenWalls_.drawn(wallKey(w.x, w.y)); // for the minimap (drawWalls sets wall byte 0xC)
         }
         if (const Sprite* s = sprites.get(image.image)) {
             // Lit from the cell's centre (drawWalls: 23x + 11, 23y + 11).

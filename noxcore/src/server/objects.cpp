@@ -1261,6 +1261,7 @@ void Objects::moverUpdate(ServerObject& o)
     const auto stop = [&] {
         o.updateFn.clear();
         o.updates = false;
+        o.vx = o.vy = 0; // (noxcpp: a finished mover keeps no velocity, so it stays put as in the game, issue #9)
         world.removeUpdatable(o); // (unitRemoveFromUpdatable)
     };
     // Its thing by its map number, at an update that has none (netGetUnitByExtent: the first on

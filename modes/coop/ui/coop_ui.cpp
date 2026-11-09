@@ -56,12 +56,7 @@ void keepCoopCharacter(App& app, std::span<const std::uint8_t> data)
         SDL_Log("coop: no character file to keep the campaign's character beside");
         return;
     }
-    std::u16string stem = app.characterFile.stem().u16string();
-    const std::u16string mark = u" (Co-op)";
-    if (!stem.ends_with(mark)) {
-        stem += mark;
-    }
-    const std::filesystem::path plr = app.characterFile.parent_path() / std::filesystem::path(stem + u".plr");
+    const std::filesystem::path plr = nox::coop::campaignCharacterFile(app.characterFile);
     namespace saves = nox::client::solo_saves;
     if (saves::keepSaveData(app.saveRoot / "Save", plr, data, true) != saves::KeptSave::Written) {
         SDL_Log("coop: unable to write %s", reinterpret_cast<const char*>(plr.u8string().c_str()));
@@ -80,24 +75,40 @@ void keepCoopCharacter(App& app, std::span<const std::uint8_t> data)
     SDL_Log("coop: kept the campaign's character in %s", reinterpret_cast<const char*>(plr.u8string().c_str()));
 }
 
-/// A guest who came with a character no solo game saved (a network character: no GameData of
-/// its own; the server gives it a new solo character's empty book): its spell bars emptied too, as
-/// a new solo character's are (the class screen's), so no spell it doesn't know sits on them. One
-/// it keeps beside its own ("(Co-op).plr", the campaign's save of it) keeps its bars.
-void barsForGuest(App& app)
+/// A guest's spell bars once it's greeted (nox::coop::guestBars). A runner the campaign kept gets
+/// its campaign character's bars, from the "(Co-op).plr" the host's saves write beside its own
+/// file. A guest that came with a character no solo game saved (a network character: no GameData of
+/// its own; the server gives it a new solo character's empty book) gets empty bars, as a new solo
+/// character's are (the class screen's), so no spell it doesn't know is on them. A "(Co-op).plr"
+/// keeps its own bars. From then on the bars are saved into the "(Co-op).plr" as the game is left
+/// (saveBars), as well as at each of the host's saves (keepCoopCharacter).
+void barsForGuest(App& app, bool kept)
 {
-    bool savedBySolo = false; // (no file at all: a network game's starting set, emptied too)
-    try {
-        if (!app.characterFile.empty()) {
-            const auto file = nox::player::loadPlayerFile(app.characterFile);
-            const auto* data = file.find(nox::player::SectionId::GameData);
-            savedBySolo = data && !data->data.empty();
+    const auto cls = static_cast<nox::player::CharacterClass>(ownClass(app));
+    if (auto bars = nox::coop::guestBars(app.characterFile, cls, kept)) {
+        const bool empty = *bars == nox::client::SpellBars{};
+        app.bars = std::move(*bars);
+        if (empty) {
+            SDL_Log("coop: a character no solo game saved: its spell bars empty, as a new solo character's");
+        } else {
+            SDL_Log("coop: the campaign kept us: the spell bars of %s",
+                    reinterpret_cast<const char*>(nox::coop::campaignCharacterFile(app.characterFile).u8string().c_str()));
         }
-    } catch (const std::exception&) {
     }
-    if (!savedBySolo) {
-        app.bars = nox::client::SpellBars{};
-        SDL_Log("coop: a character no solo game saved: its spell bars empty, as a new solo character's");
+    app.guestBarsFile = nox::coop::campaignCharacterFile(app.characterFile);
+}
+
+/// A guest's known abilities on its bars, those not on them yet (SpellBars::addKnownAbilities):
+/// a new runner's bars start empty, and a load's or a rejoin's awards are quiet ones, which fill
+/// no slot. At once, without a flight or a sound.
+void abilitiesForGuest(App& app)
+{
+    if (!app.live || (ownClass(app) != 0 && !multiclass(app))) {
+        return; // (abilities only on a warrior's bars, or multiclass ones: the book's test)
+    }
+    const auto& levels = app.live->client().world().self().abilityLevel;
+    if (const int n = app.bars.addKnownAbilities(levels, true, multiclass(app) ? nox::client::kAbilityTag : 0u)) {
+        SDL_Log("coop: %d known abilities onto the spell bars", n);
     }
 }
 
@@ -115,15 +126,19 @@ public:
         reading_ = {};
         dialogSeen_ = 0;
         barsLooked_ = false;
+        app_.guestBarsFile.clear(); // (saveBars ran before the game's let go)
         app_.partyDots = false;
         app_.partyNames = false;
         app_.partyCreatures.clear();
         creaturesSeen_ = 0;
+        seenMap_.clear(); // (what the last game's view saw and hadn't told: let go with it)
+        untoldWalls_.clear();
+        untoldObelisks_.clear();
     }
 
     /// Each frame: the friend dot over the party's creatures while we're in the campaign
     /// (friend_dot.hpp, VD-39), the session's list copied as it changes; the names over the party's
-    /// players (name_plate.hpp).
+    /// players (name_plate.hpp); a guest's minimap (seenWithHost).
     void update(App& app) override
     {
         app.partyDots = coop_ && coop_->inCampaign();
@@ -131,6 +146,9 @@ public:
         if (coop_ && coop_->partyCreaturesVersion() != creaturesSeen_) {
             creaturesSeen_ = coop_->partyCreaturesVersion();
             app.partyCreatures = coop_->partyCreatures();
+        }
+        if (coop_ && coop_->guest()) {
+            seenWithHost(app);
         }
     }
 
@@ -146,7 +164,12 @@ public:
         if (coop_->guest()) {
             if (!barsLooked_) {
                 barsLooked_ = true; // (a guest's spell bars looked at once it's in)
-                barsForGuest(app);
+                barsForGuest(app, coop_->hello() && coop_->hello()->characterKept);
+                abilitiesSeen_ = app.quietAbilityAwards;
+                abilitiesForGuest(app);
+            } else if (app.quietAbilityAwards != abilitiesSeen_ && !app.flight) {
+                abilitiesSeen_ = app.quietAbilityAwards; // (a shown award's flight lands first)
+                abilitiesForGuest(app);
             }
             if (const auto kept = coop_->takeCharacter()) {
                 keepCoopCharacter(app, *kept);
@@ -241,6 +264,50 @@ public:
     }
 
 private:
+    /// A guest's minimap, kept by the campaign (coop.hpp: a guest loads the map's own file, which
+    /// remembers nothing): what the host kept of the map we're on put on our view once it's up (the
+    /// view the client's last map load made), and the walls and obelisks our view sees for the
+    /// first time told to the host about once a second (the last map's at once as the view moves on).
+    void seenWithHost(App& app)
+    {
+        if (!app.live || !app.view || app.liveMapLoads != app.live->client().mapLoads()) {
+            return; // (a view about to go: what it sees now goes with it)
+        }
+        const std::string map = std::filesystem::path(app.liveMap).stem().string();
+        if (map != seenMap_) {
+            tellSeen();
+            seenMap_ = map;
+        }
+        if (const auto kept = coop_->takeSeen(map)) {
+            app.view->markSeen(kept->walls);
+            if (app.minimap) {
+                app.minimap->markSeen(kept->obelisks);
+            }
+            SDL_Log("coop: the campaign's minimap of %s: %d walls, %d obelisks", map.c_str(), static_cast<int>(kept->walls.size()),
+                    static_cast<int>(kept->obelisks.size()));
+        }
+        const auto walls = app.view->takeDrawnWalls();
+        untoldWalls_.insert(untoldWalls_.end(), walls.begin(), walls.end());
+        if (app.minimap) {
+            const auto obelisks = app.minimap->takeSeenObelisks();
+            untoldObelisks_.insert(untoldObelisks_.end(), obelisks.begin(), obelisks.end());
+        }
+        const std::uint64_t now = SDL_GetTicks();
+        if ((!untoldWalls_.empty() || !untoldObelisks_.empty()) && now - seenToldMs_ >= 1000) {
+            tellSeen();
+            seenToldMs_ = now;
+        }
+    }
+    /// What our view saw that the host hasn't been told, told (kSeenReport).
+    void tellSeen()
+    {
+        if (coop_ && !seenMap_.empty() && (!untoldWalls_.empty() || !untoldObelisks_.empty())) {
+            coop_->reportSeen(seenMap_, untoldWalls_, untoldObelisks_);
+        }
+        untoldWalls_.clear();
+        untoldObelisks_.clear();
+    }
+
     /// A guest's chapter screen under way: shown (its briefing seen up), then over (told back).
     struct Reading {
         bool on = false;
@@ -253,7 +320,12 @@ private:
     Reading reading_;
     std::uint32_t dialogSeen_ = 0;
     bool barsLooked_ = false;
+    std::uint32_t abilitiesSeen_ = 0; ///< (App::quietAbilityAwards as the bars last took them)
     std::uint32_t creaturesSeen_ = 0; ///< (CoopClient::partyCreaturesVersion copied to App::partyCreatures)
+    std::string seenMap_;                       ///< the map our view's walls and obelisks below are of
+    std::vector<std::uint16_t> untoldWalls_;    ///< first drawn there, not yet told the host (cell keys)
+    std::vector<std::uint16_t> untoldObelisks_; ///< first marked there, likewise (extents)
+    std::uint64_t seenToldMs_ = 0;              ///< (SDL_GetTicks at the last report)
 };
 
 } // namespace

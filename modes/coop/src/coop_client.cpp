@@ -1,6 +1,11 @@
 // The co-op campaign's client side (coop_client.hpp).
 #include "noxcore/coop/coop_client.hpp"
 
+#include "noxcore/util/text.hpp"
+
+#include <exception>
+#include <string>
+
 namespace nox::coop {
 
 CoopClient::CoopClient(client::HeadlessClient& client)
@@ -82,6 +87,17 @@ void CoopClient::onMessage(std::span<const std::uint8_t> m)
             ++partyCreaturesVersion_;
         }
         break;
+    case coopmsg::kSeen:
+        // (Parts of one map's add up; another map's starts again: ours moved on.)
+        if (auto s = coopmsg::parseSeen(rest)) {
+            if (!seen_ || !util::equalsNoCase(seen_->map, s->map)) {
+                seen_ = std::move(*s);
+            } else {
+                seen_->walls.insert(seen_->walls.end(), s->walls.begin(), s->walls.end());
+                seen_->obelisks.insert(seen_->obelisks.end(), s->obelisks.begin(), s->obelisks.end());
+            }
+        }
+        break;
     case coopmsg::kCharacter:
         // Our campaign character in parts, in order (reliable): whole once the last is in.
         if (auto c = coopmsg::parseCharacter(rest)) {
@@ -111,6 +127,62 @@ void CoopClient::chapterDone()
 void CoopClient::skipBriefing()
 {
     client_.sendNoxcpp(coopmsg::hostCmdMessage(coopmsg::HostCmd::SkipBriefing));
+}
+
+void CoopClient::reportSeen(std::string_view map, std::span<const std::uint16_t> walls, std::span<const std::uint16_t> obelisks)
+{
+    if (map.empty()) {
+        return;
+    }
+    for (auto& part : coopmsg::seenMessages(coopmsg::kSeenReport, map, walls, obelisks)) {
+        client_.sendNoxcpp(std::move(part));
+    }
+}
+
+std::optional<coopmsg::SeenCells> CoopClient::takeSeen(std::string_view map)
+{
+    if (!seen_ || !util::equalsNoCase(seen_->map, map)) {
+        return std::nullopt;
+    }
+    return std::exchange(seen_, std::nullopt);
+}
+
+std::filesystem::path campaignCharacterFile(const std::filesystem::path& characterFile)
+{
+    if (characterFile.empty()) {
+        return {};
+    }
+    std::u16string stem = characterFile.stem().u16string();
+    const std::u16string mark = u" (Co-op)";
+    if (!stem.ends_with(mark)) {
+        stem += mark;
+    }
+    return characterFile.parent_path() / std::filesystem::path(stem + u".plr");
+}
+
+std::optional<client::SpellBars> guestBars(const std::filesystem::path& characterFile, player::CharacterClass characterClass, bool kept)
+{
+    if (kept) {
+        const std::filesystem::path campaign = campaignCharacterFile(characterFile);
+        if (!campaign.empty() && campaign != characterFile) {
+            if (auto bars = client::SpellBars::read(campaign, characterClass)) {
+                return bars;
+            }
+        }
+    }
+    bool savedBySolo = false; // (no file at all: a network game's starting set, emptied too)
+    try {
+        if (!characterFile.empty()) {
+            const auto file = player::loadPlayerFile(characterFile);
+            const auto* data = file.find(player::SectionId::GameData);
+            savedBySolo = data && !data->data.empty();
+        }
+    } catch (const std::exception&) {
+    }
+    if (savedBySolo) {
+        return std::nullopt;
+    }
+    return client::SpellBars{};
 }
 
 } // namespace nox::coop

@@ -487,7 +487,10 @@ struct App {
     /// the game is left; without one, the class's starting sets.
     nox::client::SpellBars bars;
     std::filesystem::path characterFile;
-    bool barsExpanded = false;          ///< all five sets showing
+    /// Live: a co-op guest's campaign character ("<name> (Co-op).plr", set by coop_ui.cpp): its bars
+    /// are saved there when the game is left, when the campaign's save has made it (saveBars).
+    std::filesystem::path guestBarsFile;
+    bool barsExpanded = false;         ///< all five sets showing
     int barsClass = -1;                 ///< the class the bars were loaded for (ownClass)
     bool barsMulticlass = false;        ///< loaded for noxcpp's multiclass (a warrior's abilities tagged)
     bool barsInverted = false;          ///< InvertSpellTarget held
@@ -681,6 +684,9 @@ struct App {
         bool burst = false;
     };
     std::optional<AwardFlight> flight;
+    /// The quiet ability awards (MSG_REPORT_ABILITY_AWARD without 0x80, which fill no slot) the
+    /// book has had, counted: a mode's UI may put them on the bars itself (coop_ui.cpp's guest).
+    std::uint32_t quietAbilityAwards = 0;
     /// The character's file info the client holds (a solo save's File Info is
     /// written from it; a load reads it back). Unset: the profile's.
     std::optional<nox::player::FileInfo> heldFileInfo;

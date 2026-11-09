@@ -44,4 +44,8 @@ vendor.reach = 140
 -- The stash: per character (design 12.6), `tabs` tabs of `size` slots each.
 vendor.stash = { tabs = 4, size = 40 }
 
+-- The most a cell of the carried grid stacks (by decision 2026-11-08: as the game's own tray, so a
+-- 4th potion bought starts a new cell).
+vendor.stackMax = 3
+
 return vendor

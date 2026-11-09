@@ -395,6 +395,21 @@ int noxUnequip(lua_State* L)
     return 1;
 }
 
+int noxSecondaryWeapon(lua_State* L)
+{
+    // nox.secondaryWeapon(unit): the item its client holds as its secondary weapon (nil: none, or
+    // one no longer carried, or in hand now).
+    const server::ServerObject& u = toolbox::playerUnitArg(L, 1);
+    const std::uint16_t code = u.player->secondaryWeapon;
+    const server::ServerObject* item = code != 0 ? toolbox::worldOf(L).byPacketCode(server::NetCode{code}) : nullptr;
+    if (!item || item->gone() || item->holder != u.extent || (item->flags & server::ObjFlag::Equipped)) {
+        lua_pushnil(L);
+        return 1;
+    }
+    lua_pushnumber(L, item->extent);
+    return 1;
+}
+
 // ---- a player's level and experience
 
 int noxSetLevel(lua_State* L)
@@ -521,7 +536,7 @@ void addItemsToolbox(lua_State* L)
 {
     static constexpr std::pair<const char*, lua_CFunction> kFns[] = {
         {"item", noxItem},           {"modifier", noxModifier},     {"modifiers", noxModifiers},  {"itemStats", noxItemStats},
-        {"modifierFits", noxModifierFits}, {"equip", noxEquip},     {"unequip", noxUnequip},
+        {"modifierFits", noxModifierFits}, {"equip", noxEquip},     {"unequip", noxUnequip}, {"secondaryWeapon", noxSecondaryWeapon},
         {"repairCost", noxRepairCost}, {"repair", noxRepair},       {"setDurability", noxSetDurability},
         {"setLevel", noxSetLevel},   {"setExperience", noxSetExperience}, {"giveExperience", noxGiveExperience},
     };

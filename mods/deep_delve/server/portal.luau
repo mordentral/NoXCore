@@ -137,6 +137,7 @@ function portal.through(h: any, e: any): boolean
 	local x, y = nox.clearPointNear(x0, y0, 40)
 	nox.setPosition(h.unit, x, y)
 	nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
+	touch.arrived(h.unit)
 	return true
 end
 
@@ -192,7 +193,7 @@ end
 
 -- A map's town: its portal pentagram set to work.
 function portal.place(townSpots: any)
-	touch.adopt("InvisibleTeleportPentagram", townSpots.portal.x, townSpots.portal.y, portal.touched, 45)
+	touch.adopt("InvisibleTeleportPentagram", townSpots.portal.x, townSpots.portal.y, portal.touched, 45, nil, "way")
 end
 
 -- The open portals as lines, "owner x y" (an owner who left: "owner(left) x y"; for "dd portals").

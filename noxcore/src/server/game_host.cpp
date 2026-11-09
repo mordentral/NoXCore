@@ -1623,10 +1623,13 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // (playerCheckStrength: the weapon's or armour's record's strength) is
             // refused: SrvNet_SendReportSecondaryWeapon(.., null, 1), its client's "Weapon2CantUse".
             // (Kept in the exe's player record: what reads it, the saves, takes the host's window.)
+            // noxcpp keeps the code, none when refused, for mods to read (nox.secondaryWeapon).
             if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() >= 3) {
                 const std::uint16_t code = static_cast<std::uint16_t>(m[1] | (m[2] << 8));
+                unit->player->secondaryWeapon = code;
                 if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(NetCode{code}) : nullptr) {
                     if (!server_.items().classMay(*unit, *item) || !server_.items().strongEnough(*unit, *item)) {
+                        unit->player->secondaryWeapon = 0;
                         sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportSecondaryWeapon), 0, 0, 1});
                     }
                 }

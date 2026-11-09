@@ -59,7 +59,7 @@ function town.place(townSpots: any, out: any, stash: any, vendor: any, name: str
 	spots = townSpots
 	townName = name or "the Waystation"
 	table.clear(lastLine)
-	touch.adopt(spots.gate.type, spots.gate.x, spots.gate.y, out)
+	touch.adopt(spots.gate.type, spots.gate.x, spots.gate.y, out, nil, nil, "way")
 	touch.adopt("Fountain", spots.healer.x, spots.healer.y, heal)
 	touch.adopt("Chest1", spots.stash.x, spots.stash.y, stash)
 	touch.adopt("Anvil1", spots.vendor.x, spots.vendor.y, vendor)
@@ -79,12 +79,14 @@ function town.respawnPoint(): (number?, number?)
 	return nox.clearPointNear(c.x + nox.random(-30, 30), c.y + 92, 30)
 end
 
--- A unit sent home (the way back from the area's start, a town portal).
+-- A unit sent home (the way back from the area's start, a town portal), arriving there (no way
+-- takes it at once: touch.luau).
 function town.sendHome(unit: number)
 	local x, y = town.respawnPoint()
 	if x and y then
 		nox.setPosition(unit, x, y)
 		nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
+		touch.arrived(unit)
 	end
 end
 

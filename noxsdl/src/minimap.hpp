@@ -40,6 +40,9 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
+#include <utility>
+#include <vector>
 
 namespace noxsdl {
 
@@ -59,7 +62,7 @@ public:
     /// An obelisk (IMMOBILE with VISIBLE_OBELISK) the scene's sort drew this frame, lingering
     /// too: the scene draw lists it after its DRAW (Cli_AddMinimapMarker). Call whether the map is
     /// shown or not.
-    void markDrawn(std::uint16_t netCode) { seenMarkers_.insert(netCode); }
+    void markDrawn(std::uint16_t netCode) { list(netCode); }
     /// Without the scene's sort (the 3D view): the obelisks on screen this frame (and where the
     /// eye sees, given a sight) become markers.
     void observe(const nox::client::World& world, const Camera& camera, const SightMap* sight);
@@ -73,6 +76,17 @@ public:
     bool marked(std::uint16_t netCode, const nox::client::World& world) const;
     /// The obelisks listed so far (seen, or by the map).
     std::size_t obelisksListed() const { return seenMarkers_.size(); }
+    /// The map's own obelisks (their extents: a static net code less 0x8000) first listed by
+    /// being seen since the last call (a co-op guest's report to its host).
+    std::vector<std::uint16_t> takeSeenObelisks() { return std::exchange(newlySeen_, {}); }
+    /// The map's own obelisks seen before, kept for us elsewhere (a co-op guest's, by its host),
+    /// by extent: listed (as a solo save's byte lists them, mapLoaded).
+    void markSeen(std::span<const std::uint16_t> extents)
+    {
+        for (const std::uint16_t e : extents) {
+            seenMarkers_.insert(static_cast<std::uint16_t>(e | 0x8000u));
+        }
+    }
 
     /// Draws the map on a w x h screen whose HUD scale is `scale`, centred on the view's centre
     /// (`camera`), for the local player `us`.
@@ -84,6 +98,14 @@ private:
     int zoom_ = 1110;              ///< the exe's starting zoom
     std::uint64_t zoomMs_ = 0;     ///< held-key time not yet turned into steps
     std::set<std::uint16_t> seenMarkers_; ///< obelisks drawn on screen so far (or listed by the map), by net code
+    std::vector<std::uint16_t> newlySeen_; ///< the map's own of them first seen, by extent (takeSeenObelisks)
+    /// An obelisk seen: listed, and noted if it's the map's own (net code bit 15) and wasn't.
+    void list(std::uint16_t netCode)
+    {
+        if (seenMarkers_.insert(netCode).second && (netCode & 0x8000u)) {
+            newlySeen_.push_back(static_cast<std::uint16_t>(netCode & 0x7FFFu));
+        }
+    }
     /// The obelisks the client loaded from the map (net code: extent | 0x8000): its type and place,
     /// for those listed before the server has sent them.
     struct Static {

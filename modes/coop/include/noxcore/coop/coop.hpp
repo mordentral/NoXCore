@@ -34,6 +34,7 @@
 
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -146,7 +147,8 @@ public:
         int maxPlayers = 4;
         /// The seed of the director's own draws (where a guest is put): never the game's.
         std::uint32_t seed = 1;
-        /// A new player behind the party is given the experience to the party's lowest level.
+        /// A player joining or coming back behind the party (a kept character too) is given the
+        /// experience to the party's lowest; never taken any.
         bool catchUp = true;
         /// The monsters' health and the damage players take scaled by the party's size (off: the
         /// solo game's numbers); each player past the first adds these shares (Normal's).
@@ -223,7 +225,7 @@ public:
     /// A player's CLIENT_READY (GameHost::Options::onClientReady): the party's team told between
     /// it and the other NoX Core players (tellTeam); a guest's view of a map it loaded from its own
     /// file put right (the things the client draws from it that the world no longer has hidden:
-    /// MSG_DESTROY_OBJECT with the map number's high bit).
+    /// MSG_DESTROY_OBJECT with the map number's high bit), and its minimap of it given back (kSeen).
     void clientReady(server::GameHost& host, std::uint8_t peer);
     /// Whether the party lost (every one dead at once), till the next map's load.
     bool wiped() const noexcept { return wipe_; }
@@ -252,7 +254,8 @@ public:
     // ---- saves and returning players
     // The campaign's saves are the solo game's (Save\WORKING, AUTOSAVE, SAVE%04d under the co-op
     // root) with a Party folder in each: every guest's character (<file key>.plr, the server's
-    // sections as a quest player's) and party.txt (who, where, the creatures each owns). A guest
+    // sections as a quest player's), its minimap (<file key>.seen) and party.txt (who, where, the
+    // creatures each owns). A guest
     // the campaign knows (by runnerKey) gets its campaign character back as it joins, and after a
     // saved game's load; a new one behind the party is caught up; each save sends a NoX Core
     // guest its campaign character to keep.
@@ -301,12 +304,28 @@ public:
         bool caughtUp = false;    ///< its catch-up looked at
         /// A saved game's load kept no character for it: caught up as a late joiner (restoreParty).
         bool catchUpAfterLoad = false;
+        /// A saved game's load came since its last CLIENT_READY: its minimap's reports, of the game
+        /// before the load, let go.
+        bool seenHeld = false;
         std::uint64_t welcomedAt = 0; ///< (the world's ticks)
         /// Its character of another class than the campaign's: told so at these ticks, let go 3 s
         /// on (0: not).
         std::uint64_t otherClassAt = 0;
     };
     const std::vector<Member>& party() const noexcept { return party_; }
+
+    // ---- each player's minimap (coop_saves.cpp)
+    // The host's minimap is the game's: its saved map copies (each wall's byte, each obelisk's,
+    // asked of its client: HostClient::wallDrawn, minimapMarked). A NoX Core guest loads the map's
+    // own file, so the campaign keeps its own for it: the walls it drew and the obelisks it marked
+    // (kSeenReport), by runner and map, saved as Party\<file key>.seen with the rest and read back
+    // with them, and sent back as each map loads for it (kSeen at its CLIENT_READY: loads and
+    // revisits alike). A stock guest sees every wall (0x10000) and is told nothing.
+    /// The most maps kept for one runner (a class's campaign has under 40), obelisks for a map.
+    static constexpr std::size_t kSeenMapsMost = 64;
+    static constexpr std::size_t kSeenObelisksMost = 1024;
+    /// What runner `key` has seen of `map` (any case), in order (none: nothing kept).
+    std::optional<coopmsg::SeenCells> seenOf(std::string_view key, std::string_view map) const;
 
 private:
     /// The game's builtins the rules answer, by id (looked up by name once).
@@ -455,9 +474,31 @@ private:
     void restoreParty();
     /// The creatures (script ids) owned by nobody given to `to`.
     void giveCreatures(const std::vector<std::int32_t>& owned, server::ServerObject& to);
-    /// A new player behind the party given the experience to the party's lowest level.
+    /// A player behind the party (new, rejoining, or its kept character back) given the experience
+    /// to the party's lowest; one with no kept character the party's book too.
     void catchUp(Member& m, server::ServerObject& unit);
     void sendCharacter(const Member& m, std::span<const std::uint8_t> plr);
+    /// A runner's minimap of a map: a bit a wall cell (key x << 8 | y, the grid's 256 x 256: never
+    /// more), and the obelisks (extents).
+    struct Seen {
+        std::array<std::uint64_t, 1024> walls{};
+        std::set<std::uint16_t> obelisks;
+    };
+    /// Cells added to `maps` (a runner's), within the caps: a name of letters, digits, '_' and '-'
+    /// (kNameMost at most), kSeenMapsMost maps, kSeenObelisksMost obelisks a map.
+    static void addSeen(std::map<std::string, Seen>& maps, const coopmsg::SeenCells& cells);
+    /// A NoX Core guest's report (kSeenReport): malformed, from the host, or of a game a load
+    /// replaced, let go.
+    void seenReport(const Member& m, std::span<const std::uint8_t> rest);
+    /// Each runner's in WORKING's Party folder (<file key>.seen), and read from it (seen_ replaced).
+    void writeSeen();
+    void readSeen();
+    /// The guest's minimap of the map just loaded queued for it (kSeen's parts; sendSeenTick sends
+    /// them as its reliable room allows).
+    void sendSeen(const Member& m);
+    void sendSeenTick(server::GameHost& host);
+    std::map<std::string, std::map<std::string, Seen>> seen_; ///< by runner key, then map (lower case)
+    std::map<std::uint8_t, std::deque<std::vector<std::uint8_t>>> seenOut_; ///< kSeen's parts on their way (by peer)
     // ---- balance and keys (coop_balance.cpp)
     /// The monsters' health and World::modeDamage by the party's size: every monster at once when
     /// the party changed (`force`, or a new size), else those not seen yet every 5 s.

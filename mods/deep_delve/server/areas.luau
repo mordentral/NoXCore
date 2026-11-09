@@ -382,10 +382,12 @@ function areas.gateTouched(h: any): (boolean, string?)
 	return votes.ask(h, first, "start", "gate")
 end
 
--- A unit through a way within the map: put at `at`, with the teleport's flash.
+-- A unit through a way within the map: put at `at`, with the teleport's flash, arriving there (no
+-- way takes it at once: touch.luau).
 local function moveTo(unit: number, at: any)
 	nox.setPosition(unit, at.x, at.y)
 	nox.effect(0x89, at.x, at.y) -- (MSG_FX_TELEPORT)
+	touch.arrived(unit)
 end
 
 -- The area's weather for everyone: the one rolled as its map was built (an outdoor area's); on
@@ -421,10 +423,10 @@ local function enter()
 	waypoints.place(spots, info, areas)
 	decals.place(spots)
 	expeditions.place(spots)
-	touch.adopt(spots.back.type, spots.back.x, spots.back.y, town.sendHome)
+	touch.adopt(spots.back.type, spots.back.x, spots.back.y, town.sendHome, nil, nil, "way")
 	if spots.exit then
 		-- (a run's: home once its champion is dead)
-		touch.adopt(spots.exit.type, spots.exit.x, spots.exit.y, exitTouched, 15)
+		touch.adopt(spots.exit.type, spots.exit.x, spots.exit.y, exitTouched, 15, nil, "way")
 	end
 	setWeather(state.sky[state.tag])
 	-- (how far every monster made in it looks: its biome's)

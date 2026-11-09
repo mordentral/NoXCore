@@ -19,10 +19,12 @@
 --   boss    while an act boss lives: a bar with its health under its name;
 --   rage    a warrior with the Rage skill: its rage bar, a bare HUD piece under the Character
 --           window (the server sends its value only as its whole number changes);
---   stash   (touching the town's chest) the stash's tabs and what the character carries: a click
---           moves an item across;
---   vendor  (touching the town's anvil) its own stock and what the character carries: a click buys
---           or sells, a right click rerolls a magic or rare piece; a row of what needs a repair
+--   stash   (touching the town's chest) the stash's tabs and what the character carries (the gear
+--           first, then the potions and supplies, a plain one's type stacked in one cell with its
+--           count): a click moves an item across (one of a stack);
+--   vendor  (touching the town's anvil) its own stock and what the character carries (as the
+--           stash's): a click buys or sells (one of a stack), a right click rerolls a magic or
+--           rare piece; a row of what needs a repair
 --           (worn or carried): a click repairs one, "Repair all" every one;
 --   tree    the passive tree: nodes and the lines between them, panned by dragging (or the arrows,
 --           on screen or the keys) and zoomed by the wheel (or 1-3); a click takes a node, a
@@ -219,7 +221,11 @@ local function drawNote(window: string, x: number, y: number)
 	end
 end
 
--- An item's cell: its frame in its rarity's colour, its picture, a price under it.
+-- A stack's count, white at its cell's top left as the game's inventory draws one.
+local STACK_COUNT = { 255, 255, 255 }
+
+-- An item's cell: its frame in its rarity's colour, its picture, a price under it, a stack's count
+-- (e.n) over it.
 local function cell(x: number, y: number, size: number, e: any, hot: boolean, price: number?)
 	nox.box(x, y, size, size, if hot then { 50, 40, 26 } else { 22, 18, 14 })
 	nox.outline(x, y, size, size, RARITY[e.r] or RARITY.normal)
@@ -227,6 +233,9 @@ local function cell(x: number, y: number, size: number, e: any, hot: boolean, pr
 	if price then
 		local s = tostring(price)
 		nox.text(s, x + size - 2 - nox.textWidth(s), y + size - 11, "gold")
+	end
+	if e.n then
+		nox.text(tostring(e.n), x + 4, y + 3, STACK_COUNT)
 	end
 end
 
@@ -880,7 +889,7 @@ local function drawStash()
 	if hot then
 		tipItem(hot, "Click to take it")
 	elseif hotCarried then
-		tipItem(hotCarried, "Click to stash it")
+		tipItem(hotCarried, if hotCarried.n then "Click to stash one (" .. tostring(hotCarried.n) .. " carried)" else "Click to stash it")
 	else
 		nox.text("Point at an item to read it.", 4, 372, "dim")
 	end
@@ -918,7 +927,7 @@ local function drawVendor()
 	end
 	local gold = whole.carried and whole.carried.header.gold or 0
 	nox.text(string.format("Your gold: %d", gold), 452, 18, "gold")
-	for i, l in { "Click to buy.", "", "Click a piece you", "carry to sell it.", "Right click a magic or", "rare piece to reroll", "its modifiers." } do
+	for i, l in { "Click to buy.", "", "Click a piece you", "carry to sell it (one", "of a stack).", "Right click a magic or", "rare piece to reroll", "its modifiers." } do
 		nox.text(l, 452, 32 + (i - 1) * 11, "dim")
 	end
 	nox.text("Carried (the vendor's price)", 4, 110, "gold")
@@ -961,6 +970,7 @@ local function drawVendor()
 	if hot then
 		local line = if hotStock then "Buy for " .. tostring(hot.p) .. " gold"
 			elseif hotRepair then "Repair for " .. tostring(hot.c) .. " gold" .. (if hot.w then " (worn)" else "")
+			elseif hot.n then "Sells for " .. tostring(hot.p) .. " gold each (" .. tostring(hot.n) .. " carried); a click sells one"
 			else "Sells for " .. tostring(hot.p) .. " gold" .. (if hot.q then "; reroll " .. tostring(hot.q) .. " gold" else "")
 		tipItem(hot, line)
 		nox.text(line, 4, 306, "gold")

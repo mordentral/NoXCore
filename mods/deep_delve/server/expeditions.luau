@@ -57,11 +57,6 @@ local free = false
 -- nil (an act's area).
 local current: any = nil
 
--- The table's touches come every PAD_EVERY frames while a player stands against it; a gap longer
--- than PAD_GAP is a new touch (as the waypoints' pad's steps).
-local PAD_EVERY = 5
-local PAD_GAP = 15
-
 function expeditions.attach(areasApi: any)
 	areas = areasApi
 end
@@ -228,17 +223,12 @@ function expeditions.message(h: any, v: any)
 	windows.note(h, "maps", why :: string)
 end
 
--- The map table touched: the window opened on the toucher's UI, at a new touch (not again while it
--- stands against it after closing it).
+-- The map table touched: the window opened on the toucher's UI (heard only at a new touch, so not
+-- again while it stands against it after closing it: touch.luau's step things). A station, not a
+-- way: it opens at once after arriving.
 local function padTouched(unit: number)
 	local h = hero.byUnit(unit)
 	if not h then
-		return
-	end
-	local now = nox.frame()
-	local last = h.mapsAt
-	h.mapsAt = now
-	if last and now - last <= PAD_GAP then
 		return
 	end
 	windows.open(h, "maps")
@@ -253,7 +243,7 @@ function expeditions.place(spots: any)
 	if not at then
 		return
 	end
-	touch.adopt(tostring(at.type), at.x, at.y, padTouched, PAD_EVERY)
+	touch.adopt(tostring(at.type), at.x, at.y, padTouched, nil, nil, "step")
 	decals.put("maps", at.x, at.y, data.table.ring)
 end
 

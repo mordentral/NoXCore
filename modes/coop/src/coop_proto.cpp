@@ -23,6 +23,21 @@ void putText(std::vector<std::uint8_t>& out, std::string_view s, std::size_t mos
     out.insert(out.end(), s.begin(), s.begin() + static_cast<std::ptrdiff_t>(n));
 }
 
+// A varint's bytes (SeenCells' wall cells): 7 bits a byte, low first, the top bit "more".
+std::size_t varintSize(std::uint32_t v)
+{
+    return v < 0x80u ? 1 : v < 0x4000u ? 2 : 3;
+}
+
+void putVarint(std::vector<std::uint8_t>& out, std::uint32_t v)
+{
+    while (v >= 0x80u) {
+        out.push_back(static_cast<std::uint8_t>(v | 0x80u));
+        v >>= 7;
+    }
+    out.push_back(static_cast<std::uint8_t>(v));
+}
+
 /// {op, sub, u16 the rest's length, the rest}: every mode message's frame (mode_frame.hpp).
 std::vector<std::uint8_t> framed(std::uint8_t sub, const std::vector<std::uint8_t>& rest)
 {
@@ -190,6 +205,113 @@ std::optional<CharacterPart> parseCharacter(std::span<const std::uint8_t> rest)
     }
     p.bytes.assign(rest.begin() + 4, rest.end());
     return p;
+}
+
+std::vector<std::vector<std::uint8_t>> seenParts(std::string_view map, std::span<const std::uint16_t> walls,
+                                                 std::span<const std::uint16_t> obelisks)
+{
+    std::vector<std::uint16_t> cells(walls.begin(), walls.end());
+    std::ranges::sort(cells);
+    cells.erase(std::unique(cells.begin(), cells.end()), cells.end());
+    std::vector<std::uint16_t> marks;
+    for (const std::uint16_t e : obelisks) {
+        if (e <= 0x7FFFu) {
+            marks.push_back(e);
+        }
+    }
+    std::ranges::sort(marks);
+    marks.erase(std::unique(marks.begin(), marks.end()), marks.end());
+    std::vector<std::vector<std::uint8_t>> out;
+    std::size_t w = 0;
+    std::size_t o = 0;
+    while (w < cells.size() || o < marks.size()) {
+        std::vector<std::uint8_t> r;
+        putText(r, map, kNameMost);
+        const std::size_t countAt = r.size();
+        put16(r, 0);
+        // As many cells as kSeenPart's bytes take, each from the last (-1 at the part's start).
+        std::int32_t last = -1;
+        std::size_t bytes = 0;
+        std::uint16_t n = 0;
+        for (; w < cells.size(); ++w) {
+            const auto v = static_cast<std::uint32_t>(cells[w] - last - 1);
+            if (bytes + varintSize(v) > kSeenPart) {
+                break;
+            }
+            putVarint(r, v);
+            bytes += varintSize(v);
+            last = cells[w];
+            ++n;
+        }
+        r[countAt] = static_cast<std::uint8_t>(n);
+        r[countAt + 1] = static_cast<std::uint8_t>(n >> 8);
+        const std::size_t m = std::min(kSeenPartObelisks, marks.size() - o);
+        r.push_back(static_cast<std::uint8_t>(m));
+        for (std::size_t i = 0; i < m; ++i) {
+            put16(r, marks[o++]);
+        }
+        out.push_back(std::move(r));
+    }
+    return out;
+}
+
+std::vector<std::vector<std::uint8_t>> seenMessages(std::uint8_t sub, std::string_view map, std::span<const std::uint16_t> walls,
+                                                    std::span<const std::uint16_t> obelisks)
+{
+    std::vector<std::vector<std::uint8_t>> out = seenParts(map, walls, obelisks);
+    for (auto& part : out) {
+        part = framed(sub, part);
+    }
+    return out;
+}
+
+std::optional<SeenCells> parseSeen(std::span<const std::uint8_t> rest)
+{
+    Reader in{rest};
+    SeenCells s;
+    s.map = in.text();
+    const std::size_t n = in.u16();
+    if (!in.ok || s.map.empty() || s.map.size() > kNameMost || n > kSeenPart) {
+        return std::nullopt;
+    }
+    s.walls.reserve(n);
+    std::int32_t last = -1;
+    const std::size_t from = in.at;
+    for (std::size_t i = 0; i < n; ++i) {
+        std::uint32_t v = 0;
+        std::uint8_t b = 0x80;
+        for (int shift = 0; (b & 0x80u) && in.ok; shift += 7) {
+            if (shift > 14) {
+                return std::nullopt; // (past three bytes: past the grid)
+            }
+            b = in.u8();
+            v |= static_cast<std::uint32_t>(b & 0x7Fu) << shift;
+        }
+        const std::int64_t cell = static_cast<std::int64_t>(last) + 1 + v;
+        if (!in.ok || cell > 0xFFFF) {
+            return std::nullopt;
+        }
+        last = static_cast<std::int32_t>(cell);
+        s.walls.push_back(static_cast<std::uint16_t>(cell));
+    }
+    if (in.at - from > kSeenPart) {
+        return std::nullopt;
+    }
+    const std::size_t m = in.u8();
+    if (!in.ok || m > kSeenPartObelisks) {
+        return std::nullopt;
+    }
+    for (std::size_t i = 0; i < m; ++i) {
+        const std::uint16_t e = in.u16();
+        if (e > 0x7FFFu) {
+            return std::nullopt;
+        }
+        s.obelisks.push_back(e);
+    }
+    if (!in.ok || in.at != rest.size()) {
+        return std::nullopt;
+    }
+    return s;
 }
 
 std::optional<Cine> parseCine(std::span<const std::uint8_t> rest)

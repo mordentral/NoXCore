@@ -91,6 +91,13 @@ numbers.portal = {
 	every = 24,
 }
 
+-- The ways (touch.luau): the things that take a player elsewhere (the town's gate, the way home,
+-- the exit, the portal's and the waypoints' pentagrams, a lair's gate). For `grace` frames after a
+-- player arrives somewhere (a way, a portal, a waypoint, a new map, a respawn) no way takes it; one
+-- it touched in that time takes it only at a new step onto it. A new step: a touch after none for
+-- more than `gap` frames (a station's pad's too: the waypoints' pentagram, the map table).
+numbers.touch = { grace = 60, gap = 15 }
+
 -- The pads' rings on the floor (decals.luau): the asset, its size across (world units; a
 -- pentagram's own ring is about 52 across, so its ring sits inside the picture's outer band), its
 -- turn (degrees a second) and its alpha's pulse (amount 0-1, period in seconds). Drawn additive.

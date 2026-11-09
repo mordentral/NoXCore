@@ -1,20 +1,25 @@
 // A NoX Core client's side of the co-op campaign (coop.hpp): MSG_NOXCPP_COOP as it comes in,
 // kept for the client's windows (modes/coop/ui), and what the client does about it itself: a
 // guest greeted by the host sends its own character (HeadlessClient::sendCharacter); a chapter
-// screen's end is told back (chapterDone). Idle on any other server (none sends 0xF7). The mode's
+// screen's end is told back (chapterDone); a guest's minimap goes to the host to keep and comes back
+// at each map's load (reportSeen, takeSeen). Idle on any other server (none sends 0xF7). The mode's
 // client side (ClientMode), made only for noxcore.exe's own connection (Mode::everyClient off: a
 // bot's mustn't send its character), and by the tests.
 #pragma once
 
 #include "noxcore/client/headless_client.hpp"
+#include "noxcore/client/spell_bars.hpp"
 #include "noxcore/coop/coop_proto.hpp"
 #include "noxcore/modes/mode.hpp"
+#include "noxcore/player/player_file.hpp"
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -64,6 +69,13 @@ public:
     /// creatures, by net code, sorted), and a count of the lists told.
     const std::vector<std::uint16_t>& partyCreatures() const noexcept { return partyCreatures_; }
     std::uint32_t partyCreaturesVersion() const noexcept { return partyCreaturesVersion_; }
+    /// A guest's minimap: the walls drawn (cell keys) and obelisks marked (extents) for the first
+    /// time on `map` (its file's name), told to the host to keep (kSeenReport, in parts).
+    void reportSeen(std::string_view map, std::span<const std::uint16_t> walls, std::span<const std::uint16_t> obelisks);
+    /// What the campaign kept of our minimap for `map` (kSeen), once our view of that map is up:
+    /// what's come in so far, taken (later parts at a later call). Held till then; another map's
+    /// coming in drops it.
+    std::optional<coopmsg::SeenCells> takeSeen(std::string_view map);
 
 private:
     client::HeadlessClient& client_;
@@ -83,6 +95,23 @@ private:
     std::uint32_t partyCreaturesVersion_ = 0;
     std::vector<std::uint8_t> partial_;
     std::optional<std::vector<std::uint8_t>> character_;
+    std::optional<coopmsg::SeenCells> seen_; ///< (kSeen's parts as they come, till taken)
 };
+
+/// A guest's campaign character beside the character it joined with (`characterFile`): "<name>
+/// (Co-op).plr" in the same folder, which the host's saves write (noxsdl's coop_ui). That file
+/// itself when it's the one joined with; none without one.
+std::filesystem::path campaignCharacterFile(const std::filesystem::path& characterFile);
+
+/// A NoX Core guest's spell bars once the host has greeted it (noxsdl's coop_ui). The bars of the
+/// file it joined with (`characterFile`) are loaded by then. Returns the bars to use instead, or
+/// none to keep those:
+/// - a runner the campaign kept (`kept`: Hello's characterKept) plays its campaign character again,
+///   so it gets that character's bars, from its "(Co-op).plr" when that file has bars of
+///   `characterClass`;
+/// - otherwise a character no solo game saved (no GameData: a network character, or no file) gets
+///   empty bars, as a new solo character's are, so no spell it doesn't know is on them. A late
+///   joiner fills its bars from its book itself.
+std::optional<client::SpellBars> guestBars(const std::filesystem::path& characterFile, player::CharacterClass characterClass, bool kept);
 
 } // namespace nox::coop

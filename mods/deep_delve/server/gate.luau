@@ -21,6 +21,7 @@
 local acts = require("data/acts")
 local hero = require("hero")
 local progress = require("progress")
+local touch = require("touch")
 
 local gate = {}
 
@@ -29,7 +30,8 @@ local G: any = acts.gate
 -- This lair's gate site: { act, x, y, light (its light's id, or nil) }; nil when this map isn't a
 -- lair with an act after it.
 local site: any = nil
--- The open gate: { act, x, y, swirl (its thing's id), beat, sparkAt, last = unit -> frame }.
+-- The open gate: { act, x, y, swirl (its thing's id), beat, sparkAt, last = unit -> frame, way
+-- (its touch.way(): the arrival's grace) }.
 local current: any = nil
 -- areas.luau's own (handed in by enter: it requires this module).
 local areas: any = nil
@@ -57,7 +59,8 @@ local function look()
 	end
 	for _, unit in nox.unitsNear(c.x, c.y, G.reach, { players = true, alive = true }) do
 		local h = hero.byUnit(unit)
-		if h and h.ready then
+		-- (a way: not straight after arriving, touch.luau)
+		if h and h.ready and touch.passes(c.way, unit) then
 			local last = c.last[unit]
 			if not last or now - last >= G.again then
 				c.last[unit] = now
@@ -82,7 +85,7 @@ function gate.open(): boolean
 		nox.setOnOff(s.light, true)
 	end
 	nox.effect(0x89, s.x, s.y) -- (MSG_FX_TELEPORT)
-	current = { act = s.act, x = s.x, y = s.y, swirl = swirl, sparkAt = 0, last = {} }
+	current = { act = s.act, x = s.x, y = s.y, swirl = swirl, sparkAt = 0, last = {}, way = touch.way() }
 	current.beat = nox.every(G.every, look)
 	if areas then
 		areas.gateOpened(s.act)

@@ -289,12 +289,14 @@ void CoopDirector::leaving(server::GameHost& host, std::uint8_t peer, server::Se
         if (!keepGuest(*it, unit).empty()) {
             writeRecords();
         }
+        writeSeen(); // (its minimap with it)
         thingsLeaveWith(unit);
     }
     std::erase_if(party_, [&](const Member& x) { return x.peer == peer; });
     std::erase_if(toldAt_, [&](const auto& t) { return t.first.first == unit.extent; });
     downs_.erase(peer);
     fileNumbered_.erase(peer);
+    seenOut_.erase(peer);
     if (gather_) {
         gather_->standing.erase(server::ObjectRef{unit.extent});
     }
@@ -328,6 +330,10 @@ void CoopDirector::onMessage(server::GameHost& host, std::uint8_t peer, std::spa
         if (*cmd == coopmsg::HostCmd::SkipBriefing && !reading_.empty()) {
             releaseChapter();
         }
+    } else if (sub == coopmsg::kSeenReport) {
+        if (const auto it = std::ranges::find_if(party_, [&](const Member& x) { return x.peer == peer; }); it != party_.end()) {
+            seenReport(*it, rest);
+        }
     }
 }
 
@@ -357,6 +363,7 @@ void CoopDirector::mapLoaded(server::Server& server)
     wipeBy_ = 0;
     wipeRan_ = false;
     fileNumbered_.clear();
+    seenOut_.clear(); // (the last map's minimaps: each guest's of this one goes at its CLIENT_READY)
     checkpoint_.reset();
     gather_.reset();
     goNow_ = false;
@@ -422,8 +429,8 @@ void CoopDirector::tick(server::GameHost& host, std::uint32_t nowMs)
     for (const std::uint8_t peer : otherClass) {
         host.kickPeer(peer); // (leaving: party_ changes)
     }
-    // A new player behind the party caught up, once its own character is in (or none came: 10 s);
-    // one a saved game's load kept no character for, as the load's map runs.
+    // A player behind the party caught up, once its own character is in, or its kept one given back
+    // (or none came: 10 s); after a saved game's load, as the load's map runs.
     for (Member& m : party_) {
         if (m.host || !m.welcomed || m.caughtUp) {
             continue;
@@ -448,6 +455,7 @@ void CoopDirector::tick(server::GameHost& host, std::uint32_t nowMs)
     rescale(false); // (the party's size changed: at once; else the monsters not seen yet, each 5 s)
     tellRoster(host);
     tellCreatures(host);
+    sendSeenTick(host);
     watchDialog();
     watchSceneDialog();
     tellPartyHealth();

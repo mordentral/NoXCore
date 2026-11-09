@@ -766,6 +766,9 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         // (MSG_REPORT_SECONDARY_WEAPON 0xE0, netMsgLastQuiver 0xE1).
         if (solo(world) && world.hostClient) {
             world.hostClient->clearInventoryWeapons();
+            if (unit.player) {
+                unit.player->secondaryWeapon = 0;
+            }
         }
         const auto findById = [&](std::int32_t id) -> ServerObject* {
             for (const std::uint32_t e : unit.inventory) {
@@ -779,6 +782,9 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
             if (const ServerObject* o = findById(id)) {
                 const std::uint16_t code = netCodeOf(*o);
                 tell(world, unit, {0xE0, lo(code), hi(code), 0});
+                if (unit.player) {
+                    unit.player->secondaryWeapon = code; // (what its client now holds: nox.secondaryWeapon)
+                }
             }
         }
         if (1 < version) {

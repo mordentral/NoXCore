@@ -236,7 +236,7 @@ void Minimap::observe(const nox::client::World& world, const Camera& camera, con
         const auto y = static_cast<float>(d.y);
         const bool onScreen = x >= camera.left() && x <= camera.right() && y >= camera.top() && y <= camera.bottom();
         if (onScreen && (!sight || sight->visible(x, y))) {
-            seenMarkers_.insert(netCode);
+            list(netCode);
         }
     }
     // The ones the client loaded from the map that the server hasn't sent: drawn (and so marked)
@@ -248,7 +248,7 @@ void Minimap::observe(const nox::client::World& world, const Camera& camera, con
         }
         const bool onScreen = s.x >= camera.left() && s.x <= camera.right() && s.y >= camera.top() && s.y <= camera.bottom();
         if (onScreen && (!sight || sight->visible(s.x, s.y))) {
-            seenMarkers_.insert(netCode);
+            list(netCode);
         }
     }
 }
@@ -256,6 +256,7 @@ void Minimap::observe(const nox::client::World& world, const Camera& camera, con
 void Minimap::mapLoaded(const nox::map::MapFile& map)
 {
     seenMarkers_.clear();
+    newlySeen_.clear();
     statics_.clear();
     std::map<std::uint16_t, std::uint16_t> types; // TOC id -> type id
     try {

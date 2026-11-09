@@ -8,7 +8,8 @@
 //              (InventoryTraySpecial) and the tray: 4 columns of 50 x 50 cells, 21 rows, three in
 //              view (InventoryTray1-3 by row), scrolled with the arrows or the mouse wheel.
 //   cells      (guiDrawInventoryTray) the item, a stack's count, a weapon's charges, the equipped ring, a
-//              red / yellow tint on worn-out items. Picked-up items stack with their type
+//              red / yellow tint on worn-out items; in a shop's repair mode, what has nothing to
+//              mend darkened (repair_shade.hpp). Picked-up items stack with their type
 //              (not NOT_STACKABLE ones, up to 32) or take the first free cell, row by row
 //              (Gui_Inv_AddPickedUpItem); gold, the map and identify stay out. One gone
 //              closes the grid up: inventory_grid.hpp.

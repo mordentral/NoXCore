@@ -838,6 +838,11 @@ void bookEvents(App& app)
         case Kind::RevokeAbility:
             app.bars.remove(multiclass(app) ? nox::client::kAbilityTag | static_cast<std::uint32_t>(e.id) : static_cast<std::uint32_t>(e.id));
             break;
+        case Kind::Ability:
+            if (!e.show) {
+                ++app.quietAbilityAwards;
+            }
+            break;
         case Kind::Spell:
             // The Glyph learned (quickbarAddTrap): first time and shown, the bar's
             // end slides off and back as the trap or bomber, with sparks; else it just changes.
@@ -930,34 +935,30 @@ void loadBars(App& app)
 void saveBars(App& app)
 {
     expandBars(app, false);
+    // (A co-op guest's: its campaign character's, kept beside the file it joined with: coop_ui.cpp.
+    // Only into a file the campaign's save made; the one it joined with is never written.)
+    const bool guest = !app.guestBarsFile.empty();
+    const std::filesystem::path& plr = guest ? app.guestBarsFile : app.characterFile;
     // (Game_FinishQuit: only a network game's, not a quest's, under game flag 0x2000
     // without 0x1000; a solo game's .plr is the server's save's.)
-    if (app.characterFile.empty() || (app.live && (soloGame(app) || (gameFlags(app) & 0x1000u)))) {
+    if (plr.empty() || (!guest && app.live && (soloGame(app) || (gameFlags(app) & 0x1000u)))) {
         return;
     }
     if (ownClass(app) != app.profile.playerClass || app.barsMulticlass) { // (a class the server gave, or multiclass bars: not the character's)
         return;
     }
-    try {
-        auto file = nox::player::loadPlayerFile(app.characterFile);
-        const auto cls = static_cast<nox::player::CharacterClass>(app.profile.playerClass);
-        const auto data = app.bars.toGui(cls).serialize();
-        const auto it = std::ranges::find_if(file.sections, [](const nox::player::RawSection& r) {
-            return r.id == static_cast<std::uint32_t>(nox::player::SectionId::Gui);
-        });
-        if (it != file.sections.end()) {
-            if (nox::player::Gui::parse(it->data).characterClass != cls) {
-                SDL_Log("spell bars: %s is another class's; not saved", app.characterFile.string().c_str());
-                return;
-            }
-            it->data = data;
-        } else {
-            file.sections.insert(file.sections.begin(), {static_cast<std::uint32_t>(nox::player::SectionId::Gui), data});
-        }
-        nox::player::savePlayerFile(app.characterFile, file);
-        SDL_Log("spell bars: saved to %s", app.characterFile.string().c_str());
-    } catch (const std::exception& ex) {
-        SDL_Log("spell bars: saving %s: %s", app.characterFile.string().c_str(), ex.what());
+    std::error_code ec;
+    if (guest && !std::filesystem::exists(plr, ec)) {
+        return;
+    }
+    using Written = nox::client::SpellBars::Written;
+    const auto written = app.bars.write(plr, static_cast<nox::player::CharacterClass>(app.profile.playerClass));
+    const std::u8string name = plr.u8string(); // (not string(): a name the code page lacks would throw)
+    const char* named = reinterpret_cast<const char*>(name.c_str());
+    switch (written) {
+    case Written::Saved: SDL_Log("spell bars: saved to %s", named); break;
+    case Written::OtherClass: SDL_Log("spell bars: %s is another class's; not saved", named); break;
+    case Written::Failed: SDL_Log("spell bars: saving %s failed", named); break;
     }
 }
 

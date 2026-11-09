@@ -41,12 +41,6 @@ local beat: number? = nil
 -- areas.luau's own (handed in by place: it requires this module).
 local areas: any = nil
 
--- The pentagram's touches come every PAD_EVERY frames while a player stands on it; a gap longer
--- than PAD_GAP is a new step onto it, which opens the window again (closed by its player, it
--- stays closed while the player still stands there).
-local PAD_EVERY = 5
-local PAD_GAP = 15
-
 local function found(h: any)
 	if not here or not progress.addWaypoint(h.record, here.act, here.index) then
 		return
@@ -94,6 +88,7 @@ function waypoints.go(h: any, index: number, act: number?): (boolean, string?)
 		local x, y = nox.clearPointNear(at.x, at.y, 30)
 		nox.setPosition(h.unit, x, y)
 		nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
+		touch.arrived(h.unit)
 		return true, nil
 	end
 	return votes.ask(h, place, "waypoint", "waypoint")
@@ -164,17 +159,12 @@ function waypoints.message(h: any, v: any)
 	windows.note(h, "waypoints", why :: string)
 end
 
--- The town's waypoints pentagram touched: its window opened on the toucher's UI, at a new step
--- onto it (not again while it stands there after closing it).
+-- The town's waypoints pentagram stepped on: its window opened on the toucher's UI (heard only at
+-- a new step onto it, so not again while it stands there after closing it; a way, so not straight
+-- after arriving: touch.luau).
 local function padTouched(unit: number)
 	local h = hero.byUnit(unit)
 	if not h or not areas then
-		return
-	end
-	local now = nox.frame()
-	local last = h.padAt
-	h.padAt = now
-	if last and now - last <= PAD_GAP then
 		return
 	end
 	windows.open(h, "waypoints")
@@ -183,10 +173,11 @@ end
 windows.register("waypoints", { station = "waypoints", view = waypoints.view })
 
 -- Something landed on the town's receiving pentagram: a hero came home by this map's waypoint
--- (found, if it wasn't); a monster that followed is sent back.
+-- (found, if it wasn't; arriving: touch.luau); a monster that followed is sent back.
 local function arrived(unit: number)
 	local h = hero.byUnit(unit)
 	if h then
+		touch.arrived(unit)
 		if h.ready then
 			found(h)
 		end
@@ -202,7 +193,7 @@ end
 -- the town's pentagrams set to work, and this area's waypoint looked for.
 function waypoints.place(spots: any, info: any, areasApi: any)
 	areas = areasApi
-	touch.adopt("InvisibleTeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, PAD_EVERY)
+	touch.adopt("InvisibleTeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, nil, nil, "way step")
 	touch.adopt("InvisibleTeleportPentagram", spots.town.wayIn.x, spots.town.wayIn.y, arrived, 30, true)
 	if spots.waypoint then
 		here = { act = info.act, index = info.index, title = info.title, x = spots.waypoint.x, y = spots.waypoint.y, arrive = spots.wayArrive }

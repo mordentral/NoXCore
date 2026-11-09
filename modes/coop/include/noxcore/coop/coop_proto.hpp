@@ -51,12 +51,19 @@ inline constexpr std::uint8_t kCharacter = 10;
 inline constexpr std::uint8_t kCreatures = 11;
 /// The most net codes kCreatures carries (a party of 4 controls 20 at most: 5 each).
 inline constexpr std::size_t kCreaturesMost = 64;
+/// What a guest's minimap had seen of the map it just loaded, as the campaign kept it (its own
+/// reports, kSeenReport; its saves' Party\<file key>.seen), at its CLIENT_READY, in parts: each a
+/// SeenCells body (seenParts), added to what the guest has seen. An older client lets it go.
+inline constexpr std::uint8_t kSeen = 13;
 
 // ---- client to server
 /// A guest's chapter screen is over (clicked away, or its time ran out): {}.
 inline constexpr std::uint8_t kChapterReady = 6;
 /// The host's commands from its windows: {u8 HostCmd}.
 inline constexpr std::uint8_t kHostCmd = 9;
+/// A guest's minimap: the walls it drew and the obelisks it marked for the first time since its
+/// last report, about once a second, a SeenCells body each (seenParts). An older host lets it go.
+inline constexpr std::uint8_t kSeenReport = 12;
 
 enum class HostCmd : std::uint8_t {
     SkipBriefing = 1, ///< the chapter screen's wait over for everyone
@@ -138,6 +145,32 @@ struct CharacterPart {
     std::uint16_t at = 0;
     std::vector<std::uint8_t> bytes;
 };
+
+/// Part of what a player's minimap has seen of a map (kSeen, kSeenReport, a .seen file's sections):
+/// {u8 length, the map's name (its file's, any case), u16 n, n wall cells as varints (each cell's
+/// key, x << 8 | y, less the one before it and 1; the first's less -1: 7 bits a byte, low first,
+/// the top bit "more"), u8 m, m u16 obelisks (a map object's extent, 0x7FFF or less)}. The cells
+/// in key order, none twice. A part stands alone: parts are added together.
+struct SeenCells {
+    std::string map;
+    std::vector<std::uint16_t> walls;    ///< the cells' keys, in order
+    std::vector<std::uint16_t> obelisks; ///< the extents, in order
+    bool operator==(const SeenCells&) const = default;
+};
+/// A part's wall cells at most this many bytes, its obelisks at most this many (a reliable
+/// packet's room).
+inline constexpr std::size_t kSeenPart = 800;
+inline constexpr std::size_t kSeenPartObelisks = 32;
+/// The bodies of the parts that carry `walls` and `obelisks` (any order, twice or not; obelisks
+/// past 0x7FFF left out) for `map` (its name cut to kNameMost); none when there's nothing.
+std::vector<std::vector<std::uint8_t>> seenParts(std::string_view map, std::span<const std::uint16_t> walls,
+                                                 std::span<const std::uint16_t> obelisks);
+/// The same framed as `sub`'s messages (kSeen, kSeenReport).
+std::vector<std::vector<std::uint8_t>> seenMessages(std::uint8_t sub, std::string_view map, std::span<const std::uint16_t> walls,
+                                                    std::span<const std::uint16_t> obelisks);
+/// None when it's malformed or bigger than a part: no name, more cells or bytes than a part has,
+/// a cell out of order or past the grid, an obelisk past 0x7FFF, bytes left over.
+std::optional<SeenCells> parseSeen(std::span<const std::uint8_t> rest);
 
 std::vector<std::uint8_t> helloMessage(const Hello& h);
 std::vector<std::uint8_t> noticeMessage(Notice kind, std::string_view text);

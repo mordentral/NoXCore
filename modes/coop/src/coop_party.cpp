@@ -574,6 +574,10 @@ void CoopDirector::clientReady(server::GameHost& host, std::uint8_t peer)
     if (it->host) {
         return;
     }
+    // Its minimap of this map as the campaign kept it (a load's or a revisit's), its reports taken
+    // again.
+    it->seenHeld = false;
+    sendSeen(*it);
     findHiddenStatics();
     // (CliNet_OnPacket's MSG_DESTROY_OBJECT: a net code with the high bit names a static drawable
     // by its map number, set inactive.)

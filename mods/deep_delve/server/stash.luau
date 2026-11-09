@@ -113,6 +113,10 @@ function stash.put(h: any, item: number, tab: number?, slot: number?): (boolean,
 	if f.worn then
 		return false, "take it off first"
 	end
+	local kept = windows.keptBack(h, item)
+	if kept then
+		return false, kept
+	end
 	local s = stash.of(h.record)
 	local t = math.clamp(math.floor(tab or h.stashTab or 1), 1, stash.TABS)
 	local at = slot and math.floor(slot) or freeSlot(s.tabs[t])

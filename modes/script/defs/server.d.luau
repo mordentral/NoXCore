@@ -381,6 +381,8 @@ declare nox: {
     equip: (unit: number, item: number) -> (boolean, string?),
     --- Takes off an item the player's unit wears; whether it came off.
     unequip: (unit: number, item: number) -> boolean,
+    --- The item the player's client holds as its secondary weapon; nil for none, one no longer carried or one in hand now.
+    secondaryWeapon: (unit: number) -> number?,
     --- The game's shop repair price for an item (durability and a staff's charges; a stock keeper's); nil when it needs none.
     repairCost: (item: number) -> number?,
     --- The game's shop repair without gold: durability and a staff's charges to their most, its holder's client told; whether it needed one.

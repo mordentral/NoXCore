@@ -25,8 +25,7 @@
 --          by hero.dealt and hero.taken while it lasts (upgrades.luau);
 --   regen  its passive regeneration's timer and state (regen.luau);
 --   open   its windows open (windows.luau); sheetOf the party member whose sheet its sheet window
---          shows (nil: its own; sheet.luau); padAt the frame it last touched the town's
---          waypoints pentagram (waypoints.luau);
+--          shows (nil: its own; sheet.luau);
 --   told   what its client was told of its book (book.luau);
 --   need   the experience to its next level;
 --   arrival where it comes into play in this map (the area's start or its waypoint, when it came
@@ -48,6 +47,7 @@ local atlas = require("atlas")
 local items = require("items")
 local hud = require("hud")
 local town = require("town")
+local touch = require("touch")
 local tree = require("tree")
 local book = require("book")
 local team = require("team")
@@ -272,6 +272,9 @@ function hero.snapshot(h: any)
 		return
 	end
 	local equipment, inventory = {}, {}
+	-- (its secondary weapon, as its client holds it: its record marked `secondWeapon`, given again
+	-- right after the worn gear (hero.setUp); `secondary` is the enchantment's slot)
+	local second = nox.secondaryWeapon(h.unit)
 	for _, it in nox.inventory(h.unit) do
 		-- (an item being deleted this frame, as one put in the stash or sold, is gone already)
 		local o = nox.object(it.id)
@@ -281,6 +284,9 @@ function hero.snapshot(h: any)
 				rec.worn = nil
 				table.insert(equipment, rec)
 			else
+				if it.id == second then
+					rec.secondWeapon = true
+				end
 				table.insert(inventory, rec)
 			end
 		end
@@ -351,17 +357,44 @@ function hero.setUp(h: any, at: any, keep: boolean?)
 		-- won't give, made at its feet and taken into its inventory (items.hand). One that still can't be
 		-- made is held back: kept in the record as carried (hero.snapshot), tried again at the next
 		-- set-up, never dropped)
+		-- Each list given from its last to its first: a given item goes to the front of the unit's
+		-- inventory, so the inventory then reads in the record's order (the carried, then the worn) and
+		-- the next snapshot keeps it, through any number of maps; its client, told in the giving's
+		-- order, files the worn first and each part the oldest first.
+		-- The secondary weapon (marked by hero.snapshot) is given right after the worn gear, before any
+		-- other carried weapon: a given item is new to the client, and its pickup makes a weapon picked
+		-- up with one in hand and no secondary carried its secondary, so it's the secondary again. It
+		-- then reads last of the carried, and stays there.
 		local heldBack = {}
-		for _, rec in h.record.equipment do
+		local equipment, inventory = h.record.equipment, h.record.inventory
+		for i = #equipment, 1, -1 do
+			local rec = equipment[i]
 			local id = items.hand(h.unit, rec, true)
 			if id then
 				nox.equip(h.unit, id) -- (false and why when the class can't: then it's carried)
 			else
-				table.insert(heldBack, rec)
+				table.insert(heldBack, 1, rec)
 			end
 		end
-		for _, rec in h.record.inventory do
-			if not items.hand(h.unit, rec, true) then
+		local held: { [number]: boolean } = {}
+		local second: number? = nil
+		for i, rec in inventory do
+			if rec.secondWeapon then
+				second = i
+				break
+			end
+		end
+		if second then
+			held[second] = not items.hand(h.unit, inventory[second], true)
+		end
+		for i = #inventory, 1, -1 do
+			if i ~= second and not items.hand(h.unit, inventory[i], true) then
+				held[i] = true
+			end
+		end
+		-- (in the record's order: the worn ones', then the carried ones')
+		for i, rec in inventory do
+			if held[i] then
 				table.insert(heldBack, rec)
 			end
 		end
@@ -400,6 +433,8 @@ function hero.setUp(h: any, at: any, keep: boolean?)
 		nox.setPosition(h.unit, at.x, at.y)
 		nox.effect(0x89, at.x, at.y) -- (MSG_FX_TELEPORT)
 	end
+	-- (each set-up is an arrival: a join, a new map, a respawn; no way takes it at once: touch.luau)
+	touch.arrived(h.unit)
 	h.ready = true
 	h.since = nox.frame()
 	hud.hero(h)
@@ -420,6 +455,7 @@ local function keepInPlay(h: any)
 				nox.setPosition(h.unit, x, y)
 			end
 		end
+		touch.arrived(h.unit)
 	end
 end
 

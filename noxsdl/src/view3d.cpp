@@ -1137,7 +1137,7 @@ void View3D::addWalls(const Frame& f)
         const float height = pictured * (1 + wallRaise_);
         // Its centre in front of (or just behind) the eye counts as seen.
         if (toCam(static_cast<float>(w.x) * kCell + 11.5f, static_cast<float>(w.y) * kCell + 11.5f, 0).depth > -30) {
-            f.view.seenWalls_.set(MapView::wallKey(w.x, w.y)); // (the minimap's seen walls)
+            f.view.seenWalls_.drawn(MapView::wallKey(w.x, w.y)); // (the minimap's seen walls)
         }
         arms.clear();
         wallArms(w, arms);

@@ -231,6 +231,10 @@ function vendor.sell(h: any, item: number): (boolean, string?)
 	if f.worn then
 		return false, "take it off first"
 	end
+	local kept = windows.keptBack(h, item)
+	if kept then
+		return false, kept
+	end
 	local rec = items.recordOf(item)
 	if not rec then
 		return false, "not an item"

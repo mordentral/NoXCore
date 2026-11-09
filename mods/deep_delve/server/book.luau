@@ -19,15 +19,19 @@
 -- What its client holds: a network game's client starts with its class's whole book, so the
 -- first telling of a session, and each after a map change or a client's ready, takes away every
 -- spell of the class's book (every ability, for a warrior; for a conjurer every guide creature
--- too) that the tree doesn't give. Between those, only what the client was told before and the
--- tree no longer gives is taken away. A spell, ability or creature a node has just given or raised
--- is told as a learned one (its line, the book open on it, a spell or ability flown to the
--- client's bar); every other grant is told quietly. A summon spell is told with its creature.
+-- too) that the tree doesn't give (a general spell only when the book held it: below). Between
+-- those, only what the client was told before and the tree no longer gives is taken away. A
+-- spell, ability or creature a node has just given or raised is told as a learned one (its line,
+-- the book open on it, a spell or ability flown to the client's bar); every other grant is told
+-- quietly. A summon spell is told with its creature.
 --
--- Linked spells: a general spell's revoke takes its linked spells off a client too (Summon
--- Creature's, every summon spell). Summon Creature is never granted and always swept: a client
--- that lists only what was granted summons the guide's creatures without it. Its revoke reaches
--- the client after the summon spells' grants, so the book is told again once it has gone (below).
+-- Linked spells: a general spell's revoke takes its linked spells off a client too, its book and
+-- its bars (Summon Creature's, every summon spell). Summon Creature is never granted: a client
+-- that lists only what was granted summons the guide's creatures without it. So a general spell
+-- is swept only when the unit's book on the server holds it (read before the clearing): one it
+-- never had isn't revoked, and the summons a conjurer put on its bars stay there. When one is
+-- revoked, its revoke reaches the client after the summon spells' grants, so the book is told
+-- again once it has gone (below).
 --
 -- A revoke waits in the toolbox's queue (a player between maps gets it once it's in), while a
 -- grant goes at once; what the tree gives is never revoked in the same telling. Should the tree
@@ -180,13 +184,20 @@ function book.apply(h: any, fresh: boolean?)
 		end
 	end
 	local abilities: { [number]: number } = want.abilities
+	-- The general spells its book holds before the clearing (only those are revoked).
+	local leaders = leadersOf(class)
+	local held: { [number]: boolean } = {}
+	for _, l in leaders do
+		if nox.spellLevel(h.unit, l) > 0 then
+			held[l] = true
+		end
+	end
 	nox.clearBook(h.unit)
 	-- What comes. What the tree has just given or raised (since the last telling in this map) is
 	-- told as the game tells a learned one: the line, the book opened on it, a spell or ability
 	-- flown to the bar.
 	local told = h.told
 	local queued = h.revoking or {}
-	local leaders = leadersOf(class)
 	local again = false
 	for id, level in spells do
 		local learned = not quiet[id] and told ~= nil and (told.spells[id] or 0) < level
@@ -242,11 +253,14 @@ function book.apply(h: any, fresh: boolean?)
 			end
 		else
 			for _, id in classBook(class) do
-				if not spells[id] then
+				local leader = table.find(leaders, id) ~= nil
+				-- (a general spell only when the book held it: its revoke would take the linked
+				-- spells off the client's bars too)
+				if not spells[id] and (not leader or held[id]) then
 					revoke(h, p.name, REVOKE_SPELL, id)
 					-- (a general spell's revoke sets its linked spells to 0 on the client when it
 					-- arrives, after this telling's grants: those the tree gives are told again)
-					if not again and table.find(leaders, id) then
+					if not again and leader then
 						for given in spells do
 							if linked(id, given) then
 								again = true

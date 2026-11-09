@@ -1212,6 +1212,12 @@ The engine's logic is the exe's; these are where the output differs.
     WORKING (copied to the slot with the rest) with each guest's character (the server's sections,
     as a quest player's) and party.txt (who, which map and where, the creatures each owns). A
     guest leaving has its character kept there at once.
+  - Each player keeps its own explored minimap across saves, loads and revisits (the owner's
+    decision of 2026-11-08). The host's is the game's (the map copies' wall and obelisk bytes). A
+    NoX Core guest, which loads each map's own file, tells the host the walls it draws and the
+    map's obelisks it marks for the first time (about once a second); the host keeps them by
+    runner and map in the Party folder (<file key>.seen) and gives them back as each map loads for
+    it, a saved game's or a revisit's. A stock guest sees every wall (0x10000), as before.
   - A player the campaign knows (by account and name) gets its campaign character back as it
     joins (its own file isn't asked for), and every guest gets its own after the host loads a
     saved game (where it stood, its creatures its own again). A guest the loaded save keeps no

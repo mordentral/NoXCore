@@ -5,6 +5,7 @@
 
 #include "hud.hpp"
 #include "player_art.hpp"
+#include "repair_shade.hpp"
 
 #include "noxcore/things/object_class.hpp"
 
@@ -761,6 +762,16 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
                         }
                     }
                     drawItem(r, item.typeId, item.modifiers, x + 25, y + 25, s);
+                    // A shop's repair mode: what has nothing to mend at half brightness (repair_shade.hpp).
+                    if (shopMode_ == ShopMode::Repair) {
+                        const TypeArt* a = art_.get(item.typeId);
+                        if (repairShaded(item.health.value_or(0), item.maxHealth.value_or(0), item.charges.value_or(0),
+                                         item.maxCharges.value_or(0), a && (a->classes & oc::Wand))) {
+                            SDL_SetRenderDrawColor(r, 0, 0, 0, 128); // (each pixel halved)
+                            const SDL_FRect f{x * s, y * s, kCell * s, kCell * s};
+                            SDL_RenderFillRect(r, &f);
+                        }
+                    }
                     if (c.items.size() > 1) {
                         text(std::to_string(c.items.size()), x + 6, y + 6, {255, 255, 255, 255});
                     }

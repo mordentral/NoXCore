@@ -177,6 +177,10 @@ struct PlayerControl {
     float viewHalfWidth = 320;
     float viewHalfHeight = 240;
     std::uint8_t stamina = 100;
+    /// Its secondary weapon's net code as its client last reported it (MSG_REPORT_SECONDARY_WEAPON)
+    /// and the server didn't refuse, or as a .plr's read told it; 0 none. Read only (a mod's
+    /// nox.secondaryWeapon), so it may be stale: a reader checks the item is still carried.
+    std::uint16_t secondaryWeapon = 0;
     /// Its minimap's marks (player.hpp's markMinimap), the list's head first.
     struct MinimapMark {
         ObjectRef object;

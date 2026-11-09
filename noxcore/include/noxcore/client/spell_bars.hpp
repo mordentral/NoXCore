@@ -10,6 +10,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -66,6 +67,8 @@ struct SpellBars {
     std::uint8_t trapRow = 0;
     std::uint8_t summonOrder = 4; ///< kept for the .plr (the summon panel's default order)
 
+    bool operator==(const SpellBars&) const = default;
+
     BarRow& current() { return rows[row]; }
     const BarRow& current() const { return rows[row]; }
     std::array<BarSlot, 3>& currentTrap() { return traps[trapRow]; }
@@ -86,11 +89,26 @@ struct SpellBars {
     /// Puts `id` in a slot (book for a spell from the book: lit if it goes on its
     /// caster, flags 0x600).
     void place(int set, int slot, std::uint32_t id, const things::ThingDb& things);
+    /// Each ability `levels` knows (World's abilityLevel: a level other than 0) that no set holds,
+    /// by id, in the set in use's first empty slot: no slot moved or written over, none twice, and
+    /// what doesn't fit left off. Only a co-op guest's (`coopGuest`; coop_ui.cpp: a new runner's
+    /// start empty, and a load's or a rejoin's awards are quiet ones, which fill no slot); anyone else's
+    /// bars untouched. `tag`: kAbilityTag on multiclass bars. Returns how many went in.
+    int addKnownAbilities(const std::array<std::uint8_t, 6>& levels, bool coopGuest, std::uint32_t tag = 0);
 
     /// From the .plr's Gui section. Unknown names leave the slot empty.
     static SpellBars fromGui(const player::Gui& gui);
     /// For the .plr's Gui section (abilities by name for a warrior; spells otherwise).
     player::Gui toGui(player::CharacterClass characterClass) const;
+
+    /// The bars in `plr`'s Gui section when they're `characterClass`'s; none when the file isn't
+    /// there or can't be read, has no Gui section, or its bars are another class's.
+    static std::optional<SpellBars> read(const std::filesystem::path& plr, player::CharacterClass characterClass);
+    enum class Written : std::uint8_t { Saved, OtherClass, Failed };
+    /// These bars into `plr`'s Gui section (replaced, or put first when it has none), the rest of the
+    /// file as it was. OtherClass: its Gui section is another class's, left alone. Failed: no file,
+    /// or it couldn't be read or written.
+    Written write(const std::filesystem::path& plr, player::CharacterClass characterClass) const;
 
     /// How many starting sets the class has.
     static int presetCount(player::CharacterClass characterClass);

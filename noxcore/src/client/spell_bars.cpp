@@ -4,6 +4,8 @@
 
 #include "noxcore/things/spell_ids.hpp"
 
+#include <algorithm>
+#include <exception>
 #include <string_view>
 
 namespace nox::client {
@@ -121,6 +123,27 @@ void SpellBars::place(int set, int slot, std::uint32_t id, const things::ThingDb
     s.target = id != 0 && (spellFlags(things, id) & 0x600) != 0;
 }
 
+int SpellBars::addKnownAbilities(const std::array<std::uint8_t, 6>& levels, bool coopGuest, std::uint32_t tag)
+{
+    if (!coopGuest) {
+        return 0;
+    }
+    int added = 0;
+    for (std::uint32_t a = 1; a < levels.size(); ++a) {
+        const std::uint32_t id = tag | a;
+        if (levels[a] == 0 || contains(id)) {
+            continue;
+        }
+        const auto slot = firstEmptyInRow();
+        if (!slot) {
+            break;
+        }
+        current()[static_cast<std::size_t>(*slot)].id = id; // (as an award's landing puts it: the flag left)
+        ++added;
+    }
+    return added;
+}
+
 SpellBars SpellBars::fromGui(const player::Gui& gui)
 {
     SpellBars b;
@@ -184,6 +207,44 @@ player::Gui SpellBars::toGui(player::CharacterClass characterClass) const
     g.activeTrap = trapRow;
     g.summonOrder = summonOrder;
     return g;
+}
+
+std::optional<SpellBars> SpellBars::read(const std::filesystem::path& plr, player::CharacterClass characterClass)
+{
+    try {
+        const auto file = player::loadPlayerFile(plr);
+        if (const auto* raw = file.find(player::SectionId::Gui)) {
+            const auto gui = player::Gui::parse(raw->data);
+            if (gui.characterClass == characterClass) {
+                return fromGui(gui);
+            }
+        }
+    } catch (const std::exception&) {
+    }
+    return std::nullopt;
+}
+
+SpellBars::Written SpellBars::write(const std::filesystem::path& plr, player::CharacterClass characterClass) const
+{
+    try {
+        auto file = player::loadPlayerFile(plr);
+        const auto data = toGui(characterClass).serialize();
+        const auto it = std::ranges::find_if(file.sections, [](const player::RawSection& r) {
+            return r.id == static_cast<std::uint32_t>(player::SectionId::Gui);
+        });
+        if (it != file.sections.end()) {
+            if (player::Gui::parse(it->data).characterClass != characterClass) {
+                return Written::OtherClass;
+            }
+            it->data = data;
+        } else {
+            file.sections.insert(file.sections.begin(), {static_cast<std::uint32_t>(player::SectionId::Gui), data});
+        }
+        player::savePlayerFile(plr, file);
+    } catch (const std::exception&) {
+        return Written::Failed;
+    }
+    return Written::Saved;
 }
 
 int SpellBars::presetCount(player::CharacterClass characterClass)

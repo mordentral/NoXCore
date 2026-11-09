@@ -4,9 +4,12 @@
 -- the player's small window. Which are open is kept on the hero (`open`); each window's module
 -- (stash.luau, vendor.luau, treeview.luau, sheet.luau) registers how it's shown.
 --
--- The stash and the vendor both show what the player carries (not what it wears): one list,
--- with the vendor's price for each while the vendor is open (and its repair's, with the list of the
--- pieces worn or carried that need one).
+-- The stash and the vendor both show what the player carries (not what it wears): one list, the
+-- gear first (not the secondary weapon) and then the potions and supplies, the oldest first in
+-- each; plain potions and supplies
+-- of one type stacked three to an entry with their count and ids (windows.grid). With the vendor's price
+-- for each while the vendor is open (and its repair's, with the list of the pieces worn or carried
+-- that need one).
 --
 -- One beat runs while anyone has a window open: a station window closes when its player walks
 -- away from the station, a changed inventory is shown again, and an open sheet or tree is kept
@@ -81,13 +84,75 @@ function windows.carried(h: any): { any }
 	return out
 end
 
+-- The types stacked in the carried grid: the vendor's potions and supplies (a plain one's).
+local stackable: { [string]: boolean } = {}
+for _, p in vendorData.potions do
+	stackable[p.type] = true
+end
+for _, p in vendorData.supplies do
+	stackable[p.type] = true
+end
+
+-- What a carried record stacks by: nil for one shown alone (gear, or a potion or a supply with
+-- anything that makes it different: a rarity, affixes, modifiers, a unique's or a set's id); else
+-- its type, durability and charges (a quiver's arrows: a full one never stacks with a used one).
+function windows.stackKey(rec: any): string?
+	if not stackable[rec.type] or (rec.rarity or "normal") ~= "normal" or rec.unique or rec.set then
+		return nil
+	end
+	if rec.affixes and #rec.affixes > 0 then
+		return nil
+	end
+	for _, slot in items.SLOTS do
+		if rec[slot] then
+			return nil
+		end
+	end
+	return rec.type .. "/" .. tostring(rec.durability) .. "/" .. tostring(rec.charges)
+end
+
+-- The carried grid's entries: { { id, ids, rec, facts } }, the gear first, then the potions and
+-- supplies, each part the oldest first (the inventory's own order is the newest first); the plain
+-- potions and supplies of one type (windows.stackKey) one entry of at most `stackMax` (more start
+-- another, after it), `ids` theirs (the oldest first, `id` the first of them), at the place of the
+-- oldest. The secondary weapon isn't in it (it's neither sold nor stashed: windows.keptBack).
+function windows.grid(h: any): { any }
+	local out, stacks = {}, {}
+	local byKey: { [string]: any } = {}
+	local list = windows.carried(h)
+	local second = if #list > 0 then nox.secondaryWeapon(h.unit) else nil
+	for i = #list, 1, -1 do
+		local c = list[i]
+		local key = windows.stackKey(c.rec)
+		if c.id == second then
+			continue
+		elseif key == nil then
+			table.insert(out, { id = c.id, ids = { c.id }, rec = c.rec, facts = c.facts })
+		else
+			local s = byKey[key]
+			if s and #s.ids < vendorData.stackMax then
+				table.insert(s.ids, c.id)
+			else
+				s = { id = c.id, ids = { c.id }, rec = c.rec, facts = c.facts }
+				byKey[key] = s
+				table.insert(stacks, s)
+			end
+		end
+	end
+	for _, s in stacks do
+		table.insert(out, s)
+	end
+	return out
+end
+
 -- An item's entry for a window, shown to hero `h`: { t = type, r = rarity, tl = its tooltip's
 -- lines (tips.luau) }; `facts` a live item's (nox.item's), nil for a record (stashed, stocked).
 function windows.entry(h: any, rec: any, facts: any?): any
 	return { t = rec.type, r = rec.rarity or "normal", tl = tips.lines(rec, facts, h) }
 end
 
--- The inventory's ids as one string (whether it changed since it was shown).
+-- The inventory's ids, its secondary weapon and its gold as one string (whether it changed since
+-- it was shown).
 local function signature(h: any): string
 	if not nox.present(h.unit) then
 		return ""
@@ -96,16 +161,31 @@ local function signature(h: any): string
 	for _, it in nox.inventory(h.unit) do
 		table.insert(ids, tostring(it.id))
 	end
-	return table.concat(ids, ",") .. "/" .. tostring(nox.gold(h.unit))
+	return table.concat(ids, ",") .. "/" .. tostring(nox.secondaryWeapon(h.unit)) .. "/" .. tostring(nox.gold(h.unit))
 end
 
--- What the hero carries, to its UI (with the vendor's prices while the vendor is open).
+-- Why a carried item may not leave by the stash or the vendor (nil: it may): it's the hero's
+-- secondary weapon (by decision 2026-11-08, issue #14).
+function windows.keptBack(h: any, item: number): string?
+	if nox.secondaryWeapon(h.unit) == item then
+		return "that's your secondary weapon"
+	end
+	return nil
+end
+
+-- What the hero carries, to its UI (with the vendor's prices while the vendor is open): the grid's
+-- entries (windows.grid), each { i = its id, t, r, tl }, a stack's with n = its count and
+-- ids = its ids too (i the first of them: a click sells or stashes that one).
 function windows.sendCarried(h: any)
 	local list = {}
 	local priced = windows.isOpen(h, "vendor") and kinds.vendor
-	for _, c in windows.carried(h) do
+	for _, c in windows.grid(h) do
 		local e = windows.entry(h, c.rec, c.facts)
 		e.i = c.id
+		if #c.ids > 1 then
+			e.n = #c.ids
+			e.ids = c.ids
+		end
 		if priced then
 			e.p = kinds.vendor.price(c.rec)
 			if c.rec.rarity == "magic" or c.rec.rarity == "rare" then

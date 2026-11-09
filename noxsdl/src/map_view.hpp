@@ -27,6 +27,7 @@
 #include "lighting.hpp"
 #include "polygon_ambient.hpp"
 #include "scene_order.hpp"
+#include "seen_walls.hpp"
 #include "sight.hpp"
 #include "sprite_cache.hpp"
 #include "thing_art.hpp"
@@ -304,6 +305,11 @@ public:
         return x >= 0 && x < 256 && y >= 0 && y < 256 &&
                seenWalls_.test(wallKey(static_cast<std::uint8_t>(x), static_cast<std::uint8_t>(y)));
     }
+    /// The wall cells (wallKey) first drawn since the last call (a co-op guest's report to its host).
+    std::vector<std::uint16_t> takeDrawnWalls() { return seenWalls_.takeDrawn(); }
+    /// Wall cells seen before, kept for us elsewhere (a co-op guest's, by its host), added to the
+    /// minimap's seen walls.
+    void markSeen(std::span<const std::uint16_t> keys) { seenWalls_.markSeen(keys); }
     /// The map's doors, where they stand and which way they face (0-31).
     struct Door {
         float x = 0;
@@ -540,7 +546,7 @@ private:
     void indexObjects();
     /// The view's ambient from the map's AmbientData and polygons (polygonDrawColor; polygon_ambient.hpp).
     mutable PolygonAmbient ambient_;
-    mutable std::bitset<65536> seenWalls_; ///< walls drawn on screen so far (by wallKey)
+    mutable SeenWalls seenWalls_; ///< walls drawn on screen so far (by wallKey)
     bool collectBloom_ = false;
     bool batchImages_ = false; ///< setBatchImages
     float sdFloorBelow_ = 0;   ///< setSdFloorBelow

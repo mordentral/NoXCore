@@ -63,7 +63,10 @@
 --   dd types             every creature type the mod makes (rosters, champions, bosses, their
 --                        adds), sorted
 --   dd gold [N]          the first player's gold (set to N)
---   dd carried           what it carries: "n id type rarity worn" (n: the stash's and vendor's N)
+--   dd carried [grid]    what it carries: "n id type rarity worn" (n: the stash's and vendor's N,
+--                        the newest first; its secondary weapon's line ends "secondWeapon"); "grid": the stash's and vendor's carried grid, a cell
+--                        a line, "k type rarity count ids" (the gear, then the stacked potions and
+--                        supplies, each the oldest first)
 --   dd stash [open | put N | take TAB SLOT | deposit | withdraw]   its stash (as its window
 --                        does: by the chest); alone, its contents "tab slot type rarity mods"
 --   dd vendor [open | buy I | sell N | reroll N | restock LEVEL | stock ITEM | repair ID |
@@ -1339,16 +1342,31 @@ function commands.gold(args: { string }): { string }
 	return { "gold " .. nox.gold(h.unit) .. ", stashed " .. tostring(h.record.gold.stashed or 0) }
 end
 
-function commands.carried(_args: { string }): { string }
+function commands.carried(args: { string }): { string }
 	local h = firstHero()
 	if not h then
 		return { "no player" }
 	end
 	local out = {}
+	if args[2] == "grid" then
+		-- (the stash's and vendor's carried grid, a cell a line: "k type rarity count ids")
+		for k, c in windows.grid(h) do
+			local ids = {}
+			for _, id in c.ids do
+				table.insert(ids, tostring(id))
+			end
+			table.insert(out, string.format("%d %s %s %d %s", k, tostring(c.rec.type), tostring(c.rec.rarity), #c.ids, table.concat(ids, ",")))
+		end
+		return if #out > 0 then out else { "none" }
+	end
+	local second = if nox.present(h.unit) then nox.secondaryWeapon(h.unit) else nil
 	for n, c in windows.carried(h) do
 		local r = c.rec
 		local words = { tostring(n), tostring(c.id), tostring(r.type), tostring(r.rarity), tostring(r.effectiveness), tostring(r.material),
 			tostring(r.primary), tostring(r.secondary) }
+		if c.id == second then
+			table.insert(words, "secondWeapon")
+		end
 		table.insert(out, table.concat(words, " "))
 	end
 	return out
@@ -1876,7 +1894,7 @@ function commands.help(_args: { string }): { string }
 		"dd status | spots | save | xp N | award N | loot RARITY [N] [LEVEL] | modifiers [all | TYPE] | ground | monster ID | check | types",
 		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|actGate|pack [N] | area N|A-N [waypoint] | portal | waypoint N|A-N",
 		"dd progress | boss | fight [now] | smite | trial SEED N | gate [take] | seed | town | tiers | number NAME [I]",
-		"dd gold [N] | carried | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs|gear] | roll TYPE RARITY N [L] [CLASS]",
+		"dd gold [N] | carried [grid] | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs|gear] | roll TYPE RARITY N [L] [CLASS]",
 		"dd give TYPE RARITY [LEVEL] [SLOT=MOD]... [affix=ID:N]... | tip carried N|stash T S|stock I | tips [on|off] | wire | affixes [TYPE N [L] [CLASS]|worn|allowed [TYPE]] | ward",
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs|find NAME...] | icons | book | sheet [gear] | ui stash|vendor|waypoints|tree|sheet [NAME]",
 		"dd warrior [rage N | clear] | actives [clear | ready] | upgrades [clear]",
