@@ -330,6 +330,11 @@ int Painter::pixelSize(bool large) const
     if (!res_.textFont()) {
         return 10;
     }
+    if (!large && res_.textFont() == res_.font) {
+        // The original small face has nine pixel rows; the ten-unit GUI line includes
+        // spacing. Stretching the glyphs to fill it makes stock server labels wrap.
+        return res_.font->gameFontSize(scale_ * fontScale());
+    }
     const float target = (large ? 16 : 10) * fontScale() * scale_;
     const float perPixel = res_.textFont()->gameFace(large).lineHeight(100) / 100.0f;
     return std::max(6, static_cast<int>(std::lround(target / perPixel)));
