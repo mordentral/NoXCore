@@ -20,10 +20,7 @@
 
 namespace nox::coop {
 
-namespace {
-
-/// A creature type's name as players read it: "AirshipCaptain" -> "Airship Captain".
-std::string spaced(std::string_view type)
+std::string spacedName(std::string_view type)
 {
     std::string s;
     for (std::size_t i = 0; i < type.size(); ++i) {
@@ -34,6 +31,8 @@ std::string spaced(std::string_view type)
     }
     return s;
 }
+
+namespace {
 
 /// MSG_FADE_BEGIN 0xE4 {1 from black / 0 to black, over the menus}: a stock client's fade.
 std::vector<std::uint8_t> fadeMessage(bool fromBlack, bool overMenu)
@@ -357,7 +356,7 @@ void CoopDirector::mirrorDialog(const server::ServerObject& talker, const std::s
             for (const char16_t c : talker.player->name) {
                 name += c < 0x80 ? static_cast<char>(c) : '?';
             }
-            notice(m, coopmsg::Notice::Info, name + " is talking to " + spaced(npc->typeName) + ".");
+            notice(m, coopmsg::Notice::Info, name + " is talking to " + spacedName(npc->typeName) + ".");
         }
     }
 }

@@ -12,6 +12,7 @@
 #include "noxcore/server/enchant.hpp"
 #include "noxcore/server/host_client.hpp"
 #include "noxcore/server/items.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/object_links.hpp"
 #include "noxcore/server/object_save.hpp"
 #include "noxcore/server/player.hpp"
@@ -753,19 +754,31 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         }
         // The worn ones worn again (Plr_TryEquip), by script id.
         const std::uint8_t worn = r.u8();
+        std::vector<ObjectKey> wornHeld; // (noxcpp: for a mode, ModeHooks::wornRead)
         for (std::uint8_t i = 0; i < worn; ++i) {
             const std::int32_t id = r.i32();
             for (const std::uint32_t e : keysOf(unit.inventory)) {
                 if (ServerObject* o = world.byExtent(e); o && o->scriptId == id) {
                     items.tryEquip(unit, *o);
+                    if (world.modeHooks) {
+                        wornHeld.push_back(o->extent);
+                    }
                 }
             }
         }
+        // The worn list told to a mode (noxcpp: what the file had worn, in its order, held now).
+        if (world.modeHooks && !wornHeld.empty()) {
+            world.modeHooks->wornRead(world, unit, wornHeld);
+        }
         // A solo game's: the host's inventory window's secondary weapon and quiver cleared
         // (Gui_Inv_SetSecondaryWeapon(0, 0), Gui_Inv_SetLastQuiver(0)). Its client told the file's
-        // (MSG_REPORT_SECONDARY_WEAPON 0xE0, netMsgLastQuiver 0xE1).
+        // (MSG_REPORT_SECONDARY_WEAPON 0xE0, netMsgLastQuiver 0xE1). (noxcpp: the host's own load
+        // alone; a solo game's guest's leaves the host's window as it is. In a solo game alone the
+        // one player is the host: as the exe.)
         if (solo(world) && world.hostClient) {
-            world.hostClient->clearInventoryWeapons();
+            if (unit.player && (unit.player->index & 31u) == 0x1F) {
+                world.hostClient->clearInventoryWeapons();
+            }
             if (unit.player) {
                 unit.player->secondaryWeapon = 0;
             }

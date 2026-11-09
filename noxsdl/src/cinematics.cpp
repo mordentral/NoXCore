@@ -87,6 +87,7 @@ public:
     void blind() override
     {
         SDL_Log("cinematics: Blind");
+        c_.scriptedBlack_ = true;
         c_.blind();
     }
     void unblind() override
@@ -120,7 +121,13 @@ public:
             }
         });
     }
-    void setMapDrawn(bool drawn) override { c_.mapDrawn_ = drawn; }
+    void setMapDrawn(bool drawn) override
+    {
+        if (!drawn) {
+            c_.scriptedBlack_ = true; // (a chapter screen's, its briefing next)
+        }
+        c_.mapDrawn_ = drawn;
+    }
     bool wideScreenMoving() const override { return c_.find(Fx::Bars) != nullptr; }
     void wideScreen(bool on) override
     {
@@ -133,6 +140,7 @@ public:
     void playMapIntro(bool immediate) override
     {
         SDL_Log("cinematics: map intro%s", immediate ? " (immediate)" : "");
+        c_.scriptedBlack_ = immediate; // (ImmediateBlind's, or a saved game's load's)
         c_.mapIntro(immediate);
     }
     void endGame(int kind) override
@@ -611,30 +619,35 @@ void Cinematics::message(std::span<const std::uint8_t> m)
         // loaded and the client's ready): the map off and the black screen over everything, here and now (before
         // our host's map start can fade, StartupScreen's Draw_FadeInScreen then ending at once).
         mapDrawn_ = false;
+        scriptedBlack_ = false;
         blackScreen(true);
         return;
     }
+    const auto take = [&](std::size_t n) { messages_.push(std::vector<std::uint8_t>(m.begin(), m.begin() + static_cast<std::ptrdiff_t>(n))); };
     // MSG_FADE_BEGIN (0xE4) and MSG_CHAPTER_END (0xD6): 3 bytes, handled at the next update.
     if (m.size() >= 3 && (m[0] == 0xE4 || m[0] == 0xD6)) {
-        messages_.emplace_back(m.begin(), m.begin() + 3);
+        take(3);
     }
     // MSG_GAUNTLET's screens (CliNet_OnPacket: 0x0C 90 bytes, 0x0D / 0x0E 69, 0x1C 3).
     if (m.size() >= 3 && m[0] == 0xF0 && m[1] == 0x1C) {
-        messages_.emplace_back(m.begin(), m.begin() + 3);
+        take(3);
     } else if (m.size() >= 0x5A && m[0] == 0xF0 && m[1] == 0x0C) {
-        messages_.emplace_back(m.begin(), m.begin() + 0x5A);
+        take(0x5A);
     } else if (m.size() >= 0x45 && m[0] == 0xF0 && (m[1] == 0x0D || m[1] == 0x0E)) {
-        messages_.emplace_back(m.begin(), m.begin() + 0x45);
+        take(0x45);
+    }
+}
+
+void Cinematics::call(std::function<void(nox::server::HostClient&)> fn)
+{
+    if (fn) {
+        messages_.push([this, fn = std::move(fn)] { fn(*link_); });
     }
 }
 
 void Cinematics::flushMessages()
 {
-    while (!messages_.empty()) {
-        const auto m = std::move(messages_.front());
-        messages_.pop_front();
-        handle(m);
-    }
+    messages_.drain([this](const std::vector<std::uint8_t>& m) { handle(m); });
 }
 
 // One queued message, handled on the main thread (from update).
@@ -654,6 +667,7 @@ void Cinematics::handle(const std::vector<std::uint8_t>& m)
                 }
             });
         } else {
+            scriptedBlack_ = false; // (a map's way out: the next map's fade ends it)
             fadeToBlack(kFadeFrames, menu, [this] {
                 if (!find(Fx::FromBlack)) {
                     mapDrawn_ = false;
@@ -671,7 +685,7 @@ void Cinematics::handle(const std::vector<std::uint8_t>& m)
     }
 }
 
-void Cinematics::update(std::uint64_t nowMs, bool inGame, int backbufferHeight, int playerClass)
+void Cinematics::update(std::uint64_t nowMs, bool inGame, int backbufferHeight, int playerClass, bool held)
 {
     nowMs_ = nowMs;
     backbufferHeight_ = backbufferHeight > 0 ? backbufferHeight : 768;
@@ -689,6 +703,16 @@ void Cinematics::update(std::uint64_t nowMs, bool inGame, int backbufferHeight, 
     lastFrame_ = frame;
     for (std::uint64_t i = 0; i < due; ++i) {
         clientFrame(inGame);
+    }
+    // (noxcpp) A black nothing will end: in a game, the map off with nothing under way for
+    // BlackWatch::kStuckMs; one the game's scripts didn't put up ended (Escape opens the menu
+    // either way: refuses). Not the original's: issue #14's black at a load, VD-67.
+    const bool underWay = wideScreen_ || find(Fx::FromBlack) || find(Fx::ToBlack) || find(Fx::Bars) || find(Fx::BarsOut) ||
+                          screenUp(); // (screenUp: a briefing, the load menu, a message box)
+    if (watch_.update(nowMs, {.inGame = inGame && !held, .mapDrawn = mapDrawn_, .underWay = underWay, .scripted = scriptedBlack_})) {
+        SDL_Log("cinematics: the screen black for %llu ms in game with nothing under way: the fades stopped and the map drawn",
+                static_cast<unsigned long long>(watch_.quietMs()));
+        stopAllFades();
     }
 }
 
@@ -716,7 +740,8 @@ bool Cinematics::refuses(std::string_view control) const
     // The widescreen (guiCursor) refuses the casts, potions, map, inventory, book, weapon
     // swap, quick save / load and Escape (consoleEsc: a fade too, video_inFadeTransition).
     if (control == "ToggleQuitMenu") {
-        return wideScreen_ || find(Fx::FromBlack) || find(Fx::ToBlack) || !mapDrawn_;
+        // (noxcpp: the map's black that's stuck, BlackWatch's, doesn't refuse it: VD-67.)
+        return wideScreen_ || find(Fx::FromBlack) || find(Fx::ToBlack) || (!mapDrawn_ && !watch_.stuck());
     }
     if (!wideScreen_) {
         return false;

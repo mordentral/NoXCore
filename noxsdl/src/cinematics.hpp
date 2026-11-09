@@ -62,6 +62,7 @@
 
 #include "audio.hpp"
 #include "gui.hpp"
+#include "screen_watch.hpp"
 #include "thing_art.hpp"
 
 #include "noxcore/client/solo_saves.hpp"
@@ -174,10 +175,14 @@ public:
     /// The messages taken and not yet handled handled now (before the calls our host queued after
     /// them run: LocalHost keeps their order).
     void flushMessages();
+    /// (noxcpp) A mode's call on the host's client (a co-op guest's relayed cinematics), made in its
+    /// turn with the messages taken: at the next update (or flushMessages), in the order they came.
+    void call(std::function<void(nox::server::HostClient&)> fn);
 
     /// Each frame: the client frames (30 a second) due run. `inGame`: the world view is up;
-    /// `backbufferHeight` the game's resolution's height; `playerClass` ours (0-2).
-    void update(std::uint64_t nowMs, bool inGame, int backbufferHeight, int playerClass);
+    /// `backbufferHeight` the game's resolution's height; `playerClass` ours (0-2). `held`: the
+    /// view held (a movie playing, the map held for its HD images): the black's watch waits.
+    void update(std::uint64_t nowMs, bool inGame, int backbufferHeight, int playerClass, bool held = false);
 
     /// gameDisableMapDraw off.
     bool mapDrawn() const { return mapDrawn_; }
@@ -187,7 +192,8 @@ public:
     bool briefingShown() const { return briefed_; }
     /// A briefing or the load menu is up (it takes the input).
     bool screenUp() const;
-    /// Whether the game refuses `control` now (the widescreen's, a fade's Escape).
+    /// Whether the game refuses `control` now (the widescreen's, a fade's Escape). (noxcpp: Escape
+    /// not refused for the map's black once it's stuck: screen_watch.hpp's BlackWatch, VD-67.)
     bool refuses(std::string_view control) const;
 
     /// The records under the GUI, at the world's end (`width` x `height`: the game's area).
@@ -351,7 +357,12 @@ private:
     int playerClass_ = 0;
     std::uint64_t nowMs_ = 0;
     std::uint64_t lastFrame_ = 0;
-    std::deque<std::vector<std::uint8_t>> messages_;
+    ScreenQueue messages_; ///< (the messages taken and the modes' calls, in the order they came)
+    /// (noxcpp) The watch on a lasting black (screen_watch.hpp), and whether the black up now is the
+    /// game's scripts' (Blind, ImmediateBlind, a chapter screen's map off: never ended by it) rather
+    /// than a load's (MSG_USE_MAP, a fade to black's message, a load's map intro).
+    BlackWatch watch_;
+    bool scriptedBlack_ = false;
 
     // The widescreen's memory: what was open.
     bool hudHidden_ = false;

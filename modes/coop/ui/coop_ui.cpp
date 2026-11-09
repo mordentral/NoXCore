@@ -30,10 +30,9 @@ namespace {
 
 /// One of the host's client's calls made on ours (a guest's own Cinematics, as the host's server
 /// calls the host's: cinematics.hpp's HostClient).
-void applyCine(App& app, const nox::coop::coopmsg::Cine& c)
+void applyCine(nox::server::HostClient& h, const nox::coop::coopmsg::Cine& c)
 {
     using Call = nox::coop::coopmsg::CineCall;
-    nox::server::HostClient& h = app.cinematics->hostClient();
     switch (c.call) {
     case Call::Blind: h.blind(); break;
     case Call::UnBlind: h.unblind(); break;
@@ -123,6 +122,18 @@ public:
             app_.cinematics->setGuest(false);
         }
         coop_ = dynamic_cast<nox::coop::CoopClient*>(side);
+        if (coop_) {
+            // A guest's cinematics (the host's client's calls) onto our Cinematics' queue as each
+            // comes, in their turn among the game's messages (a fade's MSG_FADE_BEGIN before or after
+            // them), applied at its next update whether or not the HUD draws (issue #14: a darkening
+            // call applied after the fade-in left the screen black). (None is sent to the host.)
+            coop_->setCineSink([this, client = coop_](const nox::coop::coopmsg::Cine& c) {
+                if (coop_ != client || !app_.cinematics || (client->hello() && !client->guest())) {
+                    return;
+                }
+                app_.cinematics->call([c](nox::server::HostClient& h) { applyCine(h, c); });
+            });
+        }
         reading_ = {};
         dialogSeen_ = 0;
         barsLooked_ = false;
@@ -153,8 +164,7 @@ public:
     }
 
     /// Each frame: the rules' notices shown (in the middle of the screen, and the console); a
-    /// guest's cinematics made on its own Cinematics (the host's client's calls it was told), its
-    /// chapter screens shown and their end told back; who's still reading; the host's talk shown to
+    /// guest's chapter screens shown and their end told back; who's still reading; the host's talk shown to
     /// the others.
     void drawHud(App& app, SDL_Renderer*, const HudFrame&) override
     {
@@ -185,9 +195,7 @@ public:
         // (A guest's death chapter screen fades back to the game: the host is the one who loads.)
         app.cinematics->setGuest(coop_->guest());
         if (coop_->guest()) {
-            for (const auto& c : coop_->takeCines()) {
-                applyCine(app, c);
-            }
+            // (Its cinematics went on our Cinematics' queue as they came: bind's sink.)
             if (const auto ch = coop_->takeChapter()) {
                 // As MSG_CHAPTER_END comes (Gui_Brief_ShowLockScreen): our own class's chapter, the
                 // campaign's (every player's is).

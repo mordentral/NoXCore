@@ -4,6 +4,7 @@
 
 #include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/player/player_file.hpp"
+#include "noxcore/server/items.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/player.hpp"
@@ -596,6 +597,7 @@ void CoopDirector::catchUp(Member& m, server::ServerObject& unit)
     };
     if (!options_.catchUp) {
         ownNotice();
+        wearAgain(m, unit);
         return;
     }
     // The party's lowest experience but this player's (by experience, not level: what the others
@@ -642,6 +644,57 @@ void CoopDirector::catchUp(Member& m, server::ServerObject& unit)
                                              (spells ? ", and the party's spells." : "."));
     } else {
         ownNotice();
+    }
+    wearAgain(m, unit);
+}
+
+void CoopDirector::wornRead(server::World& w, server::ServerObject& player, std::span<const std::uint32_t> worn)
+{
+    (void)w;
+    // (Told inside the load: only kept here. The host's own file is the solo game's, as it was.)
+    for (Member& m : party_) {
+        if (!m.host && m.extent == player.extent) {
+            m.worn.clear();
+            for (const std::uint32_t e : worn) {
+                m.worn.emplace_back(e);
+            }
+        }
+    }
+}
+
+void CoopDirector::wearAgain(Member& m, server::ServerObject& unit)
+{
+    const std::vector<server::ObjectRef> worn = std::exchange(m.worn, {});
+    if (m.host || worn.empty() || !unit.player || !host_) {
+        return;
+    }
+    server::Fight f = host_->server().fight();
+    if (!f.things) {
+        return;
+    }
+    server::World& w = world();
+    server::Items items{w, *f.things, f.modifiers, f.rng, f.frame};
+    std::vector<std::string> heavy;
+    for (const server::ObjectKey e : worn) {
+        // Still its own, not worn (nor one it's put on itself since), of its class.
+        server::ServerObject* o = w.byExtent(e);
+        if (!o || o->gone() || o->pendingDelete || (o->flags & server::ObjFlag::Destroyed) || o->holder != unit.extent ||
+            (o->flags & server::ObjFlag::Equipped) || !items.classMay(unit, *o)) {
+            continue;
+        }
+        if (!items.strongEnough(unit, *o)) {
+            heavy.push_back(spacedName(o->typeName)); // (not tried: the game's refusal line and sound aren't sent)
+            continue;
+        }
+        // The game's own wear: its client's mark, everyone's worn bits, its armour and effects.
+        items.tryEquip(unit, *o);
+    }
+    if (!heavy.empty()) {
+        std::string list;
+        for (std::size_t i = 0; i < heavy.size(); ++i) {
+            list += (i ? ", " : "") + heavy[i];
+        }
+        notice(m, coopmsg::Notice::Info, "Not strong enough yet to wear what your character had on (carried): " + list + ".");
     }
 }
 

@@ -75,6 +75,8 @@ std::string listedName(std::uint8_t playerClass);
 /// A player's key from game to game: its account and name ("account/name"; no account: the
 /// name), as the Undead Tide keys its runners.
 std::string runnerKey(const server::HostedPlayer& p);
+/// A type's name as players read it: "AirshipCaptain" -> "Airship Captain".
+std::string spacedName(std::string_view type);
 
 class CoopDirector;
 
@@ -222,6 +224,9 @@ public:
     void pickedUp(server::World& w, server::ServerObject& taker, server::ServerObject& item, float x, float y) override;
     /// A spell book put back is for those below the level it was put back at.
     bool mayPickUp(server::World& w, server::ServerObject& taker, server::ServerObject& item) override;
+    /// A guest's .plr read (its upload, its kept character, a load's): the worn list it brought
+    /// kept for its catch-up (Member::worn), which wears again what it's strong enough for then.
+    void wornRead(server::World& w, server::ServerObject& player, std::span<const std::uint32_t> worn) override;
     /// A player's CLIENT_READY (GameHost::Options::onClientReady): the party's team told between
     /// it and the other NoX Core players (tellTeam); a guest's view of a map it loaded from its own
     /// file put right (the things the client draws from it that the world no longer has hidden:
@@ -311,6 +316,9 @@ public:
         /// Its character of another class than the campaign's: told so at these ticks, let go 3 s
         /// on (0: not).
         std::uint64_t otherClassAt = 0;
+        /// The worn list its last .plr read brought (wornRead), in the file's order, till its
+        /// catch-up wears them again (wearAgain).
+        std::vector<server::ObjectRef> worn;
     };
     const std::vector<Member>& party() const noexcept { return party_; }
 
@@ -477,6 +485,11 @@ private:
     /// A player behind the party (new, rejoining, or its kept character back) given the experience
     /// to the party's lowest; one with no kept character the party's book too.
     void catchUp(Member& m, server::ServerObject& unit);
+    /// After the catch-up (issue #14): what the guest's file had worn and its load couldn't put on
+    /// (its strength at the level the file's experience gave it, before the level was put right),
+    /// worn again in the file's order, each it's strong enough for now; the rest named to it in a
+    /// notice, carried. The strength rule stands; nothing else is touched.
+    void wearAgain(Member& m, server::ServerObject& unit);
     void sendCharacter(const Member& m, std::span<const std::uint8_t> plr);
     /// A runner's minimap of a map: a bit a wall cell (key x << 8 | y, the grid's 256 x 256: never
     /// more), and the obelisks (extents).

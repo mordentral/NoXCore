@@ -317,6 +317,27 @@ are the exe's (records, timings, levels, texts, voices, music). Where noxsdl dif
   frame rate (the exe ran one a game frame in a solo game); their darkening is drawn per pixel
   as the exe's 16-bit saturating subtract, on 8-bit channels.
 
+### VD-67: A black screen with nothing under way frees Escape after 5 s, and a load's is ended (noxsdl/src/screen_watch.hpp)
+
+The exe refuses Escape (the in-game menu) while the map isn't drawn, and nothing but the game's
+own calls ends that black. noxsdl watches it (issue #14: a co-op guest left black at a load,
+Escape refused): in a game, the map not drawn with nothing under way (no fade, no widescreen or
+bars, no briefing, load menu or message box, no movie, the map not held for its HD images) for 5 s
+of the client's running time (a main thread parked for our host's save or load doesn't count):
+
+- **Escape opens the in-game menu** from then on (still refused during a fade or the widescreen,
+  as the exe).
+- **A black the game's scripts didn't put up is ended** (the fades stopped, the map drawn, a log
+  line): MSG_USE_MAP's, a fade to black's message, a saved game's load's map intro, or a co-op
+  guest's relayed call of those. A script's own (Blind, ImmediateBlind, a chapter screen's map
+  off) is left: the campaign has open-ended ones that wait for the player at a way out (Con05b /
+  War05b / Wiz05b's FadeOut, Con10d / War10d's TeleportPlayer, War04a's ClearScreen; its timed
+  ones are 3.2 s at most, Wiz10d's). In the campaign's normal play nothing reaches 5 s: the exe's
+  behaviour unchanged there.
+
+Revert: `Cinematics::refuses`'s `!watch_.stuck()` and the watch's `stopAllFades` in
+`Cinematics::update`.
+
 ### VD-07: The main menu's Solo (noxsdl/src/menus.cpp)
 
 The screens, their lists, questions and files are the exe's (client/solo_menu.hpp). Where noxsdl

@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -51,6 +52,10 @@ public:
 
     /// The host's client's calls we're to make on our own (a guest's), oldest first.
     std::vector<coopmsg::Cine> takeCines() { return std::exchange(cines_, {}); }
+    /// Each of those calls handed on as it comes in (from the client's receive, after its tracer
+    /// saw the message: in its turn among the game's own messages), in place of keeping it for
+    /// takeCines; none: kept. (noxsdl's coop_ui: into its Cinematics' message queue, issue #14.)
+    void setCineSink(std::function<void(const coopmsg::Cine&)> sink) { cineSink_ = std::move(sink); }
     /// The bars are up as the host last said (a scene under way), and its actor's net code.
     bool sceneOn() const noexcept { return scene_; }
     std::uint16_t sceneActor() const noexcept { return actor_; }
@@ -85,6 +90,7 @@ private:
     std::vector<std::pair<coopmsg::Notice, std::string>> notices_;
     bool characterSent_ = false;
     std::vector<coopmsg::Cine> cines_;
+    std::function<void(const coopmsg::Cine&)> cineSink_;
     bool scene_ = false;
     std::uint16_t actor_ = 0;
     std::optional<coopmsg::Chapter> chapter_;

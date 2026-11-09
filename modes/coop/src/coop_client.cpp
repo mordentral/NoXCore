@@ -59,9 +59,13 @@ void CoopClient::onMessage(std::span<const std::uint8_t> m)
                 scene_ = c->a != 0;
                 actor_ = c->actor;
             }
-            cines_.push_back(std::move(*c));
-            if (cines_.size() > 256) {
-                cines_.erase(cines_.begin());
+            if (cineSink_) {
+                cineSink_(*c); // (in its turn among the game's messages: noxsdl's Cinematics queue)
+            } else {
+                cines_.push_back(std::move(*c));
+                if (cines_.size() > 256) {
+                    cines_.erase(cines_.begin());
+                }
             }
         }
         break;

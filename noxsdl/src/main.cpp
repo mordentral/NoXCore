@@ -4267,7 +4267,9 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         }
         if (app->cinematics) {
             // The fades, bars and briefings' client frames (cinematics.hpp).
-            app->cinematics->update(SDL_GetTicks(), inGame, app->viewHeight, ownClass(*app));
+            // (Held: a movie playing, the map held for its HD images; the black's watch waits.)
+            const bool held = app->mapHeld || (app->movie && app->movie->active());
+            app->cinematics->update(SDL_GetTicks(), inGame, app->viewHeight, ownClass(*app), held);
         }
         chooseCursor(*app, inGame);
     } else {

@@ -14,7 +14,8 @@ template <>
 struct Links<coop::CoopDirector::Member> {
     using S = coop::CoopDirector::Member;
     static constexpr std::string_view name = "CoopDirector::Member";
-    static constexpr auto fields = std::tuple{NOX_LINK(S, extent, Carry)}; // (its unit: a player's, kept; it leaves the party as it goes)
+    static constexpr auto fields = std::tuple{NOX_LINK(S, extent, Carry), // (its unit: a player's, kept; it leaves the party as it goes)
+                                              NOX_LINK(S, worn, CarryDropLost)}; // (what it carries, carried with it)
 };
 
 template <>
