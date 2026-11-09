@@ -691,10 +691,14 @@ void GameHost::afterFrame()
         }
         const auto send = [&](const World::Broadcast& b) {
             if (b.reliable) {
+                bool queued = false;
                 if (auto other = forPeer ? options_.forPeer(*this, peer, b.bytes) : std::nullopt) {
-                    transport_.sendReliable(peer, std::move(*other));
+                    queued = transport_.sendReliable(peer, std::move(*other));
                 } else {
-                    transport_.sendReliable(peer, b.bytes);
+                    queued = transport_.sendReliable(peer, b.bytes);
+                }
+                if (b.to == p.extent) {
+                    secondaryTellQueued(p, b.bytes, queued); // (noxcpp: a read's tell's packet)
                 }
             } else {
                 transport_.sendUnreliable(peer, b.bytes);
@@ -1462,6 +1466,9 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     if (bytes.empty()) {
         return;
     }
+    if (const auto it = players_.find(peer); it != players_.end() && it->second.secondaryTell.armed) {
+        secondaryTellHeard(it->second, bytes); // (noxcpp: a guest's wait on its read's tell)
+    }
     const auto op = static_cast<net::Op>(bytes[0]);
     if (op == net::Op::ClientAccept) {
         join(peer, bytes);
@@ -1629,7 +1636,12 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             // refused: SrvNet_SendReportSecondaryWeapon(.., null, 1), its client's "Weapon2CantUse".
             // (Kept in the exe's player record: what reads it, the saves, takes the host's window.)
             // noxcpp keeps the code, none when refused, for mods to read (nox.secondaryWeapon).
+            // (noxcpp: a solo game's guest's sent before it took a .plr read's tell is out of date,
+            // HostedPlayer::secondaryTell: not counted.)
             if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() >= 3) {
+                if (secondaryOutOfDate(players_[peer], *unit)) {
+                    break;
+                }
                 const std::uint16_t code = static_cast<std::uint16_t>(m[1] | (m[2] << 8));
                 unit->player->secondaryWeapon = code;
                 if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(NetCode{code}) : nullptr) {
@@ -3905,7 +3917,7 @@ void GameHost::releasePending(HostedPlayer& p)
 {
     for (const auto& h : std::exchange(p.pending, {})) {
         if (!h.onlyJoined || p.joined) {
-            transport_.sendReliable(p.peer, h.bytes);
+            secondaryTellQueued(p, h.bytes, transport_.sendReliable(p.peer, h.bytes)); // (noxcpp: a read's tell's packet)
         }
     }
 }
@@ -4080,6 +4092,85 @@ std::vector<std::uint8_t> GameHost::useMapBytes(std::uint32_t frame, bool guest)
 bool GameHost::soloGuest(const HostedPlayer& p) const
 {
     return options_.solo && options_.soloGuests > 0 && (p.slot & 31u) != 0x1F;
+}
+
+namespace {
+
+/// A server's MSG_REPORT_SECONDARY_WEAPON telling a client its secondary weapon (not a refusal).
+bool secondaryTellBytes(std::span<const std::uint8_t> m)
+{
+    return m.size() == 4 && m[0] == static_cast<std::uint8_t>(net::Op::ReportSecondaryWeapon) && m[3] == 0;
+}
+
+} // namespace
+
+void GameHost::takeSecondaryTold(HostedPlayer& p, ServerObject& unit)
+{
+    if (!unit.player || !unit.player->secondaryTold) {
+        return;
+    }
+    unit.player->secondaryTold = false;
+    if (soloGuest(p)) {
+        p.secondaryTell = {.armed = true, .since = server_.clock().frame()}; // (a read again: afresh)
+    }
+}
+
+void GameHost::secondaryTellQueued(HostedPlayer& p, std::span<const std::uint8_t> m, bool queued)
+{
+    if (!secondaryTellBytes(m)) {
+        return;
+    }
+    if (ServerObject* unit = server_.world().byExtent(p.extent)) {
+        takeSecondaryTold(p, *unit);
+    }
+    HostedPlayer::SecondaryTell& t = p.secondaryTell;
+    if (!t.armed) {
+        return;
+    }
+    const auto seqs = transport_.reliableSeqs(p.peer);
+    if (!queued || !seqs) {
+        t = {}; // (never to reach it: nothing to wait for)
+        return;
+    }
+    // The message is in the newest packet queued (it joined the last unsent one, or began one).
+    t.seq = static_cast<std::uint8_t>(seqs->next - 1);
+    t.stage = HostedPlayer::SecondaryTell::Stage::Waiting;
+    t.since = server_.clock().frame();
+}
+
+void GameHost::secondaryTellHeard(HostedPlayer& p, std::span<const std::uint8_t> payload)
+{
+    using Stage = HostedPlayer::SecondaryTell::Stage;
+    HostedPlayer::SecondaryTell& t = p.secondaryTell;
+    // The transport's note of a new ack comes alone, ahead of its datagram's messages (if any).
+    const bool ack = payload.size() == 2 && payload[0] == static_cast<std::uint8_t>(net::Op::Code38);
+    if (t.stage == Stage::Last || (ack && t.stage == Stage::Acked)) {
+        t = {}; // (that datagram read: what comes now was sent after the tell was taken)
+        return;
+    }
+    if (ack) {
+        // Its ack is the next sequence it expects: past the tell's packet, it has it.
+        if (t.seq && static_cast<std::uint8_t>(payload[1] - *t.seq - 1) < 0x80u) {
+            t.stage = Stage::Acked;
+        }
+    } else if (t.stage == Stage::Acked) {
+        t.stage = Stage::Last; // (a stock client's answer to the drops is among these)
+    }
+}
+
+bool GameHost::secondaryOutOfDate(HostedPlayer& p, ServerObject& unit)
+{
+    takeSecondaryTold(p, unit);
+    HostedPlayer::SecondaryTell& t = p.secondaryTell;
+    if (!t.armed) {
+        return false;
+    }
+    // (Waiting on a tell held for it while it loads has no end but its CLIENT_READY's.)
+    if ((t.seq || p.ready) && server_.clock().frame() - t.since > kSecondaryTellFrames) {
+        t = {};
+        return false;
+    }
+    return true;
 }
 
 void GameHost::mapLoadedSettings()

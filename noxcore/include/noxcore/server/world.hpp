@@ -187,6 +187,10 @@ struct PlayerControl {
     /// (MSG_REPORT_LAST_QUIVER, none a clear); 0 none. Read by a co-op guest's save as
     /// secondaryWeapon is, and as stale.
     std::uint16_t lastQuiver = 0;
+    /// (noxcpp) A .plr read has just told a solo game's guest's client its secondary weapon
+    /// (MSG_REPORT_SECONDARY_WEAPON, the file's or none): the host (GameHost) takes it and counts
+    /// none of that client's own 0xE0s sent before it took the tell (HostedPlayer::secondaryTell).
+    bool secondaryTold = false;
     /// Its minimap's marks (player.hpp's markMinimap), the list's head first.
     struct MinimapMark {
         ObjectRef object;

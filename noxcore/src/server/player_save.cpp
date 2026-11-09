@@ -835,6 +835,10 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
                 tell(world, unit, {0xE1, 0, 0});
                 unit.player->lastQuiver = 0;
             }
+            // (Its client takes the tell silently, and a stock client has meanwhile answered the
+            // drop above of the one it had marked with 0xE0 none: the host counts no 0xE0 of its
+            // client's sent before the tell reached it, GameHost's secondaryTell.)
+            unit.player->secondaryTold = true;
         }
         // A quest's things numbered afresh (and their Extent their net code: ours already is).
         if (quest(world)) {

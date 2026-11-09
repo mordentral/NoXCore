@@ -190,6 +190,26 @@ struct HostedPlayer {
     /// Its important messages from before it was ready (netImportant sends a player
     /// none of the queue till its status 0x10), oldest first; kept through a map change.
     std::vector<Held> pending;
+    /// (noxcpp) A solo game's guest told its secondary weapon by a .plr read
+    /// (PlayerControl::secondaryTold: the host's load, a rejoin): its client's own
+    /// MSG_REPORT_SECONDARY_WEAPON sent before it took that tell is out of date (the tell wins on
+    /// the client) and isn't counted. A stock client answers the read's drop of the one it had
+    /// marked with 0xE0 none, then takes the tell without a word: counted, the server would keep
+    /// none while the client shows the file's. Over once the client has acknowledged the reliable
+    /// packet carrying the tell, the messages of the datagram that first says so included (a stock
+    /// client's answer comes in the same datagram as that acknowledgement).
+    struct SecondaryTell {
+        enum class Stage : std::uint8_t {
+            Waiting, ///< the packet not acknowledged yet
+            Acked,   ///< acknowledged by the datagram being read (its messages come next)
+            Last,    ///< that datagram's messages being read: over at the next
+        };
+        bool armed = false;
+        std::optional<std::uint8_t> seq; ///< the reliable packet carrying the tell, once it's queued
+        Stage stage = Stage::Waiting;
+        std::uint32_t since = 0; ///< the frame it was armed, or the tell queued (a stop: kSecondaryTellFrames)
+    };
+    SecondaryTell secondaryTell;
 };
 
 // The hosted game. The owner feeds it datagrams (receive) and the time (tick) and sends what
@@ -1090,6 +1110,17 @@ private:
     std::vector<std::uint8_t> useMapBytes(std::uint32_t frame, bool guest = false) const;
     /// (noxcpp) A solo game's guest (Options::soloGuests): not the host's slot 0x1F.
     bool soloGuest(const HostedPlayer& p) const;
+    /// (noxcpp) HostedPlayer::secondaryTell: a read's tell taken from its unit (armed, a guest's
+    /// alone); the tell `m` queued for it (`queued`: the transport took it) or not; one of its
+    /// payloads in order (the transport's ack note, 0x26, or its messages); and whether its 0xE0
+    /// now is out of date (not counted).
+    void takeSecondaryTold(HostedPlayer& p, ServerObject& unit);
+    void secondaryTellQueued(HostedPlayer& p, std::span<const std::uint8_t> m, bool queued);
+    void secondaryTellHeard(HostedPlayer& p, std::span<const std::uint8_t> payload);
+    bool secondaryOutOfDate(HostedPlayer& p, ServerObject& unit);
+    /// The longest a tell's wait lasts once queued (frames, 30 s): a stop should its packet's
+    /// acknowledgement never be seen.
+    static constexpr std::uint32_t kSecondaryTellFrames = 900;
     /// (noxcpp) The map's own file's CRC, the saved copy's when a visited map loads from one aside.
     std::uint32_t pristineCrc_ = 0;
     /// Game_CopySettingsData(src, dst).
