@@ -1964,6 +1964,9 @@ void Menus::characterSaveFailed(const std::filesystem::path& path, const std::st
     deferred_.push_back([this] {
         dialog("Save failed",
                "Check that your save folder is writable and has free space. See the log for details.", 0x21, {});
+        if (gui::Window* ok = dialog_->find(kDlgOk)) {
+            ok->rect.x = (dialog_->rect.w - ok->rect.w) / 2;
+        }
     });
 }
 
