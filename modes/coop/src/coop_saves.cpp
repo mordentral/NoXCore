@@ -574,13 +574,13 @@ void CoopDirector::characterIn(server::GameHost& host, std::uint8_t peer, bool l
 void CoopDirector::catchUp(Member& m, server::ServerObject& unit)
 {
     m.caughtUp = true;
-    const bool afterLoad = std::exchange(m.catchUpAfterLoad, false);
+    m.catchUpAfterLoad = false;
     if (!unit.player) {
         return;
     }
-    // A runner given its campaign character back is caught up to the party's experience too (the
-    // owner's decision of 2026-11-08: awards given while it was away), but keeps its own book.
-    const bool kept = m.restored && !afterLoad;
+    // A runner given its campaign character back is caught up to the party's experience and book
+    // too (the owner's decisions of 2026-11-08 and 2026-11-09: what the party gained while it was
+    // away).
     // Its own level its experience's first, the catch-up on or not: a character whose .plr didn't
     // apply stays at level 1 with an empty book whatever its experience, and the party's level
     // below gives it none (it has the experience already).
@@ -632,12 +632,10 @@ void CoopDirector::catchUp(Member& m, server::ServerObject& unit)
     }
     // And the party's book (deliberately: a late joiner comes without the items, not without
     // the spells): every spell, creature and ability another player knows, at the best level.
-    // A party that started together has nothing in it yet. (A kept character's book is its own.)
-    // (What the levels above gave isn't the party's.)
+    // A party that started together has nothing in it yet. (A kept character too: what the party
+    // learnt while it was away.) (What the levels above gave isn't the party's.)
     const auto knownBefore = known();
-    if (!kept) {
-        partyBookTo(unit);
-    }
+    partyBookTo(unit);
     const bool spells = known() != knownBefore;
     if (unit.player->level != levelOwn || unit.experience != experienceBefore || spells) {
         notice(m, coopmsg::Notice::Info, "Caught up with the party: level " + std::to_string(unit.player->level) +
