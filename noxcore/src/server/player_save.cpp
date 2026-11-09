@@ -773,8 +773,8 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         // A solo game's: the host's inventory window's secondary weapon and quiver cleared
         // (Gui_Inv_SetSecondaryWeapon(0, 0), Gui_Inv_SetLastQuiver(0)). Its client told the file's
         // (MSG_REPORT_SECONDARY_WEAPON 0xE0, netMsgLastQuiver 0xE1). (noxcpp: the host's own load
-        // alone; a solo game's guest's leaves the host's window as it is. In a solo game alone the
-        // one player is the host: as the exe.)
+        // alone; a solo game's guest's leaves the host's window as it is, its own client told below.
+        // In a solo game alone the one player is the host: as the exe.)
         if (solo(world) && world.hostClient) {
             if (unit.player && (unit.player->index & 31u) == 0x1F) {
                 world.hostClient->clearInventoryWeapons();
@@ -791,21 +791,38 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
             }
             return nullptr;
         };
+        bool secondaryTold = false;
         if (const std::int32_t id = r.i32(); id != 0) {
             if (const ServerObject* o = findById(id)) {
                 const std::uint16_t code = netCodeOf(*o);
                 tell(world, unit, {0xE0, lo(code), hi(code), 0});
+                secondaryTold = true;
                 if (unit.player) {
                     unit.player->secondaryWeapon = code; // (what its client now holds: nox.secondaryWeapon)
                 }
             }
         }
+        bool quiverTold = false;
         if (1 < version) {
             if (const std::int32_t id = r.i32(); id != 0) {
                 if (const ServerObject* o = findById(id)) {
                     const std::uint16_t code = netCodeOf(*o);
                     tell(world, unit, {0xE1, lo(code), hi(code)});
+                    quiverTold = true;
                 }
+            }
+        }
+        // (noxcpp: a solo game's guest, a co-op campaign's below the host's 0x1F: its own client's
+        // window cleared as the host's is, only where the file names none: MSG_REPORT_SECONDARY_WEAPON
+        // and MSG_REPORT_LAST_QUIVER with none, which its client takes as a clear. Else its window
+        // kept the old net codes at a re-read: the host's load, a rejoin. A file naming them is told
+        // them, as above.)
+        if (solo(world) && unit.player && (unit.player->index & 31u) != 0x1F) {
+            if (!secondaryTold) {
+                tell(world, unit, {0xE0, 0, 0, 0});
+            }
+            if (!quiverTold) {
+                tell(world, unit, {0xE1, 0, 0});
             }
         }
         // A quest's things numbered afresh (and their Extent their net code: ours already is).
