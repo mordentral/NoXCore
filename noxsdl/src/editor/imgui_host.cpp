@@ -593,7 +593,11 @@ void ImGuiHost::renderViewport(ImGuiViewport* viewport)
         SDL_RenderClear(r);
     }
     toWindowCoordinates(viewport->DrawData);
+    float oldScaleX = 1.0f, oldScaleY = 1.0f;
+    SDL_GetRenderScale(r, &oldScaleX, &oldScaleY);
+    SDL_SetRenderScale(r, viewport->DrawData->FramebufferScale.x, viewport->DrawData->FramebufferScale.y);
     drawData(viewport->DrawData, r);
+    SDL_SetRenderScale(r, oldScaleX, oldScaleY);
     if (!shootBase_.empty()) saveShot(r);
 }
 
@@ -745,7 +749,9 @@ void ImGuiHost::drawData(ImDrawData* data, SDL_Renderer* renderer)
 
 void ImGuiHost::refreshDpi()
 {
-    const float s = SDL_GetWindowDisplayScale(window_);
+    // Style sizes are in window points. Retina pixel density belongs to the renderer,
+    // not the layout; using it here would enlarge the controls a second time.
+    const float s = SDL_GetDisplayContentScale(SDL_GetDisplayForWindow(window_));
     dpi_ = s > 0 ? std::clamp(s, 0.5f, 4.0f) : 1.0f;
 }
 
@@ -840,7 +846,8 @@ void ImGuiHost::processEvent(const SDL_Event& event)
         }
     }
     ImGui_ImplSDL3_ProcessEvent(&event);
-    if (event.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED && event.window.windowID == SDL_GetWindowID(window_)) {
+    if ((event.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED || event.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED) &&
+        event.window.windowID == SDL_GetWindowID(window_)) {
         refreshDpi();
         setStyle(uiScale_, theme_);
     }
@@ -909,7 +916,14 @@ void ImGuiHost::render()
     ImGui::Render();
     syncTextures(); // (before the backend below acts on the textures' status)
     toWindowCoordinates(ImGui::GetDrawData());
+    // SDL's ImGui backend scales clip rectangles but leaves vertex positions in window
+    // points. Scale both through SDL, then restore the game's pixel-coordinate renderer.
+    float oldScaleX = 1.0f, oldScaleY = 1.0f;
+    SDL_GetRenderScale(renderer_, &oldScaleX, &oldScaleY);
+    const ImVec2 framebufferScale = ImGui::GetDrawData()->FramebufferScale;
+    SDL_SetRenderScale(renderer_, framebufferScale.x, framebufferScale.y);
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer_);
+    SDL_SetRenderScale(renderer_, oldScaleX, oldScaleY);
     // The floating windows: made, moved or closed to match the panels, then drawn and presented.
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();
