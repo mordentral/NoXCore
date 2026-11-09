@@ -1,6 +1,6 @@
 // The compiled shaders embedded in noxsdl (noxsdl/CMakeLists.txt builds them from shaders/*.hlsl):
 // DXIL (Direct3D 12) when the build had dxc, SPIR-V (Vulkan: SDL's GPU API on Linux) when it had
-// glslang. Each shader is the same HLSL in either format; the device says which one it takes.
+// glslang; MSL (Metal on macOS) via SPIRV-Cross. Each uses the same HLSL source.
 #pragma once
 
 #include <SDL3/SDL.h>
@@ -24,10 +24,11 @@ enum class ShaderId {
 struct ShaderCode {
     const unsigned char* code = nullptr;
     std::size_t size = 0;
+    const char* entrypoint = "main";
 };
 
 /// The format of ours that `device` takes: DXIL when it takes DXIL and the build has it, else
-/// SPIR-V likewise; SDL_GPU_SHADERFORMAT_INVALID for neither (the callers then draw without them).
+/// SPIR-V or MSL likewise; INVALID if none are available (callers then draw without them).
 SDL_GPUShaderFormat embeddedShaderFormat(SDL_GPUDevice* device);
 
 /// `id` in `format` (one embeddedShaderFormat returned); empty if the build hasn't it.

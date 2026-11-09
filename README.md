@@ -1,7 +1,7 @@
 # NoX Core
 
 **A modern client for Nox** (Westwood Studios, 2000): the game as you know it, cleaned up, with
-new features, for today's hardware, on Windows and Linux.
+new features, for today's hardware, on Windows, Linux and macOS (Apple Silicon).
 
 NoX Core plays just like the original and speaks its network protocol, so NoX Core players and
 players on the original game join each other's games, on the original's servers and on ours. Bugs
@@ -56,6 +56,18 @@ cmake --build --preset linux-release
 
 The client is `build/linux-release/noxsdl/noxcore`.
 
+**macOS ARM64** (macOS 26+, Xcode 26 Command Line Tools, CMake, Ninja, glslang and SPIRV-Cross):
+
+```
+cmake --preset macos-arm64-release -DNOX_BUILD_VIDEOTOOLS=OFF
+cmake --build --preset macos-arm64-release --target noxsdl_bundle -j 4
+```
+
+The app is `build/macos-arm64-release/NoX Core.app`, ad-hoc signed and not notarized.
+Place it in your Nox data folder, or copy your data to
+`~/Library/Application Support/NoXCore/GameData`. Settings and saves use
+`~/Library/Application Support/NoXCore/UserData`. See [BUILDING.txt](BUILDING.txt) for details.
+
 The first configure downloads the pinned third-party libraries, so it needs a network connection.
 
 ## Running
@@ -82,6 +94,7 @@ variable. The folder it chose, and why, is written to `noxcore-log.txt` beside t
 
 Bug reports are welcome as GitHub issues. Please include `noxcore-log.txt` (it's beside the
 program) and say whether the game was hosted by NoX Core or by the original game.
+On macOS the log is `~/Library/Application Support/noxcpp/noxsdl/noxcore-log.txt`.
 
 ## Licence
 

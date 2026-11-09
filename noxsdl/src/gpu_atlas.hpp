@@ -13,8 +13,9 @@
 // take their extra textures when they're made).
 //
 // Uploads are staged on the CPU and go up together in one copy pass a flush, each row padded to
-// Direct3D 12's 256-byte pitch and each region to its 512-byte placement, so SDL never copies them
-// again. A flush is its own command buffer, submitted before the renderer's frame (at present),
+// Direct3D 12's 256-byte pitch and each region to its 512-byte placement. Metal uses tight rows
+// because the pinned SDL upload backend ignores pixels_per_row. A flush is its own command
+// buffer, submitted before the renderer's frame (at present),
 // so the GPU has the pixels before anything drawn from them.
 //
 // Pages are filled in pools (the session's, the map's, the rest), so a page holds images that go
@@ -148,6 +149,7 @@ private:
 
     SDL_Renderer* renderer_ = nullptr;
     SDL_GPUDevice* device_ = nullptr;
+    std::uint32_t rowPitchAlignment_ = 256;
     SDL_GPUShader* labelShader_ = nullptr;
     SDL_GPUSampler* nearest_ = nullptr;
     std::vector<Page> pages_;

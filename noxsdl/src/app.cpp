@@ -22,8 +22,12 @@ namespace noxsdl {
 /// the game kept the mouse on its screen.
 void intoGameArea(const App& app, float& x, float& y)
 {
-    x = std::clamp(x - app.gameArea.x, 0.0f, std::max(app.gameArea.w - 1, 0.0f));
-    y = std::clamp(y - app.gameArea.y, 0.0f, std::max(app.gameArea.h - 1, 0.0f));
+    x *= app.mousePixelScale;
+    y *= app.mousePixelScale;
+    if (app.letterboxed) {
+        x = std::clamp(x - app.gameArea.x, 0.0f, std::max(app.gameArea.w - 1, 0.0f));
+        y = std::clamp(y - app.gameArea.y, 0.0f, std::max(app.gameArea.h - 1, 0.0f));
+    }
 }
 
 /// The mouse in window pixels (or --mouse's point).
@@ -35,9 +39,7 @@ SDL_FPoint mousePos(const App& app)
     SDL_FPoint m{};
 #if NOX_PRIVATE_TOOLS
     if (devhooks::pointer(m.x, m.y)) { // (a recorded walkthrough's pointer: the desktop's mouse left alone)
-        if (app.letterboxed) {
-            intoGameArea(app, m.x, m.y);
-        }
+        intoGameArea(app, m.x, m.y);
         return m;
     }
 #endif
@@ -56,9 +58,7 @@ SDL_FPoint mousePos(const App& app)
         SDL_GetMouseState(&m.x, &m.y);
         break;
     }
-    if (app.letterboxed) {
-        intoGameArea(app, m.x, m.y);
-    }
+    intoGameArea(app, m.x, m.y);
     return m;
 }
 

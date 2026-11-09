@@ -161,6 +161,7 @@ struct App {
     bool dragging = false;
     bool running = false; ///< live: right button held, running toward the cursor
     std::filesystem::path gameDir;
+    std::filesystem::path settingsDir; ///< Writable settings; separate from game assets on macOS.
     /// The folder a solo game's Save\ is under (Game_GetWorkDir's in the exe): the game's, or with
     /// --save-dir DIR, DIR's parent when DIR is a "Save" folder, else DIR.
     std::filesystem::path saveRoot;
@@ -443,6 +444,7 @@ struct App {
     /// window in the menus (they centre their own layout).
     SDL_FRect gameArea{0, 0, 0, 0};
     bool letterboxed = false; ///< gameArea is less than the window
+    float mousePixelScale = 1.0f; ///< Window points to output pixels; editor panels use points.
     NetStat netStat;                ///< F10 (ToggleNetstat)
     std::unique_ptr<ItemNames> itemNames; ///< items' tooltip names (ToolTip.c)
     /// The tooltip (cursorSetTooltip, drawn by client_drawCursorAndTooltips): this frame's text, and

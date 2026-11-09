@@ -4,6 +4,10 @@
 file(READ "${INPUT}" hex HEX)
 string(LENGTH "${hex}" hexLength)
 math(EXPR size "${hexLength} / 2")
+if(NULL_TERMINATE)
+    string(APPEND hex "00")
+    math(EXPR size "${size} + 1")
+endif()
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," bytes "${hex}")
 # Break the initializer into lines of 32 bytes (160 characters) so the file stays editor-friendly.
 string(REGEX REPLACE "((0x..,){32})" "\\1\n" bytes "${bytes}")

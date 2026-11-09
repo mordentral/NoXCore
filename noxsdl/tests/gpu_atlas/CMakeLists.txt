@@ -1,0 +1,10 @@
+# Optional real-GPU regression; no proprietary assets are needed.
+cmake_minimum_required(VERSION 3.25)
+project(nox_gpu_atlas_tests LANGUAGES CXX)
+find_package(SDL3 CONFIG REQUIRED)
+add_executable(gpu_atlas_tests gpu_atlas_tests.cpp ../../src/gpu_atlas.cpp)
+target_compile_features(gpu_atlas_tests PRIVATE cxx_std_20)
+target_include_directories(gpu_atlas_tests PRIVATE ../../src)
+target_link_libraries(gpu_atlas_tests PRIVATE SDL3::SDL3)
+enable_testing()
+add_test(NAME gpu_atlas_upload COMMAND gpu_atlas_tests)

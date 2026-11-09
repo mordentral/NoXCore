@@ -188,6 +188,13 @@ void startLog([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 #endif
     const char* base = SDL_GetBasePath();
     fs::path path = fs::path(base ? base : "") / "noxcore-log.txt";
+#ifdef __APPLE__
+    // Never modify a signed .app bundle merely by launching it.
+    if (char* pref = SDL_GetPrefPath("noxcpp", "noxsdl")) {
+        path = fs::path(pref) / "noxcore-log.txt";
+        SDL_free(pref);
+    }
+#endif
     for (int i = 1; i + 1 < argc; ++i) {
         if (std::string_view(argv[i]) == "--log") {
             path = fs::path(reinterpret_cast<const char8_t*>(argv[i + 1])); // (a second noxcore here: a session's private test)

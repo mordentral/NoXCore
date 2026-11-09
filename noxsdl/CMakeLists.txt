@@ -157,6 +157,19 @@ add_executable(noxsdl WIN32
 # commands. No clash with the library target noxcore: its noxcore.lib / .a is built in noxcore/,
 # not beside the exe, and its compile PDB stays in its own CMakeFiles folder.
 set_target_properties(noxsdl PROPERTIES OUTPUT_NAME noxcore)
+if(APPLE)
+    configure_file(${PROJECT_SOURCE_DIR}/packaging/Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
+    add_custom_target(noxsdl_bundle
+        COMMAND ${CMAKE_COMMAND}
+            "-DEXECUTABLE=$<TARGET_FILE:noxsdl>"
+            "-DBUNDLE=${PROJECT_BINARY_DIR}/NoX Core.app"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}"
+            "-DPLIST=${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
+            "-DFONT_LICENSE=${noto_sans_license_SOURCE_DIR}/OFL.txt"
+            -P ${PROJECT_SOURCE_DIR}/cmake/NoxMacBundle.cmake
+        DEPENDS noxsdl
+        VERBATIM)
+endif()
 
 # The icon (res/noxcore.ico, made from res/noxcore.png; committed, so the
 # build needs no converter): the exe's resource and version information on Windows, and embedded
@@ -220,6 +233,13 @@ function(noxsdl_add_shader shader format)
     endif()
     if(format STREQUAL "dxil")
         set(compile ${NOXSDL_DXC} -nologo -T ${dxil_profile} -E main -Fo ${bin} ${src})
+    elseif(format STREQUAL "msl")
+        # Keep HLSL's register indices in Metal's separate buffer/texture/sampler
+        # tables, as required by SDL_GPU. Use a named entry point (MSL reserves main).
+        set(spirv ${CMAKE_CURRENT_BINARY_DIR}/shaders/${shader}.spv)
+        set(compile ${NOXSDL_SPIRV_CROSS} ${spirv} --msl --msl-version 20100
+            --msl-decoration-binding --rename-entry-point main nox_main ${glslang_stage}
+            --output ${bin})
     else()
         # HLSL in (-D), Vulkan SPIR-V out (-V). The registers' spaces are already SDL_GPU's
         # descriptor sets (fragment textures space2, uniforms space3), and the stage inputs and
@@ -232,18 +252,20 @@ function(noxsdl_add_shader shader format)
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/shaders
         COMMAND ${compile}
         # (pending_common.hlsli: included by pending.frag and the material shaders)
-        DEPENDS ${src} ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pending_common.hlsli
+        DEPENDS ${src} ${spirv} ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pending_common.hlsli
         COMMENT "Compiling ${shader}.hlsl"
         VERBATIM
     )
     add_custom_command(
         OUTPUT ${cpp}
         COMMAND ${CMAKE_COMMAND} -DINPUT=${bin} -DOUTPUT=${cpp} -DSYMBOL=kShader_${name}_${format}
+                -DNULL_TERMINATE=$<STREQUAL:${format},msl>
                 -P ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
         DEPENDS ${bin} ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
         VERBATIM
     )
     target_sources(noxsdl PRIVATE ${cpp})
+    set_property(GLOBAL APPEND PROPERTY NOXSDL_EMBEDDED_SHADER_SOURCES ${cpp})
 endfunction()
 
 find_program(NOXSDL_DXC dxc)
@@ -269,6 +291,27 @@ if(NOXSDL_GLSLANG)
         noxsdl_add_shader(${shader} spv)
     endforeach()
     target_compile_definitions(noxsdl PRIVATE NOXSDL_HAVE_SPIRV=1)
+endif()
+
+if(APPLE)
+    find_program(NOXSDL_SPIRV_CROSS NAMES spirv-cross REQUIRED)
+    if(NOT NOXSDL_GLSLANG)
+        message(FATAL_ERROR "macOS shaders require glslang (brew install glslang spirv-cross)")
+    endif()
+    message(STATUS "noxsdl shaders: Metal with ${NOXSDL_SPIRV_CROSS}")
+    foreach(shader ${NOXSDL_SHADERS})
+        noxsdl_add_shader(${shader} msl)
+    endforeach()
+    target_compile_definitions(noxsdl PRIVATE NOXSDL_HAVE_MSL=1)
+
+    option(NOX_BUILD_METAL_TESTS "Build the asset-free Metal smoke test (requires a graphical session)" OFF)
+    if(NOX_BUILD_METAL_TESTS)
+        get_property(shader_sources GLOBAL PROPERTY NOXSDL_EMBEDDED_SHADER_SOURCES)
+        add_executable(nox_metal_smoke tests/metal_smoke.cpp src/gpu_shader_code.cpp src/gpu_shaders.cpp ${shader_sources})
+        target_include_directories(nox_metal_smoke PRIVATE src)
+        target_compile_definitions(nox_metal_smoke PRIVATE NOXSDL_HAVE_MSL=1)
+        target_link_libraries(nox_metal_smoke PRIVATE SDL3::SDL3 nox_warnings)
+    endif()
 endif()
 
 if(NOT NOXSDL_DXC AND NOT NOXSDL_GLSLANG)

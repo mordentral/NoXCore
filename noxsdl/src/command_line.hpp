@@ -39,6 +39,7 @@ struct StartOptions {
     std::string movieArg;    ///< --movie NAME
     bool forceStartUp = false; ///< --startup
     std::filesystem::path hdDirArg;       ///< --hd-dir DIR
+    std::filesystem::path userDir; ///< --user-dir: writable settings and default saves
     std::filesystem::path saveDir; ///< --save-dir
     bool useGpu = true;       ///< SDL's GPU renderer and our shaders (--no-gpu: SDL's usual renderer)
     std::string gpuDriver;    ///< --gpu-driver: its API (direct3d12 by default on Windows; SDL's choice, Vulkan, elsewhere)

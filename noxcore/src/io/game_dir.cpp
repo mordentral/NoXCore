@@ -221,12 +221,32 @@ std::vector<GameDirCandidate> gameDirSearch(const fs::path& exeDir, const fs::pa
     // copy started from in it) overrides the installs.
     if (!exeDir.empty()) {
         out.push_back({exeDir, "next to the program"});
+#ifdef __APPLE__
+        // SDL_GetBasePath points inside a Mac bundle (normally Contents/Resources/).
+        // Finder's working directory is unrelated to the folder containing the app.
+        auto base = exeDir.lexically_normal();
+        if (base.filename().empty()) {
+            base = base.parent_path();
+        }
+        const auto contents = base.parent_path();
+        const auto bundle = contents.parent_path();
+        if ((base.filename() == "Resources" || base.filename() == "MacOS") &&
+            contents.filename() == "Contents" && bundle.extension() == ".app") {
+            out.push_back({contents / "Resources/GameData", "inside the Mac app's GameData folder"});
+            out.push_back({bundle.parent_path(), "next to the Mac app"});
+        }
+#endif
     }
     std::error_code ec;
     if (const auto cwd = fs::current_path(ec); !ec && !cwd.empty() && (exeDir.empty() || !sameDir(cwd, exeDir))) {
         out.push_back({cwd, "the current folder"});
     }
 #ifndef _WIN32
+#ifdef __APPLE__
+    if (const auto home = envPath("HOME")) {
+        out.push_back({*home / "Library/Application Support/NoXCore/GameData", "the macOS game data folder"});
+    }
+#endif
     withPrefixes({"Nox"}, "a usual install folder", out);
 #endif
     registryPaths(out);

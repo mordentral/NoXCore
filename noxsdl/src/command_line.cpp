@@ -329,6 +329,8 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.serverOptionsPage = std::atoi(next());
         } else if (a == "--ask-password") {
             app.askPasswordTest = next(); // tests (with --browse): the join's password asked for HOST over the game list
+        } else if (a == "--user-dir") {
+            opts.userDir = next();
         } else if (a == "--save-dir") {
             opts.saveDir = next(); // characters listed from and made in here instead of <game>\Save; a solo game's saves too
         } else if (a == "--server") {

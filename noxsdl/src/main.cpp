@@ -38,6 +38,7 @@
 #include <SDL3/SDL_main.h>
 
 #include "app.hpp"
+#include "user_data.hpp"
 #include "client_level_gate.hpp"
 #include "command_line.hpp"
 #include "editor/close_plan.hpp"
@@ -1057,8 +1058,15 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("loading failed: no folder with the game's data (thing.bin, gamedata.bin...) found");
         if (app->screenshot.empty() && opts.mapPicture.empty()) {
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "NoX Core: loading failed",
+#ifdef __APPLE__
+                                     "Nox game data wasn't found.\n\nPlace NoX Core.app in your Nox data folder, "
+                                     "or copy your game data to:\n"
+                                     "~/Library/Application Support/NoXCore/GameData\n\n"
+                                     "You can also use --game-dir or NOX_DATA.",
+#else
                                      "Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one "
                                      "with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.",
+#endif
                                      nullptr);
         }
         return SDL_APP_FAILURE;
@@ -1084,7 +1092,40 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         }
         return SDL_APP_SUCCESS;
     }
+    app->settingsDir = app->gameDir;
     app->saveRoot = app->gameDir;
+#ifdef __APPLE__
+    if (opts.userDir.empty()) {
+        if (char* pref = SDL_GetPrefPath("NoXCore", "UserData")) {
+            opts.userDir = fs::path(pref);
+            SDL_free(pref);
+        } else {
+            SDL_Log("user data: cannot locate writable Application Support folder: %s", SDL_GetError());
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "NoX Core: user data unavailable",
+                                     "Cannot locate a writable Application Support folder.", nullptr);
+            return SDL_APP_FAILURE;
+        }
+    }
+#endif
+    if (!opts.userDir.empty()) {
+        try {
+            prepareUserData(app->gameDir, opts.userDir, opts.saveDir.empty());
+            app->settingsDir = opts.userDir;
+            app->saveRoot = opts.userDir;
+            if (opts.saveDir.empty()) {
+                opts.saveDir = opts.userDir / "Save";
+            }
+            if (opts.mapCache == fs::path("noxsdl_maps")) {
+                opts.mapCache = opts.userDir / "Cache" / "maps";
+            }
+        } catch (const std::exception& ex) {
+            SDL_Log("user data: %s", ex.what());
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "NoX Core: user data unavailable",
+                                     "Cannot prepare writable settings and saves. See the log for details.", nullptr);
+            return SDL_APP_FAILURE;
+        }
+    }
+    SDL_Log("settings folder: %s", app->settingsDir.string().c_str());
     if (!opts.saveDir.empty()) {
         // (--save-dir: the Save folder; a solo game's slots are in the Save\ of the folder above
         // one named Save, else in DIR\Save.)
@@ -1097,9 +1138,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     // shows (VideoMode's resolution, VideoSize's window size).
     {
         bool fromDefault = false;
-        const auto loaded = nox::config::loadConfig(app->gameDir, &fromDefault);
+        const auto loaded = nox::config::loadConfig(app->settingsDir, &fromDefault);
         if (!loaded) {
-            SDL_Log("neither nox.cfg nor default.cfg read in %s: no key bindings", app->gameDir.string().c_str());
+            SDL_Log("neither nox.cfg nor default.cfg read in %s: no key bindings", app->settingsDir.string().c_str());
         }
         nox::config::Config config = loaded.value_or(nox::config::Config{});
         if (fromDefault || !config.setting("VideoMode")) {
@@ -1121,7 +1162,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    const SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | (app->screenshot.empty() ? 0 : SDL_WINDOW_HIDDEN);
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | (app->screenshot.empty() ? 0 : SDL_WINDOW_HIDDEN);
+#ifdef __APPLE__
+    flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#endif
     app->window = SDL_CreateWindow("NoX Core", opts.width, opts.height, flags);
     if (!app->window) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
@@ -1133,7 +1177,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     }
     if (opts.useGpu) {
         // SDL's GPU renderer, on Direct3D 12 on Windows unless told otherwise (our shaders are
-        // DXIL there); elsewhere on SDL's choice (Vulkan, for which they're SPIR-V).
+        // DXIL there); elsewhere on SDL's choice (Metal/MSL on Mac, Vulkan/SPIR-V on Linux).
         if (!SDL_GetHint(SDL_HINT_GPU_DRIVER)) {
 #ifdef _WIN32
             SDL_SetHint(SDL_HINT_GPU_DRIVER, opts.gpuDriver.empty() ? "direct3d12" : opts.gpuDriver.c_str());
@@ -1201,7 +1245,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             }
             SDL_Log("image pack: %s", app->imagePack.empty() ? "none (Use HD Images is greyed)"
                                                               : app->imagePack.string().c_str());
-            OptionsWindow::Extras extras = loadExtras(gameDir);
+            OptionsWindow::Extras extras = loadExtras(app->settingsDir);
             extras.hdImages = (extras.hdImages || opts.hdImages) && !app->imagePack.empty();
             extras.smoothEffects = extras.smoothEffects && !opts.stockEffects;
             extras.hdSpellFx = extras.hdSpellFx && !opts.stockEffects;
@@ -2864,8 +2908,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         app->editor->handleEvent(*event);
         return SDL_APP_CONTINUE;
     }
-    // In a letterboxed game the mouse is in the game's area: its coordinates from there.
-    if (app->letterboxed) {
+    // Menus and standalone games draw in pixels; editor panels retain window points.
+    if (app->letterboxed || app->mousePixelScale != 1.0f) {
         switch (event->type) {
         case SDL_EVENT_MOUSE_MOTION:
             intoGameArea(*app, event->motion.x, event->motion.y);
@@ -3268,6 +3312,7 @@ bool windowHasMouse(const App& app)
 /// letterboxed to its resolution's shape (gameArea); a game's zoom fixed by its Options.
 void layoutView(App& app, bool embedded)
 {
+    app.mousePixelScale = embedded ? 1.0f : SDL_GetWindowPixelDensity(app.window);
     if (embedded) {
         playTestLayout(app); // (the game's area in the editor's Map panel)
     } else {

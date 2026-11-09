@@ -1943,7 +1943,7 @@ void Menus::startNewSolo()
     const auto plr = menu::writeNewCharacter(soloRoot(), held, nox::client::SpellBars{}.toGui(cls), music, map,
                                              nox::client::solo_saves::localTime());
     if (plr.empty()) {
-        SDL_Log("menus: the new character couldn't be written to %s", (soloRoot() / "Save" / "WORKING").string().c_str());
+        characterSaveFailed(soloRoot() / "Save" / "WORKING", "Cannot write new solo character");
         return;
     }
     SDL_Log("menus: saved %s", plr.string().c_str());
@@ -1955,6 +1955,16 @@ void Menus::startNewSolo()
     start.map = gameDir_ / "maps" / map / (map + ".map");
     showLoading(true);
     leave([this, start] { startSolo(start); });
+}
+
+void Menus::characterSaveFailed(const std::filesystem::path& path, const std::string& reason)
+{
+    SDL_Log("character save failed: %s: %s", path.string().c_str(), reason.c_str());
+    // Defer creation until the current button callback has returned.
+    deferred_.push_back([this] {
+        dialog("Save failed",
+               "Check that your save folder is writable and has free space. See the log for details.", 0x21, {});
+    });
 }
 
 std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
@@ -1994,6 +2004,10 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
     }
     std::error_code ec;
     std::filesystem::create_directories(saveDir_, ec);
+    if (ec) {
+        characterSaveFailed(saveDir_, ec.message());
+        return std::nullopt;
+    }
     std::filesystem::path path;
     for (int n = 0; n < 100; ++n) {  // the first free number, 00-99
         const std::u16string number{static_cast<char16_t>(u'0' + n / 10), static_cast<char16_t>(u'0' + n % 10)};
@@ -2004,7 +2018,7 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
         }
     }
     if (path.empty()) {
-        SDL_Log("menus: no free character file in %s", saveDir_.string().c_str());
+        characterSaveFailed(saveDir_, "No free character filename (all 100 slots used)");
         return std::nullopt;
     }
     info.savePath = path.string();
@@ -2027,7 +2041,7 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
     try {
         nox::player::savePlayerFile(path, file);
     } catch (const std::exception& ex) {
-        SDL_Log("menus: saving %s: %s", path.string().c_str(), ex.what());
+        characterSaveFailed(path, ex.what());
         return std::nullopt;
     }
     SDL_Log("menus: saved %s", path.string().c_str());

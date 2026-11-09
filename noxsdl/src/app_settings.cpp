@@ -79,15 +79,15 @@ void applySettings(App& app, const nox::config::Config& config)
     }
 }
 
-/// Writes nox.cfg in the game folder, as the game does when its Options close.
+/// Writes nox.cfg in the settings folder when Options close.
 void saveSettings(App& app)
 {
     if (!app.input) {
         return;
     }
     try {
-        nox::config::saveConfig(app.gameDir, app.input->config());
-        SDL_Log("saved %s", (app.gameDir / "nox.cfg").string().c_str());
+        nox::config::saveConfig(app.settingsDir, app.input->config());
+        SDL_Log("saved %s", (app.settingsDir / "nox.cfg").string().c_str());
     } catch (const std::exception& ex) {
         SDL_Log("nox.cfg: %s", ex.what());
     }
@@ -184,7 +184,7 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
 /// Writes noxcore.cfg from the switches (what loadExtras reads back).
 void saveExtras(const App& app, const OptionsWindow::Extras& e)
 {
-    std::ofstream out(app.gameDir / "noxcore.cfg", std::ios::trunc);
+    std::ofstream out(app.settingsDir / "noxcore.cfg", std::ios::trunc);
     out << "FrameRate = " << e.frameRate << "\nBloom = " << e.bloom << "\nPerPixelLight = " << e.perPixelLight
         << "\nSmoothEffects = " << e.smoothEffects << "\nHDSpellFX = " << e.hdSpellFx << "\nSmoothing = " << e.smoothing
         << "\nHDImages = " << e.hdImages << "\nGamma = " << e.gamma << "\nMouseAccel = " << e.mouseAccel

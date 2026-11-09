@@ -2,7 +2,10 @@
 // THIRD_PARTY_NOTICES.txt), with the program's own folder first. The first of these that holds the game's
 // data wins:
 //   1. the NOX_DATA environment variable;
-//   2. the program's own folder, then the current folder (if it's another);
+//   2. the program's own folder; on Mac, also Contents/Resources/GameData inside the bundle,
+//      then the folder containing its .app bundle;
+//      then the current folder (if it's another);
+//      on Mac, ~/Library/Application Support/NoXCore/GameData follows these;
 //   3. (not Windows) a "Nox" folder under the XDG data, Wine, Lutris, Heroic and home prefixes;
 //   4. the registry (HKLM, its 32-bit view too): Westwood\Nox InstallPath and FolderPath
 //      (the original install, GOG, Nox Reloaded), Westwood Studios\NOX "Install Dir" (Origin);

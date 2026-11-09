@@ -30,7 +30,7 @@ SDL_GPUTexture* gpuTexture(SDL_Texture* texture)
 // shader, a pipeline or a depth format.
 std::unique_ptr<DepthPass> DepthPass::create(SDL_Renderer* renderer)
 {
-#if defined(NOXSDL_HAVE_DXIL) || defined(NOXSDL_HAVE_SPIRV)
+#if defined(NOXSDL_HAVE_DXIL) || defined(NOXSDL_HAVE_SPIRV) || defined(NOXSDL_HAVE_MSL)
     SDL_GPUDevice* device = SDL_GetGPURendererDevice(renderer);
     if (!device) {
         SDL_Log("view3d: no GPU renderer: the 3D view sorts back to front instead of a depth buffer");
@@ -49,7 +49,7 @@ std::unique_ptr<DepthPass> DepthPass::create(SDL_Renderer* renderer)
         SDL_GPUShaderCreateInfo info{};
         info.code = code.code;
         info.code_size = code.size;
-        info.entrypoint = "main";
+        info.entrypoint = code.entrypoint;
         info.format = format;
         info.stage = stage;
         info.num_samplers = samplers;

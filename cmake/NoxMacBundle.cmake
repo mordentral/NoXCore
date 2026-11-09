@@ -1,0 +1,25 @@
+# Ad-hoc signed .app packaging. No game assets; SDL_GetBasePath points to Resources.
+file(MAKE_DIRECTORY "${BUNDLE}/Contents/MacOS" "${BUNDLE}/Contents/Resources")
+file(COPY_FILE "${EXECUTABLE}" "${BUNDLE}/Contents/MacOS/noxcore" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${PLIST}" "${BUNDLE}/Contents/Info.plist" ONLY_IF_DIFFERENT)
+file(COPY "${SOURCE}/mods" DESTINATION "${BUNDLE}/Contents/Resources")
+foreach(name LICENSE NOTICE.txt THIRD_PARTY_NOTICES.txt)
+    file(COPY "${SOURCE}/${name}" DESTINATION "${BUNDLE}/Contents/Resources")
+endforeach()
+file(COPY "${FONT_LICENSE}" DESTINATION "${BUNDLE}/Contents/Resources")
+file(COPY_FILE "${SOURCE}/packaging/macos-readme.html" "${BUNDLE}/Contents/Resources/Mac Setup.html" ONLY_IF_DIFFERENT)
+get_filename_component(bundle_parent "${BUNDLE}" DIRECTORY)
+set(iconset "${bundle_parent}/noxcore.iconset")
+file(MAKE_DIRECTORY "${iconset}")
+foreach(size 16 32 128 256 512)
+    math(EXPR double_size "${size} * 2")
+    execute_process(COMMAND /usr/bin/sips -z ${size} ${size} "${SOURCE}/noxsdl/res/noxcore.png"
+        --out "${iconset}/icon_${size}x${size}.png" OUTPUT_QUIET COMMAND_ERROR_IS_FATAL ANY)
+    execute_process(COMMAND /usr/bin/sips -z ${double_size} ${double_size} "${SOURCE}/noxsdl/res/noxcore.png"
+        --out "${iconset}/icon_${size}x${size}@2x.png" OUTPUT_QUIET COMMAND_ERROR_IS_FATAL ANY)
+endforeach()
+execute_process(COMMAND /usr/bin/iconutil -c icns "${iconset}"
+    -o "${BUNDLE}/Contents/Resources/noxcore.icns" COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND /usr/bin/codesign --force --sign - --timestamp=none "${BUNDLE}" COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND /usr/bin/codesign --verify --strict "${BUNDLE}" COMMAND_ERROR_IS_FATAL ANY)
+message(STATUS "App: ${BUNDLE} (ad-hoc signed; not Developer ID signed or notarized)")

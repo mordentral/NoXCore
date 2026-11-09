@@ -36,6 +36,14 @@ glslang for the shaders. On Ubuntu 24.04:
     libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libvulkan-dev libdrm-dev libgbm-dev \
     libasound2-dev libpulse-dev libudev-dev libdbus-1-dev glslang-tools
 
+macOS ARM64: Apple Silicon, macOS 26+, Xcode 26 Command Line Tools, CMake 3.25+, Ninja,
+glslang and SPIRV-Cross:
+
+  brew install cmake ninja glslang spirv-cross
+
+The Mac preset targets macOS 26 because the client uses libc++ floating-point std::from_chars.
+The same HLSL shaders are translated to Metal; Vulkan and Rosetta are not required.
+
 The first configure downloads the pinned third-party libraries (SDL3, zstd, Dear ImGui, a few
 single headers and, on Windows, FFmpeg's LGPL build for the optional HD movies; see
 cmake/NoxDependencies.cmake and videotools/CMakeLists.txt), so it needs a network connection.
@@ -62,6 +70,18 @@ build/<preset>, the client to build/<preset>/noxsdl/noxcore. Without the presets
   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
   ninja -C build
 
+macOS ARM64:
+
+  cmake --preset macos-arm64-release -DNOX_BUILD_VIDEOTOOLS=OFF
+  cmake --build --preset macos-arm64-release --target noxsdl_bundle -j 4
+
+The client is build/macos-arm64-release/noxsdl/noxcore; the app is
+build/macos-arm64-release/NoX Core.app. A macos-arm64-debug preset is also available.
+The app includes static SDL, mods and licences, but no original game assets. It is ad-hoc
+signed, not Developer ID signed or notarized. Building your own copy needs no paid Apple
+developer account. The content editor and Windows-only HD movie path are outside this port's
+validation; original VQA movies remain available.
+
 Useful options (-DNAME=VALUE on the first cmake line):
   NOX_GAME_DIR          empty by default. Set it to your own install (for example
                         -DNOX_GAME_DIR="C:/GOG Games/Nox") to make it the programs' last-resort
@@ -75,6 +95,7 @@ Useful options (-DNAME=VALUE on the first cmake line):
                         leaves them out of the program entirely, as release builds must: with
                         them in, a player hosting a game could cheat
   NOX_BUILD_TESTS       the unit tests. OFF by default: the published source has none (see Tests)
+  NOX_BUILD_METAL_TESTS macOS shader creation/readback test (OFF; needs a graphical session)
   NOX_MODES             the game modes built in, folders of modes/ separated by ';' (default
                         "delve;tide;coop": Delving, Undead Tide and the co-op campaign)
   NOXSDL_HD_VIDEO       Windows: play HDVideo\*.mkv movies through FFmpeg's DLLs, loaded only when
@@ -94,7 +115,19 @@ On Windows noxsdl is a GUI program and opens no console window. Start it with -c
 log in a console (the terminal it was started from, else a new window); a redirected stderr
 (2> file) gets the log either way.
 
-On Linux a game folder copied from Windows works as it is: game files are matched ignoring case.
+On Linux and macOS a game folder copied from Windows works as it is: game files are matched
+ignoring case.
+
+On macOS, place NoX Core.app in the Nox data folder, or copy the data to
+~/Library/Application Support/NoXCore/GameData. The search also accepts bundled data in
+Contents/Resources and Contents/Resources/GameData. External data survives app replacement
+and does not modify the app signature. No Windows executable is needed for data discovery.
+
+Settings and saves use ~/Library/Application Support/NoXCore/UserData (saves in Save/).
+Existing settings and saves are imported once without overwriting user files. --user-dir DIR
+overrides this location; --save-dir retains its independent save override. The Mac log defaults
+to ~/Library/Application Support/noxcpp/noxsdl/noxcore-log.txt; --log PATH overrides it.
+These locations allow read-only app bundles, including during App Translocation.
 
 The content editor
 ------------------
@@ -112,14 +145,35 @@ videotools/CONTENT_EDITOR.txt.
 
 Tests
 -----
-The published source carries no unit tests, so NOX_BUILD_TESTS and NOX_TEST_COMMANDS are OFF by
+The published source carries no engine unit tests, so NOX_BUILD_TESTS and NOX_TEST_COMMANDS are OFF by
 default. (A development tree that carries the tests turns both on by default; -D values always
 win. NOX_TEST_COMMANDS=OFF needs NOX_BUILD_TESTS=OFF, since the tests use the nx commands.)
 
+Standalone Mac data-search and writable-state tests need no game assets or test commands:
+
+  cmake -S noxsdl/tests -B build/client-tests -G Ninja -DCMAKE_BUILD_TYPE=Release
+  cmake --build build/client-tests
+  ctest --test-dir build/client-tests --output-on-failure
+
+On a Mac with a graphical/Metal session, build and run the shader smoke test:
+
+  cmake --preset macos-arm64-release -DNOX_BUILD_VIDEOTOOLS=OFF -DNOX_BUILD_METAL_TESTS=ON
+  cmake --build --preset macos-arm64-release --target nox_metal_smoke -j 4
+  build/macos-arm64-release/noxsdl/nox_metal_smoke
+
+This checks shader creation and GPU readback without game assets. The GPU atlas regression
+checks BC7/R8 upload bytes, including row pitch and nonzero transfer offsets:
+
+  cmake -S noxsdl/tests/gpu_atlas -B build/gpu-atlas-tests -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DSDL3_DIR="$PWD/build/macos-arm64-release/_deps/sdl3-build"
+  cmake --build build/gpu-atlas-tests
+  ctest --test-dir build/gpu-atlas-tests --output-on-failure
+
 Automatic builds
 ----------------
-.github/workflows/ci.yml builds on Windows (MSVC) and Linux (GCC) on every push. The comments at
-the top of the file give the same steps to run by hand.
+.github/workflows/ci.yml builds on Windows (MSVC), Linux (GCC) and macOS ARM64 on every push.
+The Mac job runs the data/settings tests and packages an ad-hoc signed app. GPU runtime checks
+remain local because hosted runners may not expose a suitable GPU.
 
 Layout
 ------

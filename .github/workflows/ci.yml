@@ -31,6 +31,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  macos:
+    name: macOS ARM64
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tools
+        run: brew install cmake ninja glslang spirv-cross
+      - name: Configure
+        run: cmake --preset macos-arm64-release -DNOX_BUILD_VIDEOTOOLS=OFF -DNOX_BUILD_METAL_TESTS=ON
+      - name: Build client, app, and Metal test
+        run: cmake --build --preset macos-arm64-release --target noxsdl_bundle nox_metal_smoke -j 3
+      - name: Mac data and settings tests (no game assets)
+        run: |
+          cmake -S noxsdl/tests -B build/client-tests -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/client-tests
+          ctest --test-dir build/client-tests --output-on-failure
+      # Metal runtime checks need a graphical/GPU session; run them locally.
+      - name: Package app (ad-hoc signed, not notarized)
+        run: ditto -c -k --keepParent "build/macos-arm64-release/NoX Core.app" build/NoXCore-macOS-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NoXCore-macOS-arm64
+          path: build/NoXCore-macOS-arm64.zip
+
   windows:
     name: Windows (MSVC)
     runs-on: windows-2022
