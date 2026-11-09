@@ -651,6 +651,22 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     // Centred across, at the top (game_initOptionsInGame), the advanced panel in its place in it.
     window_->rect.x = 0;
     window_->rect.y = 0;
+    advancedHome_ = {advanced_->rect.x, advanced_->rect.y};
+    closing_ = false;
+    slide_ = nullptr;
+    if (!inGame) {
+        // game_showOptions: in from 480 above (20 a frame), out at 40, as the menus' screens.
+        slide_ = gui_.slideIn(window_, {0, -480}, {0, 20}, {0, -40});
+        followSlide();
+    }
+}
+
+void OptionsWindow::followSlide()
+{
+    if (window_ && advanced_) {
+        advanced_->rect.x = advancedHome_.x + window_->rect.x;
+        advanced_->rect.y = advancedHome_.y + window_->rect.y;
+    }
 }
 
 void OptionsWindow::showPage(int page)
@@ -680,18 +696,46 @@ void OptionsWindow::showPage(int page)
 
 void OptionsWindow::close()
 {
-    if (!open_) {
+    closeThen({});
+}
+
+void OptionsWindow::closeThen(std::function<void()> next)
+{
+    if (!open_ || closing_) {
         return;
     }
+    if (!slide_) {
+        // In a game: gone at once, the in-game menu coming back with a click.
+        finishClose(next);
+        return;
+    }
+    // From the menus: nox.cfg saved as it starts out (ShellSlideOut heard), then gone once out.
+    closing_ = true;
+    if (callbacks_.onClose) {
+        callbacks_.onClose(config_);
+    }
+    gui_.slideOut(slide_, [this, next = std::move(next)] { deferred_.push_back([this, next] { finishClose(next); }); });
+}
+
+void OptionsWindow::finishClose(const std::function<void()>& next)
+{
+    const bool slid = slide_ != nullptr;
     open_ = false;
+    closing_ = false;
+    slide_ = nullptr;
     gui_.destroyAll();
     window_ = nullptr;
     advanced_ = nullptr;
-    // Leaving: the main menu's slides out; in a game the in-game menu comes back
-    // with a click.
-    gui_.resources().sound(inGame_ ? 0x399 : 0x39B);
-    if (callbacks_.onClose) {
-        callbacks_.onClose(config_);
+    if (!slid) {
+        gui_.resources().sound(inGame_ ? 0x399 : 0x39B);
+        if (callbacks_.onClose) {
+            callbacks_.onClose(config_);
+        }
+    }
+    if (next) {
+        next();
+    } else if (callbacks_.onDismissed) {
+        callbacks_.onDismissed();
     }
 }
 
@@ -845,11 +889,13 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
         return true;
     }
     if (from.id == kInputConfig) {
+        // (From the menus: once Options has slid out.)
         deferred_.push_back([this] {
-            close();
-            if (callbacks_.onInputConfig) {
-                callbacks_.onInputConfig();
-            }
+            closeThen([this] {
+                if (callbacks_.onInputConfig) {
+                    callbacks_.onInputConfig();
+                }
+            });
         });
         return true;
     }
@@ -859,6 +905,7 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
 void OptionsWindow::update(std::uint64_t nowMs)
 {
     gui_.update(nowMs);
+    followSlide();
     gui::runQueued(deferred_);
 }
 
@@ -873,6 +920,9 @@ bool OptionsWindow::handleEvent(const SDL_Event& event, int width, int height)
 {
     if (!open_) {
         return false;
+    }
+    if (closing_) {
+        return true; // (sliding out: nothing more to press)
     }
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
         close();

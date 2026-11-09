@@ -204,6 +204,11 @@ void makeGameWindows(App* app, const gui::Resources& res)
         applyExtras(*app, e);
         saveExtras(*app, e);
     };
+    optionCallbacks.onDismissed = [app] {
+        if (app->menus && !app->live) {
+            app->menus->optionsClosed(); // (the menus' Options screen: the one it came from back)
+        }
+    };
     optionCallbacks.onInputConfig = [app] {
         if (app->inputConfig && app->input) {
             app->inputConfig->open(app->input->config());

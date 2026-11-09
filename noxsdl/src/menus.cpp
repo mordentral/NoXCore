@@ -5,6 +5,7 @@
 #include "cinematics.hpp"
 #include "client_level_gate.hpp"
 #include "console.hpp"
+#include "menu_rules.hpp"
 #include "mode_ui.hpp"
 
 #include "noxcore/client/solo_menu.hpp"
@@ -181,6 +182,7 @@ void Menus::reset()
     deferred_.clear();
     leaving_ = false;
     credits_.reset();
+    selColorKept_.reset();
 }
 
 void Menus::showMainMenu()
@@ -299,6 +301,11 @@ void Menus::enter(State s)
     stack_.push_back(s);
     slides_.clear();
     leaving_ = false;
+    // The bar: Back's text ("Quit" on the main menu: game_showMainMenu), Options greyed on
+    // Options (game_showOptions) and on again after it.
+    const OptsBackLook look = optsBackLook(static_cast<int>(s));
+    setBackText(look.backText);
+    enable(optsBack_, kOptions, look.optionsOn);
     const auto slide = [&](std::int32_t id, SDL_Point from, SDL_Point in, SDL_Point out) {
         if (gui::Window* w = screen_->find(id)) {
             slides_.push_back(gui_.slideIn(w, from, in, out));
@@ -317,8 +324,15 @@ void Menus::enter(State s)
             // only its GeneralPrint:SoloQuest text replaced. No main-menu button has a tooltip.)
             modes->text = "Game Modes";
         }
-        setBackText("OptsBack.wnd:Quit");
         optsBack_->show(true);
+        break;
+    case State::Options:
+        // game_showOptions: no screen of the menus' own; the Options window slides in from 480
+        // above over the background, the bar's Back reads "Back" and its Options is greyed.
+        optsBack_->show(true);
+        if (callbacks_.options) {
+            callbacks_.options();
+        }
         break;
     case State::Online:
         // The Online screen: from 240 above and 480 down.
@@ -327,7 +341,6 @@ void Menus::enter(State s)
         });
         slide(kOnlineTop, {0, -240}, {0, 20}, {0, -40});
         slide(kOnlineBottom, {0, 480}, {0, -20}, {0, 40});
-        setBackText("OptsBack.wnd:Back");
         optsBack_->show(true);
         break;
     case State::SelChar: {
@@ -350,7 +363,6 @@ void Menus::enter(State s)
                 }
             }
         }
-        setBackText("OptsBack.wnd:Back");
         optsBack_->show(true);
         enable(screen_, kCharNew, true); // (findAutosaves's start)
         if (solo_) {
@@ -378,7 +390,6 @@ void Menus::enter(State s)
                 };
             }
         }
-        setBackText("OptsBack.wnd:Back");
         optsBack_->show(true);
         break;
     }
@@ -389,7 +400,6 @@ void Menus::enter(State s)
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
         setupSelColor();
-        setBackText("OptsBack.wnd:Back");
         optsBack_->show(true);
         break;
     case State::Login:
@@ -398,7 +408,6 @@ void Menus::enter(State s)
             return onLogin(message, from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
-        setBackText("OptsBack.wnd:Back");
         optsBack_->show(true);
         setupLogin();
         break;
@@ -511,6 +520,14 @@ void Menus::back()
                 callbacks_.quit();
             }
         });
+        return;
+    }
+    if (stack_.back() == State::Options) {
+        // Options' Back: the window slides out (saving nox.cfg), then the screen it came from
+        // returns (optionsClosed, called by the window as it goes).
+        if (!callbacks_.closeOptions || !callbacks_.closeOptions()) {
+            optionsClosed();
+        }
         return;
     }
     if (stack_.back() == State::Chat) {
@@ -1281,10 +1298,49 @@ bool Menus::onOptsBack(gui::Window& from)
         return true;
     }
     if (from.id == kOptions && callbacks_.options) {
-        deferred_.push_back([this] { callbacks_.options(); }); // game_showOptions
+        // game_checkStateOptions: the screen up slides out, then Options (game_showOptions).
+        if (stack_.empty() || stack_.back() == State::Options || leaving_) {
+            return true;
+        }
+        if (stack_.back() == State::SelColor && screen_) {
+            // (Its name and colours kept for its return: game_showSelColor fills them back in.)
+            SelColorKept kept;
+            for (std::int32_t id = kColorSkin; id <= kColorShoes2; ++id) {
+                if (const gui::Window* w = screen_->find(id)) {
+                    kept.colors.emplace_back(id, w->userData);
+                }
+            }
+            for (const auto id : {kHairLabel, kMustacheLabel, kGoateeLabel, kBeardLabel}) {
+                if (const gui::Window* w = screen_->find(id)) {
+                    kept.labelsOn.emplace_back(id, w->enabled());
+                }
+            }
+            if (const gui::Window* name = screen_->find(kNameEntry)) {
+                kept.name = name->entry;
+            }
+            selColorKept_ = std::move(kept);
+        }
+        leave([this] { enter(State::Options); });
         return true;
     }
     return false;
+}
+
+void Menus::optionsClosed()
+{
+    // Options gone: the screen under it shown again (game_switchStates), sliding in.
+    if (!optionsUp()) {
+        return;
+    }
+    deferred_.push_back([this] {
+        if (!optionsUp()) {
+            return;
+        }
+        stack_.pop_back();
+        const State previous = stack_.back();
+        stack_.pop_back();
+        enter(previous);
+    });
 }
 
 void Menus::stepEyes()
@@ -1740,6 +1796,21 @@ void Menus::setupSelColor()
     // The name: "DefaultName" to start with (game_showSelColor).
     if (gui::Window* name = screen_->find(kNameEntry)) {
         name->entry = nox::strings::fromUtf8(gui_.text("DefaultName", "SelColor.c")).substr(0, name->entryMax);
+    }
+    // Back from Options: the name, colours and facial hair as they were chosen.
+    if (selColorKept_) {
+        for (const auto& [id, data] : selColorKept_->colors) {
+            if (gui::Window* w = screen_->find(id)) {
+                w->userData = data;
+            }
+        }
+        for (const auto& [id, on] : selColorKept_->labelsOn) {
+            enable(screen_, id, on);
+        }
+        if (gui::Window* name = screen_->find(kNameEntry)) {
+            name->entry = selColorKept_->name;
+        }
+        selColorKept_.reset();
     }
     // The picker (760) is a window of its own on top, hidden until a colour is clicked; a click
     // outside it closes it.

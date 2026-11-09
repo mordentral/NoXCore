@@ -41,6 +41,12 @@
 // on the main menu), loaded once (wndLoadMainBG). Back and Escape return to the previous
 // screen (game_checkStateSwitch); on the main menu they quit.
 //
+//   300    Options (game_showOptions): the bar's Options button is a screen of its own. The
+//          screen up slides out, the Options window (options_window.hpp) slides in from above,
+//          the bar's Back reads "Back" and its Options is greyed. Back, or Escape, slides Options
+//          out and brings the screen it came from back (SelColor with its name and colours as
+//          they were).
+//
 // The main menu's Intro plays movies\Intro.vqa (callbacks' intro: the movie player). Its Credits
 // (windowMainMenuProc's 0x7A) hides the menu behind the ending's credits screen (a Cinematics of
 // its own: Cinematics::showCredits), black with "Nox:Credits" rolling up and the credits music,
@@ -117,7 +123,10 @@ public:
         /// Join "a.b.c.d:port" as this character (kHostGame: host one here first).
         std::function<void(const std::string& host, const nox::client::PlayerProfile& profile)> join;
         std::function<void()> quit;
-        std::function<void()> options; ///< the Options bar's button (options_window.hpp)
+        std::function<void()> options; ///< the Options bar's button (options_window.hpp): opens the window
+        /// The bar's Back while Options is up: closes the window (optionsClosed() follows once it's
+        /// gone); false if it wasn't open.
+        std::function<bool()> closeOptions;
         /// Logged in to XWIS as this nick (now our account name).
         std::function<void(const std::string& nick)> loggedIn;
         /// Start a solo game (the character screen's Load, or a new character's Accept).
@@ -183,6 +192,12 @@ public:
     /// in it, "+5000" waits 5 seconds before the next.
     void queueClicks(std::vector<std::string> steps) { clicks_ = std::move(steps); }
 
+    /// Options (300) is the screen up: the window over the background, the bar's Back closing it.
+    bool optionsUp() const { return !stack_.empty() && stack_.back() == State::Options; }
+    /// The Options window has gone (Escape, the bar's Back): the screen it was opened from comes
+    /// back, as Back from any screen.
+    void optionsClosed();
+
     void update(std::uint64_t nowMs);
     void draw(SDL_Renderer* renderer, int width, int height);
     /// The credits' fades, over everything (after the pointer, as the exe's records over the GUI).
@@ -192,6 +207,7 @@ public:
 private:
     enum class State {
         MainMenu = 100,
+        Options = 300,
         Online = 400,
         SelChar = 500,
         SelClass = 600,
@@ -397,6 +413,14 @@ private:
     // Character creation.
     const nox::things::ModifierDb& modifiers_;
     std::array<std::array<Rgb, 32>, 3> palette_{}; ///< clothes, hair, skin
+    /// SelColor's choices kept while Options is up from it (its colour buttons' data, the facial
+    /// hair switched on or off, the name): the screen comes back with them, not the defaults.
+    struct SelColorKept {
+        std::vector<std::pair<std::int32_t, std::uint32_t>> colors;
+        std::vector<std::pair<std::int32_t, bool>> labelsOn;
+        std::u16string name;
+    };
+    std::optional<SelColorKept> selColorKept_;
     int chosenClass_ = -1;                         ///< its window id on SelClass, -1 none yet
     std::uint8_t newClass_ = 0;
     gui::Window* picker_ = nullptr;                ///< SelColor's 760, made top-level

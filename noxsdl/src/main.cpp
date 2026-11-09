@@ -1602,6 +1602,13 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 openEditor(*app, {});
             };
             callbacks.options = [app] { openOptions(*app); };
+            callbacks.closeOptions = [app] {
+                if (!app->options || !app->options->isOpen()) {
+                    return false;
+                }
+                app->options->close();
+                return true;
+            };
             callbacks.loggedIn = [](const std::string& nick) { SDL_Log("account: %s (XWIS login)", nick.c_str()); };
             app->menus =
                 std::make_unique<Menus>(res, gameDir, *app->browser, opts.profile, app->modifiers, std::move(callbacks));
@@ -2914,6 +2921,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
             app->input->releaseAll();
         }
         app->options->handleEvent(*event, app->camera.viewWidth, app->camera.viewHeight);
+        if (app->menus && !app->live && app->menus->optionsUp() &&
+            (event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+             event->type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+            // The menus' Options screen: the bar below the window (its Back) has the mouse too.
+            app->menus->handleEvent(*event, app->camera.viewWidth, app->camera.viewHeight, SDL_GetTicks());
+        }
         return SDL_APP_CONTINUE;
     }
     if (app->menus && !app->live) {
