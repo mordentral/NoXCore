@@ -179,6 +179,26 @@ bool menuWindowUp(const App& app)
            (app.inputConfig && app.inputConfig->isOpen());
 }
 
+/// A world on the view: a game's once it's in (not over a map's load), or the map viewer's.
+bool inWorld(const App& app)
+{
+    return app.view != nullptr &&
+           (app.live ? app.live->client().stage() == nox::client::HeadlessClient::Stage::InGame : !app.menus);
+}
+
+/// A game being played: its world up with no Escape menu, Options or key bindings, briefing or load
+/// menu, or movie over it (windowed, the pointer is the game's only then: applyMouse). Dead or
+/// observing counts (not playing(client)). A game in the editor's Map panel is played while the
+/// editor gives it the input (capturePlayTest).
+bool beingPlayed(const App& app)
+{
+    if (app.editor && app.live && (app.playTestEmbedded || app.sessionEmbedded)) {
+        return app.playTestCaptured;
+    }
+    return inWorld(app) && !menuWindowUp(app) && !(app.cinematics && app.cinematics->screenUp()) &&
+           !(app.movie && app.movie->active());
+}
+
 /// Snd_PlaySound for the HUD's and the controls' own sounds.
 void uiSound(App& app, std::uint32_t id, int volume)
 {

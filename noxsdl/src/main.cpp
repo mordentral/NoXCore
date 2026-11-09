@@ -285,10 +285,10 @@ bool saveScreenshot(App& app)
 }
 
 /// The map editor's mouse: the system's pointer, moving as the desktop's. The menus and a game
-/// (a play-test's too) run in relative mode (applyMouse), and SDL hides the pointer whatever
+/// (a play-test's too) may run in relative mode (applyMouse), and SDL hides the pointer whatever
 /// SDL_ShowCursor says while that's on, so it goes off here, every editor frame (the editor
 /// opened from the menus, back from a play-test's game, opened again); the next frame that isn't
-/// the editor's turns it on again (applyMouse, mouseApplied). The game draws its own pointer
+/// the editor's sets the mode again (applyMouse, mouseMode Unknown). The game draws its own pointer
 /// outside the editor (SDL_HideCursor where the editor hands over).
 void editorMouse(App& app)
 {
@@ -297,11 +297,11 @@ void editorMouse(App& app)
     }
     const bool relative = SDL_GetWindowRelativeMouseMode(app.window);
     const bool visible = SDL_CursorVisible();
+    app.mouseMode = MouseMode::Unknown; // (set again in the menus or a game: applyMouse)
     if (relative) {
         if (!SDL_SetWindowRelativeMouseMode(app.window, false)) {
             SDL_Log("mouse: relative mode off: %s", SDL_GetError());
         }
-        app.mouseApplied = false; // (on again in the menus or a game: applyMouse)
     }
     if (!visible) {
         SDL_ShowCursor();
@@ -4014,10 +4014,7 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         applyMouse(*app); // (a raw count is a game pixel, whose size this frame may have changed)
     }
     // The 3D view has the world, unless a window or menu has the mouse (its cursor back).
-    app->view3d.beginFrame(
-        app->view != nullptr && (app->live ? app->live->client().stage() == nox::client::HeadlessClient::Stage::InGame
-                                           : !app->menus),
-        windowHasMouse(*app));
+    app->view3d.beginFrame(inWorld(*app), windowHasMouse(*app));
 
     if (app->audio) {
         app->audio->update();

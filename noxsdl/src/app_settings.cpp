@@ -274,8 +274,11 @@ void applyDisplay(App& app)
 /// one of their 640 x 480. Then Win Mouse Accel (on by default) puts Windows' pointer speed and
 /// acceleration curve on the counts, and Mouse's speed multiplies them. SDL keeps the cursor's
 /// place in the window from that, so everything reading the mouse reads it as before. The
-/// pointer stays in the window while it has the focus, as the original's did.
-/// Called every frame: the game pixel's size changes with the window and the resolution.
+/// pointer stays in the window while it has the focus, as the original's did, except in a
+/// windowed window's menus (wantRelative: mouse_handover.hpp), where it's the desktop's pointer,
+/// at the desktop's speed, free to leave the window.
+/// Called every frame: the game pixel's size changes with the window and the resolution; SDL's
+/// mode is set only when it changes (mouseMode).
 void applyMouse(App& app)
 {
     if (!app.window) {
@@ -295,18 +298,23 @@ void applyMouse(App& app)
         SDL_Log("mouse: %s, speed x%.2f", looking ? "3D mouse look" : "cursor", speed / 100.0);
     }
     const float scale = std::max(gamePixel, 0.01f) / density * static_cast<float>(speed) / 100.0f;
-    if (!app.mouseApplied && !app.screenshot.empty()) {
-        app.mouseApplied = true; // (a --screenshot run's hidden window leaves the desktop's mouse alone)
-    }
-    if (!app.mouseApplied) {
-        SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_CENTER, "0"); // (the cursor stays where it is)
-        SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_SYSTEM_SCALE, app.mouseAccel ? "1" : "0");
-        if (!SDL_SetWindowRelativeMouseMode(app.window, true)) {
-            SDL_Log("mouse: relative mode: %s", SDL_GetError());
+    // (a --screenshot run's hidden window leaves the desktop's mouse alone)
+    const bool relative = wantRelative(beingPlayed(app), app.display == 0, SDL_GetMouseFocus() == app.window,
+                                       !app.screenshot.empty());
+    if (const auto change = mouseModeChange(app.mouseMode, relative)) {
+        app.mouseMode = *change; // (tried once: a failure isn't tried again every frame)
+        if (relative) {
+            SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_CENTER, "0"); // (the cursor stays where it is)
+            SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_SYSTEM_SCALE, app.mouseAccel ? "1" : "0");
         }
-        SDL_Log("mouse: raw input, speed x%.2f%s", app.mouseSpeed / 100.0,
-                app.mouseAccel ? " with Windows' acceleration" : " (1:1 with the original at x1)");
-        app.mouseApplied = true;
+        if (!SDL_SetWindowRelativeMouseMode(app.window, relative)) {
+            SDL_Log("mouse: relative mode %s: %s", relative ? "on" : "off", SDL_GetError());
+        } else if (relative) {
+            SDL_Log("mouse: raw input, speed x%.2f%s", app.mouseSpeed / 100.0,
+                    app.mouseAccel ? " with Windows' acceleration" : " (1:1 with the original at x1)");
+        } else {
+            SDL_Log("mouse: the desktop's pointer%s", app.screenshot.empty() ? " (windowed, not playing: free to leave the window)" : " (a hidden run)");
+        }
         app.mouseScale = 0; // (set below)
     }
     if (std::abs(scale - app.mouseScale) > 0.001f) {
@@ -319,8 +327,8 @@ void applyMouse(App& app)
 /// whole: every way out of the editor and of a play view comes through here. Nothing of the
 /// editor's or the panel's game's left behind: no held pointer place (the drawn pointer follows the
 /// mouse again), no confinement, grab or capture, SDL's pointer hidden (the game's own is drawn), and
-/// relative mode on again by applyMouse at the next frame (never in a hidden run), whatever the
-/// editor or a play view turned off.
+/// relative mode set again by applyMouse at the next frame as wantRelative says (never in a hidden
+/// run), whatever the editor or a play view turned off.
 void handMouseTo(App& app, MouseOwner owner)
 {
     const WindowMouse want = windowMouse(owner, !app.screenshot.empty());
@@ -348,13 +356,13 @@ void handMouseTo(App& app, MouseOwner owner)
     } else {
         SDL_HideCursor();
     }
-    if (want.relative) {
-        app.mouseApplied = false; // (applyMouse: relative mode with its speed, at the next frame)
-    } else if (SDL_GetWindowRelativeMouseMode(app.window)) {
+    app.mouseMode = MouseMode::Unknown; // (applyMouse: the mode with its speed, at the next frame)
+    if (!want.relative && !want.byPlay && SDL_GetWindowRelativeMouseMode(app.window)) {
         SDL_SetWindowRelativeMouseMode(app.window, false);
     }
     SDL_Log("mouse: to the %s (relative %s, pointer %s, grab %s, confined %s, drawn pointer from %s%s)",
-            owner == MouseOwner::Menus ? "menus" : "game", want.relative ? "on next frame" : SDL_GetWindowRelativeMouseMode(app.window) ? "on" : "off",
+            owner == MouseOwner::Menus ? "menus" : "game",
+            want.byPlay || want.relative ? "set next frame" : SDL_GetWindowRelativeMouseMode(app.window) ? "on" : "off",
             SDL_CursorVisible() ? "shown" : "hidden", SDL_GetWindowMouseGrab(app.window) ? "on" : "off",
             SDL_GetWindowMouseRect(app.window) ? "yes" : "no", pointerSourceName(pointerSource(app.testMouse.has_value(), app.playTestMouse.has_value(), false)),
             dropped ? "; the panel's held place dropped" : "");
@@ -427,7 +435,7 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     if (e.mouseAccel != app.mouseAccel || e.mouseSpeed != app.mouseSpeed) {
         app.mouseAccel = e.mouseAccel;
         app.mouseSpeed = e.mouseSpeed;
-        app.mouseApplied = false; // (applyMouse, next frame)
+        app.mouseMode = MouseMode::Unknown; // (applyMouse, next frame)
     }
     app.mouseSpeed3D = e.mouseSpeed3D; // (applyMouse picks it up while the 3D view looks)
     app.interpolator.setSmoothing(app.smoothMotion);

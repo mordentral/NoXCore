@@ -432,7 +432,7 @@ struct App {
     /// The map load (liveMapLoads) the host's Server Settings last came up for on arriving in a
     /// chat map (SrvNet_OnClientReady's guiServerOptsLoad).
     std::uint32_t serverOptionsLoad = 0;
-    bool mouseApplied = false; ///< the mode set as these say (applyMouse)
+    MouseMode mouseMode = MouseMode::Unknown; ///< the mode applyMouse last set (Unknown: set it again, with these)
     bool logMenuPointer = false; ///< the menus' next frame logs where their pointer is drawn (back from the editor or a game)
     std::uint64_t sessionLeaveAtMs = 0; ///< --session-leave-after (tests): the session's game left then, as its Quit menu's Leave
     float mouseScale = 0;      ///< SDL's relative speed scale as last set
@@ -760,6 +760,8 @@ std::uint32_t gameFlags(App& app);
 int ownAnimState(App& app);
 bool ownDeadFlag(App& app);
 bool menuWindowUp(const App& app);
+bool inWorld(const App& app);
+bool beingPlayed(const App& app);
 void uiSound(App& app, std::uint32_t id, int volume = 100);
 gui::Resources guiResources(App& app);
 void playMovie(App& app, const std::string& name, movies::Skip skip, std::function<void()> next);

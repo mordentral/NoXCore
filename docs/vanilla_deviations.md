@@ -269,6 +269,14 @@ Options switch unless noted.
 - **The mouse is read raw, a count a game pixel** (as vanilla's DirectInput, nextMouseEvent), with
   Windows' speed and acceleration on top by default (Options' Win Mouse Accel) and a speed
   multiplier (Mouse). Vanilla had neither switch. Off at x1.00 is vanilla's.
+- **Windowed, the menus let the pointer leave the window** (2026-11-09; concept from public PR #16
+  by Avrutskiy): vanilla kept the mouse its own throughout. With Options' Display at Windowed, the
+  menus, and a game's Escape menu, Options, key bindings, briefings and movies, have the desktop's
+  pointer at the desktop's speed (Mouse and Win Mouse Accel don't apply there), free to leave the
+  window; the game takes it again once it's over the window. A game being played is as before
+  (raw counts, a count a game pixel, kept in the window), and fullscreen and fullscreen windowed
+  are as before throughout. Always on; revert: `wantRelative` (mouse_handover.hpp) returning true
+  for windowed too.
 - **Options' Screen Resolution can be changed in a game** (2026-10-07): all
   four (640 x 480, 800 x 600, 1024 x 768, 1024 x 576) stay clickable and apply at once, the view
   re-fitted the next frame. Vanilla's in-game Options (initOptionsInGame) leaves only the one in use on.
