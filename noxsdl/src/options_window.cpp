@@ -337,7 +337,11 @@ void OptionsWindow::setDropText(const DropDown& d)
 }
 
 OptionsWindow::OptionsWindow(gui::Resources res, std::filesystem::path windowDir, Callbacks callbacks)
-    : gui_(std::move(res)), windowDir_(std::move(windowDir)), callbacks_(std::move(callbacks))
+    : gui_([&] {
+          res.bitmapFontScale = 0.8f;
+          return std::move(res);
+      }()),
+      windowDir_(std::move(windowDir)), callbacks_(std::move(callbacks))
 {
 }
 
@@ -393,11 +397,18 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
                                    std::make_move_iterator(items.end()));
     }
     window_ = gui_.load(optionsDef, proc);
+    // These full-row images include the indicator; centre their labels in the panel.
+    for (const auto id : {kDepth8, kDepth16}) {
+        if (gui::Window* w = window_->find(id)) {
+            w->radioValue = 1;
+        }
+    }
     if (gui::Window* box = window_->find(kResBox)) {
         box->dropArrow = true;
     }
     for (int i = 0; i < static_cast<int>(kResolutions.size()); ++i) {
         if (gui::Window* w = window_->find(kResItem + i)) {
+            w->singleLineText = true;
             w->text = kResolutions[static_cast<std::size_t>(i)].name;
         }
     }
@@ -561,6 +572,7 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
         }
         for (int i = 0; i < static_cast<int>(d.names.size()); ++i) {
             if (gui::Window* w = advanced_->find(d.item + i)) {
+                w->singleLineText = true;
                 w->text = d.names[static_cast<std::size_t>(i)];
             }
         }

@@ -29,6 +29,11 @@ QuitMenu::QuitMenu(gui::Resources res, std::filesystem::path windowDir, Callback
         return onButton(from);
     });
     menu_->rect.x = (640 - menu_->rect.w) / 2;
+    for (const auto id : {kAutoLoad, kAutoSave, kSave, kQuit, kOptions, kResume, kObserve, kGameplay, kVote}) {
+        if (gui::Window* button = menu_->find(id)) {
+            button->hdFontScale = 1.25f;
+        }
+    }
     // Its own drawing: the screen behind it darkened.
     menu_->draw = [](gui::Window& self, gui::Painter& p) {
         const SDL_Point pos = self.screenPos();

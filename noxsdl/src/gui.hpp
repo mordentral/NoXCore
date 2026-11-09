@@ -74,6 +74,7 @@ struct Resources {
     /// Resolve the menu face at draw time so HD Images changes apply immediately.
     Font* hdMenuFont = nullptr;
     Font* textFont() const { return hdMenuFont && sprites.usingPack() ? hdMenuFont : font; }
+    float bitmapFontScale = 1.0f;
 
     void sound(std::uint32_t id) const
     {
@@ -146,6 +147,7 @@ public:
     std::string backgroundImage, enabledImage, disabledImage, hiliteImage, selectedImage;
     SDL_Point imageOffset{};
     bool largeFont = false;
+    float hdFontScale = 1.0f;
     std::string text;    ///< shown (resolved from the string table)
     std::string tooltip;
     nox::gui::WindowData data;
@@ -180,6 +182,8 @@ public:
     /// draws the game's list-box down arrow (UIScrollDn, lit while the mouse is on it) at its
     /// right end, its text centred in the rest.
     bool dropArrow = false;
+    /// Drop-down choices stay on one line, using the small face if necessary.
+    bool singleLineText = false;
     /// (noxcpp) Drawn visibly greyed while disabled: its texts, list lines and box outlines in a dim
     /// grey, its images darkened. Off (the stock look, every window the files
     /// make): a disabled window draws as the exe's does, often no different from an enabled one.
@@ -274,7 +278,8 @@ public:
     void image(const std::string& name, int x, int y, bool dim);
     /// The same with its material pixels shaded (draw_setMaterial's two forms).
     void image(const std::string& name, int x, int y, const SpriteCache::Materials& materials);
-    int fontHeight(bool large) const { return large ? 16 : 10; }
+    int fontHeight(bool large) const;
+    void setHdFontScale(float scale) { hdFontScale_ = scale; }
     int textWidth(const std::string& utf8, bool large);
     /// The height of the text wrapped at `wrapWidth` (a font height a line).
     int textHeight(const std::string& utf8, bool large, int wrapWidth);
@@ -301,10 +306,12 @@ public:
 
 private:
     void drawSprite(const Sprite* s, int x, int y);
+    float fontScale() const;
 
     SDL_Renderer* renderer_;
     const Resources& res_;
     float scale_ = 1;
+    float hdFontScale_ = 1;
     float offsetX_ = 0, offsetY_ = 0;
 };
 
@@ -376,7 +383,7 @@ public:
 
 private:
     void drawWindow(Window& w, Painter& p);
-    void drawByType(Window& w, Painter& p);
+    void drawByType(Window& w, Painter p);
     void drawBorder(Window& w, Painter& p);
     /// The window at (x, y); `press`: only ENABLED ones (a click's), else any (the hover's).
     Window* hit(Window& w, int x, int y, bool press);

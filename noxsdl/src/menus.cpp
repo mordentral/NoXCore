@@ -312,6 +312,11 @@ void Menus::enter(State s)
         });
         slide(kMainTop, {0, -270}, {0, 20}, {0, -40});
         slide(kMainBottom, {0, 510}, {0, -20}, {0, 40});
+        for (const auto id : {kSolo, kMultiplay, kSoloQuest, kIntro, kCredits}) {
+            if (gui::Window* button = screen_->find(id)) {
+                button->hdFontScale = 1.25f;
+            }
+        }
         if (gui::Window* modes = screen_->find(kSoloQuest)) {
             // (noxcpp: Solo Quest's button opens Game Modes, soloModes; the .wnd's own font,
             // only its GeneralPrint:SoloQuest text replaced. No main-menu button has a tooltip.)

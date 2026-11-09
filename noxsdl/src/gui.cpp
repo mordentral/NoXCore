@@ -314,13 +314,23 @@ void Painter::drawSprite(const Sprite* s, int x, int y)
     res_.sprites.render(*s, nullptr, dst);
 }
 
+float Painter::fontScale() const
+{
+    return res_.hdMenuFont && res_.sprites.usingPack() ? hdFontScale_ : res_.bitmapFontScale;
+}
+
+int Painter::fontHeight(bool large) const
+{
+    return std::max(1, static_cast<int>(std::lround((large ? 16 : 10) * fontScale())));
+}
+
 int Painter::pixelSize(bool large) const
 {
     // The TTF drawn so its line is as tall as the game's font at this scale.
     if (!res_.textFont()) {
         return 10;
     }
-    const float target = static_cast<float>(fontHeight(large)) * scale_;
+    const float target = (large ? 16 : 10) * fontScale() * scale_;
     const float perPixel = res_.textFont()->gameFace(large).lineHeight(100) / 100.0f;
     return std::max(6, static_cast<int>(std::lround(target / perPixel)));
 }
@@ -624,8 +634,9 @@ void Gui::drawBorder(Window& w, Painter& p)
 
 // The stock look of a window that has no draw function of its own, by its type (the exe's
 // own draw functions for each kind of window), in layout pixels.
-void Gui::drawByType(Window& w, Painter& p)
+void Gui::drawByType(Window& w, Painter p)
 {
+    p.setHdFontScale(w.hdFontScale);
     const SDL_Point pos = w.screenPos();
     const int x = pos.x;
     const int y = pos.y;
@@ -650,9 +661,11 @@ void Gui::drawByType(Window& w, Painter& p)
         if (w.text.empty()) {
             return;
         }
-        const int tw = p.textWidth(w.text, w.largeFont);
-        p.text(w.text, x + across / 2 - tw / 2, y + height / 2 - p.fontHeight(w.largeFont) / 2, w.largeFont,
-               textColor, across);
+        const bool singleLine = w.singleLineText || w.dropArrow;
+        const bool large = w.largeFont && (!singleLine || p.textWidth(w.text, true) <= across - 4);
+        const int tw = p.textWidth(w.text, large);
+        p.text(w.text, x + across / 2 - tw / 2, y + height / 2 - p.fontHeight(large) / 2, large,
+               textColor, singleLine ? 0 : across);
     };
 
     switch (w.type) {
@@ -699,13 +712,7 @@ void Gui::drawByType(Window& w, Painter& p)
             }
             // The choice centred left of the arrow on one line: in the small font if it's too
             // long for the large one there.
-            if (!w.text.empty()) {
-                const int across = width - kArrowW - 6;
-                const bool large = w.largeFont && p.textWidth(w.text, true) <= across - 4;
-                const int tw = p.textWidth(w.text, large);
-                p.text(w.text, x + std::max(2, (across - tw) / 2), y + height / 2 - p.fontHeight(large) / 2, large,
-                       textColor);
-            }
+            centredText(width - kArrowW - 6);
             return;
         }
         centredText(width);
