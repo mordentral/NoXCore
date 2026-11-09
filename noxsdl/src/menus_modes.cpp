@@ -297,7 +297,9 @@ void Menus::modeList(ModeListFor list)
     // The headings, the column lines, and the chosen row's panel heading (its settings, or why a
     // broken mod didn't load).
     if (gui::Window* canvas = dialog_->find(kCanvasId)) {
-        canvas->draw = [chosenRow, hosting](gui::Window& w, gui::Painter& p) {
+        canvas->draw = [chosenRow, hosting](gui::Window& w, gui::Painter& painter) {
+            gui::Painter p = painter;
+            p.setHdFontScale(1.3f);
             const SDL_Point pos = w.screenPos();
             for (const Column& c : kColumns) {
                 p.text(c.title, pos.x + c.x, pos.y + kHeaderY, false, kGold);
@@ -338,7 +340,9 @@ void Menus::modeList(ModeListFor list)
     }
     for (int i = 0; i < kVisibleRows; ++i) {
         if (gui::Window* w = dialog_->find(kRowId + i)) {
-            w->draw = [state, i](gui::Window& win, gui::Painter& p) {
+            w->draw = [state, i](gui::Window& win, gui::Painter& painter) {
+                gui::Painter p = painter;
+                p.setHdFontScale(1.3f);
                 const int row = state->scroll + i;
                 if (row >= static_cast<int>(state->rows.size())) {
                     return;
@@ -371,7 +375,9 @@ void Menus::modeList(ModeListFor list)
     }
     for (int i = 0; i < kVisibleOptions; ++i) {
         if (gui::Window* w = dialog_->find(kOptionId + i)) {
-            w->draw = [this, chosenRow, i](gui::Window& win, gui::Painter& p) {
+            w->draw = [this, chosenRow, i](gui::Window& win, gui::Painter& painter) {
+                gui::Painter p = painter;
+                p.setHdFontScale(1.3f);
                 const Row* row = chosenRow();
                 if (!row || row->kind != Row::Kind::Mode || static_cast<std::size_t>(i) >= row->options.size()) {
                     return;
@@ -392,7 +398,9 @@ void Menus::modeList(ModeListFor list)
     }
     for (int b = 0; b < kButtonCount; ++b) {
         if (gui::Window* w = dialog_->find(kButtonId + b)) {
-            w->draw = [chosenRow, b, hosting](gui::Window& win, gui::Painter& p) {
+            w->draw = [chosenRow, b, hosting](gui::Window& win, gui::Painter& painter) {
+                gui::Painter p = painter;
+                p.setHdFontScale(1.3f);
                 const SDL_Point pos = win.screenPos();
                 const bool held = (win.state & gui::kPressed) != 0;
                 const Row* row = chosenRow();
@@ -411,6 +419,7 @@ void Menus::modeList(ModeListFor list)
     if (gui::Window* t = dialog_->find(kDlgTitle)) {
         t->text = hosting ? "Host Custom" : "Game Modes";
         t->largeFont = true;
+        t->hdFontScale = 1.3f;
     }
     // The keys: Up / Down (Home / End, Page Up / Down) move the choice, Enter starts it.
     dialogKeys_ = [state, choose, start](const SDL_KeyboardEvent& key) {

@@ -2,8 +2,8 @@
 // measuring, wrapping and drawing of UTF-8 text with them.
 #include "text.hpp"
 
-#include "noxcore/io/file.hpp"
 #include "content/font_palette.hpp"
+#include "noxcore/io/file.hpp"
 
 #include <stb_truetype.h>
 
@@ -17,6 +17,8 @@ extern const unsigned char kEmbeddedFont[];
 extern const std::size_t kEmbeddedFontSize;
 extern const unsigned char kEmbeddedMenuFont[];
 extern const std::size_t kEmbeddedMenuFontSize;
+extern const unsigned char kEmbeddedHudFont[];
+extern const std::size_t kEmbeddedHudFontSize;
 
 namespace noxsdl {
 
@@ -67,8 +69,15 @@ std::unique_ptr<Font> Font::load(SDL_Renderer* renderer, const std::filesystem::
 std::unique_ptr<Font> Font::loadMenu(SDL_Renderer* renderer)
 {
     return std::make_unique<Font>(renderer,
-        std::vector<std::uint8_t>(kEmbeddedMenuFont, kEmbeddedMenuFont + kEmbeddedMenuFontSize),
-        "Caudex Bold (built in)");
+                                  std::vector<std::uint8_t>(kEmbeddedMenuFont, kEmbeddedMenuFont + kEmbeddedMenuFontSize),
+                                  "Caudex Bold (built in)");
+}
+
+std::unique_ptr<Font> Font::loadHud(SDL_Renderer* renderer)
+{
+    return std::make_unique<Font>(renderer,
+                                  std::vector<std::uint8_t>(kEmbeddedHudFont, kEmbeddedHudFont + kEmbeddedHudFontSize),
+                                  "Averia Serif Libre Bold (built in)");
 }
 
 Font::Font(SDL_Renderer* renderer, std::vector<std::uint8_t> data, std::string name, Format format)
@@ -87,10 +96,14 @@ Font::Font(SDL_Renderer* renderer, std::vector<std::uint8_t> data, std::string n
             int bottom = 0;
             for (int y = 0; y < static_cast<int>(b.rows); ++y) {
                 for (int x = 0; x < b.width(*h); ++x) {
-                    if (b.pixel(*h, x, y)) bottom = y + 1;
+                    if (b.pixel(*h, x, y)) {
+                        bottom = y + 1;
+                    }
                 }
             }
-            if (bottom) info_->capHeight = static_cast<float>(bottom);
+            if (bottom) {
+                info_->capHeight = static_cast<float>(bottom);
+            }
         }
         return;
     }
@@ -149,9 +162,15 @@ const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
     std::optional<std::size_t> bitmapGlyph;
     if (info_->bitmap) {
         const auto& b = *info_->bitmap;
-        if (codepoint <= 0xFFFF) bitmapGlyph = b.glyphOf(static_cast<std::uint16_t>(codepoint));
-        if (!bitmapGlyph) bitmapGlyph = b.glyphOf('?');
-        if (!bitmapGlyph) return f.glyphs.emplace(codepoint, g).first->second;
+        if (codepoint <= 0xFFFF) {
+            bitmapGlyph = b.glyphOf(static_cast<std::uint16_t>(codepoint));
+        }
+        if (!bitmapGlyph) {
+            bitmapGlyph = b.glyphOf('?');
+        }
+        if (!bitmapGlyph) {
+            return f.glyphs.emplace(codepoint, g).first->second;
+        }
         x1 = b.width(*bitmapGlyph);
         y1 = static_cast<int>(b.rows);
         g.advance = static_cast<float>(x1 + 1) * f.scale;

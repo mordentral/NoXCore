@@ -1245,6 +1245,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             SDL_Log("font: %s", app->font->name().c_str());
             app->menuFont = Font::loadMenu(app->renderer);
             SDL_Log("menu font: %s", app->menuFont->name().c_str());
+            app->hudFont = Font::loadHud(app->renderer);
+            SDL_Log("HUD font: %s", app->hudFont->name().c_str());
         } catch (const std::exception& ex) {
             SDL_Log("font: %s (no name plates)", ex.what());
         }
@@ -3881,8 +3883,9 @@ void drawGameHud(App& app)
     app.spellLimits.update(client.world(), client.netCode(), clockFrame());
     app.hud->setLimited(app.spellLimits.limited(client.world(), app.gameData, gameFlags(app), client.modeOwnsBook()));
     app.hud->setGameFlags(gameFlags(app)); // (the cooldowns and trap prices: the game's own gamedata lines)
+    Font* hudLabels = app.sprites->usingPack() ? app.hudFont.get() : nullptr;
     if (app.renderGui && !(app.tradeScreens && app.tradeScreens->hidesHud())) {
-        app.hud->draw(app.renderer, app.font.get(), *app.sprites, client.world(), client.netCode(),
+        app.hud->draw(app.renderer, hudLabels ? hudLabels : app.font.get(), *app.sprites, client.world(), client.netCode(),
                        quickbarState(app), app.camera.viewWidth, app.camera.viewHeight,
                        gameFrame(app));
     }
@@ -3920,7 +3923,7 @@ void drawGameHud(App& app)
         app.inventory->setMulticlass(client.multiclass());
         app.inventory->setGameFlags(gameFlags(app));
         app.inventory->draw(app.renderer, client.world(), client.netCode(), app.camera.viewWidth,
-                             app.camera.viewHeight, mousePos(app));
+                             app.camera.viewHeight, mousePos(app), hudLabels);
     }
     const bool hudHidden = app.tradeScreens && app.tradeScreens->hidesHud(); // (renderGUI off)
     if (app.summon && app.renderGui && !hudHidden) {

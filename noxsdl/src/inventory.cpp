@@ -593,7 +593,7 @@ void Inventory::drawDoll(SDL_Renderer* r, const nox::client::World& world, std::
 }
 
 void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint16_t us, int w, int h,
-                     SDL_FPoint mouse)
+                     SDL_FPoint mouse, Font* labelFont)
 {
     const float s = Hud::scale(w, h);
     const float H = static_cast<float>(h) / s;
@@ -685,8 +685,8 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
         }
         // The swap key (control 0x23, SwapWeapons) in white in the small font, its cell's top
         // left at the window's (0x13, 0x66): in the ring's bottom-left tab.
-        if (font_) {
-            font_->drawGameText("V", wx + 0x13, wy + 0x66, s, {255, 255, 255, 255});
+        if (Font* swapFont = labelFont ? labelFont : font_) {
+            swapFont->drawGameText("V", wx + 0x13, wy + 0x66, s, {255, 255, 255, 255});
         }
     }
 
@@ -805,7 +805,13 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
             const auto& item = inv.at(secondary);
             drawItem(r, item.typeId, item.modifiers, bx + 25, by + 25, s);
         }
-        text("V", bx + 0x16, by + 0x29 - 8, {255, 255, 255, 255});
+        if (labelFont) {
+            // The swap key sits on the gold tab at the bottom of the weapon slot.
+            const float x = bx + (50 - labelFont->measureGameText("V", s)) / 2;
+            labelFont->drawGameText("V", x, by + 41, s, {255, 255, 255, 255});
+        } else {
+            text("V", bx + 0x16, by + 0x29 - 8, {255, 255, 255, 255});
+        }
     }
     if (font_ && !identify_) {
         const auto lines = font_->wrap(title(world, us), textSize, 196 * s);

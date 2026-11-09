@@ -53,6 +53,14 @@ void InputConfigWindow::open(const nox::config::Config& config)
     capture_.reset();
     const auto proc = [this](gui::Window&, int message, gui::Window& from) { return onMessage(message, from); };
     window_ = gui_.load(gameDir_ / "window" / "InputCfg.wnd", proc);
+    for (const auto id : {kReset, kBack, kDefaults, kPickupLeft, kPickupLeft + 1, kPickupLeft + 2}) {
+        if (gui::Window* button = window_->find(id)) {
+            button->bitmapFontScale = 0.85f;
+        }
+    }
+    if (gui::Window* prompt = window_->find(kPopupText)) {
+        prompt->hdFontScale = 1.25f;
+    }
     // The three columns tell their parent list (910), which the window's procedure stands in for.
     if (gui::Window* list = window_->find(kList)) {
         list->proc = proc;

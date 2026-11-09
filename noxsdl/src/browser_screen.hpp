@@ -34,7 +34,7 @@ public:
     void draw(SDL_Renderer* renderer, int width, int height);
     /// Inside `area` (output pixels), as the game list in the menus' game browser: the columns,
     /// the games, and the search messages at the bottom, text at `textSize` pixels.
-    void drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textSize);
+    void drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textSize, float scale);
 
     /// Handles input; returns the server to join ("a.b.c.d:port") when one is chosen. Mouse
     /// input only counts inside the area last drawn in.
@@ -91,7 +91,7 @@ private:
         int visibleRows = 0;
     };
     Layout layout(int height);
-    void drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layout& l, bool framed);
+    void drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layout& l, bool framed, int rowSize = 0);
     void sortRows();
     std::optional<std::string> joinSelected();
     /// "Searching ..." naming the places this search asks.

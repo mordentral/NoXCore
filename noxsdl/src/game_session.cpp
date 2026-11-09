@@ -374,7 +374,6 @@ void startCinematics(App& app)
     if (!app.live) {
         return;
     }
-    const gui::Resources res = guiResources(app);
     Cinematics::Hooks hooks;
     hooks.hideHud = [&app](bool hide) {
         // The HUD switch: the book, inventory and map put away (back after), the console, menus
@@ -614,7 +613,7 @@ void startCinematics(App& app)
     });
     // A quest's windows: Continue asks the server to go on (questContinue), Quit leaves (clientQuit).
     app.questWindows = std::make_unique<QuestWindows>(
-        res, app.gameDir / "window",
+        guiResources(app, true), app.gameDir / "window",
         QuestWindows::Hooks{[&app] {
                                 if (app.live) {
                                     app.live->client().questContinue();

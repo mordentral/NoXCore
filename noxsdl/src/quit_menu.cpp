@@ -256,6 +256,11 @@ void QuitMenu::ask(const std::string& title, const std::string& text, std::funct
     });
     gui::centreOnScreen(*dialog_);
     dialog_->status |= nox::gui::status::Above;
+    for (const auto id : {kDlgTitle, kDlgText, kDlgOk, kDlgCancel, kDlgYes, kDlgNo}) {
+        if (gui::Window* label = dialog_->find(id)) {
+            label->hdFontScale = 1.5f;
+        }
+    }
     if (gui::Window* t = dialog_->find(kDlgTitle)) {
         t->text = title;
     }

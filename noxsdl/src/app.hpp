@@ -648,6 +648,7 @@ struct App {
     std::array<std::uint32_t, 4> modAbilityKeys{0x04, 0x05, 0x06, 0x07};
     std::unique_ptr<Font> font;
     std::unique_ptr<Font> menuFont;
+    std::unique_ptr<Font> hudFont;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game
     bool autoSpawn = false;     ///< --spawn: leave observer mode once in the game (for tests)

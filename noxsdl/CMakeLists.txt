@@ -28,7 +28,6 @@ add_library(noxsdl_editor_host STATIC
     src/editor/texture_mirror.cpp
     src/editor/theme.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_font.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/embedded_menu_font.cpp
 )
 target_include_directories(noxsdl_editor_host PUBLIC src) # (its headers: "editor/imgui_host.hpp" ...)
 target_link_libraries(noxsdl_editor_host PUBLIC noxsdl_imgui nox::core SDL3::SDL3 PRIVATE nox_warnings)
@@ -153,6 +152,9 @@ add_executable(noxsdl WIN32
     src/view3d.cpp
     src/view3d_gpu.cpp
     src/weather.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/embedded_menu_font.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/embedded_hud_font.cpp
+    ${PROJECT_SOURCE_DIR}/videotools/src/content/font_palette.cpp
 )
 # The program is noxcore.exe (Linux: noxcore); the target keeps its name, noxsdl, for the build
 # commands. No clash with the library target noxcore: its noxcore.lib / .a is built in noxcore/,
@@ -184,12 +186,23 @@ add_custom_command(
     COMMENT "Embedding Caudex Bold menu font"
     VERBATIM
 )
+set(NOXSDL_HUD_FONT "${CMAKE_CURRENT_SOURCE_DIR}/res/fonts/AveriaSerifLibre-Bold.ttf")
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/embedded_hud_font.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${NOXSDL_HUD_FONT} -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/embedded_hud_font.cpp
+            -DSYMBOL=kEmbeddedHudFont -P ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
+    DEPENDS ${NOXSDL_HUD_FONT} ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
+    COMMENT "Embedding Averia Serif Libre Bold HUD font"
+    VERBATIM
+)
 # Ship the fonts' licences beside the exe.
 add_custom_command(TARGET noxsdl POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${noto_sans_license_SOURCE_DIR}/OFL.txt
             $<TARGET_FILE_DIR:noxsdl>/NotoSans-OFL.txt
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/res/fonts/Caudex-OFL.txt
             $<TARGET_FILE_DIR:noxsdl>/Caudex-OFL.txt
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/res/fonts/AveriaSerifLibre-OFL.txt
+            $<TARGET_FILE_DIR:noxsdl>/AveriaSerifLibre-OFL.txt
     VERBATIM
 )
 # The mods in mods/ (script modes) into the mods folder beside the exe, where a host finds them.
@@ -289,6 +302,8 @@ if(NOT NOXSDL_DXC AND NOT NOXSDL_GLSLANG)
 endif()
 
 target_include_directories(noxsdl SYSTEM PRIVATE ${stb_truetype_SOURCE_DIR})
+# The original .fnt reader is shared with the content editor, even when that target is disabled.
+target_include_directories(noxsdl PRIVATE ${PROJECT_SOURCE_DIR}/videotools/src)
 target_include_directories(noxsdl PRIVATE src) # (src/editor's files include "editor/..." and the views beside them)
 target_link_libraries(noxsdl PRIVATE nox::core nox::modes SDL3::SDL3 nox_warnings miniupnpc::miniupnpc noxsdl_imgui noxsdl_editor_host)
 # Luau's analysis library: the mod editor's diagnostics (src/editor/mod_analysis.cpp). noxsdl's
@@ -377,7 +392,3 @@ if(NOXSDL_HD_VIDEO AND WIN32 AND MSVC AND ffmpeg_lgpl_SOURCE_DIR)
 else()
     target_compile_definitions(noxsdl PRIVATE NOXSDL_HD_VIDEO=0)
 endif()
-
-# Share the original .fnt reader with the client when the content editor is disabled.
-target_sources(noxsdl PRIVATE ${PROJECT_SOURCE_DIR}/videotools/src/content/font_palette.cpp)
-target_include_directories(noxsdl PRIVATE ${PROJECT_SOURCE_DIR}/videotools/src)

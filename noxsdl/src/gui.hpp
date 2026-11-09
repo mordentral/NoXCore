@@ -148,6 +148,7 @@ public:
     SDL_Point imageOffset{};
     bool largeFont = false;
     float hdFontScale = 1.0f;
+    float bitmapFontScale = 1.0f;
     std::string text;    ///< shown (resolved from the string table)
     std::string tooltip;
     nox::gui::WindowData data;
@@ -280,6 +281,7 @@ public:
     void image(const std::string& name, int x, int y, const SpriteCache::Materials& materials);
     int fontHeight(bool large) const;
     void setHdFontScale(float scale) { hdFontScale_ = scale; }
+    void setBitmapFontScale(float scale) { bitmapFontScale_ = scale; }
     int textWidth(const std::string& utf8, bool large);
     /// The height of the text wrapped at `wrapWidth` (a font height a line).
     int textHeight(const std::string& utf8, bool large, int wrapWidth);
@@ -312,6 +314,7 @@ private:
     const Resources& res_;
     float scale_ = 1;
     float hdFontScale_ = 1;
+    float bitmapFontScale_ = 1;
     float offsetX_ = 0, offsetY_ = 0;
 };
 

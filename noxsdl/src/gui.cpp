@@ -316,7 +316,7 @@ void Painter::drawSprite(const Sprite* s, int x, int y)
 
 float Painter::fontScale() const
 {
-    return res_.hdMenuFont && res_.sprites.usingPack() ? hdFontScale_ : res_.bitmapFontScale;
+    return res_.hdMenuFont && res_.sprites.usingPack() ? hdFontScale_ : res_.bitmapFontScale * bitmapFontScale_;
 }
 
 int Painter::fontHeight(bool large) const
@@ -642,6 +642,7 @@ void Gui::drawBorder(Window& w, Painter& p)
 void Gui::drawByType(Window& w, Painter p)
 {
     p.setHdFontScale(w.hdFontScale);
+    p.setBitmapFontScale(w.bitmapFontScale);
     const SDL_Point pos = w.screenPos();
     const int x = pos.x;
     const int y = pos.y;

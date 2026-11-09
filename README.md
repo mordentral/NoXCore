@@ -31,7 +31,8 @@ original game is included.
   HD images.
 - **Fonts:** HD Images selects embedded Caudex Bold for menus and campaign screens;
   with HD Images off, these use the original Nox bitmap fonts. Switching applies immediately.
-  HUD and NPC dialogue use the original fonts in both modes.
+  HD HUD shortcuts use embedded Averia Serif Libre Bold. Compact gameplay text, spellbooks,
+  server-list rows and NPC dialogue retain the original fonts.
 - **Mods:** game modes written in Luau, loaded from the `mods` folder.
 - **The NoX Content Editor** for the game's files, saving changes into content packs.
 

@@ -184,7 +184,7 @@ public:
     /// Files new items into cells and forgets gone ones; steps the slide (per game frame).
     void update(const nox::client::World& world, std::uint32_t frame);
     void draw(SDL_Renderer* renderer, const nox::client::World& world, std::uint16_t us, int w, int h,
-              SDL_FPoint mouse);
+              SDL_FPoint mouse, Font* labelFont = nullptr);
 
     /// Mouse in output pixels. `toWorld` maps a point to world coordinates (for drops). Returns
     /// whether the inventory (or the weapon panel) took the event.

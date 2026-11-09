@@ -25,8 +25,10 @@ public:
     /// Original bitmap fonts from `gameDir`, else TrueType/OpenType or the embedded font.
     static std::unique_ptr<Font> load(SDL_Renderer* renderer, const std::filesystem::path& gameDir);
 
-    /// Embedded scalable menu face; dialogue and HUD continue using load().
+    /// Embedded scalable menu face; dialogue continues using load().
     static std::unique_ptr<Font> loadMenu(SDL_Renderer* renderer);
+    /// Compact scalable face for HD HUD labels.
+    static std::unique_ptr<Font> loadHud(SDL_Renderer* renderer);
 
     enum class Format { TrueType, NoxBitmap };
 

@@ -136,6 +136,11 @@ Menus::Menus(gui::Resources res, std::filesystem::path gameDir, BrowserScreen& b
                           [this](gui::Window&, int message, gui::Window& from) {
                               return shellSound(message) && message == gui::Clicked && onOptsBack(from);
                           });
+    for (const auto id : {kOptions, kBack}) {
+        if (gui::Window* button = optsBack_->find(id)) {
+            button->hdFontScale = 1.25f;
+        }
+    }
     // The game list's R / F5 as its Refresh button.
     browser_.setRefreshHandler([this](std::uint64_t nowMs) {
         nowMs_ = nowMs;
@@ -330,6 +335,11 @@ void Menus::enter(State s)
         screen_ = gui_.load(windowDir_ / "ArnaMain.wnd", [this](gui::Window&, int message, gui::Window& from) {
             return shellSound(message) && message == gui::Clicked && onOnline(from);
         });
+        for (const auto id : {kWestwoodOnline, kNetwork}) {
+            if (gui::Window* button = screen_->find(id)) {
+                button->hdFontScale = 1.25f;
+            }
+        }
         slide(kOnlineTop, {0, -240}, {0, 20}, {0, -40});
         slide(kOnlineBottom, {0, 480}, {0, -20}, {0, 40});
         setBackText("OptsBack.wnd:Back");
@@ -341,6 +351,12 @@ void Menus::enter(State s)
             return shellSound(message) && message == gui::Clicked && onSelChar(from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
+        for (const auto id : {kCharNew, kCharLoad, kCharDelete}) {
+            if (gui::Window* button = screen_->find(id)) {
+                button->hdFontScale = 1.15f;
+                button->bitmapFontScale = 0.85f;
+            }
+        }
         if (gui::Window* lists = screen_->find(kCharLists)) {
             lists->proc = screen_->proc; // wndSetProc: the lists' clicks reach the screen
         }
@@ -372,6 +388,12 @@ void Menus::enter(State s)
             return shellSound(message) && onSelClass(message, from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -460}, {0, 20}, {0, -40}));
+        if (gui::Window* button = screen_->find(kClassAccept)) {
+            button->hdFontScale = 1.25f;
+        }
+        if (gui::Window* description = screen_->find(kClassText)) {
+            description->bitmapFontScale = 0.85f;
+        }
         chosenClass_ = -1;
         for (std::int32_t id = kClassFirst; id <= kClassLast; ++id) {
             if (gui::Window* w = screen_->find(id)) {
@@ -393,6 +415,15 @@ void Menus::enter(State s)
             return shellSound(message) && message == gui::Clicked && onSelColor(from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
+        for (const auto id : {710, 711, 712, 713, 714, 715, 716, 717, 750, 751}) {
+            if (gui::Window* label = screen_->find(id)) {
+                label->hdFontScale = 1.1f;
+                label->bitmapFontScale = 0.9f;
+            }
+        }
+        if (gui::Window* button = screen_->find(kColorAccept)) {
+            button->hdFontScale = 1.25f;
+        }
         setupSelColor();
         setBackText("OptsBack.wnd:Back");
         optsBack_->show(true);
@@ -432,6 +463,11 @@ void Menus::enter(State s)
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
         optsBack_->show(false);
+        for (const auto id : {kHost, kHostQuest, kList, kFilters, kRefresh, kFind, kWorldBack, kJoin}) {
+            if (gui::Window* button = screen_->find(id)) {
+                button->hdFontScale = 1.25f;
+            }
+        }
         for (const auto id : {kWorldListPanel, kWorldGameList, kWorldMap, kWorldMapQuads}) {
             if (gui::Window* w = screen_->find(id)) {
                 w->show(false);
@@ -460,7 +496,7 @@ void Menus::enter(State s)
             p.image(w.backgroundImage, pos.x + w.imageOffset.x, pos.y + w.imageOffset.y);
             browser_.drawFramed(p.renderer(),
                                 p.toOutput(pos.x + kListFrame.x, pos.y + kListFrame.y, kListFrame.w, kListFrame.h),
-                                p.pixelSize(false));
+                                p.pixelSize(false), p.scale());
         };
         refreshGames();
         break;
@@ -859,6 +895,11 @@ void Menus::setupLogin()
     gui::useSliderThumb(screen_->find(kLoginSlider));
     selectLogin(std::max(pick, 0));
     scrollLogins(std::max(pick - kLoginLinesShown / 2, 0));
+    for (const auto id : {kLoginSkip, kLoginGo}) {
+        if (gui::Window* button = screen_->find(id)) {
+            button->largeFont = false;
+        }
+    }
     // Register: XWIS makes an account on its first login, so it's our way to go on without one.
     if (gui::Window* skip = screen_->find(kLoginSkip)) {
         skip->text = "Skip Login";
@@ -868,7 +909,12 @@ void Menus::setupLogin()
         go->tooltip = "Log in to XWIS (a new name makes a new account with this password)";
     }
     // Ours: how to log in to XWIS, across the top, over the screen's background.
-    screen_->draw = [](gui::Window& w, gui::Painter& p) {
+    screen_->draw = [this](gui::Window& w, gui::Painter& painter) {
+        gui::Resources textResources = gui_.resources();
+        textResources.hdMenuFont = nullptr;
+        textResources.bitmapFontScale = 0.8f;
+        const SDL_FRect origin = painter.toOutput(0, 0, 0, 0);
+        gui::Painter p(painter.renderer(), textResources, painter.scale(), origin.x, origin.y);
         const SDL_Point pos = w.screenPos();
         p.image(w.backgroundImage, pos.x + w.imageOffset.x, pos.y + w.imageOffset.y);
         static const std::string kHow =

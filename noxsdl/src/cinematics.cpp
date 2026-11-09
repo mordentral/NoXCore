@@ -831,6 +831,9 @@ void Cinematics::showBriefing(int chapter, int variant, int questMode)
     // credits from 500 down rolling up till 20 above the top (a step of 1.0 a frame for them,
     // 0 for the others: briefingFrame).
     gui::Painter p(nullptr, res_, 640, 480);
+    if (chapter == 0xFF) {
+        p.setHdFontScale(1.35f);
+    }
     const int fh = p.fontHeight(true);
     brief_.height = p.textHeight(brief_.text, true, 480);
     if (chapter == 0xFF) {
@@ -1004,6 +1007,12 @@ void Cinematics::drawBriefing(SDL_Renderer* renderer, int width, int height)
     const SDL_FRect all{0, 0, static_cast<float>(width), static_cast<float>(height)};
     SDL_RenderFillRect(renderer, &all);
     gui::Painter p(renderer, res_, width, height);
+    const int chapterLineHeight = p.fontHeight(true); // blank lines position the chapter labels
+    if (brief_.chapter == 0xFF) {
+        p.setHdFontScale(1.35f);
+    } else if (brief_.questMode == 0 || brief_.questMode == 2) {
+        p.setHdFontScale(1.5f);
+    }
     if (!brief_.image.empty()) {
         p.image(brief_.image, 0, 0);
     }
@@ -1062,7 +1071,7 @@ void Cinematics::drawBriefing(SDL_Renderer* renderer, int width, int height)
         lines.push_back(line);
     }
     // The block centred on the text window's middle; brief_.y is that window's top (it rolls up for the credits).
-    const int fh = p.fontHeight(true);
+    const int fh = brief_.chapter == 0xFF ? p.fontHeight(true) : chapterLineHeight;
     const int total = static_cast<int>(lines.size()) * fh;
     int y = static_cast<int>(brief_.y) + brief_.height / 2 - total / 2;
     const nox::gui::Color white{255, 255, 255, false};
@@ -1338,6 +1347,7 @@ void Cinematics::drawQuestStage(gui::Painter& p)
         }
     }
     if (quest_.blinkShown) {
+        p.setHdFontScale(1.0f);
         const std::string click = text("GeneralPrint:QuestSplash12");
         p.text(click, 320 - p.textWidth(click, true) / 2, 462, true, kQuestWhite);
     }
@@ -1476,6 +1486,12 @@ void Cinematics::openLoadMenu()
         });
         if (!loadMenu_) {
             return;
+        }
+        for (const auto id : {kSave, kLoad, kCancel}) {
+            if (gui::Window* button = loadMenu_->find(id)) {
+                button->hdFontScale = 1.15f;
+                button->bitmapFontScale = 0.85f;
+            }
         }
         if (gui::Window* lists = loadMenu_->find(kLists)) {
             lists->proc = loadMenu_->proc;
@@ -1763,6 +1779,11 @@ void Cinematics::dialog(DialogParent parent, const std::string& title, const std
         }
         gui::centreOnScreen(*dialog_);
         dialog_->status |= nox::gui::status::Above;
+    }
+    for (const auto id : {kDlgTitle, kDlgText, kDlgOk, kDlgCancel, kDlgYes, kDlgNo}) {
+        if (gui::Window* label = dialog_->find(id)) {
+            label->hdFontScale = 1.5f;
+        }
     }
     if (gui::Window* t = dialog_->find(kDlgTitle)) {
         t->text = title;
