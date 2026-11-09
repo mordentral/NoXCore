@@ -32,3 +32,5 @@ Desktop acceptance:
 - Repeat with server update rates of 30, 90 and 120, and with VSync on and off.
 - Switch modes, pause/resume and reconnect. Confirm that rendering continues and
   that the existing smoothing modes and menu behavior remain unchanged.
+
+The Windows and Linux CI jobs run this standalone suite on every push and pull request.
