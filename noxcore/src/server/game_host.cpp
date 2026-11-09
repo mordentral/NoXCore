@@ -276,10 +276,13 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
     // The lowest client level let in (0: any); a mode's client key realm (0: none).
     transport_.setMinClientLevel(options_.minClientLevel);
     transport_.setClientKeyRealm(options_.clientKeyRealm);
-    if (types.hash != 0 || options_.minClientLevel != 0) {
-        // (the joins' refusals, why, in the process's log: the content packs' log sink)
-        transport_.setLog([](const std::string& line) { content::writeContentPackLog(line); });
-    }
+    // The joins' refusals, why, and a client's full reliable queue, in the process's log (the content
+    // packs' log sink); the latter names the player.
+    transport_.setLog([](const std::string& line) { content::writeContentPackLog(line); });
+    transport_.setPeerName([this](std::uint8_t peer) {
+        const auto it = players_.find(peer);
+        return it == players_.end() ? std::string() : it->second.name;
+    });
 }
 
 void GameHost::refreshServerInfo()
@@ -948,6 +951,8 @@ void GameHost::updatePlayer(HostedPlayer& p)
         }
         if (o.enchantOwed & bit) {
             o.enchantOwed &= ~bit;
+            // (noxcpp, VD-69: whom it last told bits, so their "0" stays owed when they clear)
+            o.enchantTold = o.buffs != 0 ? o.enchantTold | bit : o.enchantTold & ~bit;
             transport_.sendReliable(p.peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportEnchantment),
                                                                       static_cast<std::uint8_t>(code),
                                                                       static_cast<std::uint8_t>(code >> 8),

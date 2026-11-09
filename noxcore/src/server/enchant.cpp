@@ -22,6 +22,9 @@ void setEnchantments(ServerObject& o, std::uint32_t bits)
         o.enchantOwed |= o.knownBy;
         if (bits == 0) {
             o.enchantOwed &= o.knownBy;
+            // noxcpp (VD-69, OB-425): and to those last told it had some, known or not, so a
+            // client that kept it (its out-of-sight notice lost) hears the "0" when it next sees it.
+            o.enchantOwed |= o.enchantTold;
         }
     }
 }

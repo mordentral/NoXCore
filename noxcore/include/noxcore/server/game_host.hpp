@@ -516,12 +516,13 @@ public:
     std::optional<net::ServerTransport::ReliableSeqs> reliableSeqs(std::uint8_t peer) const { return transport_.reliableSeqs(peer); }
     /// (noxcpp's) The most reliable packets a client may have out before NoX Core's own paced
     /// senders hold back (the fast map send, a mode's UI, assets, values and views, its weather, an
-    /// edit session's live view and mod files). The transport's acknowledgement compares sequence
-    /// numbers safely only within 32 of each other (transport.cpp's acknowledged; OB-001, OB-410):
-    /// past that a packet can be taken as acknowledged and dropped unsent, or kept a lap. These
-    /// senders together stay under this, leaving the rest of the 32 to the game's own messages,
-    /// which are never held (the game's own may still pass 32 in a long wait for an
-    /// acknowledgement). (The session's messages, edit_session.hpp, wait the same way.)
+    /// edit session's live view and mod files). The original's acknowledgement compares sequence
+    /// numbers safely only within 32 of each other (OB-001, OB-410, OB-424): past that a packet
+    /// can be taken as acknowledged and dropped unsent, or kept a lap. Ours takes any number out up
+    /// to the queue's 200 (transport.cpp's acknowledged, VD-68); these senders keep the pace they
+    /// had all the same: together they stay under this, leaving the rest of the 32 to the game's
+    /// own messages, which are never held. (The session's messages, edit_session.hpp, wait the same
+    /// way.)
     static constexpr std::size_t kReliableSpan = 24;
     /// How many more reliable packets one of those senders may put out to `peer` now (0: wait).
     /// Each asks before each packet it adds. (A small one, latest wins: a mode's values, views and
@@ -551,8 +552,8 @@ public:
     /// 2 MB/s: a burst a socket's send buffer takes). The stock stream's blocks don't count.
     static constexpr int kFastMapBlocksPerFrameAll = 64;
     /// The client's unacknowledged reliable packets the fast send stops at, at most: it keeps the
-    /// map's own packets in flight under the 32 numbers the transport's acknowledgement compares
-    /// safely (transport.cpp's acknowledged); other reliable traffic to the client counts in the
+    /// map's own packets in flight under the 32 numbers the original's acknowledgement compares
+    /// safely (kReliableSpan); other reliable traffic to the client counts in the
     /// window but isn't held by it. (A bulk sender: reliableBulkRoom stops it there.)
     static constexpr std::size_t kFastMapWindow = kReliableSpan - kReliableBulkReserve;
     /// The window a send starts with, and the least it falls to. A client takes reliable packets in

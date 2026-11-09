@@ -170,6 +170,7 @@ void GameHost::forgetObjects(std::uint8_t slot)
         o.xStatusOwed &= ~bit;
         o.heightOwed &= ~bit;
         o.enchantOwed &= ~bit;
+        o.enchantTold &= ~bit; // (noxcpp's, VD-69: a map loaded or a new player, its client keeps nothing)
         o.npcOwed &= ~bit;
         o.modifierOwed &= ~bit;
         if (!(o.classes & 0x20400000u)) {

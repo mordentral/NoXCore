@@ -608,9 +608,29 @@ bool ServerTransport::sendReliable(std::uint8_t peer, std::span<const std::uint8
     try {
         it->second.stream.queueReliable(messages);
     } catch (const std::exception&) {
+        if (it->second.stream.queuedReliable() >= kMaxQueuedReliable) {
+            queueFull(peer, it->second);
+        }
         return false;
     }
     return true;
+}
+
+void ServerTransport::queueFull(std::uint8_t id, Peer& p)
+{
+    ++p.fullRefused;
+    if (!log_ || (p.fullLogged && lastPoll_ - p.fullLoggedAt < kQueueFullLogMs)) {
+        return;
+    }
+    const std::string name = nameOf_ ? nameOf_(id) : std::string();
+    log_("reliable queue full for " + (name.empty() ? std::string("a client") : "\"" + name + "\"") + " (stream " +
+         std::to_string(id) + ", " + p.at.toString() + "): " + std::to_string(p.fullRefused) + " reliable send" +
+         (p.fullRefused == 1 ? "" : "s") + " refused since " + (p.fullLogged ? "the last line" : "it joined") + "; " +
+         std::to_string(kMaxQueuedReliable) + " packets unacknowledged, its ack " + std::to_string(p.stream.lastAck()) + ", our next " +
+         std::to_string(p.stream.nextSeq()));
+    p.fullLogged = true;
+    p.fullLoggedAt = lastPoll_;
+    p.fullRefused = 0;
 }
 
 bool ServerTransport::sendReliableNow(std::uint8_t peer, std::span<const std::uint8_t> messages, std::uint32_t nowMs)
@@ -626,6 +646,9 @@ bool ServerTransport::sendReliableNow(std::uint8_t peer, std::span<const std::ui
             sendPeer(it->second, std::move(d));
         }
     } catch (const std::exception&) {
+        if (it->second.stream.queuedReliable() >= kMaxQueuedReliable) {
+            queueFull(peer, it->second);
+        }
         return false;
     }
     return true;

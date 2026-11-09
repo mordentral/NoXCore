@@ -40,9 +40,12 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   which the next ack then removes unsent: their messages are lost (seen: a map's UseMap, the
   client never loading the map). Needs more than ~32 packets in flight across the wrap; the exe's
   game sends few reliable packets (one netlist a frame), so it rarely gets there.
-- **Ours:** Stream::applyAck compares the same; our server packs a frame's reliable messages into
-  one packet (vanilla_deviations.md, VD-02 "Reliable messages packed per frame"), which keeps it
-  out of reach as the exe's netlist does.
+- **Ours:** Stream::applyAck takes an ack as covering the queued packets from the oldest up to
+  it, counted round the wrap (noxcore/src/net/transport.cpp's `acknowledged`; vanilla_deviations.md,
+  VD-68), so the packets it acknowledged leave the queue whatever their numbers. (Our server also
+  packs a frame's reliable messages into one packet, VD-02 "Reliable messages packed per frame",
+  which kept it out of reach before.)
+- **Fixed** 2026-11-09 by the owner's OK (VD-68).
 
 ### OB-410: An ack in 0x20-0xE0 takes packets far ahead of it, past the wrap, as acknowledged
 - **Where:** the reliable stream's ack handler, mode 1 (as OB-001): with the ack in 0x20-0xE0 it
@@ -53,12 +56,28 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   reliable packets in order only and waits for the first of them for good: no reliable message
   reaches it again (no USE_MAP, no informs). The exe's game sends one netlist packet a frame and
   rarely has that many out.
-- **Ours:** Stream::applyAck compares the same. NoX Core's own paced senders (the fast map send, a
+- **Ours:** Stream::applyAck's window (as OB-001's "Ours": VD-68): a packet past the ack stays
+  queued and is resent till it's acknowledged. NoX Core's own paced senders (the fast map send, a
   mode's UI, assets, values, views and weather, an edit session's messages, live view and mod
-  files) add a packet only while the client has fewer than 24 out unacknowledged
-  (`GameHost::reliableRoom`), so they alone never take a stream there; the game's own messages are
-  sent as the exe sends them, so while those senders hold 24, a wait for an acknowledgement that
-  spans more than 8 of the game's reliable packets still can.
+  files) still add a packet only while the client has fewer than 24 out unacknowledged
+  (`GameHost::reliableRoom`), as before.
+- **Fixed** 2026-11-09 by the owner's OK (VD-68).
+
+### OB-424: An ack under 0x20 takes the queued packets 0x80 and up as acknowledged
+- **Where:** the reliable stream's ack handler, mode 1 (as OB-001 and OB-410): with the ack under
+  0x20 it compares signed, so a queued packet numbered 0x80-0xFF counts as before it (negative)
+  though it was sent after the ack's. With more than 0x80 - ack packets unacknowledged, those
+  numbered 0x80 and up leave the queue unsent.
+- **Effect:** the peer takes reliable packets in order only and waits for the first of them for
+  good: no reliable message reaches it again (inventory, health, mana, enchantments), till it
+  leaves. Seen in a three-player co-op fight with a guest losing 15% of the host's datagrams: its
+  ack stuck at 0x1D-0x1F with 0x80-0x82 queued, its inventory a RedPotion off for good (GitHub
+  issue #14, "a wrong health-flask count in big fights"). Needs a long wait for one lost packet
+  with many sent meanwhile: a lossy link and a busy fight.
+- **Ours:** Stream::applyAck's window (as OB-001's "Ours": VD-68). A send refused with the queue full
+  (200 unacknowledged) is told in the host's log, with the player's name (at most once every 10 s
+  for a client, the refusals between counted: `ServerTransport::queueFull`); the client isn't dropped.
+- **Fixed** 2026-11-09 by the owner's OK (VD-68).
 
 ### OB-002: The join's ping test says JOIN_OK after refusing
 - **Where:** the host's ping test, a join's ten pings done: too many lost, or the average under
@@ -1337,6 +1356,29 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Effect:** a creature of subclass 0x80 owned by a monster queues the message to a garbage
   player index (or reads through a bad pointer).
 - **Ours:** told to a player owner only.
+
+### OB-425: A client keeps a creature's enchantments it was never told cleared
+- **Where:** a changed enchantment set (MSG_REPORT_ENCHANTMENT) is owed only to the players who
+  know the object (playersKnowMask), and to the others only while it has some: one that clears
+  owes them nothing; an object that becomes known owes its report only with bits set
+  (netSendObjects2Plr's standing reports). The player stops knowing an object as its out-of-sight
+  notice goes in the unreliable update, never sent again, and as its record goes in the update
+  with the report sent before the 1000-byte stream knows it has room for the record (a record it
+  has none for isn't known).
+- **Effect:** a client whose out-of-sight notice was lost keeps the drawable with its enchantments;
+  if they clear while the player doesn't know it, it's never told, and the drawable, updated in
+  place when it's seen again, keeps them till a map load clears every drawable. So a creature that
+  was invisible stays invisible on that client alone (GitHub issue #14, "near the Heart of Nox all
+  Mages invisible", the Galava wizards casting Invisibility; visible again after a load). The same
+  when the report went and its record didn't fit, and the enchantments cleared before the record
+  went: noxsdl's client keeps a report that comes before its drawable and applies it when the
+  drawable is made.
+- **Ours:** each object keeps the players last sent a report of it with bits set
+  (`ServerObject::enchantTold`, set as game_host.cpp's `special` sends one); when its bits clear,
+  their report is owed though they don't know it (enchant.cpp's `setEnchantments`), so the "0" goes
+  when they next see it. The message is the same, so a stock client is told too
+  (vanilla_deviations.md, VD-69).
+- **Fixed** 2026-11-09 by the owner's OK (VD-69).
 
 ### OB-141: A map creature whose health is kept has none on the host
 - **Where:** NPCXfer and MonsterXfer's read: a record with the map's health kept (Field361 + 1,

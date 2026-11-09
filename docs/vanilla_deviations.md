@@ -88,6 +88,31 @@ What follows from it:
 - **Risk:** none known; the server gets one packet fewer.
 - **Revert:** remove the `forget(0)` call.
 
+### VD-68: An ack covers the queued packets from the oldest up to it, round the wrap
+
+- **Vanilla:** the reliable stream's ack handler (mode 1) drops the queued packets "before" the
+  ack, comparing sequence numbers signed with the ack under 0x20 or over 0xE0 and unsigned between.
+  Past about 32 out across the wrap that is wrong both ways: acknowledged packets kept and resent
+  for a lap (OB-001), or packets not yet received taken as acknowledged and dropped unsent, the
+  peer waiting for them for good (OB-410, OB-424).
+- **noxcpp:** `Stream::applyAck` (noxcore/src/net/transport.cpp, `acknowledged`) takes the ack as
+  the next sequence the peer expects: it covers the queued packets from the oldest queued up to
+  it, counted modulo 0x100 from the oldest. An ack outside the oldest .. our next (stale, reordered,
+  or past anything sent) takes nothing. The queue holds at most 200, so the window is never
+  ambiguous. Both ends use it: the server's stream to each client and the client's (noxsdl, the
+  bots, the headless client) to the server. The ack's resend mark and the 0x26 told to the game
+  are as before; the resend timer is untouched. A reliable send refused with a client's queue full
+  is told in the host's log with the player's name, at most once every 10 s for a client
+  (`ServerTransport::queueFull`).
+- **Why:** by the owner's OK (2026-11-09): a lossy guest in a big co-op fight had its stream frozen
+  for good, its inventory a potion off (GitHub issue #14).
+- **Risk:** none on the wire: the datagrams and acks are the same, and a stock peer's own queue
+  keeps its own rule. Where vanilla dropped packets unsent ours keeps resending them till they're
+  acknowledged, so a stalled client's queue can fill (200) where vanilla's emptied; sends past that
+  are refused, as before, and now logged.
+- **Revert:** in `acknowledged`, compare as before: with `ack < 0x20 || ack > 0xE0`,
+  `int8_t(seq) < int8_t(ack)`, else `seq < ack`.
+
 ### VD-44: A solo game's socket is on the loopback alone, any free port; a hosted game's port is its own
 
 - **Vanilla:** a solo game opens no network socket at all: the server's start makes its
@@ -535,8 +560,9 @@ sent them.
   edit session's messages (each member's outbox: a join's document goes over a few round trips,
   not in one burst), its mod files and list (to 20, leaving the live view its room; the list
   framed as a file) and its live view (at most 12 frames, its creatures cut by size).
-- **Why:** past 32 out, a packet can be taken as acknowledged and dropped unsent, and the client's
-  stream stops for good.
+- **Why:** past 32 out, a packet could be taken as acknowledged and dropped unsent, and the
+  client's stream stopped for good. Since VD-68 (2026-11-09) our stream's acknowledgement is safe
+  up to the queue's 200; the pacing is kept as it was.
 - **Risk:** on a long round trip these go somewhat slower than before. Stock clients get none of
   them.
 - **Revert:** the senders' room checks.
@@ -1651,6 +1677,25 @@ The engine's logic is the exe's; these are where the output differs.
 - **Why:** by the owner's decision (2026-11-05): it feels unintended. A player swapping weapons
   lost the shield's protection without noticing.
 - **Revert:** drop the `putShieldBack` call in `equipWeapon`.
+
+### VD-69: A cleared enchantment set is owed to those last told one, known or not
+
+- **Vanilla:** a changed enchantment set (MSG_REPORT_ENCHANTMENT) is owed to the players who know
+  the object, and to the others only while it has some; one seen again is told only a set with
+  bits. A client that missed the object's out-of-sight notice (the unreliable update lost), or got
+  the report before a record the update had no room for, keeps the old set if it clears while the
+  player doesn't know the object: a creature stays invisible on that client till the next map
+  (OB-425).
+- **Ours:** each object keeps the players last sent a set with bits (`ServerObject::enchantTold`,
+  set or cleared as game_host.cpp's `special` sends the report); when the set clears, their report
+  stays owed though they don't know the object (enchant.cpp's `setEnchantments`), and the "0" goes
+  when they next see it. A slot forgotten (a map loaded, a player gone: `GameHost::forgetObjects`)
+  clears its bit. The message is the same, so stock clients are told too.
+- **Why:** by the owner's OK (2026-11-09): GitHub issue #14, "near the Heart of Nox all Mages
+  invisible" (the Galava wizards cast Invisibility).
+- **Risk:** a player last told a set and since out of sight gets one more report when it sees the
+  object again; nothing else changes. Four bytes an object.
+- **Revert:** in `setEnchantments` drop `o.enchantOwed |= o.enchantTold;`.
 
 ## Menus: Westwood Online (no effect on the wire)
 

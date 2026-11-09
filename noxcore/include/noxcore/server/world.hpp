@@ -594,6 +594,10 @@ struct ServerObject {
     /// those who know it (playersKnowMask), which decides who's owed one when it changes.
     std::uint32_t enchantOwed = 0;
     std::uint32_t knownBy = 0;
+    /// (noxcpp's, VD-69) The players last sent a MSG_REPORT_ENCHANTMENT of it with bits set: when
+    /// its bits clear, their report stays owed though they don't know it now (their client may
+    /// still keep it, its out-of-sight notice lost), so the "0" goes when they next see it (OB-425).
+    std::uint32_t enchantTold = 0;
     /// An NPC's report (a state, the same for every player, set by
     /// setNPCColor / npcSetItemEquipFlags through) and
     /// the players owed MSG_REPORT_NPC (those who know it at the change, and

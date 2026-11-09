@@ -1,4 +1,4 @@
-﻿#include "noxcore/net/transport.hpp"
+#include "noxcore/net/transport.hpp"
 
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/net/framing.hpp"
@@ -23,14 +23,19 @@ bool reached(std::uint32_t a, std::uint32_t b)
     return static_cast<std::int32_t>(a - b) >= 0;
 }
 
-/// mode 1: is packet `seq` acknowledged by `ack`? Near the wrap (ack < 0x20 or > 0xE0)
-/// the comparison is signed, so 0xF0 counts as before 0x05.
-bool acknowledged(std::uint8_t seq, std::uint8_t ack)
+/// mode 1, NoX Core's window (vanilla_deviations.md, VD-68): `ack` is the next sequence the peer
+/// expects, so it covers the queued packets from the oldest (`oldest`) up to it, counted modulo
+/// 0x100 from the oldest. An ack outside oldest..next (stale, reordered, or one we never sent up
+/// to) covers none. The queue holds at most kMaxQueuedReliable (< 0x100) packets, so the window
+/// is never ambiguous. (The original's rule, signed under 0x20 and over 0xE0 and unsigned between,
+/// kept packets across the wrap for a lap or dropped ones past it unsent: OB-001, OB-410, OB-424.)
+bool acknowledged(std::uint8_t seq, std::uint8_t oldest, std::uint8_t ack, std::uint8_t next)
 {
-    if (ack < 0x20 || ack > 0xE0) {
-        return static_cast<std::int8_t>(seq) < static_cast<std::int8_t>(ack);
+    const auto covered = static_cast<std::uint8_t>(ack - oldest);
+    if (covered > static_cast<std::uint8_t>(next - oldest)) {
+        return false;
     }
-    return seq < ack;
+    return static_cast<std::uint8_t>(seq - oldest) < covered;
 }
 
 } // namespace
@@ -192,7 +197,10 @@ bool Stream::applyAck(std::uint8_t ack)
             p.due = true; // the peer is waiting for this one: resend it at once
         }
     }
-    std::erase_if(queue_, [ack](const Packet& p) { return acknowledged(p.seq, ack); });
+    if (!queue_.empty()) {
+        const std::uint8_t oldest = queue_.front().seq; // (the queue is oldest first)
+        std::erase_if(queue_, [&](const Packet& p) { return acknowledged(p.seq, oldest, ack, nextSeq_); });
+    }
     lastAck_ = ack;
     return true;
 }

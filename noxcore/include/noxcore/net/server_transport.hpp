@@ -118,8 +118,14 @@ public:
     /// extended reply names it (version 5), and a query naming it with a client's secret gives that
     /// client its key (lobby::clientKeyOf: clientKey); the secret itself isn't kept.
     void setClientKeyRealm(std::uint64_t realm) noexcept { clientKeyRealm_ = realm; }
-    /// Where the lobby's refusals say why (the host's log); none: not said.
+    /// Where the lobby's refusals say why, and where a client's full reliable queue is told (the
+    /// host's log); none: not said.
     void setLog(std::function<void(const std::string&)> log) { log_ = std::move(log); }
+    /// (noxcpp's) The player's name for a peer, for the log's lines ("": none yet).
+    void setPeerName(std::function<std::string(std::uint8_t)> nameOf) { nameOf_ = std::move(nameOf); }
+    /// (noxcpp's) How long a peer's full-queue line waits after its last (ms): the refused sends
+    /// meanwhile are counted in the next.
+    static constexpr std::uint32_t kQueueFullLogMs = 10'000;
 
     /// A datagram that arrived on the server's port.
     void receive(const Endpoint& from, std::span<const std::uint8_t> datagram, std::uint32_t nowMs);
@@ -229,8 +235,8 @@ public:
         return ReliableSeqs{it->second.stream.nextSeq(), it->second.stream.lastAck()};
     }
     /// A peer's reliable packets out and not yet acknowledged: the sequence numbers from its last
-    /// acknowledgement to our next, or the queue's packets if more (some acknowledged across the
-    /// wrap and kept, OB-001); 0: no peer.
+    /// acknowledgement to our next, or the queue's packets if more (a stale acknowledgement behind
+    /// the queue's oldest); 0: no peer.
     std::size_t reliableOutstanding(std::uint8_t peer) const
     {
         const auto it = peers_.find(peer);
@@ -270,7 +276,16 @@ private:
         bool awaitingAccept = true;
         std::uint32_t connectedAt = 0; ///< the game frame it connected (closeUnaccepted)
         bool held = false; ///< (holdFlush)
+        /// (noxcpp's) Reliable sends refused with its queue full since its last line in the log,
+        /// and when that line went (queueFull).
+        std::uint32_t fullRefused = 0;
+        std::uint32_t fullLoggedAt = 0;
+        bool fullLogged = false;
     };
+    /// (noxcpp's) A reliable send to `id` refused, its queue full (kMaxQueuedReliable
+    /// unacknowledged): told in the log with the peer's name and stream, at most once a
+    /// kQueueFullLogMs. The client isn't dropped; nothing else changes.
+    void queueFull(std::uint8_t id, Peer& p);
     /// For a stream awaiting its CLIENT_ACCEPT (its reliable packet in order, or a
     /// header with a new ack): the streams past the player limit, this one closed; else a packet
     /// "1F <ack> 20 .." is its CLIENT_ACCEPT (state 2, the game given it from the 0x20); anything
@@ -349,6 +364,7 @@ private:
     std::uint16_t minClientLevel_ = 0; ///< setMinClientLevel's
     std::uint64_t clientKeyRealm_ = 0; ///< setClientKeyRealm's
     std::function<void(const std::string&)> log_;
+    std::function<std::string(std::uint8_t)> nameOf_; ///< setPeerName's
     std::vector<Datagram> outgoing_;
     std::vector<Event> events_;
     std::vector<std::uint8_t> received_; ///< (receive's: a datagram as unXORed, kept to save its allocations)
