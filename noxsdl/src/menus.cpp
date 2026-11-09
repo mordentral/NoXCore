@@ -31,6 +31,7 @@ namespace st = nox::gui::status;
 
 namespace {
 
+constexpr float kMainMenuFontScale = 0.9f;
 constexpr float kCharacterLabelHdFontScale = 1.1f;
 constexpr float kCharacterLabelBitmapFontScale = 0.9f;
 constexpr float kLoginHelpBitmapFontScale = 0.8f;
@@ -310,6 +311,13 @@ void Menus::enter(State s)
     stack_.push_back(s);
     slides_.clear();
     leaving_ = false;
+    const float buttonFontScale = s == State::MainMenu ? kMainMenuFontScale : 1.0f;
+    for (const auto id : {kOptions, kBack}) {
+        if (gui::Window* button = optsBack_->find(id)) {
+            button->hdFontScale = kMenuButtonHdFontScale * buttonFontScale;
+            button->bitmapFontScale = buttonFontScale;
+        }
+    }
     const auto slide = [&](std::int32_t id, SDL_Point from, SDL_Point in, SDL_Point out) {
         if (gui::Window* w = screen_->find(id)) {
             slides_.push_back(gui_.slideIn(w, from, in, out));
@@ -325,7 +333,8 @@ void Menus::enter(State s)
         slide(kMainBottom, {0, 510}, {0, -20}, {0, 40});
         for (const auto id : {kSolo, kMultiplay, kSoloQuest, kIntro, kCredits}) {
             if (gui::Window* button = screen_->find(id)) {
-                button->hdFontScale = kMenuButtonHdFontScale;
+                button->hdFontScale = kMenuButtonHdFontScale * kMainMenuFontScale;
+                button->bitmapFontScale = kMainMenuFontScale;
             }
         }
         if (gui::Window* modes = screen_->find(kSoloQuest)) {
