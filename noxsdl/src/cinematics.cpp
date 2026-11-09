@@ -140,7 +140,7 @@ public:
     void playMapIntro(bool immediate) override
     {
         SDL_Log("cinematics: map intro%s", immediate ? " (immediate)" : "");
-        c_.scriptedBlack_ = immediate; // (ImmediateBlind's, or a saved game's load's)
+        c_.scriptedBlack_ = immediate; // (immediate: ImmediateBlind's, a quest's start; a saved game's load's isn't, VD-67)
         c_.mapIntro(immediate);
     }
     void endGame(int kind) override
