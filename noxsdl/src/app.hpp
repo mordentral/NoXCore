@@ -773,7 +773,7 @@ void storeConfig(App& app, const nox::config::Config& c);
 OptionsWindow::Extras loadExtras(const std::filesystem::path& gameDir);
 void saveExtras(const App& app, const OptionsWindow::Extras& e);
 OptionsWindow::Extras currentExtras(const App& app);
-void applyMouse(App& app);
+void applyMouse(App& app, bool gameplay);
 void handMouseTo(App& app, MouseOwner owner);
 void setOtherUnits(App& app);
 void preloadMap(App& app, const std::string& name);

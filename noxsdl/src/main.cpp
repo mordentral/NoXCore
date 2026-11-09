@@ -283,11 +283,11 @@ bool saveScreenshot(App& app)
     return true;
 }
 
-/// The map editor's mouse: the system's pointer, moving as the desktop's. The menus and a game
-/// (a play-test's too) run in relative mode (applyMouse), and SDL hides the pointer whatever
+/// The map editor's mouse: the system's pointer, moving as the desktop's. Gameplay
+/// (a play-test's too) runs in relative mode (applyMouse), and SDL hides the pointer whatever
 /// SDL_ShowCursor says while that's on, so it goes off here, every editor frame (the editor
 /// opened from the menus, back from a play-test's game, opened again); the next frame that isn't
-/// the editor's turns it on again (applyMouse, mouseApplied). The game draws its own pointer
+/// the editor's sets the mode for gameplay or menus (applyMouse). The game draws its own pointer
 /// outside the editor (SDL_HideCursor where the editor hands over).
 void editorMouse(App& app)
 {
@@ -300,7 +300,7 @@ void editorMouse(App& app)
         if (!SDL_SetWindowRelativeMouseMode(app.window, false)) {
             SDL_Log("mouse: relative mode off: %s", SDL_GetError());
         }
-        app.mouseApplied = false; // (on again in the menus or a game: applyMouse)
+        app.mouseApplied = false; // (on again in gameplay: applyMouse)
     }
     if (!visible) {
         SDL_ShowCursor();
@@ -2765,6 +2765,23 @@ SDL_AppResult editorFrame(App& app)
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 {
     auto* app = static_cast<App*>(appstate);
+    if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST || event->type == SDL_EVENT_WINDOW_MINIMIZED) {
+        // Release before menu/editor handlers can return early. SDL keeps the Nox cursor
+        // hidden only inside our window; the desktop pointer remains available outside.
+        SDL_SetWindowRelativeMouseMode(app->window, false);
+        SDL_SetWindowMouseGrab(app->window, false);
+        SDL_CaptureMouse(false);
+        app->mouseApplied = false;
+        if (app->input) {
+            app->input->releaseAll();
+        }
+        app->armed.reset();
+        app->barDrag.reset();
+        app->dragging = false;
+        if (app->book) {
+            app->book->cancelDrag();
+        }
+    }
     if (event->type == SDL_EVENT_KEYMAP_CHANGED && app->input) {
         app->input->layoutChanged(); // (another keyboard layout: the keys' labels as it prints them)
     }
@@ -2940,15 +2957,6 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         } else if (event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
             if (const auto code = InputBindings::mouseCode(event->button.button)) {
                 app->input->release(*code);
-            }
-        } else if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST) {
-            app->input->releaseAll();
-            // Whatever a press began waits for its release, which goes to the other program
-            // now (Alt+Tab while dragging a spell, or with the target cursor up): let it go.
-            app->armed.reset();
-            app->barDrag.reset();
-            if (app->book) {
-                app->book->cancelDrag();
             }
         }
     }
@@ -4010,7 +4018,13 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     if (embedded && !app->playTestCaptured) {
         editorMouse(*app); // (the game in the editor's Map panel, the input the editor's: the system's pointer)
     } else {
-        applyMouse(*app); // (a raw count is a game pixel, whose size this frame may have changed)
+        const bool inWorld = app->view && (app->live
+            ? app->live->client().stage() == nox::client::HeadlessClient::Stage::InGame : !app->menus);
+        // An embedded play-test keeps the editor's explicit ownership. Full-window games
+        // release for Escape, Options and key bindings, then recapture when those close.
+        const bool gameplay = embedded || (inWorld && !menuWindowUp(*app) &&
+            !(app->cinematics && app->cinematics->screenUp()) && !(app->movie && app->movie->active()));
+        applyMouse(*app, gameplay); // (a raw count is a game pixel, whose size this frame may have changed)
     }
     // The 3D view has the world, unless a window or menu has the mouse (its cursor back).
     app->view3d.beginFrame(

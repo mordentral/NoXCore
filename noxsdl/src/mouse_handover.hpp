@@ -1,9 +1,9 @@
 // The window's mouse as each owner of it wants it, and where the drawn pointer comes from. The
-// menus and a game run SDL's relative mode with SDL's pointer hidden (they draw their own, from the
-// mouse's place: main.cpp's mousePos); the map editor has the system's pointer; a game in the
-// editor's Map panel has the mouse kept on its area while it has the input, and, when the editor has
+// menus and a game hide SDL's pointer and draw their own, from main.cpp's mousePos. Only gameplay
+// uses relative mode: menus let the pointer leave the window; the map editor has the system's
+// pointer. A game in the editor's Map panel keeps the mouse on its area while it has the input, and, when the editor has
 // it, its drawn pointer held where it was left. Every way out of the editor or a play view puts the
-// menus' (or a game's) back whole (main.cpp's applyWindowMouse): nothing of the panel's left behind.
+// menus' (or a game's) back whole (app_settings.cpp's handMouseTo): nothing of the panel's left behind.
 // No SDL here, so the tests check it.
 #pragma once
 
@@ -20,7 +20,7 @@ enum class MouseOwner {
 
 /// The window's mouse state for an owner.
 struct WindowMouse {
-    bool relative = false;      ///< SDL relative mode (raw counts; on in the menus and games, off in a hidden run)
+    bool relative = false;      ///< SDL relative mode (raw counts; on in games, off in menus and hidden runs)
     bool systemPointer = false; ///< SDL's pointer shown (else the game's own is drawn)
     bool confined = false;      ///< kept on a rectangle (SDL_SetWindowMouseRect: the panel's game area)
     bool grabbed = false;       ///< the window's mouse grab
@@ -33,6 +33,7 @@ constexpr WindowMouse windowMouse(MouseOwner owner, bool hiddenRun)
     WindowMouse m;
     switch (owner) {
     case MouseOwner::Menus:
+        break; // Free movement, but still the Nox cursor inside the window.
     case MouseOwner::Game:
         m.relative = !hiddenRun;
         break;
@@ -49,6 +50,12 @@ constexpr WindowMouse windowMouse(MouseOwner owner, bool hiddenRun)
         break;
     }
     return m;
+}
+
+/// Relative mode confines the pointer; hiding the system cursor is independent of capture.
+constexpr bool gameplayMouseCapture(bool gameplay, bool focused, bool hiddenRun)
+{
+    return gameplay && focused && !hiddenRun;
 }
 
 /// Where the drawn pointer's place comes from.

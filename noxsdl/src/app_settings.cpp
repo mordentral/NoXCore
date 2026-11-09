@@ -269,15 +269,27 @@ void applyDisplay(App& app)
 /// The mouse as the original read it: raw movement counts (DirectInput's DIMOFS_X / DIMOFS_Y,
 /// client_nextMouseEvent), each moving the cursor one pixel of the game's screen (added and clamped
 /// by client_changeMousePos, no scaling). Here that's SDL's relative mode (raw input) with each count moving
-/// the cursor one game pixel: in a game a world unit (camera.zoom output pixels), in the menus
-/// one of their 640 x 480. Then Win Mouse Accel (on by default) puts Windows' pointer speed and
-/// acceleration curve on the counts, and Mouse's speed multiplies them. SDL keeps the cursor's
+/// the cursor one game pixel (camera.zoom output pixels). Win Mouse Accel (on by default) puts
+/// Windows' pointer speed and acceleration curve on the counts, and Mouse's speed multiplies them. SDL keeps the cursor's
 /// place in the window from that, so everything reading the mouse reads it as before. The
-/// pointer stays in the window while it has the focus, as the original's did.
+/// pointer stays in the window during focused gameplay. Menus use absolute movement so the
+/// pointer can leave the window, but still draw the Nox cursor inside it.
 /// Called every frame: the game pixel's size changes with the window and the resolution.
-void applyMouse(App& app)
+void applyMouse(App& app, bool gameplay)
 {
     if (!app.window) {
+        return;
+    }
+    // SDL restores the desktop cursor outside a window even while its cursor is hidden.
+    // This also restores the Nox cursor after returning from the editor.
+    SDL_HideCursor();
+    if (!gameplayMouseCapture(gameplay, SDL_GetKeyboardFocus() == app.window, !app.screenshot.empty())) {
+        if (SDL_GetWindowRelativeMouseMode(app.window)) {
+            SDL_SetWindowRelativeMouseMode(app.window, false);
+        }
+        SDL_SetWindowMouseGrab(app.window, false);
+        SDL_CaptureMouse(false);
+        app.mouseApplied = false;
         return;
     }
     int outW = 0, outH = 0;
@@ -294,14 +306,12 @@ void applyMouse(App& app)
         SDL_Log("mouse: %s, speed x%.2f", looking ? "3D mouse look" : "cursor", speed / 100.0);
     }
     const float scale = std::max(gamePixel, 0.01f) / density * static_cast<float>(speed) / 100.0f;
-    if (!app.mouseApplied && !app.screenshot.empty()) {
-        app.mouseApplied = true; // (a --screenshot run's hidden window leaves the desktop's mouse alone)
-    }
-    if (!app.mouseApplied) {
+    if (!app.mouseApplied || !SDL_GetWindowRelativeMouseMode(app.window)) {
         SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_CENTER, "0"); // (the cursor stays where it is)
         SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_SYSTEM_SCALE, app.mouseAccel ? "1" : "0");
         if (!SDL_SetWindowRelativeMouseMode(app.window, true)) {
             SDL_Log("mouse: relative mode: %s", SDL_GetError());
+            return; // Retry next frame instead of recording a successful capture.
         }
         SDL_Log("mouse: raw input, speed x%.2f%s", app.mouseSpeed / 100.0,
                 app.mouseAccel ? " with Windows' acceleration" : " (1:1 with the original at x1)");
@@ -318,7 +328,7 @@ void applyMouse(App& app)
 /// whole: every way out of the editor and of a play view comes through here. Nothing of the
 /// editor's or the panel's game's left behind: no held pointer place (the drawn pointer follows the
 /// mouse again), no confinement, grab or capture, SDL's pointer hidden (the game's own is drawn), and
-/// relative mode on again by applyMouse at the next frame (never in a hidden run), whatever the
+/// relative mode on again during gameplay by applyMouse (never in a menu or hidden run), whatever the
 /// editor or a play view turned off.
 void handMouseTo(App& app, MouseOwner owner)
 {
