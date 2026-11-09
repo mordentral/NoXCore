@@ -188,6 +188,7 @@ ServerOptions::Callbacks serverOptionsCallbacks(App* app)
 void makeGameWindows(App* app, const gui::Resources& res)
 {
     const std::filesystem::path& gameDir = app->gameDir;
+    const gui::Resources menuRes = guiResources(*app, true);
     // The game's Options window, from the main menu or the in-game menu.
     OptionsWindow::Callbacks optionCallbacks;
     optionCallbacks.onChange = [app](const nox::config::Config& c) { applySettings(*app, c); };
@@ -209,7 +210,7 @@ void makeGameWindows(App* app, const gui::Resources& res)
             app->inputConfig->open(app->input->config());
         }
     };
-    app->options = std::make_unique<OptionsWindow>(res, gameDir / "window", std::move(optionCallbacks));
+    app->options = std::make_unique<OptionsWindow>(menuRes, gameDir / "window", std::move(optionCallbacks));
     // The input configuration (InputCfg.wnd): Back sets the bindings and writes nox.cfg;
     // either way Options comes back.
     InputConfigWindow::Callbacks inputCallbacks;
@@ -220,7 +221,7 @@ void makeGameWindows(App* app, const gui::Resources& res)
         }
     };
     inputCallbacks.onClose = [app] { openOptions(*app); };
-    app->inputConfig = std::make_unique<InputConfigWindow>(res, gameDir, std::move(inputCallbacks));
+    app->inputConfig = std::make_unique<InputConfigWindow>(menuRes, gameDir, std::move(inputCallbacks));
 
     // The console (F1), with the game's commands and noxsdl's debug switches.
     app->console = std::make_unique<Console>(app->font.get(), app->strings.get());
@@ -282,7 +283,7 @@ void makeGameWindows(App* app, const gui::Resources& res)
             app->live->client().callMapVote();
         }
     };
-    app->quitMenu = std::make_unique<QuitMenu>(res, gameDir / "window", std::move(quitCallbacks));
+    app->quitMenu = std::make_unique<QuitMenu>(menuRes, gameDir / "window", std::move(quitCallbacks));
 
     // The host's Server Settings (servopts.wnd) on the game we host: each at once with the
     // server's lock held (LocalHost::withGame), so what one sets the next reads.

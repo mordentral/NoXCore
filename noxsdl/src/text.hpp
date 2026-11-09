@@ -1,9 +1,8 @@
-// TrueType text for overlays (name plates now, the HUD later), drawn at screen resolution so it
+// Bitmap and TrueType text for overlays (name plates now, the HUD later), drawn at screen resolution so it
 // stays sharp at any zoom or window size.
 //
-// The font is the game folder's default.ttf or default.otf, the names OpenNox looks for when it
-// swaps a TrueType font in for default.fnt, else Noto Sans compiled into the exe. Glyphs are
-// rasterised on first use per pixel size into shared atlas textures.
+// Original default.fnt and large.fnt bitmap glyphs are preferred. TrueType/OpenType and
+// the embedded Noto font remain fallbacks when the game's fonts are unavailable.
 #pragma once
 
 #include "text_wrap.hpp"
@@ -23,11 +22,18 @@ namespace noxsdl {
 
 class Font {
 public:
-    /// default.ttf / default.otf from `gameDir` if present and valid, else the embedded font.
+    /// Original bitmap fonts from `gameDir`, else TrueType/OpenType or the embedded font.
     static std::unique_ptr<Font> load(SDL_Renderer* renderer, const std::filesystem::path& gameDir);
 
-    /// Throws std::runtime_error if `data` isn't a font stb_truetype can read.
-    Font(SDL_Renderer* renderer, std::vector<std::uint8_t> data, std::string name);
+    /// Embedded scalable menu face; dialogue and HUD continue using load().
+    static std::unique_ptr<Font> loadMenu(SDL_Renderer* renderer);
+
+    enum class Format { TrueType, NoxBitmap };
+
+    /// Throws std::runtime_error if `data` cannot be read in the requested format.
+    Font(SDL_Renderer* renderer, std::vector<std::uint8_t> data, std::string name,
+         Format format = Format::TrueType);
+    Font& gameFace(bool large) { return large && large_ ? *large_ : *this; }
     ~Font();
     Font(const Font&) = delete;
     Font& operator=(const Font&) = delete;
@@ -53,7 +59,7 @@ public:
     int lineSize(float gamePixels, float scale, int least = 6);
 
     /// Draws a UTF-8 string with its line's top-left corner at (x, y), in screen pixels.
-    void draw(std::string_view utf8, float x, float y, int pixelSize, SDL_Color color);
+    void draw(std::string_view utf8, float x, float y, int pixelSize, SDL_Color color, bool smoothBitmap = false);
 
     /// The game's own fonts as this one: default.fnt and small.fnt (the same file) are 9 rows
     /// high with the capitals in the top 7, and the game's drawString puts a string's cell
@@ -72,6 +78,7 @@ private:
         float offsetX = 0; ///< bitmap corner relative to the pen on the baseline
         float offsetY = 0;
         float advance = 0;
+        float drawScale = 1; ///< native bitmap glyphs scale with filtered sampling
     };
     struct Face {
         float scale = 0;
@@ -82,13 +89,14 @@ private:
 
     Face& face(int pixelSize);
     const Glyph& glyph(Face& face, char32_t codepoint);
-    void drawRun(std::string_view utf8, float x, float y, Face& face, SDL_Color color);
+    void drawRun(std::string_view utf8, float x, float y, Face& face, SDL_Color color, bool smoothBitmap = false);
 
     SDL_Renderer* renderer_;
     std::vector<std::uint8_t> data_;
     std::string name_;
     struct Info;
     std::unique_ptr<Info> info_;
+    std::unique_ptr<Font> large_;
     std::map<int, Face> faces_;
     float capPerEm_ = 0; ///< the capitals' height for a 1-pixel em ('H'), found on first use
 

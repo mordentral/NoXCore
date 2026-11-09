@@ -154,7 +154,7 @@ BrowserScreen::Layout BrowserScreen::layout(int height)
 {
     Layout l;
     l.size = std::clamp(height / 40, 12, 40);
-    l.rowHeight = std::round(font_.lineHeight(l.size) * 1.25f);
+    l.rowHeight = std::round(font().lineHeight(l.size) * 1.25f);
     l.top = l.rowHeight * 5;
     l.visibleRows = std::max(1, static_cast<int>((static_cast<float>(height) - l.top - l.rowHeight * 4) / l.rowHeight));
     return l;
@@ -298,19 +298,19 @@ void BrowserScreen::draw(SDL_Renderer* renderer, int width, int height)
     const SDL_Color grey{150, 150, 150, 255};
     const SDL_Color gold{240, 200, 110, 255};
 
-    font_.draw("Nox games", margin, l.rowHeight * 0.6f, static_cast<int>(l.size * 1.5), gold);
+    font().draw("Nox games", margin, l.rowHeight * 0.6f, static_cast<int>(l.size * 1.5), gold);
     std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " game(s)";
     status += "     Enter / double-click: join     R: refresh     Esc: quit";
-    font_.draw(status, margin, l.rowHeight * 2.2f, l.size, grey);
+    font().draw(status, margin, l.rowHeight * 2.2f, l.size, grey);
     if (!message_.empty()) {
-        font_.draw(message_, margin, l.rowHeight * 3.2f, l.size, {235, 160, 110, 255});
+        font().draw(message_, margin, l.rowHeight * 3.2f, l.size, {235, 160, 110, 255});
     }
     drawRows(renderer, {margin, 0, static_cast<float>(width) - 2 * margin, static_cast<float>(height)}, l, false);
 
     // The last few search messages along the bottom.
     float y = static_cast<float>(height) - l.rowHeight * (static_cast<float>(log_.size()) + 0.5f);
     for (const auto& line : log_) {
-        font_.draw(line, margin, y, std::max(10, l.size - 2), grey);
+        font().draw(line, margin, y, std::max(10, l.size - 2), grey);
         y += l.rowHeight;
     }
 }
@@ -321,7 +321,7 @@ void BrowserScreen::drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textS
     area_ = area;
     Layout l;
     l.size = std::max(8, textSize);
-    l.rowHeight = std::round(font_.lineHeight(l.size) * 1.2f);
+    l.rowHeight = std::round(font().lineHeight(l.size) * 1.2f);
     const float pad = std::round(l.rowHeight * 0.4f);
     l.top = area.y + pad + l.rowHeight * 1.3f;
     const float footer = l.rowHeight * 2.5f; // status and the latest search message
@@ -340,9 +340,9 @@ void BrowserScreen::drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textS
     if (!message_.empty()) {
         status = message_;
     }
-    font_.draw(status, area.x + pad, y, l.size, {240, 180, 42, 255});
+    font().draw(status, area.x + pad, y, l.size, {240, 180, 42, 255});
     if (!log_.empty()) {
-        font_.draw(log_.back(), area.x + pad, y + l.rowHeight, std::max(8, l.size - 1), grey);
+        font().draw(log_.back(), area.x + pad, y + l.rowHeight, std::max(8, l.size - 1), grey);
     }
 }
 
@@ -362,13 +362,13 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
     const char* headers[6] = {"Name", "Map", "Mode", "Players", "Ping", "From"};
     const float headerY = l.top - l.rowHeight;
     for (int i = 0; i < 6; ++i) {
-        font_.draw(headers[i], cols[i], headerY, l.size, header);
+        font().draw(headers[i], cols[i], headerY, l.size, header);
     }
     SDL_SetRenderDrawColor(renderer, framed ? 0 : 80, framed ? 120 : 80, framed ? 0 : 80, 255);
     SDL_RenderLine(renderer, x0, l.top - 2, x0 + w, l.top - 2);
 
     // The padlock's place at each row's far right, kept clear whether or not a row has one.
-    const float lockSize = std::round(font_.lineHeight(l.size) * 0.95f);
+    const float lockSize = std::round(font().lineHeight(l.size) * 0.95f);
     const float lockRoom = lockSize + 4;
 
     // A column's text, cut to fit before the next one (with `after`, cut to leave room for it,
@@ -376,14 +376,14 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
     const auto cell = [&](int column, const std::string& s, float ty, SDL_Color c, const std::string& after = {},
                           SDL_Color afterColor = {}) {
         const float room = (column < 5 ? cols[column + 1] : x0 + w - lockRoom) - cols[column] - 4;
-        const float afterWidth = after.empty() ? 0.0f : font_.measure(after, l.size);
+        const float afterWidth = after.empty() ? 0.0f : font().measure(after, l.size);
         std::string shown = s;
-        while (!shown.empty() && font_.measure(shown, l.size) > room - afterWidth) {
+        while (!shown.empty() && font().measure(shown, l.size) > room - afterWidth) {
             shown.pop_back();
         }
-        font_.draw(shown, cols[column], ty, l.size, c);
+        font().draw(shown, cols[column], ty, l.size, c);
         if (!after.empty()) {
-            font_.draw(after, cols[column] + font_.measure(shown, l.size), ty, l.size, afterColor);
+            font().draw(after, cols[column] + font().measure(shown, l.size), ty, l.size, afterColor);
         }
     };
     // A game that wants a newer NoX Core (client_level_gate.hpp): "(Update needed)" after its name,
@@ -404,7 +404,7 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             const SDL_FRect bar{x0 - 3, y, w + 6, l.rowHeight};
             SDL_RenderFillRect(renderer, &bar);
         }
-        const float ty = y + (l.rowHeight - font_.lineHeight(l.size)) / 2;
+        const float ty = y + (l.rowHeight - font().lineHeight(l.size)) / 2;
         // Unnamed listings show their address instead.
         std::string name = g.name.empty() ? ipText(g.address) : g.name;
         // (A password's game: the padlock at the row's far right, drawn below.)
@@ -420,14 +420,14 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             // ("[EDIT] <host>"), the name in the noxcpp colour.
             const SDL_Color mark{120, 210, 255, 255};
             // (pencil_icon.hpp: the same pencil marks editors in the game.)
-            const float s = std::round(font_.lineHeight(l.size) * 0.95f);
+            const float s = std::round(font().lineHeight(l.size) * 0.95f);
             drawPencil(renderer, x0 - s / 2 - 2, y + l.rowHeight / 2, s, PeerRgb{242, 199, 77});
             cell(0, name, ty, mark, updateMark, updateColor);
         } else if (e.extended) {
             // A noxcpp server (it answered the extended query): a light-blue diamond before
             // its name, the name in that colour.
             const SDL_Color mark{120, 210, 255, 255};
-            const float d = std::round(font_.lineHeight(l.size) * 0.22f);
+            const float d = std::round(font().lineHeight(l.size) * 0.22f);
             const float cx = x0 - d - 3;
             const float cy = y + l.rowHeight / 2;
             const SDL_Vertex v[4] = {{{cx, cy - d}, {mark.r / 255.0f, mark.g / 255.0f, mark.b / 255.0f, 1}, {0, 0}},
@@ -445,7 +445,7 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
         // words kept when it's too wide: mode_column.hpp.)
         cell(2,
              mode_column::fitModeText(mode_column::modeText(e), cols[3] - cols[2] - 4,
-                                      [&](const std::string& s) { return font_.measure(s, l.size); }),
+                                      [&](const std::string& s) { return font().measure(s, l.size); }),
              ty, text);
         cell(3, std::to_string(g.players) + "/" + std::to_string(g.maxPlayers), ty, text);
         cell(4, e.pingMs ? std::to_string(*e.pingMs) + " ms" : "-", ty, pingColor(e.pingMs));

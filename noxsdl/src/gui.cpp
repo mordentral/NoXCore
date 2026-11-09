@@ -248,31 +248,31 @@ void Painter::sprite(const nox::things::ImageRef& ref, int x, int y)
 
 std::string Painter::firstLine(const std::string& utf8, bool large, int wrapWidth)
 {
-    if (!res_.font || utf8.empty() || wrapWidth <= 0) {
+    if (!res_.textFont() || utf8.empty() || wrapWidth <= 0) {
         return utf8;
     }
-    const auto lines = res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_);
+    const auto lines = res_.textFont()->gameFace(large).wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_);
     return lines.empty() ? std::string() : lines.front();
 }
 
 int Painter::wrappedWidth(const std::string& utf8, bool large, int wrapWidth)
 {
-    if (!res_.font || utf8.empty()) {
+    if (!res_.textFont() || utf8.empty()) {
         return 0;
     }
     float widest = 0;
-    for (const auto& line : res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_)) {
-        widest = std::max(widest, res_.font->measure(line, pixelSize(large)));
+    for (const auto& line : res_.textFont()->gameFace(large).wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_)) {
+        widest = std::max(widest, res_.textFont()->gameFace(large).measure(line, pixelSize(large)));
     }
     return static_cast<int>(std::ceil(widest / scale_));
 }
 
 std::vector<std::string> Painter::centredLines(const std::string& utf8, bool large, int wrapWidth)
 {
-    if (!res_.font) {
+    if (!res_.textFont()) {
         return {utf8};
     }
-    return noxsdl::centredLines(utf8, static_cast<float>(wrapWidth) * scale_, res_.font->advances(pixelSize(large)));
+    return noxsdl::centredLines(utf8, static_cast<float>(wrapWidth) * scale_, res_.textFont()->gameFace(large).advances(pixelSize(large)));
 }
 
 void Painter::image(const std::string& name, int x, int y)
@@ -317,47 +317,47 @@ void Painter::drawSprite(const Sprite* s, int x, int y)
 int Painter::pixelSize(bool large) const
 {
     // The TTF drawn so its line is as tall as the game's font at this scale.
-    if (!res_.font) {
+    if (!res_.textFont()) {
         return 10;
     }
     const float target = static_cast<float>(fontHeight(large)) * scale_;
-    const float perPixel = res_.font->lineHeight(100) / 100.0f;
+    const float perPixel = res_.textFont()->gameFace(large).lineHeight(100) / 100.0f;
     return std::max(6, static_cast<int>(std::lround(target / perPixel)));
 }
 
 int Painter::textWidth(const std::string& utf8, bool large)
 {
-    if (!res_.font || utf8.empty()) {
+    if (!res_.textFont() || utf8.empty()) {
         return 0;
     }
-    return static_cast<int>(std::ceil(res_.font->measure(utf8, pixelSize(large)) / scale_));
+    return static_cast<int>(std::ceil(res_.textFont()->gameFace(large).measure(utf8, pixelSize(large)) / scale_));
 }
 
 int Painter::textHeight(const std::string& utf8, bool large, int wrapWidth)
 {
-    if (!res_.font || utf8.empty()) {
+    if (!res_.textFont() || utf8.empty()) {
         return fontHeight(large);
     }
-    const auto lines = wrapWidth > 0 ? res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_).size()
+    const auto lines = wrapWidth > 0 ? res_.textFont()->gameFace(large).wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_).size()
                                      : std::size_t{1};
     return static_cast<int>(std::max<std::size_t>(lines, 1)) * fontHeight(large);
 }
 
 void Painter::text(const std::string& utf8, int x, int y, bool large, const Color& c, int wrapWidth)
 {
-    if (!res_.font || utf8.empty() || !visible(c)) {
+    if (!res_.textFont() || utf8.empty() || !visible(c)) {
         return;
     }
     const int size = pixelSize(large);
     std::vector<std::string> lines;
     if (wrapWidth > 0) {
-        lines = res_.font->wrap(utf8, size, static_cast<float>(wrapWidth) * scale_);
+        lines = res_.textFont()->gameFace(large).wrap(utf8, size, static_cast<float>(wrapWidth) * scale_);
     } else {
         lines.push_back(utf8);
     }
     float oy = offsetY_ + static_cast<float>(y) * scale_;
     for (const auto& line : lines) {
-        res_.font->draw(line, offsetX_ + static_cast<float>(x) * scale_, oy, size, sdl(c));
+        res_.textFont()->gameFace(large).draw(line, offsetX_ + static_cast<float>(x) * scale_, oy, size, sdl(c), shellUp());
         oy += static_cast<float>(fontHeight(large)) * scale_;
     }
 }

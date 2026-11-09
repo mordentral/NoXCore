@@ -28,6 +28,7 @@ add_library(noxsdl_editor_host STATIC
     src/editor/texture_mirror.cpp
     src/editor/theme.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_font.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/embedded_menu_font.cpp
 )
 target_include_directories(noxsdl_editor_host PUBLIC src) # (its headers: "editor/imgui_host.hpp" ...)
 target_link_libraries(noxsdl_editor_host PUBLIC noxsdl_imgui nox::core SDL3::SDL3 PRIVATE nox_warnings)
@@ -173,10 +174,22 @@ add_custom_command(
     COMMENT "Embedding ${NOXSDL_FONT_FILE}"
     VERBATIM
 )
-# Ship the font's licence beside the exe.
+# Menu face is vendored: fresh builds do not need another font download.
+set(NOXSDL_MENU_FONT "${CMAKE_CURRENT_SOURCE_DIR}/res/fonts/Caudex-Bold.ttf")
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/embedded_menu_font.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${NOXSDL_MENU_FONT} -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/embedded_menu_font.cpp
+            -DSYMBOL=kEmbeddedMenuFont -P ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
+    DEPENDS ${NOXSDL_MENU_FONT} ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
+    COMMENT "Embedding Caudex Bold menu font"
+    VERBATIM
+)
+# Ship the fonts' licences beside the exe.
 add_custom_command(TARGET noxsdl POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${noto_sans_license_SOURCE_DIR}/OFL.txt
             $<TARGET_FILE_DIR:noxsdl>/NotoSans-OFL.txt
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/res/fonts/Caudex-OFL.txt
+            $<TARGET_FILE_DIR:noxsdl>/Caudex-OFL.txt
     VERBATIM
 )
 # The mods in mods/ (script modes) into the mods folder beside the exe, where a host finds them.
@@ -364,3 +377,7 @@ if(NOXSDL_HD_VIDEO AND WIN32 AND MSVC AND ffmpeg_lgpl_SOURCE_DIR)
 else()
     target_compile_definitions(noxsdl PRIVATE NOXSDL_HD_VIDEO=0)
 endif()
+
+# Share the original .fnt reader with the client when the content editor is disabled.
+target_sources(noxsdl PRIVATE ${PROJECT_SOURCE_DIR}/videotools/src/content/font_palette.cpp)
+target_include_directories(noxsdl PRIVATE ${PROJECT_SOURCE_DIR}/videotools/src)

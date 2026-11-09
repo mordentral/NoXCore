@@ -588,7 +588,9 @@ void startCinematics(App& app)
     if (app.serverOptions) {
         app.serverOptions->close();
     }
-    app.cinematics = std::make_unique<Cinematics>(res, app.gameDir, app.audio.get(), std::move(hooks));
+    // Chapter splash/briefing, credits and save-menu text share the menu face.
+    // NPC dialogue and the HUD retain the original game font in their own resources.
+    app.cinematics = std::make_unique<Cinematics>(guiResources(app, true), app.gameDir, app.audio.get(), std::move(hooks));
     app.cinematics->setSaveRoot(app.saveRoot);
     if (app.host) {
         // (what the host reads of us between its calls, and our screen messages handled before

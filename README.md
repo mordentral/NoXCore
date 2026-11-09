@@ -29,6 +29,9 @@ original game is included.
   faster updates for NoX Core players.
 - **Graphics:** widescreen, any window size, per-pixel lighting, bloom, and an optional pack of
   HD images.
+- **Fonts:** HD Images selects embedded Caudex Bold for menus and campaign screens;
+  with HD Images off, these use the original Nox bitmap fonts. Switching applies immediately.
+  HUD and NPC dialogue use the original fonts in both modes.
 - **Mods:** game modes written in Luau, loaded from the `mods` folder.
 - **The NoX Content Editor** for the game's files, saving changes into content packs.
 

@@ -1243,6 +1243,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         try {
             app->font = Font::load(app->renderer, gameDir);
             SDL_Log("font: %s", app->font->name().c_str());
+            app->menuFont = Font::loadMenu(app->renderer);
+            SDL_Log("menu font: %s", app->menuFont->name().c_str());
         } catch (const std::exception& ex) {
             SDL_Log("font: %s (no name plates)", ex.what());
         }
@@ -1402,6 +1404,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             const auto listed = readServerLists(gameDir);
             opts.browserOptions.servers.insert(opts.browserOptions.servers.end(), listed.begin(), listed.end());
             app->browser = std::make_unique<BrowserScreen>(*app->font, opts.browserOptions);
+            app->browser->setFontProvider([app]() -> Font& {
+                return app->menuFont && app->sprites->usingPack() ? *app->menuFont : *app->font;
+            });
             // The game's menus; --browse goes straight to the game list.
             Menus::Callbacks callbacks;
             callbacks.join = [app, xwis = opts.browserOptions.xwis, account = opts.profile.account](
@@ -1603,7 +1608,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             callbacks.options = [app] { openOptions(*app); };
             callbacks.loggedIn = [](const std::string& nick) { SDL_Log("account: %s (XWIS login)", nick.c_str()); };
             app->menus =
-                std::make_unique<Menus>(res, gameDir, *app->browser, opts.profile, app->modifiers, std::move(callbacks));
+                std::make_unique<Menus>(guiResources(*app, true), gameDir, *app->browser, opts.profile, app->modifiers, std::move(callbacks));
             if (!opts.saveDir.empty()) {
                 app->menus->setSaveDir(opts.saveDir);
             }

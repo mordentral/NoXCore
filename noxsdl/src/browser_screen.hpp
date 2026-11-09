@@ -23,6 +23,9 @@ class BrowserScreen {
 public:
     BrowserScreen(Font& font, nox::lobby::ServerBrowser::Options options);
 
+    /// Resolve the face when drawing, including after the HD Images option changes.
+    void setFontProvider(std::function<Font&()> provider) { fontProvider_ = std::move(provider); }
+
     /// Starts a new search; with `xwisGames`, XWIS's games as a login just listed them.
     void refresh(std::uint64_t nowMs, const std::vector<nox::lobby::GameListing>* xwisGames = nullptr);
     /// Pumps the search.
@@ -95,6 +98,8 @@ private:
     std::string searchingText() const;
 
     Font& font_;
+    std::function<Font&()> fontProvider_;
+    Font& font() { return fontProvider_ ? fontProvider_() : font_; }
     nox::lobby::ServerBrowser browser_;
     std::vector<nox::lobby::ServerEntry> rows_; ///< sorted copy of the browser's list
     int selected_ = 0;

@@ -811,3 +811,13 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+==============================================================================
+Caudex (https://github.com/google/fonts/tree/main/ofl/caudex)
+==============================================================================
+
+Copyright (c) 2011, Hjort Nidudsson (http://caudex.sf.net), with Reserved Font Name Caudex.
+Unmodified font embedded in noxcore for menus, under the SIL Open Font License 1.1.
+The full licence is in noxsdl/res/fonts/Caudex-OFL.txt and ships beside the
+executable (in Contents/Resources in the macOS app).

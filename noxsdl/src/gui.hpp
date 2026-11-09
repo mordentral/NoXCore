@@ -71,6 +71,9 @@ struct Resources {
     const nox::strings::StringTable* strings = nullptr;
     /// Snd_PlaySound for the screens' own sounds (clicks, slides); may be empty.
     std::function<void(std::uint32_t soundId)> playSound;
+    /// Resolve the menu face at draw time so HD Images changes apply immediately.
+    Font* hdMenuFont = nullptr;
+    Font* textFont() const { return hdMenuFont && sprites.usingPack() ? hdMenuFont : font; }
 
     void sound(std::uint32_t id) const
     {
