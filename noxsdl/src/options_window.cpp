@@ -158,7 +158,7 @@ std::string_view extraTooltip(std::int32_t id)
                "Smooth Movement: each step spread over the frames between updates.\n"
                "Smooth Network: everything drawn between updates (adds latency).\n"
                "Lock to 30 FPS: as the original, a frame for each update.\n"
-               "Match Server: a frame for each update, including movement substeps.";
+               "Match Server: follow server updates; normally 60 FPS in solo play.";
     case kSmoothItem:
         return "Off: everything is drawn where the server last said,\n"
                "in its 30 steps a second, with no added delay.\n"
@@ -181,9 +181,10 @@ std::string_view extraTooltip(std::int32_t id)
                "+ Every step shown evenly once, no added delay.\n"
                "- 30 frames a second.";
     case kSmoothItem + 4:
-        return "Match Server: draw as each server update arrives,\n"
-               "including its extra movement updates (30-120 per second).\n"
-               "+ No added interpolation delay; normally 60 in solo play.\n"
+        return "Normally 60 FPS in single-player with default settings.\n"
+               "Draw as each server update arrives, including movement\n"
+               "substeps: 30, 60, 90 or 120 updates per second.\n"
+               "+ No added interpolation delay.\n"
                "Only affects gameplay; menus keep their normal frame rate.\n"
                "VSync stays as selected and may limit the rate further.";
     case kDisplayLabel:
