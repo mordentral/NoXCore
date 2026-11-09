@@ -206,7 +206,7 @@ void makeGameWindows(App* app, const gui::Resources& res)
     };
     optionCallbacks.onInputConfig = [app] {
         if (app->inputConfig && app->input) {
-            app->inputConfig->open(app->input->config());
+            app->inputConfig->open(app->input->config(), app->settingsDir);
         }
     };
     app->options = std::make_unique<OptionsWindow>(res, gameDir / "window", std::move(optionCallbacks));

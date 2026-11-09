@@ -1,16 +1,38 @@
 #include "user_data.hpp"
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <stdexcept>
+#include <string>
 #include <iostream>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
-void require(bool ok, const char* what) { if (!ok) throw std::runtime_error(what); }
-std::string read(const fs::path& p) { std::ifstream in(p); return {std::istreambuf_iterator<char>(in), {}}; }
+
+namespace {
+
+void require(bool ok, const char* what)
+{
+    if (!ok) {
+        throw std::runtime_error(what);
+    }
+}
+
+std::string read(const fs::path& path)
+{
+    std::ifstream in(path);
+    return {std::istreambuf_iterator<char>(in), {}};
+}
+
+} // namespace
+
 int main()
 {
     std::string pattern = (fs::temp_directory_path() / "nox-user-data-XXXXXX").string();
     const char* temp = mkdtemp(pattern.data());
-    if (!temp) return 1;
+    if (!temp) {
+        return 1;
+    }
     const fs::path root = temp, assets = root / "assets", user = root / "user";
     int result = 0;
     try {
@@ -38,14 +60,25 @@ int main()
         noxsdl::prepareUserData(assets, root / "override", true);
         require(read(root / "override/Save/new.plr") == "old character", "later default saves still import");
         require(read(assets / "SAVE/new.plr") == "old character", "source saves unchanged");
-        require(!fs::exists(assets / ".initial-import-complete"), "no writes into source assets");
+        require(read(assets / "noxcore.cfg") == "OutputScale = 350\n", "source settings unchanged");
+        require(read(assets / "SAVE/Slot1/Player.plr") == "old progress", "source progress unchanged");
+        for (const char* marker : {".settings-import-complete", ".saves-import-complete"}) {
+            require(fs::is_regular_file(user / marker), "import marker belongs in user directory");
+            require(!fs::exists(assets / marker), "no import markers in source assets");
+        }
         std::ofstream(root / "not-directory") << "blocked";
         bool failed = false;
-        try { noxsdl::prepareUserData(assets, root / "not-directory/state", true); }
-        catch (const fs::filesystem_error&) { failed = true; }
+        try {
+            noxsdl::prepareUserData(assets, root / "not-directory/state", true);
+        } catch (const fs::filesystem_error&) {
+            failed = true;
+        }
         require(failed, "invalid destination must report failure");
         std::cout << "PASS: read-only assets, save import, no overwrite/resurrection, writable config, override, failure\n";
-    } catch (const std::exception& e) { std::cerr << e.what() << '\n'; result = 1; }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << '\n';
+        result = 1;
+    }
     fs::permissions(assets, fs::perms::owner_all);
     fs::remove_all(root);
     return result;

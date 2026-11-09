@@ -149,7 +149,8 @@ The published source carries no engine unit tests, so NOX_BUILD_TESTS and NOX_TE
 default. (A development tree that carries the tests turns both on by default; -D values always
 win. NOX_TEST_COMMANDS=OFF needs NOX_BUILD_TESTS=OFF, since the tests use the nx commands.)
 
-Standalone Mac data-search and writable-state tests need no game assets or test commands:
+Standalone data-search, writable-state and Input Config source tests need no game assets or
+test commands (the first two run on Mac):
 
   cmake -S noxsdl/tests -B build/client-tests -G Ninja -DCMAKE_BUILD_TYPE=Release
   cmake --build build/client-tests

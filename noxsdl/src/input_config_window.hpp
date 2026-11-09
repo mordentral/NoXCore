@@ -42,7 +42,7 @@ public:
 
     bool isOpen() const { return open_; }
     /// Opens it on `config`'s bindings.
-    void open(const nox::config::Config& config);
+    void open(const nox::config::Config& config, const std::filesystem::path& settingsDir);
     /// Shuts it; with `save`, the bindings go to onSave first.
     void close(bool save);
 
@@ -67,11 +67,12 @@ private:
     void cancelCapture();
     void scroll(int by);
     std::string keyTitle(std::optional<std::uint32_t> code) const;
-    /// Reads a file's bindings (nox.cfg / default.cfg in the game folder), if it reads.
-    std::optional<nox::config::Config> readFile(const char* name) const;
+    /// Reads saved user bindings, or factory defaults from the game folder.
+    std::optional<nox::config::Config> readFile(bool defaults) const;
 
     gui::Gui gui_;
     std::filesystem::path gameDir_;
+    std::filesystem::path settingsDir_;
     Callbacks callbacks_;
     bool open_ = false;
     nox::config::Config config_;

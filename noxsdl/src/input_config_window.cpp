@@ -4,7 +4,7 @@
 
 #include "input.hpp"
 
-#include "noxcore/io/file.hpp"
+#include "input_config_files.hpp"
 
 #include <algorithm>
 #include <array>
@@ -27,29 +27,25 @@ InputConfigWindow::InputConfigWindow(gui::Resources res, std::filesystem::path g
 {
 }
 
-// A config file in the game folder (any case), parsed; nullopt if it's missing or unreadable.
-std::optional<nox::config::Config> InputConfigWindow::readFile(const char* name) const
+// Reset reads the saved user configuration; Defaults reads the original game configuration.
+std::optional<nox::config::Config> InputConfigWindow::readFile(bool defaults) const
 {
     try {
-        const auto path = nox::findNoCase(gameDir_, name);
-        if (!std::filesystem::exists(path)) {
-            return std::nullopt;
-        }
-        const auto bytes = nox::readFileBytes(path);
-        return nox::config::parseConfig(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+        return readInputConfig(gameDir_, settingsDir_, defaults);
     } catch (const std::exception& ex) {
-        SDL_Log("input config: %s: %s", name, ex.what());
+        SDL_Log("input config: %s: %s", defaults ? "default.cfg" : "nox.cfg", ex.what());
         return std::nullopt;
     }
 }
 
-void InputConfigWindow::open(const nox::config::Config& config)
+void InputConfigWindow::open(const nox::config::Config& config, const std::filesystem::path& settingsDir)
 {
     if (open_) {
         return;
     }
     open_ = true;
     config_ = config;
+    settingsDir_ = settingsDir;
     capture_.reset();
     const auto proc = [this](gui::Window&, int message, gui::Window& from) { return onMessage(message, from); };
     window_ = gui_.load(gameDir_ / "window" / "InputCfg.wnd", proc);
@@ -238,12 +234,12 @@ bool InputConfigWindow::onMessage(int message, gui::Window& from)
     switch (from.id) {
     case kReset:
         // nox.cfg's bindings again.
-        if (const auto c = readFile("nox.cfg")) {
+        if (const auto c = readFile(false)) {
             fill(*c);
         }
         return true;
     case kDefaults:
-        if (const auto c = readFile("default.cfg")) {
+        if (const auto c = readFile(true)) {
             fill(*c);
         }
         return true;

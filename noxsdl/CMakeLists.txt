@@ -94,6 +94,7 @@ add_executable(noxsdl WIN32
     src/interpolator.cpp
     src/move_predictor.cpp
     src/input.cpp
+    src/input_config_files.cpp
     src/input_config_window.cpp
     src/inventory.cpp
     src/inventory_grid.cpp
@@ -149,6 +150,7 @@ add_executable(noxsdl WIN32
     src/text_wrap.cpp
     src/test_drive.cpp
     src/thing_art.cpp
+    src/user_data.cpp
     src/view3d.cpp
     src/view3d_gpu.cpp
     src/weather.cpp
@@ -165,7 +167,6 @@ if(APPLE)
             "-DBUNDLE=${PROJECT_BINARY_DIR}/NoX Core.app"
             "-DSOURCE=${PROJECT_SOURCE_DIR}"
             "-DPLIST=${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
-            "-DFONT_LICENSE=${noto_sans_license_SOURCE_DIR}/OFL.txt"
             -P ${PROJECT_SOURCE_DIR}/cmake/NoxMacBundle.cmake
         DEPENDS noxsdl
         VERBATIM)
