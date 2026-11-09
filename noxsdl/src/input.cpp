@@ -153,6 +153,11 @@ std::string InputBindings::layoutName(std::uint32_t code)
         }
         // (Keys the game reads by place, as DirectInput did; the name is what this layout types there.)
         const SDL_Keycode key = SDL_GetKeyFromScancode(sdl, SDL_KMOD_NONE, false);
+        // The original bitmap fonts have no Cyrillic glyphs. Keep the game's Latin key
+        // names for these layouts; Latin layouts (including QWERTZ and AZERTY) keep theirs.
+        if (key >= 0x0400 && key <= 0x052F) {
+            return {};
+        }
         if (key == SDLK_UNKNOWN || (key & SDLK_SCANCODE_MASK) || key <= SDLK_SPACE || key == SDLK_DELETE) {
             return {};
         }

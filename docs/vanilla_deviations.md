@@ -669,7 +669,9 @@ The decisions are in `noxsdl/src/menu_rules.hpp`.
   notice and on the HUD. The bar's slots and the potions show the key each is bound to
   (`InputBindings::slotLabels` / `potionLabels`: the control's first single-key binding; a
   combination or no binding shows nothing), so a rebinding shows there too. AZERTY's bar reads
-  Q S D F G and its potions X C W.
+  Q S D F G and its potions X C W. Cyrillic key names fall back to the game's Latin names,
+  since the restored bitmap fonts do not contain Cyrillic glyphs. German QWERTZ and French
+  AZERTY retain their layout-specific names. This affects labels only, not the stored bindings.
 - **Why:** by the owner's decision (2026-11-06), after a French player pressed A to cast and got the
   inventory.
 - **Revert:** `layoutName` returning nothing, and hud.cpp's `kSlotKeys` / `kPotionKeys` drawn again.
