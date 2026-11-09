@@ -301,6 +301,7 @@ private:
     nox::player::FileInfo madeCharacter(std::u16string& name) const;
     nox::client::PlayerProfile profileOf(const nox::player::FileInfo& info) const;
     void startNewSolo();
+    void characterSaveFailed(const std::filesystem::path& path, const std::string& reason);
     void showLoading(bool on);
     /// The game's message box (Gui_Dialog_Create, dlg.wnd): flags 1 OK, 2 Cancel,
     /// 8 Yes, 0x10 No. Modal; OK / Yes run `onOk`, Cancel / No `onCancel`. `yesText` / `noText`:
