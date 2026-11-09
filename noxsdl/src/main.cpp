@@ -2766,7 +2766,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 {
     auto* app = static_cast<App*>(appstate);
     if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST || event->type == SDL_EVENT_WINDOW_MINIMIZED) {
-        // Release before menu/editor handlers can return early. SDL keeps the Nox cursor
+        // Release before menu/editor handlers can return early. SDL keeps the system cursor
         // hidden only inside our window; the desktop pointer remains available outside.
         SDL_SetWindowRelativeMouseMode(app->window, false);
         SDL_SetWindowMouseGrab(app->window, false);

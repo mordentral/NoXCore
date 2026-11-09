@@ -270,10 +270,10 @@ void applyDisplay(App& app)
 /// client_nextMouseEvent), each moving the cursor one pixel of the game's screen (added and clamped
 /// by client_changeMousePos, no scaling). Here that's SDL's relative mode (raw input) with each count moving
 /// the cursor one game pixel (camera.zoom output pixels). Win Mouse Accel (on by default) puts
-/// Windows' pointer speed and acceleration curve on the counts, and Mouse's speed multiplies them. SDL keeps the cursor's
-/// place in the window from that, so everything reading the mouse reads it as before. The
-/// pointer stays in the window during focused gameplay. Menus use absolute movement so the
-/// pointer can leave the window, but still draw the Nox cursor inside it.
+/// Windows' pointer speed and acceleration curve on the counts, and Mouse's speed multiplies
+/// them. SDL keeps the cursor's place in the window from that, so everything reading the mouse
+/// reads it as before. The pointer stays in the window during focused gameplay. Menus use
+/// absolute movement so the pointer can leave the window, but still draw the Nox cursor inside it.
 /// Called every frame: the game pixel's size changes with the window and the resolution.
 void applyMouse(App& app, bool gameplay)
 {

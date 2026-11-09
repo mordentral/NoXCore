@@ -1,9 +1,10 @@
 // The window's mouse as each owner of it wants it, and where the drawn pointer comes from. The
 // menus and a game hide SDL's pointer and draw their own, from main.cpp's mousePos. Only gameplay
 // uses relative mode: menus let the pointer leave the window; the map editor has the system's
-// pointer. A game in the editor's Map panel keeps the mouse on its area while it has the input, and, when the editor has
-// it, its drawn pointer held where it was left. Every way out of the editor or a play view puts the
-// menus' (or a game's) back whole (app_settings.cpp's handMouseTo): nothing of the panel's left behind.
+// pointer. A game in the editor's Map panel keeps the mouse on its area while it has the input,
+// and, when the editor has it, its drawn pointer held where it was left. Every way out of the
+// editor or a play view puts the menus' (or a game's) back whole (app_settings.cpp's handMouseTo):
+// nothing of the panel's left behind.
 // No SDL here, so the tests check it.
 #pragma once
 

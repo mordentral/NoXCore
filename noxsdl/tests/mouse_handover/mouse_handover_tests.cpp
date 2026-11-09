@@ -34,13 +34,10 @@ int main()
                 "released play-test hands the mouse back to the editor");
     }
 
-    // Startup -> play -> Escape/Options -> resume -> focus loss -> refocus.
-    require(!gameplayMouseCapture(false, true, false), "startup menus do not capture");
-    require(gameplayMouseCapture(true, true, false), "entering gameplay captures");
-    require(!gameplayMouseCapture(false, true, false), "opening Escape/Options releases capture");
+    require(!gameplayMouseCapture(false, true, false), "startup and Escape/Options menus do not capture");
+    require(!gameplayMouseCapture(false, false, false), "unfocused menus do not capture");
     require(gameplayMouseCapture(true, true, false), "closing menus restores capture");
     require(!gameplayMouseCapture(true, false, false), "unfocused gameplay does not capture");
-    require(gameplayMouseCapture(true, true, false), "refocused gameplay restores capture");
     for (bool gameplay : {false, true}) {
         for (bool focused : {false, true}) {
             require(!gameplayMouseCapture(gameplay, focused, true), "hidden screenshot runs never capture");
@@ -48,5 +45,5 @@ int main()
     }
     require(pointerSource(false, true, false) == PointerSource::Mouse,
             "leaving the editor for menus must not retain a stale held pointer");
-    std::cout << "Mouse ownership and capture transitions passed\n";
+    std::cout << "Mouse ownership and capture policy passed\n";
 }

@@ -3,7 +3,7 @@
 Run the standalone, asset-free policy tests:
 
 ```sh
-cmake -S noxsdl/tests -B build/mouse-tests
+cmake -S noxsdl/tests/mouse_handover -B build/mouse-tests
 cmake --build build/mouse-tests
 ctest --test-dir build/mouse-tests --output-on-failure
 ```
