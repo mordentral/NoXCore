@@ -534,12 +534,12 @@ struct App {
     /// The frame-rate counter in the top right (--no-fps hides it; an Options setting later).
     bool showFps = true;
     /// Options' Smoothing: 0 Off, 1 Smooth Movement (eased to each new position), 2 Smooth Network
-    /// (everything drawn between snapshots: the default), 3 Lock to 30 FPS (Off, drawn as
-    /// snapshots come), 4 Match Server (Off, drawn as each frame or movement substep comes).
+    /// (everything drawn between snapshots: the default), 3 Match Server (Off, drawn as each frame
+    /// or movement substep comes).
     int smoothing = 2;
     bool smoothMotion = true;    ///< Smoothing = Smooth Network: everything drawn between snapshots
     bool smoothScrolling = true; ///< Smoothing = Smooth Network: the camera (and us) on that clock too
-    std::uint32_t lockedSnapshot = 0; ///< Frame lock: last drawn frameUpdateCount, or snapshotCount for Match Server
+    std::uint32_t lockedSnapshot = 0; ///< Match Server: the snapshotCount the last frame drew
     std::uint64_t lockedAtMs = 0;     ///< and when
     bool predictMovement = false; ///< --predict-movement (an experiment; runs only with smoothMotion)
     int otherUnits = 0; ///< --other-units: 0 smooth, 1 newest, 2 ahead (Interpolator::Others; an experiment)

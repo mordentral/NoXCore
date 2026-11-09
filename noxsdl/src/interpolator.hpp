@@ -23,15 +23,15 @@
 //
 // Options' Smoothing:
 //   Off               the newest snapshot as it comes (as vanilla draws: in 30 fps steps);
-//   Lock to 30 FPS    the same, with frames drawn only as snapshots come (main.cpp);
 //   Smooth Movement   no clock and no buffering: when a snapshot brings a new position, the
 //                     camera and every drawable move from where they're drawn to it over one
 //                     server frame (~33 ms, by the fitted rate, at whatever the frame rate), then
 //                     hold there till the next: each 30 fps step spread over the frames between,
 //                     about half a server frame behind on average, never past where the server
 //                     put it (a late snapshot holds, a teleport snaps);
-//   Smooth Network    (the default) everything drawn on the clock above, between snapshots.
-//   Match Server      Off, with frames drawn as each snapshot comes, including movement substeps.
+//   Smooth Network    (the default) everything drawn on the clock above, between snapshots;
+//   Match Server      Off, with frames drawn as each snapshot comes, including movement substeps
+//                     (main.cpp).
 // With
 // --predict-movement (an experiment) our own player and the camera come from the MovePredictor
 // instead: ahead of the server, not behind it.

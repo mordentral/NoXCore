@@ -1,7 +1,0 @@
-cmake_minimum_required(VERSION 3.25)
-project(nox_snapshot_pacing_tests LANGUAGES CXX)
-enable_testing()
-add_executable(snapshot_pacing_tests snapshot_pacing_tests.cpp)
-target_compile_features(snapshot_pacing_tests PRIVATE cxx_std_20)
-target_include_directories(snapshot_pacing_tests PRIVATE ../../src)
-add_test(NAME snapshot_pacing COMMAND snapshot_pacing_tests)

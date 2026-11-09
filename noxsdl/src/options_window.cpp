@@ -56,7 +56,7 @@ constexpr std::array<Switch, 10> kSwitches{{
 constexpr std::int32_t kMouseLabel = 2920, kMouseSlider = 2921;
 // Smoothing: its label, the drop-down's button and its choices (Extras::smoothing)
 constexpr std::int32_t kSmoothLabel = 2910, kSmoothBox = 2911, kSmoothItem = 2912;
-constexpr std::array<const char*, 5> kSmoothNames{"Off", "Smooth Movement", "Smooth Network", "Lock to 30 FPS", "Match Server"};
+constexpr std::array<const char*, 4> kSmoothNames{"Off", "Smooth Movement", "Smooth Network", "Match Server"};
 // Display: the same (Extras::display)
 constexpr std::int32_t kDisplayLabel = 2930, kDisplayBox = 2931, kDisplayItem = 2932;
 constexpr std::array<const char*, 3> kDisplayNames{"Windowed", "Fullscreen Windowed", "Fullscreen"};
@@ -157,7 +157,6 @@ std::string_view extraTooltip(std::int32_t id)
                "Off: in the server's 30 steps a second, at your frame rate.\n"
                "Smooth Movement: each step spread over the frames between updates.\n"
                "Smooth Network: everything drawn between updates (adds latency).\n"
-               "Lock to 30 FPS: as the original, a frame for each update.\n"
                "Match Server: follow server updates; normally 60 FPS in solo play.";
     case kSmoothItem:
         return "Off: everything is drawn where the server last said,\n"
@@ -176,14 +175,9 @@ std::string_view extraTooltip(std::int32_t id)
                "- Everything is shown about 50 ms late (adapts to your\n"
                "  connection), on top of your ping: lead moving targets.";
     case kSmoothItem + 3:
-        return "Lock to 30 FPS: a frame is drawn as each server update\n"
-               "comes, as the original's 30 FPS loop showed them.\n"
-               "+ Every step shown evenly once, no added delay.\n"
-               "- 30 frames a second.";
-    case kSmoothItem + 4:
-        return "Normally a 60 FPS lock in single-player. No interpolation.\n"
-               "Draw when a server update arrives, including extra movement\n"
-               "updates (30-120 per second).\n"
+        return "Match Server: normally a 60 FPS lock in single-player.\n"
+               "No interpolation. Draw when a server update arrives,\n"
+               "including extra movement updates (30-120 per second).\n"
                "Menus use their normal frame rate.";
     case kDisplayLabel:
     case kDisplayBox:

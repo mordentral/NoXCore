@@ -1209,7 +1209,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             extras.perPixelLight = extras.perPixelLight && !opts.gridLight;
             extras.bloom = extras.bloom && !opts.noBloom;
             extras.frameRate = extras.frameRate && app->showFps;
-            // Smoothing: 0 off, 1 movement, 2 network, 3 lock30, 4 server (as --smoothing).
+            // Smoothing: 0 off, 1 movement, 2 network, 3 server (as --smoothing).
             if (opts.smoothing) {
                 extras.smoothing = *opts.smoothing;
             }
@@ -4129,11 +4129,12 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         // extended query, sends it whole: the averaging only for the first.)
         app->interpolator.setSelfRounded(!app->live->extended().has_value());
         app->interpolator.update(client, static_cast<double>(SDL_GetTicksNS()) / 1e6);
-        if ((app->smoothing == 3 || app->smoothing == 4) && app->view) {
-            // Lock to 30 FPS follows base game frames; Match Server includes movement substeps.
-            // Both show the latest state without interpolation, or redraw after 50 ms without one.
+        if (app->smoothing == 3 && app->view) {
+            // Match Server follows base game frames and movement substeps (a paused solo game's
+            // frames count too). It shows the latest state without interpolation, or redraws after
+            // 50 ms without one.
             const std::uint64_t nowMs = SDL_GetTicks();
-            const std::uint32_t update = renderUpdateCount(app->smoothing == 4, client.frameUpdateCount(), client.snapshotCount());
+            const std::uint32_t update = client.snapshotCount();
             if (!snapshotFrameDue(update, app->lockedSnapshot, nowMs, app->lockedAtMs)) {
                 if (embedded) {
                     return editorFrame(*app); // (the editor round the game's last frame, still in its texture)

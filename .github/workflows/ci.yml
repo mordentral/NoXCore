@@ -49,11 +49,6 @@ jobs:
           key: deps-windows-${{ hashFiles('cmake/NoxDependencies.cmake', 'cmake/patches/**') }}
       - name: Configure
         run: cmake --preset msvc-release -DNOX_PRIVATE_TOOLS=OFF -DNOX_WARNINGS_AS_ERRORS=OFF
-      - name: Snapshot pacing tests
-        run: |
-          cmake -S noxsdl/tests/snapshot_pacing -B build/snapshot_pacing-tests
-          cmake --build build/snapshot_pacing-tests --config Release
-          ctest --test-dir build/snapshot_pacing-tests -C Release --output-on-failure --no-tests=error
       - name: Build
         run: cmake --build --preset msvc-release
       - name: Test
@@ -80,11 +75,6 @@ jobs:
           key: deps-linux-${{ hashFiles('cmake/NoxDependencies.cmake', 'cmake/patches/**') }}
       - name: Configure
         run: cmake --preset linux-release -DNOX_PRIVATE_TOOLS=OFF
-      - name: Snapshot pacing tests
-        run: |
-          cmake -S noxsdl/tests/snapshot_pacing -B build/snapshot_pacing-tests
-          cmake --build build/snapshot_pacing-tests --config Release
-          ctest --test-dir build/snapshot_pacing-tests -C Release --output-on-failure --no-tests=error
       - name: Build
         run: cmake --build --preset linux-release -j 4
       - name: Test

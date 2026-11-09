@@ -3,6 +3,7 @@
 // game view's size.
 #include "app.hpp"
 #include "effects_draw.hpp"
+#include "snapshot_pacing.hpp"
 
 #include "noxcore/things/object_class.hpp"
 
@@ -140,7 +141,7 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
         } else if (name == "HDSpellFX") {
             e.hdSpellFx = on;
         } else if (name == "Smoothing") {
-            e.smoothing = std::clamp(std::atoi(line.c_str() + eq + 1), 0, 4);
+            e.smoothing = smoothingSetting(std::atoi(line.c_str() + eq + 1));
         } else if (name == "HDImages") {
             e.hdImages = on;
         } else if (name == "Gamma") {
@@ -417,13 +418,8 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
         app.vsync = e.vsync;
         applyDisplay(app);
     }
-    // Options' Smoothing: Off, Smooth Movement, Smooth Network, Lock to 30 FPS, Match Server.
-    const int smoothing = std::clamp(e.smoothing, 0, 4);
-    if (smoothing != app.smoothing) {
-        app.lockedSnapshot = 0; // (the two frame locks count different updates)
-        app.lockedAtMs = 0;
-    }
-    app.smoothing = smoothing;
+    // Options' Smoothing: Off, Smooth Movement, Smooth Network, Match Server.
+    app.smoothing = smoothingSetting(e.smoothing);
     app.smoothMotion = app.smoothing == 2;
     app.smoothScrolling = app.smoothing == 2;
     app.interpolator.setEasing(app.smoothing == 1);

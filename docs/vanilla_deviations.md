@@ -152,9 +152,11 @@ Options switch unless noted.
 - **The view is drawn behind the newest snapshot** for smooth motion, by a delay that adapts to
   the connection (one frame plus the measured lateness, ~50 ms on a steady line; interpolator.cpp);
   vanilla draws the newest. Options' Smoothing: Smooth Network (the default: everything), Smooth Movement (the
-  camera and us; other players then step against the smooth scroll), Off (as vanilla), Lock to 30
-  FPS (Off, a frame drawn as each snapshot comes). --predict-movement (an experiment) draws us and the camera ahead
-  of the server instead. (Since 2026-10-07, Smooth Movement eases the camera and every
+  camera and us; other players then step against the smooth scroll), Off (as vanilla), Match
+  Server (Off, a frame drawn as each server update comes, a NoX Core server's movement updates
+  between frames included: 30-120 a second, 60 in solo play by default; 2026-11-09, in place of
+  Lock to 30 FPS). --predict-movement (an experiment) draws us and the camera ahead of the server
+  instead. (Since 2026-10-07, Smooth Movement eases the camera and every
   drawable to each new snapshot over a server frame, no clock: interpolator.hpp.)
 - **An update stream that comes out of order is kept from putting things back** (2026-10-12): a
   datagram whose timestamp is older than one already seen (UDP overtaking, over the internet) still
