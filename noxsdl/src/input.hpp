@@ -70,8 +70,7 @@ public:
 
     /// A key's name as printed on this keyboard (its layout's: the code's position is AZERTY's Q
     /// for nox.cfg's "A"), for a key that types a character; empty for the rest (Ctrl, F1, the
-    /// arrows, the keypad), whose names are the game's own. Cyrillic characters also use the
-    /// game's Latin names, since the original bitmap fonts cannot display them.
+    /// arrows, the keypad), whose names are the game's own.
     static std::string layoutName(std::uint32_t code);
     /// The spell bar's five slots' and the potions' (health, mana, cure poison) labels: each
     /// control's first single-key binding by layoutName, else the game's name for the key; empty
