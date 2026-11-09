@@ -470,7 +470,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         for (const std::uint32_t e : kept) {
             const std::uint32_t code = renumbered.at(e);
             const ServerObject* item = code != e ? world_.byExtent(code) : nullptr;
-            const ServerObject* holder = item && item->holder ? world_.byExtent(item->holder) : nullptr;
+            ServerObject* holder = item && item->holder ? world_.byExtent(item->holder) : nullptr;
             if (!holder || !holder->player) {
                 continue;
             }
@@ -491,6 +491,9 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
             }
             if (item->flags & ObjFlag::Equipped) {
                 tell({0x60, u8(code), u8(code >> 8)}); // MSG_REPORT_EQUIP
+                if (things::weaponBitOf(item->typeName) == 2) {
+                    holder->player->lastQuiver = netCodeOf(*item); // (a quiver: its window's last one now)
+                }
             }
         }
         // noxcpp: a forced class gone with the game that forced it (a mode's lobby again,

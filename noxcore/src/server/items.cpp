@@ -744,6 +744,8 @@ bool Items::equipWeapon(ServerObject& player, ServerObject& item, bool everyone,
     }
     if (bit != 2) {
         p.currentWeapon = item.extent;
+    } else {
+        p.lastQuiver = netCodeOf(item); // (noxcpp: its window's last quiver now, for a co-op guest's save)
     }
     // Its charges to its client (SrvNet_SendReportCharges): a magical staff's (wand class, subclass
     // 0x47F0000), else a quiver's or throwing stars' (weapon class, weapon bits 0x82). (A bow's or

@@ -201,8 +201,8 @@ std::optional<std::vector<std::uint8_t>> writeStatus(Fight& fight, ServerObject&
 }
 
 // Inventory: gold, each item's record, the worn items' script ids, the host window's weapon
-// picks and the trap count. Fails outside solo and quest games, or for a quest player carrying
-// too much (questInventoryAllowed).
+// picks (a co-op guest's own) and the trap count. Fails outside solo and quest games, or for a
+// quest player carrying too much (questInventoryAllowed).
 std::optional<std::vector<std::uint8_t>> writeInventory(Fight& fight, ServerObject& unit)
 {
     World& world = fight.world;
@@ -267,13 +267,18 @@ std::optional<std::vector<std::uint8_t>> writeInventory(Fight& fight, ServerObje
             }
         }
         // The host's window's secondary weapon and last quiver, by its net codes, as the script
-        // ids of its things (in any game; none found: 0).
+        // ids of its things (in any game; none found: 0). (noxcpp: a solo game's guest, a co-op
+        // campaign's below the host's 0x1F, its own: the secondary weapon its client reported
+        // (MSG_REPORT_SECONDARY_WEAPON) and the last quiver its client was told it wears, which the
+        // server keeps for it. The host's window names only the host's things, so a guest's
+        // character kept none. In a solo game alone the one player is the host: as the exe.)
         const auto scriptIdOf = [&](std::uint16_t nc) -> std::uint32_t {
             const ServerObject* o = nc != 0 ? byNetCode(nc) : nullptr;
             return o ? static_cast<std::uint32_t>(o->scriptId) : 0u;
         };
-        c.secondaryWeapon = scriptIdOf(window.secondaryWeapon);
-        c.lastQuiver = scriptIdOf(window.lastQuiver);
+        const bool guest = solo(world) && unit.player && (unit.player->index & 31u) != 0x1F;
+        c.secondaryWeapon = scriptIdOf(guest ? p.secondaryWeapon : window.secondaryWeapon);
+        c.lastQuiver = scriptIdOf(guest ? p.lastQuiver : window.lastQuiver);
         c.trapCount = p.curTraps; // (CurTraps)
         inv.contents = std::move(c);
     }
@@ -781,6 +786,7 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
             }
             if (unit.player) {
                 unit.player->secondaryWeapon = 0;
+                unit.player->lastQuiver = 0;
             }
         }
         const auto findById = [&](std::int32_t id) -> ServerObject* {
@@ -809,6 +815,9 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
                     const std::uint16_t code = netCodeOf(*o);
                     tell(world, unit, {0xE1, lo(code), hi(code)});
                     quiverTold = true;
+                    if (unit.player) {
+                        unit.player->lastQuiver = code; // (what its client now holds)
+                    }
                 }
             }
         }
@@ -820,9 +829,11 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         if (solo(world) && unit.player && (unit.player->index & 31u) != 0x1F) {
             if (!secondaryTold) {
                 tell(world, unit, {0xE0, 0, 0, 0});
+                unit.player->secondaryWeapon = 0;
             }
             if (!quiverTold) {
                 tell(world, unit, {0xE1, 0, 0});
+                unit.player->lastQuiver = 0;
             }
         }
         // A quest's things numbered afresh (and their Extent their net code: ours already is).
