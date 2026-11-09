@@ -18,7 +18,7 @@ namespace videotools::gui {
 namespace {
 
 /// `text` in `font` as white pixels on clear (each glyph then a pixel's gap, as the game advances).
-std::vector<std::uint8_t> drawText(const content::BitmapFont& font, std::u16string_view text, int& w, int& h)
+std::vector<std::uint8_t> drawText(const nox::video::BitmapFont& font, std::u16string_view text, int& w, int& h)
 {
     w = 0;
     for (const char16_t c : text) {
@@ -80,7 +80,7 @@ bool RecordPanel::fontForm(const content::Record& r)
         try {
             const auto bytes = nox::readFileBytes(*file);
             if (r.ref.kind == content::FileKind::Fonts) {
-                font_ = content::BitmapFont::parse(bytes);
+                font_ = nox::video::BitmapFont::parse(bytes);
             } else {
                 palette_ = content::Palette::parse(bytes);
             }
@@ -94,7 +94,7 @@ bool RecordPanel::fontForm(const content::Record& r)
         return true;
     }
     if (font_) {
-        const content::BitmapFont& f = *font_;
+        const nox::video::BitmapFont& f = *font_;
         ImGui::TextWrapped("The original game's bitmap font: %zu glyphs, %u pixels high (lines %u apart), %s layout. NoX Core draws its own "
                            "text with a TrueType font; these are what GAME.EXE shows.",
                            f.glyphCount(), f.rows, f.height, f.tagged ? "the \"tNoF\"" : "the older");

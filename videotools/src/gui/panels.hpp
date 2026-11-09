@@ -2,6 +2,8 @@
 // the preview and references, and the Changes / Problems / Log panels (shell.hpp lays them out).
 #pragma once
 
+#include "noxcore/video/bitmap_font.hpp"
+
 #include "content/character.hpp"
 #include "content/font_palette.hpp"
 #include "content/text_files.hpp"
@@ -98,7 +100,7 @@ private:
     // The font or palette shown.
     std::filesystem::path viewerFile_;
     std::string viewerError_;
-    std::optional<content::BitmapFont> font_;
+    std::optional<nox::video::BitmapFont> font_;
     std::optional<content::Palette> palette_;
     SDL_Texture* fontSheet_ = nullptr;
     int fontSheetW_ = 0;

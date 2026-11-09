@@ -12,6 +12,8 @@ namespace noxsdl {
 
 namespace {
 
+constexpr float kOptionsBitmapFontScale = 0.8f;
+
 namespace st = nox::gui::status;
 
 // Options.wnd
@@ -338,7 +340,7 @@ void OptionsWindow::setDropText(const DropDown& d)
 
 OptionsWindow::OptionsWindow(gui::Resources res, std::filesystem::path windowDir, Callbacks callbacks)
     : gui_([&] {
-          res.bitmapFontScale = 0.8f;
+          res.bitmapFontScale = kOptionsBitmapFontScale;
           return std::move(res);
       }()),
       windowDir_(std::move(windowDir)), callbacks_(std::move(callbacks))

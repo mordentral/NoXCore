@@ -174,6 +174,7 @@ add_library(noxcore
     src/things/sound_sets.cpp
     src/things/spell_ids.cpp
     src/things/thing_db.cpp
+    src/video/bitmap_font.cpp
     src/video/image_pack.cpp
     src/video/nxz.cpp
     src/video/sprite.cpp

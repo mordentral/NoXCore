@@ -2,6 +2,7 @@
 // over it.
 #include "quit_menu.hpp"
 
+#include "menu_font_sizes.hpp"
 #include "menu_rules.hpp"
 
 namespace noxsdl {
@@ -31,7 +32,7 @@ QuitMenu::QuitMenu(gui::Resources res, std::filesystem::path windowDir, Callback
     menu_->rect.x = (640 - menu_->rect.w) / 2;
     for (const auto id : {kAutoLoad, kAutoSave, kSave, kQuit, kOptions, kResume, kObserve, kGameplay, kVote}) {
         if (gui::Window* button = menu_->find(id)) {
-            button->hdFontScale = 1.25f;
+            button->hdFontScale = kMenuButtonHdFontScale;
         }
     }
     // Its own drawing: the screen behind it darkened.
@@ -258,7 +259,7 @@ void QuitMenu::ask(const std::string& title, const std::string& text, std::funct
     dialog_->status |= nox::gui::status::Above;
     for (const auto id : {kDlgTitle, kDlgText, kDlgOk, kDlgCancel, kDlgYes, kDlgNo}) {
         if (gui::Window* label = dialog_->find(id)) {
-            label->hdFontScale = 1.5f;
+            label->hdFontScale = kDialogHdFontScale;
         }
     }
     if (gui::Window* t = dialog_->find(kDlgTitle)) {

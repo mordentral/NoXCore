@@ -154,7 +154,6 @@ add_executable(noxsdl WIN32
     src/weather.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_menu_font.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_hud_font.cpp
-    ${PROJECT_SOURCE_DIR}/videotools/src/content/font_palette.cpp
 )
 # The program is noxcore.exe (Linux: noxcore); the target keeps its name, noxsdl, for the build
 # commands. No clash with the library target noxcore: its noxcore.lib / .a is built in noxcore/,
@@ -302,8 +301,6 @@ if(NOT NOXSDL_DXC AND NOT NOXSDL_GLSLANG)
 endif()
 
 target_include_directories(noxsdl SYSTEM PRIVATE ${stb_truetype_SOURCE_DIR})
-# The original .fnt reader is shared with the content editor, even when that target is disabled.
-target_include_directories(noxsdl PRIVATE ${PROJECT_SOURCE_DIR}/videotools/src)
 target_include_directories(noxsdl PRIVATE src) # (src/editor's files include "editor/..." and the views beside them)
 target_link_libraries(noxsdl PRIVATE nox::core nox::modes SDL3::SDL3 nox_warnings miniupnpc::miniupnpc noxsdl_imgui noxsdl_editor_host)
 # Luau's analysis library: the mod editor's diagnostics (src/editor/mod_analysis.cpp). noxsdl's

@@ -5,6 +5,7 @@
 #include "cinematics.hpp"
 #include "client_level_gate.hpp"
 #include "console.hpp"
+#include "menu_font_sizes.hpp"
 #include "mode_ui.hpp"
 
 #include "noxcore/client/solo_menu.hpp"
@@ -29,6 +30,10 @@ namespace noxsdl {
 namespace st = nox::gui::status;
 
 namespace {
+
+constexpr float kCharacterLabelHdFontScale = 1.1f;
+constexpr float kCharacterLabelBitmapFontScale = 0.9f;
+constexpr float kLoginHelpBitmapFontScale = 0.8f;
 
 // MainMenu.wnd
 constexpr std::int32_t kMainTop = 110, kMainBottom = 120;
@@ -64,7 +69,8 @@ constexpr std::int32_t kClassFirst = 601, kClassLast = 603, kClassText = 605, kC
 constexpr std::int32_t kColorSkin = 720, kColorHair = 721, kColorMustache = 722, kColorGoatee = 723,
                        kColorBeard = 724, kColorPants = 725, kColorShirt1 = 726, kColorShirt2 = 727,
                        kColorShoes1 = 728, kColorShoes2 = 729;
-constexpr std::int32_t kHairLabel = 711, kMustacheLabel = 712, kGoateeLabel = 713, kBeardLabel = 714;
+constexpr std::int32_t kSkinLabel = 710, kHairLabel = 711, kMustacheLabel = 712, kGoateeLabel = 713,
+                       kBeardLabel = 714, kPantsLabel = 715, kShirtLabel = 716, kShoesLabel = 717, kNameLabel = 750;
 constexpr std::int32_t kToggleFirst = 731, kToggleLast = 734; // switch 711-714 (id - 20)
 constexpr std::int32_t kPreview = 740, kPicker = 760, kSwatchFirst = 761, kSwatchLast = 792, kNameEntry = 751,
                        kColorAccept = 799;
@@ -138,7 +144,7 @@ Menus::Menus(gui::Resources res, std::filesystem::path gameDir, BrowserScreen& b
                           });
     for (const auto id : {kOptions, kBack}) {
         if (gui::Window* button = optsBack_->find(id)) {
-            button->hdFontScale = 1.25f;
+            button->hdFontScale = kMenuButtonHdFontScale;
         }
     }
     // The game list's R / F5 as its Refresh button.
@@ -319,7 +325,7 @@ void Menus::enter(State s)
         slide(kMainBottom, {0, 510}, {0, -20}, {0, 40});
         for (const auto id : {kSolo, kMultiplay, kSoloQuest, kIntro, kCredits}) {
             if (gui::Window* button = screen_->find(id)) {
-                button->hdFontScale = 1.25f;
+                button->hdFontScale = kMenuButtonHdFontScale;
             }
         }
         if (gui::Window* modes = screen_->find(kSoloQuest)) {
@@ -337,7 +343,7 @@ void Menus::enter(State s)
         });
         for (const auto id : {kWestwoodOnline, kNetwork}) {
             if (gui::Window* button = screen_->find(id)) {
-                button->hdFontScale = 1.25f;
+                button->hdFontScale = kMenuButtonHdFontScale;
             }
         }
         slide(kOnlineTop, {0, -240}, {0, 20}, {0, -40});
@@ -353,8 +359,8 @@ void Menus::enter(State s)
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
         for (const auto id : {kCharNew, kCharLoad, kCharDelete}) {
             if (gui::Window* button = screen_->find(id)) {
-                button->hdFontScale = 1.15f;
-                button->bitmapFontScale = 0.85f;
+                button->hdFontScale = kCharacterButtonHdFontScale;
+                button->bitmapFontScale = kCompactBitmapFontScale;
             }
         }
         if (gui::Window* lists = screen_->find(kCharLists)) {
@@ -389,10 +395,10 @@ void Menus::enter(State s)
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -460}, {0, 20}, {0, -40}));
         if (gui::Window* button = screen_->find(kClassAccept)) {
-            button->hdFontScale = 1.25f;
+            button->hdFontScale = kMenuButtonHdFontScale;
         }
         if (gui::Window* description = screen_->find(kClassText)) {
-            description->bitmapFontScale = 0.85f;
+            description->bitmapFontScale = kCompactBitmapFontScale;
         }
         chosenClass_ = -1;
         for (std::int32_t id = kClassFirst; id <= kClassLast; ++id) {
@@ -415,14 +421,15 @@ void Menus::enter(State s)
             return shellSound(message) && message == gui::Clicked && onSelColor(from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
-        for (const auto id : {710, 711, 712, 713, 714, 715, 716, 717, 750, 751}) {
+        for (const auto id : {kSkinLabel, kHairLabel, kMustacheLabel, kGoateeLabel, kBeardLabel,
+                              kPantsLabel, kShirtLabel, kShoesLabel, kNameLabel, kNameEntry}) {
             if (gui::Window* label = screen_->find(id)) {
-                label->hdFontScale = 1.1f;
-                label->bitmapFontScale = 0.9f;
+                label->hdFontScale = kCharacterLabelHdFontScale;
+                label->bitmapFontScale = kCharacterLabelBitmapFontScale;
             }
         }
         if (gui::Window* button = screen_->find(kColorAccept)) {
-            button->hdFontScale = 1.25f;
+            button->hdFontScale = kMenuButtonHdFontScale;
         }
         setupSelColor();
         setBackText("OptsBack.wnd:Back");
@@ -465,7 +472,7 @@ void Menus::enter(State s)
         optsBack_->show(false);
         for (const auto id : {kHost, kHostQuest, kList, kFilters, kRefresh, kFind, kWorldBack, kJoin}) {
             if (gui::Window* button = screen_->find(id)) {
-                button->hdFontScale = 1.25f;
+                button->hdFontScale = kMenuButtonHdFontScale;
             }
         }
         for (const auto id : {kWorldListPanel, kWorldGameList, kWorldMap, kWorldMapQuads}) {
@@ -912,7 +919,7 @@ void Menus::setupLogin()
     screen_->draw = [this](gui::Window& w, gui::Painter& painter) {
         gui::Resources textResources = gui_.resources();
         textResources.hdMenuFont = nullptr;
-        textResources.bitmapFontScale = 0.8f;
+        textResources.bitmapFontScale = kLoginHelpBitmapFontScale;
         const SDL_FRect origin = painter.toOutput(0, 0, 0, 0);
         gui::Painter p(painter.renderer(), textResources, painter.scale(), origin.x, origin.y);
         const SDL_Point pos = w.screenPos();

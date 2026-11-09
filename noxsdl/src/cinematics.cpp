@@ -4,6 +4,7 @@
 #include "cinematics.hpp"
 
 #include "console.hpp"
+#include "menu_font_sizes.hpp"
 #include "menu_rules.hpp"
 
 #include "noxcore/client/movies.hpp"
@@ -19,6 +20,11 @@
 namespace noxsdl {
 
 namespace {
+
+constexpr float kCreditsHdFontScale = 1.35f;
+// Chapter labels use blank lines for placement; enlarge glyphs without changing those gaps.
+constexpr float kChapterTitleHdFontScale = 1.275f;
+constexpr float kBriefingHdFontScale = 1.5f;
 
 constexpr int kFadeFrames = 25; ///< client_getIntroScreenDuration, and the server's fades
 constexpr int kMusicBriefing = 50; ///< the briefing music's volume
@@ -832,7 +838,7 @@ void Cinematics::showBriefing(int chapter, int variant, int questMode)
     // 0 for the others: briefingFrame).
     gui::Painter p(nullptr, res_, 640, 480);
     if (chapter == 0xFF) {
-        p.setHdFontScale(1.35f);
+        p.setHdFontScale(kCreditsHdFontScale);
     }
     const int fh = p.fontHeight(true);
     brief_.height = p.textHeight(brief_.text, true, 480);
@@ -1009,11 +1015,11 @@ void Cinematics::drawBriefing(SDL_Renderer* renderer, int width, int height)
     gui::Painter p(renderer, res_, width, height);
     const int chapterLineHeight = p.fontHeight(true); // blank lines position the chapter labels
     if (brief_.chapter == 0xFF) {
-        p.setHdFontScale(1.35f);
+        p.setHdFontScale(kCreditsHdFontScale);
     } else if (brief_.chapter < 0xFE && brief_.variant == 1) {
-        p.setHdFontScale(1.275f);
+        p.setHdFontScale(kChapterTitleHdFontScale);
     } else if (brief_.questMode == 0 || brief_.questMode == 2) {
-        p.setHdFontScale(1.5f);
+        p.setHdFontScale(kBriefingHdFontScale);
     }
     if (!brief_.image.empty()) {
         p.image(brief_.image, 0, 0);
@@ -1491,8 +1497,8 @@ void Cinematics::openLoadMenu()
         }
         for (const auto id : {kSave, kLoad, kCancel}) {
             if (gui::Window* button = loadMenu_->find(id)) {
-                button->hdFontScale = 1.15f;
-                button->bitmapFontScale = 0.85f;
+                button->hdFontScale = kCharacterButtonHdFontScale;
+                button->bitmapFontScale = kCompactBitmapFontScale;
             }
         }
         if (gui::Window* lists = loadMenu_->find(kLists)) {
@@ -1784,7 +1790,7 @@ void Cinematics::dialog(DialogParent parent, const std::string& title, const std
     }
     for (const auto id : {kDlgTitle, kDlgText, kDlgOk, kDlgCancel, kDlgYes, kDlgNo}) {
         if (gui::Window* label = dialog_->find(id)) {
-            label->hdFontScale = 1.5f;
+            label->hdFontScale = kDialogHdFontScale;
         }
     }
     if (gui::Window* t = dialog_->find(kDlgTitle)) {

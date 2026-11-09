@@ -1,6 +1,7 @@
 // The input configuration window (input_config_window.hpp): one row per control with its two keys,
 // a cell clicked waits for a key or button, and Back writes the bindings back.
 #include "input_config_window.hpp"
+#include "menu_font_sizes.hpp"
 
 #include "input.hpp"
 
@@ -12,6 +13,8 @@
 namespace noxsdl {
 
 namespace {
+
+constexpr float kCapturePromptHdFontScale = 1.25f;
 
 // InputCfg.wnd
 constexpr std::int32_t kList = 910, kTitles = 911, kFirst = 912, kSecond = 913;
@@ -55,11 +58,11 @@ void InputConfigWindow::open(const nox::config::Config& config)
     window_ = gui_.load(gameDir_ / "window" / "InputCfg.wnd", proc);
     for (const auto id : {kReset, kBack, kDefaults, kPickupLeft, kPickupLeft + 1, kPickupLeft + 2}) {
         if (gui::Window* button = window_->find(id)) {
-            button->bitmapFontScale = 0.85f;
+            button->bitmapFontScale = kCompactBitmapFontScale;
         }
     }
     if (gui::Window* prompt = window_->find(kPopupText)) {
-        prompt->hdFontScale = 1.25f;
+        prompt->hdFontScale = kCapturePromptHdFontScale;
     }
     // The three columns tell their parent list (910), which the window's procedure stands in for.
     if (gui::Window* list = window_->find(kList)) {

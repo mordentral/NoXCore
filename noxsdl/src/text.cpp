@@ -2,7 +2,7 @@
 // measuring, wrapping and drawing of UTF-8 text with them.
 #include "text.hpp"
 
-#include "content/font_palette.hpp"
+#include "noxcore/video/bitmap_font.hpp"
 #include "noxcore/io/file.hpp"
 
 #include <stb_truetype.h>
@@ -31,7 +31,7 @@ constexpr int kPadding = 1; ///< between glyphs, so linear sampling never bleeds
 
 struct Font::Info {
     stbtt_fontinfo font{};
-    std::optional<videotools::content::BitmapFont> bitmap;
+    std::optional<nox::video::BitmapFont> bitmap;
     float capHeight = 7;
 };
 
@@ -84,7 +84,7 @@ Font::Font(SDL_Renderer* renderer, std::vector<std::uint8_t> data, std::string n
     : renderer_(renderer), data_(std::move(data)), name_(std::move(name)), info_(std::make_unique<Info>())
 {
     if (format == Format::NoxBitmap) {
-        info_->bitmap = videotools::content::BitmapFont::parse(data_);
+        info_->bitmap = nox::video::BitmapFont::parse(data_);
         const auto& b = *info_->bitmap;
         if (b.rows > 256 || b.stride > 32 || b.height > 256) {
             throw std::runtime_error("bitmap font dimensions are too large");

@@ -30,6 +30,8 @@ namespace st = nox::gui::status;
 
 namespace {
 
+constexpr float kModeListHdFontScale = 1.3f;
+
 constexpr std::int32_t kDlgCancel = 4002, kDlgTitle = 4005; // (dlg.wnd's)
 constexpr std::int32_t kCanvasId = 4200, kRowId = 4201, kOptionId = 4301, kButtonId = 4401;
 
@@ -299,7 +301,7 @@ void Menus::modeList(ModeListFor list)
     if (gui::Window* canvas = dialog_->find(kCanvasId)) {
         canvas->draw = [chosenRow, hosting](gui::Window& w, gui::Painter& painter) {
             gui::Painter p = painter;
-            p.setHdFontScale(1.3f);
+            p.setHdFontScale(kModeListHdFontScale);
             const SDL_Point pos = w.screenPos();
             for (const Column& c : kColumns) {
                 p.text(c.title, pos.x + c.x, pos.y + kHeaderY, false, kGold);
@@ -342,7 +344,7 @@ void Menus::modeList(ModeListFor list)
         if (gui::Window* w = dialog_->find(kRowId + i)) {
             w->draw = [state, i](gui::Window& win, gui::Painter& painter) {
                 gui::Painter p = painter;
-                p.setHdFontScale(1.3f);
+                p.setHdFontScale(kModeListHdFontScale);
                 const int row = state->scroll + i;
                 if (row >= static_cast<int>(state->rows.size())) {
                     return;
@@ -377,7 +379,7 @@ void Menus::modeList(ModeListFor list)
         if (gui::Window* w = dialog_->find(kOptionId + i)) {
             w->draw = [this, chosenRow, i](gui::Window& win, gui::Painter& painter) {
                 gui::Painter p = painter;
-                p.setHdFontScale(1.3f);
+                p.setHdFontScale(kModeListHdFontScale);
                 const Row* row = chosenRow();
                 if (!row || row->kind != Row::Kind::Mode || static_cast<std::size_t>(i) >= row->options.size()) {
                     return;
@@ -400,7 +402,7 @@ void Menus::modeList(ModeListFor list)
         if (gui::Window* w = dialog_->find(kButtonId + b)) {
             w->draw = [chosenRow, b, hosting](gui::Window& win, gui::Painter& painter) {
                 gui::Painter p = painter;
-                p.setHdFontScale(1.3f);
+                p.setHdFontScale(kModeListHdFontScale);
                 const SDL_Point pos = win.screenPos();
                 const bool held = (win.state & gui::kPressed) != 0;
                 const Row* row = chosenRow();
@@ -419,7 +421,7 @@ void Menus::modeList(ModeListFor list)
     if (gui::Window* t = dialog_->find(kDlgTitle)) {
         t->text = hosting ? "Host Custom" : "Game Modes";
         t->largeFont = true;
-        t->hdFontScale = 1.3f;
+        t->hdFontScale = kModeListHdFontScale;
     }
     // The keys: Up / Down (Home / End, Page Up / Down) move the choice, Enter starts it.
     dialogKeys_ = [state, choose, start](const SDL_KeyboardEvent& key) {
