@@ -183,7 +183,8 @@ std::string_view extraTooltip(std::int32_t id)
     case kSmoothItem + 4:
         return "Normally a 60 FPS lock in single-player. No interpolation.\n"
                "Draw when a server update arrives, including extra movement\n"
-               "updates (30-120 per second).";
+               "updates (30-120 per second).\n"
+               "Menus use their normal frame rate; this only affects gameplay.";
     case kDisplayLabel:
     case kDisplayBox:
         return "How the game is shown: in a window, filling the screen\n"
