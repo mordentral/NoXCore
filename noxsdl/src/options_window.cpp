@@ -181,12 +181,9 @@ std::string_view extraTooltip(std::int32_t id)
                "+ Every step shown evenly once, no added delay.\n"
                "- 30 frames a second.";
     case kSmoothItem + 4:
-        return "Normally 60 FPS in single-player with default settings.\n"
-               "Draw as each server update arrives, including movement\n"
-               "substeps: 30, 60, 90 or 120 updates per second.\n"
-               "+ No added interpolation delay.\n"
-               "Only affects gameplay; menus keep their normal frame rate.\n"
-               "VSync stays as selected and may limit the rate further.";
+        return "Normally a 60 FPS lock in single-player. No interpolation.\n"
+               "Draw when a server update arrives, including extra movement\n"
+               "updates (30-120 per second).";
     case kDisplayLabel:
     case kDisplayBox:
         return "How the game is shown: in a window, filling the screen\n"
