@@ -608,9 +608,7 @@ bool ServerTransport::sendReliable(std::uint8_t peer, std::span<const std::uint8
     try {
         it->second.stream.queueReliable(messages);
     } catch (const std::exception&) {
-        if (it->second.stream.queuedReliable() >= kMaxQueuedReliable) {
-            queueFull(peer, it->second);
-        }
+        queueFull(peer, it->second);
         return false;
     }
     return true;
@@ -618,6 +616,9 @@ bool ServerTransport::sendReliable(std::uint8_t peer, std::span<const std::uint8
 
 void ServerTransport::queueFull(std::uint8_t id, Peer& p)
 {
+    if (p.stream.queuedReliable() < kMaxQueuedReliable) {
+        return; // (refused for another reason: a packet too big)
+    }
     ++p.fullRefused;
     if (!log_ || (p.fullLogged && lastPoll_ - p.fullLoggedAt < kQueueFullLogMs)) {
         return;
@@ -646,9 +647,7 @@ bool ServerTransport::sendReliableNow(std::uint8_t peer, std::span<const std::ui
             sendPeer(it->second, std::move(d));
         }
     } catch (const std::exception&) {
-        if (it->second.stream.queuedReliable() >= kMaxQueuedReliable) {
-            queueFull(peer, it->second);
-        }
+        queueFull(peer, it->second);
         return false;
     }
     return true;

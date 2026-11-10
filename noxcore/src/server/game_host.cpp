@@ -1466,7 +1466,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     if (bytes.empty()) {
         return;
     }
-    if (const auto it = players_.find(peer); it != players_.end() && it->second.secondaryTell.armed) {
+    if (const auto it = players_.find(peer); it != players_.end() && it->second.secondaryTell.stage != HostedPlayer::SecondaryTell::Stage::Off) {
         secondaryTellHeard(it->second, bytes); // (noxcpp: a guest's wait on its read's tell)
     }
     const auto op = static_cast<net::Op>(bytes[0]);
@@ -4111,7 +4111,8 @@ void GameHost::takeSecondaryTold(HostedPlayer& p, ServerObject& unit)
     }
     unit.player->secondaryTold = false;
     if (soloGuest(p)) {
-        p.secondaryTell = {.armed = true, .since = server_.clock().frame()}; // (a read again: afresh)
+        // (a read again: afresh)
+        p.secondaryTell = {.stage = HostedPlayer::SecondaryTell::Stage::Waiting, .since = server_.clock().frame()};
     }
 }
 
@@ -4124,7 +4125,7 @@ void GameHost::secondaryTellQueued(HostedPlayer& p, std::span<const std::uint8_t
         takeSecondaryTold(p, *unit);
     }
     HostedPlayer::SecondaryTell& t = p.secondaryTell;
-    if (!t.armed) {
+    if (t.stage == HostedPlayer::SecondaryTell::Stage::Off) {
         return;
     }
     const auto seqs = transport_.reliableSeqs(p.peer);
@@ -4144,17 +4145,21 @@ void GameHost::secondaryTellHeard(HostedPlayer& p, std::span<const std::uint8_t>
     HostedPlayer::SecondaryTell& t = p.secondaryTell;
     // The transport's note of a new ack comes alone, ahead of its datagram's messages (if any).
     const bool ack = payload.size() == 2 && payload[0] == static_cast<std::uint8_t>(net::Op::Code38);
-    if (t.stage == Stage::Last || (ack && t.stage == Stage::Acked)) {
+    if (t.stage == Stage::Last) {
         t = {}; // (that datagram read: what comes now was sent after the tell was taken)
         return;
     }
     if (ack) {
         // Its ack is the next sequence it expects: past the tell's packet, it has it.
-        if (t.seq && static_cast<std::uint8_t>(payload[1] - *t.seq - 1) < 0x80u) {
+        if (t.stage == Stage::Waiting && t.seq && static_cast<std::uint8_t>(payload[1] - *t.seq - 1) < 0x80u) {
             t.stage = Stage::Acked;
         }
-    } else if (t.stage == Stage::Acked) {
-        t.stage = Stage::Last; // (a stock client's answer to the drops is among these)
+    } else if (t.stage == Stage::Acked && payload[0] != static_cast<std::uint8_t>(net::Op::Code37)) {
+        // The first game messages since: a stock client's answer to the drops is among these. (The
+        // ack may come first in a datagram with none, its ping's or its 0x09 answer to our echo, sent
+        // as soon as the echo arrives: the answer then comes in its next datagram, whatever that one
+        // acknowledges. The transport's note of its ping isn't one of its messages.)
+        t.stage = Stage::Last;
     }
 }
 
@@ -4162,7 +4167,7 @@ bool GameHost::secondaryOutOfDate(HostedPlayer& p, ServerObject& unit)
 {
     takeSecondaryTold(p, unit);
     HostedPlayer::SecondaryTell& t = p.secondaryTell;
-    if (!t.armed) {
+    if (t.stage == HostedPlayer::SecondaryTell::Stage::Off) {
         return false;
     }
     // (Waiting on a tell held for it while it loads has no end but its CLIENT_READY's.)

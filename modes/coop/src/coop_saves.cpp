@@ -678,7 +678,7 @@ void CoopDirector::wearAgain(Member& m, server::ServerObject& unit)
     for (const server::ObjectKey e : worn) {
         // Still its own, not worn (nor one it's put on itself since), of its class.
         server::ServerObject* o = w.byExtent(e);
-        if (!o || o->gone() || o->pendingDelete || (o->flags & server::ObjFlag::Destroyed) || o->holder != unit.extent ||
+        if (!o || o->gone() || o->pendingDelete || o->holder != unit.extent ||
             (o->flags & server::ObjFlag::Equipped) || !items.classMay(unit, *o)) {
             continue;
         }

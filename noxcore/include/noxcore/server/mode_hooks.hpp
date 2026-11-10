@@ -340,7 +340,8 @@ struct ModeHooks {
     /// Told: a player's .plr read (its Inventory section: the host's file, a guest's upload, a
     /// mode's own load), its worn list worn again as the game does (each by its strength at the
     /// level the file's experience gave it: one it isn't strong enough for stays carried). `worn`:
-    /// the things the list named, in its order, by key (what it carries now). Every player's.
+    /// the things the list named, in its order, by key (what it carries now; empty, nothing worn).
+    /// Every player's, every read with its Inventory's contents.
     virtual void wornRead(World& world, ServerObject& player, std::span<const std::uint32_t> worn)
     {
         (void)world;

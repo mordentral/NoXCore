@@ -282,9 +282,9 @@ private:
         std::uint32_t fullLoggedAt = 0;
         bool fullLogged = false;
     };
-    /// (noxcpp's) A reliable send to `id` refused, its queue full (kMaxQueuedReliable
-    /// unacknowledged): told in the log with the peer's name and stream, at most once a
-    /// kQueueFullLogMs. The client isn't dropped; nothing else changes.
+    /// (noxcpp's) A reliable send to `id` refused: when its queue is full (kMaxQueuedReliable
+    /// unacknowledged), told in the log with the peer's name and stream, at most once a
+    /// kQueueFullLogMs; refused otherwise, nothing. The client isn't dropped; nothing else changes.
     void queueFull(std::uint8_t id, Peer& p);
     /// For a stream awaiting its CLIENT_ACCEPT (its reliable packet in order, or a
     /// header with a new ack): the streams past the player limit, this one closed; else a packet

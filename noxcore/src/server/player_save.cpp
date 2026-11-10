@@ -75,6 +75,13 @@ bool solo(const World& world) { return (world.gameFlags & GameFlag::Solo) != 0; 
 bool quest(const World& world) { return (world.gameFlags & GameFlag::Quest) != 0; }
 bool network(const World& world) { return (world.gameFlags & GameFlag::Network) != 0; }
 
+/// (noxcpp) A solo game's guest: a player below the host's 0x1F (Options::soloGuests, a co-op
+/// campaign's). In a solo game alone the one player is the host.
+bool soloGuest(const World& world, const ServerObject& unit)
+{
+    return solo(world) && unit.player && (unit.player->index & 31u) != 0x1F;
+}
+
 /// The inventory's, field guide's and spellbook's "has": not in a network game but a quest.
 bool hasBook(const World& world) { return !(network(world) && !quest(world)); }
 
@@ -234,6 +241,7 @@ std::optional<std::vector<std::uint8_t>> writeInventory(Fight& fight, ServerObje
             return nullptr;
         };
         const HostClient::InventoryWindow window = world.hostClient ? world.hostClient->inventoryWindow() : HostClient::InventoryWindow{};
+        const bool guest = soloGuest(world, unit);
         std::size_t count = 0;
         // Count what will be written, to see whether the host's window lists every one of them.
         for (const ServerObject* o : held) {
@@ -243,7 +251,7 @@ std::optional<std::vector<std::uint8_t>> writeInventory(Fight& fight, ServerObje
         }
         // (noxcpp: the host's own window is the host's things; a solo game's guest's are listed as
         // held. In a solo game alone the one player is the host: as the exe.)
-        if (solo(world) && window.cells.size() == count && unit.player && (unit.player->index & 31u) == 0x1F) {
+        if (solo(world) && !guest && window.cells.size() == count) {
             // Every one in the host's window: in its cells' order. One not held
             // fails the section.
             for (const std::uint16_t nc : window.cells) {
@@ -276,7 +284,6 @@ std::optional<std::vector<std::uint8_t>> writeInventory(Fight& fight, ServerObje
             const ServerObject* o = nc != 0 ? byNetCode(nc) : nullptr;
             return o ? static_cast<std::uint32_t>(o->scriptId) : 0u;
         };
-        const bool guest = solo(world) && unit.player && (unit.player->index & 31u) != 0x1F;
         c.secondaryWeapon = scriptIdOf(guest ? p.secondaryWeapon : window.secondaryWeapon);
         c.lastQuiver = scriptIdOf(guest ? p.lastQuiver : window.lastQuiver);
         c.trapCount = p.curTraps; // (CurTraps)
@@ -689,6 +696,7 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
     World& world = fight.world;
     ServerObject& unit = L.unit;
     PlayerControl& p = *unit.player;
+    const bool guest = soloGuest(world, unit);
     Items items{world, *fight.things, fight.modifiers, fight.rng, fight.frame};
     levelByExperience(world, unit);
     const std::uint16_t version = r.u16();
@@ -771,8 +779,9 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
                 }
             }
         }
-        // The worn list told to a mode (noxcpp: what the file had worn, in its order, held now).
-        if (world.modeHooks && !wornHeld.empty()) {
+        // The worn list told to a mode (noxcpp: what the file had worn, in its order, held now; an
+        // empty list when it had nothing worn, so a list from an earlier read isn't kept).
+        if (world.modeHooks) {
             world.modeHooks->wornRead(world, unit, wornHeld);
         }
         // A solo game's: the host's inventory window's secondary weapon and quiver cleared
@@ -780,14 +789,14 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         // (MSG_REPORT_SECONDARY_WEAPON 0xE0, netMsgLastQuiver 0xE1). (noxcpp: the host's own load
         // alone; a solo game's guest's leaves the host's window as it is, its own client told below.
         // In a solo game alone the one player is the host: as the exe.)
-        if (solo(world) && world.hostClient) {
-            if (unit.player && (unit.player->index & 31u) == 0x1F) {
-                world.hostClient->clearInventoryWeapons();
-            }
-            if (unit.player) {
-                unit.player->secondaryWeapon = 0;
-                unit.player->lastQuiver = 0;
-            }
+        if (solo(world) && world.hostClient && !guest) {
+            world.hostClient->clearInventoryWeapons();
+        }
+        // (noxcpp: the server's record of them, none till the tells below set them: with a host's
+        // client, and always for a guest, whose own client is told to clear any the file has none of.)
+        if ((solo(world) && world.hostClient) || guest) {
+            p.secondaryWeapon = 0;
+            p.lastQuiver = 0;
         }
         const auto findById = [&](std::int32_t id) -> ServerObject* {
             for (const std::uint32_t e : unit.inventory) {
@@ -826,19 +835,17 @@ void readInventory(Load& L, ByteReader& r, std::span<const std::uint8_t> section
         // and MSG_REPORT_LAST_QUIVER with none, which its client takes as a clear. Else its window
         // kept the old net codes at a re-read: the host's load, a rejoin. A file naming them is told
         // them, as above.)
-        if (solo(world) && unit.player && (unit.player->index & 31u) != 0x1F) {
+        if (guest) {
             if (!secondaryTold) {
                 tell(world, unit, {0xE0, 0, 0, 0});
-                unit.player->secondaryWeapon = 0;
             }
             if (!quiverTold) {
                 tell(world, unit, {0xE1, 0, 0});
-                unit.player->lastQuiver = 0;
             }
             // (Its client takes the tell silently, and a stock client has meanwhile answered the
             // drop above of the one it had marked with 0xE0 none: the host counts no 0xE0 of its
             // client's sent before the tell reached it, GameHost's secondaryTell.)
-            unit.player->secondaryTold = true;
+            p.secondaryTold = true;
         }
         // A quest's things numbered afresh (and their Extent their net code: ours already is).
         if (quest(world)) {

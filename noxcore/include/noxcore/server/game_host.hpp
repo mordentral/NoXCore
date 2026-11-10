@@ -196,18 +196,19 @@ struct HostedPlayer {
     /// the client) and isn't counted. A stock client answers the read's drop of the one it had
     /// marked with 0xE0 none, then takes the tell without a word: counted, the server would keep
     /// none while the client shows the file's. Over once the client has acknowledged the reliable
-    /// packet carrying the tell, the messages of the datagram that first says so included (a stock
-    /// client's answer comes in the same datagram as that acknowledgement).
+    /// packet carrying the tell, the messages of the first datagram with game messages from then on
+    /// included (a stock client's answer comes in the same datagram as that acknowledgement, or in
+    /// the next when a ping's datagram carried the acknowledgement first).
     struct SecondaryTell {
         enum class Stage : std::uint8_t {
-            Waiting, ///< the packet not acknowledged yet
-            Acked,   ///< acknowledged by the datagram being read (its messages come next)
-            Last,    ///< that datagram's messages being read: over at the next
+            Off,     ///< no tell waited on: its 0xE0s count
+            Waiting, ///< the tell not queued yet (`seq` none), or its packet not acknowledged yet
+            Acked,   ///< acknowledged: the next game messages (that datagram's, or a later one's) still waited on
+            Last,    ///< those messages being read: over at the next payload
         };
-        bool armed = false;
+        Stage stage = Stage::Off;
         std::optional<std::uint8_t> seq; ///< the reliable packet carrying the tell, once it's queued
-        Stage stage = Stage::Waiting;
-        std::uint32_t since = 0; ///< the frame it was armed, or the tell queued (a stop: kSecondaryTellFrames)
+        std::uint32_t since = 0; ///< the frame it began, or the tell queued (a stop: kSecondaryTellFrames)
     };
     SecondaryTell secondaryTell;
 };
@@ -1110,7 +1111,7 @@ private:
     std::vector<std::uint8_t> useMapBytes(std::uint32_t frame, bool guest = false) const;
     /// (noxcpp) A solo game's guest (Options::soloGuests): not the host's slot 0x1F.
     bool soloGuest(const HostedPlayer& p) const;
-    /// (noxcpp) HostedPlayer::secondaryTell: a read's tell taken from its unit (armed, a guest's
+    /// (noxcpp) HostedPlayer::secondaryTell: a read's tell taken from its unit (waited on, a guest's
     /// alone); the tell `m` queued for it (`queued`: the transport took it) or not; one of its
     /// payloads in order (the transport's ack note, 0x26, or its messages); and whether its 0xE0
     /// now is out of date (not counted).
