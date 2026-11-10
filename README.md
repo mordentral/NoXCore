@@ -13,6 +13,8 @@ original game is included.
 - **Everything it adds:** https://noxhub.net/features.html
 - **What changed lately:** https://noxhub.net/patch-notes.html
 - **Video walkthroughs** (map editor, scripting, mods): https://noxhub.net/walkthroughs.html
+- **macOS:** a community-maintained fork by Avrutskiy, with its own builds and support:
+  https://github.com/Avrutskiy/NoXCore-Mac
 
 > You need your own copy of Nox (GOG, Origin or the original CD). NoX Core contains none of the
 > game's art, sound, music, maps or text; it reads them from your installed game when it runs.
