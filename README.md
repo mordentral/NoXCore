@@ -67,6 +67,12 @@ current folder, then the usual GOG, Origin and CD installs (on Linux, the usual 
 Heroic prefixes). Point it at another copy with `--game-dir DIR` or the `NOX_DATA` environment
 variable. The folder it chose, and why, is written to `noxcore-log.txt` beside the program.
 
+**Saved servers:** Network Game's **Add/Remove** saves a hostname or IPv4 address (optional
+`:port`, 18590 by default) to `servers.txt` in the game folder, or removes one. The list pings
+them on every refresh, beside the LAN's games; one that doesn't answer stays listed ("No response")
+and can still be joined. `servers.txt` beside the program is read as well; one address per line,
+`#` starts a comment.
+
 ## What's in this repository
 
 | Folder | What it holds |

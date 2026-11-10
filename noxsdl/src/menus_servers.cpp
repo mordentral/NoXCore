@@ -201,7 +201,7 @@ void Menus::serverDialog()
     dialog_->find(kTitle)->rect = {5, 6, kDialogWidth - 10, 20};
     auto* entry = dialog_->find(kEntry);
     entry->rect = kInputRect; entry->entryMax = 260; entry->largeFont = false;
-    std::get<nox::gui::EntryFieldData>(entry->data).width = kInputRect.w;
+    std::get<nox::gui::EntryFieldData>(entry->data).width = static_cast<std::uint16_t>(kInputRect.w);
     entry->tooltip = "Hostname or IPv4 address, optional :port (default 18590)";
     dialog_->find(kOk)->rect = {kActionX, kInputRect.y, kButtonWidth, kButtonHeight}; dialog_->find(kOk)->text = "Add";
     dialog_->find(kRemove)->text = "Remove";

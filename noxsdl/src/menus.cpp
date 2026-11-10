@@ -1144,7 +1144,7 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
     infoStatus_ = BrowserScreen::statusText(entry);
     const bool saved = browser_.isSaved(entry);
     if (auto* join = box->find(kJoin)) {
-        gui::setGreyed(join, !entry.answered);
+        gui::setGreyed(join, entry.unresolved); // (an unanswered server may still be joined)
     }
     const auto& g = entry.game;
     const nox::gui::Color plain = list->textColor;
@@ -1727,10 +1727,10 @@ void Menus::fillCharacterList()
 
 void Menus::chooseCharacter(const std::string& host)
 {
+    // (only a listed name that didn't resolve can't be joined; an unanswered server may)
     if (!host.starts_with('@')) {
-        const auto* entry = browser_.entryFor(host);
-        if (!entry || !entry->answered) {
-            browser_.setMessage("Server has not replied. Refresh to try again.");
+        if (const auto* entry = browser_.entryFor(host); entry && entry->unresolved) {
+            browser_.setMessage("Address not found. Refresh to try again.");
             return;
         }
     }

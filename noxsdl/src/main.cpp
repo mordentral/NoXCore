@@ -1390,9 +1390,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             if (!app->font) {
                 throw std::runtime_error("the server browser needs a font");
             }
+            // servers.txt: the settings folder's (where Add/Remove saves) and the one beside the exe.
             const char* base = SDL_GetBasePath();
-            app->browser = std::make_unique<BrowserScreen>(*app->font, opts.browserOptions,
-                                                           serverListPaths(gameDir, base ? fs::path(base) : fs::path{}));
+            app->browser = std::make_unique<BrowserScreen>(
+                *app->font, opts.browserOptions,
+                serverListPaths(backend::settingsDirectory(gameDir), base ? fs::path(base) : fs::path{}));
             // The game's menus; --browse goes straight to the game list.
             Menus::Callbacks callbacks;
             callbacks.join = [app, xwis = opts.browserOptions.xwis, account = opts.profile.account](

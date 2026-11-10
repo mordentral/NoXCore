@@ -38,10 +38,10 @@ enum SourceBits : unsigned {
 
 struct ServerEntry {
     GameListing game;
-    // Original configured addresses, retained even after a reply supplies the game's name.
+    /// The servers.txt / --server lines that name it, kept after a reply gives the game's name.
     std::vector<std::string> listedAddresses;
-    bool checking = false;
-    bool unresolved = false;
+    bool checking = false;   ///< a ping to it is waiting for its answer ("Checking...")
+    bool unresolved = false; ///< a listed name that didn't resolve ("Address not found"; can't be joined)
     unsigned sources = 0;             ///< SourceBits
     std::optional<std::uint32_t> pingMs; ///< round trip of the discover ping, if it answered
     bool answered = false;            ///< the server replied to a ping (details are fresh)
@@ -114,6 +114,7 @@ private:
     void pollUdp(std::uint32_t nowMs);
     void startRefresh(std::uint32_t nowMs, const std::vector<GameListing>* xwisGames, bool keepXwisLogin);
     ServerEntry& upsert(std::uint32_t address, std::uint16_t port);
+    void markChecking(const net::Endpoint& to, bool on);
     void closeXwis(const std::string& why);
 
     Options options_;

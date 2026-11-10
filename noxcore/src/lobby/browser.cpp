@@ -97,6 +97,9 @@ void ServerBrowser::ping(const net::Endpoint& to, std::uint32_t nowMs, bool broa
     try {
         udp_->sendTo(to, w.data());
         pings_[token] = {to, nowMs, 1, broadcast};
+        if (!broadcast) {
+            markChecking(to, true);
+        }
         // Beside it, in its own datagram, the query only a noxcpp server answers (a stock one
         // drops it: extended.hpp).
         udp_->sendTo(to, encodeExtendedQuery(token));
@@ -224,15 +227,16 @@ void ServerBrowser::poll(std::uint32_t nowMs)
     }
     pollXwis(nowMs);
     pollUdp(nowMs);
-    // Index pending endpoints once, rather than scanning every ping for every row each frame.
-    std::set<net::Endpoint> pending;
-    for (const auto& [token, ping] : pings_) {
-        if (!ping.broadcast) {
-            pending.insert(ping.to);
+}
+
+// A listed server's "Checking...": on while a ping to it waits (ping), off once it answers or
+// its last try runs out (pollUdp). Only when a ping is sent or given up, never per frame.
+void ServerBrowser::markChecking(const net::Endpoint& to, bool on)
+{
+    for (auto& e : entries_) {
+        if (!e.unresolved && e.game.address == to.address && e.game.port == to.port) {
+            e.checking = on;
         }
-    }
-    for (auto& entry : entries_) {
-        entry.checking = !entry.unresolved && !entry.answered && pending.contains({entry.game.address, entry.game.port});
     }
 }
 
@@ -348,6 +352,7 @@ void ServerBrowser::pollUdp(std::uint32_t nowMs)
         e.sources = sources;
         e.pingMs = nowMs - p->second.sentAt;
         e.answered = true;
+        e.checking = false;
         if (!p->second.broadcast) {
             pings_.erase(p); // a broadcast collects every reply until it times out
         }
@@ -364,6 +369,8 @@ void ServerBrowser::pollUdp(std::uint32_t nowMs)
         }
         if (!p.broadcast && p.tries < kPingTries) {
             retry.push_back(p);
+        } else if (!p.broadcast) {
+            markChecking(p.to, false); // (its last try: "No response")
         }
         it = pings_.erase(it);
     }

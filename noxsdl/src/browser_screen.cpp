@@ -241,8 +241,10 @@ std::optional<std::string> BrowserScreen::joinSelected()
     if (selected_ < 0 || selected_ >= static_cast<int>(rows_.size())) {
         return std::nullopt;
     }
+    // A server that hasn't answered may still be joined (its ping lost, or still on its way);
+    // only a name that didn't resolve has no address to join.
     const auto& entry = rows_[static_cast<std::size_t>(selected_)];
-    if (!entry.answered) {
+    if (entry.unresolved) {
         message_ = statusText(entry) + ". Refresh to try again.";
         return std::nullopt;
     }
