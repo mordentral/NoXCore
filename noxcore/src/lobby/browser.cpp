@@ -204,13 +204,12 @@ void ServerBrowser::startRefresh(std::uint32_t nowMs, const std::vector<GameList
         for (auto& line : xwisSocket_->takeLog()) {
             log_.push_back(std::move(line));
         }
-        if (xwisSocket_->state() == net::TcpSocket::State::Failed) {
-            closeXwis("XWIS: " + xwisSocket_->error());
-        } else {
-            xwis_.emplace(nick, options_.xwisPassword);
-            xwisStartedAt_ = nowMs;
-            log_.push_back("XWIS: logging in as " + nick);
-        }
+        // The login starts whatever the connection's state: one that failed at once (a refused
+        // loopback connect fails before connect returns on Linux, a moment later on Windows) is
+        // closed by the next poll, with its reason, the same on every system.
+        xwis_.emplace(nick, options_.xwisPassword);
+        xwisStartedAt_ = nowMs;
+        log_.push_back("XWIS: logging in as " + nick);
     }
 }
 
