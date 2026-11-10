@@ -421,6 +421,7 @@ void createMonster(ServerObject& o, const things::MonsterDef* def, std::uint32_t
         }
     }
     if (def) {
+        o.experience = static_cast<float>(def->experience);
         o.maxHealth = o.health = static_cast<std::uint16_t>(def->health);
         o.speedBase = o.speedCur = static_cast<float>(def->speed) * 0.03125f;  // monster.bin's speed / 32
         m.retreatLevel = def->retreatRatio;
