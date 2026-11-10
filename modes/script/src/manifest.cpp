@@ -150,6 +150,7 @@ ManifestResult readManifest(std::string_view text_)
         }
         m.clientKeys = flag(doc, "clientKeys", false);
         m.noMapRespawns = !flag(doc, "mapRespawns", true);
+        m.noMapStartInvulnerable = !flag(doc, "mapStartInvulnerable", true);
         const std::string levels = text(doc, "levels", "mapFiles", 16);
         if (levels != "mapFiles" && levels != "generated") {
             throw Bad{"\"levels\" is \"mapFiles\" or \"generated\""};

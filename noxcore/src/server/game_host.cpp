@@ -174,6 +174,7 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
                        .pickupAnyClass = options_.pickupAnyClass,
                        .pickupDuplicates = options_.pickupDuplicates,
                        .noMapRespawns = options_.noMapRespawns,
+                       .noMapStartInvulnerable = options_.noMapStartInvulnerable,
                        .exactMaths = options_.exactMaths})
     , transport_({.maxPlayers = options_.solo ? 1 + options_.soloGuests : options_.maxPlayers, .password = options_.password})
 {

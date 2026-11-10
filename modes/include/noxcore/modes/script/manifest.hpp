@@ -16,6 +16,9 @@
 //                                        client's secret for it in its own folder (false: none)
 //     "mapRespawns": false,              nothing its maps put in respawns (a barrel broken, a potion
 //                                        drunk, a weapon taken stay gone; true, the default: as the game)
+//     "mapStartInvulnerable": false,     a map's start leaves its players open to harm (true, the
+//                                        default: as the game, everyone in play invulnerable till it
+//                                        attacks or casts); the 5 s of a ready and a respawn kept
 //     "gameplay": {"teamDamage": false}, the host's team options it pins for the game: any of
 //                                        "teamDamage", "autoAssign", "teamPlay" (gameplay flags
 //                                        1, 2, 4), each kept as given (none: the host's)
@@ -73,6 +76,8 @@ struct Manifest {
     bool clientKeys = false;
     /// mode.json's "mapRespawns": false (GameHost::Options::noMapRespawns).
     bool noMapRespawns = false;
+    /// mode.json's "mapStartInvulnerable": false (GameHost::Options::noMapStartInvulnerable).
+    bool noMapStartInvulnerable = false;
     /// mode.json's "pickup" (GameHost::Options::pickupAnyClass / pickupDuplicates).
     bool pickupAnyClass = false;
     bool pickupDuplicates = false;

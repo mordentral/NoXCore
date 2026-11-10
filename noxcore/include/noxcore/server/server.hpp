@@ -116,6 +116,10 @@ public:
         /// A mode's (mode.json's "mapRespawns": false): nothing a map puts in goes on the respawn
         /// list (World::respawns), so its things stay gone once used, taken or broken. Off: as the game.
         bool noMapRespawns = false;
+        /// A mode's (mode.json's "mapStartInvulnerable": false): a network map's start leaves its
+        /// players as they are, none made invulnerable till it attacks or casts. The timed
+        /// invulnerability of a CLIENT_READY and a respawn (5 s) stays. Off: as the game.
+        bool noMapStartInvulnerable = false;
         /// The game's own float rounding for the server's figuring: towards zero, as its x87 chops
         /// (util::RoundingScope at each entry: the map loads and the frames); off, to nearest
         /// (VD-37): the same code, the old last bits.

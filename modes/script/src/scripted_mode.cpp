@@ -4814,6 +4814,9 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
     o.pickupDuplicates = o.pickupDuplicates || impl.package->manifest.pickupDuplicates;
     // A mod whose maps' things stay gone (mode.json's "mapRespawns": false).
     o.noMapRespawns = o.noMapRespawns || impl.package->manifest.noMapRespawns;
+    // A mod whose maps' starts make no one invulnerable till it attacks (mode.json's
+    // "mapStartInvulnerable": false); a ready's and a respawn's 5 s kept.
+    o.noMapStartInvulnerable = o.noMapStartInvulnerable || impl.package->manifest.noMapStartInvulnerable;
     // A mod's client keys (mode.json's "clientKeys"): the host's realm, kept beside its store (a
     // pool's games share it); none without a store's folder.
     if (impl.package->manifest.clientKeys && !impl.ctx.modData.empty()) {

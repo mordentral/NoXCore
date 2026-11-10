@@ -1300,14 +1300,16 @@ void Server::tickEnd()
         if ((mapInitPending_ || mapEntryPending_) && !world_.playerUnits().empty()) {
             // (the map's start, its players in): the screen fades in (MSG_FADE_BEGIN
             // {1, 1}), a quest's briefing instead (quest.hpp's questMapStart); in a network game
-            // but a chat one everyone in play is INVULNERABLE for good (till it attacks).
+            // but a chat one everyone in play is INVULNERABLE for good (till it attacks); a mode's
+            // Options::noMapStartInvulnerable leaves that out (a ready's and a respawn's 5 s are
+            // their own, kept).
             if (!world_.quest()) {
                 world_.broadcasts().push_back({{0xE4, 1, 1}, true, 0});
             } else {
                 Fight f{world_, rng_, next, &things_, options_.modifiers};
                 questMapStart(f);
             }
-            if (world_.network() && !(world_.gameFlags & GameFlag::Chat)) {
+            if (world_.network() && !(world_.gameFlags & GameFlag::Chat) && !options_.noMapStartInvulnerable) {
                 for (auto& [extent, o] : world_.objects()) {
                     // (not the host's own, slot 0x1F: its index isn't 0x1F)
                     if (o.player && o.player->index != 0x1F && !(o.player->statusFlags & 1u)) {

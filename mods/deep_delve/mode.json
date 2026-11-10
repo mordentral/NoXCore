@@ -11,6 +11,7 @@
   "mapPrefix": "DD",
   "clientKeys": true,
   "mapRespawns": false,
+  "mapStartInvulnerable": false,
   "ui": "ui/main.luau",
   "uiApi": 5,
   "gameplay": { "teamDamage": false, "autoAssign": false, "teamPlay": false },

@@ -425,6 +425,10 @@ public:
         /// noxcpp (a mode's: mode.json's "mapRespawns": false): no map thing respawns
         /// (Server::Options::noMapRespawns).
         bool noMapRespawns = false;
+        /// noxcpp (a mode's: mode.json's "mapStartInvulnerable": false): a map's start makes no
+        /// one invulnerable till it attacks; the 5 s of a ready and a respawn kept
+        /// (Server::Options::noMapStartInvulnerable).
+        bool noMapStartInvulnerable = false;
         /// noxcpp (a mode's: mode.json's "pickup"): players pick up what their class can't use
         /// (never wearing it), and seconds under server option 2 (World::pickupAnyClass,
         /// World::pickupDuplicates).
