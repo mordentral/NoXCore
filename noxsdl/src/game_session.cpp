@@ -563,7 +563,7 @@ void startCinematics(App& app)
         if (app.book) {
             app.book->particles.clear();
             if (app.book->isOpen()) {
-                app.book->hide();
+                app.book->hide(true); // (an open book's put back to the list's first page)
             }
         }
     };

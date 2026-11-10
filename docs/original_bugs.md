@@ -2121,6 +2121,19 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   scripts' text). The original client still shows its "?" for the same message; ASCII lines are
   unchanged byte for byte. Mode plugins plan 12.1n.
 
+### OB-426: The spell book's list can come back without its forward arrow
+- **Where:** the book's arrows are windows of their own, shown and hidden as the book turns. The
+  page's drawing hides the forward arrow on an entry's page at or past the last listed entry (its
+  last spell, ability or creature, or an unlisted spell's page after an award). Turning to a page,
+  either arrow and the tabs show it again; the reset to the list that a revoke, a quest's
+  briefing screens and a solo save do when they close an open book doesn't.
+- **Effect:** after one of those closes the book from such a page, the book opens on the list's
+  first page with no arrows at all (the back arrow is hidden there as usual): a list longer than
+  a page can't be turned until an entry is opened or a tab is clicked.
+- **Ours:** not reproduced; the owner's call. Spellbook works the arrows out from the page it is on
+  (`bookpages::forwardShown`, `noxsdl/src/book_pages.hpp`), so the list's first page always has
+  its forward arrow.
+
 ## Menus
 
 ### OB-189: The game list's description box takes a LAN game's last weapons from its map's name

@@ -1762,6 +1762,37 @@ The engine's logic is the exe's; these are where the output differs.
 - **Revert:** Options::servers left empty (no servers.txt); in Westwood Online's list,
   Options::lan off; Register's own screen back in place of Skip Login.
 
+### VD-70: XWIS's chat server: servserv's first match, xwis.net:4000 when servserv gives none
+
+- **Vanilla:** before a login the game asks WOLAPI for the server list with the SKU from the
+  registry (HKLM SOFTWARE\Westwood\Nox, SKU: 9472 on an English install), version 0x10004, the
+  nick and its encoded password, and a 30-second timeout. WOLAPI sends servserv.westwood.com:4005
+  its query (verchk, verchk, lobcount, whereto with the CD key from the registry, QUIT) and hands
+  the game the list once 607 ends it. The game offers the chat servers (605) whose name starts with
+  a digit and whose codes include its language (the SKU's low four bits) in a server-choice
+  window, the first one picked, and connects to the one chosen with a 30-second timeout. With
+  servserv out of reach, silent or listing none, the player gets an error and stays off line.
+  The chat login sends CVERS 11020 (WOLAPI 1.20), PASS, NICK, apgar, SERIAL with the CD key, USER,
+  `verchk <SKU> <version>` and `SETOPT 17,33` (others may find and page the player).
+- **Ours:** `lobby::XwisConnection` (noxcore/include/noxcore/lobby/servserv.hpp) sends the same query, always as
+  English Nox (SKU 9472) and with an empty CD key, and takes the first matching chat server
+  without a window. It waits 15 seconds for servserv; when servserv can't be looked up or reached,
+  doesn't answer in time, closes before 607 or names no chat server for the language, it connects
+  to xwis.net:4000 as before and logs why ("XWIS: servserv failed (...), using xwis.net:4000").
+  The chat login (lobby's `xwisLoginLines`) sends CVERS 11015, PASS, NICK, apgar and USER only:
+  no SERIAL, chat-server verchk or SETOPT.
+- **Why:** servserv first is the stock client's way in, which reached XWIS where xwis.net's own
+  address didn't (public issue #14, the owner's OK of 2026-11-10); the fallback keeps NoX Core
+  working wherever it worked before when servserv is down. 15 seconds keeps the screens
+  responsive. XWIS lists one chat server, so a choice window would only add a click. NoX Core
+  reads no CD key.
+- **Risk:** a servserv that names a server only for another language is passed over for
+  xwis.net:4000; a non-English player is seen as English. XWIS accepts the shorter login today;
+  without SETOPT the chat server's own find and page defaults apply to NoX Core players.
+- **Revert:** a server-choice window over `ServservSession::chatServers()`; no fallback
+  (`XwisRoute::fallback` failing); `kServservTimeoutMs` 30000; the stock lines in
+  `xwisLoginLines`.
+
 ## Server: memory safety
 
 ### VD-28: The map grid's point cell is clamped to the grid

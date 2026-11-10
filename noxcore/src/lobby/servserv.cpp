@@ -33,6 +33,26 @@ std::optional<unsigned> leadingNumber(std::string_view s)
     return value;
 }
 
+// A language code as the game reads it (atoi): leading white space skipped, a sign, the digits up to
+// the first other character; 0 when there are none.
+long codeNumber(std::string_view s)
+{
+    std::size_t i = 0;
+    while (i < s.size() && (s[i] == ' ' || (s[i] >= '\t' && s[i] <= '\r'))) {
+        ++i;
+    }
+    bool negative = false;
+    if (i < s.size() && (s[i] == '+' || s[i] == '-')) {
+        negative = s[i] == '-';
+        ++i;
+    }
+    long value = 0;
+    for (; i < s.size() && s[i] >= '0' && s[i] <= '9' && value < 1000000; ++i) {
+        value = value * 10 + (s[i] - '0');
+    }
+    return negative ? -value : value;
+}
+
 std::string hostAndPort(std::string_view host, std::uint16_t port)
 {
     return std::string(host) + ":" + std::to_string(port);
@@ -91,12 +111,13 @@ bool servesLanguage(const ChatServer& server, unsigned language)
     if (name.empty() || !std::isdigit(static_cast<unsigned char>(name.front()))) {
         return false;
     }
-    // The codes: up to the ':', split at the commas; each read as atoi would.
+    // The codes: up to the ':', split at the commas (an empty one skipped); each read as atoi
+    // would, so " 2" is 2 and "x" is 0.
     std::string_view codes = name.substr(0, name.find(':'));
     while (!codes.empty()) {
         const auto comma = codes.find(',');
         const std::string_view code = codes.substr(0, comma);
-        if (const auto n = leadingNumber(code); n && *n == language) {
+        if (!code.empty() && codeNumber(code) == static_cast<long>(language)) {
             return true;
         }
         if (comma == std::string_view::npos) {
