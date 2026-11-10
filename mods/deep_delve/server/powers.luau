@@ -510,8 +510,9 @@ local function storm(id: number, e: any, def: any, x: number, y: number)
 	end)
 end
 
--- A powered monster of the mod's died (monsters.killed, its entry already out of the index): its
--- timer stopped; its death's powers.
+-- A powered monster of the mod's died (monsters.killed, its entry already out of the index, but a
+-- zombie's, kept till its body goes; a zombie's first death alone): its timer stopped; its death's
+-- powers.
 function powers.died(id: number, e: any)
 	stop(id)
 	local list = e.powers

@@ -122,6 +122,29 @@ function items.wasHanded(id: number): boolean
 	return was
 end
 
+-- Called with the unit when a piece handed over (items.hand, not a set-up's) is worn as it comes
+-- (main.luau: what onEquip does), or nil.
+local wornHook: ((number) -> ())? = nil
+
+function items.onHandedWorn(fn: (number) -> ())
+	wornHook = fn
+end
+
+-- A handed piece's Deep Delve part kept; its id. The game puts a piece on as it's given or picked
+-- up when nothing of its kind is worn, before the piece is watched or its affixes known, so
+-- onEquip never hears that: its wearer's numbers are worked out again here instead.
+local function settle(unit: number, id: number, rec: any, restore: boolean?): number
+	items.setMeta(id, items.metaOf(rec))
+	local fn = wornHook
+	if not restore and fn then
+		local f = nox.item(id)
+		if f and f.worn then
+			fn(unit)
+		end
+	end
+	return id
+end
+
 -- A record's item handed to a player's unit from the stash or the vendor: given as items.give
 -- does; a weapon or armour its class may not use (which the game won't give, though any class may
 -- pick anything up in Deep Delve) made at its feet and picked up by the game's own pickup, with
@@ -129,11 +152,12 @@ end
 -- nil and why: then nothing was made, so the caller keeps what it had. `restore`: the record's own
 -- gear put back on a character being set up (hero.setUp): taken into its inventory as the game's
 -- give puts gear there, with no pickup to refuse it (a unit just in may not pick anything up yet).
+-- A piece the game puts on as it comes counts at once (settle; a set-up works its numbers out
+-- itself).
 function items.hand(unit: number, rec: any, restore: boolean?): (number?, string?)
 	local ok, id = pcall(nox.giveItem, unit, rec.type, false, items.specOf(rec))
 	if ok and id then
-		items.setMeta(id, items.metaOf(rec))
-		return id, nil
+		return settle(unit, id, rec, restore), nil
 	end
 	if not nox.present(unit) then
 		return nil, "not now"
@@ -158,8 +182,7 @@ function items.hand(unit: number, rec: any, restore: boolean?): (number?, string
 		nox.delete(it)
 		return nil, "you can't carry it"
 	end
-	items.setMeta(it, items.metaOf(rec))
-	return it, nil
+	return settle(unit, it, rec), nil
 end
 
 -- What an affix says ("+6% damage"): the loot's, or a stat only uniques and sets carry.

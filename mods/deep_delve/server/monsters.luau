@@ -33,10 +33,15 @@ local monsters = {}
 type Kind = { type: string, health: number }
 
 -- Each live monster the mod made: id -> { type, tier, name?, code (its net code), level, damage,
--- experience, base (its most health for one player) }.
+-- experience, base (its most health for one player), died (one that rises again: it has died
+-- once, its death's experience and loot given) }. One that rises again stays here while it lies
+-- dead (monsters.killed).
 local known: { [number]: any } = {}
 -- The live ones with a name (their plates): id -> its entry in `known`.
 local named: { [number]: any } = {}
+-- The named ones that rise again lying dead now, their plates down (monsters.killed): id -> its
+-- entry in `known`.
+local lying: { [number]: any } = {}
 -- Called as a named monster comes or goes (labels.luau's plates), or nil.
 local namedChanged: (() -> ())? = nil
 local packsMade = 0
@@ -68,7 +73,8 @@ function monsters.info(id: number): any
 	return known[id]
 end
 
--- Every live monster the mod made (id -> entry); the index itself, read only.
+-- Every live monster the mod made (id -> entry; a zombie lying dead too: its `died`); the index
+-- itself, read only.
 function monsters.all(): { [number]: any }
 	return known
 end
@@ -90,11 +96,14 @@ local function namedNow()
 	end
 end
 
--- How many the mod made are alive now (for "dd status").
+-- How many the mod made are alive now (for "dd status"; one that rises again only while it
+-- stands).
 function monsters.count(): number
 	local n = 0
-	for _ in known do
-		n += 1
+	for id, e in known do
+		if not e.died or nox.living(id) then
+			n += 1
+		end
 	end
 	return n
 end
@@ -261,8 +270,13 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 		named[id] = entry
 		namedNow()
 	end
-	-- Its death (experience, loot) and the hits it takes (combat.luau's affixes).
-	nox.watchEvents(id, nox.events.death + nox.events.damage)
+	-- Its death (experience, loot) and the hits it takes (combat.luau's affixes); one that rises
+	-- again, its body's end too (monsters.gone).
+	local watch = nox.events.death + nox.events.damage
+	if risingTypes[thingType] then
+		watch += nox.events.destroyed
+	end
+	nox.watchEvents(id, watch)
 	return entry
 end
 
@@ -419,6 +433,7 @@ end
 local function drop(id: number): any
 	local e = known[id]
 	known[id] = nil
+	lying[id] = nil
 	if named[id] then
 		named[id] = nil
 		namedNow()
@@ -426,14 +441,69 @@ local function drop(id: number): any
 	return e
 end
 
--- A watched monster's death: its entry (forgotten here), or nil when it wasn't one of the mod's. A
--- powered one's death powers go off (powers.luau).
+-- A watched monster's death: its entry, or nil when it wasn't one of the mod's or it has died
+-- before. A powered one's death powers go off (powers.luau), at its first death.
+--
+-- One that rises again (a zombie: the engine stands it up again, whole, a while after it fell,
+-- unless it burned) stays one of the mod's while it lies dead and after it rises (by decision
+-- 2026-11-10): its hits on the heroes scaled, the heroes' on it worked as on any (the warrior's
+-- skills, its Rage). Its plate comes down while it lies (monsters.standing puts it back). Only its
+-- first death gives anything (by decision 2026-10-29: a risen zombie gives nothing), and it's
+-- forgotten only as its body goes (monsters.gone) or with the map.
 function monsters.killed(id: number): any
-	local e = drop(id)
+	local e = known[id]
+	if e and risingTypes[e.type] then
+		if named[id] then
+			named[id] = nil
+			lying[id] = e
+			namedNow()
+		end
+		if e.died then
+			return nil
+		end
+		e.died = true
+		if e.powers then
+			powers.died(id, e)
+		end
+		return e
+	end
+	e = drop(id)
 	if e and e.powers then
 		powers.died(id, e)
 	end
 	return e
+end
+
+-- A watched thing gone from the world (main.luau's onDestroyed: a zombie burnt away, a body
+-- deleted): one of the mod's that rises again forgotten now. `thingType`: the gone thing's, so
+-- that an id made again since isn't taken for it.
+function monsters.gone(id: number, thingType: string?)
+	local e = known[id]
+	if not e or (thingType ~= nil and e.type ~= thingType) or nox.present(id) then
+		return
+	end
+	drop(id)
+	if e.powers then
+		powers.forgot(id, e)
+	end
+end
+
+-- The named ones lying dead that the engine has stood up again: their plates back (labels.luau's
+-- beat; a walk of those lying alone).
+function monsters.standing()
+	local any = false
+	for id, e in lying do
+		if nox.living(id) then
+			lying[id] = nil
+			named[id] = e
+			any = true
+		elseif not nox.present(id) then
+			lying[id] = nil
+		end
+	end
+	if any then
+		namedNow()
+	end
 end
 
 -- A monster that's no longer the mod's (a hero charmed it: summons.luau): forgotten, so its death
@@ -476,10 +546,11 @@ function monsters.rescale()
 	local f = scale.factor("health")
 	for id, e in known do
 		local o = nox.object(id)
-		if o and o.alive and o.maxHealth > 0 then
+		if o and o.maxHealth > 0 and (o.alive or e.died) then
 			local most = math.clamp(math.floor(e.base * f + 0.5), 1, 65535)
 			if most ~= o.maxHealth then
-				local health = math.clamp(math.floor(o.health * most / o.maxHealth + 0.5), 1, most)
+				-- (one that rises again lying dead: only its most, which it rises with)
+				local health = if o.alive then math.clamp(math.floor(o.health * most / o.maxHealth + 0.5), 1, most) else 0
 				nox.setHealth(id, health, most)
 				nox.touch(id)
 			end
@@ -532,6 +603,7 @@ end
 function monsters.reset()
 	table.clear(known)
 	table.clear(named)
+	table.clear(lying)
 	here = nil
 	weakest = nil
 	sight = nil

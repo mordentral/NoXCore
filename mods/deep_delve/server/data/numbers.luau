@@ -83,6 +83,9 @@ numbers.waypoints = {
 	-- A hero within `reach` of an area's waypoint finds it; looked for every `every` frames.
 	reach = 120,
 	every = 10,
+	-- The sound a hero sent home by an area's waypoint makes where it stood and where it lands
+	-- (the game's own pentagram's).
+	sound = 0x93,
 }
 
 numbers.portal = {

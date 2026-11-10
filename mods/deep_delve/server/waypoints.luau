@@ -5,8 +5,10 @@
 --   * Found: by coming within numbers.waypoints.reach of it (looked for a few times a second, for
 --     the heroes only), by arriving through it, or by arriving in town from it.
 --   * Out in the area -> town: the waypoint is a real pentagram written into the map, leading to
---     the town's receiving pentagram; the game itself sends whoever stands on it (a pentagram
---     links places in one map, and the town is in every map).
+--     the town's receiving pentagram (a pentagram links places in one map, and the town is in
+--     every map). It carries heroes alone (by decision 2026-11-10): its touches are the mod's, and a
+--     hero who steps on it is sent home with the game's flash at both ends; a monster or a hero's
+--     creature on it stays where it is.
 --   * Town -> a waypoint: stepping on the town's waypoints pentagram (an invisible one under the
 --     cyan ring) opens the waypoints
 --     window on the toucher's UI (ui/main.luau): the areas that have a waypoint, by act (each
@@ -17,15 +19,12 @@
 --     anyone else in the game that's the party's vote (votes.luau: the ones in town asked too),
 --     else (alone) it's at once. Walking away from the pentagram closes the window
 --     (windows.luau's station), and so does a step or a vote started from it.
---   * The town's receiving pentagram watches what lands on it: a monster that followed a player
---     through is sent back to the waypoint it came by.
 --
 -- The town's waypoints pentagram is the mod's (watched, leading nowhere by itself) because only
 -- the mod knows which waypoints a character has found.
 
 local hero = require("hero")
 local hud = require("hud")
-local monsters = require("monsters")
 local progress = require("progress")
 local touch = require("touch")
 local votes = require("votes")
@@ -172,31 +171,49 @@ end
 
 windows.register("waypoints", { station = "waypoints", view = waypoints.view })
 
--- Something landed on the town's receiving pentagram: a hero came home by this map's waypoint
--- (found, if it wasn't; arriving: touch.luau); a monster that followed is sent back.
-local function arrived(unit: number)
+-- This map's waypoint stepped on by a hero (its touches the mod's: see waypoints.place): home to the
+-- town's receiving pentagram as the game's own pentagram sends one, its flash and sound where it
+-- stood and where it lands; the waypoint found, if it wasn't; arriving (touch.luau).
+local function sendHome(unit: number)
 	local h = hero.byUnit(unit)
-	if h then
-		touch.arrived(unit)
-		if h.ready then
-			found(h)
-		end
+	if not h or not here or not nox.present(unit) then
 		return
 	end
-	if monsters.info(unit) and here then
-		local x, y = nox.clearPointNear(here.arrive.x, here.arrive.y, 40)
-		nox.setPosition(unit, x, y)
+	local x, y = nox.position(unit)
+	nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
+	nox.sound(unit, numbers.waypoints.sound)
+	nox.setPosition(unit, here.home.x, here.home.y)
+	nox.effect(0x89, here.home.x, here.home.y)
+	nox.sound(unit, numbers.waypoints.sound)
+	touch.arrived(unit)
+	if h.ready then
+		found(h)
 	end
 end
 
 -- A map's area entered (`spots`: the generator's; `info`: areas.info's; `areasApi`: areas.luau):
--- the town's pentagrams set to work, and this area's waypoint looked for.
+-- the town's pentagram set to work, and this area's waypoint looked for.
+--
+-- The area's waypoint carries heroes alone (by decision 2026-11-10): no monster, no risen zombie and
+-- no hero's creature goes through it to town. It is the game's own visible pentagram, kept as it is
+-- written into the map (lit, leading to the town's receiving pentagram), but its touches are the
+-- mod's (nox.watchCollide, touch.adopt): the game never sends anything by it, and sendHome moves a
+-- hero who steps on it. The town's receiving pentagram is an invisible one leading nowhere: walked
+-- over, it takes nobody anywhere, so it needs no watching.
 function waypoints.place(spots: any, info: any, areasApi: any)
 	areas = areasApi
 	touch.adopt("InvisibleTeleportPentagram", spots.town.waypoints.x, spots.town.waypoints.y, padTouched, nil, nil, "way step")
-	touch.adopt("InvisibleTeleportPentagram", spots.town.wayIn.x, spots.town.wayIn.y, arrived, 30, true)
 	if spots.waypoint then
-		here = { act = info.act, index = info.index, title = info.title, x = spots.waypoint.x, y = spots.waypoint.y, arrive = spots.wayArrive }
+		here = {
+			act = info.act,
+			index = info.index,
+			title = info.title,
+			x = spots.waypoint.x,
+			y = spots.waypoint.y,
+			arrive = spots.wayArrive,
+			home = spots.town.wayIn,
+		}
+		touch.adopt("TeleportPentagram", spots.waypoint.x, spots.waypoint.y, sendHome)
 		beat = nox.every(numbers.waypoints.every, look)
 	end
 end

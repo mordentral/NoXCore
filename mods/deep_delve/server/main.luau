@@ -85,6 +85,7 @@ local combat = require("combat")
 local expeditions = require("expeditions")
 local gate = require("gate")
 local hero = require("hero")
+local items = require("items")
 local labels = require("labels")
 local loot = require("loot")
 local monsters = require("monsters")
@@ -370,7 +371,8 @@ function mode.collide(thing: number, other: number?)
 end
 
 -- A monster the mod made died: experience to the heroes, its loot on the ground (the act boss:
--- its own drop, and the act cleared); both by the party's size (scale.luau).
+-- its own drop, and the act cleared); both by the party's size (scale.luau). A zombie gives them
+-- at its first death alone (monsters.killed: nil after).
 function mode.onObjectKilled(e: any)
 	summons.killed(e.id)
 	local m = monsters.killed(e.id)
@@ -397,6 +399,12 @@ function mode.onObjectKilled(e: any)
 		-- (an expedition's champion: the run cleared, its reward)
 		expeditions.killed(m, e.x, e.y)
 	end
+end
+
+-- A watched thing gone from the world: a zombie of the mod's (it rises again, so it stays the mod's
+-- while it lies dead) forgotten as its body goes, burnt away or deleted (monsters.luau).
+function mode.onDestroyed(e: any)
+	monsters.gone(e.id, e.type)
 end
 
 function mode.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): number?
@@ -448,6 +456,13 @@ function mode.onEquip(unit: number, _item: number, _worn: boolean)
 	hero.equipChanged(unit)
 	tips.changed(unit)
 end
+
+-- A piece handed over (the stash, the vendor, a reroll, "dd give") that the game put on as it came,
+-- which onEquip never hears: the same (items.luau).
+items.onHandedWorn(function(unit: number)
+	hero.equipChanged(unit)
+	tips.changed(unit)
+end)
 
 -- A warrior's active ability used (its button or key): Leap Slam's leap, Whirlwind's spin and its
 -- end (actives.luau); false refuses a press.

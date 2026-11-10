@@ -16,7 +16,8 @@
 -- Name plates (design 3.3): a rare's, a champion's or the act boss's name (any monster of the
 -- mod's with a name) over its head in its tier's colour, always shown, Alt or not. Each player's
 -- UI is sent the named monsters of the area as their own list ("plates": net code, name, colour),
--- again only when that set changes: a named one made, killed, charmed away or gone, so nothing
+-- again only when that set changes: a named one made, killed, charmed away, gone or (a zombie)
+-- standing again, so nothing
 -- while they only move (the client draws a label where it draws its object). A dozen or so in an
 -- area, so every one is sent while there are at most numbers.plates.most of them, the same list
 -- to everyone; past that, the most nearest each player's unit. The plates' most and the loot's add
@@ -142,6 +143,8 @@ local function nearestPlates(h: any, o: any): { any }
 end
 
 local function platesTick()
+	-- (a named zombie stood up again: its plate back)
+	monsters.standing()
 	local named = monsters.named()
 	-- (one gone without a death's word: forgotten, out of the index; the codes still there)
 	local count = 0
