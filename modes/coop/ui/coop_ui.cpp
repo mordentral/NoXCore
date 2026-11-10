@@ -123,15 +123,29 @@ public:
         }
         coop_ = dynamic_cast<nox::coop::CoopClient*>(side);
         if (coop_) {
-            // A guest's cinematics (the host's client's calls) onto our Cinematics' queue as each
-            // comes, in their turn among the game's messages (a fade's MSG_FADE_BEGIN before or after
-            // them), applied at its next update whether or not the HUD draws (issue #14: a darkening
-            // call applied after the fade-in left the screen black). (None is sent to the host.)
-            coop_->setCineSink([this, client = coop_](const nox::coop::coopmsg::Cine& c) {
-                if (coop_ != client || !app_.cinematics || (client->hello() && !client->guest())) {
+            // A guest's cinematics (the host's client's calls) and chapter screens onto our
+            // Cinematics' queue as each comes, in their turn among the game's messages (a fade's
+            // MSG_FADE_BEGIN before or after them) and each other, applied at its next update whether
+            // or not the HUD draws (issue #14: a darkening call applied after the fade-in left the
+            // screen black). (None is sent to the host.)
+            const auto forUs = [this](const nox::coop::CoopClient* client) {
+                return coop_ == client && app_.cinematics && !(client->hello() && !client->guest());
+            };
+            coop_->setCineSink([this, forUs, client = coop_](const nox::coop::coopmsg::Cine& c) {
+                if (forUs(client)) {
+                    app_.cinematics->call([c](nox::server::HostClient& h) { applyCine(h, c); });
+                }
+            });
+            coop_->setChapterSink([this, forUs, client = coop_](const nox::coop::coopmsg::Chapter& ch) {
+                if (!forUs(client)) {
                     return;
                 }
-                app_.cinematics->call([c](nox::server::HostClient& h) { applyCine(h, c); });
+                // As MSG_CHAPTER_END comes (Gui_Brief_ShowLockScreen): our own class's chapter, the
+                // campaign's (every player's is). (A guest's death chapter screen fades back to the
+                // game: the host is the one who loads.)
+                app_.cinematics->setGuest(client->guest());
+                app_.cinematics->message(std::vector<std::uint8_t>{0xD6, ch.chapter, static_cast<std::uint8_t>(ch.startup ? 1 : 0)});
+                reading_ = Reading{true, false, {}};
             });
         }
         reading_ = {};
@@ -149,7 +163,8 @@ public:
 
     /// Each frame: the friend dot over the party's creatures while we're in the campaign
     /// (friend_dot.hpp, VD-39), the session's list copied as it changes; the names over the party's
-    /// players (name_plate.hpp); a guest's minimap (seenWithHost).
+    /// players (name_plate.hpp); a guest's minimap (seenWithHost); a guest's chapter screen's end
+    /// told back (its screen went on our Cinematics' queue as it came: bind's sink).
     void update(App& app) override
     {
         app.partyDots = coop_ && coop_->inCampaign();
@@ -161,11 +176,24 @@ public:
         if (coop_ && coop_->guest()) {
             seenWithHost(app);
         }
+        if (!coop_ || !app.cinematics) {
+            return;
+        }
+        // (A guest's death chapter screen fades back to the game: the host is the one who loads.)
+        app.cinematics->setGuest(coop_->guest());
+        if (coop_->guest() && reading_.on) {
+            if (app.cinematics->briefingShown()) {
+                reading_.seenUp = true;
+            } else if (reading_.seenUp) {
+                // Ours over (clicked away, or its time ran out): the host told.
+                coop_->chapterDone();
+                reading_.on = false;
+            }
+        }
     }
 
-    /// Each frame: the rules' notices shown (in the middle of the screen, and the console); a
-    /// guest's chapter screens shown and their end told back; who's still reading; the host's talk shown to
-    /// the others.
+    /// Each frame: the rules' notices shown (in the middle of the screen, and the console); who's
+    /// still reading a chapter screen; the host's talk shown to the others.
     void drawHud(App& app, SDL_Renderer*, const HudFrame&) override
     {
         if (!coop_) {
@@ -191,26 +219,6 @@ public:
         }
         if (!app.cinematics) {
             return;
-        }
-        // (A guest's death chapter screen fades back to the game: the host is the one who loads.)
-        app.cinematics->setGuest(coop_->guest());
-        if (coop_->guest()) {
-            // (Its cinematics went on our Cinematics' queue as they came: bind's sink.)
-            if (const auto ch = coop_->takeChapter()) {
-                // As MSG_CHAPTER_END comes (Gui_Brief_ShowLockScreen): our own class's chapter, the
-                // campaign's (every player's is).
-                app.cinematics->message(std::vector<std::uint8_t>{0xD6, ch->chapter, static_cast<std::uint8_t>(ch->startup ? 1 : 0)});
-                reading_ = Reading{true, false, {}};
-            }
-            if (reading_.on) {
-                if (app.cinematics->briefingShown()) {
-                    reading_.seenUp = true;
-                } else if (reading_.seenUp) {
-                    // Ours over (clicked away, or its time ran out): the host told.
-                    coop_->chapterDone();
-                    reading_.on = false;
-                }
-            }
         }
         // Who's still reading: told when it changes, while any is.
         const auto state = coop_->readyState();

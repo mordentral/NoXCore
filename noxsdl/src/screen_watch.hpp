@@ -9,8 +9,10 @@
 //                under way that ends or explains it (no fade, briefing, screen or widescreen bars;
 //                no movie, nor the map held for its HD images) for kStuckMs of the client's running
 //                time. Then Escape may open the in-game menu; and a black the game's own scripts
-//                didn't put up (a map's load, a fade to black, a relayed call's) is ended: the
-//                fades stopped and the map drawn.
+//                didn't put up (a map's load, a fade to black's message, a saved game's load's map
+//                intro; a co-op guest's relayed call of those too) is ended: the fades stopped and
+//                the map drawn. A script's own (Blind, ImmediateBlind, a chapter screen's map off;
+//                relayed to a guest or not) is left to the scripts and Escape.
 #pragma once
 
 #include <algorithm>

@@ -13,8 +13,9 @@
 #include "noxcore/server/teleport.hpp"
 #include "noxcore/server/world.hpp"
 
+#include "mode_shared.hpp"
+
 #include <algorithm>
-#include <cctype>
 #include <string>
 #include <utility>
 
@@ -22,14 +23,7 @@ namespace nox::coop {
 
 std::string spacedName(std::string_view type)
 {
-    std::string s;
-    for (std::size_t i = 0; i < type.size(); ++i) {
-        if (i > 0 && std::isupper(static_cast<unsigned char>(type[i])) && std::islower(static_cast<unsigned char>(type[i - 1]))) {
-            s += ' ';
-        }
-        s += type[i];
-    }
-    return s;
+    return server::detail::spacedName(type);
 }
 
 namespace {
@@ -356,7 +350,7 @@ void CoopDirector::mirrorDialog(const server::ServerObject& talker, const std::s
             for (const char16_t c : talker.player->name) {
                 name += c < 0x80 ? static_cast<char>(c) : '?';
             }
-            notice(m, coopmsg::Notice::Info, name + " is talking to " + spacedName(npc->typeName) + ".");
+            notice(m, coopmsg::Notice::Info, name + " is talking to " + server::detail::spacedName(npc->typeName) + ".");
         }
     }
 }

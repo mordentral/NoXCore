@@ -61,17 +61,12 @@ void CoopClient::onMessage(std::span<const std::uint8_t> m)
             }
             if (cineSink_) {
                 cineSink_(*c); // (in its turn among the game's messages: noxsdl's Cinematics queue)
-            } else {
-                cines_.push_back(std::move(*c));
-                if (cines_.size() > 256) {
-                    cines_.erase(cines_.begin());
-                }
             }
         }
         break;
     case coopmsg::kChapter:
-        if (auto c = coopmsg::parseChapter(rest)) {
-            chapter_ = *c;
+        if (auto c = coopmsg::parseChapter(rest); c && chapterSink_) {
+            chapterSink_(*c); // (in its turn with the cinematics: the same queue)
         }
         break;
     case coopmsg::kReadyState:

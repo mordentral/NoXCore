@@ -193,7 +193,7 @@ void startTradeScreens(App& app)
     };
     a.centredMessage = [&app](const std::string& words) { centredMessage(app, words); };
     a.pointer = [&app] { return mousePos(app); }; // (in the game's pixels, as its events are)
-    app.tradeScreens =std::make_unique<TradeScreens>(res, app.gameDir / "window", *app.inventory, *app.itemNames,
+    app.tradeScreens = std::make_unique<TradeScreens>(res, app.gameDir / "window", *app.inventory, *app.itemNames,
                                                       *app.art, std::move(a));
     app.inventory->setGameData(&app.gameData); // the stats page's maximums
     app.inventory->setItemNames(app.itemNames.get());
