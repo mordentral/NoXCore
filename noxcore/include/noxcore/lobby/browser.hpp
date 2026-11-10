@@ -38,6 +38,10 @@ enum SourceBits : unsigned {
 
 struct ServerEntry {
     GameListing game;
+    // Original configured addresses, retained even after a reply supplies the game's name.
+    std::vector<std::string> listedAddresses;
+    bool checking = false;
+    bool unresolved = false;
     unsigned sources = 0;             ///< SourceBits
     std::optional<std::uint32_t> pingMs; ///< round trip of the discover ping, if it answered
     bool answered = false;            ///< the server replied to a ping (details are fresh)
@@ -70,6 +74,7 @@ public:
     void setXwisListing(bool on);
     bool listsXwis() const { return options_.xwis && xwisListing_; }
     bool listsLan() const { return options_.lan; }
+    void setServers(std::vector<std::string> servers) { options_.servers = std::move(servers); }
     bool hasServerList() const { return !options_.servers.empty(); }
     /// Lists XWIS through this login from the next refresh on (a player who logged in: XWIS
     /// won't take a throwaway nick from the same address right after a registered one).

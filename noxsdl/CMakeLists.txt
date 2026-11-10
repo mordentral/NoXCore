@@ -40,6 +40,8 @@ add_executable(noxsdl WIN32
     src/audio.cpp
     src/bloom.cpp
     src/browser_screen.cpp
+    src/server_list_files.cpp
+    src/menus_servers.cpp
     src/centred_messages.cpp
     src/chat_entry.cpp
     src/cinematics.cpp

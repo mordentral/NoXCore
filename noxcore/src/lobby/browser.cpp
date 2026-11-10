@@ -25,7 +25,8 @@ std::optional<net::Endpoint> parseServer(std::string_view text)
     std::uint16_t port = kDefaultGamePort;
     if (const auto colon = text.rfind(':'); colon != std::string_view::npos) {
         const std::string_view p = text.substr(colon + 1);
-        if (std::from_chars(p.data(), p.data() + p.size(), port).ec != std::errc{}) {
+        const auto [end, error] = std::from_chars(p.data(), p.data() + p.size(), port);
+        if (p.empty() || error != std::errc{} || end != p.data() + p.size() || port == 0) {
             return std::nullopt;
         }
         text = text.substr(0, colon);
@@ -119,15 +120,27 @@ void ServerBrowser::refresh(std::uint32_t nowMs, const std::vector<GameListing>*
     if (options_.lan) {
         queued_.push_back({options_.lanQueryTo.value_or(net::Endpoint{kBroadcast, kDefaultGamePort}), true});
     }
+    std::set<std::string> listed;
     for (const auto& s : options_.servers) {
+        if (!listed.insert(s).second) continue;
         if (const auto to = parseServer(s)) {
             ServerEntry& e = upsert(to->address, to->port);
             e.sources |= kFromList;
+            e.checking = true;
+            if (std::find(e.listedAddresses.begin(), e.listedAddresses.end(), s) == e.listedAddresses.end())
+                e.listedAddresses.push_back(s);
             if (e.game.name.empty()) {
                 e.game.name = s;
             }
-            queued_.push_back({*to, false});
+            if (std::find(queued_.begin(), queued_.end(), std::pair{*to, false}) == queued_.end())
+                queued_.push_back({*to, false});
         } else {
+            ServerEntry e;
+            e.game.name = s;
+            e.listedAddresses = {s};
+            e.sources = kFromList;
+            e.unresolved = true;
+            entries_.push_back(std::move(e));
             log_.push_back("can't resolve " + s);
         }
     }
@@ -178,6 +191,14 @@ void ServerBrowser::poll(std::uint32_t nowMs)
     }
     pollXwis(nowMs);
     pollUdp(nowMs);
+    // Index pending endpoints once, rather than scanning every ping for every row each frame.
+    std::set<net::Endpoint> pending;
+    for (const auto& [token, ping] : pings_) {
+        if (!ping.broadcast) pending.insert(ping.to);
+    }
+    for (auto& entry : entries_) {
+        entry.checking = !entry.answered && pending.contains({entry.game.address, entry.game.port});
+    }
 }
 
 // Drives the XWIS listing login: connect, send its lines, read replies; when it's done, its

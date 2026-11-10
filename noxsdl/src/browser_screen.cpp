@@ -83,17 +83,88 @@ SDL_Color pingColor(const std::optional<std::uint32_t>& ping)
 
 } // namespace
 
-BrowserScreen::BrowserScreen(Font& font, nox::lobby::ServerBrowser::Options options)
-    : font_(font), browser_(std::move(options))
+BrowserScreen::BrowserScreen(Font& font, nox::lobby::ServerBrowser::Options options,
+                             std::vector<std::filesystem::path> serverFiles)
+    : serverFiles_(std::move(serverFiles)), commandServers_(options.servers), font_(font), browser_(std::move(options))
 {
+}
+
+void BrowserScreen::reloadServerLists()
+{
+    try {
+        auto saved = serverFiles_.read();
+        auto servers = commandServers_;
+        servers.insert(servers.end(), saved.begin(), saved.end());
+        browser_.setServers(std::move(servers));
+        savedServers_ = std::move(saved);
+    } catch (const std::exception& ex) {
+        message_ = std::string("Cannot read saved servers: ") + ex.what();
+        SDL_Log("browser: %s", message_.c_str());
+    }
+}
+
+void BrowserScreen::refreshSavedServers(std::uint64_t nowMs)
+{
+    // Reuse the current online listing; an edit must not start a second XWIS login.
+    std::vector<nox::lobby::GameListing> online;
+    for (const auto& row : rows_) if (row.sources & nox::lobby::kFromXwis) online.push_back(row.game);
+    refresh(nowMs, &online);
+}
+
+bool BrowserScreen::addSavedServer(const std::string& address)
+{
+    return serverFiles_.add(address);
+}
+
+void BrowserScreen::removeSavedServer(const std::string& address)
+{
+    serverFiles_.remove({address});
+}
+
+bool BrowserScreen::isSaved(const nox::lobby::ServerEntry& entry) const
+{
+    return std::any_of(entry.listedAddresses.begin(), entry.listedAddresses.end(), [&](const auto& address) {
+        return std::find(savedServers_.begin(), savedServers_.end(), address) != savedServers_.end();
+    });
+}
+
+std::string BrowserScreen::rowKey(const nox::lobby::ServerEntry& entry)
+{
+    return entry.unresolved && !entry.listedAddresses.empty() ? entry.listedAddresses.front() : address(entry.game);
+}
+
+std::string BrowserScreen::statusText(const nox::lobby::ServerEntry& entry)
+{
+    if (entry.answered) return "Online";
+    if (entry.unresolved) return "Address not found";
+    return entry.checking ? "Checking..." : "No response";
+}
+
+void BrowserScreen::selectAddress(const std::string& address)
+{
+    const auto normalized = normalizedServerAddress(address);
+    for (std::size_t i = 0; i < rows_.size(); ++i) {
+        const auto& entry = rows_[i];
+        if (rowKey(entry) == address || (normalized &&
+            std::find(entry.listedAddresses.begin(), entry.listedAddresses.end(), *normalized) != entry.listedAddresses.end())) {
+            selected_ = static_cast<int>(i);
+            scroll_ = std::max(0, selected_ - std::max(1, lastLayout_.visibleRows) + 1);
+            break;
+        }
+    }
 }
 
 void BrowserScreen::refresh(std::uint64_t nowMs, const std::vector<nox::lobby::GameListing>* xwisGames)
 {
+    message_.clear();
+    reloadServerLists();
     browser_.refresh(static_cast<std::uint32_t>(nowMs), xwisGames);
     rows_.clear();
     selected_ = 0;
     scroll_ = 0;
+    clicked_.reset();
+    lastClickRow_ = -1;
+    sortRows();
 }
 
 // Pumps the search, keeping the last three log lines for the bottom of the screen.
@@ -113,10 +184,9 @@ void BrowserScreen::update(std::uint64_t nowMs)
 void BrowserScreen::sortRows()
 {
     // Keep the selection on the same server as the list changes.
-    std::optional<std::pair<std::uint32_t, std::uint16_t>> keep;
+    std::optional<std::string> keep;
     if (selected_ >= 0 && selected_ < static_cast<int>(rows_.size())) {
-        keep = std::pair{rows_[static_cast<std::size_t>(selected_)].game.address,
-                         rows_[static_cast<std::size_t>(selected_)].game.port};
+        keep = rowKey(rows_[static_cast<std::size_t>(selected_)]);
     }
     rows_ = browser_.servers();
     // noxcpp servers first, then the other pinged ones, fastest first; then the rest by name.
@@ -140,7 +210,7 @@ void BrowserScreen::sortRows()
     });
     if (keep) {
         for (std::size_t i = 0; i < rows_.size(); ++i) {
-            if (rows_[i].game.address == keep->first && rows_[i].game.port == keep->second) {
+            if (rowKey(rows_[i]) == *keep) {
                 selected_ = static_cast<int>(i);
             }
         }
@@ -165,7 +235,12 @@ std::optional<std::string> BrowserScreen::joinSelected()
     if (selected_ < 0 || selected_ >= static_cast<int>(rows_.size())) {
         return std::nullopt;
     }
-    return address(rows_[static_cast<std::size_t>(selected_)].game);
+    const auto& entry = rows_[static_cast<std::size_t>(selected_)];
+    if (!entry.answered) {
+        message_ = statusText(entry) + ". Refresh to try again.";
+        return std::nullopt;
+    }
+    return address(entry.game);
 }
 
 std::string BrowserScreen::searchingText() const
@@ -200,7 +275,7 @@ std::string BrowserScreen::address(const nox::lobby::GameListing& game)
 
 const nox::lobby::ServerEntry* BrowserScreen::entryFor(const std::string& server) const
 {
-    const auto it = std::ranges::find_if(rows_, [&](const nox::lobby::ServerEntry& e) { return address(e.game) == server; });
+    const auto it = std::ranges::find_if(rows_, [&](const nox::lobby::ServerEntry& e) { return rowKey(e) == server; });
     return it != rows_.end() ? &*it : nullptr;
 }
 
@@ -299,7 +374,7 @@ void BrowserScreen::draw(SDL_Renderer* renderer, int width, int height)
     const SDL_Color gold{240, 200, 110, 255};
 
     font_.draw("Nox games", margin, l.rowHeight * 0.6f, static_cast<int>(l.size * 1.5), gold);
-    std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " game(s)";
+    std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " server(s)";
     status += "     Enter / double-click: join     R: refresh     Esc: quit";
     font_.draw(status, margin, l.rowHeight * 2.2f, l.size, grey);
     if (!message_.empty()) {
@@ -336,7 +411,7 @@ void BrowserScreen::drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textS
 
     const SDL_Color grey{150, 150, 150, 255};
     float y = area.y + area.h - footer + l.rowHeight * 0.3f;
-    std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " game(s)";
+    std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " server(s)";
     if (!message_.empty()) {
         status = message_;
     }
@@ -409,6 +484,12 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             SDL_RenderFillRect(renderer, &bar);
         }
         const float ty = y + (l.rowHeight - font_.lineHeight(l.size)) / 2;
+        if (!e.answered) {
+            cell(0, g.name.empty() ? rowKey(e) : g.name, ty, text);
+            font_.draw(statusText(e), cols[1], ty, l.size, grey);
+            cell(5, isSaved(e) ? "Saved" : "list", ty, grey);
+            continue;
+        }
         // Unnamed listings show their address instead.
         std::string name = g.name.empty() ? ipText(g.address) : g.name;
         // (A password's game: the padlock at the row's far right, drawn below.)
@@ -465,7 +546,7 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             from += "LAN ";
         }
         if (e.sources & nox::lobby::kFromList) {
-            from += "list";
+            from += isSaved(e) ? "Saved" : "list";
         }
         cell(5, from, ty, grey);
         if (g.access == nox::lobby::GameAccess::Password) {

@@ -53,7 +53,8 @@
 // its own: Cinematics::showCredits), black with "Nox:Credits" rolling up and the credits music,
 // till a key or click or the roll's end; then the menu as it was, faded back from black, its
 // music back.
-// Not yet: Solo Quest, hosting, filters and Find (their buttons are off).
+// The unused Find slot opens Add/Remove, with saved addresses listed independently of discovery.
+// Filters remain unavailable.
 #pragma once
 
 #include "browser_screen.hpp"
@@ -268,6 +269,8 @@ private:
     /// The game list's XWIS games: through the WOL connection while there is one (state 8's
     /// RequestChannelList(37), "Loading games"), else a search of its own.
     void refreshGames();
+    void serverDialog();
+    void setupServerControls();
     /// RequestLogout; the connection let go once the server closes it.
     void logOffWol();
     /// A colour button's or swatch's colour (its data: palette table low, index high).
@@ -383,6 +386,9 @@ private:
     std::unique_ptr<Cinematics> credits_;
     /// The game the description box is up for (its Join joins it).
     std::optional<std::string> infoServer_;
+    std::string infoStatus_;
+    SDL_FPoint infoAt_{};
+    int infoWidth_ = 640, infoHeight_ = 480;
     nox::client::PlayerProfile profile_;
     bool skippedLogin_ = false;
     std::optional<nox::io::SavedLogin> wolLogin_;
@@ -392,6 +398,7 @@ private:
     /// The keys of the dialog `dialogKeysOf_` (noxcpp's mode lists: arrows and Enter) while it's
     /// the one up; true when it took the key.
     std::function<bool(const SDL_KeyboardEvent&)> dialogKeys_;
+    std::function<bool(const SDL_Event&)> dialogEvents_; ///< popup scrolling and Escape before the dialog closes
     gui::Window* dialogKeysOf_ = nullptr;
     std::string hostModeChosen_; ///< Host Custom's row chosen (mode_list.hpp's modeListKey; none: Quest), kept for next time
     std::string soloModeChosen_; ///< Game Modes' row chosen, the same way

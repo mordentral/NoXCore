@@ -512,31 +512,6 @@ void speech(App& app)
 
 } // namespace
 
-/// Servers to always ping: "host" or "host:port" per line of servers.txt next to the exe and in
-/// the game folder ('#' starts a comment).
-std::vector<std::string> readServerLists(const fs::path& gameDir)
-{
-    std::vector<std::string> out;
-    std::vector<fs::path> files{gameDir / "servers.txt"};
-    if (const char* base = SDL_GetBasePath()) {
-        files.insert(files.begin(), fs::path(base) / "servers.txt");
-    }
-    for (const auto& file : files) {
-        std::error_code ec;
-        if (!fs::exists(file, ec)) {
-            continue;
-        }
-        try {
-            // Line by line (the end of the file ends the last line); '#' starts a comment, blanks are trimmed.
-            const auto lines = nox::lobby::splitServerList(nox::readFileBytes(file));
-            out.insert(out.end(), lines.begin(), lines.end());
-        } catch (const std::exception& ex) {
-            SDL_Log("%s: %s", file.string().c_str(), ex.what());
-        }
-    }
-    return out;
-}
-
 /// Live: this frame's cursor (cursorUpdate): the pointer over the in-game
 /// menu; else the arrow, unless we're playing and the cursor's pick is an item (the pickup hand
 /// within 75, the far one beyond), a creature to talk to or a shopkeeper within 125, or a useable
@@ -1411,9 +1386,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             if (!app->font) {
                 throw std::runtime_error("the server browser needs a font");
             }
-            const auto listed = readServerLists(gameDir);
-            opts.browserOptions.servers.insert(opts.browserOptions.servers.end(), listed.begin(), listed.end());
-            app->browser = std::make_unique<BrowserScreen>(*app->font, opts.browserOptions);
+            const char* base = SDL_GetBasePath();
+            app->browser = std::make_unique<BrowserScreen>(*app->font, opts.browserOptions,
+                                                           serverListPaths(gameDir, base ? fs::path(base) : fs::path{}));
             // The game's menus; --browse goes straight to the game list.
             Menus::Callbacks callbacks;
             callbacks.join = [app, xwis = opts.browserOptions.xwis, account = opts.profile.account](

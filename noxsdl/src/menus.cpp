@@ -474,9 +474,8 @@ void Menus::enter(State s)
                 w->show(false);
             }
         }
-        for (const auto id : {kFilters, kFind}) {
-            wip(screen_, id);
-        }
+        wip(screen_, kFilters);
+        setupServerControls();
         if (gui::Window* list = screen_->find(kList)) {
             list->state |= gui::kPressed; // showing the list
         }
@@ -1134,6 +1133,14 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
     box->rect.x = x - screen_->rect.x;
     box->rect.y = y - screen_->rect.y;
 
+    infoAt_ = at;
+    infoWidth_ = width;
+    infoHeight_ = height;
+    infoStatus_ = BrowserScreen::statusText(entry);
+    const bool saved = browser_.isSaved(entry);
+    if (auto* join = box->find(kJoin)) {
+        gui::setGreyed(join, !entry.answered);
+    }
     const auto& g = entry.game;
     const nox::gui::Color plain = list->textColor;
     const auto colour = [](int index) {
@@ -1146,6 +1153,19 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
     };
     const auto title = [&](const char* id) { add(gui_.text(std::string("Noxworld.c:") + id), 0xE); };
     const auto gap = [&] { add(" "); }; // (L"\n")
+    if (saved || !entry.answered) {
+        add(saved ? "Saved server" : "Server", 0xE);
+        for (const auto& address : entry.listedAddresses) add(address);
+        add(BrowserScreen::statusText(entry));
+        gap();
+    }
+    if (!entry.answered) {
+        scrollGameInfo(0);
+        infoServer_ = BrowserScreen::rowKey(entry);
+        box->show(true);
+        gui_.setModal(box);
+        return;
+    }
     title("Name");
     add(g.name.empty() ? BrowserScreen::address(g) : g.name);
     if (wolMode_) {
@@ -1306,7 +1326,11 @@ bool Menus::onBrowser(gui::Window& from)
         // their servers.
         hostCustom();
         return true;
+    case kFind:
+        deferred_.push_back([this] { serverDialog(); });
+        return true;
     case kRefresh:
+        closeGameInfo();
         refreshGames();
         return true;
     case kWorldBack:
@@ -1490,6 +1514,12 @@ void Menus::update(std::uint64_t nowMs)
     gui::runQueued(deferred_);
     if (!stack_.empty() && stack_.back() == State::Browser) {
         browser_.update(nowMs);
+        if (infoServer_) {
+            if (const auto* entry = browser_.entryFor(*infoServer_);
+                entry && BrowserScreen::statusText(*entry) != infoStatus_) {
+                showGameInfo(*entry, infoAt_, infoWidth_, infoHeight_);
+            }
+        }
     }
     pollWol();
     if (!clicks_.empty() && clicks_.front().starts_with('+')) {
@@ -1692,6 +1722,13 @@ void Menus::fillCharacterList()
 
 void Menus::chooseCharacter(const std::string& host)
 {
+    if (!host.starts_with('@')) {
+        const auto* entry = browser_.entryFor(host);
+        if (!entry || !entry->answered) {
+            browser_.setMessage("Server has not replied. Refresh to try again.");
+            return;
+        }
+    }
     // (noxcpp: a listed game that wants a newer NoX Core, marked "Update needed": its notice
     // instead of the join, however it was chosen; client_level_gate.hpp)
     if (!host.starts_with('@') && client_level::noticeInsteadOfJoin(browser_.entryFor(host))) {
@@ -2240,6 +2277,9 @@ void Menus::handleEvent(const SDL_Event& event, int width, int height, std::uint
             pick(0xDEAD);  // an index of 32 or more only closes it
             return;
         }
+    }
+    if (dialog_ && dialog_ == dialogKeysOf_ && dialogEvents_ && !gui_.sliding() && dialogEvents_(event)) {
+        return;
     }
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
         if (picker_ && !picker_->hidden()) {

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "text.hpp"
+#include "server_list_files.hpp"
 
 #include "noxcore/lobby/browser.hpp"
 
@@ -21,7 +22,16 @@ namespace noxsdl {
 
 class BrowserScreen {
 public:
-    BrowserScreen(Font& font, nox::lobby::ServerBrowser::Options options);
+    BrowserScreen(Font& font, nox::lobby::ServerBrowser::Options options,
+                  std::vector<std::filesystem::path> serverFiles = {});
+    void refreshSavedServers(std::uint64_t nowMs);
+    bool addSavedServer(const std::string& address);
+    void removeSavedServer(const std::string& address);
+    std::vector<std::string> savedServerAddresses() const { return serverFiles_.read(); }
+    bool isSaved(const nox::lobby::ServerEntry& entry) const;
+    void selectAddress(const std::string& address);
+    static std::string rowKey(const nox::lobby::ServerEntry& entry);
+    static std::string statusText(const nox::lobby::ServerEntry& entry);
 
     /// Starts a new search; with `xwisGames`, XWIS's games as a login just listed them.
     void refresh(std::uint64_t nowMs, const std::vector<nox::lobby::GameListing>* xwisGames = nullptr);
@@ -94,6 +104,9 @@ private:
     /// "Searching ..." naming the places this search asks.
     std::string searchingText() const;
 
+    ServerListFiles serverFiles_;
+    std::vector<std::string> commandServers_, savedServers_;
+    void reloadServerLists();
     Font& font_;
     nox::lobby::ServerBrowser browser_;
     std::vector<nox::lobby::ServerEntry> rows_; ///< sorted copy of the browser's list
