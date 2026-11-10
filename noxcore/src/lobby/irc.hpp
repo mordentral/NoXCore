@@ -1,16 +1,10 @@
 // The IRC-like plumbing every XWIS session shares (xwis.cpp, xwis_host.cpp, xwis_login.cpp,
-// wol_chat.cpp): the connection, the login lines, splitting received bytes into lines, and words
-// and names. (Internal to noxcore's lobby sources.)
+// wol_chat.cpp, servserv.cpp): the login lines, splitting received bytes into lines, and words
+// and names. (Internal to noxcore's lobby sources; the connection is servserv.hpp's.)
 #pragma once
-
-#include "noxcore/lobby/xwis.hpp" // (kXwisHost)
-#include "noxcore/net/tcp_socket.hpp"
-#include "noxcore/net/udp_socket.hpp" // (net::Endpoint)
 
 #include <cctype>
 #include <cstdint>
-#include <exception>
-#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -18,25 +12,9 @@
 
 namespace nox::lobby::detail {
 
-/// A TCP connection to XWIS (kXwisHost, kXwisPort); none, with `why`, when the name doesn't
-/// resolve or the connect fails.
-inline std::optional<net::TcpSocket> connectXwis(std::string& why)
-{
-    const auto host = net::Endpoint::resolve(kXwisHost, kXwisPort);
-    if (!host) {
-        why = "can't resolve " + std::string(kXwisHost);
-        return std::nullopt;
-    }
-    try {
-        return net::TcpSocket::connect(*host);
-    } catch (const std::exception& ex) {
-        why = ex.what();
-        return std::nullopt;
-    }
-}
-
 /// The login lines a session starts with: the client version, the PASS word (the same for every
-/// login), the nick, the apgar-encoded password and the USER line.
+/// login), the nick, the apgar-encoded password and the USER line, whose server field WOLAPI
+/// always fills with irc.westwood.com, whichever chat server it is on.
 inline std::vector<std::string> xwisLoginLines(const std::string& nick, std::string_view apgarPassword)
 {
     return {
@@ -44,7 +22,7 @@ inline std::vector<std::string> xwisLoginLines(const std::string& nick, std::str
         "PASS supersecret",
         "NICK " + nick,
         "apgar " + std::string(apgarPassword) + " 0",
-        "USER UserName HostName " + std::string(kXwisHost) + " :RealName",
+        "USER UserName HostName irc.westwood.com :RealName",
     };
 }
 

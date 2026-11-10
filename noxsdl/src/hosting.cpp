@@ -49,6 +49,9 @@ void postToXwis(App& app)
         app.xwisHost->setRecord(nox::lobby::makeWolRecord(g));
     }
     app.xwisHost->poll(static_cast<std::uint32_t>(now));
+    for (const auto& line : app.xwisHost->takeLog()) {
+        SDL_Log("%s", line.c_str()); // (the chat server servserv named, or why xwis.net)
+    }
     // What became of the post, logged as it changes (a refused login, a channel taken...).
     if (const bool posted = app.xwisHost->hosting(); posted != app.xwisPosted) {
         app.xwisPosted = posted;

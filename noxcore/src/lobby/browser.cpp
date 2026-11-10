@@ -192,20 +192,24 @@ void ServerBrowser::startRefresh(std::uint32_t nowMs, const std::vector<GameList
             }
         }
     } else if (xwis) {
-        const auto host = options_.xwisServer ? options_.xwisServer : net::Endpoint::resolve(kXwisHost, kXwisPort);
-        if (!host) {
-            log_.push_back("XWIS: can't resolve " + std::string(kXwisHost));
+        // servserv first, for the chat server (servserv.hpp), unless one is given.
+        XwisRoute route = options_.xwisRoute;
+        if (options_.xwisServer) {
+            route.fallback = options_.xwisServer;
+            route.direct = true;
+        }
+        const std::string nick =
+            options_.xwisNick.empty() ? xwisNick(static_cast<std::uint32_t>(rng_())) : options_.xwisNick;
+        xwisSocket_.emplace(nick, options_.xwisPassword, nowMs, std::move(route));
+        for (auto& line : xwisSocket_->takeLog()) {
+            log_.push_back(std::move(line));
+        }
+        if (xwisSocket_->state() == net::TcpSocket::State::Failed) {
+            closeXwis("XWIS: " + xwisSocket_->error());
         } else {
-            try {
-                xwisSocket_ = net::TcpSocket::connect(*host);
-                const std::string nick =
-                    options_.xwisNick.empty() ? xwisNick(static_cast<std::uint32_t>(rng_())) : options_.xwisNick;
-                xwis_.emplace(nick, options_.xwisPassword);
-                xwisStartedAt_ = nowMs;
-                log_.push_back("XWIS: logging in as " + nick);
-            } catch (const std::exception& ex) {
-                log_.push_back(std::string("XWIS: ") + ex.what());
-            }
+            xwis_.emplace(nick, options_.xwisPassword);
+            xwisStartedAt_ = nowMs;
+            log_.push_back("XWIS: logging in as " + nick);
         }
     }
 }
@@ -247,9 +251,18 @@ void ServerBrowser::pollXwis(std::uint32_t nowMs)
     if (!xwis_ || !xwisSocket_) {
         return;
     }
+    if (xwisSocket_->poll(nowMs)) {
+        xwisStartedAt_ = nowMs; // (the login's time counts from the chat server's connection)
+    }
+    for (auto& line : xwisSocket_->takeLog()) {
+        log_.push_back(std::move(line));
+    }
+    if (xwisSocket_->asking()) {
+        return;
+    }
     const auto state = xwisSocket_->state();
     if (state == net::TcpSocket::State::Failed) {
-        closeXwis("XWIS: can't connect to " + std::string(kXwisHost));
+        closeXwis("XWIS: " + xwisSocket_->error());
         return;
     }
     if (nowMs - xwisStartedAt_ > kXwisTimeoutMs) {

@@ -17,6 +17,7 @@
 // XwisHostSession is the conversation without sockets; XwisHost drives one over a TcpSocket.
 #pragma once
 
+#include "noxcore/lobby/servserv.hpp"
 #include "noxcore/lobby/xwis.hpp"
 #include "noxcore/net/tcp_socket.hpp"
 
@@ -70,10 +71,12 @@ private:
     std::string topicSent_; ///< what was
 };
 
-/// An XwisHostSession over a socket, polled; it reconnects 30 s after the connection fails.
+/// An XwisHostSession over a connection to the chat server servserv names (servserv.hpp), polled;
+/// it reconnects (servserv asked again) 30 s after the connection fails.
 class XwisHost {
 public:
-    XwisHost(std::string nick, std::string apgarPassword, std::uint32_t nowMs, std::uint32_t place = kXwisDefaultPlace);
+    XwisHost(std::string nick, std::string apgarPassword, std::uint32_t nowMs, std::uint32_t place = kXwisDefaultPlace,
+             XwisRoute route = {});
     ~XwisHost();
     XwisHost(const XwisHost&) = delete;
     XwisHost& operator=(const XwisHost&) = delete;
@@ -85,16 +88,21 @@ public:
 
     bool hosting() const noexcept { return session_ && session_->state() == XwisHostSession::State::Hosting; }
     const std::string& error() const noexcept { return error_; }
+    /// The routes to the chat server, as "XWIS: ..." lines, since the last call (the last 16).
+    std::vector<std::string> takeLog();
 
 private:
     void connect(std::uint32_t nowMs);
     void flush();
+    void keepLog();
 
     std::string nick_;
     std::string password_;
     std::uint32_t place_;
-    std::optional<net::TcpSocket> socket_;
+    XwisRoute route_;
+    std::optional<XwisConnection> socket_;
     std::optional<XwisHostSession> session_;
+    std::vector<std::string> log_;
     std::vector<std::uint8_t> record_;
     std::string send_;
     std::string error_;

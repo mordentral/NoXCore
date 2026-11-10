@@ -123,12 +123,33 @@ void XwisHostSession::line(std::string_view text)
     }
 }
 
-XwisHost::XwisHost(std::string nick, std::string apgarPassword, std::uint32_t nowMs, std::uint32_t place)
+XwisHost::XwisHost(std::string nick, std::string apgarPassword, std::uint32_t nowMs, std::uint32_t place, XwisRoute route)
     : nick_(std::move(nick))
     , password_(std::move(apgarPassword))
     , place_(place)
+    , route_(std::move(route))
 {
     connect(nowMs);
+}
+
+std::vector<std::string> XwisHost::takeLog()
+{
+    keepLog();
+    return std::exchange(log_, {});
+}
+
+// The connection's route lines, kept (the last few: a host nobody reads keeps retrying).
+void XwisHost::keepLog()
+{
+    if (!socket_) {
+        return;
+    }
+    for (auto& line : socket_->takeLog()) {
+        log_.push_back(std::move(line));
+    }
+    if (log_.size() > 16) {
+        log_.erase(log_.begin(), log_.end() - 16);
+    }
 }
 
 XwisHost::~XwisHost()
@@ -139,12 +160,14 @@ XwisHost::~XwisHost()
 // Starts over: a new socket and session (the record re-posted once in the channel); retries in 30 s.
 void XwisHost::connect(std::uint32_t nowMs)
 {
+    keepLog();
     socket_.reset();
     session_.reset();
     send_.clear();
     retryAt_ = nowMs + kRetryMs;
-    socket_ = detail::connectXwis(error_);
-    if (!socket_) {
+    socket_.emplace(nick_, password_, nowMs, route_);
+    if (socket_->state() == net::TcpSocket::State::Failed) {
+        error_ = socket_->error();
         return;
     }
     session_.emplace(nick_, password_, place_);
@@ -177,6 +200,17 @@ void XwisHost::poll(std::uint32_t nowMs)
 {
     if (stopped_) {
         return;
+    }
+    if (socket_ && session_) {
+        if (socket_->poll(nowMs)) {
+            retryAt_ = nowMs + kRetryMs; // (counted from the chat server's connection)
+        }
+        if (socket_->asking()) {
+            return;
+        }
+        if (socket_->state() == net::TcpSocket::State::Failed && error_ != socket_->error()) {
+            error_ = socket_->error();
+        }
     }
     const bool broken = !socket_ || !session_ || socket_->state() == net::TcpSocket::State::Failed ||
                         socket_->state() == net::TcpSocket::State::Closed || session_->state() == XwisHostSession::State::Failed;

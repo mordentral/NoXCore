@@ -1,5 +1,6 @@
 // XWIS: the community revival of Westwood Online (xwis.net:4000), where 1.2b hosts still post
-// their games. The protocol is IRC-like text over TCP.
+// their games. The protocol is IRC-like text over TCP. Its chat server is the one servserv names,
+// as the game's WOLAPI.dll finds it (servserv.hpp); xwis.net:4000 when servserv gives none.
 //
 // Listing games needs no account: log in with a throwaway nick whose password is the nick
 // itself (XWIS makes the account on the spot), then `LIST -1 37` (37 = Nox) answers one

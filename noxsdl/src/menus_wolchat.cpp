@@ -569,6 +569,9 @@ void Menus::pollWol()
     using WolState = nox::lobby::WolChat::State;
     if (wol_) {
         wol_->poll(static_cast<std::uint32_t>(nowMs_));
+        for (const auto& line : wol_->takeLog()) {
+            SDL_Log("%s", line.c_str()); // (the chat server servserv named, or why xwis.net)
+        }
         // Logging in: once Ready or Failed, the login screen goes on (loginDone).
         if (wolLoggingIn_) {
             if (wol_->state() == WolState::Ready) {

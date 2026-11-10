@@ -85,6 +85,7 @@ add_library(noxcore
     src/lobby/browser.cpp
     src/lobby/client_keys.cpp
     src/lobby/listing.cpp
+    src/lobby/servserv.cpp
     src/lobby/wol_chat.cpp
     src/lobby/xwis.cpp
     src/lobby/xwis_host.cpp

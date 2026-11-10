@@ -682,15 +682,24 @@ int WolLobbyLists::removeUser(std::string_view name)
 
 // ------------------------------------------------------------------------------------ WolChat
 
-WolChat::WolChat(std::string nick, std::string apgarPassword, std::uint32_t nowMs)
+WolChat::WolChat(std::string nick, std::string apgarPassword, std::uint32_t nowMs, XwisRoute route)
     : startedAt_(nowMs)
 {
+    socket_.emplace(nick, apgarPassword, nowMs, std::move(route));
     session_.emplace(std::move(nick), std::move(apgarPassword));
-    std::string why;
-    socket_ = detail::connectXwis(why);
-    if (!socket_) {
-        fail(std::move(why), false);
+    if (socket_->state() == net::TcpSocket::State::Failed) {
+        fail(socket_->error(), false);
     }
+}
+
+std::vector<std::string> WolChat::takeLog()
+{
+    if (socket_) {
+        for (auto& line : socket_->takeLog()) {
+            log_.push_back(std::move(line));
+        }
+    }
+    return std::exchange(log_, {});
 }
 
 void WolChat::fail(std::string why, bool refused)
@@ -698,6 +707,11 @@ void WolChat::fail(std::string why, bool refused)
     state_ = State::Failed;
     error_ = std::move(why);
     refused_ = refused;
+    if (socket_) {
+        for (auto& line : socket_->takeLog()) {
+            log_.push_back(std::move(line)); // (the route it took, kept for takeLog)
+        }
+    }
     socket_.reset();
 }
 
@@ -746,9 +760,15 @@ void WolChat::poll(std::uint32_t nowMs)
         }
         return;
     }
+    if (socket_->poll(nowMs)) {
+        startedAt_ = nowMs; // (the login's time counts from the chat server's connection)
+    }
+    if (socket_->asking()) {
+        return;
+    }
     const auto socketState = socket_->state();
     if (socketState == net::TcpSocket::State::Failed) {
-        fail("can't connect to " + std::string(kXwisHost), false);
+        fail(socket_->error(), false);
         return;
     }
     if (state_ == State::Connecting && nowMs - startedAt_ > kLoginTimeoutMs) {

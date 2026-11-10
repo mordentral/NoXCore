@@ -15,16 +15,24 @@ constexpr std::uint32_t kTimeoutMs = 20000;
 
 } // namespace
 
-XwisLogin::XwisLogin(std::string nick, std::string apgarPassword, std::uint32_t nowMs)
+XwisLogin::XwisLogin(std::string nick, std::string apgarPassword, std::uint32_t nowMs, XwisRoute route)
     : startedAt_(nowMs)
 {
-    std::string why;
-    socket_ = detail::connectXwis(why);
-    if (!socket_) {
-        fail(std::move(why), false);
-        return;
-    }
+    socket_.emplace(nick, apgarPassword, nowMs, std::move(route));
     session_.emplace(std::move(nick), std::move(apgarPassword), XwisSession::Purpose::List);
+    if (socket_->state() == net::TcpSocket::State::Failed) {
+        fail(socket_->error(), false);
+    }
+}
+
+std::vector<std::string> XwisLogin::takeLog()
+{
+    if (socket_) {
+        for (auto& line : socket_->takeLog()) {
+            log_.push_back(std::move(line));
+        }
+    }
+    return std::exchange(log_, {});
 }
 
 void XwisLogin::fail(std::string why, bool refused)
@@ -32,6 +40,11 @@ void XwisLogin::fail(std::string why, bool refused)
     state_ = State::Failed;
     error_ = std::move(why);
     refused_ = refused;
+    if (socket_) {
+        for (auto& line : socket_->takeLog()) {
+            log_.push_back(std::move(line));
+        }
+    }
     socket_.reset();
     session_.reset();
 }
@@ -54,9 +67,15 @@ void XwisLogin::poll(std::uint32_t nowMs)
         }
         return;
     }
+    if (socket_->poll(nowMs)) {
+        startedAt_ = nowMs; // (the login's time counts from the chat server's connection)
+    }
+    if (socket_->asking()) {
+        return;
+    }
     const auto state = socket_->state();
     if (state == net::TcpSocket::State::Failed) {
-        fail("can't connect to " + std::string(kXwisHost), false);
+        fail(socket_->error(), false);
         return;
     }
     if (nowMs - startedAt_ > kTimeoutMs) {

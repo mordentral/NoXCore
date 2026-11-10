@@ -25,10 +25,11 @@
 // ":- ") are the message of the day.
 //
 // WolChatSession is the conversation without sockets (tests feed it lines); WolChat runs it over a
-// TcpSocket to xwis.net.
+// connection to the chat server servserv names (servserv.hpp).
 #pragma once
 
 #include "noxcore/lobby/listing.hpp"
+#include "noxcore/lobby/servserv.hpp"
 #include "noxcore/lobby/xwis.hpp"
 #include "noxcore/net/tcp_socket.hpp"
 
@@ -211,18 +212,20 @@ private:
     std::vector<User> users_;
 };
 
-/// A WolChatSession over a socket to xwis.net: polled, never blocking.
+/// A WolChatSession over a connection to XWIS's chat server: polled, never blocking.
 class WolChat {
 public:
     enum class State : std::uint8_t { Connecting, Ready, Failed, Closed };
 
-    /// Connects and logs in; `apgarPassword` is already encoded.
-    WolChat(std::string nick, std::string apgarPassword, std::uint32_t nowMs);
+    /// Asks servserv for the chat server, connects and logs in; `apgarPassword` is already encoded.
+    WolChat(std::string nick, std::string apgarPassword, std::uint32_t nowMs, XwisRoute route = {});
 
-    /// Sends, receives; the login times out after 20 seconds. After logOff, waits (3 seconds at
-    /// most) for the server to close the connection, since XWIS refuses another login from this
-    /// address while it lasts.
+    /// Sends, receives; the login times out 20 seconds after the chat server's connection
+    /// starts. After logOff, waits (3 seconds at most) for the server to close the connection,
+    /// since XWIS refuses another login from this address while it lasts.
     void poll(std::uint32_t nowMs);
+    /// The route to the chat server, as "XWIS: ..." lines, since the last call.
+    std::vector<std::string> takeLog();
     /// RequestLogout, then Closed once the server has closed the connection.
     void logOff(std::uint32_t nowMs);
 
@@ -238,8 +241,9 @@ private:
     void fail(std::string why, bool refused);
     void flush();
 
-    std::optional<net::TcpSocket> socket_;
+    std::optional<XwisConnection> socket_;
     std::optional<WolChatSession> session_;
+    std::vector<std::string> log_;
     std::string send_;
     std::uint32_t startedAt_ = 0;
     std::uint32_t quitAt_ = 0;

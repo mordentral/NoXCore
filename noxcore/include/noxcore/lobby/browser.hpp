@@ -1,5 +1,5 @@
 // Finding Nox games to join, from every place they're advertised, merged into one list:
-//   XWIS      the games 1.2b hosts post to xwis.net (xwis.hpp)
+//   XWIS      the games 1.2b hosts post to XWIS (xwis.hpp), on the chat server servserv names
 //   LAN       a MSG_SERVER_DISCOVER broadcast to port 18590 on the local network
 //   list      servers named directly ("host" or "host:port"), e.g. from a servers file
 // Every server found is pinged with MSG_SERVER_DISCOVER (header 00 00, a token the server
@@ -15,6 +15,7 @@
 
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/lobby/listing.hpp"
+#include "noxcore/lobby/servserv.hpp"
 #include "noxcore/lobby/xwis.hpp"
 #include "noxcore/net/tcp_socket.hpp"
 #include "noxcore/net/udp_socket.hpp"
@@ -59,11 +60,14 @@ public:
         /// The nick's password, apgar-encoded (a player's own login); empty: the nick stands in
         /// (a throwaway listing login).
         std::string xwisPassword;
-        /// Where XWIS is (default xwis.net:4000; tests: a loopback fake).
+        /// XWIS's chat server, gone to straight without asking servserv (tests: a loopback fake);
+        /// none: the one servserv names (xwisRoute).
         std::optional<net::Endpoint> xwisServer;
         /// Where the LAN query goes (default the broadcast to the game port, 18590; tests: a
         /// loopback fake). Every reply to it counts as found on the LAN.
         std::optional<net::Endpoint> lanQueryTo;
+        /// The way to XWIS's chat server: servserv first (servserv.hpp; tests: loopback fakes).
+        XwisRoute xwisRoute;
     };
 
     explicit ServerBrowser(Options options);
@@ -121,7 +125,7 @@ private:
     bool xwisListing_ = true;
     std::minstd_rand rng_;
     std::optional<net::UdpSocket> udp_;
-    std::optional<net::TcpSocket> xwisSocket_;
+    std::optional<XwisConnection> xwisSocket_;
     std::optional<XwisSession> xwis_;
     std::uint32_t xwisStartedAt_ = 0;
     std::string xwisSend_;
