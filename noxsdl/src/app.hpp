@@ -543,8 +543,8 @@ struct App {
     int smoothing = 2;
     bool smoothMotion = true;    ///< Smoothing = Smooth Network: everything drawn between snapshots
     bool smoothScrolling = true; ///< Smoothing = Smooth Network: the camera (and us) on that clock too
-    std::uint32_t lockedSnapshot = 0; ///< Match Server: the snapshotCount the last frame drew
-    std::uint64_t lockedAtMs = 0;     ///< and when
+    std::uint32_t pacedSnapshot = 0; ///< Match Server: the snapshotCount the last frame drew
+    std::uint64_t pacedAtMs = 0;     ///< and when
     bool predictMovement = false; ///< --predict-movement (an experiment; runs only with smoothMotion)
     int otherUnits = 0; ///< --other-units: 0 smooth, 1 newest, 2 ahead (Interpolator::Others; an experiment)
     /// The HD image pack Options' Use HD Images draws from (empty: none found): --image-pack, else

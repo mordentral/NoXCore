@@ -35,6 +35,7 @@
 #pragma once
 
 #include "gui.hpp"
+#include "options_trip.hpp"
 
 #include "noxcore/config/nox_config.hpp"
 
@@ -121,7 +122,7 @@ public:
     /// Closes it (nox.cfg saved: onClose); from the menus it slides out first, then onDismissed.
     void close();
     /// Open, or still sliding out.
-    bool isOpen() const { return open_; }
+    bool isOpen() const { return life_.isOpen(); }
     /// The tooltip for what's under the mouse: noxsdl's switches say what they do, with their
     /// upsides and downsides (the game's own have none).
     std::string tooltip() const;
@@ -132,10 +133,15 @@ public:
     bool handleEvent(const SDL_Event& event, int width, int height);
 
 private:
-    /// close(), then `next` in place of onDismissed (Input Config: the input configuration).
-    void closeThen(std::function<void()> next);
+    using After = optionstrip::WindowLife::After;
+    /// close(), going on to `after` once gone (Input Config: the input configuration in place of
+    /// onDismissed). nox.cfg is saved (onClose) as it starts out from the menus, or once it's gone
+    /// in a game.
+    void closeThen(After after);
     /// The windows gone once it's out (or at once in a game).
-    void finishClose(const std::function<void()>& next);
+    void takeDown();
+    /// Gone: on to `after` (onInputConfig or onDismissed).
+    void goOn(After after);
     /// The advanced panel (a window of its own here) kept in its place on the sliding window.
     void followSlide();
     bool onMessage(int message, gui::Window& from);
@@ -177,8 +183,7 @@ private:
     SoundOn sound_{true, true, true};
     int resolution_ = -1; ///< the resolution drop-down's choice (kResolutions' index, -1 none)
     bool inGame_ = false;
-    bool open_ = false;
-    bool closing_ = false;           ///< sliding out (the input ignored)
+    optionstrip::WindowLife life_;   ///< open, sliding out (the input ignored), gone
     gui::Slide* slide_ = nullptr;    ///< the menus' slide in and out (none in a game)
     SDL_Point advancedHome_{};       ///< the advanced panel's place with the window at 0, 0
     std::vector<std::function<void()>> deferred_;

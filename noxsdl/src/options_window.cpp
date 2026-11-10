@@ -253,7 +253,7 @@ std::string_view extraTooltip(std::int32_t id)
 
 std::string OptionsWindow::tooltip() const
 {
-    if (!open_) {
+    if (!life_.isOpen()) {
         return {};
     }
     const gui::Window* w = gui_.hovered();
@@ -343,14 +343,13 @@ OptionsWindow::OptionsWindow(gui::Resources res, std::filesystem::path windowDir
 
 void OptionsWindow::open(const nox::config::Config& config, bool inGame, const Extras& extras, const SoundOn& sound)
 {
-    if (open_) {
+    if (!life_.open()) {
         return;
     }
     config_ = config;
     extras_ = extras;
     sound_ = sound;
     inGame_ = inGame;
-    open_ = true;
     const auto proc = [this](gui::Window&, int message, gui::Window& from) { return onMessage(message, from); };
     auto optionsDef = nox::gui::loadWindowFile(windowDir_ / "Options.wnd");
     // The resolutions: the game's radio buttons (1024x576 only in some installs) replaced by a
@@ -652,7 +651,6 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     window_->rect.x = 0;
     window_->rect.y = 0;
     advancedHome_ = {advanced_->rect.x, advanced_->rect.y};
-    closing_ = false;
     slide_ = nullptr;
     if (!inGame) {
         // game_showOptions: in from 480 above (20 a frame), out at 40, as the menus' screens.
@@ -696,44 +694,53 @@ void OptionsWindow::showPage(int page)
 
 void OptionsWindow::close()
 {
-    closeThen({});
+    closeThen(After::Dismissed);
 }
 
-void OptionsWindow::closeThen(std::function<void()> next)
+void OptionsWindow::closeThen(After after)
 {
-    if (!open_ || closing_) {
+    const auto how = life_.close(slide_ != nullptr, after);
+    if (how == optionstrip::WindowLife::Close::Nothing) {
         return;
     }
-    if (!slide_) {
+    const bool atOnce = how == optionstrip::WindowLife::Close::AtOnce;
+    if (atOnce) {
         // In a game: gone at once, the in-game menu coming back with a click.
-        finishClose(next);
-        return;
+        takeDown();
+        gui_.resources().sound(inGame_ ? 0x399 : 0x39B);
     }
-    // From the menus: nox.cfg saved as it starts out (ShellSlideOut heard), then gone once out.
-    closing_ = true;
+    // nox.cfg saved: from the menus as it starts out (ShellSlideOut heard), in a game once it's gone.
     if (callbacks_.onClose) {
         callbacks_.onClose(config_);
     }
-    gui_.slideOut(slide_, [this, next = std::move(next)] { deferred_.push_back([this, next] { finishClose(next); }); });
+    if (atOnce) {
+        goOn(after);
+        return;
+    }
+    // From the menus: gone once out.
+    gui_.slideOut(slide_, [this, after] {
+        deferred_.push_back([this, after] {
+            takeDown();
+            goOn(after);
+        });
+    });
 }
 
-void OptionsWindow::finishClose(const std::function<void()>& next)
+void OptionsWindow::takeDown()
 {
-    const bool slid = slide_ != nullptr;
-    open_ = false;
-    closing_ = false;
+    life_.gone();
     slide_ = nullptr;
     gui_.destroyAll();
     window_ = nullptr;
     advanced_ = nullptr;
-    if (!slid) {
-        gui_.resources().sound(inGame_ ? 0x399 : 0x39B);
-        if (callbacks_.onClose) {
-            callbacks_.onClose(config_);
+}
+
+void OptionsWindow::goOn(After after)
+{
+    if (after == After::InputConfig) {
+        if (callbacks_.onInputConfig) {
+            callbacks_.onInputConfig();
         }
-    }
-    if (next) {
-        next();
     } else if (callbacks_.onDismissed) {
         callbacks_.onDismissed();
     }
@@ -890,13 +897,7 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
     }
     if (from.id == kInputConfig) {
         // (From the menus: once Options has slid out.)
-        deferred_.push_back([this] {
-            closeThen([this] {
-                if (callbacks_.onInputConfig) {
-                    callbacks_.onInputConfig();
-                }
-            });
-        });
+        deferred_.push_back([this] { closeThen(After::InputConfig); });
         return true;
     }
     return false;
@@ -911,17 +912,17 @@ void OptionsWindow::update(std::uint64_t nowMs)
 
 void OptionsWindow::draw(SDL_Renderer* renderer, int width, int height)
 {
-    if (open_) {
+    if (life_.isOpen()) {
         gui_.draw(renderer, width, height);
     }
 }
 
 bool OptionsWindow::handleEvent(const SDL_Event& event, int width, int height)
 {
-    if (!open_) {
+    if (!life_.isOpen()) {
         return false;
     }
-    if (closing_) {
+    if (life_.closing()) {
         return true; // (sliding out: nothing more to press)
     }
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {

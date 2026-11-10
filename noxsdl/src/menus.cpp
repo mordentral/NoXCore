@@ -182,7 +182,7 @@ void Menus::reset()
     deferred_.clear();
     leaving_ = false;
     credits_.reset();
-    selColorKept_.reset();
+    kept_.clear();
 }
 
 void Menus::showMainMenu()
@@ -371,6 +371,16 @@ void Menus::enter(State s)
             loadCharacters();
             fillCharacterList();
         }
+        // Back from Options: the character picked as it was (the game's picks the first again).
+        if (const auto kept = kept_.take<optionstrip::SelCharKept>()) {
+            for (const auto& k : kept->lists) {
+                if (gui::Window* list = screen_->find(k.id)) {
+                    const int lines = static_cast<int>(list->lines.size());
+                    list->selectedLine = k.line < lines ? k.line : list->selectedLine;
+                    list->scroll = std::clamp(k.scroll, 0, std::max(lines - 1, 0));
+                }
+            }
+        }
         break;
     }
     case State::SelClass: {
@@ -389,6 +399,10 @@ void Menus::enter(State s)
                     }
                 };
             }
+        }
+        // Back from Options: the class picked as it was (the game's has none picked again).
+        if (const auto kept = kept_.take<optionstrip::SelClassKept>(); kept && kept->chosen >= 0) {
+            pickClass(kept->chosen);
         }
         optsBack_->show(true);
         break;
@@ -410,6 +424,20 @@ void Menus::enter(State s)
         slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
         optsBack_->show(true);
         setupLogin();
+        // Back from Options: the fields as they were left, not the saved login filled in again.
+        if (const auto kept = kept_.take<optionstrip::LoginKept>()) {
+            selectLogin(kept->slot);
+            if (gui::Window* name = screen_->find(kLoginName)) {
+                name->entry = kept->name;
+            }
+            if (gui::Window* password = screen_->find(kLoginPassword)) {
+                password->entry = kept->password;
+            }
+            if (gui::Window* save = screen_->find(kLoginSave)) {
+                save->state = kept->save ? save->state | gui::kPressed : save->state & ~gui::kPressed;
+            }
+            scrollLogins(kept->scroll);
+        }
         break;
     case State::Browser: {
         // game_showGameSel: the whole screen from 480 above. It has its own Back.
@@ -535,13 +563,12 @@ void Menus::back()
         // RequestLogout), back to the login.
         logOffWol();
     }
-    leave([this] {
-        // Drop this screen, then re-enter the one under it (enter pushes it again).
-        stack_.pop_back();
-        const State previous = stack_.back();
-        stack_.pop_back();
-        enter(previous);
-    });
+    leave([this] { returnToPrevious(); });
+}
+
+void Menus::returnToPrevious()
+{
+    enter(optionstrip::dropToPrevious(stack_)); // (enter pushes it again)
 }
 
 bool Menus::onMainMenu(gui::Window& from)
@@ -1299,47 +1326,91 @@ bool Menus::onOptsBack(gui::Window& from)
     }
     if (from.id == kOptions && callbacks_.options) {
         // game_checkStateOptions: the screen up slides out, then Options (game_showOptions).
-        if (stack_.empty() || stack_.back() == State::Options || leaving_) {
+        if (!optionstrip::mayOpen(stack_, leaving_)) {
             return true;
         }
-        if (stack_.back() == State::SelColor && screen_) {
-            // (Its name and colours kept for its return: game_showSelColor fills them back in.)
-            SelColorKept kept;
-            for (std::int32_t id = kColorSkin; id <= kColorShoes2; ++id) {
-                if (const gui::Window* w = screen_->find(id)) {
-                    kept.colors.emplace_back(id, w->userData);
-                }
-            }
-            for (const auto id : {kHairLabel, kMustacheLabel, kGoateeLabel, kBeardLabel}) {
-                if (const gui::Window* w = screen_->find(id)) {
-                    kept.labelsOn.emplace_back(id, w->enabled());
-                }
-            }
-            if (const gui::Window* name = screen_->find(kNameEntry)) {
-                kept.name = name->entry;
-            }
-            selColorKept_ = std::move(kept);
-        }
+        keepForOptions();
         leave([this] { enter(State::Options); });
         return true;
     }
     return false;
 }
 
+void Menus::keepForOptions()
+{
+    // The screen's choices kept for its return (game_switchStates enters it again). The game's
+    // SelColor keeps its own (game_showSelColor fills them back in); its class and character
+    // screens start over, and its login has Options greyed. Here each comes back as it was left.
+    kept_.clear();
+    if (!screen_ || stack_.empty()) {
+        return;
+    }
+    switch (stack_.back()) {
+    case State::SelColor: {
+        optionstrip::SelColorKept kept;
+        for (std::int32_t id = kColorSkin; id <= kColorShoes2; ++id) {
+            if (const gui::Window* w = screen_->find(id)) {
+                kept.colors.emplace_back(id, w->userData);
+            }
+        }
+        for (const auto id : {kHairLabel, kMustacheLabel, kGoateeLabel, kBeardLabel}) {
+            if (const gui::Window* w = screen_->find(id)) {
+                kept.labelsOn.emplace_back(id, w->enabled());
+            }
+        }
+        if (const gui::Window* name = screen_->find(kNameEntry)) {
+            kept.name = name->entry;
+        }
+        kept_.keep(std::move(kept));
+        break;
+    }
+    case State::SelClass:
+        kept_.keep(optionstrip::SelClassKept{chosenClass_});
+        break;
+    case State::SelChar: {
+        optionstrip::SelCharKept kept;
+        for (const auto id : {kCharLists, kCharKind, kCharName}) {
+            if (const gui::Window* list = screen_->find(id)) {
+                kept.lists.push_back({id, list->selectedLine, list->scroll});
+            }
+        }
+        kept_.keep(std::move(kept));
+        break;
+    }
+    case State::Login: {
+        optionstrip::LoginKept kept;
+        kept.slot = loginSlot_;
+        if (const gui::Window* name = screen_->find(kLoginName)) {
+            kept.name = name->entry;
+        }
+        if (const gui::Window* password = screen_->find(kLoginPassword)) {
+            kept.password = password->entry;
+        }
+        if (const gui::Window* save = screen_->find(kLoginSave)) {
+            kept.save = (save->state & gui::kPressed) != 0;
+        }
+        if (const gui::Window* list = screen_->find(kLoginList)) {
+            kept.scroll = list->scroll;
+        }
+        kept_.keep(std::move(kept));
+        break;
+    }
+    default:
+        break; // (the main menu and Online: nothing to keep)
+    }
+}
+
 void Menus::optionsClosed()
 {
-    // Options gone: the screen under it shown again (game_switchStates), sliding in.
+    // Options gone: the screen under it shown again (game_switchStates), sliding in. (A second
+    // report before then finds Options gone already.)
     if (!optionsUp()) {
         return;
     }
     deferred_.push_back([this] {
-        if (!optionsUp()) {
-            return;
+        if (optionsUp()) {
+            returnToPrevious();
         }
-        stack_.pop_back();
-        const State previous = stack_.back();
-        stack_.pop_back();
-        enter(previous);
     });
 }
 
@@ -1744,12 +1815,7 @@ bool Menus::onSelClass(int message, gui::Window& from)
     // one does nothing more. Accept goes on to the looks.
     if (message == gui::Hover) {
         if (from.id >= kClassFirst && from.id <= kClassLast) {
-            chosenClass_ = from.id;
-            newClass_ = static_cast<std::uint8_t>(from.id - kClassFirst);
-            enable(screen_, kClassAccept, true);
-            if (gui::Window* t = screen_->find(kClassText)) {
-                t->text = gui_.text(kClassNames[newClass_], "SelClass.c");
-            }
+            pickClass(from.id);
         }
         return true;
     }
@@ -1760,6 +1826,16 @@ bool Menus::onSelClass(int message, gui::Window& from)
         leave([this] { enter(State::SelColor); });
     }
     return true;
+}
+
+void Menus::pickClass(std::int32_t id)
+{
+    chosenClass_ = id;
+    newClass_ = static_cast<std::uint8_t>(id - kClassFirst);
+    enable(screen_, kClassAccept, true);
+    if (gui::Window* t = screen_->find(kClassText)) {
+        t->text = gui_.text(kClassNames[newClass_], "SelClass.c");
+    }
 }
 
 // ------------------------------------------------------------------------------ SelColor
@@ -1798,19 +1874,18 @@ void Menus::setupSelColor()
         name->entry = nox::strings::fromUtf8(gui_.text("DefaultName", "SelColor.c")).substr(0, name->entryMax);
     }
     // Back from Options: the name, colours and facial hair as they were chosen.
-    if (selColorKept_) {
-        for (const auto& [id, data] : selColorKept_->colors) {
+    if (const auto kept = kept_.take<optionstrip::SelColorKept>()) {
+        for (const auto& [id, data] : kept->colors) {
             if (gui::Window* w = screen_->find(id)) {
                 w->userData = data;
             }
         }
-        for (const auto& [id, on] : selColorKept_->labelsOn) {
+        for (const auto& [id, on] : kept->labelsOn) {
             enable(screen_, id, on);
         }
         if (gui::Window* name = screen_->find(kNameEntry)) {
-            name->entry = selColorKept_->name;
+            name->entry = kept->name;
         }
-        selColorKept_.reset();
     }
     // The picker (760) is a window of its own on top, hidden until a colour is clicked; a click
     // outside it closes it.

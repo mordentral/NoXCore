@@ -67,7 +67,9 @@ constexpr WindowMouse windowMouse(MouseOwner owner, bool hiddenRun)
 /// are absolute, and a game being played is relative only with the pointer over the window: back
 /// from the menus with it outside (Escape closed by its key), it's taken when it comes back over
 /// the window, so it never jumps and no click is lost. Once relative, SDL keeps the mouse's focus
-/// on the window while it has the keyboard's, and ends relative mode itself when that goes.
+/// on the window while it has the keyboard's; when that goes, SDL pauses relative mode (the window
+/// keeps its relative flag, SDL_GetWindowRelativeMouseMode still true) and resumes it when the
+/// keyboard's focus comes back.
 constexpr bool wantRelative(bool playing, bool windowed, bool pointerInWindow, bool hiddenRun)
 {
     if (hiddenRun) {

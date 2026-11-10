@@ -44,8 +44,9 @@
 //   300    Options (game_showOptions): the bar's Options button is a screen of its own. The
 //          screen up slides out, the Options window (options_window.hpp) slides in from above,
 //          the bar's Back reads "Back" and its Options is greyed. Back, or Escape, slides Options
-//          out and brings the screen it came from back (SelColor with its name and colours as
-//          they were).
+//          out and brings the screen it came from back with its choices as they were (options_trip.hpp:
+//          SelColor's name and colours, SelClass's class, SelChar's character, the login's fields;
+//          the game brings back only SelColor's as they were, and greys Options on its login).
 //
 // The main menu's Intro plays movies\Intro.vqa (callbacks' intro: the movie player). Its Credits
 // (windowMainMenuProc's 0x7A) hides the menu behind the ending's credits screen (a Cinematics of
@@ -58,6 +59,7 @@
 #include "browser_screen.hpp"
 #include "gui.hpp"
 #include "mode_list.hpp"
+#include "options_trip.hpp"
 
 #include "noxcore/client/headless_client.hpp"
 #include "noxcore/client/solo_menu.hpp"
@@ -193,7 +195,7 @@ public:
     void queueClicks(std::vector<std::string> steps) { clicks_ = std::move(steps); }
 
     /// Options (300) is the screen up: the window over the background, the bar's Back closing it.
-    bool optionsUp() const { return !stack_.empty() && stack_.back() == State::Options; }
+    bool optionsUp() const { return optionstrip::optionsUp(stack_); }
     /// The Options window has gone (Escape, the bar's Back): the screen it was opened from comes
     /// back, as Back from any screen.
     void optionsClosed();
@@ -205,17 +207,7 @@ public:
     void handleEvent(const SDL_Event& event, int width, int height, std::uint64_t nowMs);
 
 private:
-    enum class State {
-        MainMenu = 100,
-        Options = 300,
-        Online = 400,
-        SelChar = 500,
-        SelClass = 600,
-        SelColor = 700,
-        Login = 1700,
-        Chat = 1900,
-        Browser = 10000
-    };
+    using State = MenuState; // (options_trip.hpp)
     using Rgb = std::array<std::uint8_t, 3>;
 
     /// A saved character (Save\*.plr) as the character list shows it (its path empty for a record
@@ -227,6 +219,12 @@ private:
     /// Slides the current screen out, destroys it, then runs `next`.
     void leave(std::function<void()> next);
     void back();
+    /// Drops the screen on top, then enters the one under it again (Back's, once the screen has
+    /// slid out, and Options' once its window has gone).
+    void returnToPrevious();
+    /// The choices on the screen up kept for its return from Options (SelChar, SelClass, SelColor,
+    /// the login; the others have none).
+    void keepForOptions();
     bool shellSound(int message) const;
     bool onMainMenu(gui::Window& from);
     bool onOnline(gui::Window& from);
@@ -234,6 +232,8 @@ private:
     bool onOptsBack(gui::Window& from);
     bool onSelChar(gui::Window& from);
     bool onSelClass(int message, gui::Window& from);
+    /// SelClass's portrait `id` picked: its class, its description, Accept on.
+    void pickClass(std::int32_t id);
     bool onSelColor(gui::Window& from);
     void setupSelColor();
     // The XWIS login (1700).
@@ -414,14 +414,10 @@ private:
     // Character creation.
     const nox::things::ModifierDb& modifiers_;
     std::array<std::array<Rgb, 32>, 3> palette_{}; ///< clothes, hair, skin
-    /// SelColor's choices kept while Options is up from it (its colour buttons' data, the facial
-    /// hair switched on or off, the name): the screen comes back with them, not the defaults.
-    struct SelColorKept {
-        std::vector<std::pair<std::int32_t, std::uint32_t>> colors;
-        std::vector<std::pair<std::int32_t, bool>> labelsOn;
-        std::u16string name;
-    };
-    std::optional<SelColorKept> selColorKept_;
+    /// The choices of the screen Options is up from (SelColor's colours, facial hair and name,
+    /// SelClass's class, SelChar's character, the login's fields): it comes back with them, not
+    /// its defaults.
+    optionstrip::KeptScreen kept_;
     int chosenClass_ = -1;                         ///< its window id on SelClass, -1 none yet
     std::uint8_t newClass_ = 0;
     gui::Window* picker_ = nullptr;                ///< SelColor's 760, made top-level

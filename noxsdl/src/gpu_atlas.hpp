@@ -44,15 +44,13 @@ public:
     enum class Pool : std::uint8_t { Session, Map, Demand };
     static constexpr int kPools = 3;
 
-    /// The row pitch staged uploads are padded to by default (gpu_row_pitch.hpp).
-    static constexpr std::uint32_t kDefaultRowPitch = rowpitch::kDefault;
-
     /// The atlas on the renderer's GPU device, or nullptr: not the GPU renderer, or its device
     /// can't sample BC7 (logged). `labelShader`: the material shader that takes the material
     /// bytes as a second texture (nullptr: no Labels pages). `rowPitch`: what each staged row is
-    /// padded to, in bytes (1: rows packed tight, for a backend whose upload reads them so).
+    /// padded to, in bytes (1: rows packed tight, for a backend whose upload reads them so; by
+    /// default gpu_row_pitch.hpp's).
     static std::unique_ptr<GpuAtlas> create(SDL_Renderer* renderer, SDL_GPUShader* labelShader,
-                                            std::uint32_t rowPitch = kDefaultRowPitch);
+                                            std::uint32_t rowPitch = rowpitch::kDefault);
     ~GpuAtlas();
     /// Whether it makes Labels pages (a material shader to read them).
     bool takesLabels() const { return labelShader_ != nullptr; }
@@ -158,7 +156,7 @@ private:
 
     SDL_Renderer* renderer_ = nullptr;
     SDL_GPUDevice* device_ = nullptr;
-    std::uint32_t rowPitch_ = kDefaultRowPitch;
+    std::uint32_t rowPitch_ = rowpitch::kDefault;
     SDL_GPUShader* labelShader_ = nullptr;
     SDL_GPUSampler* nearest_ = nullptr;
     std::vector<Page> pages_;

@@ -288,7 +288,8 @@ void applyMouse(App& app)
     SDL_GetCurrentRenderOutputSize(app.renderer, &outW, &outH);
     const float gamePixel = app.live ? app.camera.zoom // (viewZoom, set this frame)
                                      : std::min(static_cast<float>(outW) / 640.0f, static_cast<float>(outH) / 480.0f);
-    const float density = std::max(SDL_GetWindowPixelDensity(app.window), 0.01f); // (events are in window points)
+    // (Events are in window points: the density the pointer mapping uses, layoutView's this frame.)
+    const float density = std::max(app.pixelDensity, 0.01f);
     // The 3D view's mouse look turns by the same counts at its own speed (Options' Mouse slider
     // sets that one while the 3D view is on); a window open there gets the cursor's speed back.
     const bool looking = app.view3d.looking();

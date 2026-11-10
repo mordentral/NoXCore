@@ -4149,15 +4149,15 @@ SDL_AppResult SDL_AppIterate(void* appstate)
             // 50 ms without one.
             const std::uint64_t nowMs = SDL_GetTicks();
             const std::uint32_t update = client.snapshotCount();
-            if (!snapshotFrameDue(update, app->lockedSnapshot, nowMs, app->lockedAtMs)) {
+            if (!snapshotFrameDue(update, app->pacedSnapshot, nowMs, app->pacedAtMs)) {
                 if (embedded) {
                     return editorFrame(*app); // (the editor round the game's last frame, still in its texture)
                 }
                 SDL_Delay(1);
                 return SDL_APP_CONTINUE;
             }
-            app->lockedSnapshot = update;
-            app->lockedAtMs = nowMs;
+            app->pacedSnapshot = update;
+            app->pacedAtMs = nowMs;
         }
         for (auto& fx : client.takeEffects()) {
             app->effects->add(std::move(fx));
