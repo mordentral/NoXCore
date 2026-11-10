@@ -398,12 +398,15 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
                                    std::make_move_iterator(items.end()));
     }
     window_ = gui_.load(optionsDef, proc);
+    // A drop-down's button and choices all in the small font, so one list never mixes faces.
     if (gui::Window* box = window_->find(kResBox)) {
         box->dropArrow = true;
+        box->largeFont = false;
     }
     for (int i = 0; i < static_cast<int>(kResolutions.size()); ++i) {
         if (gui::Window* w = window_->find(kResItem + i)) {
             w->text = kResolutions[static_cast<std::size_t>(i)].name;
+            w->largeFont = false;
         }
     }
     // The advanced options: the old renderer's switches for low-end hardware (surfaces, shading,
@@ -568,10 +571,12 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     for (const DropDown& d : drops()) {
         if (gui::Window* box = advanced_->find(d.box)) {
             box->dropArrow = true; // (the game's list-box arrow on the button: it opens a list)
+            box->largeFont = false; // (the small font, as its choices: one face for the whole list)
         }
         for (int i = 0; i < static_cast<int>(d.names.size()); ++i) {
             if (gui::Window* w = advanced_->find(d.item + i)) {
                 w->text = d.names[static_cast<std::size_t>(i)];
+                w->largeFont = false;
             }
         }
     }
