@@ -3724,9 +3724,9 @@ void Monsters::raiseZombie(ServerObject& o)
 
 void Monsters::burnZombie(ServerObject& o)
 {
-    // zombieBurnDelete: a player's loses it, a scorch, gone. (The solo game's kill
-    // award: with the solo game.)
+    // zombieBurnDelete: its owner told, solo kill XP awarded, a scorch, gone.
     loseCreature(fight.world, o);
+    awardKillXP(fight, o);
     if (fight.things) {
         makeScorch(fight.world, *fight.things, o.x, o.y, 1, fight.rng, fight.frame);
     }
