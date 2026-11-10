@@ -309,8 +309,14 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.dropEquipped = true;
         } else if (a == "--image-pack") {
             app.imagePack = next(); // the HD image pack to use instead of the one found
-        } else if (a == "--hd-images") {
-            opts.hdImages = true; // Use HD Images on for this run
+        } else if (a == "--hd-images" || a == "--original-fonts" || a == "--no-original-fonts") {
+            // Use HD Images on for this run; Original Style Fonts on or off for this run. (One branch:
+            // the chain is as deep as the compiler takes.)
+            if (a == "--hd-images") {
+                opts.hdImages = true;
+            } else {
+                opts.originalFonts = a == "--original-fonts";
+            }
         } else if (a == "--hd-decode-sync") {
             app.hdDecodeSync = true; // (HD images decoded as they're first drawn: no workers, no map preload)
         } else if (a == "--hd-placeholders") {

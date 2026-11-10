@@ -650,7 +650,15 @@ struct App {
     /// codes nox.cfg's names stand for (InputBindings::keyCode's; 0: none).
     std::array<std::string, 4> modAbilityKeyNames{"3", "4", "5", "6"};
     std::array<std::uint32_t, 4> modAbilityKeys{0x04, 0x05, 0x06, 0x07};
+    /// The game text's faces (text.hpp's GameFonts: before the Fonts, so it outlives them), and the
+    /// Fonts that stand for default.fnt (`font`, most text) and large.fnt (`largeFont`, the menus'
+    /// large text). Their faces are switched in place by Original Style Fonts and Use HD Images
+    /// (applyFonts), so the pointers handed out stay good.
+    std::unique_ptr<GameFonts> fontFaces;
     std::unique_ptr<Font> font;
+    std::unique_ptr<Font> largeFont;
+    /// Options' Original Style Fonts (noxcore.cfg's OriginalFonts): the Nox-style fonts, else Caudex.
+    bool originalFonts = true;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game
     bool autoSpawn = false;     ///< --spawn: leave observer mode once in the game (for tests)
@@ -787,6 +795,7 @@ void setOtherUnits(App& app);
 void preloadMap(App& app, const std::string& name);
 void preloadSession(App& app);
 void applyExtras(App& app, const OptionsWindow::Extras& e);
+void applyFonts(App& app);
 void openOptions(App& app);
 int trackData(App& app);
 void setTrackData(App& app, int mask);

@@ -71,6 +71,8 @@ struct Resources {
     const nox::strings::StringTable* strings = nullptr;
     /// Snd_PlaySound for the screens' own sounds (clicks, slides); may be empty.
     std::function<void(std::uint32_t soundId)> playSound;
+    /// large.fnt's: the windows drawn in the large font (Window::largeFont); none, the default's.
+    Font* largeFont = nullptr;
 
     void sound(std::uint32_t id) const
     {
@@ -147,6 +149,9 @@ public:
     std::string tooltip;
     nox::gui::WindowData data;
     std::int32_t radioValue = 0; ///< RADIOBUTTON DATA: 0 text beside the button, else centred
+    /// (noxsdl's) A radio button whose image holds its switch this far in (the Options window's
+    /// colour-depth rows): its label is centred in the rest of the row, clear of the switch.
+    int labelLeft = 0;
 
     // List boxes.
     struct Line {
@@ -177,6 +182,9 @@ public:
     /// draws the game's list-box down arrow (UIScrollDn, lit while the mouse is on it) at its
     /// right end, its text centred in the rest.
     bool dropArrow = false;
+    /// (noxsdl's) A static text that is one line: drawn in the small font when it's too long for
+    /// the large one, never wrapped (the Options panel's labels, whatever the face).
+    bool oneLine = false;
     /// (noxcpp) Drawn visibly greyed while disabled: its texts, list lines and box outlines in a dim
     /// grey, its images darkened. Off (the stock look, every window the files
     /// make): a disabled window draws as the exe's does, often no different from an enabled one.
@@ -290,8 +298,10 @@ public:
     /// A rectangle in output pixels, for things drawn in a window's place (our browser).
     SDL_FRect toOutput(int x, int y, int w, int h) const;
     float scale() const { return scale_; }
-    /// The pixel size to draw text at.
+    /// The pixel size to draw text at, in font(large).
     int pixelSize(bool large) const;
+    /// The game's default font, or its large one (Resources::largeFont, the default's without it).
+    Font* font(bool large) const { return large && res_.largeFont ? res_.largeFont : res_.font; }
     SDL_Renderer* renderer() const { return renderer_; }
     /// Output pixels to the 640 x 480 layout.
     SDL_FPoint toLayout(float x, float y) const;

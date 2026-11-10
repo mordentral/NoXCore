@@ -130,8 +130,9 @@ if(NOX_BUILD_SDL)
     )
     FetchContent_MakeAvailable(SDL3)
 
-    # Text: stb_truetype renders TrueType, and noxsdl embeds Noto Sans (SIL OFL 1.1) as the font it
-    # uses when the game folder has no default.ttf / default.otf of its own.
+    # Text: stb_truetype renders TrueType, and noxsdl embeds Caudex Bold (SIL OFL 1.1, Reserved Font
+    # Name "Caudex", embedded unmodified) for the game's text with Original Style Fonts off, and
+    # Noto Sans (SIL OFL 1.1) for the characters a face lacks (text.hpp).
     FetchContent_Declare(stb_truetype
         URL https://raw.githubusercontent.com/nothings/stb/2c980bb59875b0d32144a71867fbdebb2f77cd20/stb_truetype.h
         URL_HASH SHA256=ECD30B05E0DD4FEA3A13C26810DD9E1992DC379049482C393D5A19E6B5090AAB
@@ -147,7 +148,17 @@ if(NOX_BUILD_SDL)
         URL_HASH SHA256=CEE9892F9F0CC8FE882C9E9537EE6A89621D86EE7CEAF70B02E2B2B1C25C061A
         DOWNLOAD_NO_EXTRACT TRUE
     )
-    FetchContent_MakeAvailable(stb_truetype noto_sans noto_sans_license)
+    FetchContent_Declare(caudex
+        URL https://raw.githubusercontent.com/google/fonts/90abd17b4f97671435798b6147b698aa9087612f/ofl/caudex/Caudex-Bold.ttf
+        URL_HASH SHA256=880FB67901CE94573ED0262D152B87115A08F928C72FC6C1101375A1223D390A
+        DOWNLOAD_NO_EXTRACT TRUE
+    )
+    FetchContent_Declare(caudex_license
+        URL https://raw.githubusercontent.com/google/fonts/90abd17b4f97671435798b6147b698aa9087612f/ofl/caudex/OFL.txt
+        URL_HASH SHA256=1E5BF8207A40678BC401E2E5456D0DB1F2A183B550A30976B48DCDD6A4E4C46C
+        DOWNLOAD_NO_EXTRACT TRUE
+    )
+    FetchContent_MakeAvailable(stb_truetype noto_sans noto_sans_license caudex caudex_license)
 
     # UPnP (noxsdl port_mapper.cpp): miniupnpc (BSD), static, to open a hosted game's port on the
     # router.

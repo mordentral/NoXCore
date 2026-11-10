@@ -21,15 +21,15 @@
 //                         nothing to switch, so they're left out of the panel.
 //   noxsdl's switches     below those: the frame-rate counter, bloom, per-pixel lighting, smooth
 //                         effects, HD spell effects, HD images, the kill feed, Windows' mouse
-//                         acceleration and VSync (Extras), in the panel's own checkbox style; the mouse's speed, a
+//                         acceleration, VSync and the original style fonts (Extras), in the panel's own checkbox style; the mouse's speed, a
 //                         slider; then two drop-downs: Smoothing (Off / Smooth Movement / Smooth
 //                         Network / Match Server) and Display (Windowed / Fullscreen Windowed /
 //                         Fullscreen); and on More, Weather Effects (On / Reduced / Off).
 //   the panel's tabs      (noxsdl's) General and More along its top, in the game's tab look (the
 //                         Server Settings' tabs, servopts.wnd): More has the rarely changed
-//                         switches (Soft Shadow Edge, Fade Objects, Render GUI, Frame Rate) and
-//                         HD Spell FX (General is full), General the rest. It opens on General
-//                         each time.
+//                         switches (Soft Shadow Edge, Fade Objects, Render GUI, Frame Rate), HD
+//                         Spell FX and Original Style Fonts (General is full), General the rest.
+//                         It opens on General each time.
 //
 // Changes apply at once (onChange); nox.cfg is written when the window closes.
 #pragma once
@@ -68,6 +68,9 @@ public:
         int smoothing = 2;
         bool hdImages = false;     ///< images from the HD image pack (.nxp) instead of video.bag
         bool hdAvailable = false;  ///< whether there's a pack to use (the switch is greyed without)
+        /// Original Style Fonts (the More page): the game's text in the Nox-style fonts (their HD
+        /// forms with Use HD Images), off in Caudex Bold (text.hpp's GameFonts). On by default.
+        bool originalFonts = true;
         int gamma = 1;             ///< Insert / Delete's brightness, 1-10 (not on the panel)
         bool gpu = false;          ///< whether the GPU renderer's shaders are there (the last three need them)
         /// Win Mouse Accel: Windows' pointer speed and acceleration (Enhance Pointer Precision)

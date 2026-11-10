@@ -641,7 +641,7 @@ void TradeScreens::wrapDialog(float scale)
     const std::size_t most = ld && ld->lines ? ld->lines : 128;
     const gui::Painter p(nullptr, res, scale, 0, 0);
     const float width = static_cast<float>(list->rect.w - 10) * scale;
-    for (auto& line : dialogLines(dialog_.text, width, most, res.font->advances(p.pixelSize(list->largeFont)))) {
+    for (auto& line : dialogLines(dialog_.text, width, most, p.font(list->largeFont)->advances(p.pixelSize(list->largeFont)))) {
         list->lines.push_back({std::move(line), list->textColor});
     }
     // (the scroll kept, clamped to the new lines)

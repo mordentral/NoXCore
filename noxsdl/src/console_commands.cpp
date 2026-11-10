@@ -517,6 +517,14 @@ std::vector<Console::Command> consoleCommands(App& app)
              extras([on](OptionsWindow::Extras& e) { e.hdImages = on; });
              con.print(std::string("hdimages ") + (app.sprites && app.sprites->usingPack() ? "on" : "off"), Yellow);
          }},
+        {"originalfonts", Console::kNoxsdl, "[on|off]: the game's text in the Nox-style fonts, off in Caudex (Options' Original Style Fonts, --original-fonts)",
+         [&app, &con, onOff, extras](const Args& a) {
+             const bool on = onOff(a, app.originalFonts);
+             extras([on](OptionsWindow::Extras& e) { e.originalFonts = on; });
+             con.print(std::string("originalfonts ") + (app.originalFonts ? "on" : "off") +
+                           (app.font ? " (" + app.font->name() + ")" : std::string()),
+                       Yellow);
+         }},
         {"bloom", Console::kNoxsdl, "[on|off|0-1]: bloom, or how much (--no-bloom, --bloom N)",
          [&app, &con, onOff, says, extras](const Args& a) {
              if (!a.empty() && (std::isdigit(static_cast<unsigned char>(a[0][0])) || a[0][0] == '.')) {  // a number: the strength, and bloom on

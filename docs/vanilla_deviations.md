@@ -330,6 +330,10 @@ Options switch unless noted.
 - **HUD text is TrueType** (text.cpp; as everywhere in noxsdl), sized and placed to match the
   game's 9-row default / small fonts: capitals 7 game pixels tall, their tops where the exe's
   drawString puts the cell's top (Font::drawGameText). Widths are the TrueType font's.
+- **The game's text is in TrueType fonts:** with Options' Original Style Fonts (on by default)
+  NoX Core's Nox-style fonts (fonts/ beside the program: the game's letters on its 9- and 15-row
+  grid, drawn smooth with Use HD Images), off Caudex Bold, with Noto Sans for the characters a face
+  lacks (text.hpp, font_choice.hpp). Revert: none (the game's bitmap fonts aren't drawn).
 
 ### VD-06: Solo cinematics and briefings (noxsdl/src/cinematics.cpp)
 

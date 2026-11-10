@@ -29,6 +29,8 @@ or links the following third-party code, each under its own licence, reproduced 
   LodePNG (with bc7enc_rdo)          zlib                       noxcontent only, not in noxcore.exe
   Noto Sans SemiBold                 SIL Open Font License 1.1  noxcore.exe, noxcontent (embedded;
                                                                 NotoSans-OFL.txt)
+  Caudex Bold (Reserved Font Name    SIL Open Font License 1.1  noxcore.exe (embedded, unmodified;
+    "Caudex")                                                    Caudex-OFL.txt)
   Dear ImGui (docking branch)        MIT                        noxcore.exe (the map editor's panels,
                                                                 static), noxcontent
   ProggyForever (Dear ImGui's        MIT                        noxcore.exe (the map editor's script panel's
@@ -706,6 +708,17 @@ Noto Sans (https://notofonts.github.io)
 
 Licensed under the SIL Open Font License, Version 1.1; its full text ships beside
 the program as NotoSans-OFL.txt.
+
+
+==============================================================================
+Caudex (https://github.com/google/fonts/tree/main/ofl/caudex)
+==============================================================================
+
+Copyright (c) 2011, Hjort Nidudsson (http://caudex.sf.net),
+with Reserved Font Name Caudex.
+
+Caudex Bold is embedded in the program as it comes. Licensed under the SIL Open Font
+License, Version 1.1; its full text ships beside the program as Caudex-OFL.txt.
 
 
 ==============================================================================

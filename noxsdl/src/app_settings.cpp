@@ -144,6 +144,8 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
             e.smoothing = smoothingSetting(std::atoi(line.c_str() + eq + 1));
         } else if (name == "HDImages") {
             e.hdImages = on;
+        } else if (name == "OriginalFonts") {
+            e.originalFonts = on;
         } else if (name == "Gamma") {
             e.gamma = std::clamp(std::atoi(line.c_str() + eq + 1), 1, 10);
         } else if (name == "MouseAccel") {
@@ -188,7 +190,7 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
     std::ofstream out(app.gameDir / "noxcore.cfg", std::ios::trunc);
     out << "FrameRate = " << e.frameRate << "\nBloom = " << e.bloom << "\nPerPixelLight = " << e.perPixelLight
         << "\nSmoothEffects = " << e.smoothEffects << "\nHDSpellFX = " << e.hdSpellFx << "\nSmoothing = " << e.smoothing
-        << "\nHDImages = " << e.hdImages << "\nGamma = " << e.gamma << "\nMouseAccel = " << e.mouseAccel
+        << "\nHDImages = " << e.hdImages << "\nOriginalFonts = " << e.originalFonts << "\nGamma = " << e.gamma << "\nMouseAccel = " << e.mouseAccel
         << "\nMouseSpeed = " << e.mouseSpeed << "\nMouseSpeed3D = " << e.mouseSpeed3D << "\nKillFeed = " << e.killFeed << "\nDisplay = " << e.display
         << "\nVSync = " << e.vsync << "\nServerUpdateRate = " << e.serverUpdateRate
         << "\nServerMapVote = " << e.serverMapVote << "\nExactMaths = " << e.exactMaths << "\nPendingChanges = " << e.pendingView
@@ -213,6 +215,7 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.smoothing = app.smoothing;
     e.hdImages = app.sprites && app.sprites->usingPack();
     e.hdAvailable = !app.imagePack.empty();
+    e.originalFonts = app.originalFonts;
     e.gamma = app.gamma;
     e.gpu = app.shaders != nullptr && app.white != nullptr;
     e.mouseAccel = app.mouseAccel;
@@ -456,6 +459,9 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
             SDL_Log("images: video.bag");
         }
     }
+    // Original Style Fonts, and the HD Nox-style fonts with the HD images.
+    app.originalFonts = e.originalFonts;
+    applyFonts(app);
     if (!app.shaders || !app.white) {
         return;
     }
@@ -473,6 +479,16 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     fxdraw::spellFx() = e.hdSpellFx
                             ? fxdraw::SpellFx{app.white, app.shaders->puff(), app.shaders->barrier(), app.shaders->ripple()}
                             : fxdraw::SpellFx{};
+}
+
+/// The game text's fonts to Original Style Fonts' faces (the HD Nox-style ones while the HD images
+/// are in use), switched in place: the Fonts' holders keep them (GameFonts::apply, font_choice.hpp).
+/// Nothing is done for a font whose face is unchanged.
+void applyFonts(App& app)
+{
+    if (app.fontFaces && app.font && app.largeFont) {
+        app.fontFaces->apply(*app.font, *app.largeFont, app.originalFonts, app.sprites && app.sprites->usingPack());
+    }
 }
 
 /// Opens the Options window on the current settings (in a game the resolution stays).

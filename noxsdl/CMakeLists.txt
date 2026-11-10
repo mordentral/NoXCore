@@ -147,6 +147,9 @@ add_executable(noxsdl WIN32
     src/stb_truetype.cpp
     src/text.cpp
     src/text_wrap.cpp
+    src/typeface.cpp
+    src/font_choice.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/caudex_font.cpp
     src/test_drive.cpp
     src/thing_art.cpp
     src/view3d.cpp
@@ -173,10 +176,29 @@ add_custom_command(
     COMMENT "Embedding ${NOXSDL_FONT_FILE}"
     VERBATIM
 )
-# Ship the font's licence beside the exe.
+# Caudex Bold, compiled in too: the game's text with Original Style Fonts off (text.hpp). Embedded
+# as it comes (SIL OFL 1.1, Reserved Font Name "Caudex": never modified).
+set(NOXSDL_CAUDEX_FILE "${caudex_SOURCE_DIR}/Caudex-Bold.ttf")
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/caudex_font.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${NOXSDL_CAUDEX_FILE} -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/caudex_font.cpp
+            -DSYMBOL=kCaudexFont -P ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
+    DEPENDS ${NOXSDL_CAUDEX_FILE} ${PROJECT_SOURCE_DIR}/cmake/NoxEmbedFile.cmake
+    COMMENT "Embedding ${NOXSDL_CAUDEX_FILE}"
+    VERBATIM
+)
+# Ship the fonts' licences beside the exe.
 add_custom_command(TARGET noxsdl POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${noto_sans_license_SOURCE_DIR}/OFL.txt
             $<TARGET_FILE_DIR:noxsdl>/NotoSans-OFL.txt
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${caudex_license_SOURCE_DIR}/OFL.txt
+            $<TARGET_FILE_DIR:noxsdl>/Caudex-OFL.txt
+    VERBATIM
+)
+# The Nox-style fonts (res/fonts: NoxDefault, NoxLarge and their HD forms) into the fonts folder
+# beside the exe, where the program looks for them (text.hpp's GameFonts) and packages take them.
+add_custom_command(TARGET noxsdl POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res/fonts $<TARGET_FILE_DIR:noxsdl>/fonts
     VERBATIM
 )
 # The mods in mods/ (script modes) into the mods folder beside the exe, where a host finds them.

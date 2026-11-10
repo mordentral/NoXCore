@@ -30,7 +30,8 @@ constexpr std::int32_t kAdvancedClose = 2099;
 constexpr std::int32_t kAdvancedTemplate = 2040; // Render GUI: the checkbox noxsdl's are copied from
 // noxsdl's switches, added below them
 constexpr std::int32_t kFrameRate = 2900, kBloom = 2901, kPerPixelLight = 2902, kSmoothEffects = 2903, kHdSpellFx = 2904,
-                       kHdImages = 2905, kMouseAccel = 2906, kKillFeed = 2907, kVsync = 2908, kExactMaths = 2909;
+                       kHdImages = 2905, kMouseAccel = 2906, kKillFeed = 2907, kVsync = 2908, kExactMaths = 2909,
+                       kOriginalFonts = 2960;
 /// Those switches in the order they're stacked: their label (not a string-table id) and the
 /// Extras field each turns on and off.
 using Extras = OptionsWindow::Extras;
@@ -39,7 +40,7 @@ struct Switch {
     const char* label;
     bool Extras::*field;
 };
-constexpr std::array<Switch, 10> kSwitches{{
+constexpr std::array<Switch, 11> kSwitches{{
     {kFrameRate, "Frame Rate", &Extras::frameRate},
     {kBloom, "Bloom", &Extras::bloom},
     {kPerPixelLight, "Pixel Light", &Extras::perPixelLight},
@@ -50,6 +51,7 @@ constexpr std::array<Switch, 10> kSwitches{{
     {kMouseAccel, "Win Mouse Accel", &Extras::mouseAccel},
     {kVsync, "VSync", &Extras::vsync},
     {kExactMaths, "Exact Original Maths", &Extras::exactMaths},
+    {kOriginalFonts, "Original Style Fonts", &Extras::originalFonts},
 }};
 // Mouse speed: its label (with the speed) and slider (Extras::mouseSpeed, percent; with the 3D
 // view on, Extras::mouseSpeed3D)
@@ -72,12 +74,12 @@ constexpr int kTabGroup = 0x7A;
 constexpr int kPageTop = 3 + kTabHeight + 2; // the pages' first row, under the tabs
 
 /// The page a row of the panel is on: the rarely changed switches on the second (More). HD Spell FX
-/// is there too: the first page is full (a row more and the Smoothing and Display lists open past
-/// the panel's foot).
+/// and Original Style Fonts are there too: the first page is full (a row more and the Smoothing and
+/// Display lists open past the panel's foot).
 int pageOf(std::int32_t id)
 {
     return id == 2012 || id == 2016 || id == kAdvancedTemplate || id == kFrameRate || id == kHdSpellFx || id == kExactMaths ||
-                   id == kWeatherLabel || id == kWeatherBox
+                   id == kOriginalFonts || id == kWeatherLabel || id == kWeatherBox
                ? 1
                : 0;
 }
@@ -223,6 +225,10 @@ std::string_view extraTooltip(std::int32_t id)
                "  original's exact behaviour.\n"
                "For games you host and solo or campaign play, not games you join.\n"
                "Takes effect from the next game.";
+    case kOriginalFonts:
+        return "The game's text in Nox-style fonts: the original's letters,\n"
+               "drawn smooth with Use HD Images.\n"
+               "Off: Caudex, a book face, with Noto Sans for what it lacks.";
     case kWeatherLabel:
     case kWeatherBox:
         return "Rain, snow, storms and wind that a mod's game turns on,\n"
@@ -242,8 +248,8 @@ std::string_view extraTooltip(std::int32_t id)
     case kTabMore:
         return "Settings seldom changed: the line of sight's soft edge,\n"
                "Fade Objects, the HUD, the frame-rate counter, HD Spell FX,\n"
-               "the original's exact maths for games you host and the\n"
-               "weather effects.";
+               "the original's exact maths for games you host, the\n"
+               "weather effects and the original style fonts.";
     default:
         return {};
     }
@@ -554,6 +560,11 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
             w->text = label;
         }
     }
+    for (const std::int32_t id : {kSmoothLabel, kDisplayLabel, kWeatherLabel, kMouseLabel}) {
+        if (gui::Window* w = advanced_->find(id)) {
+            w->oneLine = true; // (a label too long for the large face drops to the small one)
+        }
+    }
     for (const DropDown& d : drops()) {
         if (gui::Window* box = advanced_->find(d.box)) {
             box->dropArrow = true; // (the game's list-box arrow on the button: it opens a list)
@@ -593,6 +604,11 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     const int size = number(config_.setting("VideoSize"), 100);
     for (const auto& [id, percent] : kWindowSizes) {
         gui::setChecked(window_->find(id), percent == size);
+    }
+    for (const std::int32_t id : {kDepth8, kDepth16}) {
+        if (gui::Window* w = window_->find(id)) {
+            w->labelLeft = 40; // (the row image's two-slot switch reaches 36 in; the stock x + 28 sat on it)
+        }
     }
     gui::setChecked(window_->find(kDepth16), true);
     gui::setEnabled(window_->find(kDepth8), false); // (always 16-bit or better here)

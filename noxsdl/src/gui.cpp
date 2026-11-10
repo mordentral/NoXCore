@@ -251,7 +251,7 @@ std::string Painter::firstLine(const std::string& utf8, bool large, int wrapWidt
     if (!res_.font || utf8.empty() || wrapWidth <= 0) {
         return utf8;
     }
-    const auto lines = res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_);
+    const auto lines = font(large)->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_);
     return lines.empty() ? std::string() : lines.front();
 }
 
@@ -261,8 +261,8 @@ int Painter::wrappedWidth(const std::string& utf8, bool large, int wrapWidth)
         return 0;
     }
     float widest = 0;
-    for (const auto& line : res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_)) {
-        widest = std::max(widest, res_.font->measure(line, pixelSize(large)));
+    for (const auto& line : font(large)->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_)) {
+        widest = std::max(widest, font(large)->measure(line, pixelSize(large)));
     }
     return static_cast<int>(std::ceil(widest / scale_));
 }
@@ -272,7 +272,7 @@ std::vector<std::string> Painter::centredLines(const std::string& utf8, bool lar
     if (!res_.font) {
         return {utf8};
     }
-    return noxsdl::centredLines(utf8, static_cast<float>(wrapWidth) * scale_, res_.font->advances(pixelSize(large)));
+    return noxsdl::centredLines(utf8, static_cast<float>(wrapWidth) * scale_, font(large)->advances(pixelSize(large)));
 }
 
 void Painter::image(const std::string& name, int x, int y)
@@ -316,13 +316,12 @@ void Painter::drawSprite(const Sprite* s, int x, int y)
 
 int Painter::pixelSize(bool large) const
 {
-    // The TTF drawn so its line is as tall as the game's font at this scale.
+    // The TTF drawn so its line is as tall as the game's font at this scale (a Nox-style font: its
+    // rows at this scale, Font::lineSize).
     if (!res_.font) {
         return 10;
     }
-    const float target = static_cast<float>(fontHeight(large)) * scale_;
-    const float perPixel = res_.font->lineHeight(100) / 100.0f;
-    return std::max(6, static_cast<int>(std::lround(target / perPixel)));
+    return font(large)->lineSize(static_cast<float>(fontHeight(large)), scale_, 6);
 }
 
 int Painter::textWidth(const std::string& utf8, bool large)
@@ -330,7 +329,7 @@ int Painter::textWidth(const std::string& utf8, bool large)
     if (!res_.font || utf8.empty()) {
         return 0;
     }
-    return static_cast<int>(std::ceil(res_.font->measure(utf8, pixelSize(large)) / scale_));
+    return static_cast<int>(std::ceil(font(large)->measure(utf8, pixelSize(large)) / scale_));
 }
 
 int Painter::textHeight(const std::string& utf8, bool large, int wrapWidth)
@@ -338,7 +337,7 @@ int Painter::textHeight(const std::string& utf8, bool large, int wrapWidth)
     if (!res_.font || utf8.empty()) {
         return fontHeight(large);
     }
-    const auto lines = wrapWidth > 0 ? res_.font->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_).size()
+    const auto lines = wrapWidth > 0 ? font(large)->wrap(utf8, pixelSize(large), static_cast<float>(wrapWidth) * scale_).size()
                                      : std::size_t{1};
     return static_cast<int>(std::max<std::size_t>(lines, 1)) * fontHeight(large);
 }
@@ -351,13 +350,13 @@ void Painter::text(const std::string& utf8, int x, int y, bool large, const Colo
     const int size = pixelSize(large);
     std::vector<std::string> lines;
     if (wrapWidth > 0) {
-        lines = res_.font->wrap(utf8, size, static_cast<float>(wrapWidth) * scale_);
+        lines = font(large)->wrap(utf8, size, static_cast<float>(wrapWidth) * scale_);
     } else {
         lines.push_back(utf8);
     }
     float oy = offsetY_ + static_cast<float>(y) * scale_;
     for (const auto& line : lines) {
-        res_.font->draw(line, offsetX_ + static_cast<float>(x) * scale_, oy, size, sdl(c));
+        font(large)->draw(line, offsetX_ + static_cast<float>(x) * scale_, oy, size, sdl(c));
         oy += static_cast<float>(fontHeight(large)) * scale_;
     }
 }
@@ -708,6 +707,14 @@ void Gui::drawByType(Window& w, Painter& p)
             }
             return;
         }
+        // (noxsdl's) A plain button one line high (a drop-down's choices): its text on one line, in
+        // the small font if it's too long for the large one, never wrapped.
+        if (!withImage && !w.text.empty() && height < 2 * p.fontHeight(w.largeFont)) {
+            const bool large = w.largeFont && p.textWidth(w.text, true) <= width - 4;
+            const int tw = p.textWidth(w.text, large);
+            p.text(w.text, x + width / 2 - tw / 2, y + height / 2 - p.fontHeight(large) / 2, large, textColor);
+            return;
+        }
         centredText(width);
         return;
 
@@ -735,6 +742,10 @@ void Gui::drawByType(Window& w, Painter& p)
             const int fh = p.fontHeight(w.largeFont);
             if (check) {
                 p.text(w.text, x + 20, y + height / 2 - fh / 2, w.largeFont, textColor, width);
+            } else if (w.radioValue == 0 && w.labelLeft > 0) {
+                const int room = width - w.labelLeft;
+                const int tw = std::min(p.textWidth(w.text, w.largeFont), room);
+                p.text(w.text, x + w.labelLeft + (room - tw) / 2, y + (height - fh) / 2, w.largeFont, textColor, room);
             } else if (w.radioValue == 0) {
                 p.text(w.text, x + 28, y + (height - fh) / 2, w.largeFont, textColor, width);
             } else {
@@ -759,6 +770,15 @@ void Gui::drawByType(Window& w, Painter& p)
         }
         const auto* data = std::get_if<nox::gui::StaticTextData>(&w.data);
         if (w.text.empty()) {
+            return;
+        }
+        if (w.oneLine) {
+            // (noxsdl's labels) One line, centred up and down: in the small font if it's too long
+            // for the large one (as wide as the label: it starts 2 in, and the panel leaves 2 after).
+            const bool large = w.largeFont && p.textWidth(w.text, true) <= width;
+            const int tw = p.textWidth(w.text, large);
+            const int tx = data && data->center ? x + (width - std::min(tw, width)) / 2 : x + 2;
+            p.text(w.text, tx, y + height / 2 - p.fontHeight(large) / 2, large, textColor);
             return;
         }
         // The wrapped block centred up and down.

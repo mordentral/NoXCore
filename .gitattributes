@@ -7,3 +7,5 @@ BUILDING.txt text eol=lf
 mods/**/*.json text eol=lf
 *.sh text eol=lf
 *.yml text eol=lf
+# Fonts are bytes (noxsdl/res/fonts).
+*.ttf binary

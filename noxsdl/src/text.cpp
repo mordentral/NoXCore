@@ -1,5 +1,6 @@
-// Font (text.hpp): stb_truetype rasterising glyphs on first use into shared atlas pages, and the
-// measuring, wrapping and drawing of UTF-8 text with them.
+// Font, GlyphAtlas and GameFonts (text.hpp): glyphs found along a Font's chain of faces and
+// rasterised by stb_truetype on first use into each face's atlas pages, the measuring, wrapping
+// and drawing of UTF-8 text with them, and the faces loaded once and handed to the Fonts.
 #include "text.hpp"
 
 #include "noxcore/io/file.hpp"
@@ -7,13 +8,17 @@
 #include <stb_truetype.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <exception>
 #include <stdexcept>
+#include <string>
 
-// The built-in Noto Sans, compiled into the exe as a byte array.
+// The built-in fonts, compiled into the exe as byte arrays: Noto Sans SemiBold and Caudex Bold.
 extern const unsigned char kEmbeddedFont[];
 extern const std::size_t kEmbeddedFontSize;
+extern const unsigned char kCaudexFont[];
+extern const std::size_t kCaudexFontSize;
 
 namespace noxsdl {
 
@@ -24,86 +29,31 @@ constexpr int kPadding = 1; ///< between glyphs, so linear sampling never bleeds
 
 } // namespace
 
-struct Font::Info {
-    stbtt_fontinfo font{};
-};
+// ---------------------------------------------------------------------------------- GlyphAtlas
 
-std::unique_ptr<Font> Font::load(SDL_Renderer* renderer, const std::filesystem::path& gameDir)
-{
-    for (const char* file : {"default.ttf", "default.otf"}) {
-        const auto path = gameDir / file;
-        std::error_code ec;
-        if (!std::filesystem::exists(path, ec)) {
-            continue;
-        }
-        try {
-            return std::make_unique<Font>(renderer, nox::readFileBytes(path), path.string());
-        } catch (const std::exception& ex) {
-            SDL_Log("%s: %s (using the built-in font)", path.string().c_str(), ex.what());
-        }
-    }
-    return std::make_unique<Font>(renderer, std::vector<std::uint8_t>(kEmbeddedFont, kEmbeddedFont + kEmbeddedFontSize),
-                                  "Noto Sans SemiBold (built in)");
-}
-
-Font::Font(SDL_Renderer* renderer, std::vector<std::uint8_t> data, std::string name)
-    : renderer_(renderer), data_(std::move(data)), name_(std::move(name)), info_(std::make_unique<Info>())
-{
-    const int offset = stbtt_GetFontOffsetForIndex(data_.data(), 0);
-    if (offset < 0 || !stbtt_InitFont(&info_->font, data_.data(), offset)) {
-        throw std::runtime_error("not a TrueType/OpenType font");
-    }
-}
-
-Font::~Font()
+GlyphAtlas::~GlyphAtlas()
 {
     for (SDL_Texture* page : pages_) {
         SDL_DestroyTexture(page);
     }
 }
 
-// A pixel size's metrics, worked out the first time it's asked for.
-Font::Face& Font::face(int pixelSize)
+// A glyph at a scale, rasterised into the atlas the first time and kept: its page and place (no
+// page when it has no pixels or doesn't fit one).
+const GlyphAtlas::Raster& GlyphAtlas::get(const Typeface& face, int index, float scale)
 {
-    pixelSize = std::max(pixelSize, 1);
-    auto [it, added] = faces_.try_emplace(pixelSize);
-    Face& f = it->second;
-    if (added) {
-        f.scale = stbtt_ScaleForMappingEmToPixels(&info_->font, static_cast<float>(pixelSize));
-        int ascent = 0;
-        int descent = 0;
-        int gap = 0;
-        stbtt_GetFontVMetrics(&info_->font, &ascent, &descent, &gap);
-        f.ascent = std::ceil(static_cast<float>(ascent) * f.scale);
-        f.lineHeight = std::ceil(static_cast<float>(ascent - descent) * f.scale);
-    }
-    return f;
-}
-
-// A codepoint's glyph at face `f`, rasterised into the atlas the first time and kept: its
-// advance, and its page and place (no page when it has no pixels or doesn't fit one).
-const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
-{
-    if (const auto it = f.glyphs.find(codepoint); it != f.glyphs.end()) {
+    const std::uint64_t key = (static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(scale)) << 32) |
+                              static_cast<std::uint32_t>(index);
+    if (const auto it = rasters_.find(key); it != rasters_.end()) {
         return it->second;
     }
-    Glyph g;
-    if (codepoint < 0x20) {
-        // Control characters (some strings start with one) take no room and draw nothing, as in
-        // the game's fonts; the font's "missing" box would show otherwise.
-        return f.glyphs.emplace(codepoint, g).first->second;
-    }
-    const int index = stbtt_FindGlyphIndex(&info_->font, static_cast<int>(codepoint));
-    int advance = 0;
-    int bearing = 0;
-    stbtt_GetGlyphHMetrics(&info_->font, index, &advance, &bearing);
-    g.advance = static_cast<float>(advance) * f.scale;
+    Raster r;
     int x0 = 0;
     int y0 = 0;
     int x1 = 0;
     int y1 = 0;
     // Its bitmap's box from the pen on the baseline (y0 negative: above it).
-    stbtt_GetGlyphBitmapBox(&info_->font, index, f.scale, f.scale, &x0, &y0, &x1, &y1);
+    stbtt_GetGlyphBitmapBox(&face.info(), index, scale, scale, &x0, &y0, &x1, &y1);
     const int w = x1 - x0;
     const int h = y1 - y0;
     // Into the atlas: white pixels whose alpha is the glyph's coverage, so a colour mod tints them.
@@ -130,7 +80,7 @@ const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
         }
         if (!pages_.empty()) {
             std::vector<std::uint8_t> coverage(static_cast<std::size_t>(w) * h);
-            stbtt_MakeGlyphBitmap(&info_->font, coverage.data(), w, h, w, f.scale, f.scale, index);
+            stbtt_MakeGlyphBitmap(&face.info(), coverage.data(), w, h, w, scale, scale, index);
             std::vector<std::uint8_t> rgba(coverage.size() * 4);
             for (std::size_t i = 0; i < coverage.size(); ++i) {
                 rgba[i * 4 + 0] = 0xFF;
@@ -140,14 +90,84 @@ const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
             }
             const SDL_Rect dest{shelfX_, shelfY_, w, h};
             SDL_UpdateTexture(pages_.back(), &dest, rgba.data(), w * 4);
-            g.page = static_cast<int>(pages_.size()) - 1;
-            g.source = {static_cast<float>(shelfX_), static_cast<float>(shelfY_), static_cast<float>(w),
+            r.page = pages_.back();
+            r.source = {static_cast<float>(shelfX_), static_cast<float>(shelfY_), static_cast<float>(w),
                         static_cast<float>(h)};
-            g.offsetX = static_cast<float>(x0);
-            g.offsetY = static_cast<float>(y0);
+            r.offsetX = static_cast<float>(x0);
+            r.offsetY = static_cast<float>(y0);
             shelfX_ += w + kPadding;
             shelfHeight_ = std::max(shelfHeight_, h + kPadding);
         }
+    }
+    return rasters_.emplace(key, r).first->second;
+}
+
+// ---------------------------------------------------------------------------------------- Font
+
+void Font::setFaces(std::vector<Link> chain, bool onGameCell)
+{
+    chain_ = std::move(chain);
+    faces_.clear();
+    for (const Link& l : chain_) {
+        faces_.push_back(l.face);
+    }
+    onGameCell_ = onGameCell && !chain_.empty();
+    renderer_ = chain_.empty() ? nullptr : chain_.front().atlas->renderer();
+    sizes_.clear(); // (the glyphs found and the sizes' metrics were the old faces')
+}
+
+const std::string& Font::name() const
+{
+    static const std::string none;
+    return chain_.empty() ? none : chain_.front().face->name();
+}
+
+// A pixel size's metrics, worked out the first time it's asked for. On the game's cell the
+// baseline is the face's own (the cell's baseline row) and a line is the rows and a pixel.
+Font::Face& Font::face(int pixelSize)
+{
+    pixelSize = std::max(pixelSize, 1);
+    auto [it, added] = sizes_.try_emplace(pixelSize);
+    Face& f = it->second;
+    if (added && !faces_.empty()) {
+        const Typeface& main = *faces_.front();
+        const auto px = static_cast<float>(pixelSize);
+        f.scale = main.scaleForEm(px);
+        if (onGameCell_) {
+            // (less a hair: 7/9 of 9 pixels is 7, not 8, whatever the float's last bit)
+            f.ascent = std::ceil(static_cast<float>(main.ascent()) * f.scale - 0.01f);
+            f.lineHeight = std::ceil(px * (cell_.rows + 1) / cell_.rows - 0.01f);
+        } else {
+            f.ascent = std::ceil(static_cast<float>(main.ascent()) * f.scale);
+            f.lineHeight = std::ceil(static_cast<float>(main.ascent() - main.descent()) * f.scale);
+        }
+        f.scales.push_back(f.scale);
+        for (std::size_t i = 1; i < faces_.size(); ++i) {
+            f.scales.push_back(fallbackScale(main, f.scale, *faces_[i]));
+        }
+    }
+    return f;
+}
+
+// A codepoint's glyph at face `f`, from the first face of the chain that has it, kept.
+const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
+{
+    if (const auto it = f.glyphs.find(codepoint); it != f.glyphs.end()) {
+        return it->second;
+    }
+    Glyph g;
+    // Control characters (some strings start with one) take no room and draw nothing, as in the
+    // game's fonts; the font's "missing" box would show otherwise.
+    if (codepoint >= 0x20 && !chain_.empty()) {
+        const ChainGlyph at = findInChain(faces_, codepoint);
+        const Link& l = chain_[at.face];
+        const float scale = f.scales[at.face];
+        g.advance = static_cast<float>(l.face->advanceUnits(at.index)) * scale;
+        const GlyphAtlas::Raster& r = l.atlas->get(*l.face, at.index, scale);
+        g.page = r.page;
+        g.source = r.source;
+        g.offsetX = r.offsetX;
+        g.offsetY = r.offsetY;
     }
     return f.glyphs.emplace(codepoint, g).first->second;
 }
@@ -189,9 +209,14 @@ float Font::lineHeight(int pixelSize)
     return face(pixelSize).lineHeight;
 }
 
+float Font::linePerEm()
+{
+    return onGameCell_ ? (cell_.rows + 1) / cell_.rows : lineHeight(100) / 100.0f;
+}
+
 int Font::lineSize(float gamePixels, float scale, int least)
 {
-    return std::max(least, static_cast<int>(std::lround(gamePixels * scale / (lineHeight(100) / 100.0f))));
+    return std::max(least, static_cast<int>(std::lround(gamePixels * scale / linePerEm())));
 }
 
 // Glyphs placed from the pen on the baseline, on whole pixels so the 1:1 atlas stays sharp.
@@ -201,12 +226,11 @@ void Font::drawRun(std::string_view utf8, float x, float y, Face& f, SDL_Color c
     float pen = std::round(x);
     for (std::size_t pos = 0; pos < utf8.size();) {
         const Glyph& g = glyph(f, nextCodepoint(utf8, pos));
-        if (g.page >= 0) {
-            SDL_Texture* page = pages_[static_cast<std::size_t>(g.page)];
-            SDL_SetTextureColorMod(page, color.r, color.g, color.b);
-            SDL_SetTextureAlphaMod(page, color.a);
+        if (g.page) {
+            SDL_SetTextureColorMod(g.page, color.r, color.g, color.b);
+            SDL_SetTextureAlphaMod(g.page, color.a);
             const SDL_FRect dest{std::round(pen) + g.offsetX, baseline + g.offsetY, g.source.w, g.source.h};
-            SDL_RenderTexture(renderer_, page, &g.source, &dest);
+            SDL_RenderTexture(renderer_, g.page, &g.source, &dest);
         }
         pen += g.advance;
     }
@@ -217,24 +241,11 @@ void Font::draw(std::string_view utf8, float x, float y, int pixelSize, SDL_Colo
     drawRun(utf8, x, y, face(pixelSize), color);
 }
 
-namespace {
-/// The game fonts' capitals: rows 0-6 of their 9 (default.fnt, small.fnt).
-constexpr float kGameCapHeight = 7;
-} // namespace
-
 int Font::gameFontSize(float scale)
 {
-    if (capPerEm_ <= 0) {
-        int x0 = 0;
-        int y0 = 0;
-        int x1 = 0;
-        int y1 = 0;
-        const float perEm = stbtt_ScaleForMappingEmToPixels(&info_->font, 1.0f);
-        capPerEm_ = stbtt_GetCodepointBox(&info_->font, 'H', &x0, &y0, &x1, &y1) && y1 > 0
-                        ? static_cast<float>(y1) * perEm
-                        : 0.7f; // (no 'H': about the usual)
-    }
-    return std::max(6, static_cast<int>(std::lround(kGameCapHeight * scale / capPerEm_)));
+    // On the game's cell the capitals are the cell's (its em is the rows); else the face's 'H'.
+    const float capPerEm = onGameCell_ ? cell_.capHeight / cell_.rows : faces_.empty() ? 0.7f : faces_.front()->capPerEm();
+    return std::max(6, static_cast<int>(std::lround(cell_.capHeight * scale / capPerEm)));
 }
 
 float Font::measureGameText(std::string_view utf8, float scale)
@@ -245,9 +256,107 @@ float Font::measureGameText(std::string_view utf8, float scale)
 void Font::drawGameText(std::string_view utf8, float gx, float gy, float scale, SDL_Color color)
 {
     const int size = gameFontSize(scale);
-    // The baseline on a whole pixel, the capitals' height below the given top.
-    const float baseline = std::round((gy + kGameCapHeight) * scale);
+    // The baseline on a whole pixel, the cell's baseline row below the given top.
+    const float baseline = std::round((gy + cell_.baseline) * scale);
     drawRun(utf8, gx * scale, baseline - face(size).ascent, face(size), color);
+}
+
+// ----------------------------------------------------------------------------------- GameFonts
+
+GameFonts::GameFonts(SDL_Renderer* renderer, const std::filesystem::path& gameDir, std::filesystem::path fontDir)
+    : renderer_(renderer), fontDir_(std::move(fontDir))
+{
+    // The plain face: the game folder's default.ttf / default.otf, the names OpenNox looks for when
+    // it swaps a TrueType font in for default.fnt, else Caudex Bold.
+    for (const char* file : {"default.ttf", "default.otf"}) {
+        const auto path = gameDir / file;
+        std::error_code ec;
+        if (!std::filesystem::exists(path, ec)) {
+            continue;
+        }
+        try {
+            plain_ = make(nox::readFileBytes(path), path.string());
+            SDL_Log("font: %s in place of Caudex Bold", path.string().c_str());
+            break;
+        } catch (const std::exception& ex) {
+            SDL_Log("%s: %s (using Caudex Bold)", path.string().c_str(), ex.what());
+        }
+    }
+    if (!plain_.face) {
+        plain_ = make(std::vector<std::uint8_t>(kCaudexFont, kCaudexFont + kCaudexFontSize), "Caudex Bold (built in)");
+    }
+    noto_ = make(std::vector<std::uint8_t>(kEmbeddedFont, kEmbeddedFont + kEmbeddedFontSize), "Noto Sans SemiBold (built in)");
+    // Which Nox-style files there are, looked for once (read when first chosen).
+    std::string missing;
+    for (std::size_t i = 0; i < kNoxFaces; ++i) {
+        const char* file = noxFontFile(static_cast<FontFace>(i));
+        std::error_code ec;
+        files_[i] = std::filesystem::is_regular_file(fontDir_ / file, ec);
+        if (!files_[i]) {
+            missing += missing.empty() ? file : std::string(", ") + file;
+        }
+    }
+    if (!missing.empty()) {
+        SDL_Log("fonts: no %s in %s (Original Style Fonts draws in Caudex Bold where its file is missing)", missing.c_str(),
+                fontDir_.string().c_str());
+    }
+}
+
+GameFonts::~GameFonts() = default;
+
+GameFonts::Loaded GameFonts::make(std::vector<std::uint8_t> data, std::string name)
+{
+    Loaded l;
+    l.face = std::make_unique<Typeface>(std::move(data), std::move(name));
+    l.atlas = std::make_unique<GlyphAtlas>(renderer_);
+    return l;
+}
+
+bool GameFonts::loadNox(FontFace face)
+{
+    const auto i = static_cast<std::size_t>(face);
+    if (nox_[i].face) {
+        return true;
+    }
+    if (!files_[i]) {
+        return false;
+    }
+    const auto path = fontDir_ / noxFontFile(face);
+    try {
+        nox_[i] = make(nox::readFileBytes(path), path.filename().string());
+        return true;
+    } catch (const std::exception& ex) {
+        SDL_Log("%s: %s (not used)", path.string().c_str(), ex.what());
+        files_[i] = false; // (not tried again)
+        return false;
+    }
+}
+
+void GameFonts::applyRole(Font& font, FontRole role, bool originalStyle, bool hdImages)
+{
+    FontFace face = chooseFace(role, originalStyle, hdImages, files_);
+    while (isNoxFace(face) && !loadNox(face)) {
+        face = chooseFace(role, originalStyle, hdImages, files_); // (it's marked missing now)
+    }
+    int& chosen = chosen_[role == FontRole::Large ? 1 : 0];
+    if (chosen == static_cast<int>(face)) {
+        return;
+    }
+    chosen = static_cast<int>(face);
+    std::vector<Font::Link> chain;
+    if (isNoxFace(face)) {
+        chain.push_back(nox_[static_cast<std::size_t>(face)].link());
+    }
+    chain.push_back(plain_.link());
+    chain.push_back(noto_.link());
+    font.setFaces(std::move(chain), isNoxFace(face));
+    SDL_Log("font: %s for %s's text", font.name().c_str(), role == FontRole::Large ? "large.fnt" : "default.fnt");
+}
+
+void GameFonts::apply(Font& standard, Font& large, bool originalStyle, bool hdImages)
+{
+    applyRole(standard, FontRole::Default, originalStyle, hdImages);
+    applyRole(large, FontRole::Large, originalStyle, hdImages);
 }
 
 } // namespace noxsdl

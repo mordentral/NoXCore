@@ -25,9 +25,12 @@ void drawShadowed(Font& font, std::string_view text, float x, float y, int size,
 }
 
 /// The size of the text drawn in the world (names, flag labels, bubbles): 11 at the camera's
-/// zoom, 9 to 64 pixels.
-int worldFontSize(const Camera& cam)
+/// zoom, 9 to 64 pixels; in a Nox-style font, default.fnt's own size (its 9 rows at the zoom).
+int worldFontSize(Font* font, const Camera& cam)
 {
+    if (font && font->onGameCell()) {
+        return std::clamp(font->gameFontSize(cam.zoom), 9, 64);
+    }
     return std::clamp(static_cast<int>(std::lround(11 * cam.zoom)), 9, 64);
 }
 
@@ -318,7 +321,7 @@ void drawNamePlate(App& app, const NamePlate& plate)
     // default.fnt (about 9 units to the baseline), with a dark shadow a pixel down and right.
     constexpr float kBaselineAbove = 55;
     const Camera& cam = app.camera;
-    const int size = worldFontSize(cam);
+    const int size = worldFontSize(app.font.get(), cam);
     const float width = name ? app.font->measure(plate.name, size) : 0;
     const float sx = (plate.x - cam.left()) * cam.zoom - width / 2;
     if (name) {
@@ -354,7 +357,7 @@ void drawFlagLabels(App& app)
         return;
     }
     const Camera& cam = app.camera;
-    const int size = worldFontSize(cam);
+    const int size = worldFontSize(app.font.get(), cam);
     for (const std::uint16_t netCode : app.flagLabels) {
         const auto found = world.drawables().find(netCode);
         if (found == world.drawables().end()) {
@@ -816,7 +819,7 @@ void drawChatBubbles(App& app, std::uint32_t frame)
     const auto& world = client.world();
     const Camera& cam = app.camera;
     const float k = cam.zoom;
-    const int size = worldFontSize(cam);
+    const int size = worldFontSize(app.font.get(), cam);
     const float fh = app.font->lineHeight(size);
     const float h = std::floor(fh / 2);  // half a line: the octagon's corner cut
     int screenW = 0;

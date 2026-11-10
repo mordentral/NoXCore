@@ -342,7 +342,7 @@ void BrowserScreen::drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textS
     }
     font_.draw(status, area.x + pad, y, l.size, {240, 180, 42, 255});
     if (!log_.empty()) {
-        font_.draw(log_.back(), area.x + pad, y + l.rowHeight, std::max(8, l.size - 1), grey);
+        font_.draw(log_.back(), area.x + pad, y + l.rowHeight, l.size, grey); // (the rows' size)
     }
 }
 
@@ -361,8 +361,12 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
     const float cols[6] = {x0, x0 + w * 0.35f, x0 + w * 0.47f, x0 + w * 0.61f, x0 + w * 0.71f, x0 + w * 0.80f};
     const char* headers[6] = {"Name", "Map", "Mode", "Players", "Ping", "From"};
     const float headerY = l.top - l.rowHeight;
+    // The headers a quarter larger in a plain face (Caudex); the Nox-style fonts keep the game's one
+    // size. (The header's line ends where the rows' size would end it.)
+    const int headerSize = !font_.onGameCell() ? static_cast<int>(std::lround(static_cast<float>(l.size) * 1.25f)) : l.size;
+    const float headerTop = headerY + font_.lineHeight(l.size) - font_.lineHeight(headerSize);
     for (int i = 0; i < 6; ++i) {
-        font_.draw(headers[i], cols[i], headerY, l.size, header);
+        font_.draw(headers[i], cols[i], headerTop, headerSize, header);
     }
     SDL_SetRenderDrawColor(renderer, framed ? 0 : 80, framed ? 120 : 80, framed ? 0 : 80, 255);
     SDL_RenderLine(renderer, x0, l.top - 2, x0 + w, l.top - 2);

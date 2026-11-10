@@ -1205,6 +1205,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                                                               : app->imagePack.string().c_str());
             OptionsWindow::Extras extras = loadExtras(gameDir);
             extras.hdImages = (extras.hdImages || opts.hdImages) && !app->imagePack.empty();
+            if (opts.originalFonts) {
+                extras.originalFonts = *opts.originalFonts;
+            }
             extras.smoothEffects = extras.smoothEffects && !opts.stockEffects;
             extras.hdSpellFx = extras.hdSpellFx && !opts.stockEffects;
             extras.perPixelLight = extras.perPixelLight && !opts.gridLight;
@@ -1243,9 +1246,16 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         app->art = std::make_unique<ThingArt>(app->things);
         preloadSession(*app); // (the pack's set on first: the session's images queued now that the art is known)
         try {
-            app->font = Font::load(app->renderer, gameDir);
-            SDL_Log("font: %s", app->font->name().c_str());
+            // The game text's faces (the Nox-style fonts from the fonts folder beside the exe) and
+            // the two Fonts set to the ones Original Style Fonts and Use HD Images pick.
+            const char* base = SDL_GetBasePath();
+            app->fontFaces = std::make_unique<GameFonts>(app->renderer, gameDir, fs::path(base ? base : "") / "fonts");
+            app->font = std::make_unique<Font>(Font::kDefaultCell);
+            app->largeFont = std::make_unique<Font>(Font::kLargeCell);
+            applyFonts(*app);
         } catch (const std::exception& ex) {
+            app->font.reset();
+            app->largeFont.reset();
             SDL_Log("font: %s (no name plates)", ex.what());
         }
         app->effects = std::make_unique<Effects>(app->things, *app->art);

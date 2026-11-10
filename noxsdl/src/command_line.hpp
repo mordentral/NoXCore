@@ -52,6 +52,7 @@ struct StartOptions {
     bool noSmoothScrolling = false;      ///< --no-smooth-scrolling
     std::optional<int> otherUnits;       ///< --other-units smooth|newest|ahead
     bool hdImages = false;       ///< --hd-images: Use HD Images for this run
+    std::optional<bool> originalFonts; ///< --original-fonts / --no-original-fonts: Original Style Fonts for this run
     bool noAudio = false;        ///< --no-audio: no sound at all
     std::string audioCapture;    ///< --audio-capture FILE: what's played, recorded
     bool audioLog = false;       ///< --audio-log: log the sounds asked for

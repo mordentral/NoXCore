@@ -211,12 +211,13 @@ void uiSound(App& app, std::uint32_t id, int volume)
     }
 }
 
-/// What the .wnd windows draw and sound with: thing.bin, the sprites, the font, the string table,
-/// and the interface's sounds.
+/// What the .wnd windows draw and sound with: thing.bin, the sprites, the fonts (default.fnt's and
+/// large.fnt's), the string table, and the interface's sounds.
 gui::Resources guiResources(App& app)
 {
     gui::Resources res{app.things, *app.sprites, app.font.get(), app.strings.get()};
     res.playSound = [&app](std::uint32_t id) { uiSound(app, id); };
+    res.largeFont = app.largeFont.get();
     return res;
 }
 
