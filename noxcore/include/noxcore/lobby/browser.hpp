@@ -88,6 +88,9 @@ public:
     /// a login just listed them, instead of logging in again (XWIS refuses a second login from
     /// the same address within a few seconds); ignored while XWIS isn't listed.
     void refresh(std::uint32_t nowMs, const std::vector<GameListing>* xwisGames = nullptr);
+    /// Recheck LAN and configured addresses after an edit, retaining XWIS's games and any
+    /// listing login still in progress. Does not open a second XWIS connection.
+    void refreshListedServers(std::uint32_t nowMs);
     /// Pumps the sockets. Never throws; network trouble ends up in the log.
     void poll(std::uint32_t nowMs);
 
@@ -109,6 +112,7 @@ private:
     void ping(const net::Endpoint& to, std::uint32_t nowMs, bool broadcast = false);
     void pollXwis(std::uint32_t nowMs);
     void pollUdp(std::uint32_t nowMs);
+    void startRefresh(std::uint32_t nowMs, const std::vector<GameListing>* xwisGames, bool keepXwisLogin);
     ServerEntry& upsert(std::uint32_t address, std::uint16_t port);
     void closeXwis(const std::string& why);
 

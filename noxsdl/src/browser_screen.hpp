@@ -100,6 +100,7 @@ private:
     Layout layout(int height);
     void drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layout& l, bool framed);
     void sortRows();
+    void resetRows();
     std::optional<std::string> joinSelected();
     /// "Searching ..." naming the places this search asks.
     std::string searchingText() const;

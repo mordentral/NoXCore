@@ -91,24 +91,25 @@ BrowserScreen::BrowserScreen(Font& font, nox::lobby::ServerBrowser::Options opti
 
 void BrowserScreen::reloadServerLists()
 {
-    try {
-        auto saved = serverFiles_.read();
-        auto servers = commandServers_;
-        servers.insert(servers.end(), saved.begin(), saved.end());
-        browser_.setServers(std::move(servers));
-        savedServers_ = std::move(saved);
-    } catch (const std::exception& ex) {
-        message_ = std::string("Cannot read saved servers: ") + ex.what();
-        SDL_Log("browser: %s", message_.c_str());
+    std::vector<std::string> errors;
+    savedServers_ = serverFiles_.read(&errors);
+    auto servers = commandServers_;
+    servers.insert(servers.end(), savedServers_.begin(), savedServers_.end());
+    browser_.setServers(std::move(servers));
+    if (!errors.empty()) {
+        message_ = "Cannot read saved servers: " + errors.front();
+        for (const auto& error : errors) {
+            SDL_Log("browser: %s", error.c_str());
+        }
     }
 }
 
 void BrowserScreen::refreshSavedServers(std::uint64_t nowMs)
 {
-    // Reuse the current online listing; an edit must not start a second XWIS login.
-    std::vector<nox::lobby::GameListing> online;
-    for (const auto& row : rows_) if (row.sources & nox::lobby::kFromXwis) online.push_back(row.game);
-    refresh(nowMs, &online);
+    message_.clear();
+    reloadServerLists();
+    browser_.refreshListedServers(static_cast<std::uint32_t>(nowMs));
+    resetRows();
 }
 
 bool BrowserScreen::addSavedServer(const std::string& address)
@@ -159,6 +160,11 @@ void BrowserScreen::refresh(std::uint64_t nowMs, const std::vector<nox::lobby::G
     message_.clear();
     reloadServerLists();
     browser_.refresh(static_cast<std::uint32_t>(nowMs), xwisGames);
+    resetRows();
+}
+
+void BrowserScreen::resetRows()
+{
     rows_.clear();
     selected_ = 0;
     scroll_ = 0;

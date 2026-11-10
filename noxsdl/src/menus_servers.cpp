@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <exception>
 #include <memory>
+#include <stdexcept>
 
 namespace noxsdl {
 namespace {
@@ -43,7 +44,11 @@ void Menus::serverDialog()
     auto def = nox::gui::loadWindowFile(windowDir_ / "dlg.wnd");
     def.width = kDialogWidth;
     def.height = kDialogHeight;
-    const auto button = *std::find_if(def.children.begin(), def.children.end(), [](const auto& child) { return child.id == kClose; });
+    const auto close = std::find_if(def.children.begin(), def.children.end(), [](const auto& child) { return child.id == kClose; });
+    if (close == def.children.end()) {
+        throw std::runtime_error("dlg.wnd is missing the Close button");
+    }
+    const auto button = *close;
     const auto add = [&](int id, int x, int y, int w, int h, nox::gui::WindowType type) -> nox::gui::WindowDef& {
         auto child = button;
         child.id = id; child.x = x; child.y = y; child.width = w; child.height = h;
@@ -61,7 +66,7 @@ void Menus::serverDialog()
     remove.id = kRemove; remove.x = kActionX; remove.y = kDropdownRect.y;
     def.children.push_back(std::move(remove));
     auto& list = add(kList, kListRect.x, kListRect.y, kListRect.w, kListRect.h, Type::ScrollListBox);
-    list.data = nox::gui::ListBoxData{0, 10, {}};
+    list.data = nox::gui::ListBoxData{0, kRowHeight - 1, {}};
     list.backgroundColor = {0, 0, 0, false};
     list.selectedColor = {0, 90, 0, false};
     add(kUp, kScrollX, kListRect.y, 16, 15, Type::PushButton);
@@ -186,6 +191,8 @@ void Menus::serverDialog()
                     if (state->adding) dialog_->find(kEntry)->entry.clear();
                 } catch (const std::exception& ex) {
                     SDL_Log("saved servers: %s", ex.what());
+                    // A failure during the final renames can still leave a partial removal.
+                    browser_.refreshSavedServers(nowMs_);
                     normal(); reload();
                     dialog_->find(kText)->text = "Could not change servers.txt. Check that it is writable and try again.";
                 }
@@ -221,6 +228,7 @@ void Menus::serverDialog()
     dialogEvents_ = [this, state, drop, scroll, choose, normal](const SDL_Event& event) {
         const bool open = !dialog_->find(kList)->hidden();
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+            if (event.key.repeat) return true;
             if (open) { drop(false); return true; }
             if (state->confirming) { normal(); return true; }
         }
@@ -256,8 +264,13 @@ void Menus::serverDialog()
         if (event.key.key == SDLK_V && (event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI))) {
             if (char* pasted = SDL_GetClipboardText()) {
                 auto* entry = dialog_->find(kEntry);
-                entry->entry = nox::strings::fromUtf8(pasted).substr(0, entry->entryMax - 1);
+                const auto text = nox::strings::fromUtf8(pasted);
                 SDL_free(pasted);
+                if (text.size() >= entry->entryMax) {
+                    dialog_->find(kText)->text = "Address is too long. Paste a hostname or IPv4 address with an optional port.";
+                } else {
+                    entry->entry = text;
+                }
             }
             return true;
         }

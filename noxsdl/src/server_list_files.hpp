@@ -18,7 +18,9 @@ std::vector<std::filesystem::path> serverListPaths(const std::filesystem::path& 
 class ServerListFiles {
 public:
     explicit ServerListFiles(std::vector<std::filesystem::path> paths = {});
-    std::vector<std::string> read() const;
+    // With errors, keep readable sources and report failures there. Without it, fail the read
+    // so edits cannot silently ignore an unreadable source (including duplicate addresses).
+    std::vector<std::string> read(std::vector<std::string>* errors = nullptr) const;
     bool add(std::string_view address) const; // false: already saved
     void remove(const std::vector<std::string>& addresses) const;
 private:
