@@ -19,19 +19,22 @@
 //              list pages and then the entries; PageTurn, and BookPageForward / Backward played
 //              over the page (bookWndProc and the book's page turn).
 //   contents   (guiSpellSortList) a caster's class spells, in a network game all of them, else those
-//              learned (not the trap glyph, not the numbered summons, marks and teleports'
-//              general spells), by title; a warrior's abilities; the guide's creatures (the
-//              last four only in quests), all of them in a network game, else those met.
+//              learned (not the trap glyph or the numbered summons), by title, the general Summon
+//              Creature, Mark Location and Teleport to Marker after them, unlisted (book_pages.hpp);
+//              a warrior's abilities; the guide's creatures (the last four only in quests), all of
+//              them in a network game, else those met.
 //   awards     (Cli_AwardSpell, Cli_AwardGuideCreature, abilityReward, bookRewardCli) a spell,
 //              creature or ability learned with the show flag opens the book, moved up to a third
-//              of the screen, on its page, sparks bursting from its edges; with the fill flag a
-//              spell or ability also goes to the first empty slot of the bars, sparks trailing to
-//              it (bookFillAll, in a network game at once). With a menu up, or on the solo
+//              of the screen, on its page (an unlisted spell's too), sparks bursting from its
+//              edges; with the fill flag a spell or ability (not an unlisted spell) also goes to
+//              the first empty slot of the bars, sparks trailing to it (bookFillAll, in a
+//              network game at once). With a menu up, or on the solo
 //              moment under a widescreen or dying, the book isn't shown; a solo award within two
 //              client frames of the last does only its first page turn and showing (book_award.hpp).
 #pragma once
 
 #include "book_award.hpp"
+#include "book_pages.hpp"
 #include "screen_particles.hpp"
 #include "sprite_cache.hpp"
 #include "text.hpp"
@@ -194,7 +197,9 @@ private:
     std::optional<SDL_FPoint> moved_; ///< where it was dragged to (its window's position), game pixels
     std::optional<SDL_FPoint> grab_;  ///< the pointer while the book itself is held
     int lastHeight_ = 600; ///< the screen's height in game pixels when last drawn
+    /// The entries: the listed ones by title, then a caster's unlisted spells (book_pages.hpp).
     std::vector<std::uint32_t> entries_;
+    int listed_ = 0; ///< how many of entries_ the list, its pages and the arrows go through
 
     std::optional<int> pressed_; ///< the list entry pressed
     SDL_FPoint pressAt_{};

@@ -127,6 +127,7 @@ bool Spellbook::canSummon(const BookContext& ctx) const
 bool Spellbook::sort(const BookContext& ctx)
 {
     entries_.clear();
+    std::size_t unlisted = 0;
     const auto& self = ctx.world->self();
     const bool all = ctx.allKnown; // a network game's book has everything (game flag 0x2000, not 0x1000)
     if (guide_) {
@@ -157,26 +158,15 @@ bool Spellbook::sort(const BookContext& ctx)
                 }
             }
         }
-        for (std::uint32_t id = 1; id < nox::things::kSpellCount; ++id) {
-            const auto* s = things_.findSpell(id);
-            if (!s || id == kGlyph || !(s->flags & (0x1000000 | classBit))) {
-                continue;
-            }
-            const auto it = self.spellLevels.find(static_cast<std::uint8_t>(id));
-            if (!all && (it == self.spellLevels.end() || it->second == 0)) {
-                continue;
-            }
-            // The numbered summons are the guide's; the general summon, mark and go-to-mark
-            // spells (0x15000) come last and the page count leaves them off.
-            if (!(s->flags & (0x2000 | 0x15000))) {
-                entries_.push_back(id);
-            }
-        }
+        // The numbered summons are the guide's; the general summon, mark and go-to-mark spells
+        // come last, unlisted, where an award still turns to them.
+        unlisted = bookpages::addSpells(things_, self.spellLevels, all, classBit, entries_);
     }
     const bool guide = guide_;
-    std::stable_sort(entries_.begin(), entries_.end(), [&](std::uint32_t a, std::uint32_t b) {
+    listed_ = bookpages::order(entries_, unlisted, [&](std::uint32_t a, std::uint32_t b) {
         return titleLess(title(nox::client::untagged(a), guide, entryClass(a, ctx)), title(nox::client::untagged(b), guide, entryClass(b, ctx)));
     });
+    // (Unlisted spells alone still open the book, on an empty list.)
     return !entries_.empty();
 }
 
@@ -188,8 +178,8 @@ int Spellbook::linesPerColumn() const
 
 int Spellbook::pageCount() const
 {
-    // (the exe's count: one more page when the last is exactly full)
-    return static_cast<int>(entries_.size()) / perPage() + 1;
+    // (the exe's count of the listed entries: one more page when the last is exactly full)
+    return bookpages::pageCount(listed_, perPage());
 }
 
 SDL_FPoint Spellbook::origin(int h) const
@@ -315,15 +305,16 @@ std::optional<std::uint32_t> Spellbook::event(const nox::client::BookEvent& e, c
     }
     // (noxcpp's multiclass: an ability's entry, and what flies to the bars, tagged.)
     const std::uint32_t entry = bookaward::awardEntry(e.kind, e.id, ctx.multiclass);
-    const auto it = std::find(entries_.begin(), entries_.end(), entry);
-    if (it == entries_.end()) {
+    // Its page, listed or not (Summon Creature's, unlisted, too).
+    const auto at = bookpages::indexOf(entries_, entry);
+    if (!at) {
         return std::nullopt;
     }
     // Shut (BookClose), turned to its page (PageTurn) and shown (BookOpen); then shown again
     // (BookOpen), moved a third of the way down, turned again (PageTurn) and sparks off its edges
     // (bookSetForward, then bookRewardCli's bursts), each step as book_award.hpp's showing lists it.
     const auto s = bookaward::showing(ctx.award, e.kind, e.fill, open_, ctx.flying, ctx.frame, lastReward_);
-    const int page = static_cast<int>(it - entries_.begin());
+    const int page = *at;
     for (std::size_t i = 0; i < s.count; ++i) {
         switch (s.steps[i]) {
         case bookaward::Step::Close:
@@ -427,40 +418,23 @@ bool Spellbook::mouseDown(float x, float y, int w, int h, const BookContext& ctx
         }
         return true;
     }
-    // The arrows (book back, bookWndProc on).
-    const bool prevShown = !(listMode_ && listPage_ == 0);
-    const bool nextShown = !(!listMode_ && entry_ >= n - 1);
-    if (prevShown && inside(gx, gy, 0x18, 0x8A, 0x14, 0x14)) {
+    // The arrows (book back, bookWndProc on), through the listed entries only (book_pages.hpp).
+    const bookpages::Place here{listMode_, listPage_, entry_};
+    const auto go = [&](const bookpages::Place& to) {
+        listMode_ = to.listMode;
+        listPage_ = to.listPage;
+        entry_ = to.entry;
+    };
+    if (bookpages::backShown(here) && inside(gx, gy, 0x18, 0x8A, 0x14, 0x14)) {
         grab_.reset(); // (an arrow's own window)
-        // Back: one list page back, one entry back, or from the first entry to the list's last page.
-        if (listMode_) {
-            --listPage_;
-        } else if (entry_ < n) {
-            if (entry_ > 0) {
-                --entry_;
-            } else {
-                listMode_ = true;
-                listPage_ = pageCount() - 1;
-            }
-        } else {
-            listMode_ = true;
-            listPage_ = 0;
-        }
+        go(bookpages::back(here, listed_, pageCount()));
         turn(Anim::Backward, ctx);
         sound(0x314);
         return true;
     }
-    if (nextShown && inside(gx, gy, 0xE9, 0x8A, 0x14, 0x14)) {
+    if (bookpages::forwardShown(here, listed_) && inside(gx, gy, 0xE9, 0x8A, 0x14, 0x14)) {
         grab_.reset();
-        // Forward: one entry on, one list page on, or from the last list page to the first entry.
-        if (!listMode_) {
-            ++entry_;
-        } else if (listPage_ + 1 >= pageCount()) {
-            listMode_ = false;
-            entry_ = 0;
-        } else {
-            ++listPage_;
-        }
+        go(bookpages::forward(here, pageCount()));
         turn(Anim::Forward, ctx);
         sound(0x314);
         return true;
@@ -502,7 +476,7 @@ bool Spellbook::mouseDown(float x, float y, int w, int h, const BookContext& ctx
     }
     // The entry's index: each list page holds two columns of `lines` rows.
     const int index = row + listPage_ * perPage();
-    if (index >= n) {
+    if (index >= listed_) {
         return true;
     }
     const auto e = entries_[static_cast<std::size_t>(index)];
@@ -662,7 +636,7 @@ void Spellbook::draw(SDL_Renderer* renderer, const BookContext& ctx, int w, int 
         // Two columns of titles from this list page, each centred on its x.
         for (int i = 0; i < lines * 2; ++i) {
             const int index = listPage_ * lines * 2 + i;
-            if (index >= n) {
+            if (index >= listed_) {
                 break;
             }
             if (i == lines) {
@@ -767,11 +741,12 @@ void Spellbook::draw(SDL_Renderer* renderer, const BookContext& ctx, int w, int 
             drawRef(*ic, o.x + 0x3F, o.y + 0x13);
         }
     }
-    // The arrows: back unless on the first list page, on unless on the last entry.
-    if (!(listMode_ && listPage_ == 0)) {
+    // The arrows: back unless on the first list page, on unless on the last listed entry or past it.
+    const bookpages::Place here{listMode_, listPage_, entry_};
+    if (bookpages::backShown(here)) {
         drawNamed("ArrowW", o.x + 0x18, o.y + 0x8A);
     }
-    if (listMode_ || entry_ < n - 1) {
+    if (bookpages::forwardShown(here, listed_)) {
         drawNamed("ArrowE", o.x + 0xE9, o.y + 0x8A);
     }
 }
