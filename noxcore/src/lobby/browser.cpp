@@ -22,13 +22,21 @@ constexpr std::uint32_t kBroadcast = 0xFFFFFFFF; // 255.255.255.255
 /// "host" or "host:port" as an endpoint (the game port by default).
 std::optional<net::Endpoint> parseServer(std::string_view text)
 {
+    // getaddrinfo takes a C string: never let a malformed saved line resolve only its prefix.
+    if (text.find('\0') != std::string_view::npos) {
+        return std::nullopt;
+    }
     std::uint16_t port = kDefaultGamePort;
     if (const auto colon = text.rfind(':'); colon != std::string_view::npos) {
         const std::string_view p = text.substr(colon + 1);
-        if (std::from_chars(p.data(), p.data() + p.size(), port).ec != std::errc{}) {
+        const auto [end, error] = std::from_chars(p.data(), p.data() + p.size(), port);
+        if (p.empty() || error != std::errc{} || end != p.data() + p.size() || port == 0) {
             return std::nullopt;
         }
         text = text.substr(0, colon);
+    }
+    if (text.empty()) {
+        return std::nullopt;
     }
     return net::Endpoint::resolve(text, port);
 }
@@ -57,7 +65,9 @@ bool ServerBrowser::searching() const
 ServerEntry& ServerBrowser::upsert(std::uint32_t address, std::uint16_t port)
 {
     const auto it = std::find_if(entries_.begin(), entries_.end(),
-                                 [&](const ServerEntry& e) { return e.game.address == address && e.game.port == port; });
+                                 [&](const ServerEntry& e) {
+                                     return !e.unresolved && e.game.address == address && e.game.port == port;
+                                 });
     if (it != entries_.end()) {
         return *it;
     }
@@ -100,10 +110,28 @@ void ServerBrowser::ping(const net::Endpoint& to, std::uint32_t nowMs, bool broa
 // given or logged into (pollXwis carries the login on).
 void ServerBrowser::refresh(std::uint32_t nowMs, const std::vector<GameListing>* xwisGames)
 {
+    startRefresh(nowMs, xwisGames, false);
+}
+
+void ServerBrowser::refreshListedServers(std::uint32_t nowMs)
+{
+    std::vector<GameListing> games;
+    for (const auto& entry : entries_) {
+        if (entry.sources & kFromXwis) {
+            games.push_back(entry.game);
+        }
+    }
+    startRefresh(nowMs, &games, true);
+}
+
+void ServerBrowser::startRefresh(std::uint32_t nowMs, const std::vector<GameListing>* xwisGames, bool keepXwisLogin)
+{
     entries_.clear();
     pings_.clear();
     queried_.clear();
-    closeXwis({});
+    if (!keepXwisLogin) {
+        closeXwis({});
+    }
     try {
         if (!udp_) {
             udp_ = net::UdpSocket::open(0);
@@ -119,15 +147,30 @@ void ServerBrowser::refresh(std::uint32_t nowMs, const std::vector<GameListing>*
     if (options_.lan) {
         queued_.push_back({options_.lanQueryTo.value_or(net::Endpoint{kBroadcast, kDefaultGamePort}), true});
     }
+    std::set<std::string> listed;
+    std::set<net::Endpoint> endpoints;
     for (const auto& s : options_.servers) {
+        if (!listed.insert(s).second) {
+            continue;
+        }
         if (const auto to = parseServer(s)) {
             ServerEntry& e = upsert(to->address, to->port);
             e.sources |= kFromList;
+            e.checking = true;
+            e.listedAddresses.push_back(s);
             if (e.game.name.empty()) {
                 e.game.name = s;
             }
-            queued_.push_back({*to, false});
+            if (endpoints.insert(*to).second) {
+                queued_.push_back({*to, false});
+            }
         } else {
+            ServerEntry e;
+            e.game.name = s;
+            e.listedAddresses = {s};
+            e.sources = kFromList;
+            e.unresolved = true;
+            entries_.push_back(std::move(e));
             log_.push_back("can't resolve " + s);
         }
     }
@@ -140,7 +183,10 @@ void ServerBrowser::refresh(std::uint32_t nowMs, const std::vector<GameListing>*
             ServerEntry& e = upsert(g.address, g.port);
             e.game = g;
             e.sources |= kFromXwis;
-            queued_.push_back({{g.address, g.port}, false});
+            e.checking = true;
+            if (endpoints.insert({g.address, g.port}).second) {
+                queued_.push_back({{g.address, g.port}, false});
+            }
         }
     } else if (xwis) {
         const auto host = options_.xwisServer ? options_.xwisServer : net::Endpoint::resolve(kXwisHost, kXwisPort);
@@ -178,6 +224,16 @@ void ServerBrowser::poll(std::uint32_t nowMs)
     }
     pollXwis(nowMs);
     pollUdp(nowMs);
+    // Index pending endpoints once, rather than scanning every ping for every row each frame.
+    std::set<net::Endpoint> pending;
+    for (const auto& [token, ping] : pings_) {
+        if (!ping.broadcast) {
+            pending.insert(ping.to);
+        }
+    }
+    for (auto& entry : entries_) {
+        entry.checking = !entry.unresolved && !entry.answered && pending.contains({entry.game.address, entry.game.port});
+    }
 }
 
 // Drives the XWIS listing login: connect, send its lines, read replies; when it's done, its

@@ -174,6 +174,7 @@ void Menus::closeDialog()
         gui_.destroy(dialog_);
         dialog_ = nullptr;
     }
+    dialogEvents_ = nullptr;
     dialogKeys_ = nullptr;
     dialogKeysOf_ = nullptr;
 }
