@@ -1502,6 +1502,19 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
         case net::Op::ServerQuitAck: // (SrvNet_OnPacket 0xC8: Game_OnQuitAckReceived, whoever sent it, quitting or not)
             --quitPendingAcks_;
             break;
+        case net::Op::Important: // (0xAA: u32 the client's frame) a stock client's important messages follow
+            // Answered with MSG_IMPORTANT_ACK {0xAB, the same u32} in the player's frame's datagram
+            // (unreliable), for a player with a unit, as GAME.EXE's server does: the client's
+            // important queue lets go of what it sent in that frame. Unanswered, it sent each of them
+            // again every 2 s for good (an emote played again, a team switch, a save asked, a console
+            // command run again). The messages after it are read as any: one sent again after a lost
+            // ack is taken again, as the exe's server takes it. (A NoX Core client sends its own on
+            // the reliable stream, never this.)
+            if (server_.world().byExtent(players_[peer].extent)) {
+                const std::array<std::uint8_t, 5> ack{static_cast<std::uint8_t>(net::Op::ImportantAck), m[1], m[2], m[3], m[4]};
+                transport_.sendUnreliable(peer, ack);
+            }
+            break;
         case net::Op::IncomingClient:
             onIncomingClient(peer);
             break;
