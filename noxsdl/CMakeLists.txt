@@ -166,6 +166,14 @@ set_target_properties(noxsdl PROPERTIES OUTPUT_NAME noxcore)
 # for the window's icon (src/icon/window_icon.hpp).
 nox_app_icon(noxsdl ICON "${CMAKE_CURRENT_SOURCE_DIR}/res/noxcore.ico" DESCRIPTION "NoX Core")
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    option(NOXSDL_USE_DISPLAY_SAFE_AREA "Keep Mac client and editor content inside SDL's display safe area" OFF)
+    if(NOXSDL_USE_DISPLAY_SAFE_AREA)
+        target_compile_definitions(noxsdl PRIVATE NOXSDL_USE_DISPLAY_SAFE_AREA=1)
+        target_compile_definitions(noxsdl_editor_host PRIVATE NOXSDL_USE_DISPLAY_SAFE_AREA=1)
+    endif()
+endif()
+
 # The fallback font, compiled in so the exe needs no data files of its own.
 set(NOXSDL_FONT_FILE "${noto_sans_SOURCE_DIR}/NotoSans-SemiBold.ttf")
 add_custom_command(

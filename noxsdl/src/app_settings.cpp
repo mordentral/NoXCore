@@ -3,6 +3,7 @@
 // game view's size.
 #include "app.hpp"
 #include "effects_draw.hpp"
+#include "display_area.hpp"
 #include "snapshot_pacing.hpp"
 
 #include "noxcore/things/object_class.hpp"
@@ -289,6 +290,10 @@ void applyMouse(App& app)
     }
     int outW = 0, outH = 0;
     SDL_GetCurrentRenderOutputSize(app.renderer, &outW, &outH);
+    if (displayarea::enabled && app.letterboxed) {
+        outW = static_cast<int>(app.gameArea.w);
+        outH = static_cast<int>(app.gameArea.h);
+    }
     const float gamePixel = app.live ? app.camera.zoom // (viewZoom, set this frame)
                                      : std::min(static_cast<float>(outW) / 640.0f, static_cast<float>(outH) / 480.0f);
     // (Events are in window points: the density the pointer mapping uses, layoutView's this frame.)
@@ -324,6 +329,11 @@ void applyMouse(App& app)
     if (std::abs(scale - app.mouseScale) > 0.001f) {
         app.mouseScale = scale;
         SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_SPEED_SCALE, std::to_string(scale).c_str());
+    }
+    if (displayarea::enabled && !(app.editor && app.live && (app.playTestEmbedded || app.sessionEmbedded))) {
+        const SDL_Rect area = displayarea::pointerBounds(app.gameArea, density);
+        displayarea::confinePointer(app.window,
+            relative && SDL_GetWindowRelativeMouseMode(app.window) && area.w > 0 && area.h > 0 ? &area : nullptr);
     }
 }
 

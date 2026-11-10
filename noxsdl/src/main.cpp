@@ -43,6 +43,7 @@
 #include "editor/close_plan.hpp"
 #include "editor/editor_settings.hpp"
 #include "effects_draw.hpp"
+#include "display_area.hpp"
 #include "icon/window_icon.hpp"
 #include "leaving_notice.hpp"
 #include "log_output.hpp"
@@ -105,6 +106,7 @@ void playTestToEditor(App& app);
 void capturePlayTest(App& app, bool on);
 void pausePlayTest(App& app, bool on);
 void editorMouse(App& app);
+void layoutView(App& app, bool embedded);
 // The collaborative map editor session, defined with the play-test's.
 std::string hostEditSession(App& app, const editor::SessionSetup& setup, std::uint16_t port, bool listed);
 void showEditSessionSetup(App& app, bool closeOnCancel = false);
@@ -296,6 +298,7 @@ void editorMouse(App& app)
     if (!app.window) {
         return;
     }
+    displayarea::confinePointer(app.window, nullptr);
     const bool relative = SDL_GetWindowRelativeMouseMode(app.window);
     const bool visible = SDL_CursorVisible();
     app.mouseMode = MouseMode::Unknown; // (set again in the menus or a game: applyMouse)
@@ -952,7 +955,14 @@ SDL_AppResult showMovie(App& app, bool shotReady)
     int w = 0;
     int h = 0;
     SDL_GetCurrentRenderOutputSize(app.renderer, &w, &h);
+    const auto area = displayarea::render(app.renderer);
+    if (area) {
+        SDL_SetRenderViewport(app.renderer, &*area);
+        w = area->w;
+        h = area->h;
+    }
     app.movie->draw(w, h);
+    if (area) SDL_SetRenderViewport(app.renderer, nullptr);
     if (shotReady && SDL_GetTicks() >= static_cast<std::uint64_t>(app.shotAfterSeconds * 1000)) {
         app.shotTaken = true;
         SDL_Log("movie: %s frame %d", app.movie->hd() ? "HD" : "VQA", app.movie->frame());
@@ -2285,6 +2295,7 @@ void endPlayTest(App& app)
 void playTestToEditor(App& app)
 {
     app.playTestInGame = false;
+    if (displayarea::enabled) editorMouse(app);
     if (app.input) {
         app.input->releaseAll();
     }
@@ -2485,6 +2496,7 @@ void sessionToEditor(App& app)
     }
     app.playTestMouse.reset(); // (no game in the panel: no held pointer place to outlive it)
     app.sessionInGame = false;
+    if (displayarea::enabled) editorMouse(app);
     if (app.cinematics) {
         app.cinematics->clearScreen(); // (a cinematic's black, bars and hidden HUD not kept for the next Play)
     }
@@ -2882,6 +2894,14 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         }
         app->editor->handleEvent(*event);
         return SDL_APP_CONTINUE;
+    }
+    if (displayarea::enabled && !gameInPanel(*app)) {
+        // Refresh before dispatch too: a display change or editor handoff can
+        // precede pointer events in the same batch, before the next drawn frame.
+        layoutView(*app, false);
+        applyMouse(*app);
+        displayarea::confineEvent(app->window, *event);
+        if (!displayarea::acceptsPointer(app->window, *event)) return SDL_APP_CONTINUE;
     }
     // The mouse in the game's output pixels (a letterboxed game's from its area's corner).
     if (mapsPointer(*app)) {
@@ -3300,6 +3320,10 @@ void layoutView(App& app, bool embedded)
         playTestLayout(app); // (the game's area in the editor's Map panel)
     } else {
         SDL_GetCurrentRenderOutputSize(app.renderer, &app.camera.viewWidth, &app.camera.viewHeight);
+        const int outW = app.camera.viewWidth, outH = app.camera.viewHeight;
+        const SDL_Rect area = displayarea::render(app.renderer).value_or(SDL_Rect{0, 0, outW, outH});
+        app.camera.viewWidth = area.w;
+        app.camera.viewHeight = area.h;
         // A game's view keeps its resolution's shape: the largest such area that fits, black
         // bars round it (the frame is drawn at its size: beginFrame / endFrame).
         const float ow = static_cast<float>(app.camera.viewWidth);
@@ -3317,6 +3341,9 @@ void layoutView(App& app, bool embedded)
                 app.camera.viewHeight = static_cast<int>(h);
             }
         }
+        app.gameArea.x += static_cast<float>(area.x);
+        app.gameArea.y += static_cast<float>(area.y);
+        app.letterboxed = app.letterboxed || area.x != 0 || area.y != 0 || area.w != outW || area.h != outH;
     }
     if (app.live) {
         app.camera.zoom = viewZoom(app); // a game's view is fixed by its Options

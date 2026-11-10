@@ -4,6 +4,7 @@
 #include "editor/panel_textures.hpp"
 #include "editor/theme_colours.hpp"
 #include "window_density.hpp"
+#include "display_area.hpp"
 
 #include "noxcore/io/file.hpp"
 #include "noxcore/io/png.hpp"
@@ -897,6 +898,14 @@ void ImGuiHost::newFrame()
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+    if (const auto area = displayarea::window(window_)) {
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        const float right = std::min(viewport->WorkPos.x + viewport->WorkSize.x, viewport->Pos.x + area->x + area->w);
+        const float bottom = std::min(viewport->WorkPos.y + viewport->WorkSize.y, viewport->Pos.y + area->y + area->h);
+        viewport->WorkPos.x = std::max(viewport->WorkPos.x, viewport->Pos.x + area->x);
+        viewport->WorkPos.y = std::max(viewport->WorkPos.y, viewport->Pos.y + area->y);
+        viewport->WorkSize = ImVec2(std::max(right - viewport->WorkPos.x, 0.0f), std::max(bottom - viewport->WorkPos.y, 0.0f));
+    }
     bringBackLostWindows();
 }
 
