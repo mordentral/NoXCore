@@ -160,6 +160,9 @@ add_executable(noxsdl WIN32
 # commands. No clash with the library target noxcore: its noxcore.lib / .a is built in noxcore/,
 # not beside the exe, and its compile PDB stays in its own CMakeFiles folder.
 set_target_properties(noxsdl PROPERTIES OUTPUT_NAME noxcore)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_sources(noxsdl PRIVATE src/backend_hooks.cpp)
+endif()
 
 # The icon (res/noxcore.ico, made from res/noxcore.png; committed, so the
 # build needs no converter): the exe's resource and version information on Windows, and embedded

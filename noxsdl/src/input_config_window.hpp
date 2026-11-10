@@ -67,7 +67,7 @@ private:
     void cancelCapture();
     void scroll(int by);
     std::string keyTitle(std::optional<std::uint32_t> code) const;
-    /// Reads a file's bindings (nox.cfg / default.cfg in the game folder), if it reads.
+    /// Reads saved nox.cfg bindings or the game folder's factory default.cfg bindings.
     std::optional<nox::config::Config> readFile(const char* name) const;
 
     gui::Gui gui_;

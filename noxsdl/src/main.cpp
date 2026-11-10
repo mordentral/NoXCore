@@ -38,6 +38,7 @@
 #include <SDL3/SDL_main.h>
 
 #include "app.hpp"
+#include "backend_hooks.hpp"
 #include "client_level_gate.hpp"
 #include "command_line.hpp"
 #include "editor/close_plan.hpp"
@@ -1095,13 +1096,15 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         app->saveRoot = leaf == "save" ? opts.saveDir.parent_path() : opts.saveDir;
     }
 
-    // The game's config (nox.cfg, else default.cfg): the key bindings, and the view a game
-    // shows (VideoMode's resolution, VideoSize's window size).
+    // Saved nox.cfg from user settings, else the installed default.cfg: the key bindings,
+    // and the view a game shows (VideoMode's resolution, VideoSize's window size).
     {
         bool fromDefault = false;
-        const auto loaded = nox::config::loadConfig(app->gameDir, &fromDefault);
+        const auto& settingsDir = backend::settingsDirectory(app->gameDir);
+        const auto loaded = nox::config::loadConfig(settingsDir, app->gameDir, &fromDefault);
         if (!loaded) {
-            SDL_Log("neither nox.cfg nor default.cfg read in %s: no key bindings", app->gameDir.string().c_str());
+            SDL_Log("neither %s nor %s read: no key bindings", (settingsDir / "nox.cfg").string().c_str(),
+                    (app->gameDir / "default.cfg").string().c_str());
         }
         nox::config::Config config = loaded.value_or(nox::config::Config{});
         if (fromDefault || !config.setting("VideoMode")) {
@@ -1123,7 +1126,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    const SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | (app->screenshot.empty() ? 0 : SDL_WINDOW_HIDDEN);
+    const SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | (app->screenshot.empty() ? 0 : SDL_WINDOW_HIDDEN) |
+                                  backend::additionalWindowFlags();
     app->window = SDL_CreateWindow("NoX Core", opts.width, opts.height, flags);
     if (!app->window) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
@@ -1203,7 +1207,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             }
             SDL_Log("image pack: %s", app->imagePack.empty() ? "none (Use HD Images is greyed)"
                                                               : app->imagePack.string().c_str());
-            OptionsWindow::Extras extras = loadExtras(gameDir);
+            OptionsWindow::Extras extras = loadExtras(backend::settingsDirectory(gameDir));
             extras.hdImages = (extras.hdImages || opts.hdImages) && !app->imagePack.empty();
             if (opts.originalFonts) {
                 extras.originalFonts = *opts.originalFonts;

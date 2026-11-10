@@ -3,11 +3,13 @@
 #include "input_config_window.hpp"
 
 #include "input.hpp"
+#include "backend_hooks.hpp"
 
 #include "noxcore/io/file.hpp"
 
 #include <algorithm>
 #include <array>
+#include <string_view>
 
 namespace noxsdl {
 
@@ -27,11 +29,12 @@ InputConfigWindow::InputConfigWindow(gui::Resources res, std::filesystem::path g
 {
 }
 
-// A config file in the game folder (any case), parsed; nullopt if it's missing or unreadable.
+// Reset reads saved user bindings; Defaults always reads the installed factory bindings.
 std::optional<nox::config::Config> InputConfigWindow::readFile(const char* name) const
 {
     try {
-        const auto path = nox::findNoCase(gameDir_, name);
+        const auto& dir = std::string_view(name) == "nox.cfg" ? backend::settingsDirectory(gameDir_) : gameDir_;
+        const auto path = nox::findNoCase(dir, name);
         if (!std::filesystem::exists(path)) {
             return std::nullopt;
         }

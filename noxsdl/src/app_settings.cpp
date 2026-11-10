@@ -2,6 +2,7 @@
 // applied, the window's display mode, the mouse as the game read it and who has it, and the
 // game view's size.
 #include "app.hpp"
+#include "backend_hooks.hpp"
 #include "effects_draw.hpp"
 #include "snapshot_pacing.hpp"
 
@@ -80,15 +81,16 @@ void applySettings(App& app, const nox::config::Config& config)
     }
 }
 
-/// Writes nox.cfg in the game folder, as the game does when its Options close.
+/// Writes nox.cfg in the settings directory (the game folder by default) when Options close.
 void saveSettings(App& app)
 {
     if (!app.input) {
         return;
     }
     try {
-        nox::config::saveConfig(app.gameDir, app.input->config());
-        SDL_Log("saved %s", (app.gameDir / "nox.cfg").string().c_str());
+        const auto& dir = backend::settingsDirectory(app.gameDir);
+        nox::config::saveConfig(dir, app.input->config());
+        SDL_Log("saved %s", (dir / "nox.cfg").string().c_str());
     } catch (const std::exception& ex) {
         SDL_Log("nox.cfg: %s", ex.what());
     }
@@ -187,7 +189,7 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
 /// Writes noxcore.cfg from the switches (what loadExtras reads back).
 void saveExtras(const App& app, const OptionsWindow::Extras& e)
 {
-    std::ofstream out(app.gameDir / "noxcore.cfg", std::ios::trunc);
+    std::ofstream out(backend::settingsDirectory(app.gameDir) / "noxcore.cfg", std::ios::trunc);
     out << "FrameRate = " << e.frameRate << "\nBloom = " << e.bloom << "\nPerPixelLight = " << e.perPixelLight
         << "\nSmoothEffects = " << e.smoothEffects << "\nHDSpellFX = " << e.hdSpellFx << "\nSmoothing = " << e.smoothing
         << "\nHDImages = " << e.hdImages << "\nOriginalFonts = " << e.originalFonts << "\nGamma = " << e.gamma << "\nMouseAccel = " << e.mouseAccel
