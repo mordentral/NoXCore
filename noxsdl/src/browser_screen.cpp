@@ -119,7 +119,7 @@ bool BrowserScreen::addSavedServer(const std::string& address)
 
 void BrowserScreen::removeSavedServer(const std::string& address)
 {
-    serverFiles_.remove({address});
+    serverFiles_.remove(address);
 }
 
 bool BrowserScreen::isSaved(const nox::lobby::ServerEntry& entry) const

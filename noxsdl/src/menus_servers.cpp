@@ -26,16 +26,6 @@ struct ServerDialogState {
 };
 }
 
-void Menus::setupServerControls()
-{
-    if (auto* button = screen_->find(10007)) {
-        button->text = "Add/Remove";
-        button->show(true);
-        button->tooltip = "Add or remove saved server addresses";
-        gui::setEnabled(button, true);
-    }
-}
-
 void Menus::serverDialog()
 {
     closeGameInfo();
@@ -179,22 +169,26 @@ void Menus::serverDialog()
             // File writes and refresh happen outside GUI event dispatch.
             deferred_.push_back([this, state, normal, reload, expected = dialog_] {
                 if (dialog_ != expected || !state->confirming) return;
+                bool succeeded = false;
+                std::string result;
                 try {
                     bool changed = true;
                     if (state->adding) changed = browser_.addSavedServer(state->pending);
                     else browser_.removeSavedServer(state->pending);
-                    browser_.refreshSavedServers(nowMs_);
-                    if (state->adding) browser_.selectAddress(state->pending);
                     SDL_Log("saved servers: %s %s", state->adding ? "added" : "removed", state->pending.c_str());
-                    normal(); reload();
-                    dialog_->find(kText)->text = !changed ? "Already saved." : state->adding ? "Server added." : "Saved address removed.";
-                    if (state->adding) dialog_->find(kEntry)->entry.clear();
+                    result = !changed ? "Already saved." : state->adding ? "Server added." : "Saved address removed.";
+                    succeeded = true;
                 } catch (const std::exception& ex) {
                     SDL_Log("saved servers: %s", ex.what());
-                    // A failure during the final renames can still leave a partial removal.
-                    browser_.refreshSavedServers(nowMs_);
-                    normal(); reload();
-                    dialog_->find(kText)->text = "Could not change servers.txt. Check that it is writable and try again.";
+                    result = "Could not change servers.txt. Check that it is writable and try again.";
+                }
+                // Reload after failures too: a final rename may have left a partial removal.
+                browser_.refreshSavedServers(nowMs_);
+                normal(); reload();
+                dialog_->find(kText)->text = std::move(result);
+                if (succeeded && state->adding) {
+                    browser_.selectAddress(state->pending);
+                    dialog_->find(kEntry)->entry.clear();
                 }
             });
             break;

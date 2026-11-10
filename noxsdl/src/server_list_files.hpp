@@ -22,7 +22,7 @@ public:
     // so edits cannot silently ignore an unreadable source (including duplicate addresses).
     std::vector<std::string> read(std::vector<std::string>* errors = nullptr) const;
     bool add(std::string_view address) const; // false: already saved
-    void remove(const std::vector<std::string>& addresses) const;
+    void remove(std::string_view address) const;
 private:
     std::vector<std::filesystem::path> paths_;
 };

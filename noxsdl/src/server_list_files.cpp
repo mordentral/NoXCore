@@ -231,17 +231,16 @@ bool ServerListFiles::add(std::string_view address) const
     return true;
 }
 
-void ServerListFiles::remove(const std::vector<std::string>& addresses) const
+void ServerListFiles::remove(std::string_view address) const
 {
-    std::unordered_set<std::string> keys;
-    for (const auto& address : addresses) keys.insert(key(address));
+    const auto removed = key(address);
     std::vector<std::unique_ptr<FileReplacement>> edits;
     for (const auto& path : paths_) {
         const auto before = readText(path);
         std::string after;
         lines(before, [&](std::string_view line) {
             const auto address = addressOf(line);
-            if (address.empty() || !keys.contains(key(address))) after += line;
+            if (address.empty() || key(address) != removed) after += line;
             else if (const auto comment = line.find('#'); comment != line.npos) after += line.substr(comment);
         });
         if (before != after) {

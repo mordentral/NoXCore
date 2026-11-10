@@ -270,7 +270,6 @@ private:
     /// RequestChannelList(37), "Loading games"), else a search of its own.
     void refreshGames();
     void serverDialog();
-    void setupServerControls();
     /// RequestLogout; the connection let go once the server closes it.
     void logOffWol();
     /// A colour button's or swatch's colour (its data: palette table low, index high).

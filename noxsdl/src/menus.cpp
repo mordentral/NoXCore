@@ -475,7 +475,12 @@ void Menus::enter(State s)
             }
         }
         wip(screen_, kFilters);
-        setupServerControls();
+        if (auto* button = screen_->find(kFind)) {
+            button->text = "Add/Remove";
+            button->show(true);
+            button->tooltip = "Add or remove saved server addresses";
+            gui::setEnabled(button, true);
+        }
         if (gui::Window* list = screen_->find(kList)) {
             list->state |= gui::kPressed; // showing the list
         }
