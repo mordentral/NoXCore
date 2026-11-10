@@ -22,6 +22,7 @@ local decals = require("decals")
 local hero = require("hero")
 local hud = require("hud")
 local offers = require("offers")
+local summons = require("summons")
 local town = require("town")
 local touch = require("touch")
 local numbers = require("data/numbers")
@@ -135,9 +136,12 @@ function portal.through(h: any, e: any): boolean
 		hud.hero(h)
 	end
 	local x, y = nox.clearPointNear(x0, y0, 40)
+	local fromX, fromY = nox.position(h.unit)
 	nox.setPosition(h.unit, x, y)
 	nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
 	touch.arrived(h.unit)
+	-- (its creatures with it)
+	summons.bring(h.unit, fromX, fromY)
 	return true
 end
 

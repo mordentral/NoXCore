@@ -15,6 +15,9 @@
 --                    monster on a hero (the hit's final amount); the slow or the heal follows the
 --                    next frame (onDamage may change nothing in the world).
 --   its death        splitting, stormcharged: monsters.luau tells `died`.
+--   rising again     a zombie's beat stops at each of its deaths and starts again, as it was
+--                    made, each time it stands (`rose`); its death powers go off at its first
+--                    death alone.
 --
 -- A summoner's minions (by decision 2026-11-02) are made through monsters.luau as normal ones of the
 -- area's weakest types, their entries marked `minion` and `master` (the summoner's id): main.luau
@@ -339,6 +342,14 @@ local function think(id: number)
 	end
 end
 
+-- Its beat started (any one it had stopped first): each power's clock from now.
+local function beatFor(id: number, e: any)
+	stop(id)
+	local st = { entry = e, at = {} :: { [string]: number }, timer = 0 }
+	st.timer = nox.every(data.powerBeat.every, think, id)
+	live[id] = st
+end
+
 -- ---- Rolling them
 
 -- `want` (a list of ids, the console's) or `n` of the powers that fit `thingType`, drawn at random
@@ -416,10 +427,35 @@ function powers.give(id: number, e: any, n: number, want: { string }?)
 		e.plate = plateOf(e)
 	end
 	if active then
-		stop(id)
-		local st = { entry = e, at = {} :: { [string]: number }, timer = 0 }
-		st.timer = nox.every(data.powerBeat.every, think, id)
-		live[id] = st
+		beatFor(id, e)
+	end
+end
+
+-- A risen monster of the mod's (a zombie stood up again: monsters.standing) with powers: they work
+-- again as they did when it was made (by decision 2026-11-10): its beat started afresh (each power's
+-- clock from now, no minions), and its powers' enchantments put back should any be off (the engine
+-- keeps a zombie's through its death).
+function powers.rose(id: number, e: any)
+	local list = e.powers
+	if not list or not nox.living(id) then
+		return
+	end
+	local active = false
+	for _, p in list do
+		local def = byId[p]
+		for _, ench in { def.enchant, def.look } do
+			if ench and not nox.enchanted(id, ench) then
+				nox.enchant(id, ench, 0)
+			end
+		end
+		if ACTIVE[p] then
+			active = true
+		end
+	end
+	if active then
+		e.minions = nil
+		beatFor(id, e)
+		count("risen")
 	end
 end
 
@@ -511,9 +547,9 @@ local function storm(id: number, e: any, def: any, x: number, y: number)
 end
 
 -- A powered monster of the mod's died (monsters.killed, its entry already out of the index, but a
--- zombie's, kept till its body goes; a zombie's first death alone): its timer stopped; its death's
--- powers.
-function powers.died(id: number, e: any)
+-- zombie's, kept till its body goes): its timer stopped, its minions gone; its death's powers, but
+-- for a zombie's later deaths (`again`: it has died before; only its first gives anything).
+function powers.died(id: number, e: any, again: boolean?)
 	stop(id)
 	local list = e.powers
 	if not list then
@@ -521,6 +557,9 @@ function powers.died(id: number, e: any)
 	end
 	if e.minions then
 		dismiss(id, e)
+	end
+	if again then
+		return
 	end
 	local o = nox.object(id)
 	if not o then
@@ -555,10 +594,10 @@ end
 
 -- ---- For the console
 
--- "dd powers": each live powered monster ("id type tier powers drops D xp X [minions IDS]": D its
--- death's loot rolls past the first, its tier's and its powers'; X its death's experience for one
--- player, its powers' share in it; IDS a summoner's minions alive now, comma separated, or "-"),
--- then what they've done.
+-- "dd powers": each live powered monster ("id type tier powers drops D xp X [minions IDS] beat B":
+-- D its death's loot rolls past the first, its tier's and its powers'; X its death's experience for
+-- one player, its powers' share in it; IDS a summoner's minions alive now, comma separated, or "-";
+-- B 1 while its beat runs, else 0: a zombie lying dead), how many beats run, then what they've done.
 function powers.lines(): { string }
 	local out = {}
 	for id, e in host.all() do
@@ -574,10 +613,13 @@ function powers.lines(): { string }
 				table.insert(words, "minions")
 				table.insert(words, if #ids > 0 then table.concat(ids, ",") else "-")
 			end
+			table.insert(words, "beat")
+			table.insert(words, if live[id] then "1" else "0")
 			table.insert(out, table.concat(words, " "))
 		end
 	end
 	table.sort(out)
+	table.insert(out, "beating " .. tostring(powers.beating()))
 	local done: { string } = {}
 	for k, n in counts do
 		table.insert(done, k .. " " .. tostring(n))

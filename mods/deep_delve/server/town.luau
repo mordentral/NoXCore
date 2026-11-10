@@ -79,14 +79,26 @@ function town.respawnPoint(): (number?, number?)
 	return nox.clearPointNear(c.x + nox.random(-30, 30), c.y + 92, 30)
 end
 
--- A unit sent home (the way back from the area's start, a town portal), arriving there (no way
--- takes it at once: touch.luau).
+-- What comes home with a unit sent home (main.luau's: its creatures, summons.bring), or nil.
+local along: ((number, number, number) -> ())? = nil
+
+function town.onSentHome(fn: (unit: number, fromX: number, fromY: number) -> ())
+	along = fn
+end
+
+-- A unit sent home (the way back from the area's start, a town portal, a run's way out), arriving
+-- there (no way takes it at once: touch.luau), its creatures with it.
 function town.sendHome(unit: number)
 	local x, y = town.respawnPoint()
-	if x and y then
+	if x and y and nox.present(unit) then
+		local fromX, fromY = nox.position(unit)
 		nox.setPosition(unit, x, y)
 		nox.effect(0x89, x, y) -- (MSG_FX_TELEPORT)
 		touch.arrived(unit)
+		local fn = along
+		if fn then
+			fn(unit, fromX, fromY)
+		end
 	end
 end
 

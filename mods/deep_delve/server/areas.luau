@@ -383,11 +383,16 @@ function areas.gateTouched(h: any): (boolean, string?)
 end
 
 -- A unit through a way within the map: put at `at`, with the teleport's flash, arriving there (no
--- way takes it at once: touch.luau).
+-- way takes it at once: touch.luau), its creatures with it (summons.luau).
 local function moveTo(unit: number, at: any)
+	if not nox.present(unit) then
+		return
+	end
+	local fromX, fromY = nox.position(unit)
 	nox.setPosition(unit, at.x, at.y)
 	nox.effect(0x89, at.x, at.y) -- (MSG_FX_TELEPORT)
 	touch.arrived(unit)
+	summons.bring(unit, fromX, fromY)
 end
 
 -- The area's weather for everyone: the one rolled as its map was built (an outdoor area's); on

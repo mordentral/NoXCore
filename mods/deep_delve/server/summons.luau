@@ -22,6 +22,10 @@
 --     with its owner (a charm takes a creature off any team first).
 --   * A summoned creature (not a charmed one) of a hero whose tree has summonHealth (a keystone)
 --     has its most health changed by that share as it's found.
+--   * A hero moved by a way within the map brings its creatures with it (bring: the area's
+--     waypoint, the town's gate, the way home, a town portal both ways, the town's waypoints
+--     window's step, a run's way out). A map change ends them: the engine keeps no creature of
+--     a network game's from one map to the next.
 --
 -- Nothing walks the world: only the units near a summoning or a charm while its creature is on
 -- its way.
@@ -29,6 +33,7 @@
 local hero = require("hero")
 local monsters = require("monsters")
 local team = require("team")
+local numbers = require("data/numbers")
 local treeData = require("data/tree")
 
 local summons = {}
@@ -182,6 +187,61 @@ function summons.of(owner: number): { number }
 		end
 	end
 	return out
+end
+
+local ALIVE_MONSTERS: any = { monsters = true, alive = true }
+local MSG_TELEPORT = 0x89
+
+-- A hero moved by a way within the map (by decision 2026-11-10: a hero's creatures come with it):
+-- `owner` (its unit) stands where the way put it, from (fromX, fromY). Its creatures come too, each
+-- put beside it on clear ground with the teleport's flash where it lands: the ones known here (its
+-- summons, what it charmed, a unique's companion: wherever they are) and any other creature the
+-- engine has it own near where it stood. `sound`: as the area's waypoint sends one, the flash
+-- where each stood as well, and that sound at both ends. Monsters after the hero aren't its own
+-- and stay. How many came.
+function summons.bring(owner: number, fromX: number, fromY: number, sound: number?): number
+	if not nox.present(owner) then
+		return 0
+	end
+	local list: { number } = {}
+	local seen: { [number]: boolean } = {}
+	for id in known do
+		if summons.ownerOf(id) == owner and nox.living(id) then
+			table.insert(list, id)
+			seen[id] = true
+		end
+	end
+	for _, id in nox.unitsNear(fromX, fromY, numbers.along.reach, ALIVE_MONSTERS) do
+		local o = nox.object(id)
+		if not seen[id] and o and o.owner == owner then
+			table.insert(list, id)
+			seen[id] = true
+		end
+	end
+	if #list == 0 then
+		return 0
+	end
+	table.sort(list)
+	local x, y, r = nox.position(owner)
+	-- (round the hero, the first behind it: its facing's opposite)
+	local fx, fy = nox.directionVector(nox.direction(owner))
+	local back = math.atan2(-fy, -fx)
+	for i, id in list do
+		local cx, cy, cr = nox.position(id)
+		if sound then
+			nox.effect(MSG_TELEPORT, cx, cy)
+			nox.sound(id, sound)
+		end
+		local a = back + (i - 1) / #list * 2 * math.pi
+		local d = r + cr + numbers.along.beside
+		local px, py = nox.clearPointNear(x + d * math.cos(a), y + d * math.sin(a), numbers.along.room)
+		nox.setPosition(id, px, py)
+		nox.effect(MSG_TELEPORT, px, py)
+		if sound then
+			nox.sound(id, sound)
+		end
+	end
+	return #list
 end
 
 -- A watched creature died.

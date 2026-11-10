@@ -464,6 +464,12 @@ items.onHandedWorn(function(unit: number)
 	tips.changed(unit)
 end)
 
+-- A hero sent home within the map (the way home, a town portal, a run's way out): its creatures
+-- come too (summons.luau).
+town.onSentHome(function(unit: number, fromX: number, fromY: number)
+	summons.bring(unit, fromX, fromY)
+end)
+
 -- A warrior's active ability used (its button or key): Leap Slam's leap, Whirlwind's spin and its
 -- end (actives.luau); false refuses a press.
 function mode.onModAbility(unit: number, id: string, x: number?, y: number?, phase: string): boolean?

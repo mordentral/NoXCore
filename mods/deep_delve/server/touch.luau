@@ -14,7 +14,7 @@
 --     numbers.touch.gap frames. Closed by its player, the window stays closed while it still
 --     stands there.
 --   * a way (a thing that takes a player elsewhere: the town's gate, the way home, the exit, the
---     portal's pentagram, the waypoints' pentagram) takes nobody for numbers.touch.grace frames
+--     portal's pentagram, the waypoints' pentagram, an area's waypoint) takes nobody for numbers.touch.grace frames
 --     after that player arrived somewhere (touch.arrived: through a way, by a portal, a waypoint,
 --     a map change, a respawn). One it touched in that time is held for it: it takes that player
 --     only at a new step onto it (stepped off and come back). So a player who arrives walking
@@ -91,6 +91,19 @@ end
 function touch.passes(w: any, unit: number): boolean
 	local now = nox.frame()
 	return lets(w, unit, now, stepped(w, unit, now))
+end
+
+-- Whether way `thing` (one adopt took) holds `unit` now: in its arrival's grace, or held since a
+-- touch in it, till a new step onto it (the area's waypoint asks, for whoever stands on it as it
+-- goes off).
+function touch.holds(thing: number, unit: number): boolean
+	local h = handlers[thing]
+	if not h or not h.way then
+		return false
+	end
+	local at = arrivedAt[unit]
+	local now = nox.frame()
+	return (at ~= nil and now >= at and now - at < T.grace) or h.held[unit] == true
 end
 
 -- The map's thing of `thingType` at (x, y) set to call fn(unit, thing) when a player's unit

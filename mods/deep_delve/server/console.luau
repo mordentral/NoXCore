@@ -43,7 +43,8 @@
 --   dd portal            the first player opens a town portal (as its UI's button does)
 --   dd waypoint N        the first player to area N's waypoint of the act being played ("A-N":
 --                        of act A; one it has found), as a click in the town's waypoints window
---                        sends it (wherever it stands)
+--                        sends it (wherever it stands); "dd waypoint wind": this area's waypoint's
+--                        cycle now (idle, up, down)
 --   dd progress          the first player's record: its version, its act progress, boss kills
 --   dd boss              the boss of this map: id, type, health, name
 --   dd fight [now]       the boss's fight (the barrow-king's: its phase, adds, charges, mists,
@@ -148,8 +149,10 @@
 --                        one); POWERS: their powers, comma-separated ids, or "none" (else its tier's
 --                        rolled); "id code tier name"
 --   dd powers [clear]    each live monster with powers ("id type tier powers drops D xp X", a
---                        summoner's then "minions IDS") and what the powers
---                        have done ("done: ..."); "clear": those counts back to none
+--                        summoner's then "minions IDS", then "beat 1" while its beat runs, else
+--                        "beat 0"), how many have a beat now ("beating N")
+--                        and what the powers have done ("done: ..."); "clear": those counts back
+--                        to none
 --   dd slay ID           one of the mod's monsters killed by the first player
 --   dd portals           the open portals, "owner x y" ("owner(left)": its owner left the game)
 --   dd portal take       the first player through the town's portal pentagram (as its touch)
@@ -865,6 +868,9 @@ function commands.slay(args: { string }): { string }
 end
 
 function commands.waypoint(args: { string }): { string }
+	if args[2] == "wind" then
+		return { waypoints.wind() }
+	end
 	local h = firstHero()
 	if not h then
 		return { "no player" }

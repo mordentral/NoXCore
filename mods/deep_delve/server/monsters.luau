@@ -39,8 +39,8 @@ type Kind = { type: string, health: number }
 local known: { [number]: any } = {}
 -- The live ones with a name (their plates): id -> its entry in `known`.
 local named: { [number]: any } = {}
--- The named ones that rise again lying dead now, their plates down (monsters.killed): id -> its
--- entry in `known`.
+-- The named or powered ones that rise again lying dead now, their plates down and their powers'
+-- beats stopped (monsters.killed): id -> its entry in `known`.
 local lying: { [number]: any } = {}
 -- Called as a named monster comes or goes (labels.luau's plates), or nil.
 local namedChanged: (() -> ())? = nil
@@ -450,22 +450,27 @@ end
 -- skills, its Rage). Its plate comes down while it lies (monsters.standing puts it back). Only its
 -- first death gives anything (by decision 2026-10-29: a risen zombie gives nothing), and it's
 -- forgotten only as its body goes (monsters.gone) or with the map.
+--
+-- Its powers that act by themselves (their beat: burning, a summoner's minions and the rest) stop
+-- at each of its deaths, its minions crumbling, and start again as it was made when it stands
+-- (by decision 2026-11-10; monsters.standing). Its death powers (splitting, stormcharged) go off at
+-- its first death alone, with the rest of what that death gives.
 function monsters.killed(id: number): any
 	local e = known[id]
 	if e and risingTypes[e.type] then
+		if e.name or e.powers then
+			lying[id] = e
+		end
 		if named[id] then
 			named[id] = nil
-			lying[id] = e
 			namedNow()
 		end
-		if e.died then
-			return nil
-		end
+		local first = not e.died
 		e.died = true
 		if e.powers then
-			powers.died(id, e)
+			powers.died(id, e, not first)
 		end
-		return e
+		return if first then e else nil
 	end
 	e = drop(id)
 	if e and e.powers then
@@ -488,15 +493,21 @@ function monsters.gone(id: number, thingType: string?)
 	end
 end
 
--- The named ones lying dead that the engine has stood up again: their plates back (labels.luau's
--- beat; a walk of those lying alone).
+-- The ones lying dead that the engine has stood up again: a named one's plate back, a powered
+-- one's beat started again as it was made (powers.rose) (labels.luau's beat; a walk of those lying
+-- alone).
 function monsters.standing()
 	local any = false
 	for id, e in lying do
 		if nox.living(id) then
 			lying[id] = nil
-			named[id] = e
-			any = true
+			if e.name then
+				named[id] = e
+				any = true
+			end
+			if e.powers then
+				powers.rose(id, e)
+			end
 		elseif not nox.present(id) then
 			lying[id] = nil
 		end
