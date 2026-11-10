@@ -585,6 +585,49 @@ function area.build(p, w)
 			used:addSquare(c, 4)
 		end
 	end
+	-- The rooms the packs stand in (the server wakes a room's monsters as a hero comes into it):
+	-- each room (a chamber of the route or a side room; every shape lies within its radius of its
+	-- middle, counted as |dx| + |dy| in cells) that holds a pack or the champion's spot, as
+	-- spots.rooms = { { x, y, radius (cells), door } } (door: where the route first comes into
+	-- it, when it does; else none), and on each pack's spot (and the champion's) `room`, its
+	-- index there. A spot in a corridor has none. No draw: the map is as it was without them.
+	local roomList = {}
+	for _, list in { lay.chambers, sideRooms } do
+		for _, room in list do
+			table.insert(roomList, room)
+		end
+	end
+	local roomAt: { [any]: number } = {}
+	spots.rooms = {}
+	local function roomOf(at: any)
+		local c = util.cell(math.floor(at.x / 23), math.floor(at.y / 23))
+		for _, room in roomList do
+			if util.manhattan(c, centre(room)) <= room.radius then
+				local index = roomAt[room]
+				if not index then
+					local r: any = point(centre(room))
+					r.radius = room.radius
+					for _, pc in path do
+						if util.manhattan(pc, centre(room)) <= room.radius then
+							r.door = point(pc)
+							break
+						end
+					end
+					table.insert(spots.rooms, r)
+					index = #spots.rooms
+					roomAt[room] = index
+				end
+				at.room = index
+				return
+			end
+		end
+	end
+	for _, at in spots.packs do
+		roomOf(at)
+	end
+	if spots.guardian then
+		roomOf(spots.guardian)
+	end
 
 	-- ---- Scenery: off the ways (a cell round the route, its branches and loops)
 	local clear = used:clone()

@@ -77,6 +77,17 @@ numbers.areas = {
 	lair = { segments = 3, packs = 5, endRadius = 13 },
 }
 
+-- A room's monsters waking (wake.luau). The engine's own look finds a foe within a monster's
+-- sight (its own at least 250; outdoors the biome's, data/acts.luau's sights) with nothing between
+-- them. A room's monsters see further once a hero comes into the room, so the whole room
+-- notices: each one's sight then reaches the room's far side.
+--   every   frames between looks at the rooms still asleep (one unitsNear a room)
+--   margin  cells past a room's edge that count as in it (its doorway)
+--   hit     a pack member struck by a hero (or its creature): each of the pack's sight reaches this
+--           past whoever struck, so the pack turns on it together (still only in its sight)
+--   most    no sight set past this
+numbers.wake = { every = 10, margin = 1, hit = 40, most = 1000 }
+
 -- ---- Waypoints, the portal, the boss
 
 numbers.waypoints = {

@@ -242,6 +242,14 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 		end
 	end
 	local who = behind(source)
+	-- (one of the mod's monsters struck with a hero behind the blow: its pack wakes to whoever
+	-- struck, monsters.struck; nothing about the hit changes)
+	if not victim and monsters.info(target) then
+		local maker = heroBehind(source)
+		if maker then
+			monsters.struck(target, if source and source ~= maker then { maker, source } else { maker })
+		end
+	end
 	if not who then
 		-- (a hit from nothing, a trap's or poison's: only the hero's worn powers on it)
 		return if victim then uniquePowers.taken(victim, nil, source, weapon, amount, kind, cause) else nil

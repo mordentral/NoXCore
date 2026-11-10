@@ -22,10 +22,16 @@
 -- minions are the mod's monsters too (the party rule, the scaling), their entries marked `minion`
 -- (and `master`, the summoner's id): main.luau gives no experience or loot for their deaths.
 
+--
+-- Waking (wake.luau): each pack, and the end chamber's champion with its guards, is told to
+-- wake.luau with the room it stands in, so a room's monsters wake as a hero comes into it, and a
+-- pack together when one of it is struck.
+
 local data = require("data/monsters")
 local numbers = require("data/numbers")
 local powers = require("powers")
 local scale = require("scale")
+local wake = require("wake")
 
 local monsters = {}
 
@@ -298,8 +304,10 @@ monsters.spawn = spawn
 -- its followers), the champion and its guards in the end chamber (a lair has no champion's spot:
 -- its boss is boss.luau's). `area`: areas.info's ({ roster (its biome's, or the area's own), level,
 -- index }; an expedition's map hands its roster and champion themselves, runRoster and
--- runChampion, and its guards).
+-- runChampion, and its guards). Each pack (and the champion's group) is told to wake.luau with
+-- its room (the spot's `room`, spots.rooms'), so a room's monsters wake as a hero comes in.
 function monsters.populate(spots: any, area: any)
+	wake.rooms(spots.rooms)
 	local rosterName = area.roster or area.biome
 	local roster = area.runRoster or (data.rosters :: any)[rosterName] or data.rosters.Crypt
 	here = { roster = roster, area = area }
@@ -350,9 +358,11 @@ function monsters.populate(spots: any, area: any)
 			local tier = if quiet then "normal" else rollTier(area.level)
 			local followers = if quiet then f.fewest else nox.random(f.fewest, f.most)
 			local pack = { along = along, size = 0, tier = tier, leader = leaderType, experience = 0, rising = 0 }
+			local ids: { number } = {}
 			local function made(id: number?)
 				local e = id and known[id]
 				if e then
+					table.insert(ids, id :: number)
 					pack.size += 1
 					pack.experience += e.experience
 					if risingTypes[e.type] then
@@ -366,6 +376,7 @@ function monsters.populate(spots: any, area: any)
 				local t = if nox.random() < 0.5 then leaderType else (pickType(roster, area, plain, light) or leaderType)
 				made(spawn(t, spot.x, spot.y, if tier == "rare" then "magic" else "normal", area.level))
 			end
+			wake.pack(ids, tonumber(spot.room))
 			table.insert(packList, pack)
 		end
 	end
@@ -374,9 +385,11 @@ function monsters.populate(spots: any, area: any)
 	if champ and spots.guardian then
 		local g = spots.guardian
 		local group: any = { size = 0, experience = 0 }
+		local ids: { number } = {}
 		local function made(id: number?)
 			local e = id and known[id]
 			if e then
+				table.insert(ids, id :: number)
 				group.size += 1
 				group.experience += e.experience
 			end
@@ -387,8 +400,21 @@ function monsters.populate(spots: any, area: any)
 		for _ = 1, if opening and opening.guards then opening.guards else (area.guards or champ.guards) do
 			made(spawn(pickType(roster, area) or champ.type, g.x, g.y, "magic", area.level))
 		end
+		wake.pack(ids, tonumber(g.room))
 		guarded = group
 	end
+	wake.start()
+end
+
+-- A group the host's console made ("dd spawn"): one pack (no room), as the area's are.
+function monsters.grouped(ids: { number })
+	wake.pack(ids)
+end
+
+-- A hit on one of the mod's monsters with a hero behind it (combat.luau; `foes`: the hero and what
+-- struck for it): its pack wakes (wake.luau).
+function monsters.struck(target: number, foes: { number })
+	wake.struck(target, foes)
 end
 
 -- The `n` weakest types of the roster where the monsters are now (by monster.bin's health, the
@@ -429,11 +455,12 @@ function monsters.weakTypes(n: number): { string }
 	return out
 end
 
--- A monster out of the index (and its plate's): its entry, or nil.
+-- A monster out of the index (and its plate's, and its pack's): its entry, or nil.
 local function drop(id: number): any
 	local e = known[id]
 	known[id] = nil
 	lying[id] = nil
+	wake.forget(id)
 	if named[id] then
 		named[id] = nil
 		namedNow()
@@ -619,6 +646,7 @@ function monsters.reset()
 	weakest = nil
 	sight = nil
 	powers.reset()
+	wake.reset()
 end
 
 powers.attach(monsters)
