@@ -83,6 +83,10 @@ std::string writeConfig(const Config& config);
 /// nox.cfg in `gameDir`, else default.cfg; nullopt if neither reads. With `fromDefault`, whether
 /// it came from default.cfg.
 std::optional<Config> loadConfig(const std::filesystem::path& gameDir, bool* fromDefault = nullptr);
+/// Saved nox.cfg in `settingsDir`, else the installed default.cfg in `gameDir`.
+/// Missing or rejected saved settings fall back to factory defaults; nullopt if neither reads.
+std::optional<Config> loadConfig(const std::filesystem::path& settingsDir, const std::filesystem::path& gameDir,
+                                 bool* fromDefault = nullptr);
 /// Writes nox.cfg in `gameDir`. Throws std::system_error.
 void saveConfig(const std::filesystem::path& gameDir, const Config& config);
 

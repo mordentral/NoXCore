@@ -353,12 +353,19 @@ std::string writeConfig(const Config& config)
 
 std::optional<Config> loadConfig(const std::filesystem::path& gameDir, bool* fromDefault)
 {
+    return loadConfig(gameDir, gameDir, fromDefault);
+}
+
+std::optional<Config> loadConfig(const std::filesystem::path& settingsDir, const std::filesystem::path& gameDir,
+                                 bool* fromDefault)
+{
     for (const char* name : {"nox.cfg", "default.cfg"}) {
         try {
-            const auto bytes = readFileBytes(gameDir / name);
+            const bool factory = std::string_view(name) == "default.cfg";
+            const auto bytes = readFileBytes((factory ? gameDir : settingsDir) / name);
             Config config = parseConfig({reinterpret_cast<const char*>(bytes.data()), bytes.size()});
             if (fromDefault) {
-                *fromDefault = std::string_view(name) == "default.cfg";
+                *fromDefault = factory;
             }
             return config;
         } catch (const std::exception&) {
