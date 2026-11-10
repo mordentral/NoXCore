@@ -5,6 +5,7 @@
 // while.
 #include "sprite_cache.hpp"
 
+#include "hd_kept_originals.hpp"
 #include "pending_look.hpp"
 
 #include "noxcore/io/file.hpp"
@@ -1145,6 +1146,7 @@ void SpriteCache::setPack(std::unique_ptr<nox::video::ImagePackReader> pack, con
     atlas_.reset();
     pack_ = std::move(pack);
     packNamed_.clear();
+    keptOriginal_ = pack_ ? hdKeptOriginalSlots(*pack_) : std::vector<std::int32_t>{};
     if (pack_) {
         // BC7 images to the GPU as they are, when the renderer's device takes them.
         bool bc7 = false;
@@ -1240,8 +1242,10 @@ const nox::video::PackEntry* SpriteCache::hdEntry(std::int32_t index) const
         return nullptr;
     }
     const auto& e = pack_->entry(static_cast<std::size_t>(index));
-    // (Floor tiles and edges stay at their size: the floor is composited in world units.)
-    return e.present() && static_cast<std::int32_t>(e.pixelWidth) > e.width && e.type != 0 && e.type != 1 ? &e : nullptr;
+    // (Floor tiles and edges stay at their size: the floor is composited in world units. The
+    // redraws kept out are drawn from video.bag: hd_kept_originals.hpp.)
+    const bool hd = e.present() && static_cast<std::int32_t>(e.pixelWidth) > e.width && e.type != 0 && e.type != 1;
+    return hd && std::find(keptOriginal_.begin(), keptOriginal_.end(), index) == keptOriginal_.end() ? &e : nullptr;
 }
 
 // A video.bag segment's decompressed bytes, from a short most-recently-used list (kSegmentCache).

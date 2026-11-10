@@ -366,7 +366,7 @@ private:
     void dropGpuPage(int page);
     /// Each BC7 and material page marked kept if anything kept is on it (the sweep's).
     void repinGpuPages();
-    /// The pack's entry for an image it holds upscaled (HD), else nullptr.
+    /// The pack's entry for an image it holds upscaled (HD) and draws so, else nullptr.
     const nox::video::PackEntry* hdEntry(std::int32_t index) const;
     /// Whether an HD image is decoded on the workers: there are workers, and video.bag has the
     /// image to draw meanwhile (an image only the pack has is decoded when asked, as before).
@@ -420,6 +420,8 @@ private:
     SDL_GPUShader* splitShader_ = nullptr;
     SDL_GPURenderState* pendingState_ = nullptr; ///< setPendingShader
     std::unique_ptr<nox::video::ImagePackReader> pack_;
+    /// The pack's HD images drawn from the originals all the same (hd_kept_originals.hpp).
+    std::vector<std::int32_t> keptOriginal_;
     /// The BC7 pages (a pack with kCodecBc7 entries on the GPU renderer with BC7), else null.
     std::unique_ptr<GpuAtlas> atlas_;
     bool placeholders_ = false; ///< --hd-placeholders
