@@ -21,11 +21,6 @@
 
 namespace nox::coop {
 
-std::string spacedName(std::string_view type)
-{
-    return server::detail::spacedName(type);
-}
-
 namespace {
 
 /// MSG_FADE_BEGIN 0xE4 {1 from black / 0 to black, over the menus}: a stock client's fade.

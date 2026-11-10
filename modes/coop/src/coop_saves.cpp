@@ -17,6 +17,8 @@
 #include "noxcore/util/text.hpp"
 #include "noxcore/util/x87.hpp"
 
+#include "mode_shared.hpp"
+
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -683,7 +685,7 @@ void CoopDirector::wearAgain(Member& m, server::ServerObject& unit)
             continue;
         }
         if (!items.strongEnough(unit, *o)) {
-            heavy.push_back(spacedName(o->typeName)); // (not tried: the game's refusal line and sound aren't sent)
+            heavy.push_back(server::detail::spacedName(o->typeName)); // (not tried: the game's refusal line and sound aren't sent)
             continue;
         }
         // The game's own wear: its client's mark, everyone's worn bits, its armour and effects.

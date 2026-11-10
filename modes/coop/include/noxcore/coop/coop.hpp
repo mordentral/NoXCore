@@ -75,9 +75,6 @@ std::string listedName(std::uint8_t playerClass);
 /// A player's key from game to game: its account and name ("account/name"; no account: the
 /// name), as the Undead Tide keys its runners.
 std::string runnerKey(const server::HostedPlayer& p);
-/// A type's name as players read it: "AirshipCaptain" -> "Airship Captain" (the modes' own,
-/// mode_shared.hpp's server::detail::spacedName, for the co-op sources that don't include it).
-std::string spacedName(std::string_view type);
 
 class CoopDirector;
 
