@@ -3,6 +3,7 @@
 #include "trade_screens.hpp"
 
 #include "hud.hpp"
+#include "trade_place.hpp"
 
 #include "noxcore/things/object_class.hpp"
 
@@ -137,6 +138,10 @@ TradeScreens::TradeScreens(gui::Resources res, std::filesystem::path windowDir, 
         }
     });
     if (shop_.window) {
+        // At the layout's bottom right, as the game moves it (trade_place.hpp).
+        const LayoutPlace at = bottomRightPlace(shop_.window->rect.w, shop_.window->rect.h);
+        shop_.window->rect.x = at.x;
+        shop_.window->rect.y = at.y;
         // Its drawing: ShopBase and the mode's picture, at the layout's corner.
         shop_.window->draw = [this](gui::Window&, gui::Painter& p) {
             p.image("ShopBase", 0, 0);
@@ -249,6 +254,11 @@ TradeScreens::TradeScreens(gui::Resources res, std::filesystem::path windowDir, 
         }
     });
     if (dialog_.window) {
+        // At the layout's bottom right, as the game moves it (trade_place.hpp): the talker's
+        // picture in ShopBase's frame.
+        const LayoutPlace at = bottomRightPlace(dialog_.window->rect.w, dialog_.window->rect.h);
+        dialog_.window->rect.x = at.x;
+        dialog_.window->rect.y = at.y;
         // Its background (ShopBase) at the layout's corner.
         dialog_.window->draw = [](gui::Window& self, gui::Painter& p) { p.image(self.backgroundImage, 0, 0); };
         gui::useSliderThumb(dialog_.window->find(kDlgSlider));

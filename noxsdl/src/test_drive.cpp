@@ -166,7 +166,7 @@ void fakeScreen(App& app, int which)
         ascii(app.fakeDialogText.empty() ? "Con01a:CaptainGreet" : app.fakeDialogText, 32);
         wide("Airship Captain", 32);
         u32(0);
-        ascii("AirshipCaptainPic", 32);
+        ascii(app.fakeDialogPic.empty() ? "AirshipCaptainPic" : app.fakeDialogPic, 32);
         m.push_back(1); // Yes / No
         client.injectForTest(m);
     }

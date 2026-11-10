@@ -63,6 +63,11 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.fakeDialogText = next();
             continue;
         }
+        if (a == "--fake-dialog-pic") {
+            app.fakeScreen = 2; // --fake-dialog with this picture (tests)
+            app.fakeDialogPic = next();
+            continue;
+        }
         if (a == "--host") {
             hosting().map = next();
         } else if (a == "--host-port") {

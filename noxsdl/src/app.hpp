@@ -718,6 +718,7 @@ struct App {
     int fakeScreen = 0; ///< --fake-shop (1) / --fake-dialog (2) / --fake-sell (3, then 4: an offer) / --fake-quest-keys (7) / --fake-game-over (8) / a mode's own (kFakeModeScreen: fakeModeFlag: its --fake-* flags): shown locally, 2 s in (tests)
     static constexpr int kFakeModeScreen = 100;
     std::string fakeDialogText; ///< --fake-dialog-text ID: the fake dialog's string id (else Con01a:CaptainGreet)
+    std::string fakeDialogPic;  ///< --fake-dialog-pic NAME: the fake dialog's picture (else AirshipCaptainPic)
     bool holdMoveTest = false;                 ///< --hold-move: the move button held from 1.5 s in
     std::string chatTest;                      ///< --chat-test TEXT: says it (Enter, TEXT, Enter), 2.5 s in
     std::string consoleRun; ///< --console "cmd; cmd": the console opened and these run (in a game, once in)
