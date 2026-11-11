@@ -271,11 +271,15 @@ bool XwisConnection::poll(std::uint32_t nowMs)
 {
     if (!servserv_) {
         // A chat connection that can't be opened (refused, or not open in the game's 30 s) moves on
-        // while there's another way to try.
+        // while there's another way to try. (One lost after it was open is the login's or the
+        // session's to see: its lines went on it, so no other server is tried in its place.)
         if (!socket_ || !moreToTry()) {
             return false;
         }
-        const auto chat = socket_->state();
+        const auto chat = chatState();
+        if (chatOpened_) {
+            return false;
+        }
         if (chat == net::TcpSocket::State::Failed) {
             moveOn("can't connect to " + chatServer_, nowMs);
             return !asking();
@@ -364,6 +368,7 @@ void XwisConnection::connectChat(const net::Endpoint& to, const std::string& nam
 {
     chatServer_ = name;
     chatStartedAt_ = nowMs;
+    chatOpened_ = false;
     try {
         socket_ = net::TcpSocket::connect(to);
     } catch (const std::exception& ex) {
@@ -380,21 +385,39 @@ void XwisConnection::connectChat(const net::Endpoint& to, const std::string& nam
 net::TcpSocket::State XwisConnection::state()
 {
     if (socket_) {
-        const auto s = socket_->state();
-        // (A refused connection with another way left is moved on from by the next poll.)
-        return s == net::TcpSocket::State::Failed && moreToTry() ? net::TcpSocket::State::Connecting : s;
+        const auto s = chatState();
+        // (A refused connection with another way left is moved on from by the next poll; one lost
+        // after it was open is told as it is.)
+        return s == net::TcpSocket::State::Failed && !chatOpened_ && moreToTry() ? net::TcpSocket::State::Connecting : s;
     }
     return failed_ ? net::TcpSocket::State::Failed : net::TcpSocket::State::Connecting;
 }
 
+net::TcpSocket::State XwisConnection::chatState()
+{
+    const auto s = socket_->state();
+    if (s == net::TcpSocket::State::Connected) {
+        chatOpened_ = true;
+    }
+    return s;
+}
+
 std::size_t XwisConnection::send(std::span<const std::uint8_t> data)
 {
-    return socket_ ? socket_->send(data) : 0;
+    if (!socket_) {
+        return 0;
+    }
+    chatState(); // (seen open before a send can lose it)
+    return socket_->send(data);
 }
 
 std::optional<std::size_t> XwisConnection::receive(std::span<std::uint8_t> buffer)
 {
-    return socket_ ? socket_->receive(buffer) : std::nullopt;
+    if (!socket_) {
+        return std::nullopt;
+    }
+    chatState(); // (seen open before a receive can lose it)
+    return socket_->receive(buffer);
 }
 
 std::string XwisConnection::error()
@@ -403,7 +426,7 @@ std::string XwisConnection::error()
         return error_;
     }
     if (state() == net::TcpSocket::State::Failed) {
-        return "can't connect to " + chatServer_;
+        return (chatOpened_ ? "lost the connection to " : "can't connect to ") + chatServer_;
     }
     return {};
 }

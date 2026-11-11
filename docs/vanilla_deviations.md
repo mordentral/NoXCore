@@ -1796,7 +1796,8 @@ The engine's logic is the exe's; these are where the output differs.
   servserv out of reach, silent or listing none, the player gets an error and stays off line.
   The 30 seconds are WOLAPI's deadline for a connection to open. The chat login sends, in this
   order: `CVERS 11020 9472` (WOLAPI 1.20's version and the SKU), `PASS supersecret`, NICK,
-  `apgar <password> 0`, `SERIAL <CD key>`, `USER UserName HostName irc.westwood.com
+  `apgar <password> 0`, `SERIAL <CD key>` (always sent: `SERIAL ` with nothing after it when the
+  install has no CD key in the registry), `USER UserName HostName irc.westwood.com
   :RealName`, `verchk 32512 720916` (WOLAPI's
   product code for the language and its chat version number) and `SETOPT 17,33` (others may
   find and page the player). The community's patched WOLAPI.DLL (1.15, in the Nox Reloaded /

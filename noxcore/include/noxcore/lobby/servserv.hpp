@@ -140,7 +140,9 @@ public:
     bool poll(std::uint32_t nowMs);
     /// Still asking servserv (the chat connection not started).
     bool asking() const noexcept { return !socket_ && !failed_; }
-    /// Connecting until the chat server's connection is open; Failed when it can't be.
+    /// Connecting until the chat server's connection is open; Failed when it can't be. Once it
+    /// has been open, its own state: a connection lost then is the login's or session's, never a
+    /// way in to move on from.
     net::TcpSocket::State state();
     /// As TcpSocket's; nothing before the chat connection is open.
     std::size_t send(std::span<const std::uint8_t> data);
@@ -173,6 +175,8 @@ private:
     void useServserv(const ChatServer& server, std::uint32_t nowMs);
     void useFallback(const std::string& why, std::uint32_t nowMs);
     void connectChat(const net::Endpoint& to, const std::string& name, std::uint32_t nowMs);
+    /// The chat connection's state, noting once it's open (chatOpened_).
+    net::TcpSocket::State chatState();
 
     XwisRoute route_;
     std::string nick_;
@@ -189,6 +193,7 @@ private:
     ServservSession session_;
     std::string request_;
     std::optional<net::TcpSocket> socket_;
+    bool chatOpened_ = false; ///< the chat connection has been open (its loss isn't moved on from)
     std::string chatServer_;
     std::string error_;
     bool failed_ = false;

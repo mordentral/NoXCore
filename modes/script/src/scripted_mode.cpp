@@ -255,9 +255,14 @@ struct ScriptedMode::Impl {
     {
         server::World& world = host->server().world();
         for (auto it = barFills.begin(); it != barFills.end();) {
-            const auto who = std::ranges::find_if(host->players(), [&](const auto& e) { return e.second.name == it->first && !host->refused(e.first); });
+            // (Only to a client that takes kToBars, checked again here: the name may be another
+            // client's by now, or a stock one's of the same name, which must never get it.)
+            const auto who = std::ranges::find_if(host->players(), [&](const auto& e) {
+                return e.second.name == it->first && !host->refused(e.first) &&
+                       (host->clientFeatures(e.first) & lobby::ClientFeature::ModeUi) != 0 && host->clientLevel(e.first) >= uimsg::kToBarsLevel;
+            });
             if (who == host->players().end()) {
-                it = barFills.erase(it); // (gone: let go)
+                it = barFills.erase(it); // (gone, or no longer a client that takes it: let go)
                 continue;
             }
             const server::ServerObject* unit = world.byExtent(who->second.extent);
