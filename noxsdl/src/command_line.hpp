@@ -29,6 +29,7 @@ struct StartOptions {
     bool haveAt = false;   ///< --at X Y gave the viewer's camera
     bool mapGiven = false; ///< --map given (else the menus)
     bool browse = false;   ///< --browse: the menus' game list straight away
+    bool fakeWolChat = false; ///< --fake-wol-chat (tests): the Westwood Online chat lobby made up, no XWIS
     std::string editorMap; ///< --map-editor MAP
     std::string hostEditMap; ///< --host-edit MAP
     std::string hostEditMod; ///< --host-edit-mod ID: the session carries mods\ID

@@ -2,8 +2,8 @@
 // name, lobby/extended.hpp version 6: "Delve", "Undead Tide", a mod's mode.json name), any other
 // game's (a stock host, an older NoX Core one, a plain game) by its game flags (lobby::
 // gameModeName: "arena", "quest"...). A name too wide for the column loses whole words from its end
-// first ("Deep Delve - WIP" to "Deep Delve", "Co-op Campaign" to "Co-op"), then letters. No SDL here
-// (the tests use it).
+// first ("Deep Delve - WIP" to "Deep Delve", "Co-op Campaign" to "Co-op"), then letters. Also the
+// list's columns and the gap kept after each column's text. No SDL here (the tests use it).
 #pragma once
 
 #include "noxcore/lobby/browser.hpp"
@@ -13,6 +13,19 @@
 #include <string_view>
 
 namespace noxsdl::mode_column {
+
+/// The game list's columns (Name, Map, Mode, Players, Ping, From): where each starts, as a share of
+/// the rows' width. (The name has the most room; Mode enough for "Deep Delve" or "Undead Tide" whole,
+/// Map for 8 letters, Players for its header, Ping for "99 ms"; From the rest, "NoX Core list" and
+/// the padlock.)
+inline constexpr float kColumnStarts[6] = {0.0f, 0.32f, 0.44f, 0.60f, 0.70f, 0.79f};
+
+/// The room kept clear after a column's text before the next column: 0.4 of a line, in the units
+/// `lineHeight` is in (4 game pixels at the game's small line), so it grows with the text.
+inline float columnGap(float lineHeight)
+{
+    return lineHeight * 0.4f;
+}
 
 /// What the Mode column says of a game, before it's fitted.
 inline std::string modeText(const nox::lobby::ServerEntry& e)

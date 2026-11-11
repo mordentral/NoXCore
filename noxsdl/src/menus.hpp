@@ -159,6 +159,9 @@ public:
     void showMainMenu();
     /// Straight to the game browser (main menu and online / network on the back stack).
     void showGameBrowser();
+    /// (Tests: --fake-wol-chat) The chat lobby as a login leaves it, with made-up lobbies, users and
+    /// lines and no connection to XWIS: the screen to look at.
+    void showFakeChat();
     /// A notice over the screen (Gui_Dialog_Create with flags 0x21: OK), its title and text string
     /// ids ("Noxworld.c:Notification", "Noxworld.c:Timeout": Gui_ShowTimeoutNotice's).
     void notice(const std::string& titleId, const std::string& textId);
@@ -288,6 +291,9 @@ private:
     void enable(gui::Window* top, std::int32_t id, bool on);
     /// A button that isn't hooked up yet: disabled, " - WIP" after its text.
     void wip(gui::Window* top, std::int32_t id);
+    /// A Westwood Online screen's window file (wolapi.wnd, wolchat.wnd), its windows that give no
+    /// FONT in the default face (wol_screens.hpp).
+    nox::gui::WindowDef wolScreen(const char* file) const;
     /// Chosen a game: pick the character to join as (as noxworld's Join, windowMultiplayerSub).
     void chooseCharacter(const std::string& host);
     /// A game clicked in the list (client_gui_serverInfoBlockCheckExp):

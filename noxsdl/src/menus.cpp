@@ -7,6 +7,7 @@
 #include "console.hpp"
 #include "menu_rules.hpp"
 #include "mode_ui.hpp"
+#include "wol_screens.hpp"
 
 #include "noxcore/client/solo_menu.hpp"
 #include "noxcore/client/spell_bars.hpp"
@@ -165,6 +166,14 @@ void Menus::wip(gui::Window* top, std::int32_t id)
         enable(top, id, false);
         w->text += " - WIP";
     }
+}
+
+nox::gui::WindowDef Menus::wolScreen(const char* file) const
+{
+    // The Westwood Online screens' windows with no FONT in the default face, not the shell's large.
+    nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / file);
+    wol_screens::useDefaultFont(def);
+    return def;
 }
 
 void Menus::reset()
@@ -417,8 +426,8 @@ void Menus::enter(State s)
         optsBack_->show(true);
         break;
     case State::Login:
-        // The login: from 480 above.
-        screen_ = gui_.load(windowDir_ / "wolapi.wnd", [this](gui::Window&, int message, gui::Window& from) {
+        // The login: from 480 above, its text in the default face (wol_screens.hpp).
+        screen_ = gui_.load(wolScreen("wolapi.wnd"), [this](gui::Window&, int message, gui::Window& from) {
             return onLogin(message, from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
@@ -910,16 +919,16 @@ void Menus::setupLogin()
     if (gui::Window* go = screen_->find(kLoginGo)) {
         go->tooltip = "Log in to XWIS (a new name makes a new account with this password)";
     }
-    // Ours: how to log in to XWIS, across the top, over the screen's background.
-    screen_->draw = [](gui::Window& w, gui::Painter& p) {
-        const SDL_Point pos = w.screenPos();
-        p.image(w.backgroundImage, pos.x + w.imageOffset.x, pos.y + w.imageOffset.y);
-        static const std::string kHow =
-            "Log in with your XWIS account. A new name becomes your account with the password you type; for a "
-            "name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays without one.";
-        p.fillAlpha(pos.x + 36, pos.y + 29, 568, 26, {0, 0, 0, 170});
-        p.text(kHow, pos.x + 42, pos.y + 31, false, w.textColor, 556);
-    };
+    // Ours: how to log in to XWIS, in the default face at the top of the screen's empty panel on the
+    // right (its black box; its border is drawn over it after).
+    if (gui::Window* panel = screen_->find(wol_screens::kLoginHelpPanel)) {
+        panel->draw = [textColor = screen_->textColor](gui::Window& w, gui::Painter& p) {
+            const SDL_Point pos = w.screenPos();
+            p.fill(pos.x, pos.y, w.rect.w, w.rect.h, w.backgroundColor);
+            constexpr int in = wol_screens::kLoginHelpInset;
+            p.text(std::string(wol_screens::kLoginHelp), pos.x + in, pos.y + in, false, textColor, w.rect.w - 2 * in);
+        };
+    }
 }
 
 void Menus::selectLogin(int slot)

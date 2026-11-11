@@ -1762,6 +1762,21 @@ The engine's logic is the exe's; these are where the output differs.
 - **Revert:** Options::servers left empty (no servers.txt); in Westwood Online's list,
   Options::lan off; Register's own screen back in place of Skip Login.
 
+### VD-71: The login and chat screens draw their text in the default font
+
+- **Vanilla:** the login (wolapi.wnd) and chat (wolchat.wnd) load while the shell is up, so their
+  windows that give no FONT (the login's every window; the chat's buttons and entry field) get
+  "large": the buttons, labels and the login list in the large font, on boxes sized for the
+  default one (the login list's 10-unit lines, the chat's own lists FONT = default).
+- **Ours:** those windows get "default" (noxsdl/src/wol_screens.hpp, Menus::wolScreen), so every
+  label fits its box, noxsdl's longer ones too ("Skip Login", the " - WIP" marks). The login's
+  how-to text (noxsdl's) is drawn in the screen's empty right-hand panel instead of across the top.
+  The game list's columns keep a gap that grows with the text, and a cut name ends in "...".
+- **Why:** the owner asked for these screens' text smaller (2026-11-10): the large face overflowed
+  and wrapped off its buttons.
+- **Revert:** load the two screens with `gui_.load(windowDir_ / file, ...)` instead of
+  `wolScreen(file)`.
+
 ### VD-70: XWIS's chat server: servserv's first match, xwis.net:4000 when servserv gives none
 
 - **Vanilla:** before a login the game asks WOLAPI for the server list with the SKU from the

@@ -1626,6 +1626,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                     // that wants one leaves it asked)
                     app->menus->askJoinPassword(app->askPasswordTest, opts.profile, false);
                 }
+            } else if (opts.fakeWolChat) {
+                startMainMenu(*app);
+                app->menus->showFakeChat();
             } else if (!opts.movieArg.empty()) {
                 app->movie->play(opts.movieArg, movies::Skip::AnyInput, [app] { startMainMenu(*app); });
             } else if (automated) {

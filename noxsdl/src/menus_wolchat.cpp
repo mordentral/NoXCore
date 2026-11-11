@@ -117,8 +117,8 @@ void eraseLine(gui::Window& list, int at)
 void Menus::setupChat()
 {
     // The screen: wolchat.wnd from 480 above (in at 20 a frame, out at 40); modal, its own
-    // Back.
-    screen_ = gui_.load(windowDir_ / "wolchat.wnd", [this](gui::Window&, int message, gui::Window& from) {
+    // Back. Its text in the default face (wol_screens.hpp).
+    screen_ = gui_.load(wolScreen("wolchat.wnd"), [this](gui::Window&, int message, gui::Window& from) {
         return onChat(message, from);
     });
     slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
@@ -158,6 +158,37 @@ void Menus::setupChat()
     // The channel list asked for (-99999, 1): every channel, "Downloading channel list..." (0x120: no buttons).
     wolListWanted_ = nox::lobby::kWolAllChannels;
     dialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("wolchat.c:LoadingChannels"), 0x120, {});
+}
+
+void Menus::showFakeChat()
+{
+    // Entered as from the login, but with no login kept until the screen is up (setupChat would
+    // connect for one); then the connection's news made up and handled as the real ones are.
+    nowMs_ = SDL_GetTicks();
+    reset();
+    stack_ = {State::MainMenu, State::Online, State::Login};
+    wolLogin_.reset();
+    enter(State::Chat);
+    wolListWanted_.reset();
+    wolLogin_ = nox::io::SavedLogin{"NoXPlayer", {}};
+    using Kind = Session::Event::Kind;
+    Session::Event list{.kind = Kind::ChannelList};
+    for (int i = 0; i < 8; ++i) {
+        list.channels.push_back({.name = "Lob_37_" + std::to_string(i), .users = i == 0 ? 3 : 30 + i, .official = 1});
+    }
+    chatEvent(list);
+    const Session::User me{"NoXPlayer", Session::User::kMe};
+    chatEvent({.kind = Kind::ChannelJoin, .channel = "Lob_37_0", .user = me});
+    Session::Event users{.kind = Kind::UserList, .channel = "Lob_37_0"};
+    users.users = {me, {"Wizard_of_Ix", Session::User::kOp}, {"Conjurer42", 0}, {"AVeryLongPlayerName", 0}};
+    chatEvent(users);
+    const auto say = [&](const char* who, const char* text) {
+        chatEvent({.kind = Kind::PublicMessage, .channel = "Lob_37_0", .user = {who, 0}, .text = nox::lobby::wolEncodeText(nox::strings::fromUtf8(text))});
+    };
+    say("Wizard_of_Ix", "Anyone up for an arena game on Estate?");
+    say("Conjurer42", "Sure, host it and I'll join. A long line to see how the messages wrap in the list's width here.");
+    chatEvent({.kind = Kind::PublicAction, .channel = "Lob_37_0", .user = {"AVeryLongPlayerName", 0},
+               .text = nox::lobby::wolEncodeText(u"waves")});
 }
 
 void Menus::focusChatEntry()

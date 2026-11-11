@@ -68,6 +68,10 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.fakeDialogPic = next();
             continue;
         }
+        if (a == "--fake-wol-chat") {
+            opts.fakeWolChat = true; // (tests) the chat lobby made up, no XWIS: Menus::showFakeChat
+            continue;
+        }
         if (a == "--host") {
             hosting().map = next();
         } else if (a == "--host-port") {
