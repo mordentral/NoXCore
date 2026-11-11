@@ -139,22 +139,29 @@ public:
     void closeUnaccepted();
     static constexpr std::uint32_t kAcceptFrames = 300;
 
-    /// The three sends below are every game message's way to a client. (noxcpp's) Each refuses
-    /// (false, nothing queued) messages holding one of noxcpp's own (net::holdsNoxCoreOnly) to a
-    /// peer that didn't identify itself (identified): a stock client's decoder has none of them.
-    /// A refusal is told in the log, a peer's first only (refusedNoxCoreOnly counts them all);
-    /// every sender asks first, so one is a sender's bug.
+    /// The three sends below are every game message's way to a client (a client's own chat line
+    /// passed on goes by relayUnreliable). (noxcpp's) Each refuses (false, nothing queued) messages
+    /// holding one of noxcpp's own (net::holdsNoxCoreOnly) to a peer that didn't identify itself
+    /// (identified): a stock client's decoder has none of them. A refusal is told in the log, a
+    /// peer's first only (refusedNoxCoreOnly counts them all); every sender asks first, so one is a
+    /// sender's bug.
     bool sendReliable(std::uint8_t peer, std::span<const std::uint8_t> messages);
     /// Net_Send's flag 3 (reliable, flushed): a reliable packet of its own, out at once (after any
     /// still unsent: Stream::sendReliableAlone).
     bool sendReliableNow(std::uint8_t peer, std::span<const std::uint8_t> messages, std::uint32_t nowMs);
     bool sendUnreliable(std::uint8_t peer, std::span<const std::uint8_t> messages);
+    /// A client's own message passed on as it came (SrvNet_OnPacket's chat relay: Net_Send, flag 0),
+    /// queued as sendUnreliable queues it, not refused for what holdsNoxCoreOnly finds in it: the
+    /// bytes are the sender's, sized by the server's rule for them, and a stock client can read
+    /// them by its own rule into more messages (OB-427), as it does from a stock server.
+    bool relayUnreliable(std::uint8_t peer, std::span<const std::uint8_t> messages);
     /// (noxcpp's) The sends refused so far for holding one of noxcpp's own messages to a peer that
     /// didn't identify itself (any peer's; 0: none, as it should stay).
     std::uint64_t refusedNoxCoreOnly() const noexcept { return refusedNoxCoreOnly_; }
     /// (noxcpp's) How long an extended query identifies the address it came from (ms): a connect
     /// from there later than this is a stock client's (its query's long gone, its address another
-    /// game's now). As long as the join gates keep a query, over a password prompt too.
+    /// game's now). As long as the join gates keep a query, over a password prompt too, unless
+    /// another query comes once it's a minute old (that query's sweep lets it go).
     static constexpr std::uint32_t kIdentifyKeepMs = 600'000;
     /// Net_FlushStream(peer, 1)'s unreliable part: what the peer's unreliable buffer holds goes out
     /// now as its own datagram (not with the frame's update).

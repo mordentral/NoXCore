@@ -514,7 +514,10 @@ does: what comes between frames waits for the next one. The frames
 themselves are the classic ones at every rate (tested at 30 and 120 Hz with the controls coming
 in between frames).
 Identification: before joining, noxsdl sends the game list's extended query (00 00 F0 "NXSD")
-from the socket it then connects from; a noxcpp server marks that connection, a stock server drops
+from the socket it then connects from; a noxcpp server marks that connection (a query from that
+address and port at most ten minutes before the connect, and at most a minute when another query came
+after it: an older one, or another port's, leaves it a stock client's, sent none of noxcpp's own
+messages), a stock server drops
 the query (its packet handler: no connection yet), and a stock client never asks, so neither ever sees the
 message. Checked live against a stock GAME.EXE server on XWIS: the join went as usual.
 

@@ -685,6 +685,12 @@ bool ServerTransport::sendUnreliable(std::uint8_t peer, std::span<const std::uin
     return it != peers_.end() && !refuseNoxCoreOnly(peer, it->second, messages) && it->second.stream.queueUnreliable(messages);
 }
 
+bool ServerTransport::relayUnreliable(std::uint8_t peer, std::span<const std::uint8_t> messages)
+{
+    const auto it = peers_.find(peer);
+    return it != peers_.end() && it->second.stream.queueUnreliable(messages);
+}
+
 void ServerTransport::flushUnreliable(std::uint8_t peer)
 {
     if (const auto it = peers_.find(peer); it != peers_.end()) {

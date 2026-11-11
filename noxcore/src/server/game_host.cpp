@@ -2164,7 +2164,9 @@ void GameHost::onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> m)
     }
     World& world = server_.world();
     const auto relay = [&](std::uint8_t to) {
-        transport_.sendUnreliable(to, m);
+        // (The sender's bytes as they came, to stock clients too: a line flagged 8 but wide is
+        // read shorter there, the rest as messages, as from a stock server: OB-427.)
+        transport_.relayUnreliable(to, m);
         transport_.flushUnreliable(to);
     };
     const ServerObject* sender = world.byExtent(players_[peer].extent);

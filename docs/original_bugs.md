@@ -805,6 +805,21 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   TextMessage case: to the NUL or the message's end); a message past its packet isn't read (the
   rest of the packet dropped, framing.cpp). Not reproduced.
 
+### OB-427: A wide chat line flagged 8 is relayed at its sender's length and read shorter: its end arrives as server messages
+- **Where:** SrvNet_OnPacket's MSG_TEXT_MESSAGE (0xA8) sizes the text by flag 2 alone (1 byte a
+  character with it, 2 without) and relays 11 + that many bytes x the length byte to every player
+  (or the team). CliNet_OnPacket's MSG_TEXT_MESSAGE reads 1 byte a character when flag 2 or flag 8
+  is set (8: a string id, as the server's unit speech sends it), and goes on reading the packet
+  from there.
+- **Effect:** a line flagged 8 and not 2 (an edited client's: the stock one sends 2 or 4, with 1
+  for the team, CliNet_SendChatText) of n characters is relayed as 11 + 2n bytes, and every client
+  it reaches reads 11 + n: the first n bytes looked up as a string id, the other n read as further
+  messages from the server. A player can so send the other players any server messages that fit in
+  a line (up to about 250 bytes), or end their datagram at once.
+- **Ours:** kept: game_host.cpp's onTextMessage relays the message as framing.cpp sizes a client's
+  (flag 2), by ServerTransport::relayUnreliable, which sends a client's bytes on as they came, to a
+  stock client too; framing.cpp reads a server's line by flags 2 and 8, as the stock client does.
+
 ### OB-081: A .plr's map name is written twice its length, and read into 32 bytes
 - **Where:** plr_rwGameData copies the map's name into the player's saved map name (32 bytes),
   then writes u16 its length and 2 x that many bytes from there; reading, it reads 2 x the length
@@ -1745,6 +1760,18 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   unchanged, as are the arena modes.
 
 ## Client
+
+### OB-428: MSG_INFORM, MSG_TEAM_MSG or MSG_DIALOG with a sub the client has no case for hangs it
+- **Where:** CliNet_OnPacket goes on from where each case leaves the read; a case that leaves it
+  where it began reads the same message again. CliNet_OnInform returns a length of 0 for a sub
+  past 0x15; MSG_TEAM_MSG's switch has no case for subs 0x0A, 0x0B and past 0x0C and no default;
+  MSG_DIALOG reads subs 3 and 4 only. Each leaves the read where it was. (MSG_VOTE and MSG_GAUNTLET's
+  unknown subs end the datagram instead.)
+- **Effect:** a server sending one of them freezes every client it reaches (an endless loop). The
+  stock server sends none.
+- **Ours:** noxcpp's server sends only the subs a 1.2b client reads (net/messages.cpp's sub-op
+  table: nox.inform takes only a notice in it); noxcore's client drops the rest of the packet at a
+  sub it can't size (framing.cpp). Not reproduced.
 
 ### OB-170: The quest's screens: a wrap from the wrong corner, a column from two axes, a line measured in another font
 - **Where:** the quest's start screen wraps QuestSplash4b ("and you will reappear there...") at
