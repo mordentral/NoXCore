@@ -134,6 +134,26 @@ SplitResult splitMessages(std::span<const std::uint8_t> payload, Direction dir, 
     return out;
 }
 
+bool holdsNoxCoreOnly(std::span<const std::uint8_t> messages)
+{
+    std::size_t offset = 0;
+    while (offset < messages.size()) {
+        const std::uint8_t op = messages[offset];
+        if (noxCoreOnly(op)) {
+            return true;
+        }
+        if (static_cast<Op>(op) == Op::Important) {
+            return false; // (its size is the receiver's: the host's 5, anyone else's 1)
+        }
+        const std::size_t size = messageSize(messages.subspan(offset), Direction::ServerToClient);
+        if (size == 0 || size == kVariableSize) {
+            return false;
+        }
+        offset += size;
+    }
+    return false;
+}
+
 namespace detail {
 
 // Cuts an encoded message down to the size the receiving side reads for its opcode, so a

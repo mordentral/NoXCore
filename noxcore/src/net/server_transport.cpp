@@ -11,6 +11,7 @@
 #include "noxcore/util/random.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <exception>
 
@@ -478,7 +479,13 @@ void ServerTransport::connect(const Endpoint& from, std::span<const std::uint8_t
     // the new stream's header byte to the listening stream's, 0): the client looks
     // that index up among its own streams and drops what doesn't match.
     p.stream.setId(kServerStreamIndex);
-    p.identified = identifying_.erase(from) != 0;
+    // (Identified by a query from this very address, and not long ago: one left by a game that
+    // never connected, or the game list's, kept till another query swept it, could otherwise
+    // identify a stock client that comes later from the same address.)
+    if (const auto q = identifying_.find(from); q != identifying_.end()) {
+        p.identified = nowMs - q->second <= kIdentifyKeepMs;
+        identifying_.erase(q);
+    }
     if (const auto f = identifyingFeatures_.find(from); f != identifyingFeatures_.end()) {
         p.clientFeatures = p.identified ? f->second : 0u;
         identifyingFeatures_.erase(f);
@@ -599,10 +606,29 @@ void ServerTransport::control(std::uint8_t id, Peer& p, std::span<const std::uin
     }
 }
 
+bool ServerTransport::refuseNoxCoreOnly(std::uint8_t id, Peer& p, std::span<const std::uint8_t> messages)
+{
+    if (p.identified || !holdsNoxCoreOnly(messages)) {
+        return false;
+    }
+    ++refusedNoxCoreOnly_;
+    if (log_ && !p.noxCoreOnlyLogged) {
+        p.noxCoreOnlyLogged = true;
+        const std::string name = nameOf_ ? nameOf_(id) : std::string();
+        char op[8];
+        std::snprintf(op, sizeof op, "0x%02X", messages[0]);
+        log_("refused NoX Core-only messages (the first op " + std::string(op) + ", " + std::to_string(messages.size()) +
+             " bytes) to a client that didn't identify itself as NoX Core, " +
+             (name.empty() ? std::string("a client") : "\"" + name + "\"") + " (stream " + std::to_string(id) + ", " + p.at.toString() +
+             "): a sender's missing check; its later ones refused unlogged");
+    }
+    return true;
+}
+
 bool ServerTransport::sendReliable(std::uint8_t peer, std::span<const std::uint8_t> messages)
 {
     const auto it = peers_.find(peer);
-    if (it == peers_.end()) {
+    if (it == peers_.end() || refuseNoxCoreOnly(peer, it->second, messages)) {
         return false;
     }
     try {
@@ -637,7 +663,7 @@ void ServerTransport::queueFull(std::uint8_t id, Peer& p)
 bool ServerTransport::sendReliableNow(std::uint8_t peer, std::span<const std::uint8_t> messages, std::uint32_t nowMs)
 {
     const auto it = peers_.find(peer);
-    if (it == peers_.end()) {
+    if (it == peers_.end() || refuseNoxCoreOnly(peer, it->second, messages)) {
         return false;
     }
     try {
@@ -656,7 +682,7 @@ bool ServerTransport::sendReliableNow(std::uint8_t peer, std::span<const std::ui
 bool ServerTransport::sendUnreliable(std::uint8_t peer, std::span<const std::uint8_t> messages)
 {
     const auto it = peers_.find(peer);
-    return it != peers_.end() && it->second.stream.queueUnreliable(messages);
+    return it != peers_.end() && !refuseNoxCoreOnly(peer, it->second, messages) && it->second.stream.queueUnreliable(messages);
 }
 
 void ServerTransport::flushUnreliable(std::uint8_t peer)

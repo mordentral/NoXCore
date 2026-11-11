@@ -3067,7 +3067,17 @@ int noxRevoke(lua_State* L)
     const char* name = luaL_checklstring(L, 1, &len);
     luaL_argcheck(L, len <= 64, 1, "a player's name");
     const int kind = wholeArg(L, 2, 0x11, 0x13, "0x11 a spell, 0x12 an ability, 0x13 a field guide's creature");
-    const int what = wholeArg(L, 3, 0, 65535, "its number 0-65535");
+    // (Its number within the game's own tables: the stock client clears the entry it names
+    // unchecked, so one past them would write outside its tables.)
+    constexpr int kSpells = static_cast<int>(std::tuple_size_v<decltype(server::PlayerControl::spellLevels)>);
+    constexpr int kAbilities = static_cast<int>(std::tuple_size_v<decltype(server::PlayerControl::abilityLevels)>);
+    constexpr int kGuide = static_cast<int>(std::tuple_size_v<decltype(server::PlayerControl::fieldGuide)>);
+    static_assert(kSpells == 137 && kAbilities == 6 && kGuide == 41);
+    const int most = (kind == 0x11 ? kSpells : kind == 0x12 ? kAbilities : kGuide) - 1;
+    const int what = wholeArg(L, 3, 0, most,
+                              kind == 0x11   ? "a spell's number 0-136"
+                              : kind == 0x12 ? "an ability's number 0-5"
+                                             : "a field guide creature's number 0-40");
     auto& owed = impl.revokes[std::string(name, len)];
     luaL_argcheck(L, owed.size() < 4096, 1, "too many revokes owed");
     owed.push_back({0xF0, static_cast<std::uint8_t>(kind), static_cast<std::uint8_t>(what), static_cast<std::uint8_t>(what >> 8)});
@@ -3552,7 +3562,13 @@ int noxInformString(lua_State* L)
 {
     // One of the game's lines (a string id: "objcoll.c:FlagNoTeam") to one unit's player.
     server::ServerObject& u = unitArg(L, 1);
-    worldOf(L).broadcasts().push_back({server::informStringBytes(luaL_checkstring(L, 2)), true, u.extent});
+    // (1-48 characters, as SrvNet_SendInformString sends: a stock client looks it up and, when its
+    // table has none, writes it into a fixed buffer.)
+    size_t len = 0;
+    const char* id = luaL_checklstring(L, 2, &len);
+    luaL_argcheck(L, len >= 1 && len <= server::kMaxInformString && std::char_traits<char>::find(id, len, '\0') == nullptr, 2,
+                  "a string id of 1-48 characters");
+    worldOf(L).broadcasts().push_back({server::informStringBytes(std::string_view(id, len)), true, u.extent});
     return 0;
 }
 

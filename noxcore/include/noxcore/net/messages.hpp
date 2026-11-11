@@ -299,6 +299,13 @@ enum class Op : std::uint8_t {
     NoxcppModeUi = 0xF8,
 };
 
+/// The first of noxcpp's own opcodes (MSG_NOXCPP_*, and any after them): the 1.2b client's
+/// decoder has no case from here on (its default ends the datagram, what follows lost), so none
+/// goes to a client that didn't identify itself (ServerTransport refuses it: holdsNoxCoreOnly).
+inline constexpr std::uint8_t kFirstNoxcppOp = 0xF2;
+/// Whether `op` is one of noxcpp's own (kFirstNoxcppOp on): a NoX Core client's alone.
+constexpr bool noxCoreOnly(std::uint8_t op) noexcept { return op >= kFirstNoxcppOp; }
+
 struct OpInfo {
     std::string_view name; ///< the exe's name, e.g. "MSG_USE_MAP"; empty if the opcode has none
     std::string_view direction; ///< "S->C", "C->S", "S->C / C->S", "transport" or "-"

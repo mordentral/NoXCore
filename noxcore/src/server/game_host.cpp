@@ -4663,6 +4663,9 @@ void GameHost::setPlayersCantDie(bool on)
 
 void GameHost::sendVoteAvailable(std::uint8_t peer)
 {
+    if (!transport_.identified(peer)) {
+        return; // (a noxsdl player's alone, as its callers' inVoteWindow asks)
+    }
     transport_.sendReliable(peer, mapvote::availableMessage(voteAvailable()));
 }
 

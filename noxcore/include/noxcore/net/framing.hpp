@@ -56,6 +56,12 @@ struct SplitResult {
 SplitResult splitMessages(std::span<const std::uint8_t> payload, Direction dir, const FramingOptions& options = {},
                           const UpdateStreamSizer& streamSizer = {});
 
+/// Whether server->client `messages` hold one of noxcpp's own (net::noxCoreOnly: a stock client's
+/// decoder has no case for it), walked from the first as a stock client reads them, up to the
+/// first it can't size without more (MSG_UPDATE_STREAM, MSG_IMPORTANT, an unknown or cut-short
+/// one: a stock client reads no further either, but for the stream). No allocation.
+bool holdsNoxCoreOnly(std::span<const std::uint8_t> messages);
+
 /// Encodes a message for `dir`, trimming the direction-dependent ones (IMPORTANT, OUTGOING_CLIENT,
 /// REPORT_SECONDARY_WEAPON) to the size the receiver reads.
 template <class Message>

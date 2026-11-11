@@ -2656,8 +2656,11 @@ bool clientOnlyType(const things::ThingDef& t);
 /// A new thing of `type` as its type makes it (its flags, xStatus...), not in the world.
 ServerObject describeType(World& world, const things::ThingDb& things, std::string_view type);
 
+/// The longest string id SrvNet_SendInformString sends (it sends none longer, or empty).
+inline constexpr std::size_t kMaxInformString = 48;
 /// SrvNet_SendInformString's message: MSG_INFORM 0xA9 kind 0x0F, {u8 sign, the string table id
-/// the client looks up, NUL}. (Who it goes to, and when, is the caller's.)
+/// the client looks up, NUL}. (Who it goes to, and when, is the caller's; an id from a mod is
+/// 1 to kMaxInformString characters.)
 inline std::vector<std::uint8_t> informStringBytes(std::string_view id, std::uint8_t sign = 0)
 {
     std::vector<std::uint8_t> m;

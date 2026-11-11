@@ -275,7 +275,7 @@ declare nox: {
     guideNumber: (name: string) -> number?,
     --- Clears a player's spells, abilities and field guide (no messages: nox.revoke tells its client).
     clearBook: (unit: number) -> (),
-    --- Queues a spell (0x11), ability (0x12) or field guide creature (0x13) taken off a player's client.
+    --- Queues a spell (0x11: 0-136), ability (0x12: 0-5) or field guide creature (0x13: 0-40) taken off a player's client; a number past the game's tables is an error.
     revoke: (playerName: string, kind: number, id: number) -> (),
     --- Sends up to 30 queued revokes to each player, once a frame; how many are still owed.
     sendRevokes: () -> number,
@@ -358,7 +358,7 @@ declare nox: {
     --- # The stock messages
     --- Sends MSG_INFORM to everyone: a notice's code and exactly the numbers it carries.
     inform: (code: number, ...number) -> (),
-    --- Sends one of the game's lines by its string id (e.g. "objcoll.c:FlagNoTeam") to one player.
+    --- Sends one of the game's lines by its string id (e.g. "objcoll.c:FlagNoTeam", 1-48 characters as the game sends; longer or empty is an error) to one player.
     informString: (unit: number, id: string) -> (),
     --- Reports a team's flag (0 home, 1 carried, 2 dropped), its colour and carrier's net code to everyone.
     flagStatus: (team: number, state: number, colour: number, carrier: number?) -> (),

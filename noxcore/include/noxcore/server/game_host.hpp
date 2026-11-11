@@ -526,6 +526,11 @@ public:
     static constexpr float kServerReach = kClientReach + kReachMargin;
     /// Whether `peer` identified itself (a noxsdl).
     bool identified(std::uint8_t peer) const { return transport_.identified(peer); }
+    /// (noxcpp's) The sends the transport refused for holding noxcpp's own messages to a client
+    /// that didn't identify itself (ServerTransport::refusedNoxCoreOnly; 0: every sender checked).
+    std::uint64_t refusedNoxCoreOnly() const noexcept { return transport_.refusedNoxCoreOnly(); }
+    /// The address `peer`'s stream is at (none: no such stream).
+    std::optional<net::Endpoint> endpointOf(std::uint8_t peer) const { return transport_.endpointOf(peer); }
     /// What an identified client said it takes (lobby::ClientFeature); 0 for any other.
     std::uint32_t clientFeatures(std::uint8_t peer) const { return transport_.clientFeatures(peer); }
     /// The client level an identified client named (lobby::kClientLevel: a feature keyed "level N

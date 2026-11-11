@@ -139,11 +139,23 @@ public:
     void closeUnaccepted();
     static constexpr std::uint32_t kAcceptFrames = 300;
 
+    /// The three sends below are every game message's way to a client. (noxcpp's) Each refuses
+    /// (false, nothing queued) messages holding one of noxcpp's own (net::holdsNoxCoreOnly) to a
+    /// peer that didn't identify itself (identified): a stock client's decoder has none of them.
+    /// A refusal is told in the log, a peer's first only (refusedNoxCoreOnly counts them all);
+    /// every sender asks first, so one is a sender's bug.
     bool sendReliable(std::uint8_t peer, std::span<const std::uint8_t> messages);
     /// Net_Send's flag 3 (reliable, flushed): a reliable packet of its own, out at once (after any
     /// still unsent: Stream::sendReliableAlone).
     bool sendReliableNow(std::uint8_t peer, std::span<const std::uint8_t> messages, std::uint32_t nowMs);
     bool sendUnreliable(std::uint8_t peer, std::span<const std::uint8_t> messages);
+    /// (noxcpp's) The sends refused so far for holding one of noxcpp's own messages to a peer that
+    /// didn't identify itself (any peer's; 0: none, as it should stay).
+    std::uint64_t refusedNoxCoreOnly() const noexcept { return refusedNoxCoreOnly_; }
+    /// (noxcpp's) How long an extended query identifies the address it came from (ms): a connect
+    /// from there later than this is a stock client's (its query's long gone, its address another
+    /// game's now). As long as the join gates keep a query, over a password prompt too.
+    static constexpr std::uint32_t kIdentifyKeepMs = 600'000;
     /// Net_FlushStream(peer, 1)'s unreliable part: what the peer's unreliable buffer holds goes out
     /// now as its own datagram (not with the frame's update).
     void flushUnreliable(std::uint8_t peer);
@@ -281,7 +293,12 @@ private:
         std::uint32_t fullRefused = 0;
         std::uint32_t fullLoggedAt = 0;
         bool fullLogged = false;
+        bool noxCoreOnlyLogged = false; ///< (noxcpp's: a refusal of noxcpp's own messages told: refuseNoxCoreOnly)
     };
+    /// (noxcpp's) Whether `messages` to `p` must be refused: it didn't identify itself and they hold
+    /// one of noxcpp's own (net::holdsNoxCoreOnly). Counted, and a peer's first told in the log.
+    bool refuseNoxCoreOnly(std::uint8_t id, Peer& p, std::span<const std::uint8_t> messages);
+    std::uint64_t refusedNoxCoreOnly_ = 0;
     /// (noxcpp's) A reliable send to `id` refused: when its queue is full (kMaxQueuedReliable
     /// unacknowledged), told in the log with the peer's name and stream, at most once a
     /// kQueueFullLogMs; refused otherwise, nothing. The client isn't dropped; nothing else changes.

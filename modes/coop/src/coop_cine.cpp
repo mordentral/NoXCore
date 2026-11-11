@@ -4,6 +4,7 @@
 // talk shown to the others.
 #include "noxcore/coop/coop.hpp"
 
+#include "noxcore/net/messages.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/quest.hpp"
@@ -157,6 +158,11 @@ server::HostClient* CoopDirector::hostClient(server::HostClient* own)
 void CoopDirector::tell(const Member& m, std::vector<std::uint8_t> bytes)
 {
     if (!host_) {
+        return;
+    }
+    // (A co-op message to its peer's client as it is now, a NoX Core one: a member's record is its
+    // join's, and a stock client may since have that peer.)
+    if (!bytes.empty() && net::noxCoreOnly(bytes[0]) && !host_->identified(m.peer)) {
         return;
     }
     if (const server::ServerObject* u = host_->unitOf(m.peer)) {
