@@ -9,12 +9,6 @@
 
 namespace nox::lobby {
 
-namespace {
-
-constexpr std::uint32_t kTimeoutMs = 20000;
-
-} // namespace
-
 XwisLogin::XwisLogin(std::string nick, std::string apgarPassword, std::uint32_t nowMs, XwisRoute route)
     : startedAt_(nowMs)
 {
@@ -78,7 +72,7 @@ void XwisLogin::poll(std::uint32_t nowMs)
         fail(socket_->error(), false);
         return;
     }
-    if (nowMs - startedAt_ > kTimeoutMs) {
+    if (nowMs - startedAt_ > kXwisChatTimeoutMs) {
         fail("timed out", false);
         return;
     }

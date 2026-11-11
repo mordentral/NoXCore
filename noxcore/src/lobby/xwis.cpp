@@ -195,8 +195,9 @@ void XwisSession::line(std::string_view text)
     } else if (command == "323" && state_ == State::Listing) {
         outgoing_.push_back("QUIT");
         state_ = State::Done;
-    } else if (command.size() == 3 && (command[0] == '4' || command[0] == '5')) {
-        // An IRC error reply (nick taken, bad password, ...).
+    } else if (command.size() == 3 && (command[0] == '4' || command[0] == '5') && !detail::isStockLoginExtraReply(text)) {
+        // An IRC error reply (nick taken, bad password, ...); one to the login's verchk or
+        // SETOPT is passed over.
         state_ = State::Failed;
         error_ = std::string(text);
     }

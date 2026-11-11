@@ -56,8 +56,8 @@ public:
     /// List: log in, list the Nox games, quit. Login: log in and quit (a player's login checked).
     enum class Purpose : std::uint8_t { List, Login };
 
-    /// Queues the login (the WOL client handshake OpenNox uses: CVERS, PASS, NICK, apgar with
-    /// the password, USER). Without a password the nick stands in for it, as a throwaway listing
+    /// Queues the login (WOLAPI 1.20's chat login: CVERS, PASS, NICK, apgar with the password,
+    /// USER, verchk, SETOPT; no SERIAL). Without a password the nick stands in for it, as a throwaway listing
     /// login (XWIS makes the account on the spot); `apgarPassword` is already encoded.
     explicit XwisSession(std::string nick, std::string apgarPassword = {}, Purpose purpose = Purpose::List);
 

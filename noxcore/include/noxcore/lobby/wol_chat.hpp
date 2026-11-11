@@ -112,7 +112,7 @@ public:
         std::vector<User> users;
     };
 
-    /// Queues the login (XwisSession's: CVERS, PASS, NICK, apgar, USER); `apgarPassword` is already
+    /// Queues the login (XwisSession's: CVERS, PASS, NICK, apgar, USER, verchk, SETOPT); `apgarPassword` is already
     /// encoded.
     WolChatSession(std::string nick, std::string apgarPassword);
 
@@ -220,8 +220,8 @@ public:
     /// Asks servserv for the chat server, connects and logs in; `apgarPassword` is already encoded.
     WolChat(std::string nick, std::string apgarPassword, std::uint32_t nowMs, XwisRoute route = {});
 
-    /// Sends, receives; the login times out 20 seconds after the chat server's connection
-    /// starts. After logOff, waits (3 seconds at most) for the server to close the connection,
+    /// Sends, receives; the login times out kXwisChatTimeoutMs (30 s) after the chat server's
+    /// connection starts. After logOff, waits (3 seconds at most) for the server to close the connection,
     /// since XWIS refuses another login from this address while it lasts.
     void poll(std::uint32_t nowMs);
     /// The route to the chat server, as "XWIS: ..." lines, since the last call.

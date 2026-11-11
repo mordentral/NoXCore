@@ -22,7 +22,7 @@ public:
     /// Starts it; `apgarPassword` is already encoded (apgar()).
     XwisLogin(std::string nick, std::string apgarPassword, std::uint32_t nowMs, XwisRoute route = {});
 
-    /// Moves it on: sends, receives, times out 20 seconds after the chat server's connection starts.
+    /// Moves it on: sends, receives, times out kXwisChatTimeoutMs (30 s) after the chat server's connection starts.
     void poll(std::uint32_t nowMs);
     /// The route to the chat server, as "XWIS: ..." lines, since the last call.
     std::vector<std::string> takeLog();

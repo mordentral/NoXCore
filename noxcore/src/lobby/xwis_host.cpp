@@ -116,8 +116,10 @@ void XwisHostSession::line(std::string_view text)
         // Our own join echoed back: in the channel, so the record goes up as its topic.
         state_ = State::Hosting;
         sendTopic();
-    } else if (command.size() == 3 && (command[0] == '4' || command[0] == '5') && state_ != State::Hosting) {
-        // An error reply while logging in or making the channel (a nick in use, the channel taken).
+    } else if (command.size() == 3 && (command[0] == '4' || command[0] == '5') && state_ != State::Hosting &&
+               !detail::isStockLoginExtraReply(text)) {
+        // An error reply while logging in or making the channel (a nick in use, the channel
+        // taken); one to the login's verchk or SETOPT is passed over.
         state_ = State::Failed;
         error_ = std::string(text);
     }
@@ -165,6 +167,7 @@ void XwisHost::connect(std::uint32_t nowMs)
     session_.reset();
     send_.clear();
     retryAt_ = nowMs + kRetryMs;
+    loginStartedAt_ = nowMs;
     socket_.emplace(nick_, password_, nowMs, route_);
     if (socket_->state() == net::TcpSocket::State::Failed) {
         error_ = socket_->error();
@@ -204,12 +207,28 @@ void XwisHost::poll(std::uint32_t nowMs)
     if (socket_ && session_) {
         if (socket_->poll(nowMs)) {
             retryAt_ = nowMs + kRetryMs; // (counted from the chat server's connection)
+            loginStartedAt_ = nowMs;
         }
         if (socket_->asking()) {
             return;
         }
         if (socket_->state() == net::TcpSocket::State::Failed && error_ != socket_->error()) {
             error_ = socket_->error();
+        }
+        const auto s = session_->state();
+        const auto open = socket_->state();
+        if ((s == XwisHostSession::State::LoggingIn || s == XwisHostSession::State::Joining) &&
+            (open == net::TcpSocket::State::Connecting || open == net::TcpSocket::State::Connected) &&
+            nowMs - loginStartedAt_ > kXwisChatTimeoutMs) {
+            // Not in its channel in time (the connection or the login stalled): dropped, and
+            // tried again in 30 s.
+            keepLog();
+            socket_.reset();
+            session_.reset();
+            send_.clear();
+            error_ = "timed out";
+            retryAt_ = nowMs + kRetryMs;
+            return;
         }
     }
     const bool broken = !socket_ || !session_ || socket_->state() == net::TcpSocket::State::Failed ||

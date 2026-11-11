@@ -17,7 +17,7 @@ namespace nox::lobby {
 
 namespace {
 
-constexpr std::uint32_t kLoginTimeoutMs = 20000;
+constexpr std::uint32_t kLoginTimeoutMs = kXwisChatTimeoutMs;
 constexpr std::uint32_t kCloseWaitMs = 3000;
 /// The lobbies' names: the exe counts 53 of them.
 constexpr int kLobbyNames = 53;
@@ -355,8 +355,9 @@ void WolChatSession::line(std::string_view text)
             events_.push_back({Event::Kind::Motd, {}, {}, {}, std::exchange(motd_, {})});
             return;
         }
-        // Any other 4xx / 5xx numeric during the login fails it as refused.
-        if (command.size() == 3 && (command[0] == '4' || command[0] == '5')) {
+        // Any other 4xx / 5xx numeric during the login fails it as refused (but one answering the
+        // login's verchk or SETOPT).
+        if (command.size() == 3 && (command[0] == '4' || command[0] == '5') && !detail::isStockLoginExtraReply(text)) {
             fail(std::string(text), true); // (nick taken, bad password...)
         }
         return;

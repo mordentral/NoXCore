@@ -13,7 +13,9 @@ namespace nox::lobby {
 
 namespace {
 
-constexpr std::uint32_t kXwisTimeoutMs = 15'000;
+// The listing login's time on the chat server, counted from the chat connection's start; servserv
+// has its own kServservTimeoutMs before it, so the listing can take both (60 s), as the game's.
+constexpr std::uint32_t kXwisTimeoutMs = kXwisChatTimeoutMs;
 constexpr std::uint32_t kPingRetryMs = 1'000;
 constexpr int kPingTries = 3;
 constexpr std::uint32_t kBroadcastWaitMs = 1'500;

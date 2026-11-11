@@ -1784,7 +1784,7 @@ The engine's logic is the exe's; these are where the output differs.
   the large one scaled down looked best and keeps the menus' large lettering.
 - **Revert:** `kLargeScale` 1 (the full size; the labels overflow again).
 
-### VD-70: XWIS's chat server: servserv's first match, xwis.net:4000 when servserv gives none
+### VD-70: XWIS's way in: servserv at xwis.net:4005, then xwis.net:4000, then servserv.westwood.com:4005; the login without SERIAL
 
 - **Vanilla:** before a login the game asks WOLAPI for the server list with the SKU from the
   registry (HKLM SOFTWARE\Westwood\Nox, SKU: 9472 on an English install), version 0x10004, the
@@ -1794,26 +1794,47 @@ The engine's logic is the exe's; these are where the output differs.
   a digit and whose codes include its language (the SKU's low four bits) in a server-choice
   window, the first one picked, and connects to the one chosen with a 30-second timeout. With
   servserv out of reach, silent or listing none, the player gets an error and stays off line.
-  The chat login sends CVERS 11020 (WOLAPI 1.20), PASS, NICK, apgar, SERIAL with the CD key, USER,
-  `verchk <SKU> <version>` and `SETOPT 17,33` (others may find and page the player).
+  The 30 seconds are WOLAPI's deadline for a connection to open. The chat login sends, in this
+  order: `CVERS 11020 9472` (WOLAPI 1.20's version and the SKU), `PASS supersecret`, NICK,
+  `apgar <password> 0`, `SERIAL <CD key>`, `USER UserName HostName irc.westwood.com
+  :RealName`, `verchk 32512 720916` (WOLAPI's
+  product code for the language and its chat version number) and `SETOPT 17,33` (others may
+  find and page the player). The community's patched WOLAPI.DLL (1.15, in the Nox Reloaded /
+  Nox Solution install) sends the same lines but asks servserv at xwis.net:4005 instead.
 - **Ours:** `lobby::XwisConnection` (noxcore/include/noxcore/lobby/servserv.hpp) sends the same query, always as
   English Nox (SKU 9472) and with an empty CD key, and takes the first matching chat server
-  without a window. It waits 15 seconds for servserv; when servserv can't be looked up or reached,
-  doesn't answer in time, closes before 607 or names no chat server for the language, it connects
-  to xwis.net:4000 as before and logs why ("XWIS: servserv failed (...), using xwis.net:4000").
-  The chat login (lobby's `xwisLoginLines`) sends CVERS 11015, PASS, NICK, apgar and USER only:
-  no SERIAL, chat-server verchk or SETOPT.
-- **Why:** servserv first is the stock client's way in, which reached XWIS where xwis.net's own
-  address didn't (public issue #14, the owner's OK of 2026-11-10); the fallback keeps NoX Core
-  working wherever it worked before when servserv is down. 15 seconds keeps the screens
-  responsive. XWIS lists one chat server, so a choice window would only add a click. NoX Core
-  reads no CD key.
-- **Risk:** a servserv that names a server only for another language is passed over for
-  xwis.net:4000; a non-English player is seen as English. XWIS accepts the shorter login today;
-  without SETOPT the chat server's own find and page defaults apply to NoX Core players.
-- **Revert:** a server-choice window over `ServservSession::chatServers()`; no fallback
-  (`XwisRoute::fallback` failing); `kServservTimeoutMs` 30000; the stock lines in
-  `xwisLoginLines`.
+  without a window. By decision, 2026-11-11, it goes in this order:
+  1. servserv at xwis.net:4005, as the community-patched client does, and the chat server it
+     names;
+  2. if that fails, the chat server xwis.net:4000 directly;
+  3. only if that also fails, servserv at servserv.westwood.com:4005 and the chat server it
+     names (skipped when it has the address step 1 asked).
+  A step fails when its name can't be looked up or its connection is refused (the next step
+  starts at once), when a connection isn't open in 30 seconds, or when a servserv doesn't answer
+  in the stock 30 seconds (`kServservTimeoutMs`), closes before 607 or names no chat server for
+  the language. Each step's outcome is logged ("XWIS: xwis.net:4005 gave chat server ...",
+  "XWIS: servserv failed (...), using xwis.net:4000", "XWIS: failed (...), asking servserv
+  servserv.westwood.com:4005"). Every login on the chat server (the WOL chat, a player's login
+  check, the game list's listing login, a hosted game's post) has 30 seconds
+  (`kXwisChatTimeoutMs`) from the chat connection's start to its welcome; a hosted game's post
+  not in its channel by then tries again 30 seconds later. The chat login (lobby's
+  `xwisLoginLines`) sends the stock lines in the stock order, without SERIAL: by decision,
+  2026-11-11, no CD key is read or sent (whereto's serial stays empty too). An error reply to
+  verchk or SETOPT is passed over, and nothing waits for their answers.
+- **Why:** servserv first is how both the stock and the community clients find the chat server,
+  and the community client's xwis.net:4005 reached XWIS where xwis.net's own chat address didn't
+  (public issue #14); xwis.net:4000 directly keeps NoX Core working wherever it worked before;
+  servserv.westwood.com is the stock client's own way in, for a network where xwis.net is out
+  of reach. The wait times and login lines are the stock client's (the owner's call,
+  2026-11-11). XWIS lists one chat server, so a choice window would only add a click.
+- **Risk:** a servserv that names a server only for another language is passed over; a
+  non-English player is seen as English. With every way in silent, the game list waits up to
+  two minutes (two servservs, the chat connection and the login) before saying so. XWIS takes
+  logins without SERIAL today; were it to require a CD key, NoX Core's logins would be refused.
+- **Revert:** servserv.westwood.com:4005 alone in `XwisRoute::servservs`'s default, no fallback
+  (`XwisRoute::fallback` failing), and a server-choice window over
+  `ServservSession::chatServers()`; a SERIAL line in `xwisLoginLines` (only with a new decision
+  on the CD key).
 
 ## Server: memory safety
 

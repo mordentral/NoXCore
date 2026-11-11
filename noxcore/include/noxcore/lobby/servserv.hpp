@@ -2,7 +2,15 @@
 // Online's server server ("servserv", servserv.westwood.com:4005, which XWIS answers) where to
 // go, and the game connects to the chat server it names. XwisConnection does the same for every
 // XWIS connection NoX Core opens (the game list's listing login, the WOL chat login, a player's
-// login check, a hosted game's post).
+// login check, a hosted game's post). By decision (2026-11-11) it goes, in turn:
+//   1. servserv at xwis.net:4005 (where the community's patched WOLAPI.DLL, Nox Reloaded's, asks)
+//      and the chat server it names;
+//   2. the chat server xwis.net:4000 directly;
+//   3. servserv at servserv.westwood.com:4005 (WOLAPI 1.20's) and the chat server it names
+//      (skipped when it has the address step 1 asked: the same answer, or none).
+// A step fails when its name can't be looked up, its connection is refused or isn't open in 30 s,
+// or (a servserv) it doesn't answer in 30 s, closes before 607 or names no chat server for the
+// language; the next step then starts at once.
 //
 // The query, as WOLAPI sends it on connecting (one line each, CR LF):
 //   verchk 32512 65556                    WOLAPI's own product code (0x7F00) and file version (1.20)
@@ -26,9 +34,12 @@
 // digit and whose codes include its language (the SKU's low four bits: 0 for English), and
 // offers them by description with the first one picked; it then connects to that server's host
 // and port with a 30-second timeout and doesn't try another. XwisConnection takes that first one.
-// WOLAPI waits up to 30 seconds for servserv; XwisConnection waits kServservTimeoutMs, then (or
-// when servserv can't be looked up or reached, or names no chat server for the language) goes to
-// xwis.net:4000 as before. Every route taken is logged ("XWIS: ...").
+// The game gives WOLAPI 30 seconds for both connections (its connection deadline: the time a
+// connection may take to open). XwisConnection waits the same 30 s (kServservTimeoutMs) for a
+// server server's connection and its answer, and for a chat connection to open while another step
+// is left. Each login on the chat server has kXwisChatTimeoutMs from the chat connection's start
+// to its welcome. Every step's outcome is logged ("XWIS: xwis.net:4005 gave chat server ...",
+// "XWIS: servserv failed (...), using xwis.net:4000", "XWIS: failed (...), asking servserv ...").
 #pragma once
 
 #include "noxcore/net/tcp_socket.hpp"
@@ -46,8 +57,15 @@ namespace nox::lobby {
 
 inline constexpr std::string_view kServservHost = "servserv.westwood.com";
 inline constexpr std::uint16_t kServservPort = 4005;
-/// How long servserv may take to answer before xwis.net:4000 is used instead.
-inline constexpr std::uint32_t kServservTimeoutMs = 15000;
+/// The first server server asked (on kServservPort), as the community's patched WOLAPI.DLL has it;
+/// kServservHost (WOLAPI 1.20's) is asked last, after xwis.net:4000 itself.
+inline constexpr std::string_view kServservCommunityHost = "xwis.net";
+/// How long each server server may take to answer before the next is asked (the game's 30 s).
+inline constexpr std::uint32_t kServservTimeoutMs = 30000;
+/// How long a login on the chat server may take, from the chat connection's start to the end of
+/// its welcome (the game's 30 s): the WOL chat, a player's login check, the game list's listing
+/// login and a hosted game's post.
+inline constexpr std::uint32_t kXwisChatTimeoutMs = 30000;
 
 /// The game's WOL SKU: Nox (37) in the high byte, the language (0, English) in the low bits.
 inline constexpr std::uint32_t kWolSku = 0x2500;
@@ -98,17 +116,19 @@ private:
 
 /// Where an XWIS connection goes: the real places by default, loopback fakes in tests.
 struct XwisRoute {
-    /// The servserv to ask; none: kServservHost:kServservPort, looked up when the connection starts.
-    std::optional<net::Endpoint> servserv;
-    /// Where to go when servserv gives no chat server; none: xwis.net:4000.
+    /// The server servers to ask: the first before the fallback, the rest after it; none:
+    /// kServservCommunityHost then kServservHost (on kServservPort), each looked up at its turn.
+    std::vector<net::Endpoint> servservs;
+    /// The chat server tried directly when the first servserv gives none; none: xwis.net:4000.
     std::optional<net::Endpoint> fallback;
     std::uint32_t servservTimeoutMs = kServservTimeoutMs;
     /// Straight to the fallback, servserv not asked.
     bool direct = false;
 };
 
-/// A TCP connection to the XWIS chat server servserv names (or the fallback), polled and never
-/// waiting: Connecting while servserv is asked and the chat server's connection opens.
+/// A TCP connection to the XWIS chat server a server server names (or the fallback), polled and
+/// never waiting: Connecting while the server servers are asked and the chat server's connection
+/// opens.
 class XwisConnection {
 public:
     /// Starts asking servserv for the chat server, with the login's nick and its apgar-encoded
@@ -134,13 +154,37 @@ public:
     std::vector<std::string> takeLog() { return std::exchange(log_, {}); }
 
 private:
-    void useServserv(const ChatServer& server);
-    void useFallback(const std::string& why);
-    void connectChat(const std::optional<net::Endpoint>& to, const std::string& name);
+    /// A server server to ask: by name (looked up at its turn) or a given address.
+    struct Servserv {
+        std::string name; ///< for the log: "servserv.westwood.com:4005", or the test's address
+        std::optional<net::Endpoint> at;
+    };
+
+    /// Asks the next server server that can be looked up and reached (not one at an address
+    /// already tried): the first before the fallback, the rest after it. When none is left, the
+    /// fallback if it's untried, else the connection fails.
+    void askNext(std::uint32_t nowMs);
+    /// The way being tried gave no chat connection (`why`): the next way.
+    void moveOn(const std::string& why, std::uint32_t nowMs);
+    /// Another way is left after the one being tried.
+    bool moreToTry() const;
+    /// Why each way tried failed, "; " between.
+    std::string failures() const;
+    void useServserv(const ChatServer& server, std::uint32_t nowMs);
+    void useFallback(const std::string& why, std::uint32_t nowMs);
+    void connectChat(const net::Endpoint& to, const std::string& name, std::uint32_t nowMs);
 
     XwisRoute route_;
-    std::uint32_t startedAt_ = 0;
-    std::string servservName_; ///< for the log: "servserv.westwood.com", or the test's address
+    std::string nick_;
+    std::string password_;
+    std::vector<Servserv> servservs_;
+    std::size_t next_ = 0;                ///< the next of servservs_ to ask
+    std::vector<net::Endpoint> tried_;    ///< the addresses asked so far
+    std::vector<std::string> failures_;   ///< why each gave none, for the fallback's log line
+    bool fallbackTried_ = false;          ///< xwis.net:4000 (or the test's) tried
+    std::uint32_t startedAt_ = 0;         ///< when the one being asked was
+    std::uint32_t chatStartedAt_ = 0;     ///< when the chat connection started opening
+    std::string servservName_;            ///< the one being asked
     std::optional<net::TcpSocket> servserv_;
     ServservSession session_;
     std::string request_;

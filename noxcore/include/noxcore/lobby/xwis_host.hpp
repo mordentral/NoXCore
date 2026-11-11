@@ -1,6 +1,7 @@
 // Posting a hosted game to XWIS as GAME.EXE does through WOLAPI.dll, so other players' game lists
 // show it (xwis.hpp's listing reads it back):
-//   - logged in (as XwisSession: CVERS, PASS, NICK, apgar, USER) with the host's WOL login,
+//   - logged in (as XwisSession: CVERS, PASS, NICK, apgar, USER, verchk, SETOPT) with the host's
+//     WOL login,
 //   - the game's channel made and joined (the host's Channel to RequestChannelCreate,
 //     as WOLAPI words it): "JOINGAME #<nick>'s_game 1 32 37 3 1 1 <reserved> <key>": at least 1
 //     and at most 32 users, game type 37 (Nox: the SKU's high byte), WOLAPI's 3
@@ -72,7 +73,8 @@ private:
 };
 
 /// An XwisHostSession over a connection to the chat server servserv names (servserv.hpp), polled;
-/// it reconnects (servserv asked again) 30 s after the connection fails.
+/// it reconnects (servserv asked again) 30 s after the connection fails, or after a login that
+/// isn't in its channel kXwisChatTimeoutMs after the chat connection started is given up.
 class XwisHost {
 public:
     XwisHost(std::string nick, std::string apgarPassword, std::uint32_t nowMs, std::uint32_t place = kXwisDefaultPlace,
@@ -107,6 +109,7 @@ private:
     std::string send_;
     std::string error_;
     std::uint32_t retryAt_ = 0;
+    std::uint32_t loginStartedAt_ = 0; ///< the chat connection's start (the login's deadline counts from it)
     bool stopped_ = false;
 };
 
