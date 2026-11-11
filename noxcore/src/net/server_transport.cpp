@@ -250,7 +250,7 @@ void ServerTransport::lobby(const Endpoint& from, std::span<const std::uint8_t> 
             }
             // (noxcpp's: a client that asks from the address it then connects from is noxsdl,
             // and gets the identified clients' extras: ServerTransport::identified)
-            std::erase_if(identifying_, [nowMs](const auto& kv) { return nowMs - kv.second > 60'000; });
+            std::erase_if(identifying_, [nowMs](const auto& kv) { return nowMs - kv.second > kIdentifyKeepMs; });
             std::erase_if(identifyingFeatures_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
             std::erase_if(identifyingLevels_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
             std::erase_if(identifyingKeys_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
@@ -683,12 +683,6 @@ bool ServerTransport::sendUnreliable(std::uint8_t peer, std::span<const std::uin
 {
     const auto it = peers_.find(peer);
     return it != peers_.end() && !refuseNoxCoreOnly(peer, it->second, messages) && it->second.stream.queueUnreliable(messages);
-}
-
-bool ServerTransport::relayUnreliable(std::uint8_t peer, std::span<const std::uint8_t> messages)
-{
-    const auto it = peers_.find(peer);
-    return it != peers_.end() && it->second.stream.queueUnreliable(messages);
 }
 
 void ServerTransport::flushUnreliable(std::uint8_t peer)

@@ -816,9 +816,11 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   it reaches reads 11 + n: the first n bytes looked up as a string id, the other n read as further
   messages from the server. A player can so send the other players any server messages that fit in
   a line (up to about 250 bytes), or end their datagram at once.
-- **Ours:** kept: game_host.cpp's onTextMessage relays the message as framing.cpp sizes a client's
-  (flag 2), by ServerTransport::relayUnreliable, which sends a client's bytes on as they came, to a
-  stock client too; framing.cpp reads a server's line by flags 2 and 8, as the stock client does.
+- **Ours:** fixed (owner, 2026-11-11: an exploit against the other players): game_host.cpp's
+  onTextMessage passes a line flagged 8 and not 2 on as every client reads it, narrow with flag 2
+  set and cut to 11 + its length byte, so nothing after its text reaches anyone; the server's own
+  reading of it (a mode's chat, the map vote, the host's log) is the same narrow text. A stock
+  client shows such a line as it did; every other line goes on byte for byte as it came.
 
 ### OB-081: A .plr's map name is written twice its length, and read into 32 bytes
 - **Where:** plr_rwGameData copies the map's name into the player's saved map name (32 bytes),
