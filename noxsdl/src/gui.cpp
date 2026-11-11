@@ -23,14 +23,6 @@ SDL_Color sdl(const Color& c)
     return {c.r, c.g, c.b, 255};
 }
 
-/// A list box's line height: its DATA's, raised to the font's (gui_newScrollListBox).
-int lineHeight(const Window& w)
-{
-    const int fh = w.largeFont ? 16 : 10;
-    const auto* d = std::get_if<nox::gui::ListBoxData>(&w.data);
-    return std::max(fh, d ? static_cast<int>(d->lineHeight) : 0);
-}
-
 /// thing.bin's named images, by name.
 const std::map<std::string, const nox::things::ImageDef*>& imageIndex(const nox::things::ThingDb& things)
 {
@@ -50,6 +42,17 @@ const std::map<std::string, const nox::things::ImageDef*>& imageIndex(const nox:
 bool shellFlag = false;
 
 } // namespace
+
+int fontLine(const Window& w)
+{
+    return w.largeFont ? static_cast<int>(std::lround(16.0f * w.largeScale)) : 10;
+}
+
+int listLineHeight(const Window& w)
+{
+    const auto* d = std::get_if<nox::gui::ListBoxData>(&w.data);
+    return std::max(fontLine(w), d ? static_cast<int>(d->lineHeight) : 0);
+}
 
 void setShellUp(bool up)
 {
@@ -321,7 +324,7 @@ int Painter::pixelSize(bool large) const
     if (!res_.font) {
         return 10;
     }
-    return font(large)->lineSize(static_cast<float>(fontHeight(large)), scale_, 6);
+    return font(large)->lineSize(large ? 16.0f * largeScale_ : 10.0f, scale_, 6);
 }
 
 int Painter::textWidth(const std::string& utf8, bool large)
@@ -556,11 +559,15 @@ void Gui::drawWindow(Window& w, Painter& p)
     if (w.hidden()) {
         return;
     }
+    // (its large font at its own share of the size while it draws)
+    const float largeScale = p.largeScale();
+    p.setLargeScale(w.largeScale);
     if (w.draw) {
         w.draw(w, p);
     } else {
         drawByType(w, p);
     }
+    p.setLargeScale(largeScale);
     if (w.status & st::Border) {
         drawBorder(w, p);
     }
@@ -832,7 +839,7 @@ void Gui::drawByType(Window& w, Painter& p)
         const int wrapWidth = width - 7;
         // Each line's height first, so a wrapped line takes the rows it needs.
         for (auto& l : w.lines) {
-            l.height = lineHeight(w);
+            l.height = listLineHeight(w);
             if (l.text.find('\t') == std::string::npos && p.textWidth(l.text, w.largeFont) > wrapWidth) {
                 l.height = std::max(l.height, p.textHeight(l.text, w.largeFont, wrapWidth));
             }
@@ -854,7 +861,7 @@ void Gui::drawByType(Window& w, Painter& p)
                 p.text(line.substr(tab + 1), x + 5 + w.tabWidth, ly + 2, w.largeFont, lineColor);
             } else {
                 p.text(line, x + 5, ly + 2, w.largeFont, lineColor,
-                       w.lines[i].height > lineHeight(w) ? wrapWidth : 0);
+                       w.lines[i].height > listLineHeight(w) ? wrapWidth : 0);
             }
             ly += step;
         }
@@ -1174,13 +1181,13 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
             if (h == w) {
                 // The line under the mouse (lines are a font height and a pixel apart, below the
                 // title line if there is one).
-                const int fh = w->largeFont ? 16 : 10;
+                const int fh = fontLine(*w);
                 const int top = w->screenPos().y + (w->text.empty() ? 0 : fh + 1);
                 int row = std::max(w->scroll, 0);
                 // Down the visible lines by their heights to the one under the mouse.
                 for (int y = top; row < static_cast<int>(w->lines.size()); ++row) {
                     const auto& l = w->lines[static_cast<std::size_t>(row)];
-                    y += (l.height > 0 ? l.height : lineHeight(*w)) + 1;
+                    y += (l.height > 0 ? l.height : listLineHeight(*w)) + 1;
                     if (at.y < y) {
                         break;
                     }

@@ -42,8 +42,6 @@ constexpr std::int32_t kOptions = 151, kBack = 152;
 // wolapi.wnd
 constexpr std::int32_t kLoginName = 1701, kLoginPassword = 1702, kLoginSave = 1703, kLoginSkip = 1705,
                        kLoginGo = 1706, kLoginList = 1708, kLoginSlider = 1709, kLoginUp = 1710, kLoginDown = 1711;
-/// How many of the login list's lines show at once (79 high, less its title line, 11 a line).
-constexpr int kLoginLinesShown = 6;
 // noxworld.wnd
 constexpr std::int32_t kWorldListPanel = 10033, kWorldGameList = 10037, kWorldMap = 10020, kWorldMapQuads = 10021,
                        kHost = 10002, kHostQuest = 10003, kList = 10004, kFilters = 10005, kRefresh = 10006,
@@ -168,12 +166,22 @@ void Menus::wip(gui::Window* top, std::int32_t id)
     }
 }
 
-nox::gui::WindowDef Menus::wolScreen(const char* file) const
+gui::Window* Menus::loadWolScreen(const char* file, gui::Proc proc)
 {
-    // The Westwood Online screens' windows with no FONT in the default face, not the shell's large.
-    nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / file);
-    wol_screens::useDefaultFont(def);
-    return def;
+    // The Westwood Online screens' large text at kLargeScale of its size (wol_screens.hpp).
+    gui::Window* top = gui_.load(windowDir_ / file, std::move(proc));
+    gui::scaleLargeFont(*top, wol_screens::kLargeScale);
+    return top;
+}
+
+int Menus::loginLinesShown()
+{
+    // As many as the list's box holds at its font's line.
+    const gui::Window* list = screen_ ? screen_->find(kLoginList) : nullptr;
+    if (!list) {
+        return 1;
+    }
+    return wol_screens::linesShown(list->rect.h, !list->text.empty(), gui::fontLine(*list), gui::listLineHeight(*list));
 }
 
 void Menus::reset()
@@ -426,8 +434,8 @@ void Menus::enter(State s)
         optsBack_->show(true);
         break;
     case State::Login:
-        // The login: from 480 above, its text in the default face (wol_screens.hpp).
-        screen_ = gui_.load(wolScreen("wolapi.wnd"), [this](gui::Window&, int message, gui::Window& from) {
+        // The login: from 480 above, its large text smaller (wol_screens.hpp).
+        screen_ = loadWolScreen("wolapi.wnd", [this](gui::Window&, int message, gui::Window& from) {
             return onLogin(message, from);
         });
         slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
@@ -910,7 +918,7 @@ void Menus::setupLogin()
     // Its slider's thumb (with UISlider / UISliderLit).
     gui::useSliderThumb(screen_->find(kLoginSlider));
     selectLogin(std::max(pick, 0));
-    scrollLogins(std::max(pick - kLoginLinesShown / 2, 0));
+    scrollLogins(std::max(pick - loginLinesShown() / 2, 0));
     // Register: XWIS makes an account on its first login, so it's our way to go on without one.
     if (gui::Window* skip = screen_->find(kLoginSkip)) {
         skip->text = "Skip Login";
@@ -959,7 +967,7 @@ void Menus::scrollLogins(int first)
     if (!list) {
         return;
     }
-    const int most = std::max(0, static_cast<int>(list->lines.size()) - kLoginLinesShown);
+    const int most = std::max(0, static_cast<int>(list->lines.size()) - loginLinesShown());
     list->scroll = std::clamp(first, 0, most);
     // The slider (DATA 0-128, its maximum at the top) follows.
     if (gui::Window* slider = screen_->find(kLoginSlider)) {
@@ -977,7 +985,7 @@ bool Menus::onLogin(int message, gui::Window& from)
         gui::Window* list = screen_->find(kLoginList);
         const auto* sl = std::get_if<nox::gui::SliderData>(&from.data);
         if (list && sl) {
-            const int most = std::max(0, static_cast<int>(list->lines.size()) - kLoginLinesShown);
+            const int most = std::max(0, static_cast<int>(list->lines.size()) - loginLinesShown());
             list->scroll = gui::scrollFromSlider(*sl, from.sliderValue, most);
         }
         return true;

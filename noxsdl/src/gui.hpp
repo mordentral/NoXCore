@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -145,6 +146,9 @@ public:
     std::string backgroundImage, enabledImage, disabledImage, hiliteImage, selectedImage;
     SDL_Point imageOffset{};
     bool largeFont = false;
+    /// (noxsdl's) The large font drawn at this share of its size (its 16-unit line), for screens whose
+    /// boxes are too small for it at full size (the Westwood Online screens: wol_screens.hpp).
+    float largeScale = 1.0f;
     std::string text;    ///< shown (resolved from the string table)
     std::string tooltip;
     nox::gui::WindowData data;
@@ -242,6 +246,23 @@ inline void setGreyed(Window* w, bool greyed)
     }
 }
 
+/// A window's font's line in layout units: 10, or the large font's 16 at its largeScale.
+int fontLine(const Window& w);
+/// A list box's line height: its DATA's, raised to its font's line (gui_newScrollListBox).
+int listLineHeight(const Window& w);
+
+/// (noxsdl's) Every window from `top` down that's in the large font drawn at `share` of its size
+/// (Window::largeScale).
+inline void scaleLargeFont(Window& top, float share)
+{
+    if (top.largeFont) {
+        top.largeScale = share;
+    }
+    for (auto& c : top.children) {
+        scaleLargeFont(*c, share);
+    }
+}
+
 /// A window centred in the game's 640 x 480 layout.
 inline void centreOnScreen(Window& w)
 {
@@ -279,7 +300,11 @@ public:
     void image(const std::string& name, int x, int y, bool dim);
     /// The same with its material pixels shaded (draw_setMaterial's two forms).
     void image(const std::string& name, int x, int y, const SpriteCache::Materials& materials);
-    int fontHeight(bool large) const { return large ? 16 : 10; }
+    /// A line of the font in layout units: 10, or the large font's 16 at the window's largeScale.
+    int fontHeight(bool large) const { return large ? static_cast<int>(std::lround(16.0f * largeScale_)) : 10; }
+    /// The large font's share of its size for what's drawn next (the window being drawn's largeScale).
+    void setLargeScale(float s) { largeScale_ = s; }
+    float largeScale() const { return largeScale_; }
     int textWidth(const std::string& utf8, bool large);
     /// The height of the text wrapped at `wrapWidth` (a font height a line).
     int textHeight(const std::string& utf8, bool large, int wrapWidth);
@@ -313,6 +338,7 @@ private:
     const Resources& res_;
     float scale_ = 1;
     float offsetX_ = 0, offsetY_ = 0;
+    float largeScale_ = 1;
 };
 
 /// A window sliding in from `from` to its place, and back out when asked (gui_makeAnimation).

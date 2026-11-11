@@ -65,16 +65,14 @@ const nox::gui::ListBoxData* listData(const gui::Window& list)
 // A line's height plus a pixel's gap: its own (wrapped) height, else the taller of the font's and the list's line height.
 int lineStep(const gui::Window& list, const gui::Window::Line& l)
 {
-    const auto* d = listData(list);
-    const int fh = list.largeFont ? 16 : 10;
-    return (l.height > 0 ? l.height : std::max(fh, d ? static_cast<int>(d->lineHeight) : 0)) + 1;
+    return (l.height > 0 ? l.height : gui::listLineHeight(list)) + 1;
 }
 
 /// The furthest a list scrolls: its last lines just fill it.
 int mostScroll(const gui::Window& list)
 {
     // The list's height less its title line, if it has one.
-    int room = list.rect.h - (list.text.empty() ? 0 : (list.largeFont ? 16 : 10) + 1) + 1;
+    int room = list.rect.h - (list.text.empty() ? 0 : gui::fontLine(list) + 1) + 1;
     int first = static_cast<int>(list.lines.size());
     // Count back from the end while whole lines still fit; where that stops is the first line shown.
     while (first > 0) {
@@ -117,8 +115,8 @@ void eraseLine(gui::Window& list, int at)
 void Menus::setupChat()
 {
     // The screen: wolchat.wnd from 480 above (in at 20 a frame, out at 40); modal, its own
-    // Back. Its text in the default face (wol_screens.hpp).
-    screen_ = gui_.load(wolScreen("wolchat.wnd"), [this](gui::Window&, int message, gui::Window& from) {
+    // Back. Its large text smaller (wol_screens.hpp).
+    screen_ = loadWolScreen("wolchat.wnd", [this](gui::Window&, int message, gui::Window& from) {
         return onChat(message, from);
     });
     slides_.push_back(gui_.slideIn(screen_, {0, -480}, {0, 20}, {0, -40}));
@@ -263,6 +261,7 @@ void Menus::chatLine(const std::string& text, int color)
     }
     gui::Window::Line line{text, palette(color)};
     gui::Painter p(nullptr, gui_.resources(), 640, 480);
+    p.setLargeScale(list->largeScale);
     if (p.textWidth(text, list->largeFont) > list->rect.w - 7) {
         line.height = std::max(10, p.textHeight(text, list->largeFont, list->rect.w - 7));
     }

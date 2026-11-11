@@ -291,9 +291,11 @@ private:
     void enable(gui::Window* top, std::int32_t id, bool on);
     /// A button that isn't hooked up yet: disabled, " - WIP" after its text.
     void wip(gui::Window* top, std::int32_t id);
-    /// A Westwood Online screen's window file (wolapi.wnd, wolchat.wnd), its windows that give no
-    /// FONT in the default face (wol_screens.hpp).
-    nox::gui::WindowDef wolScreen(const char* file) const;
+    /// A Westwood Online screen (wolapi.wnd, wolchat.wnd) loaded as gui_.load does, its large text
+    /// drawn smaller (wol_screens.hpp).
+    gui::Window* loadWolScreen(const char* file, gui::Proc proc);
+    /// How many of the login list's lines show at once (at its font's size).
+    int loginLinesShown();
     /// Chosen a game: pick the character to join as (as noxworld's Join, windowMultiplayerSub).
     void chooseCharacter(const std::string& host);
     /// A game clicked in the list (client_gui_serverInfoBlockCheckExp):
