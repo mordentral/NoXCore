@@ -28,7 +28,7 @@ local words = require("data/tips")
 
 local tips = {}
 
--- Read once each: type -> its stats (false: none); type -> its name; modifier name -> its line.
+-- Read once each: type -> its stats (false: none); type -> its name; "type|modifier" -> its line.
 local statsOf: { [string]: any } = {}
 local names: { [string]: string } = {}
 local modLines: { [string]: string } = {}
@@ -124,16 +124,18 @@ local function readModifier(name: string): (string, string)
 	return label, text
 end
 
--- A game modifier's line: its live line, or "LABEL: no effect" when it does nothing (loot.does:
--- no effect the engine runs, or none at all). Read once a modifier.
-function tips.modifier(name: string): string
-	local line = modLines[name]
+-- A game modifier's line on an item of `thingType`: its live line, or "LABEL: no effect" when it
+-- does nothing there (loot.doesOn: no effect the engine runs, none at all, or only one that scales
+-- a number the type hasn't: an armour quality on a shield). Read once a type and modifier.
+function tips.modifier(name: string, thingType: string): string
+	local key = thingType .. "|" .. name
+	local line = modLines[key]
 	if line then
 		return line
 	end
 	local label, text = readModifier(name)
-	line = if loot.does(name) then text else label .. ": no effect"
-	modLines[name] = line
+	line = if loot.doesOn(thingType, name) then text else label .. ": no effect"
+	modLines[key] = line
 	return line
 end
 
@@ -216,7 +218,7 @@ function tips.lines(rec: any, facts: any?, h: any?): { string }
 	end
 	for _, slot in items.SLOTS do
 		if rec[slot] then
-			table.insert(out, "m" .. tips.modifier(rec[slot]))
+			table.insert(out, "m" .. tips.modifier(rec[slot], rec.type))
 		end
 	end
 	for _, a in rec.affixes or {} do

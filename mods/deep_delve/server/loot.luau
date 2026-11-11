@@ -6,7 +6,8 @@
 -- rare all of the slots the item takes, plus one or two of Deep Delve's own affixes (only those its
 -- kind may carry: affixes.luau). A modifier is
 -- only ever one that fits the slot of that item (nox.modifierFits: the game's own rule), does
--- something (loot.does: an effect the engine runs) and is no dearer than the area level allows
+-- something on it (loot.doesOn: an effect the engine runs, and a number of the item's for it to
+-- scale: no armour quality on a shield) and is no dearer than the area level allows
 -- (data/loot.luau's worth). Rarely a loot roll's gear is a unique or a set piece instead, and a
 -- champion and an act boss roll for one of each besides (uniques.luau, data/uniques.luau).
 
@@ -129,6 +130,36 @@ function loot.does(name: string): boolean
 	return yes
 end
 
+-- Whether a modifier does anything on an item type: as loot.does, but an effect that only scales
+-- one of the type's own numbers (data/loot's `scales`) counts only when the type has some of it.
+-- The game's shields have no armour value, so an armour quality on one does nothing. Read once a
+-- type and modifier.
+local doesOnCache: { [string]: boolean } = {}
+
+function loot.doesOn(thingType: string, name: string): boolean
+	local key = thingType .. "|" .. name
+	local known = doesOnCache[key]
+	if known ~= nil then
+		return known
+	end
+	local yes = false
+	if loot.does(name) then
+		local m = nox.modifier(name)
+		local st = nox.itemStats(thingType)
+		for fn in (if m then m.effects else {}) :: { [string]: number } do
+			if (data.effects :: any)[fn] then
+				local stat = (data.scales :: any)[fn]
+				if not stat or (st and type((st :: any)[stat]) == "number" and (st :: any)[stat] > 0) then
+					yes = true
+					break
+				end
+			end
+		end
+	end
+	doesOnCache[key] = yes
+	return yes
+end
+
 local function poolFor(thingType: string): any
 	local pool = pools[thingType]
 	if pool then
@@ -139,7 +170,7 @@ local function poolFor(thingType: string): any
 		local fits = {}
 		for _, name in nox.modifiers(sectionOf[slot]) do
 			-- (only one that fits the slot, as the game's rule has it, and does something)
-			if nox.modifierFits(thingType, slot, name) and loot.does(name) then
+			if nox.modifierFits(thingType, slot, name) and loot.doesOn(thingType, name) then
 				local m = nox.modifier(name)
 				table.insert(fits, { name = name, worth = if m then m.worth else 0 })
 			end
@@ -152,8 +183,8 @@ end
 
 -- Each modifier of a worth that does nothing (loot.does), as "dd modifiers" lists them: "NAME
 -- worth W fits F drops N" (F: the gear types it fits a slot of by the game's rule; N: those it may
--- drop on, does and worth allowing: 0 for every one listed), sorted; with `all`, every modifier of
--- the three sections, "does" or "nothing" after its line.
+-- drop on, doing something there (loot.doesOn) and worth allowing: 0 for every one listed),
+-- sorted; with `all`, every modifier of the three sections, "does" or "nothing" after its line.
 function loot.modifierLines(all: boolean?): { string }
 	local out = {}
 	for _, section in { "effectiveness", "material", "enchantment" } do
@@ -172,7 +203,7 @@ function loot.modifierLines(all: boolean?): { string }
 					end
 					if fit then
 						fits += 1
-						if does and worth > 0 and worth <= data.worth.most then
+						if loot.doesOn(g.type, name) and worth > 0 and worth <= data.worth.most then
 							drops += 1
 						end
 					end
@@ -186,7 +217,7 @@ function loot.modifierLines(all: boolean?): { string }
 end
 
 -- What fits each slot of a type by the game's rule, as "dd modifiers TYPE" lists it: "SLOT NAME
--- worth W does|nothing", in modifier.bin's order.
+-- worth W does|nothing" (on that type: loot.doesOn), in modifier.bin's order.
 function loot.fitLines(thingType: string): { string }
 	local out = {}
 	for _, slot in items.SLOTS do
@@ -194,7 +225,7 @@ function loot.fitLines(thingType: string): { string }
 			if nox.modifierFits(thingType, slot, name) then
 				local m = nox.modifier(name)
 				table.insert(out, string.format("%s %s worth %d %s", slot, name, if m then m.worth else 0,
-					if loot.does(name) then "does" else "nothing"))
+					if loot.doesOn(thingType, name) then "does" else "nothing"))
 			end
 		end
 	end

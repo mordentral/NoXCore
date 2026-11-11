@@ -26,7 +26,8 @@
 --   regen  its passive regeneration's timer and state (regen.luau);
 --   open   its windows open (windows.luau); sheetOf the party member whose sheet its sheet window
 --          shows (nil: its own; sheet.luau);
---   told   what its client was told of its book (book.luau);
+--   told   what its client was told of its book (book.luau); barsTold: its abilities were told
+--          as learned once this session, for its bars (book.luau);
 --   need   the experience to its next level;
 --   arrival where it comes into play in this map (the area's start or its waypoint, when it came
 --          by a map change; nil: the town);

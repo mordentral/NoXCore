@@ -107,6 +107,14 @@ loot.effects = {
 	RegenerationEngage = true,
 }
 
+-- The effects above that only scale one of the item's own numbers (nox.itemStats' field): on a
+-- type without any of it the effect does nothing, so such a modifier drops only where it scales
+-- something (loot.doesOn). The game's shields have no armour value (they block instead), so an
+-- armour quality ("+20% armour") on one would do nothing.
+loot.scales = {
+	ArmorMultiplierEffect = "armor",
+}
+
 -- Deep Delve's own affixes (design 4.3), a rare's one or two: { id, text (%d its value), stat,
 -- low, high (its value at area level 1), perLevel (more each area level), kinds (the gear kinds it
 -- may roll on, loot.gear's `kind`; none: any), most (what all the worn pieces' together count

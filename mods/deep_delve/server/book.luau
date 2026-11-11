@@ -25,6 +25,12 @@
 -- the book open on it, a spell or ability flown to the client's bar); every other grant is told
 -- quietly. A summon spell is told with its creature.
 --
+-- But a warrior's abilities at the first telling of a session (its join) are told as learned ones
+-- too: a client's bars are its .plr's, shared by every character played from it, so another
+-- character played in between (one with none of these abilities, its sweep emptying their slots)
+-- leaves them off the bars, and a quiet grant never puts one back. A learned one goes to the bar's
+-- first empty slot only when no slot holds it already, so bars that kept them stay as they were.
+--
 -- Linked spells: a general spell's revoke takes its linked spells off a client too, its book and
 -- its bars (Summon Creature's, every summon spell). Summon Creature is never granted: a client
 -- that lists only what was granted summons the guide's creatures without it. So a general spell
@@ -209,8 +215,10 @@ function book.apply(h: any, fresh: boolean?)
 			end
 		end
 	end
+	local onBars = not h.barsTold
+	h.barsTold = true
 	for a, level in abilities do
-		local learned = told ~= nil and (told.abilities[a] or 0) < level
+		local learned = onBars or (told ~= nil and (told.abilities[a] or 0) < level)
 		nox.setAbility(h.unit, a, level, true, learned)
 		again = again or queued[REVOKE_ABILITY * 1000 + a] == true
 	end
