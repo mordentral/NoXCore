@@ -72,6 +72,12 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             opts.fakeWolChat = true; // (tests) the chat lobby made up, no XWIS: Menus::showFakeChat
             continue;
         }
+        if (a == "--fake-xwis-games" || a == "--fake-wol-connecting") {
+            // (tests) Westwood Online's game list with made-up XWIS games on the loopback
+            // (Menus::showFakeXwisGames), or the login's Connecting... dialog (showFakeConnecting).
+            (a == "--fake-xwis-games" ? opts.fakeXwisGames : opts.fakeWolConnecting) = true;
+            continue;
+        }
         if (a == "--host") {
             hosting().map = next();
         } else if (a == "--host-port") {

@@ -155,7 +155,7 @@ void Menus::setupChat()
     }
     // The channel list asked for (-99999, 1): every channel, "Downloading channel list..." (0x120: no buttons).
     wolListWanted_ = nox::lobby::kWolAllChannels;
-    dialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("wolchat.c:LoadingChannels"), 0x120, {});
+    wolDialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("wolchat.c:LoadingChannels"), 0x120, {});
 }
 
 void Menus::showFakeChat()
@@ -402,7 +402,7 @@ void Menus::joinLobby(int index)
         wol_->session().requestChannelJoin(lobbies[static_cast<std::size_t>(index)].channel);
     }
     closeDialog();
-    dialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("Wolchat.c:UpdatingChannels"), 0x120, {});
+    wolDialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("Wolchat.c:UpdatingChannels"), 0x120, {});
 }
 
 void Menus::sendChat(bool action)
@@ -532,7 +532,7 @@ bool Menus::onChat(int message, gui::Window& from)
         // 0x76F: state 7's 0xC (every channel, "Downloading channel list...") and 0xD (the
         // lobby's users).
         wolListWanted_ = nox::lobby::kWolAllChannels;
-        dialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("wolchat.c:LoadingChannels"), 0x120, {});
+        wolDialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("wolchat.c:LoadingChannels"), 0x120, {});
         if (wol_ && wol_->state() == nox::lobby::WolChat::State::Ready) {
             wol_->session().requestUserList();
         }
@@ -573,10 +573,39 @@ void Menus::refreshGames()
         wol_->state() != nox::lobby::WolChat::State::Closed) {
         wolState_ = 8;
         wolListWanted_ = nox::lobby::kWolGameCode;
-        dialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("noxworld.c:LoadingGames"), 0x120, {});
+        wolDialog(gui_.text("wolchat.c:PleaseWait"), gui_.text("noxworld.c:LoadingGames"), 0x120, {});
+        return;
+    }
+    if (fakeXwisGames_ && !lanOnly_) {
+        browser_.refresh(nowMs_, &*fakeXwisGames_); // (tests: --fake-xwis-games, no login)
         return;
     }
     browser_.refresh(nowMs_);
+}
+
+void Menus::showFakeXwisGames(std::vector<nox::lobby::GameListing> games)
+{
+    // Westwood Online's game list after Skip Login, its XWIS games these instead of a listing
+    // login's.
+    fakeXwisGames_ = std::move(games);
+    nowMs_ = SDL_GetTicks();
+    reset();
+    skippedLogin_ = true;
+    wolLogin_.reset();
+    wolMode_ = false;
+    lanOnly_ = false;
+    stack_ = {State::MainMenu, State::Online, State::Login};
+    enter(State::Browser);
+}
+
+void Menus::showFakeConnecting()
+{
+    // The login screen with its "Connecting..." up, as Login! puts it up (startLogin), no connection.
+    nowMs_ = SDL_GetTicks();
+    reset();
+    stack_ = {State::MainMenu, State::Online};
+    enter(State::Login);
+    wolDialog(gui_.text("WolProg.wnd:Connecting"), gui_.text("Wolchat.c:PleaseWait"), 2, {}, {});
 }
 
 void Menus::logOffWol()
@@ -628,7 +657,7 @@ void Menus::pollWol()
                         stack_.pop_back();
                         stack_.pop_back();
                         enter(State::Login);
-                        dialog(gui_.text("Wollogin.c:Notice"), gui_.text("Wollogin.c:Discon"), 0x21, {});
+                        wolDialog(gui_.text("Wollogin.c:Notice"), gui_.text("Wollogin.c:Discon"), 0x21, {});
                     });
                 } else if (stack_.back() == State::Browser && wolListWanted_) {
                     closeDialog();

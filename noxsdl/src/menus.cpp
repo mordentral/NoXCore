@@ -1039,11 +1039,11 @@ void Menus::startLogin()
     const std::string typed = password ? nox::strings::toUtf8(password->entry) : std::string();
     const std::string title = gui_.text("wolpatch.c:LoginFailed");
     if (nick.empty()) {
-        dialog(title, gui_.text("Wolreg.c:ErrNoNick"), 1, {});
+        wolDialog(title, gui_.text("Wolreg.c:ErrNoNick"), 1, {});
         return;
     }
     if (!std::isalpha(static_cast<unsigned char>(nick.front()))) {
-        dialog(title, gui_.text("Wolreg.c:ErrNickFirstLetter"), 1, {});
+        wolDialog(title, gui_.text("Wolreg.c:ErrNickFirstLetter"), 1, {});
         return;
     }
     // No password is allowed, as in the game: WOLAPI encodes the empty one like any other
@@ -1079,7 +1079,7 @@ void Menus::startLogin()
     wol_.emplace(pendingLogin_.nick, pendingLogin_.password, static_cast<std::uint32_t>(nowMs_));
     wolLoggingIn_ = true;
     // "Connecting...", with Cancel.
-    dialog(gui_.text("WolProg.wnd:Connecting"), gui_.text("Wolchat.c:PleaseWait"), 2, {}, [this] {
+    wolDialog(gui_.text("WolProg.wnd:Connecting"), gui_.text("Wolchat.c:PleaseWait"), 2, {}, [this] {
         wol_.reset();
         wolLoggingIn_ = false;
     });
@@ -1104,7 +1104,7 @@ void Menus::loginDone()
             const auto colon = done.error().find(" :");
             why = colon != std::string::npos ? done.error().substr(colon + 2) : done.error();
         }
-        dialog(gui_.text("wolpatch.c:LoginFailed"), why, 1, {});
+        wolDialog(gui_.text("wolpatch.c:LoginFailed"), why, 1, {});
         return;
     }
     SDL_Log("XWIS: logged in as %s", pendingLogin_.nick.c_str());
@@ -1679,6 +1679,21 @@ void Menus::dialog(const std::string& title, const std::string& text, std::uint3
     gui_.setModal(dialog_);
 }
 
+void Menus::wolDialog(const std::string& title, const std::string& text, std::uint32_t flags, std::function<void()> onOk,
+                      std::function<void()> onCancel)
+{
+    dialog(title, text, flags, std::move(onOk), std::move(onCancel));
+    gui::scaleLargeFont(*dialog_, wol_screens::kLargeScale);
+    // The title's box (15 high, 2 below the dialog's top) as tall as its lines: centred in it, a
+    // title that wraps grows down, not up past the dialog's edge. (Measured a twentieth narrower
+    // than it's drawn: the size drawn at is a whole number of output pixels.)
+    if (gui::Window* t = dialog_->find(kDlgTitle)) {
+        gui::Painter p(nullptr, gui_.resources(), 640, 480);
+        p.setLargeScale(t->largeScale);
+        t->rect.h = std::max(t->rect.h, p.textHeight(t->text, t->largeFont, t->rect.w * 19 / 20));
+    }
+}
+
 std::string Menus::modeHostKey(std::string_view modeId, bool local)
 {
     return std::string(local ? "@solomode:" : "@hostnetmode:") + std::string(modeId);
@@ -1786,7 +1801,7 @@ void Menus::join(const nox::client::PlayerProfile& profile)
         // game posts itself with the same login), the join once the server has closed it.
         joinAfterLogOff_ = profile;
         logOffWol();
-        dialog(gui_.text("Wolchat.c:PleaseWait"), gui_.text("WolChat.c:LoggingOff"), 0, {});
+        wolDialog(gui_.text("Wolchat.c:PleaseWait"), gui_.text("WolChat.c:LoggingOff"), 0, {});
         return;
     }
     if (callbacks_.join && !pendingHost_.empty()) {

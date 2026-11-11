@@ -30,6 +30,8 @@ struct StartOptions {
     bool mapGiven = false; ///< --map given (else the menus)
     bool browse = false;   ///< --browse: the menus' game list straight away
     bool fakeWolChat = false; ///< --fake-wol-chat (tests): the Westwood Online chat lobby made up, no XWIS
+    bool fakeXwisGames = false; ///< --fake-xwis-games (tests): Westwood Online's game list, made-up XWIS games
+    bool fakeWolConnecting = false; ///< --fake-wol-connecting (tests): the login's Connecting... dialog
     std::string editorMap; ///< --map-editor MAP
     std::string hostEditMap; ///< --host-edit MAP
     std::string hostEditMod; ///< --host-edit-mod ID: the session carries mods\ID

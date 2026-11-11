@@ -1772,9 +1772,13 @@ The engine's logic is the exe's; these are where the output differs.
 - **Ours:** those windows keep the large font, drawn at 0.8 of its size (a 12.8-unit line:
   `wol_screens::kLargeScale` in noxsdl/src/wol_screens.hpp, Window::largeScale, Menus::loadWolScreen),
   so every label fits its box, noxsdl's longer ones too ("Skip Login", the " - WIP" marks); the
-  login list scrolls by the lines its box shows at that size (four). The login's how-to text
-  (noxsdl's) is drawn in the default font in the screen's empty right-hand panel instead of across
-  the top. The game list's columns keep a gap that grows with the text, and a cut name ends in "...".
+  login list scrolls by the lines its box shows at that size (four). Their message boxes
+  (Connecting..., the login's errors, the channel and game lists' waits, the disconnect notice,
+  logging off: Menus::wolDialog) are drawn the same way, the title's box grown down to its lines so
+  a title that wraps stays inside the box (dlg.wnd centres the title on one line's height, so a
+  second line started above the box's top edge). The login's how-to text (noxsdl's) is drawn in the
+  default font in the screen's empty right-hand panel instead of across the top. The game list's
+  columns keep a gap that grows with the text, and a cut name ends in "...".
 - **Why:** the owner asked for these screens' text smaller (2026-11-10): the large face overflowed
   and wrapped off its buttons. Of the small font, the large one scaled down, and a mix of the two,
   the large one scaled down looked best and keeps the menus' large lettering.

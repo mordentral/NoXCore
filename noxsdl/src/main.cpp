@@ -1629,6 +1629,29 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             } else if (opts.fakeWolChat) {
                 startMainMenu(*app);
                 app->menus->showFakeChat();
+            } else if (opts.fakeWolConnecting) {
+                startMainMenu(*app);
+                app->menus->showFakeConnecting();
+            } else if (opts.fakeXwisGames) {
+                // Made-up XWIS listings on the loopback: one where a test may host (18731), the
+                // others at ports nothing answers on (a stock host whose ping never comes back).
+                startMainMenu(*app);
+                const auto listing = [](const char* name, const char* map, std::uint16_t port, int players, int most) {
+                    nox::lobby::GameListing g;
+                    g.name = name;
+                    g.map = map;
+                    g.address = 0x7F000001;
+                    g.port = port;
+                    g.players = players;
+                    g.maxPlayers = most;
+                    g.gameFlags = 0x100;
+                    return g;
+                };
+                app->menus->showFakeXwisGames({listing("Hosted Here", "DD_0A", 18731, 0, 16),
+                                               listing("Kor] Newbies", "ext5", 18791, 0, 31),
+                                               listing("USA Midwest #1", "!TakRP", 18792, 1, 15),
+                                               listing("User_Game", "DD_0A", 18793, 1, 3),
+                                               listing("Waystation", "estate", 18794, 0, 16)});
             } else if (!opts.movieArg.empty()) {
                 app->movie->play(opts.movieArg, movies::Skip::AnyInput, [app] { startMainMenu(*app); });
             } else if (automated) {

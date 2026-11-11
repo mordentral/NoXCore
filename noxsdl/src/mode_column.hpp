@@ -3,7 +3,8 @@
 // game's (a stock host, an older NoX Core one, a plain game) by its game flags (lobby::
 // gameModeName: "arena", "quest"...). A name too wide for the column loses whole words from its end
 // first ("Deep Delve - WIP" to "Deep Delve", "Co-op Campaign" to "Co-op"), then letters. Also the
-// list's columns and the gap kept after each column's text. No SDL here (the tests use it).
+// list's columns, the gap kept after each column's text, which rows only say why a listed address
+// isn't there, and the From column. No SDL here (the tests use it).
 #pragma once
 
 #include "noxcore/lobby/browser.hpp"
@@ -15,10 +16,38 @@
 namespace noxsdl::mode_column {
 
 /// The game list's columns (Name, Map, Mode, Players, Ping, From): where each starts, as a share of
-/// the rows' width. (The name has the most room; Mode enough for "Deep Delve" or "Undead Tide" whole,
-/// Map for 8 letters, Players for its header, Ping for "99 ms"; From the rest, "NoX Core list" and
-/// the padlock.)
-inline constexpr float kColumnStarts[6] = {0.0f, 0.32f, 0.44f, 0.60f, 0.70f, 0.79f};
+/// the rows' width. (Mode has room for "Deep Delve" or "Undead Tide" whole, Players for its header,
+/// Ping for "999 ms", From for its longest (fromText: "NoX Core Saved") and the padlock; Map and
+/// the name share the rest.)
+inline constexpr float kColumnStarts[6] = {0.0f, 0.263f, 0.39f, 0.548f, 0.646f, 0.748f};
+
+/// Whether a game's row only says why it isn't listed (its name, "No response" or "Address not
+/// found" across the columns): an address from servers.txt, --server or the saved servers that
+/// didn't answer our ping, or one that didn't resolve. A game XWIS or the LAN listed is drawn from
+/// its listing (map, mode, players) whether or not it answered, its ping "-" if it didn't.
+inline bool statusRow(const nox::lobby::ServerEntry& e)
+{
+    return e.unresolved || (!e.answered && (e.sources & (nox::lobby::kFromXwis | nox::lobby::kFromLan)) == 0);
+}
+
+/// The From column: "NoX Core" for a NoX Core host, then where it was found: "XWIS", else "LAN",
+/// else "Saved" (the saved servers) or "list" (servers.txt or --server). One place each, the first
+/// of those: an XWIS game that's also on the LAN or in a list is XWIS's.
+inline std::string fromText(const nox::lobby::ServerEntry& e, bool saved)
+{
+    std::string from = e.extended ? "NoX Core " : "";
+    if (e.sources & nox::lobby::kFromXwis) {
+        from += "XWIS";
+    } else if (e.sources & nox::lobby::kFromLan) {
+        from += "LAN";
+    } else if (e.sources & nox::lobby::kFromList) {
+        from += saved ? "Saved" : "list";
+    }
+    while (!from.empty() && from.back() == ' ') {
+        from.pop_back();
+    }
+    return from;
+}
 
 /// The room kept clear after a column's text before the next column: 0.4 of a line, in the units
 /// `lineHeight` is in (4 game pixels at the game's small line), so it grows with the text.

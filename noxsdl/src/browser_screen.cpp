@@ -503,10 +503,12 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
             SDL_RenderFillRect(renderer, &bar);
         }
         const float ty = y + (l.rowHeight - font_.lineHeight(l.size)) / 2;
-        if (!e.answered) {
+        // A listed address that didn't answer (or didn't resolve): its name and why; a game XWIS or the
+        // LAN listed is drawn from its listing below, answered or not (mode_column.hpp's statusRow).
+        if (mode_column::statusRow(e)) {
             cell(0, g.name.empty() ? rowKey(e) : g.name, ty, text);
             font_.draw(statusText(e), cols[1], ty, l.size, grey);
-            cell(5, isSaved(e) ? "Saved" : "list", ty, grey);
+            cell(5, mode_column::fromText(e, isSaved(e)), ty, grey);
             continue;
         }
         // Unnamed listings show their address instead.
@@ -553,21 +555,8 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
              ty, text);
         cell(3, std::to_string(g.players) + "/" + std::to_string(g.maxPlayers), ty, text);
         cell(4, e.pingMs ? std::to_string(*e.pingMs) + " ms" : "-", ty, pingColor(e.pingMs));
-        // `sources` is a bitmask of every place the game was found (it can be several).
-        std::string from;
-        if (e.extended) {
-            from += "NoX Core ";
-        }
-        if (e.sources & nox::lobby::kFromXwis) {
-            from += "XWIS ";
-        }
-        if (e.sources & nox::lobby::kFromLan) {
-            from += "LAN ";
-        }
-        if (e.sources & nox::lobby::kFromList) {
-            from += isSaved(e) ? "Saved" : "list";
-        }
-        cell(5, from, ty, grey);
+        // Where it was found (mode_column.hpp's fromText: the first of XWIS, the LAN, the lists).
+        cell(5, mode_column::fromText(e, isSaved(e)), ty, grey);
         if (g.access == nox::lobby::GameAccess::Password) {
             drawLock(renderer, x0 + w - lockSize / 2 - 1, y + l.rowHeight / 2, lockSize);
         }
