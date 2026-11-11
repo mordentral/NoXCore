@@ -263,6 +263,8 @@ declare nox: {
     abilityLevel: (unit: number, ability: number) -> number,
     --- Sets a player's level (0-5) of an ability 1-5; with report, its client told, and with show it flies to its bar.
     setAbility: (unit: number, ability: number, level: number, report: boolean?, show: boolean?) -> (),
+    --- Puts a spell ("spell": its name or number) or an ability ("ability": 1-5) the player knows on its client's spell bars quietly: the first empty slot, only where no slot holds it (nothing moved or doubled), no book, sound, sparks or line. Sent once the player is in play and every revoke owed to it (nox.revoke) has gone. Whether it will be sent (false: not known, or a client below client level 10 or without the mode UI: nothing sent).
+    putOnBars: (unit: number, kind: "spell" | "ability", what: string | number) -> boolean,
     --- A player's field guide: for each creature 1-40, whether it has it.
     fieldGuide: (unit: number) -> { boolean },
     --- Puts a creature (its guide number 1-40 or its type's name) in a player's field guide as a found guide does; with notify, the player and the others told. Whether it was put in (false: already known, or no such creature).
@@ -459,7 +461,7 @@ declare function require(name: string): any
 --- @hook collide(thing, other) | A thing it watches (nox.watchCollide) was touched by another (ids; nil: no thing).
 --- @hook onObjectKilled(e) | A watched thing died ({ id, type, x, y, by }); told the next frame's start.
 --- @hook onDestroyed(e) | A watched thing was destroyed ({ id, type, x, y }).
---- @hook onDamage(target, source, weapon, amount, kind, cause) | Before a watched thing takes a hit (cause: "blow", "missile", "spell" or "other"): return a new amount (0 cancels) or nil; changes nothing in the world.
+--- @hook onDamage(target, source, weapon, amount, kind, cause) | Before a watched thing takes a hit (cause: "blow", "missile", "spell" or "other"): return a new amount (0 cancels) or nil, and optionally a second number, the amount its worn armour, raised shield or blocking weapon wear by instead (the hit before the mode's own scaling; nil: by the hit as it lands); changes nothing in the world.
 --- @hook onReflect(target, missile, front) | A missile about to hit a watched thing (front: met at its front): return true to turn it as a reflective shield does (back, the target's now) instead of the hit; changes nothing in the world.
 --- @hook onDamaged(target, amount) | A watched thing took a hit.
 --- @hook onPickup(taker, item, x, y) | Something picked an item up from (x, y).

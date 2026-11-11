@@ -77,6 +77,12 @@
 //                 last; else its index, past the last the last)              (10 bytes)
 //                 (the animation's frames spread over the frames, whatever its own speed; or the
 //                 one held the while)
+// and, only to a client at client level 10 or above (kToBarsLevel) that named ModeUi, a spell or
+// ability its player knows to put on its spell bars quietly (nox.putOnBars; sent once the player
+// is in play and the revokes owed to it have gone):
+//   kToBars       u8 kind (0 a spell, 1 an ability), u8 its id (a spell 1-136, an ability 1-5)
+//                 (2 bytes; in the first empty slot, only where no slot holds it: no book, no
+//                 sound, no sparks, no slot moved, the set shown unchanged)
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -129,6 +135,7 @@ enum Sub : std::uint8_t {
     kUseAbility = 23,
     kSpin = 24,
     kAnim = 25,
+    kToBars = 26,
 };
 
 /// The most UI source a server sends, and a client takes (section 10.3's cap).
@@ -465,6 +472,36 @@ inline std::optional<Anim> decodeAnim(std::span<const std::uint8_t> payload)
     a.weapon = payload[8] < 27 && a.kind == AnimKind::Player ? payload[8] : kNoWeaponLayer;
     a.hold = payload[9];
     return a;
+}
+
+/// (Client level 10) A spell or ability put on a player's bars quietly (nox.putOnBars): kToBars's
+/// payload, 2 bytes: u8 kind, u8 id.
+inline constexpr std::uint16_t kToBarsLevel = 10;
+enum class BarKind : std::uint8_t { Spell = 0, Ability = 1 };
+struct ToBars {
+    BarKind kind = BarKind::Spell;
+    std::uint8_t id = 0;
+    bool operator==(const ToBars&) const = default;
+};
+
+inline std::vector<std::uint8_t> toBarsMessage(const ToBars& b)
+{
+    const std::uint8_t payload[2] = {static_cast<std::uint8_t>(b.kind), b.id};
+    return message(kToBars, payload);
+}
+
+/// A kToBars payload read (bytes past the 2 left for later versions); none: cut short, a kind past
+/// an ability, or an id out of its kind's range (a spell 1-136, an ability 1-5).
+inline std::optional<ToBars> decodeToBars(std::span<const std::uint8_t> payload)
+{
+    if (payload.size() < 2 || payload[0] > 1) {
+        return std::nullopt;
+    }
+    ToBars b{static_cast<BarKind>(payload[0]), payload[1]};
+    if (b.id == 0 || b.id > (b.kind == BarKind::Spell ? 136 : 5)) {
+        return std::nullopt;
+    }
+    return b;
 }
 
 /// (Client level 8) A player's mod abilities (nox.grantAbility): kAbilityBar's entries, at most

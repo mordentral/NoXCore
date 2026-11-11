@@ -154,11 +154,12 @@
 --   dd plates            the named monsters' name plates ("id code tier r,g,b plate": the plate as
 --                        shown, its powers' words and its name) and the codes the first player's
 --                        UI was last sent
---   dd spawn TIER [N] [TYPE] [POWERS]   N monsters (1-60) of that tier (normal, magic, rare,
---                        champion: the area's biome's champion, its name and set) round the first
---                        player, of TYPE or the biome roster's first (a champion: its own; "-": that
---                        one); POWERS: their powers, comma-separated ids, or "none" (else its tier's
---                        rolled); "id code tier name"
+--   dd spawn TIER [N] [TYPE] [POWERS] [LEVEL]   N monsters (1-60) of that tier (normal, magic,
+--                        rare, champion: the area's biome's champion, its name and set) round the
+--                        first player, of TYPE or the biome roster's first (a champion: its own; "-":
+--                        that one); POWERS: their powers, comma-separated ids, or "none" (else its
+--                        tier's rolled); LEVEL: made as at that area level (1-100; else the area's);
+--                        "id code tier name"
 --   dd powers [clear]    each live monster with powers ("id type tier powers drops D xp X", a
 --                        summoner's then "minions IDS", then "beat 1" while its beat runs, else
 --                        "beat 0"), how many have a beat now ("beating N")
@@ -842,12 +843,13 @@ function commands.spawn(args: { string }): { string }
 		end
 	end
 	local roster: any = (monsterData.rosters :: any)[s.roster] or monsterData.rosters.Crypt
+	local level = if tonumber(args[6]) then math.clamp(math.floor(tonumber(args[6]) :: number), 1, 100) else s.level
 	local out = {}
 	local ids: { number } = {}
 	for i = 1, math.clamp(tonumber(args[3]) or 1, 1, 60) do
 		-- (a widening ring round the player)
 		local r = 60 + 6 * i
-		local id = monsters.spawn(thingType or roster[1].type, o.x + r * math.cos(i * 1.3), o.y + r * math.sin(i * 1.3), tier, s.level, fixed, want)
+		local id = monsters.spawn(thingType or roster[1].type, o.x + r * math.cos(i * 1.3), o.y + r * math.sin(i * 1.3), tier, level, fixed, want)
 		local m: any = if id then monsters.info(id) else nil
 		if id and m then
 			table.insert(ids, id)

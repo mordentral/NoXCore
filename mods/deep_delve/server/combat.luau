@@ -14,7 +14,9 @@
 --     is scaled by the monster's tier and area level; one by something it owns, times its
 --     `spells` too (a boss's: the barrow-king's mist and fists; 1 for every other monster).
 --     The player's resistance (worn affixes, its passive tree) takes its share off, and its
---     shield's guard its share of a blow or missile from a monster in front of it.
+--     shield's guard its share of a blow or missile from a monster in front of it. Whatever the
+--     mod makes of a hit on a player, its worn armour, raised shield or blocking weapon wear by the
+--     hit as it came (onDamage's second answer), as the game's do from that blow.
 --   * The mod's monsters never hurt each other (a hit on one by another, or by something another
 --     owns, is cancelled): a boss's quake, mist or fist spares its own dead.
 --   * A hit on one of the mod's monsters from a player (or something it owns: a missile, a
@@ -209,7 +211,7 @@ function combat.onReflect(target: number, missile: number, _front: boolean): boo
 	return true
 end
 
-function combat.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): number?
+function combat.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): ...number?
 	-- (a power's own flame on its own hero: none, uniquepowers.luau)
 	if uniquePowers.spares(target, source, weapon) then
 		return 0
@@ -252,8 +254,13 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 		end
 	end
 	if not who then
-		-- (a hit from nothing, a trap's or poison's: only the hero's worn powers on it)
-		return if victim then uniquePowers.taken(victim, nil, source, weapon, amount, kind, cause) else nil
+		-- (a hit from nothing, a trap's or poison's: only the hero's worn powers on it, the worn
+		-- pieces wearing by the hit as it came)
+		local worn = if victim then uniquePowers.taken(victim, nil, source, weapon, amount, kind, cause) else nil
+		if worn then
+			return worn, amount
+		end
+		return nil
 	end
 	-- (the mod's monsters never hurt each other: a boss's own quake, mist or fist among its dead)
 	if not victim and monsters.info(target) and monsters.info(who) then
@@ -343,6 +350,12 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 	end
 	if not changed then
 		return nil
+	end
+	-- (a hit on a hero: its worn pieces wear by the hit as it came, before the scaling here, so
+	-- armour and a raised shield wear as the game's do from the same blow; resilience gives its
+	-- share back after)
+	if victim then
+		return final, amount
 	end
 	return final
 end

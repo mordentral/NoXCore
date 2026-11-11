@@ -882,6 +882,37 @@ void bookEvents(App& app)
             fillBars(app, *fill, e.kind == Kind::Ability);
         }
     }
+    quietFills(app); // (client level 10: a script mode's, once no award flies)
+}
+
+void putOnBarsQuietly(App& app, std::uint8_t id, bool ability)
+{
+    // (Put in at the end of the frame's book events: a revoke that came before it empties its
+    // slot first.)
+    if (app.quietFills.size() < 256) {
+        app.quietFills.push_back({id, ability});
+    }
+}
+
+void quietFills(App& app)
+{
+    // (An award flying lands in the slot it chose first; then these, each where the bars have room.)
+    if (app.flight || app.quietFills.empty()) {
+        return;
+    }
+    const bool multi = multiclass(app);
+    const bool warrior = isWarrior(app);
+    for (const App::QuietFill& f : std::exchange(app.quietFills, {})) {
+        // (Only what these bars hold: a warrior's abilities, a caster's spells, multiclass both.)
+        if (!multi && f.ability != warrior) {
+            continue;
+        }
+        const std::uint32_t id = f.ability && multi ? nox::client::kAbilityTag | f.id : f.id;
+        if (const auto at = app.bars.putQuietly(id, f.ability, app.things)) {
+            SDL_Log("spell bars: %s %u put in quietly (set %d, slot %d)", f.ability ? "ability" : "spell", static_cast<unsigned>(f.id), at->first + 1,
+                    at->second + 1);
+        }
+    }
 }
 
 /// The character's spell bars from its .plr's Gui section (Plr_LoadClientPlayerData),

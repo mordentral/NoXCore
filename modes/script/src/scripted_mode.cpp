@@ -247,6 +247,31 @@ struct ScriptedMode::Impl {
     /// frames).
     static constexpr std::size_t kRevokesPerFrame = 30;
     std::map<std::string, std::vector<std::array<std::uint8_t, 4>>> revokes;
+    /// (Client level 10) Quiet fills of the bars (nox.putOnBars: kToBars), by player name, each held
+    /// till its player is in play with no revoke owed (flushBarFills, once a frame).
+    static constexpr std::size_t kMaxBarFills = 256;
+    std::map<std::string, std::vector<uimsg::ToBars>> barFills;
+    void flushBarFills()
+    {
+        server::World& world = host->server().world();
+        for (auto it = barFills.begin(); it != barFills.end();) {
+            const auto who = std::ranges::find_if(host->players(), [&](const auto& e) { return e.second.name == it->first && !host->refused(e.first); });
+            if (who == host->players().end()) {
+                it = barFills.erase(it); // (gone: let go)
+                continue;
+            }
+            const server::ServerObject* unit = world.byExtent(who->second.extent);
+            const auto owed = revokes.find(it->first);
+            if (!unit || !who->second.ready || (owed != revokes.end() && !owed->second.empty())) {
+                ++it;
+                continue;
+            }
+            for (const uimsg::ToBars& b : it->second) {
+                world.broadcasts().push_back({uimsg::toBarsMessage(b), true, unit->extent});
+            }
+            it = barFills.erase(it);
+        }
+    }
     std::uint32_t revokedAt = ~0u;
     /// nox.lock's: the host's own Closed and allowed list, put back by nox.unlock. `lockChanged`:
     /// since the host last asked (ServerMode::takeLockChanged: a pool opens another lobby).
@@ -2918,6 +2943,49 @@ int noxSetAbility(lua_State* L)
     return 0;
 }
 
+int noxPutOnBars(lua_State* L)
+{
+    // nox.putOnBars(unit, kind, what) -> whether it was sent: a spell ("spell": its name or number)
+    // or an ability ("ability": 1-5) the unit knows (its level on the server above 0) put on its
+    // client's spell bars quietly (kToBars): in the first empty slot where no slot holds it, no book,
+    // sound or sparks. False: not known, or a client that doesn't take it (below client level 10,
+    // ModeUi not named, a held-out or unit-less player): nothing sent.
+    server::ServerObject& u = unitArg(L, 1);
+    const std::string_view kind = luaL_checkstring(L, 2);
+    uimsg::ToBars bars;
+    if (kind == "spell") {
+        const std::size_t s = bookSpellArg(L, 3);
+        if (u.player->spellLevels[s] == 0) {
+            lua_pushboolean(L, 0);
+            return 1;
+        }
+        bars = {uimsg::BarKind::Spell, static_cast<std::uint8_t>(s)};
+    } else if (kind == "ability") {
+        const int a = wholeArg(L, 3, 1, 5, "an ability 1-5");
+        if (u.player->abilityLevel(static_cast<std::size_t>(a)) == 0) {
+            lua_pushboolean(L, 0);
+            return 1;
+        }
+        bars = {uimsg::BarKind::Ability, static_cast<std::uint8_t>(a)};
+    } else {
+        luaL_argerror(L, 2, "\"spell\" or \"ability\"");
+    }
+    Impl& impl = implOf(L);
+    const std::optional<std::uint8_t> peer = peerOfUnit(impl, u.extent);
+    if (!peer || !(impl.host->clientFeatures(*peer) & lobby::ClientFeature::ModeUi) || impl.host->clientLevel(*peer) < uimsg::kToBarsLevel) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    // (Held, by the player's name, till it's in play and every revoke owed to it, nox.revoke's
+    // queue, has gone: so the bars it fills are the ones the revokes left, a slot one of them
+    // empties free for it. Sent at the end of a frame: ScriptedMode::tick.)
+    auto& held = impl.barFills[std::string(impl.host->players().at(*peer).name)];
+    luaL_argcheck(L, held.size() < Impl::kMaxBarFills, 1, "too many bar fills waiting");
+    held.push_back(bars);
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 int noxGrantCreature(lua_State* L)
 {
     // nox.grantCreature(unit, creature, notify): Plr_AwardFieldGuide, as a found field guide gives
@@ -4109,7 +4177,8 @@ void Impl::installToolbox()
         {"gold", noxGold},     {"setGold", noxSetGold}, {"mana", noxMana},       {"setMana", noxSetMana},
         {"setPlayerHealth", noxSetPlayerHealth}, {"strength", noxStrength}, {"setStrength", noxSetStrength},
         {"spellLevel", noxSpellLevel}, {"spells", noxSpells}, {"raiseSpell", noxRaiseSpell}, {"grantSpell", noxGrantSpell},
-        {"abilityLevel", noxAbilityLevel}, {"setAbility", noxSetAbility}, {"fieldGuide", noxFieldGuide}, {"clearBook", noxClearBook},
+        {"abilityLevel", noxAbilityLevel}, {"setAbility", noxSetAbility}, {"putOnBars", noxPutOnBars}, {"fieldGuide", noxFieldGuide},
+        {"clearBook", noxClearBook},
         {"grantCreature", noxGrantCreature}, {"spellId", noxSpellId}, {"guideNumber", noxGuideNumber},
         {"revoke", noxRevoke}, {"sendRevokes", noxSendRevokes}, {"status", noxStatus}, {"gameOverAt", noxGameOverAt},
         {"setGameOverAt", noxSetGameOverAt}, {"exitGate", noxExitGate}, {"rewards", noxRewards}, {"rewardAt", noxRewardAt},
@@ -4554,13 +4623,14 @@ public:
         }
     }
     bool damage(server::Fight&, server::ServerObject& target, server::ServerObject* source, server::ServerObject* weapon, int& amount,
-                int type, server::HitCause cause) override
+                int type, server::HitCause cause, int& wearAs) override
     {
         if (!impl_.parts.events.has().onDamage || impl_.hidden(target) || (source && impl_.hidden(*source))) {
             return true;
         }
         bool hit = true; // (the game's own, whatever goes wrong in the script)
-        impl_.guarded("onDamage", [&] { hit = impl_.parts.events.damage(impl_.vm->thread(), target, source, weapon, amount, type, cause); });
+        impl_.guarded("onDamage",
+                      [&] { hit = impl_.parts.events.damage(impl_.vm->thread(), target, source, weapon, amount, type, cause, wearAs); });
         return hit;
     }
     bool reflect(server::Fight&, server::ServerObject& target, server::ServerObject& missile, bool front) override
@@ -4974,6 +5044,9 @@ void ScriptedMode::tick(server::GameHost& host, std::uint32_t)
     }
     if (impl.parts.anims.active()) {
         impl.parts.anims.step(host); // (and the animations; a dying thing's stopped)
+    }
+    if (!impl.barFills.empty()) {
+        impl.flushBarFills(); // (nox.putOnBars's, each player's once it's in play with no revoke owed)
     }
     impl.pumpUi();
     if (impl.parts.weather.used()) {

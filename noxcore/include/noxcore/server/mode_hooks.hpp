@@ -265,7 +265,11 @@ struct ModeHooks {
     /// Asked: a hit on `target` (with ModeEvent::Damage) before anything of the game's (its
     /// DAMAGE function, armour...): `amount` may be changed; false cancels the hit (the damage
     /// call returns 0, nothing done). `cause`: what dealt it (a blow, a missile, a spell).
-    virtual bool damage(Fight& fight, ServerObject& target, ServerObject* source, ServerObject* weapon, int& amount, int type, HitCause cause)
+    /// `wearAs` comes in as -1 (the target's worn pieces wear by the hit as it lands, the game's
+    /// way); a mode that rescales the hit may set it to 0 or more, the amount the target's armour,
+    /// raised shield and blocking weapon wear by instead (the hit before its own scaling).
+    virtual bool damage(Fight& fight, ServerObject& target, ServerObject* source, ServerObject* weapon, int& amount, int type, HitCause cause,
+                        int& wearAs)
     {
         (void)fight;
         (void)target;
@@ -274,6 +278,7 @@ struct ModeHooks {
         (void)amount;
         (void)type;
         (void)cause;
+        (void)wearAs;
         return true;
     }
     /// Asked, at once: `missile` about to hit `target` (with ModeEvent::Damage), before its COLLIDE

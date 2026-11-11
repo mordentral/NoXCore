@@ -25,11 +25,15 @@
 -- the book open on it, a spell or ability flown to the client's bar); every other grant is told
 -- quietly. A summon spell is told with its creature.
 --
--- But a warrior's abilities at the first telling of a session (its join) are told as learned ones
--- too: a client's bars are its .plr's, shared by every character played from it, so another
--- character played in between (one with none of these abilities, its sweep emptying their slots)
--- leaves them off the bars, and a quiet grant never puts one back. A learned one goes to the bar's
--- first empty slot only when no slot holds it already, so bars that kept them stay as they were.
+-- At the first telling of a session (its join), every spell and ability the tree gives (a
+-- creature's summon spell too) is also put back on the client's bars, quietly (nox.putOnBars: no
+-- book, no sound, no line): a client's bars are its .plr's, shared by every character played from
+-- it, so another character played in between (one without them, its sweep emptying their slots)
+-- leaves them off the bars, and a quiet grant never puts one back. Each goes to the first empty
+-- slot only where no slot holds it already, so bars that kept them stay as they were. A client
+-- that can't take the quiet fill (below client level 10) gets what it got before: a warrior's
+-- abilities told as learned ones (the book open on each, the bar filled the same way), a caster's
+-- spells nothing more. A map change, a ready, a respawn and a tree change never fill the bars.
 --
 -- Linked spells: a general spell's revoke takes its linked spells off a client too, its book and
 -- its bars (Summon Creature's, every summon spell). Summon Creature is never granted: a client
@@ -205,9 +209,16 @@ function book.apply(h: any, fresh: boolean?)
 	local told = h.told
 	local queued = h.revoking or {}
 	local again = false
+	-- (the session's first telling, its join: everything given put back on the client's bars)
+	local onBars = not h.barsTold
+	h.barsTold = true
 	for id, level in spells do
 		local learned = not quiet[id] and told ~= nil and (told.spells[id] or 0) < level
 		nox.grantSpell(h.unit, id, level, learned, learned)
+		if onBars and not learned then
+			-- (quietly; a client that can't take it keeps its bars as they were)
+			nox.putOnBars(h.unit, "spell", id)
+		end
 		again = again or queued[REVOKE_SPELL * 1000 + id] == true
 		for _, l in leaders do
 			if queued[REVOKE_SPELL * 1000 + l] and linked(l, id) then
@@ -215,10 +226,14 @@ function book.apply(h: any, fresh: boolean?)
 			end
 		end
 	end
-	local onBars = not h.barsTold
-	h.barsTold = true
 	for a, level in abilities do
-		local learned = onBars or (told ~= nil and (told.abilities[a] or 0) < level)
+		local learned = told ~= nil and (told.abilities[a] or 0) < level
+		if onBars and not learned then
+			-- (its level first, so the quiet fill finds it known; a client that can't take that is
+			-- told it as a learned one, which fills the bar its own way: the book open on it)
+			nox.setAbility(h.unit, a, level, false)
+			learned = not nox.putOnBars(h.unit, "ability", a)
+		end
 		nox.setAbility(h.unit, a, level, true, learned)
 		again = again or queued[REVOKE_ABILITY * 1000 + a] == true
 	end

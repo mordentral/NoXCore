@@ -50,9 +50,10 @@ public:
 
     // ---- asked: the script's answer, at once
     /// onDamage(target, source, weapon, amount, kind, cause) -> amount (nil: kept; 0: the hit
-    /// cancelled); cause "blow", "missile", "spell" or "other". False: cancel it.
+    /// cancelled) [, wearAs (what the target's worn pieces wear by; nil: the hit as it lands)];
+    /// cause "blow", "missile", "spell" or "other". False: cancel it.
     bool damage(lua_State* L, const server::ServerObject& target, const server::ServerObject* source,
-                const server::ServerObject* weapon, int& amount, int type, server::HitCause cause);
+                const server::ServerObject* weapon, int& amount, int type, server::HitCause cause, int& wearAs);
     /// onReflect(target, missile, front) -> true turns the missile as a reflective shield does.
     bool reflect(lua_State* L, const server::ServerObject& target, const server::ServerObject& missile, bool front);
     /// onExit(exit, player) -> false holds the player at the exit.

@@ -170,6 +170,8 @@ inline constexpr std::uint64_t kUiLabelWaitMs = 3000;
 inline constexpr std::size_t kUiMaxHitAreas = 32;
 /// (Client level 8: ui_proto.hpp's kText) The most coloured lines that wait untaken (more: let go).
 inline constexpr std::size_t kUiMaxTextLines = 64;
+/// (Client level 10: ui_proto.hpp's kToBars) The most quiet bar fills that wait untaken (more: let go).
+inline constexpr std::size_t kUiMaxToBars = 256;
 
 /// (Client level 5: ui_proto.hpp's kDrawScale) The most draw scales a client keeps (more: let go,
 /// those things drawn as their types), how long one waits for a thing the client hasn't been sent
@@ -427,6 +429,10 @@ public:
     /// nox.tell with a colour) since the last take, in order, for the program to show as the
     /// server's plain lines are; at most kUiMaxTextLines wait (more: let go).
     std::vector<uimsg::TextLine> takeTextLines();
+    /// (Client level 10) The spells and abilities the server asked put on our bars quietly
+    /// (ui_proto.hpp's kToBars: nox.putOnBars) since the last take, in order; at most kUiMaxToBars
+    /// wait (more: let go). Whatever the UI's state (a mode with no UI sends them too).
+    std::vector<uimsg::ToBars> takeToBars();
     /// (Client level 8) The things in a leap now (ui_proto.hpp's kLeap), each its height at the
     /// last frame()'s time: 4 h t (1 - t) from the message's arrival. A leap over is let go in
     /// frame(); a new one for the same thing replaces it.

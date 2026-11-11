@@ -238,6 +238,10 @@ public:
             for (const nox::modes::script::uimsg::TextLine& t : ui_->takeTextLines()) {
                 centredMessage(app, chatLine(app, t.text, false), SDL_Color{t.r, t.g, t.b, 255});
             }
+            // (Client level 10) The spells and abilities the server asked put on the bars quietly.
+            for (const nox::modes::script::uimsg::ToBars& b : ui_->takeToBars()) {
+                putOnBarsQuietly(app, b.id, b.kind == nox::modes::script::uimsg::BarKind::Ability);
+            }
             for (const nox::modes::script::UiDrawScale& s : ui_->drawScales()) {
                 if (!s.gone) {
                     app.modeDrawScales.push_back({s.object, s.type, s.scale});

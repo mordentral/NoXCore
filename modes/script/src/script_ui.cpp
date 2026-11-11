@@ -127,6 +127,8 @@ struct ScriptUiClient::Impl {
     std::vector<uimsg::Decal> decals;
     /// (Client level 8) The coloured lines the server told, not yet taken (at most kUiMaxTextLines).
     std::vector<uimsg::TextLine> textLines;
+    /// (Client level 10) The quiet bar fills the server asked for, not yet taken (at most kUiMaxToBars).
+    std::vector<uimsg::ToBars> toBars;
     /// (Client level 8) The leaps told (kLeap), each from the frame time it came at.
     struct LeapNow {
         std::uint16_t object = 0;
@@ -1581,6 +1583,12 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             abilityBarAtMs = nowMs;
         }
         break;
+    case uimsg::kToBars:
+        // (Client level 10; whatever the UI's state.) Past kUiMaxToBars untaken: let go.
+        if (const auto b = uimsg::decodeToBars(rest); b && toBars.size() < kUiMaxToBars) {
+            toBars.push_back(*b);
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -1900,6 +1908,11 @@ const std::vector<uimsg::Decal>& ScriptUiClient::decals() const noexcept
 std::vector<uimsg::TextLine> ScriptUiClient::takeTextLines()
 {
     return std::exchange(impl_->textLines, {});
+}
+
+std::vector<uimsg::ToBars> ScriptUiClient::takeToBars()
+{
+    return std::exchange(impl_->toBars, {});
 }
 
 std::optional<std::uint32_t> gameIconId(std::string_view name)

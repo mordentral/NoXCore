@@ -413,7 +413,7 @@ function mode.onDestroyed(e: any)
 	monsters.gone(e.id, e.type)
 end
 
-function mode.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): number?
+function mode.onDamage(target: number, source: number?, weapon: number?, amount: number, kind: number, cause: string): ...number?
 	return combat.onDamage(target, source, weapon, amount, kind, cause)
 end
 

@@ -135,7 +135,7 @@ bool Events::ask(lua_State* L, const char* hook, int nargs, int nresults)
 }
 
 bool Events::damage(lua_State* L, const server::ServerObject& target, const server::ServerObject* source,
-                    const server::ServerObject* weapon, int& amount, int type, server::HitCause cause)
+                    const server::ServerObject* weapon, int& amount, int type, server::HitCause cause, int& wearAs)
 {
     if (!has_.onDamage || !toolbox::beginHook(L, "onDamage")) {
         return true;
@@ -147,22 +147,33 @@ bool Events::damage(lua_State* L, const server::ServerObject& target, const serv
     lua_pushnumber(L, amount);
     lua_pushnumber(L, type);
     lua_pushstring(L, kCauses[static_cast<std::size_t>(cause)]);
-    if (!ask(L, "onDamage", 6, 1)) {
+    if (!ask(L, "onDamage", 6, 2)) {
         return true; // (a failing hook changes nothing)
     }
     bool keep = true;
+    // The second answer first (the first's checks may end the hit): what the worn pieces wear by.
     if (lua_isnumber(L, -1)) {
         const double n = lua_tonumber(L, -1);
+        if (!(n >= 0 && n <= 1'000'000)) { // (NaN too)
+            toolbox::report(L, "onDamage: a wear amount from 0 to 1000000 (the hit's wear kept as it was)");
+        } else {
+            wearAs = static_cast<int>(std::floor(n));
+        }
+    } else if (!lua_isnil(L, -1)) {
+        toolbox::report(L, "onDamage: its second answer a number or nil (the hit's wear kept as it was)");
+    }
+    if (lua_isnumber(L, -2)) {
+        const double n = lua_tonumber(L, -2);
         if (!(n >= 0 && n <= 1'000'000)) { // (NaN too)
             toolbox::report(L, "onDamage: an amount from 0 to 1000000 (the hit kept as it was)");
         } else {
             amount = static_cast<int>(std::floor(n));
             keep = amount != 0;
         }
-    } else if (!lua_isnil(L, -1)) {
+    } else if (!lua_isnil(L, -2)) {
         toolbox::report(L, "onDamage: return a number or nil (the hit kept as it was)");
     }
-    lua_pop(L, 1);
+    lua_pop(L, 2);
     return keep;
 }
 

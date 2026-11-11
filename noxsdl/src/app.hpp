@@ -699,6 +699,13 @@ struct App {
     /// The quiet ability awards (MSG_REPORT_ABILITY_AWARD without 0x80, which fill no slot) the
     /// book has had, counted: a mode's UI may put them on the bars itself (coop_ui.cpp's guest).
     std::uint32_t quietAbilityAwards = 0;
+    /// (Client level 10) A script mode's quiet fills of the bars (kToBars: nox.putOnBars) waiting
+    /// for an award's flight to land: each a spell's or ability's bare id.
+    struct QuietFill {
+        std::uint8_t id = 0;
+        bool ability = false;
+    };
+    std::vector<QuietFill> quietFills;
     /// The character's file info the client holds (a solo save's File Info is
     /// written from it; a load reads it back). Unset: the profile's.
     std::optional<nox::player::FileInfo> heldFileInfo;
@@ -847,6 +854,11 @@ void buildTrap(App& app);
 void updateTrapBar(App& app);
 void drinkPotion(App& app, int kind);
 void fillBars(App& app, std::uint32_t id, bool ability);
+/// (Client level 10) A script mode's quiet fill (kToBars): queued, put in after the frame's book
+/// events once no award flies (quietFills).
+void putOnBarsQuietly(App& app, std::uint8_t id, bool ability);
+/// The quiet fills waiting put in, unless an award flies (each frame, after the book's events).
+void quietFills(App& app);
 void landFlightAtOnce(App& app);
 void stepFlight(App& app);
 void drawFlight(App& app);

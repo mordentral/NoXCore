@@ -95,6 +95,13 @@ struct SpellBars {
     /// start empty, and a load's or a rejoin's awards are quiet ones, which fill no slot); anyone else's
     /// bars untouched. `tag`: kAbilityTag on multiclass bars. Returns how many went in.
     int addKnownAbilities(const std::array<std::uint8_t, 6>& levels, bool coopGuest, std::uint32_t tag = 0);
+    /// (A script mode's kToBars, client level 10: nox.putOnBars) `id` put in quietly, as an award's
+    /// fill puts it but with nothing shown: an ability (kAbilityTag on multiclass bars) in the set in
+    /// use's first empty slot; a spell in the first empty slot from the set in use round all five,
+    /// lit as place() lights it. The set in use stays the same; no slot moved or written over. None
+    /// (nothing done): a slot holds it already, a general spell (flags 0x15000) or the Glyph, or no
+    /// slot empty. Where it went.
+    std::optional<std::pair<int, int>> putQuietly(std::uint32_t id, bool ability, const things::ThingDb& things);
 
     /// From the .plr's Gui section. Unknown names leave the slot empty.
     static SpellBars fromGui(const player::Gui& gui);

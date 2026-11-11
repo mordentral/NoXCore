@@ -585,6 +585,31 @@ void Fight::wearArmor(ServerObject& t, ServerObject* src, ServerObject* obj3, in
     }
 }
 
+void Fight::wearArmorBy(ServerObject& t, ServerObject* src, ServerObject* obj3, double amount, int type)
+{
+    // (noxcpp: wearArmor for a mode's wearAs: each worn piece its share of `amount`, a fraction
+    // too, by its value over the whole.)
+    const bool npc = !t.player && (t.classes & oc::Monster) && (t.subclasses & 0x10u) && t.monster;
+    if ((!t.player && !npc) || !things || !modifiers || !(amount > 0)) {
+        return;
+    }
+    const float total = t.player ? t.player->armorValue : t.monster->armorValue;
+    if (total <= 0.0f) {
+        return;
+    }
+    for (const std::uint32_t e : keysOf(t.inventory)) {
+        ServerObject* item = world.byExtent(e);
+        if (!item || item->holder != t.extent || !(item->classes & oc::Armor) || !(item->flags & ObjFlag::Equipped)) {
+            continue;
+        }
+        const float value = armorValueOf(modifiers, *item);
+        if (value <= 0.0f) {
+            continue;
+        }
+        Items{world, *things, modifiers, rng, frame}.wear(t, *item, static_cast<double>(value) / total * amount, src, obj3, type, false);
+    }
+}
+
 float Fight::metalFactor(const ServerObject& t) const
 {
     // Worn metal armour (not of Material7) adds its value, a plate's 0.15
@@ -612,17 +637,19 @@ int Fight::damage(ServerObject& t, ServerObject* source, std::uint32_t weapon, i
 {
     ServerObject* obj3 = weapon ? world.byExtent(weapon) : nullptr;
     // (noxcpp: a mode watching hits on it may change the amount or cancel the hit; told what dealt
-    // it, a missile's own hit or burst by the thing itself.)
+    // it, a missile's own hit or burst by the thing itself. It may also say what the target's worn
+    // pieces wear by, the hit before its own scaling: -1, the hit as it lands, the game's way.)
+    int wearAs = -1;
     if (world.modeHooks && (t.modeEvents & ModeEvent::Damage)) {
         if (cause == HitCause::Other && ((obj3 && (obj3->classes & oc::Missile)) || (source && (source->classes & oc::Missile)))) {
             cause = HitCause::Missile;
         }
-        if (!world.modeHooks->damage(*this, t, source, obj3, amount, type, cause)) {
+        if (!world.modeHooks->damage(*this, t, source, obj3, amount, type, cause, wearAs)) {
             return 0;
         }
     }
     if (t.player || t.damageFn == NameId::PlayerDamage) { // (the NPC's DAMAGE too)
-        return playerDamage(t, source, obj3, amount, type);
+        return playerDamage(t, source, obj3, amount, type, wearAs);
     }
     if (t.damageFn == NameId::BallDamage) {
         return 0; // (BallDamage: the flagball takes none)
@@ -746,7 +773,7 @@ int Fight::damage(ServerObject& t, ServerObject* source, std::uint32_t weapon, i
     return defaultDamage(t, source, obj3, amount, type);
 }
 
-int Fight::playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, int dmg, int type)
+int Fight::playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, int dmg, int type, int wearAs)
 {
     // PlayerDamage: a player's, or an NPC's (a monster of subclass 0x10, with its worn bits
     // and its armour value); anything else takes none.
@@ -868,8 +895,8 @@ int Fight::playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, 
                     // The shield's wear (equipDamage) or the weapon's
                     // (playerDamageWeapon): ItemDamageFromBlockPercentage of it,
                     // from the source and the weapon (or the source). Broken: Plr_SetState, a
-                    // monster's action popped.
-                    const double amount = static_cast<double>(world.number("ItemDamageFromBlockPercentage")) * dmg;
+                    // monster's action popped. (noxcpp: a mode's wearAs in place of the blow.)
+                    const double amount = static_cast<double>(world.number("ItemDamageFromBlockPercentage")) * (wearAs >= 0 ? wearAs : dmg);
                     if (item && things &&
                         Items{world, *things, modifiers, rng, frame}.wear(t, *item, amount, src, obj3 ? obj3 : src, type, weapon)) {
                         if (p) {
@@ -940,23 +967,32 @@ int Fight::playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, 
     // (Each amount on the x87: FLD 1, FSUB the armour (FMUL 0.5 first, then FSUBR 1, for a fall),
     // FIMUL the damage, FSTP to playerDecrementHPMana's float argument.)
     const X87 hits = X87::fromDouble(dmg);
+    // (noxcpp: a mode's wearAs, the hit before its own scaling: the pieces wear as that hit would
+    // have worn them, what the armour took in the same share of it; the hit itself as it lands.)
+    const auto wear = [&](int took, int wearType) {
+        if (wearAs < 0) {
+            wearArmor(t, src, obj3, took, wearType);
+        } else if (dmg > 0) {
+            wearArmorBy(t, src, obj3, static_cast<double>(took) * wearAs / dmg, wearType);
+        }
+    };
     // Damage types past 0x11 skip the armour and the kill feed.
     if (type <= 0x11) {
         switch (type) {
         case 0: case 3: case 7: case 8: case 10: case 11:
             final = carryDamage(t, ((X87(1.0f) - armor) * hits).f());
-            wearArmor(t, src, obj3, dmg - final, type);
+            wear(dmg - final, type);
             break;
         case 2:
             final = carryDamage(t, ((X87(1.0f) - X87(armor) * 0.5f) * hits).f());
-            wearArmor(t, src, obj3, dmg - final, 2);
+            wear(dmg - final, 2);
             break;
         case 1: case 12:
-            wearArmor(t, src, obj3, dmg, type);
+            wear(dmg, type);
             break;
         case 9: case 0x11:
             final = carryDamage(t, (X87(metalFactor(t)) * hits).f());
-            wearArmor(t, src, obj3, dmg, type);
+            wear(dmg, type);
             break;
         case 13:
             feed = false;

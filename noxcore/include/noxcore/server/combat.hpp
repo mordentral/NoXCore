@@ -142,8 +142,10 @@ private:
     bool strike(ServerObject& a, const Attack& atk, ServerObject*& struck);
     /// PlayerDie: the kill feed, dying, the mode's scoring, its things dropped.
     void playerDies(ServerObject& player);
-    /// PlayerDamage (players and NPCs): shields, blocks and armour, then defaultDamage.
-    int playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, int dmg, int type);
+    /// PlayerDamage (players and NPCs): shields, blocks and armour, then defaultDamage. `wearAs`
+    /// (noxcpp: a mode's, ModeHooks::damage): -1, the worn pieces wear by `dmg` as the game's do;
+    /// else as a hit of `wearAs` would have worn them.
+    int playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, int dmg, int type, int wearAs = -1);
     /// DefaultDamage: immunities, protections, notes and enchantments, then its health down.
     int defaultDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, int dmg, int type);
     /// Fire or lightning protection: worn items' (at most 0.5) plus the enchantment's, at most 0.6.
@@ -152,6 +154,8 @@ private:
     int carryDamage(ServerObject& t, float amount);
     /// playerDamageItems: the worn armour wears from what it took.
     void wearArmor(ServerObject& t, ServerObject* src, ServerObject* obj3, int amount, int type);
+    /// (noxcpp) wearArmor by an amount with its fraction (a mode's wearAs share of what the armour took).
+    void wearArmorBy(ServerObject& t, ServerObject* src, ServerObject* obj3, double amount, int type);
     /// 1 plus the worn metal armour's values: electricity's multiplier through metal.
     float metalFactor(const ServerObject& t) const;
     /// The Shield spell's share of a blow: half; a blow that would kill breaks it instead (left on 2).

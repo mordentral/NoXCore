@@ -123,6 +123,35 @@ void SpellBars::place(int set, int slot, std::uint32_t id, const things::ThingDb
     s.target = id != 0 && (spellFlags(things, id) & 0x600) != 0;
 }
 
+std::optional<std::pair<int, int>> SpellBars::putQuietly(std::uint32_t id, bool ability, const things::ThingDb& things)
+{
+    if (untagged(id) == 0 || contains(id)) {
+        return std::nullopt;
+    }
+    // (As an award's fill: never a general spell, flags 0x1000 / 0x4000 / 0x10000; nor the Glyph,
+    // the trap bar's.)
+    if (!ability && (id == kGlyph || (spellFlags(things, id) & 0x15000) != 0)) {
+        return std::nullopt;
+    }
+    std::optional<std::pair<int, int>> at;
+    if (ability) {
+        if (const auto i = firstEmptyInRow()) {
+            at = std::pair{static_cast<int>(row), *i};
+        }
+    } else {
+        at = firstEmpty();
+    }
+    if (!at) {
+        return std::nullopt;
+    }
+    if (ability) {
+        rows[static_cast<std::size_t>(at->first)][static_cast<std::size_t>(at->second)].id = id; // (the flag left)
+    } else {
+        place(at->first, at->second, id, things);
+    }
+    return at;
+}
+
 int SpellBars::addKnownAbilities(const std::array<std::uint8_t, 6>& levels, bool coopGuest, std::uint32_t tag)
 {
     if (!coopGuest) {
