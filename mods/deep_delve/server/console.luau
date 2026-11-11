@@ -52,7 +52,7 @@
 --   dd progress          the first player's record: its version, its act progress, boss kills
 --   dd boss              the boss of this map: id, type, health, name
 --   dd fight [now]       the boss's fight (the barrow-king's: its phase, adds, charges, mists,
---                        fists, graves; the troll chieftain's: its phase, scorched or mending, what
+--                        fists, graves, times put back on the floor; the troll chieftain's: its phase, scorched or mending, what
 --                        it mended, its kin, stones, roots, pulls, stomps; the ruin-warden's: its
 --                        phase, plates, pounds and misses, reels, wardens, quakes, sand-devils,
 --                        stones); "now": its next blows on the next beat

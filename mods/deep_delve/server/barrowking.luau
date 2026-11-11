@@ -11,7 +11,9 @@
 --            the arena (never at his side), at most so many standing at once. And his charge: a
 --            player some way off is marked by sparks along the ground between them; a moment later
 --            he rushes along that line, striking and throwing back whoever he passes, until a wall
---            or his reach stops him (step aside from the sparks and he misses).
+--            (his body kept clear of it and of the floor's edge) or his reach stops him (step
+--            aside from the sparks and he misses). Should he ever stand off the floor, he's put
+--            back on the last open ground he stood on.
 --   2        below the mist's share of his health: the grave-mist (the game's Toxic Cloud, his own)
 --            rises under a player's feet a moment after a smoke warning there; the graves now give
 --            up ghosts and vile zombies too.
@@ -39,6 +41,12 @@ local MSG_TURN_UNDEAD = 0xA0
 
 -- How near a player wakes him.
 local WAKE = 320
+
+-- How far past his body (his radius) each step of his charge looks for a wall or the floor's edge:
+-- a step whose end comes within this of a wall, or has no floor ahead of it, ends the rush there.
+-- (Looking only along his middle let his body run into a wall's cell, and the game then put him out
+-- on its far side, off the floor, where no hero could reach him.)
+local CLEARANCE = 8
 
 -- The graves his dead climb from: the generator's (a barrow arena's), else a ring round his spot.
 local function gravesOf(spots: any): { any }
@@ -110,6 +118,21 @@ end
 
 -- ---- His charge
 
+-- Whether (x, y) is open ground: a floor under it and no wall in its cell.
+local function openGround(x: number, y: number): boolean
+	return nox.floorAt(x, y) >= 0 and not nox.wallAt(math.floor(x / 23), math.floor(y / 23))
+end
+
+-- Whether a step of his rush from (x, y) to (nx, ny) (heading dx, dy) keeps his body clear: no wall
+-- between him and his radius and CLEARANCE past the step's end, open ground at the end and floor
+-- under the point ahead.
+local function clearStep(c: any, x: number, y: number, nx: number, ny: number, dx: number, dy: number): boolean
+	local o = nox.object(c.id)
+	local ahead = (if o then o.radius else 0) + CLEARANCE
+	local ax, ay = nx + dx * ahead, ny + dy * ahead
+	return nox.traceRay(x, y, ax, ay, 1) and openGround(nx, ny) and nox.floorAt(ax, ay) >= 0
+end
+
 local function rushStep(c: any)
 	local k = c.k
 	local r = k.rush
@@ -120,12 +143,13 @@ local function rushStep(c: any)
 	local x, y = nox.position(c.id)
 	local nx, ny = x + r.dx * n.speed, y + r.dy * n.speed
 	r.left -= 1
-	if not on(c) or r.left < 0 or not nox.traceRay(x, y, nx, ny, 1) then
+	if not on(c) or r.left < 0 or not clearStep(c, x, y, nx, ny, r.dx, r.dy) then
 		nox.cancelTimer(r.timer)
 		k.rush = nil
 		return
 	end
 	nox.setPosition(c.id, nx, ny)
+	k.ground = { x = nx, y = ny }
 	for _, u in nox.unitsNear(nx, ny, n.reach, PLAYERS) do
 		if not r.hit[u] then
 			r.hit[u] = true
@@ -270,6 +294,9 @@ function king.start(c: any, spots: any)
 		fistAt = 0,
 		rush = nil,
 		marked = nil,
+		-- (the last open ground he stood on: where he's put back should he ever be off the floor)
+		ground = { x = spots.boss.x, y = spots.boss.y },
+		putBack = 0,
 	}
 	c.k.nextGrave = nox.random(#c.k.graves)
 end
@@ -284,6 +311,16 @@ function king.think(c: any)
 	local o = nox.object(c.id)
 	if not o then
 		return
+	end
+	-- (between rushes: where he stands noted while it's open ground; off the floor, by whatever
+	-- means, he's put back on the last open ground he stood on)
+	if not k.rush then
+		if openGround(o.x, o.y) then
+			k.ground.x, k.ground.y = o.x, o.y
+		elseif nox.floorAt(o.x, o.y) < 0 then
+			nox.setPosition(c.id, k.ground.x, k.ground.y)
+			k.putBack += 1
+		end
 	end
 	local now = nox.frame()
 	if not k.awake then
@@ -343,7 +380,7 @@ function king.stop(c: any)
 end
 
 -- What "dd fight" says: "phase P awake|asleep, adds standing/raised, charges N (hits H), mists M,
--- fists F, graves G".
+-- fists F, graves G, putBack B" (B: the times he was found off the floor and put back).
 function king.line(c: any): string
 	local k = c.k
 	if not k then
@@ -353,7 +390,7 @@ function king.line(c: any): string
 	local awake: string = if k.awake then "awake" else "asleep"
 	return "phase " .. tostring(k.phase) .. " " .. awake .. ", adds " .. tostring(standing) .. "/" .. tostring(k.raised) .. ", charges "
 		.. tostring(k.charges) .. " (hits " .. tostring(k.charged) .. "), mists " .. tostring(k.mists) .. ", fists " .. tostring(k.fists)
-		.. ", graves " .. tostring(#k.graves)
+		.. ", graves " .. tostring(#k.graves) .. ", putBack " .. tostring(k.putBack)
 end
 
 -- The fight's next blows brought forward, for "dd fight now": each comes on the next beat.
