@@ -29,14 +29,15 @@
 --
 -- An area is entered once both its map has loaded and its spots (the generator's result) are in:
 -- its stations, pentagrams and exits set to work (the pads' rings drawn under them), the vendor's
--- stock rolled at its level, its monsters (and boss) put in, its chests watched and a secret room's
--- guards put in (secrets.luau), its weather set (an outdoor area's,
+-- stock rolled at its level, its breakables outside the town watched (breakables.luau), its monsters
+-- (and boss) put in, its chests watched and a secret room's guards put in (secrets.luau), its weather set (an outdoor area's,
 -- rolled from its biome's list as its map was built, so each visit may differ and a visit keeps
 -- its own; none again on coming back indoors), its players set up.
 
 local acts = require("data/acts")
 local numbers = require("data/numbers")
 local boss = require("boss")
+local breakables = require("breakables")
 local decals = require("decals")
 local expeditions = require("expeditions")
 local gate = require("gate")
@@ -424,6 +425,9 @@ local function enter()
 		moveTo(unit, spots.arrive)
 	end, stash.touched, vendor.touched, areas.townOf(info.act).name)
 	vendor.restock(info.level)
+	-- (its barrels, coffins and the rest found, those outside the town watched: each broken may give
+	-- a small find)
+	breakables.enter(info)
 	portal.place(spots.town)
 	waypoints.place(spots, info, areas)
 	decals.place(spots)
@@ -483,6 +487,7 @@ function areas.mapLoaded(name: string)
 	votes.reset()
 	expeditions.reset()
 	secrets.reset()
+	breakables.reset()
 	hero.mapChanging()
 	state.entered = false
 	local tag = nil

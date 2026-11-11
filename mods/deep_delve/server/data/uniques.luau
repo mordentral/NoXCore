@@ -52,8 +52,10 @@ u.uniques = {
 	},
 	{
 		id = "unyielding", name = "The Unyielding Wall", type = "SteelShield", class = "warrior", from = 20,
-		mods = { effectiveness = "ArmorQuality4", material = "Material4", primary = "LightningProtect2" },
-		affixes = { { id = "health", low = 25, high = 35 }, { id = "resist", value = 6 } },
+		-- (its guard in its effectiveness slot's place: a shield has no armour for a quality to raise;
+		-- by decision 2026-11-11)
+		mods = { material = "Material4", primary = "LightningProtect2" },
+		affixes = { { id = "guard", value = 20 }, { id = "health", low = 25, high = 35 }, { id = "resist", value = 6 } },
 		power = { kind = "bulwark", pct = 20 },
 	},
 	{
@@ -164,7 +166,7 @@ u.sets = {
 		id = "bloodsworn", name = "The Bloodsworn", class = "warrior", from = 22, to = 34,
 		pieces = {
 			{ id = "bloodswornBlade", name = "Bloodsworn Blade", type = "Longsword", mods = { effectiveness = "WeaponPower4" }, affixes = { { id = "damage", value = 10 } } },
-			{ id = "bloodswornBulwark", name = "Bloodsworn Bulwark", type = "SteelShield", mods = { effectiveness = "ArmorQuality4" }, affixes = { { id = "health", value = 25 } } },
+			{ id = "bloodswornBulwark", name = "Bloodsworn Bulwark", type = "SteelShield", affixes = { { id = "guard", value = 15 }, { id = "health", value = 25 } } },
 			{ id = "bloodswornSabatons", name = "Bloodsworn Sabatons", type = "PlateBoots", mods = { effectiveness = "ArmorQuality4" }, affixes = { { id = "health", value = 20 } } },
 		},
 		bonuses = { { n = 2, stats = { health = 40 } }, { n = 3, power = { kind = "leech", pct = 3 } } },

@@ -75,12 +75,19 @@
 --   dd stash [open | put N | take TAB SLOT | deposit | withdraw]   its stash (as its window
 --                        does: by the chest); alone, its contents "tab slot type rarity mods"
 --   dd vendor [open | buy I | sell N | reroll N | restock LEVEL | stock ITEM | repair ID |
---             repairall | repairs | gear]   the vendor (by the anvil); "stock": ITEM (as dd give
+--             repairall | repairs | gear | ids | click SID]   the vendor (by the anvil); "buy":
+--                        the entry at place I now; "ids": each entry's "index sid" (its own
+--                        number); "click": the window's purchase of entry SID, as its UI sends it
+--                        (one gone: refused, nothing spent); "stock": ITEM (as dd give
 --                        names it) put at the end of its stock; "repair": the piece of that item
 --                        id (worn or carried) repaired; "repairs": what needs one, "id type cost
 --                        worn|carried"; "gear": its rolled gear, "index type rarity effectiveness
 --                        material primary secondary affixes"; alone, its stock "index type rarity
 --                        price"
+--   dd breakables [odds KIND N [LEVEL]]   the area's breakables (breakables.luau): "level L",
+--                        then "KIND watched W town T broken B gave G" a kind found; "odds": N
+--                        breaks of KIND rolled (records only, 250 at most), "rolls N gold G potion
+--                        P nothing X"
 --   dd roll TYPE RARITY N [LEVEL] [CLASS]   N records of TYPE rolled at RARITY as the loot rolls
 --                        them (CLASS: rolled for that class, as a vendor's stock is), nothing made:
 --                        "rarity effectiveness material primary secondary affixes" each (N 250 at
@@ -181,6 +188,7 @@
 local areas = require("areas")
 local atlas = require("atlas")
 local boss = require("boss")
+local breakables = require("breakables")
 local expeditions = require("expeditions")
 local combat = require("combat")
 local decals = require("decals")
@@ -1483,6 +1491,16 @@ function commands.vendor(args: { string }): { string }
 		return reply(windows.open(h, "vendor"), "too far from the vendor")
 	elseif op == "buy" then
 		return reply(vendor.buy(h, tonumber(args[3]) or 0))
+	elseif op == "ids" then
+		-- (each entry's place and its own number, which the window's purchase names)
+		local out = {}
+		for i, s in vendor.stockOf(h) do
+			table.insert(out, tostring(i) .. " " .. tostring(s.sid))
+		end
+		return out
+	elseif op == "click" then
+		-- (the window's purchase as its UI sends it: the entry's own number)
+		return reply(vendor.message(h, { op = "buy", stock = tonumber(args[3]) }))
 	elseif op == "sell" or op == "reroll" then
 		local id = carriedId(h, args[3])
 		if not id then
@@ -1909,19 +1927,32 @@ function commands.secrets(args: { string }): { string }
 	return secrets.console(args, areas, firstHero())
 end
 
+function commands.breakables(args: { string }): { string }
+	if args[2] == "odds" then
+		local kind = args[3]
+		if not kind then
+			return { "dd breakables odds KIND N [LEVEL]" }
+		end
+		local n = math.clamp(tonumber(args[4]) or 1, 1, 250)
+		local level = tonumber(args[5]) or areas.status().level
+		return { breakables.odds(kind, n, level) }
+	end
+	return breakables.lines()
+end
+
 function commands.help(_args: { string }): { string }
 	return {
 		"dd status | spots | save | xp N | award N | loot RARITY [N] [LEVEL] | modifiers [all | TYPE] | ground | monster ID | check | types",
 		"dd go town|arrive|exit|guardian|boss|waypoint|wayArrive|portal|pad|wayIn|actGate|pack [N] | area N|A-N [waypoint] | portal | waypoint N|A-N",
 		"dd progress | boss | fight [now] | smite | trial SEED N | gate [take] | seed | town | tiers | number NAME [I]",
-		"dd gold [N] | carried [grid] | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs|gear] | roll TYPE RARITY N [L] [CLASS]",
+		"dd gold [N] | carried [grid] | stash [open|put N|take T S|deposit|withdraw] | vendor [open|buy I|sell N|reroll N|restock L|stock ITEM|repair ID|repairall|repairs|gear|ids|click SID] | roll TYPE RARITY N [L] [CLASS]",
 		"dd give TYPE RARITY [LEVEL] [SLOT=MOD]... [affix=ID:N]... | tip carried N|stash T S|stock I | tips [on|off] | wire | affixes [TYPE N [L] [CLASS]|worn|allowed [TYPE]] | ward",
 		"dd tree [take ID...|respec|refund [ID]|nodes [REGION]|describe ID [CLASS]|costs|find NAME...] | icons | book | sheet [gear] | ui stash|vendor|waypoints|tree|sheet [NAME]",
 		"dd warrior [rage N | clear] | actives [clear | ready] | upgrades [clear]",
 		"dd as NAME COMMAND | party | scale | packs | regen | exit | vote [yes|no|cancel|seconds N] | labels | plates | spawn TIER [N] [TYPE|-] [POWERS|none] | powers [clear] | slay ID | portals | portal take | hud",
 		"dd option [lootNames alt|always] | hits [clear] | summons | team | sight | wake [on|off|all]",
 		"dd give unique ID [L] | give set PIECE [L] | uniques [list|check|odds N LEVEL TIER [BOSS]|drop unique|set ID [L]|worn|powers]",
-		"dd secrets [trial SEED N | go lever|room|chest I|door|keyguard|key | take [NAME] | trap I KIND|none | odds KIND N [LEVEL] | sprung]",
+		"dd secrets [trial SEED N | go lever|room|chest I|door|keyguard|key | take [NAME] | trap I KIND|none | odds KIND N [LEVEL] | sprung] | breakables [odds KIND N [LEVEL]]",
 		"dd chars [clock S | lockat N|none | NAME list|play I|new|code|enter CODE|unlink I|pcs]",
 	}
 end

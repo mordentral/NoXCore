@@ -11,6 +11,7 @@
 --                  per hero
 --   items.luau     item records and the game's items (modifiers, rarity, affixes)
 --   loot.luau      what deaths drop, rarity rules, how loot shows on the ground
+--   breakables.luau an area's barrels, coffins and the like: each broken may give a small find
 --   monsters.luau  packs, tiers, champions
 --   boss.luau      the act boss: its fight, its drop, the act cleared
 --   gate.luau      the gate in a lair to the next act: opened by its boss's death, kept for a
@@ -80,6 +81,7 @@
 local areas = require("areas")
 local affixes = require("affixes")
 local boss = require("boss")
+local breakables = require("breakables")
 local casts = require("casts")
 local combat = require("combat")
 local expeditions = require("expeditions")
@@ -374,6 +376,10 @@ end
 -- its own drop, and the act cleared); both by the party's size (scale.luau). A zombie gives them
 -- at its first death alone (monsters.killed: nil after).
 function mode.onObjectKilled(e: any)
+	-- (a barrel or the like of the area's broken: what its kind gives; breakables.luau)
+	if breakables.killed(e) then
+		return
+	end
 	summons.killed(e.id)
 	local m = monsters.killed(e.id)
 	-- (a locked secret room's key guard: its key dropped)

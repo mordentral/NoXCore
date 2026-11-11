@@ -112,7 +112,8 @@ end
 
 -- The sheet's Gear page for a hero (by decision 2026-11-02): { a = its worn affixes' totals as
 -- lines ("+12 mana", "Frost: 14% chance to chill on a hit"; the affixes in the loot's order, then
--- the stats only uniques and sets carry; each up to its most, as it counts), s = its worn uniques
+-- the stats only uniques and sets carry; each up to its most, as it counts; resilience's line with
+-- its most: data/loot's sheetMost), s = its worn uniques
 -- and sets (uniques.sheetLines: tagged lines) }. Worked out again only when the hero's bonus is
 -- (each equip, set-up and tree change makes a new one).
 local affixOrder: { any } = {}
@@ -134,7 +135,12 @@ function sheet.gear(h: any): any
 	for _, def in affixOrder do
 		local v = sums[def.stat]
 		if v and v ~= 0 and def.text then
-			table.insert(a, string.format(def.text, v))
+			-- (one whose most the sheet says: "... (80% at most)", by decision 2026-11-11)
+			local line = string.format(def.text, v)
+			if def.sheetMost and def.most then
+				line ..= string.format(" (%d%% at most)", def.most)
+			end
+			table.insert(a, line)
 		end
 	end
 	local value = { a = a, s = if b then uniques.sheetLines(b) else {} }

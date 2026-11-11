@@ -15,7 +15,7 @@
 --          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), manaOnKill,
 --          spellCost, summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a
 --          hit's thing type: a spell's own), skills (a warrior's passive skills by key, each its
---          rank: tree.totals), frost, dread, grip, reflect, ward, resilience (%: the worn
+--          rank: tree.totals), frost, dread, grip, reflect, ward, resilience, guard (%: the worn
 --          affixes', affixes.luau), weapon (the worn weapon's id), ammo (its shot's type), shield
 --          (the worn shield's id),
 --          powers, sets, pieces, setSig (the worn uniques' powers and the worn sets: uniques.worn;

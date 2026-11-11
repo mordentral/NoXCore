@@ -11,7 +11,8 @@
 -- look; anyone else's is rolled when they first look (so a player alone sees what the shared stock
 -- was). Prices are data/vendor.luau's. A sale, a purchase or a reroll is one step on the server,
 -- the record written at once (as the stash's moves are: an item is never in two places, and gold
--- never counted twice).
+-- never counted twice). A purchase names the stock entry's own number, never its place, so a stale
+-- click is refused.
 
 local affixes = require("affixes")
 local hero = require("hero")
@@ -29,6 +30,16 @@ local vendor = {}
 local restocks = 0
 local stockLevel = 1
 local fresh: { any }? = nil
+
+-- Each stock entry's own number (`sid`), never given twice in a game: a purchase names it (by
+-- decision 2026-11-11), so a second click on a piece already bought, sent before the window showed
+-- it gone, is refused instead of buying what moved into its place.
+local lastSid = 0
+local function entry(e: any): any
+	lastSid += 1
+	e.sid = lastSid
+	return e
+end
 
 -- The potions' and supplies' own prices, by type (a plain one's: a magic or rare quiver is gear).
 local potionPrice: { [string]: number } = {}
@@ -69,10 +80,10 @@ end
 local function rollStock(class: string?): { any }
 	local stock = {}
 	for _, p in data.potions do
-		table.insert(stock, { type = p.type, price = p.price, potion = true })
+		table.insert(stock, entry({ type = p.type, price = p.price, potion = true }))
 	end
 	for _, p in data.supplies do
-		table.insert(stock, { type = p.type, price = p.price, supply = true })
+		table.insert(stock, entry({ type = p.type, price = p.price, supply = true }))
 	end
 	local all: { any } = {}
 	local total = 0
@@ -95,7 +106,7 @@ local function rollStock(class: string?): { any }
 		local r = nox.random()
 		local rarity = if r < data.gear.rare then "rare" elseif r < data.gear.rare + data.gear.magic then "magic" else "normal"
 		local rec = loot.makeGear(pick.type, rarity, stockLevel, class)
-		table.insert(stock, { rec = rec, price = vendor.price(rec) })
+		table.insert(stock, entry({ rec = rec, price = vendor.price(rec) }))
 	end
 	return stock
 end
@@ -151,7 +162,7 @@ end
 -- index.
 function vendor.addStock(h: any, rec: any): number
 	local stock = vendor.stockOf(h)
-	table.insert(stock, { rec = rec, price = vendor.price(rec) })
+	table.insert(stock, entry({ rec = rec, price = vendor.price(rec) }))
 	if windows.isOpen(h, "vendor") then
 		vendor.view(h)
 	end
@@ -165,6 +176,7 @@ function vendor.view(h: any)
 	for i, s in stock do
 		local e = if s.potion or s.supply then windows.entry(h, { type = s.type, rarity = "normal" }) else windows.entry(h, s.rec)
 		e.i = i
+		e.s = s.sid -- (what a purchase names)
 		e.p = s.price
 		table.insert(list, e)
 	end
@@ -187,17 +199,9 @@ local function after(h: any, why: string)
 	windows.sendCarried(h)
 end
 
--- Stock entry `i` bought; whether it was, else why.
-function vendor.buy(h: any, i: number): (boolean, string?)
-	local ok, why = ready(h)
-	if not ok then
-		return false, why
-	end
-	local stock = vendor.stockOf(h)
-	local s = stock[math.floor(i)]
-	if not s then
-		return false, "not for sale"
-	end
+-- The stock entry at `at` of the hero's stock bought; whether it was, else why.
+local function buyAt(h: any, stock: { any }, at: number): (boolean, string?)
+	local s = stock[at]
 	local gold = nox.gold(h.unit)
 	if gold < s.price then
 		return false, "not enough gold"
@@ -211,10 +215,41 @@ function vendor.buy(h: any, i: number): (boolean, string?)
 	end
 	nox.setGold(h.unit, gold - s.price, true)
 	if not always then
-		table.remove(stock, math.floor(i))
+		table.remove(stock, at)
 	end
 	after(h, "vendor")
 	return true, nil
+end
+
+-- Stock entry `i` (its place in the stock now: "dd vendor buy") bought; whether it was, else why.
+function vendor.buy(h: any, i: number): (boolean, string?)
+	local ok, why = ready(h)
+	if not ok then
+		return false, why
+	end
+	local stock = vendor.stockOf(h)
+	local at = math.floor(i)
+	if not stock[at] then
+		return false, "not for sale"
+	end
+	return buyAt(h, stock, at)
+end
+
+-- The stock entry numbered `sid` (its own number, as the window names it) bought; whether it was,
+-- else why: one no longer in the hero's stock (bought already, or gone with a restock) is refused
+-- and nothing is spent.
+function vendor.buyStock(h: any, sid: number): (boolean, string?)
+	local ok, why = ready(h)
+	if not ok then
+		return false, why
+	end
+	local stock = vendor.stockOf(h)
+	for at, s in stock do
+		if s.sid == sid then
+			return buyAt(h, stock, at)
+		end
+	end
+	return false, "that's no longer for sale"
 end
 
 -- A carried item sold; whether it was, else why.
@@ -421,16 +456,17 @@ function vendor.touched(unit: number)
 	end
 end
 
--- A message from the vendor's window: { op = "buy", index } | { op = "sell", item } |
--- { op = "reroll", item } | { op = "repair", item } | { op = "repairAll" }.
-function vendor.message(h: any, v: any)
+-- A message from the vendor's window: { op = "buy", stock (the entry's own number: its `s`) } |
+-- { op = "sell", item } | { op = "reroll", item } | { op = "repair", item } | { op = "repairAll" }.
+-- Whether it was done, else why (also noted on the window).
+function vendor.message(h: any, v: any): (boolean, string?)
 	if not windows.isOpen(h, "vendor") then
-		return
+		return false, "the vendor's window isn't open"
 	end
 	local ok, why = true, nil
-	local index, item = tonumber(v.index), tonumber(v.item)
-	if v.op == "buy" and index then
-		ok, why = vendor.buy(h, index)
+	local sid, item = tonumber(v.stock), tonumber(v.item)
+	if v.op == "buy" then
+		ok, why = vendor.buyStock(h, sid or -1)
 	elseif v.op == "sell" and item then
 		ok, why = vendor.sell(h, item)
 	elseif v.op == "reroll" and item then
@@ -443,6 +479,7 @@ function vendor.message(h: any, v: any)
 	if not ok then
 		windows.note(h, "vendor", tostring(why))
 	end
+	return ok, why
 end
 
 -- A hero's rolled gear in its stock as lines, "index type rarity effectiveness material primary

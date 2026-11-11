@@ -13,7 +13,8 @@
 --   * A hit on a player's unit from one of the mod's monsters (or something it owns: its arrow)
 --     is scaled by the monster's tier and area level; one by something it owns, times its
 --     `spells` too (a boss's: the barrow-king's mist and fists; 1 for every other monster).
---     The player's resistance (worn affixes, its passive tree) takes its share off.
+--     The player's resistance (worn affixes, its passive tree) takes its share off, and its
+--     shield's guard its share of a blow or missile from a monster in front of it.
 --   * The mod's monsters never hurt each other (a hit on one by another, or by something another
 --     owns, is cancelled): a boss's quake, mist or fist spares its own dead.
 --   * A hit on one of the mod's monsters from a player (or something it owns: a missile, a
@@ -279,7 +280,8 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			end)
 			return 0
 		end
-		factor = scaled * hero.taken(victim)
+		-- (its shield's guard: a blow or missile from a monster in front of it, less; affixes.luau)
+		factor = scaled * hero.taken(victim) * affixes.guarded(victim.bonus, target, if monsters.info(who) then who else nil, cause)
 	elseif reflecting or warrior.quiet() then
 		-- (a hit turned back, or a warrior's skill's own hit: dealt as it was, the hero's bonuses no
 		-- part of it again)

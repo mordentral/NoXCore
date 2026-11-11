@@ -918,7 +918,9 @@ local function drawVendor()
 			cell(cx, cy, CELL - 2, e, isHot, e.p)
 			zone(w, cx, cy, CELL - 2, CELL - 2, function(b: number)
 				if b == 1 then
-					nox.send({ kind = "vendor", op = "buy", index = e.i })
+					-- (by the entry's own number: a stale second click is refused, not a buy of what
+					-- moved into its place)
+					nox.send({ kind = "vendor", op = "buy", stock = e.s })
 				end
 			end)
 		else

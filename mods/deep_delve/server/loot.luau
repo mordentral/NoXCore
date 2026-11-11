@@ -8,7 +8,9 @@
 -- only ever one that fits the slot of that item (nox.modifierFits: the game's own rule), does
 -- something on it (loot.doesOn: an effect the engine runs, and a number of the item's for it to
 -- scale: no armour quality on a shield) and is no dearer than the area level allows
--- (data/loot.luau's worth). Rarely a loot roll's gear is a unique or a set piece instead, and a
+-- (data/loot.luau's worth). A shield's effectiveness slot, where no armour quality does anything,
+-- is filled with its own guard affix instead (affixes.slotAffix): one of a magic shield's one or
+-- two, always on a rare one. Rarely a loot roll's gear is a unique or a set piece instead, and a
 -- champion and an act boss roll for one of each besides (uniques.luau, data/uniques.luau).
 
 --
@@ -285,7 +287,7 @@ end
 -- carry (affixes.allowed: a weapon's, armour's, or any piece's; for `class`, only those it may
 -- have), at the area level.
 local function rollAffixes(thingType: string, n: number, level: number, class: string?): { any }
-	local defs = table.clone(affixes.allowed(thingType, class))
+	local defs = table.clone(affixes.allowed(thingType, class, true))
 	local out = {}
 	for _ = 1, math.min(#defs, n) do
 		local def: any = table.remove(defs, nox.random(#defs))
@@ -305,14 +307,21 @@ function loot.makeGear(thingType: string, rarity: string, level: number, class: 
 		return rec
 	end
 	local pool = poolFor(thingType)
+	-- (a slot no modifier does anything in, rolled as an affix instead: a shield's effectiveness,
+	-- its guard; affixes.slotAffix)
+	local inPlace = affixes.slotAffix(thingType, class)
 	local open = {}
 	for _, slot in items.SLOTS do
 		-- (a slot with a modifier that may drop: one of a worth, and not past the most)
+		local any = false
 		for _, m in pool[slot] do
 			if m.worth > 0 and m.worth <= data.worth.most then
-				table.insert(open, slot)
+				any = true
 				break
 			end
+		end
+		if any or (inPlace and inPlace.slot == slot) then
+			table.insert(open, slot)
 		end
 	end
 	if #open == 0 then
@@ -320,11 +329,16 @@ function loot.makeGear(thingType: string, rarity: string, level: number, class: 
 		return rec
 	end
 	local taken = {}
+	local slotted = false
 	local function fill(slot: string)
 		local name = pickModifier(pool, slot, level, taken)
 		if name then
 			rec[slot] = name
 			taken[name] = true -- (never the same enchantment twice)
+		elseif inPlace and inPlace.slot == slot then
+			rec.affixes = rec.affixes or {}
+			table.insert(rec.affixes, { id = inPlace.id, value = affixValue(inPlace, level) })
+			slotted = true
 		end
 	end
 	if rarity == "magic" then
@@ -340,10 +354,14 @@ function loot.makeGear(thingType: string, rarity: string, level: number, class: 
 		for _, slot in open do
 			fill(slot)
 		end
-		rec.affixes = rollAffixes(thingType, nox.random(2), level, class)
+		local list = rec.affixes or {}
+		for _, a in rollAffixes(thingType, nox.random(2), level, class) do
+			table.insert(list, a)
+		end
+		rec.affixes = list
 	end
 	-- An item that takes no modifier at all stays normal (its affixes with it).
-	if not (rec.effectiveness or rec.material or rec.primary or rec.secondary) then
+	if not (rec.effectiveness or rec.material or rec.primary or rec.secondary or slotted) then
 		rec.rarity = "normal"
 		rec.affixes = nil
 	end
@@ -432,34 +450,67 @@ function loot.place(rec: any, x: number, y: number): number?
 	return id
 end
 
+-- One roll's thing (loot.rollOne's) put near (x, y), a little apart (so a pile reads as several
+-- things); its id.
+local function put(d: any, x: number, y: number): number?
+	local px, py = nox.clearPointNear(x + nox.random(-20, 20), y + nox.random(-20, 20), 30)
+	local id: number? = nil
+	if d.kind == "gold" then
+		id = nox.create("Gold", px, py)
+		if id then
+			index(id, { type = "Gold" }, "gold", px, py, "gold")
+		end
+	elseif d.kind == "potion" then
+		id = nox.create(d.type, px, py)
+		if id then
+			index(id, { type = d.type }, "normal", px, py, "potion")
+		end
+	else
+		id = loot.place(d.record, px, py)
+	end
+	return id
+end
+
 -- A death's loot at (x, y): `rolls` rolls at the area level; the ids made.
 function loot.drop(x: number, y: number, level: number, rolls: number, better: number?): { number }
 	local made = {}
 	for _ = 1, rolls do
 		local d = loot.rollOne(level, better)
 		if d then
-			-- (a little apart, so a pile reads as several things)
-			local px, py = nox.clearPointNear(x + nox.random(-20, 20), y + nox.random(-20, 20), 30)
-			local id: number? = nil
-			if d.kind == "gold" then
-				id = nox.create("Gold", px, py)
-				if id then
-					index(id, { type = "Gold" }, "gold", px, py, "gold")
-				end
-			elseif d.kind == "potion" then
-				id = nox.create(d.type, px, py)
-				if id then
-					index(id, { type = d.type }, "normal", px, py, "potion")
-				end
-			else
-				id = loot.place(d.record, px, py)
-			end
+			local id = put(d, x, y)
 			if id then
 				table.insert(made, id)
 			end
 		end
 	end
 	return made
+end
+
+-- ---- Breakables (data/loot's breakables: breakables.luau watches them)
+
+-- What a breakable of `kind` gives as it breaks at the area level: at its kind's chance (the
+-- default's for a kind not named) one small find, gold or a potion in the shares a loot roll gives
+-- them; else nil. As loot.rollOne's: { kind = "gold" } | { kind = "potion", type }.
+function loot.rollBreakable(kind: string, level: number): any
+	local b = data.breakables
+	local d = (b.drops :: any)[kind] or b.drops.default
+	if nox.random() >= d.chance then
+		return nil
+	end
+	local r = data.roll
+	if nox.random() * (r.gold + r.potion) < r.gold then
+		return { kind = "gold" }
+	end
+	local all, total = eligible(data.potions, level)
+	return { kind = "potion", type = weighted(all, total).type }
+end
+
+-- A breakable of `kind` broken at (x, y) in an area of `level`: what it gives put there; the ids
+-- made.
+function loot.dropBreakable(kind: string, x: number, y: number, level: number): { number }
+	local d = loot.rollBreakable(kind, level)
+	local id = if d then put(d, x, y) else nil
+	return if id then { id } else {}
 end
 
 -- A champion's or an act boss's own rolls for a unique and a set piece (uniques.rollSpecial;

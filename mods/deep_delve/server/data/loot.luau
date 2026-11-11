@@ -61,6 +61,35 @@ loot.potions = {
 -- One loot roll: the chances (hundredths) that it gives gold, a potion, gear; else nothing.
 loot.roll = { gold = 30, potion = 15, gear = 18 }
 
+-- Breakable things (by decision 2026-11-11: every breakable in an area has a drop table): `kinds`
+-- every thing.bin kind the game breaks into pieces (its death makes its broken pieces: barrels,
+-- casks, crates, coffins, a wasps' nest; not the burning powder trail), each one of them in an area
+-- watched from the area's set-up (breakables.luau). `drops` what each kind gives as it breaks, by
+-- its type: the `chance` (0-1) of one small find, gold or a potion in the shares a loot roll gives
+-- them (`roll` above), at the area level as a monster's are; `default` for a kind not named (one
+-- the generator places later still gives). Gear stays the monsters' and the chests'. Nothing in
+-- town gives anything.
+loot.breakables = {
+	kinds = {
+		"Barrel", "Barrel2", "TargetBarrel1", "TargetBarrel2", "BarrelLOTD", "WaterBarrel",
+		"LargeBarrel1", "LargeBarrel2", "PiledBarrels1", "PiledBarrels2", "PiledBarrels3", "PiledBarrels4",
+		"BlackPowderBarrel", "BlackPowderBarrel2", "Crate1", "Crate2", "DarkCrate1", "DarkCrate2",
+		"Coffin1", "Coffin2", "Coffin3", "Coffin4", "WaspNest",
+	},
+	drops = {
+		-- (the generator's: the Dungeon's and the Mines' barrels, the Crypt's coffins; the towns'
+		-- barrels and water barrels, which give nothing there)
+		Barrel = { chance = 1 / 3 },
+		Barrel2 = { chance = 1 / 3 },
+		WaterBarrel = { chance = 1 / 3 },
+		Coffin1 = { chance = 1 / 3 },
+		Coffin2 = { chance = 1 / 3 },
+		Coffin3 = { chance = 1 / 3 },
+		Coffin4 = { chance = 1 / 3 },
+		default = { chance = 1 / 3 },
+	},
+}
+
 -- The rarity of a piece of gear, by weight; each area level adds `perLevel` to magic and rare.
 -- (Uniques and set pieces are rolls of their own: data/uniques.luau.)
 loot.rarity = {
@@ -138,6 +167,13 @@ loot.scales = {
 --               last that much (%) less, and each poison step (loot.wardPoison);
 --   resilience  armour's: its wearer's worn pieces wear that much (%) less (the durability each one
 --               loses to a hit, given back in that share a frame on: affixes.wear).
+-- A shield's own (by decision 2026-11-11; first-pass numbers): `slot` names the game slot it is
+-- rolled in place of, on a type of `kinds` (a shield: data/tips.luau's kind) where no modifier of
+-- that slot does anything (an armour quality on a shield: loot.scales); never one of a rare's
+-- affixes besides:
+--   guard       a shield's: blows and missiles from monsters in front of its wearer (loot.guard's
+--               arc of its facing) deal that much (%) less (combat.luau).
+-- `sheetMost`: the character sheet says its most after the total.
 loot.affixes = {
 	{ id = "damage", text = "+%d%% damage", stat = "damage", low = 4, high = 8, perLevel = 0.6 },
 	{ id = "health", text = "+%d health", stat = "health", low = 4, high = 10, perLevel = 1.0 },
@@ -148,8 +184,14 @@ loot.affixes = {
 	{ id = "grip", text = "Grip: +%d%% damage with this weapon", stat = "grip", low = 5, high = 10, perLevel = 0.5, kinds = { weapon = true } },
 	{ id = "reflect", text = "Reflection: %d%% to turn missiles back", stat = "reflect", low = 4, high = 8, perLevel = 0.3, kinds = { armour = true }, most = 35 },
 	{ id = "ward", text = "Spell Protection: hexes %d%% shorter", stat = "ward", low = 10, high = 18, perLevel = 0.8, kinds = { armour = true }, most = 75 },
-	{ id = "resilience", text = "Resilience: worn gear wears %d%% less", stat = "resilience", low = 10, high = 18, perLevel = 0.8, kinds = { armour = true }, most = 60 },
+	-- (its most 80 by decision 2026-11-11, from 60; shown on the sheet)
+	{ id = "resilience", text = "Resilience: worn gear wears %d%% less", stat = "resilience", low = 10, high = 18, perLevel = 0.8, kinds = { armour = true }, most = 80, sheetMost = true },
+	{ id = "guard", text = "Guard: %d%% less from blows and missiles ahead", stat = "guard", low = 8, high = 12, perLevel = 0.3, kinds = { shield = true }, slot = "effectiveness", most = 40 },
 }
+
+-- The guard affix's front: within `arc` degrees either side of its wearer's facing (about the
+-- front a raised shield blocks), from the monster behind the hit; the hits it lessens, by cause.
+loot.guard = { arc = 67.5, causes = { blow = true, missile = true } }
 
 -- What a frost or dread affix puts on a monster it procs on: the game's enchantment, for how many
 -- frames, at what power; `spare`: monster tiers it never takes (a boss doesn't flee). Never one

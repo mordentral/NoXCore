@@ -17,7 +17,10 @@
 --                 short as each comes on (its time set shorter in place, silently) and each poison
 --                 step (the frames till it falls a level);
 --   resilience    the hero's worn pieces lose less durability: a share of what a hit wore off
---                 given back a frame on (affixes.worn).
+--                 given back a frame on (affixes.worn);
+--   guard         a shield's own, rolled in its effectiveness slot's place (affixes.slotAffix): a
+--                 monster's blow or missile from in front of the hero takes that share less
+--                 (affixes.guarded, combat.luau).
 
 local data = require("data/loot")
 local tipData = require("data/tips")
@@ -65,26 +68,57 @@ local function forType(def: any, thingType: string): boolean
 	return false
 end
 
--- The affixes that may roll on a type (those with no kinds, and those its kind is one of; with
--- classes, only on gear one of them may use), in data order, for `class` (rolled for that class:
--- only those it may have; nil: any); worked out once a type and class.
+-- Whether a type is a shield (data/tips.luau's kind).
+function affixes.isShield(thingType: string): boolean
+	local t = (tipData.items :: any)[thingType]
+	return t ~= nil and t.kind == "shield"
+end
+
+-- The affixes that may go on a type (those with no kinds, and those its kind is one of, a shield's
+-- own too; with classes, only on gear one of them may use), in data order, for `class` (rolled for
+-- that class: only those it may have; nil: any); worked out once a type and class. `rolled`: only
+-- those a rare's affixes are drawn from (not one rolled in a slot's place: affixes.slotAffix).
 local allowedOf: { [string]: { any } } = {}
 
-function affixes.allowed(thingType: string, class: string?): { any }
-	local key = if class then thingType .. "|" .. class else thingType
+function affixes.allowed(thingType: string, class: string?, rolled: boolean?): { any }
+	local key = (if class then thingType .. "|" .. class else thingType) .. (if rolled then "|rolled" else "")
 	local list = allowedOf[key]
 	if list then
 		return list
 	end
 	local kind = affixes.kindOf(thingType)
+	local shield = affixes.isShield(thingType)
 	list = {}
 	for _, def in data.affixes :: { any } do
-		if (not def.kinds or (kind and (def.kinds :: any)[kind])) and forType(def, thingType) and affixes.forClass(def, class) then
+		local kinds: any = def.kinds
+		local fits = not kinds or (kind and kinds[kind]) or (shield and kinds.shield)
+		if fits and forType(def, thingType) and affixes.forClass(def, class) and not (rolled and def.slot) then
 			table.insert(list, def)
 		end
 	end
 	allowedOf[key] = list
 	return list
+end
+
+-- The affix a type's game slot is rolled as instead (data/loot's `slot`: a shield's guard, in its
+-- effectiveness slot, where no armour quality does anything), for `class`; nil: none.
+local slotOf: { [string]: any } = {}
+
+function affixes.slotAffix(thingType: string, class: string?): any
+	local key = if class then thingType .. "|" .. class else thingType
+	local known = slotOf[key]
+	if known ~= nil then
+		return if known == false then nil else known
+	end
+	local found: any = false
+	for _, def in affixes.allowed(thingType, class) do
+		if def.slot then
+			found = def
+			break
+		end
+	end
+	slotOf[key] = found
+	return if found == false then nil else found
 end
 
 -- An affix's definition by id: the loot's, and the stats only uniques and sets carry
@@ -198,6 +232,33 @@ function affixes.turnsBack(b: any, who: number, weapon: number?): boolean
 		return false
 	end
 	return affixes.reflects(b)
+end
+
+-- ---- Guard: a shield's front
+--
+-- The cosine of the guard's arc either side of the hero's facing, worked out once.
+local guardCos = math.cos(math.rad(data.guard.arc))
+
+-- The share of a monster's hit the hero takes past its guard (1: all of it): less by its guard
+-- when the hit is a blow or a missile (its cause) and the monster behind it (`who`) stands within
+-- the arc of the hero's facing.
+function affixes.guarded(b: any, unit: number, who: number?, cause: string): number
+	local g = b.guard or 0
+	if g <= 0 or not who or who == unit or not (data.guard.causes :: any)[cause] or not nox.present(unit) or not nox.present(who) then
+		return 1
+	end
+	local x, y = nox.position(unit)
+	local wx, wy = nox.position(who)
+	local dx, dy = wx - x, wy - y
+	local len = math.sqrt(dx * dx + dy * dy)
+	if len <= 0 then
+		return 1
+	end
+	local fx, fy = nox.directionVector(nox.direction(unit))
+	if (dx * fx + dy * fy) / len < guardCos then
+		return 1
+	end
+	return 1 - g / 100
 end
 
 -- ---- Resilience: the worn pieces wear less
