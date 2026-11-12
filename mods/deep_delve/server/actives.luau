@@ -1,7 +1,7 @@
 --!strict
 -- The warrior's active abilities (by decision 2026-11-02): Leap Slam and Whirlwind, mod abilities
 -- (nox.defineAbility), a button each on a NoX Core client's strip over the quickbar (client level
--- 8; their bodies' animations level 9, the mod's minClientLevel). Their numbers are
+-- 8; their bodies' animations level 9; the mod's minClientLevel is 10). Their numbers are
 -- data/warrior.luau's `actives`, their tree nodes data/tree.luau's (skill nodes: a warrior's
 -- alone, any other class gets the stats' worth).
 --

@@ -373,9 +373,10 @@ local function addStats(sum: any, stats: any, times: number)
 end
 
 -- What the taken nodes add up to: { health, mana, strength, healthPct, manaPct, damage, resist,
--- healthRegen, manaRegen (a second), manaOnKill, spellCost, summonCost, summonHealth (%), own,
--- skills }: each node's stats, the masteries of the spells and abilities the class has from them,
--- and the stats' worth of each spell, ability, summon or skill node it can't use (data.crossWorth);
+-- healthRegen, manaRegen (a second), manaOnKill, spellCost, summonCost, summonHealth, poison (%),
+-- own, skills }: each node's stats, the masteries of the spells and abilities the class has from
+-- them, and the stats' worth of each spell, ability, summon or skill node it can't use
+-- (data.crossWorth);
 -- own: the % more damage a hit by a thing of each type deals (its spell's own bonus, data.rises),
 -- by type; skills: a warrior's passive skills (data/warrior.luau) by key, each its rank.
 function tree.totals(rec: any): any
@@ -384,7 +385,7 @@ function tree.totals(rec: any): any
 	-- (skills: a warrior's passive skills, each its rank: how many of its nodes are taken)
 	local skills: { [string]: number } = {}
 	local sum = { health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, damage = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-		manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = own, skills = skills }
+		manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, poison = 0, own = own, skills = skills }
 	local worth = (data.crossWorth :: any)[class] or {}
 	for id in tree.taken(rec) do
 		local n = nodes[id]
@@ -454,6 +455,7 @@ local STAT_WORDS: { { string } } = {
 	{ "spellCost", "spells cost %d%% more mana", "spells cost %d%% less mana" },
 	{ "summonCost", "summonings cost %d%% more mana", "summonings cost %d%% less mana" },
 	{ "summonHealth", "%+d%% most health for your summoned creatures" },
+	{ "poison", "%+d%% poison damage (your poison's bites and poison hits)" },
 }
 
 -- What a set of stats says ("+8 health, +3% damage dealt").

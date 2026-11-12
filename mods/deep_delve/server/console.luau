@@ -86,8 +86,8 @@
 --                        price"
 --   dd breakables [odds KIND N [LEVEL]]   the area's breakables (breakables.luau): "level L",
 --                        then "KIND watched W town T broken B gave G" a kind found; "odds": N
---                        breaks of KIND rolled (records only, 250 at most), "rolls N gold G potion
---                        P nothing X"
+--                        breaks of KIND rolled for the party now (records only, 250 at most),
+--                        "rolls N gold G potion P nothing X" (finds in all; breaks with none)
 --   dd roll TYPE RARITY N [LEVEL] [CLASS]   N records of TYPE rolled at RARITY as the loot rolls
 --                        them (CLASS: rolled for that class, as a vendor's stock is), nothing made:
 --                        "rarity effectiveness material primary secondary affixes" each (N 250 at

@@ -11,6 +11,8 @@
 --     the blow's last amount (warrior.landed) what follows it is done a frame on (an asked hook
 --     changes nothing): Cleave's splash, Rend's and the axe's bleed, the hammer's shockwave, the
 --     staff's push, the rage's fill or its spin; a thrown chakram's hit strikes the next monster;
+--     Envenom's poison (by decision 2026-11-12) on any hit of the warrior's weapon (its blow, a
+--     thrown chakram; a worn bow's arrow too, should one be worn);
 --   a monster's hit on the warrior (combat.luau, warrior.taken): a sword's parry turns a blow,
 --     Shield Wall staggers the monster that struck (the game's hold), the rage fills;
 --   a hit taken, after it (main.luau's onDamaged, warrior.hurt): Second Wind below its share;
@@ -26,6 +28,7 @@
 
 local data = require("data/warrior")
 local tipData = require("data/tips")
+local affixes = require("affixes")
 local hero = require("hero")
 local hud = require("hud")
 local monsters = require("monsters")
@@ -251,12 +254,16 @@ function warrior.dealt(h: any, target: number, m: any, source: number?, weapon: 
 	local unit = h.unit
 	local now = nox.frame()
 	local s = state(h)
+	local env = skill(h, "envenom")
 	if cause == "missile" and weapon then
-		-- (a thrown chakram's hit: its family's by the missile in flight)
+		-- (a thrown chakram's hit: its family's by the missile in flight; Envenom on it, and on the
+		-- worn bow's arrow)
 		local o = nox.object(weapon)
-		local fam = if o and o.owner == unit then familyOfThrown[o.type] else nil
-		if fam and sk[fam] then
-			pending = { h = h, target = target, thrown = fam, kind = kind }
+		local thrown = if o and o.owner == unit then familyOfThrown[o.type] else nil
+		local fam = if thrown and sk[thrown] then thrown else nil
+		local venom = if env and (thrown or affixes.byWeapon(h.bonus, unit, weapon, cause)) then env.most else nil
+		if fam or venom then
+			pending = { h = h, target = target, missile = true, thrown = fam, kind = kind, venom = venom }
 		end
 		return mult
 	end
@@ -302,9 +309,32 @@ function warrior.dealt(h: any, target: number, m: any, source: number?, weapon: 
 		local o = nox.object(weapon)
 		fam = if o then warrior.familyOf(o.type) else nil
 	end
-	-- (its facing as the blow lands: Cleave's arc)
-	pending = { h = h, target = target, family = if fam and sk[fam] then fam else nil, kind = kind, face = nox.direction(unit) }
+	-- (its facing as the blow lands: Cleave's arc; Envenom's most on a blow of its worn weapon)
+	local venom = if env and affixes.byWeapon(h.bonus, unit, weapon, cause) then env.most else nil
+	pending = { h = h, target = target, family = if fam and sk[fam] then fam else nil, kind = kind, face = nox.direction(unit), venom = venom }
 	return mult
+end
+
+-- Envenom: the monster's poison a level more, to at most `most` (the game's Poison spell from the
+-- warrior at the level it is to reach: a monster immune to poison, or resisting it, takes none, as
+-- the game's Venom's blow), the warrior noted as its poisoner (combat.luau: its poison stat on the
+-- bites).
+local function envenom(h: any, target: number, most: number)
+	local m = monsters.info(target)
+	if not m or not nox.living(target) then
+		return
+	end
+	local level = nox.poison(target)
+	if level >= most then
+		m.poisoner = h.unit
+		return
+	end
+	local x, y = nox.position(target)
+	nox.cast("SPELL_POISON", h.unit, target, x, y, level + 1)
+	if nox.poison(target) > level then
+		m.poisoner = h.unit
+		count(h, "envenom")
+	end
 end
 
 -- What follows a blow (Cleave, the bleeds, the shockwave, the push, the rage), a frame on.
@@ -317,9 +347,13 @@ local function follow(p: any, final: number)
 	local target = p.target
 	local s = state(h)
 	local hx, hy = nox.position(unit)
-	if p.thrown then
-		-- (a chakram's hit: the next monster near its target)
-		local c = skill(h, p.thrown)
+	-- Envenom: the weapon's hit poisons.
+	if p.venom then
+		envenom(h, target, p.venom)
+	end
+	if p.missile then
+		-- (a chakram's hit: the next monster near its target; nothing else follows a missile)
+		local c = if p.thrown then skill(h, p.thrown) else nil
 		if c and nox.present(target) then
 			local tx, ty = nox.position(target)
 			local other = monstersNear(tx, ty, c.reach, target, 1)[1]

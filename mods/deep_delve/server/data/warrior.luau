@@ -45,6 +45,13 @@ w.skills = {
 	-- Tread Lightly's upgrade: the first blow out of its sneak (landing within `window` frames of the
 	-- sneak's end: the swing ends it) deals `times` as much.
 	ambush = { times = 3, window = 40 },
+	-- Envenom (by decision 2026-11-12): every hit of the warrior's weapon on one of the mod's monsters
+	-- (any weapon: its blow, a thrown chakram; a worn bow's arrow too, should one be worn) raises the
+	-- monster's poison a level,
+	-- to at most `most` (the game's poison: the game's Poison spell at that level, so a monster
+	-- immune to poison or resisting it takes none; its bites as numbers.poison scales them). Rank 2
+	-- (Envenom II) a level more.
+	envenom = { ranks = { { most = 2 }, { most = 3 } } },
 	-- Eye of the Wolf's upgrade: while its sight is on, the party's hits on a monster the warrior
 	-- sees (within `sight`, no wall between) deal `pct` more; the secret room's lever and the trapped
 	-- chests within `reveal` of the warrior are shown by a ring on the floor while it lasts.
@@ -254,6 +261,14 @@ function w.words(key: string, rank: number): string
 			.. " times the blow"
 	elseif key == "ambush" then
 		return string.format("Tread Lightly's upgrade: your first blow out of its sneak deals %d times as much", s.ambush.times)
+	elseif key == "envenom" then
+		local n = w.numbers(key, rank)
+		if rank >= 2 then
+			return string.format("Envenom's poison up to level %d", n.most)
+		end
+		return string.format(
+			"Every hit of your weapon (a blow, a thrown chakram) poisons the monster a level more, up to level %d; the poison bites harder in deeper areas (never one poison can't hurt)",
+			n.most)
 	elseif key == "huntersMark" then
 		return string.format(
 			"Eye of the Wolf's upgrade: while it lasts, the party deals %d%% more to monsters you see, and hidden levers and trapped chests near you show",

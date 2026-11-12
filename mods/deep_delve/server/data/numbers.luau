@@ -77,6 +77,19 @@ numbers.areas = {
 	lair = { segments = 3, packs = 5, endRadius = 13 },
 }
 
+-- Poison on the mod's monsters (by decision 2026-11-12; combat.luau). The game's poison bites a
+-- poisoned creature for 1 (a hit from nothing, of damage type `kind`), each 128 frames at level 1
+-- down to every frame past level 8. On one of the mod's monsters each bite is times its area
+-- level's health factor (1 + areas.healthPerLevel x (level - 1): x3.28 at area level 20), so a
+-- poison keeps the share of a monster's health it takes at area level 1 (a level-4 Venom's 1.9
+-- health a second there, 6.2 at area level 20); the parts of a point carried to the next bite.
+-- Never the hero's damage bonus: only the poison stat (the tree's Virulence and Miasma: % more) of
+-- the hero whose hit last poisoned it. Only the party poisons the mod's monsters (a monster's own
+-- cloud and its poisoned blow poison only its foes, and the mod's monsters are one side; the traps
+-- strike players), so a bite on one is taken as the party's. Poison on a hero is the game's,
+-- unchanged.
+numbers.poison = { kind = 5 }
+
 -- A room's monsters waking (wake.luau). The engine's own look finds a foe within a monster's
 -- sight (its own at least 250; outdoors the biome's, data/acts.luau's sights) with nothing between
 -- them. A room's monsters see further once a hero comes into the room, so the whole room

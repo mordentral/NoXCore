@@ -16,8 +16,8 @@
 --
 -- Every item the mod puts on the ground (gear, gold, potions) is kept in one index while it lies
 -- there, with its label: its name in its rarity's colour, which labels.luau sends to the players
--- near it (NoX Core clients show it while Alt is held). A party's deaths roll more loot
--- (scale.luau's loot factor).
+-- near it (NoX Core clients show it while Alt is held). A party's deaths, chests and broken
+-- barrels roll more loot (scale.luau's loot factor).
 
 local data = require("data/loot")
 local affixes = require("affixes")
@@ -278,9 +278,7 @@ end
 
 -- An affix's value at the area level.
 local function affixValue(def: any, level: number): number
-	local lo = def.low + def.perLevel * (level - 1)
-	local hi = def.high + def.perLevel * (level - 1)
-	return math.floor(lo + nox.random() * (hi - lo) + 0.5)
+	return affixes.valueAt(def, level, nox.random())
 end
 
 -- `n` of Deep Delve's own affixes for an item type, each a different one of those its kind may
@@ -505,12 +503,32 @@ function loot.rollBreakable(kind: string, level: number): any
 	return { kind = "potion", type = weighted(all, total).type }
 end
 
+-- What one breakable of `kind` broken in an area of `level` gives: its table rolled as many times
+-- as a death's one roll is for the party now (loot.rollsFor(1): by decision 2026-11-12, a party's
+-- barrels give more as its deaths and chests do; one player, one roll); each find, as
+-- loot.rollBreakable's.
+function loot.rollBreakables(kind: string, level: number): { any }
+	local out = {}
+	for _ = 1, loot.rollsFor(1) do
+		local d = loot.rollBreakable(kind, level)
+		if d then
+			table.insert(out, d)
+		end
+	end
+	return out
+end
+
 -- A breakable of `kind` broken at (x, y) in an area of `level`: what it gives put there; the ids
 -- made.
 function loot.dropBreakable(kind: string, x: number, y: number, level: number): { number }
-	local d = loot.rollBreakable(kind, level)
-	local id = if d then put(d, x, y) else nil
-	return if id then { id } else {}
+	local made = {}
+	for _, d in loot.rollBreakables(kind, level) do
+		local id = put(d, x, y)
+		if id then
+			table.insert(made, id)
+		end
+	end
+	return made
 end
 
 -- A champion's or an act boss's own rolls for a unique and a set piece (uniques.rollSpecial;

@@ -14,9 +14,10 @@
 --     is scaled by the monster's tier and area level; one by something it owns, times its
 --     `spells` too (a boss's: the barrow-king's mist and fists; 1 for every other monster).
 --     The player's resistance (worn affixes, its passive tree) takes its share off, and its
---     shield's guard its share of a blow or missile from a monster in front of it. Whatever the
---     mod makes of a hit on a player, its worn armour, raised shield or blocking weapon wear by the
---     hit as it came (onDamage's second answer), as the game's do from that blow.
+--     shield's guard its share of a blow, missile or spell (never an electric one) from a monster
+--     in front of it. Whatever the mod makes of a hit on a player, its worn armour, raised shield
+--     or blocking weapon wear by the hit as it came (onDamage's second answer), as the game's do
+--     from that blow.
 --   * The mod's monsters never hurt each other (a hit on one by another, or by something another
 --     owns, is cancelled): a boss's quake, mist or fist spares its own dead.
 --   * A hit on one of the mod's monsters from a player (or something it owns: a missile, a
@@ -46,6 +47,11 @@
 --     be parried (0) or answered by a stagger. A skill's own hit is dealt as it is.
 --   * A flame hit on the troll chieftain (act 3's boss: mosschief.luau) is noted on him, with the
 --     hero behind it: fire keeps his wounds from closing. Nothing about the hit changes.
+--   * Poison (by decision 2026-11-12, numbers.poison): a poison's bite on one of the mod's monsters
+--     (a hit from nothing of the poison type) is times the monster's area level's health factor,
+--     and the poison stat of the hero who poisoned it last (its poison hit, Toxic Cloud's, or a
+--     weapon hit of a weapon that poisons; Envenom's, warrior.luau); never the hero's damage bonus.
+--     A hero's poison hit takes its poison stat too. Poison on a hero is the game's.
 --
 -- The watches: every player's unit, every monster the mod makes and every creature a player
 -- summons carry nox.events.damage (set in hero.luau, monsters.luau and summons.luau), so the hook
@@ -65,6 +71,32 @@ local lootData = require("data/loot")
 local combat = {}
 
 local ownSpared: { [string]: boolean } = numbers.party.ownSpared :: any
+local POISON: number = numbers.poison.kind
+
+-- A hero's poison stat as a factor (the tree's Virulence and Miasma: 1 none).
+local function poisonBoost(h: any): number
+	local p = h.bonus and h.bonus.poison or 0
+	return if p ~= 0 then math.max(0, 1 + p / 100) else 1
+end
+
+-- A poison's bite on one of the mod's monsters (m: monsters.info's; by decision 2026-11-12,
+-- numbers.poison): times its area level's health factor and the poison stat of the hero who
+-- poisoned it last (`m.poisoner`, while it plays), the parts of a point carried on the monster
+-- (`m.biteCarry`) to its next bite; nil when nothing changes it (area level 1, no stat).
+local function bite(m: any, amount: number): number?
+	local f = monsters.healthFactor(m.level or 1)
+	local by = if m.poisoner then hero.byUnit(m.poisoner) else nil
+	if by then
+		f *= poisonBoost(by)
+	end
+	if f == 1 or amount <= 0 then
+		return nil
+	end
+	local want = amount * f + (m.biteCarry or 0)
+	local whole = math.floor(want)
+	m.biteCarry = want - whole
+	return whole
+end
 
 -- Whoever stands behind a hit's source: the source itself, or its owner (a missile's, a summoned
 -- creature's), one step up.
@@ -254,6 +286,13 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 		end
 	end
 	if not who then
+		-- (a poison's bite on one of the mod's monsters: by its area level, numbers.poison)
+		if not victim and kind == POISON and not weapon then
+			local m = monsters.info(target)
+			if m then
+				return bite(m, amount)
+			end
+		end
 		-- (a hit from nothing, a trap's or poison's: only the hero's worn powers on it, the worn
 		-- pieces wearing by the hit as it came)
 		local worn = if victim then uniquePowers.taken(victim, nil, source, weapon, amount, kind, cause) else nil
@@ -287,8 +326,9 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			end)
 			return 0
 		end
-		-- (its shield's guard: a blow or missile from a monster in front of it, less; affixes.luau)
-		factor = scaled * hero.taken(victim) * affixes.guarded(victim.bonus, target, if monsters.info(who) then who else nil, cause)
+		-- (its shield's guard: a blow, missile or spell, never an electric one, from a monster in
+		-- front of it, less; affixes.luau)
+		factor = scaled * hero.taken(victim) * affixes.guarded(victim.bonus, target, if monsters.info(who) then who else nil, cause, kind)
 	elseif reflecting or warrior.quiet() then
 		-- (a hit turned back, or a warrior's skill's own hit: dealt as it was, the hero's bonuses no
 		-- part of it again)
@@ -303,6 +343,12 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			factor = t.scale
 		elseif m and h then
 			factor = hero.dealt(h, weapon)
+			-- (a poison hit, Toxic Cloud's: the hero's poison stat on it, and the hero noted as the
+			-- one poisoning the monster, for the bites to come)
+			if kind == POISON then
+				factor *= poisonBoost(h)
+				m.poisoner = h.unit
+			end
 			-- (the worn uniques' and sets' powers on the hero's hit: uniquepowers.luau)
 			factor *= uniquePowers.dealt(h, target, m, weapon, kind, amount, factor, cause)
 			-- (the warrior's skills on the hit, and Hunter's Mark on any of the party's: warrior.luau)
@@ -312,6 +358,11 @@ function combat.onDamage(target: number, source: number?, weapon: number?, amoun
 			if affixes.byWeapon(h.bonus, h.unit, weapon, cause) then
 				factor += (h.bonus.grip or 0) / 100
 				affixes.onWeaponHit(h.bonus, target, m)
+				-- (a weapon that poisons, the game's Venom on it or its quiver: the hero noted as the
+				-- one poisoning the monster; Envenom notes it as its poison goes on, warrior.luau)
+				if h.bonus.venom then
+					m.poisoner = h.unit
+				end
 				-- (the blow wears the weapon: its resilience gives a share back a frame on)
 				affixes.worn(h)
 			end

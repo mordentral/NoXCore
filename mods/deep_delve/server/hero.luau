@@ -13,11 +13,12 @@
 --          last put of its records row (records.luau);
 --   bonus  what its worn affixes and its passive tree add: { damage (%), resist (%), health,
 --          mana, strength, healthPct, manaPct, healthRegen, manaRegen (a second), manaOnKill,
---          spellCost, summonCost, summonHealth (%: the cast-cost keystones'), own (% more by a
---          hit's thing type: a spell's own), skills (a warrior's passive skills by key, each its
+--          spellCost, summonCost, summonHealth (%: the cast-cost keystones'), poison (% more poison
+--          damage: the tree's Virulence and Miasma, combat.luau), own (% more by a hit's thing
+--          type: a spell's own), skills (a warrior's passive skills by key, each its
 --          rank: tree.totals), frost, dread, grip, reflect, ward, resilience, guard (%: the worn
 --          affixes', affixes.luau), weapon (the worn weapon's id), ammo (its shot's type), shield
---          (the worn shield's id),
+--          (the worn shield's id), venom (the worn weapon or quiver poisons: the game's Venom),
 --          powers, sets, pieces, setSig (the worn uniques' powers and the worn sets: uniques.worn;
 --          their active bonuses' stats are in the numbers above) };
 --   powerState its worn powers' own state (uniquepowers.luau);
@@ -129,6 +130,7 @@ local function bonusOf(unit: number, rec: any)
 		spellCost = t.spellCost,
 		summonCost = t.summonCost,
 		summonHealth = t.summonHealth,
+		poison = t.poison,
 		own = t.own,
 		skills = t.skills,
 	}
@@ -149,8 +151,14 @@ local function bonusOf(unit: number, rec: any)
 			if m and (m.unique or m.set) then
 				table.insert(special, m)
 			end
-			if affixes.kindOf(facts.type) == "weapon" then
+			local kind = affixes.kindOf(facts.type)
+			if kind == "weapon" then
 				affixes.noteWeapon(b, it.id, facts.type)
+			end
+			-- (a worn weapon or quiver that poisons, the game's Venom: its hits note the hero as the
+			-- monster's poisoner, combat.luau)
+			if (kind == "weapon" or kind == "quiver") and affixes.venomous(facts) then
+				(b :: any).venom = true
 			end
 			-- (a shield worn: the warrior's shield skills, warrior.luau)
 			local tip = (tipData.items :: any)[facts.type]
@@ -541,7 +549,8 @@ function hero.join(p: any, chosen: any?)
 		record = record,
 		ready = false,
 		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, healthRegen = 0, manaRegen = 0,
-			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, own = {}, skills = {}, powers = {}, sets = {}, pieces = {}, setSig = "" },
+			manaOnKill = 0, spellCost = 0, summonCost = 0, summonHealth = 0, poison = 0, own = {}, skills = {}, powers = {}, sets = {}, pieces = {},
+			setSig = "" },
 		open = {},
 		need = hero.needFor(record.level.level),
 		since = nox.frame(),

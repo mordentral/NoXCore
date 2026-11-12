@@ -4,7 +4,8 @@
 -- breakables.kinds) standing in an area are found once as it's entered (one walk of each kind, at
 -- set-up), and those outside the town's walls watched for their death (nox.events.death). One
 -- broken gives what its kind's drop table says (loot.dropBreakable: a chance of one small find,
--- gold or a potion, at the area level) where it stood. The town's give nothing: they are never
+-- gold or a potion, at the area level) where it stood, rolled more times for a party as a death's
+-- loot is (by decision 2026-11-12: loot.rollsFor). The town's give nothing: they are never
 -- watched.
 
 local data = require("data/loot")
@@ -82,18 +83,22 @@ function breakables.lines(): { string }
 	return out
 end
 
--- "dd breakables odds KIND N [LEVEL]": N breaks of KIND rolled (records only, nothing made), as
--- "rolls N gold G potion P nothing X".
+-- "dd breakables odds KIND N [LEVEL]": N breaks of KIND rolled as they'd break now, for the party
+-- in the game (records only, nothing made), as "rolls N gold G potion P nothing X": the finds of
+-- each kind in all (a party's break may give more than one), and the breaks that gave nothing.
 function breakables.odds(kind: string, n: number, at: number): string
 	local gold, potion, nothing = 0, 0, 0
 	for _ = 1, n do
-		local d = loot.rollBreakable(kind, at)
-		if not d then
+		local finds = loot.rollBreakables(kind, at)
+		if #finds == 0 then
 			nothing += 1
-		elseif d.kind == "gold" then
-			gold += 1
-		else
-			potion += 1
+		end
+		for _, d in finds do
+			if d.kind == "gold" then
+				gold += 1
+			else
+				potion += 1
+			end
 		end
 	end
 	return string.format("rolls %d gold %d potion %d nothing %d", n, gold, potion, nothing)

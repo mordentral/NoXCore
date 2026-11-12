@@ -39,6 +39,9 @@
 -- it makes). Each class also has a short Renewal run of regeneration nodes beside its root (at the
 -- end of `nodes`); the wizard's branch notables give mana a second too (by decision 2026-10-31).
 --
+-- The poison stat (by decision 2026-11-12; combat.luau): poison (% more poison damage: the bites of
+-- a poison its taker put on one of the mod's monsters, and its poison hits).
+--
 -- Cast-cost stats (keystones only; casts.luau and summons.luau): spellCost (% of a spell's mana
 -- price given back as the cast goes off; summonings aside), summonCost (the same for a summoning),
 -- summonHealth (% more or less most health for each creature summoned). A cast still needs its
@@ -698,6 +701,26 @@ do
 		{ x = -15, y = -6, name = "Terror", icon = "k_predator", skill = "terror" })
 	pair(3, branchNode("warrior", "Hunt", 12), { x = -17, y = 5, name = "Reel and Rend", icon = "n_rend", skill = "reelAndRend" },
 		{ x = -18, y = 5, name = "Chain", icon = "n_pack_leader", skill = "chain" })
+end
+
+-- Poison (by decision 2026-11-12; ids 192-195). The poison stat (% more poison damage: the bites of
+-- a poison its taker put on a monster, and its poison hits, Toxic Cloud's; combat.luau) and the
+-- warrior's Envenom:
+--   Envenom, Envenom II  the warrior's skill (a warrior's alone; data/warrior.luau's numbers,
+--           warrior.luau's work), in Quarry off Hunt's notable (Keen Eye, -11, 3): Envenom
+--           (-11, 5), its second rank past it (-12, 5);
+--   Virulence  a notable of the poison stat beside Envenom (-10, 5), off it: any class's stats;
+--   Miasma  the conjurer's, a notable of the poison stat off Wilds' second Toxic Cloud node (its
+--           8th, 0, 13), at (-1, 13); its branch its own (Fumes), so Wilds keeps its 13.
+-- Pictures: existing ones for now (Envenom's the bleeding blade, Virulence's and Miasma's green).
+do
+	local envenom = skillNode({ x = -11, y = 5, kind = "notable", branch = "Quarry", name = "Envenom", icon = "n_rend", skill = "envenom" },
+		{ branchNode("warrior", "Hunt", 6) })
+	skillNode({ x = -12, y = 5, kind = "notable", branch = "Quarry", name = "Envenom II", icon = "n_rend", skill = "envenom", rank = 2 }, { envenom })
+	link(envenom, add({ x = -10, y = 5, kind = "notable", region = "warrior", branch = "Quarry", name = "Virulence", icon = "k_swarmcaller",
+		stats = { poison = 30, health = 8 } }))
+	link(branchNode("conjurer", "Wilds", 8), add({ x = -1, y = 13, kind = "notable", region = "conjurer", branch = "Fumes", name = "Miasma",
+		icon = "n_brood", stats = { poison = 30, mana = 6 } }))
 end
 
 return data

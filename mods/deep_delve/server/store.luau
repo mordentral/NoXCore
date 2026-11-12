@@ -12,6 +12,7 @@ local acts = require("data/acts")
 local classes = require("data/classes")
 local progress = require("progress")
 local atlas = require("atlas")
+local affixes = require("affixes")
 
 local store = {}
 
@@ -42,9 +43,16 @@ local store = {}
 --   7  atlas = { open, best, runs, cleared = { [biome] = { ranks } } }: the expeditions cleared
 --      (atlas.luau). Version 6's records get an empty atlas, open when they cleared the last act
 --      of the day (act 2) or any after it.
+--   8  every magic, rare, unique or set shield it keeps (worn, carried, in the stash) has its
+--      shield's own guard affix (by decision 2026-11-12): one made before guard was gets it once,
+--      by this step (affixes.guardOnce: rolled at the level it was made at, a unique's or set
+--      piece's fixed; the dead armour quality in its slot gone). Version 8 is its mark: a record
+--      steps up once, so a shield never rolls it again. The rolls are the record's own (a stream
+--      seeded by its identity), so a record read twice before it's written (a server character's
+--      list, then its play) rolls the same.
 --   (Act 3, appended after act 2, needed no version: no act's indices moved, and a record that
 --   cleared act 2 has act 3 opened as it's read, progress.openAfterCleared.)
-store.VERSION = 7
+store.VERSION = 8
 
 -- How many areas version 6 put in front of act 2's (data/acts.luau's act 2: Old Workings, Cave
 -- Mouth).
@@ -292,6 +300,42 @@ local function toVersion7(rec: any)
 	rec.version = 7
 end
 
+-- Version 7 -> 8: each shield it keeps made before guard was given it once (affixes.guardOnce):
+-- the worn and carried pieces in order, then the stash's tabs and slots in order, each roll from
+-- the record's own stream (seeded by its name, class and account: the same rolls each time the
+-- same record is brought up).
+local STASH_SIZE: number = require("data/vendor").stash.size
+
+local function toVersion8(rec: any)
+	local id = if type(rec.identity) == "table" then rec.identity else {}
+	local words = tostring(id.name) .. "|" .. tostring(id.class) .. "|" .. tostring(id.account)
+	local seed = 2166136261
+	for i = 1, #words do
+		seed = nox.mul32(bit32.bxor(seed, string.byte(words, i)), 16777619)
+	end
+	local stream = nox.mt19937(seed)
+	local function draw(): number
+		return stream:next() / 4294967296
+	end
+	for _, list in { rec.equipment, rec.inventory } do
+		if type(list) == "table" then
+			for _, it in list do
+				affixes.guardOnce(it, draw)
+			end
+		end
+	end
+	local tabs = if type(rec.stash) == "table" and type(rec.stash.tabs) == "table" then rec.stash.tabs else {}
+	for t = 1, STASH_TABS do
+		local tab = tabs[t]
+		if type(tab) == "table" then
+			for slot = 1, STASH_SIZE do
+				affixes.guardOnce(tab[slot], draw)
+			end
+		end
+	end
+	rec.version = 8
+end
+
 -- An older record brought up to date (each version's step in turn).
 local function migrate(rec: any): any
 	if rec.version < 2 then
@@ -311,6 +355,9 @@ local function migrate(rec: any): any
 	end
 	if rec.version < 7 then
 		toVersion7(rec)
+	end
+	if rec.version < 8 then
+		toVersion8(rec)
 	end
 	rec.version = store.VERSION
 	return rec

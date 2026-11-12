@@ -68,7 +68,8 @@ loot.roll = { gold = 30, potion = 15, gear = 18 }
 -- its type: the `chance` (0-1) of one small find, gold or a potion in the shares a loot roll gives
 -- them (`roll` above), at the area level as a monster's are; `default` for a kind not named (one
 -- the generator places later still gives). Gear stays the monsters' and the chests'. Nothing in
--- town gives anything.
+-- town gives anything. A party's break rolls its table more times, as a death's loot is rolled
+-- (by decision 2026-11-12: loot.rollsFor, scale.luau's loot factor; one player, once).
 loot.breakables = {
 	kinds = {
 		"Barrel", "Barrel2", "TargetBarrel1", "TargetBarrel2", "BarrelLOTD", "WaterBarrel",
@@ -171,8 +172,9 @@ loot.scales = {
 -- rolled in place of, on a type of `kinds` (a shield: data/tips.luau's kind) where no modifier of
 -- that slot does anything (an armour quality on a shield: loot.scales); never one of a rare's
 -- affixes besides:
---   guard       a shield's: blows and missiles from monsters in front of its wearer (loot.guard's
---               arc of its facing) deal that much (%) less (combat.luau).
+--   guard       a shield's: blows, missiles and spells (by decision 2026-11-12; never the game's
+--               electric damage: loot.guard.spared) from monsters in front of its wearer
+--               (loot.guard's arc of its facing) deal that much (%) less (combat.luau).
 -- `sheetMost`: the character sheet says its most after the total.
 loot.affixes = {
 	{ id = "damage", text = "+%d%% damage", stat = "damage", low = 4, high = 8, perLevel = 0.6 },
@@ -186,12 +188,16 @@ loot.affixes = {
 	{ id = "ward", text = "Spell Protection: hexes %d%% shorter", stat = "ward", low = 10, high = 18, perLevel = 0.8, kinds = { armour = true }, most = 75 },
 	-- (its most 80 by decision 2026-11-11, from 60; shown on the sheet)
 	{ id = "resilience", text = "Resilience: worn gear wears %d%% less", stat = "resilience", low = 10, high = 18, perLevel = 0.8, kinds = { armour = true }, most = 80, sheetMost = true },
-	{ id = "guard", text = "Guard: %d%% less from blows and missiles ahead", stat = "guard", low = 8, high = 12, perLevel = 0.3, kinds = { shield = true }, slot = "effectiveness", most = 40 },
+	{ id = "guard", text = "Guard: %d%% less from blows, missiles and spells ahead (not lightning)", stat = "guard", low = 8, high = 12, perLevel = 0.3, kinds = { shield = true }, slot = "effectiveness", most = 40 },
 }
 
 -- The guard affix's front: within `arc` degrees either side of its wearer's facing (about the
--- front a raised shield blocks), from the monster behind the hit; the hits it lessens, by cause.
-loot.guard = { arc = 67.5, causes = { blow = true, missile = true } }
+-- front a raised shield blocks), from the monster behind the hit; the hits it lessens, by cause (a
+-- monster's spells too, by decision 2026-11-12: its missiles' bursts, its rays, a boss's mist and
+-- fists); `spared` the damage types it never lessens, by the game's number: the electric ones
+-- (9 electric: a Shock's touch, a shock trap; 17 airborne electric: Energy Bolt, Chain Lightning,
+-- the lightning glyphs), as a raised shield stops all but a shock.
+loot.guard = { arc = 67.5, causes = { blow = true, missile = true, spell = true }, spared = { [9] = true, [17] = true } }
 
 -- What a frost or dread affix puts on a monster it procs on: the game's enchantment, for how many
 -- frames, at what power; `spare`: monster tiers it never takes (a boss doesn't flee). Never one

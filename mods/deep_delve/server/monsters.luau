@@ -195,6 +195,12 @@ local function rollTier(level: number): string
 	return "normal"
 end
 
+-- A monster's health factor at an area level (1 at level 1; numbers.areas.healthPerLevel a level
+-- more): its most health's, and the poison bites' on it (combat.luau).
+function monsters.healthFactor(level: number): number
+	return 1 + numbers.areas.healthPerLevel * (level - 1)
+end
+
 -- Sets a made monster up as `tier` at the area level: health, enchantments, its name, its powers
 -- (`want`: these powers' ids, {} none; nil: its tier's count rolled); registered and watched (its
 -- death, the mod's loot and experience).
@@ -211,7 +217,7 @@ function monsters.applyTier(id: number, thingType: string, tierName: string, lev
 	-- (a boss's own factor on its tier's: data/monsters.luau's bosses' `health`; else its type's,
 	-- data/monsters.luau's typeHealth)
 	local own: number = if fixed and type(fixed.health) == "number" then fixed.health else ((data.typeHealth :: any)[thingType] or 1)
-	local health = math.clamp(math.floor(most * (1 + a.healthPerLevel * (level - 1)) * tier.health * openHealth * own + 0.5), 1, 65535)
+	local health = math.clamp(math.floor(most * monsters.healthFactor(level) * tier.health * openHealth * own + 0.5), 1, 65535)
 	local alone = health
 	local party = scale.factor("health")
 	if party ~= 1 then
