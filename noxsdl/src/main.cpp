@@ -43,10 +43,12 @@
 #include "command_line.hpp"
 #include "editor/close_plan.hpp"
 #include "editor/editor_settings.hpp"
+#include "editor/editor_text.hpp"
 #include "effects_draw.hpp"
 #include "icon/window_icon.hpp"
 #include "leaving_notice.hpp"
 #include "log_output.hpp"
+#include "map_cache_dir.hpp"
 #include "mods_folder.hpp"
 #include "new_game.hpp"
 #include "predicted_drop.hpp"
@@ -407,13 +409,13 @@ void syncLiveMap(App& app)
             app.minimap->mapLoaded(app.map);
         }
         const auto remembered = std::ranges::count_if(app.view->walls(), [](const nox::map::Wall& w) { return w.unknown != 0; });
-        SDL_Log("map %s (the minimap's memory: %d walls, %d obelisks)", path->string().c_str(), static_cast<int>(remembered),
+        SDL_Log("map %s (the minimap's memory: %d walls, %d obelisks)", editor::pathText(*path).c_str(), static_cast<int>(remembered),
                 app.minimap ? static_cast<int>(app.minimap->obelisksListed()) : 0);
         if (!std::exchange(app.mapDownloaded, false)) {
             chatMapNotice(app);
         }
     } catch (const std::exception& ex) {
-        SDL_Log("loading %s failed: %s", path->string().c_str(), ex.what());
+        SDL_Log("loading %s failed: %s", editor::pathText(*path).c_str(), ex.what());
         app.liveMap = client.mapName(); // don't retry every frame
     }
 }
@@ -1287,6 +1289,25 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         app->minimap->setModifiers(&app->modifiers);
         app->profile = opts.profile;
         app->mapCache = opts.mapCache;
+        if (app->mapCache.empty()) {
+            // (Beside the exe, else the user's settings folder: never the current folder.)
+            fs::path exeDir;
+            if (const char* base = SDL_GetBasePath()) {
+                exeDir = fs::path(reinterpret_cast<const char8_t*>(base));
+            }
+            app->mapCache = defaultMapCache(exeDir, [] {
+                fs::path dir;
+                if (char* pref = SDL_GetPrefPath("noxcpp", "noxsdl")) {
+                    dir = fs::path(reinterpret_cast<const char8_t*>(pref));
+                    SDL_free(pref);
+                }
+                return dir;
+            });
+        }
+        {
+            const auto cache = app->mapCache.u8string();
+            SDL_Log("downloaded maps: %s", reinterpret_cast<const char*>(cache.c_str()));
+        }
         try {
             app->strings =
                 std::make_unique<nox::strings::StringTable>(nox::strings::StringTable::load(gameDir / "nox.csf"));

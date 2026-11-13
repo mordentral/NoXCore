@@ -41,6 +41,7 @@ add_executable(noxsdl WIN32
     src/bloom.cpp
     src/browser_screen.cpp
     src/server_list_files.cpp
+    src/map_cache_dir.cpp
     src/menus_servers.cpp
     src/centred_messages.cpp
     src/chat_entry.cpp

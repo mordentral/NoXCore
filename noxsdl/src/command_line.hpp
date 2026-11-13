@@ -21,7 +21,7 @@ struct StartOptions {
     std::string mapArg = "Estate"; ///< --map: the viewer's map
     std::string connect;           ///< --connect HOST[:PORT] (or the game --host / --solo hosts here)
     nox::client::PlayerProfile profile; ///< --name, --class, --hair... (the menus' till one is chosen)
-    std::filesystem::path mapCache = "noxsdl_maps"; ///< --map-cache: where downloaded maps go
+    std::filesystem::path mapCache; ///< --map-cache: where downloaded maps go (none: defaultMapCache)
     std::string mapPicture;                ///< --map-picture MAP OUT.png: the map vote's picture written out
     std::filesystem::path mapPictureOut;
     int width = 1280; ///< --size WxH: the window

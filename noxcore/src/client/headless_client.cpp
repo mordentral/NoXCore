@@ -1657,7 +1657,9 @@ void HeadlessClient::finishDownload()
         std::filesystem::create_directories(dir);
         writeFileBytes(dir / (download_.name + ".nxz"), download_.data);
         writeFileBytes(dir / (download_.name + ".map"), stored);
-        event(ClientEvent::Kind::Log, "map saved to " + (dir / (download_.name + ".map")).string());
+        // (As UTF-8: the folder's whole path may hold letters the system's code page has not.)
+        const auto saved = (dir / (download_.name + ".map")).u8string();
+        event(ClientEvent::Kind::Log, "map saved to " + std::string(saved.begin(), saved.end()));
         download_.data.clear();
         mapPath_ = dir / (download_.name + ".map");
         mapReady(file);
