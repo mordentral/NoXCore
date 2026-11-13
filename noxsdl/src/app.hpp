@@ -169,6 +169,11 @@ struct App {
     /// 1.2b client's "Attempting to connect" dialog till the host lets us in or the join fails.
     bool joinWaiting = false;
     bool joinWaitShow = false; ///< the dialog's still to be put up (next frame, outside the menus' handlers)
+    /// The join's wait for an XWIS game's ping still out (identify_wait.hpp's PingWait), before its
+    /// session starts: the game to join once it's answered or given up (empty: none), and when the
+    /// wait began.
+    std::string pingWaitHost;
+    std::uint32_t pingWaitStartedAt = 0;
 
     nox::things::ThingDb things;
     nox::things::ModifierDb modifiers; ///< item colours (empty if modifier.bin is missing)

@@ -65,13 +65,67 @@ inline bool joinWaits(bool addsTypes, bool identifyFirst, bool knownStock)
 /// from. A GAME.EXE host started from Westwood Online answers no discover ping (its receive takes
 /// 0x0C only in a LAN game) and the 1.2b client sends a listed game nothing before its TRY_JOIN; a
 /// NoX Core host always answers the ping. Only once its ping has gone unanswered ("No response"):
-/// a game clicked while its ping is still out ("Checking...") may be a NoX Core host whose answer
-/// hasn't come yet, and is asked as before. A game typed in or from servers.txt / the LAN is asked
-/// as before.
+/// a join waits for a ping still out (PingWait, below), so `checking` is never set here but where
+/// that wait gave up at its cap with the ping still out (it can't outlast the browser's own
+/// give-up, so only a list that stopped polling): then the game may be a NoX Core host whose
+/// answer hasn't come, and is asked as before (the guard kept). A game typed in or from
+/// servers.txt / the LAN is asked as before.
 inline bool joinStockShaped(const nox::lobby::ServerEntry* entry)
 {
     return entry && (entry->sources & nox::lobby::kFromXwis) != 0 && !entry->answered && !entry->checking &&
            !entry->extended;
 }
+
+/// Whether joining the listed game `entry` waits for its ping first (the owner's call,
+/// 2026-11-13: "wait for the ping, its safer and better"): an XWIS game whose ping is still out
+/// ("Checking..."), neither answered nor known as NoX Core yet. How it's joined (stock-shaped or
+/// asked first: joinStockShaped) is decided once the ping has answered or given up. Anything else
+/// (no ping out, a typed or saved address, a LAN game) is joined at once.
+inline bool joinWaitsForPing(const nox::lobby::ServerEntry* entry)
+{
+    return entry && (entry->sources & nox::lobby::kFromXwis) != 0 && entry->checking && !entry->answered &&
+           !entry->extended;
+}
+
+/// The join's wait for that ping (the join's dialog up meanwhile, its Cancel the join's): over once
+/// the game has answered, its ping has run out ("No response"), it's gone from the list, or the
+/// browser's own give-up time (lobby::kPingGiveUpMs) has passed since the wait began, whichever
+/// comes first: it never outlasts the list's own "Checking...".
+struct PingWait {
+    static constexpr std::uint32_t kMaxMs = nox::lobby::kPingGiveUpMs;
+    std::uint32_t startedAt = 0;
+
+    enum class Step : std::uint8_t {
+        Wait,       ///< the ping still out
+        Answered,   ///< the game answered (a NoX Core host, or a LAN-style stock one): asked as now
+        NoResponse, ///< the ping ran out: a stock host from Westwood Online, joined stock-shaped
+        Gone,       ///< the game left the list (a refresh): joined as the list has it now (by address)
+        GaveUp,     ///< kMaxMs passed with the ping still out: joined anyway (joinStockShaped's guard)
+    };
+    Step step(const nox::lobby::ServerEntry* entry, std::uint32_t nowMs) const
+    {
+        if (!entry) {
+            return Step::Gone;
+        }
+        if (entry->answered || entry->extended) {
+            return Step::Answered;
+        }
+        if (!entry->checking) {
+            return Step::NoResponse;
+        }
+        return nowMs - startedAt >= kMaxMs ? Step::GaveUp : Step::Wait;
+    }
+    static const char* name(Step s)
+    {
+        switch (s) {
+        case Step::Wait: return "waiting";
+        case Step::Answered: return "answered";
+        case Step::NoResponse: return "no response";
+        case Step::Gone: return "gone from the list";
+        case Step::GaveUp: return "gave up";
+        }
+        return "?";
+    }
+};
 
 } // namespace noxsdl

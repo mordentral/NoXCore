@@ -46,6 +46,7 @@
 #include "editor/editor_text.hpp"
 #include "effects_draw.hpp"
 #include "icon/window_icon.hpp"
+#include "identify_wait.hpp"
 #include "leaving_notice.hpp"
 #include "log_output.hpp"
 #include "map_cache_dir.hpp"
@@ -1511,6 +1512,18 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                     }
                 }
                 SDL_Log("joining %s, account: %s", address.c_str(), app->profile.account.empty() ? "(none)" : app->profile.account.c_str());
+                if (!app->host && app->browser && joinWaitsForPing(app->browser->entryFor(address))) {
+                    // An XWIS game whose ping is still out ("Checking..."): its session starts once
+                    // the ping has answered or given up (joinWaitFrame, PingWait), so how it's
+                    // joined (stock-shaped or asked first) is known; the join's dialog up meanwhile.
+                    app->pingWaitHost = address;
+                    app->pingWaitStartedAt = static_cast<std::uint32_t>(SDL_GetTicks());
+                    SDL_Log("join: %s's ping is still out: the join waits for it (at most %u ms)", address.c_str(),
+                            PingWait::kMaxMs);
+                    app->joinWaiting = true;
+                    app->joinWaitShow = true;
+                    return;
+                }
                 startLive(*app, address);
                 notePortMoved(*app);
                 if (!app->host) {
@@ -3738,7 +3751,35 @@ SDL_AppResult gameLeft(App& app, JoinWaitEnd joinEnd = JoinWaitEnd::None)
 std::optional<SDL_AppResult> joinWaitFrame(App& app, bool shotReady)
 {
     if (std::exchange(app.joinWaitShow, false)) {
-        app.menus->showJoinWait([&app] { gameLeft(app, JoinWaitEnd::Cancelled); });
+        app.menus->showJoinWait([&app] {
+            if (app.live) {
+                gameLeft(app, JoinWaitEnd::Cancelled);
+                return;
+            }
+            // (Cancel while the game's ping was still out: no session yet, nothing to close.)
+            SDL_Log("join: cancelled (the dialog's Cancel) while %s's ping was out", app.pingWaitHost.c_str());
+            app.pingWaitHost.clear();
+            app.joinWaiting = false;
+        });
+    }
+    if (!app.live) {
+        // The wait for an XWIS game's ping (PingWait): the game list kept polling under the
+        // dialog; the session once the ping has answered or given up, or at the browser's own
+        // give-up time.
+        if (app.pingWaitHost.empty()) {
+            app.joinWaiting = false; // (nothing to wait for)
+            return menusFrame(app, shotReady);
+        }
+        const PingWait wait{app.pingWaitStartedAt};
+        const auto now = static_cast<std::uint32_t>(SDL_GetTicks());
+        const auto step = wait.step(app.browser ? app.browser->entryFor(app.pingWaitHost) : nullptr, now);
+        if (step == PingWait::Step::Wait) {
+            return menusFrame(app, shotReady);
+        }
+        const std::string host = std::exchange(app.pingWaitHost, {});
+        SDL_Log("join: %s's ping: %s after %u ms; joining", host.c_str(), PingWait::name(step), now - wait.startedAt);
+        startLive(app, host);
+        gui::setShellUp(true); // (the join's dialog stays up: the menus' till the host lets us in)
     }
     app.live->update();
     if (app.live->done()) {
@@ -4152,13 +4193,14 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     std::vector<HealthBar> healthBars;
     std::set<std::uint32_t> liveCodes;
     bool shotReady = !app->screenshot.empty() && !app->shotTaken && !embedded; // (in the editor's panel: the editor's shot)
-    if (app->menus && !app->live) {
-        return menusFrame(*app, shotReady);
-    }
-    if (app->menus && app->live && app->joinWaiting) {
+    if (app->menus && app->joinWaiting && (app->live || !app->pingWaitHost.empty())) {
+        // (the join's wait: for the host, or before it for an XWIS game's ping)
         if (const auto result = joinWaitFrame(*app, shotReady)) {
             return *result;
         }
+    }
+    if (app->menus && !app->live) {
+        return menusFrame(*app, shotReady);
     }
     if (app->live && app->movie && app->movie->active()) {
         // A class's ending movie (Cinematics::endGame): the game kept going underneath, unseen.

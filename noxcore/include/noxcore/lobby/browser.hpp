@@ -31,6 +31,12 @@
 
 namespace nox::lobby {
 
+/// A server's ping: sent again after kPingRetryMs without an answer, kPingTries times in all; its
+/// "Checking..." over (given up: "No response") kPingGiveUpMs after the first.
+inline constexpr std::uint32_t kPingRetryMs = 1'000;
+inline constexpr int kPingTries = 3;
+inline constexpr std::uint32_t kPingGiveUpMs = kPingRetryMs * kPingTries;
+
 enum SourceBits : unsigned {
     kFromXwis = 1,
     kFromLan = 2,
