@@ -435,6 +435,12 @@ void updateEffects(Fight& fight, ServerObject& player)
                     now = item->maxCharges;
                 }
                 item->charges = now;
+                // (VD-73, OB-429: the exe leaves the charge percent as it was, so a staff that refilled
+                // itself still showed its old percent, and an obelisk's recharge took it back down to
+                // that. Set from the charges, as every spend does.)
+                if (item->maxCharges != 0) {
+                    item->chargePercent = item->charges * 100 / item->maxCharges;
+                }
                 if (before != now && holder && (holder->classes & oc::Player)) {
                     // MSG_REPORT_CHARGES (0x64): the wand's extent (16 bits), its charges and its most.
                     tell(world, *holder, {0x64, lo(item->extent), hi(item->extent), item->charges, item->maxCharges});

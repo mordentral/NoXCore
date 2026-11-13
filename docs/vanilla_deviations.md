@@ -155,6 +155,21 @@ What follows from it:
 - **Risk:** low; the server decoder accepts 0xBE at any time (it only advances past it).
 - **Revert:** remove the keep-alive block in `gameFrame`.
 
+### VD-73: Continual Replenishment keeps a staff's charge percent with its charges (OB-429)
+
+- **Vanilla:** Continual Replenishment adds a charge to a wand or staff every so many frames but
+  leaves its charge percent where the last spend put it. An obelisk's recharge sets the charges to
+  most x percent / 100 whenever that differs from the charges held, so a staff that had refilled
+  itself drops back to a handful of charges near an obelisk with mana in it, then climbs again.
+- **Ours:** the percent is set from the charges each time Replenishment adds one
+  (noxcore/src/server/item_effects.cpp, ContinualReplenishmentUpdate), as every spend sets it, so
+  the obelisk sees the staff as it is and never lowers its charges.
+- **Why:** by the owner's decision, 2026-11-13 ("fix it and note it as an original bug"). Delve and
+  Undead Tide rewards can put Replenishment1 on a staff.
+- **Risk:** none known: only the percent changes, and only on items with Continual Replenishment.
+  A stock client is told the charges as before (MSG_REPORT_CHARGES).
+- **Revert:** remove the percent update after `item->charges = now` in ContinualReplenishmentUpdate.
+
 ### VD-72: Downloaded maps go to NoX Core's own noxsdl_maps folder, never the game's maps folder
 
 - **Vanilla:** a map the host sends (the server's map not found in the game's maps folder, or found

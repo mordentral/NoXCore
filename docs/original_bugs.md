@@ -834,8 +834,11 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   the charges its percent gives: from full to a handful, then climbs back as the obelisk fills
   the percent. Only a staff with that enchantment (it is a wand's; whether stock maps or loot put
   it on one of the staffs an obelisk recharges wasn't checked).
-- **Ours:** the same (item_effects.cpp's ContinualReplenishmentUpdate, objects.cpp's obelisk,
-  trade.cpp's recharge). Logged, not changed.
+- **Ours:** fixed (owner, 2026-11-13: "fix it and note it as an original bug"; VD-73):
+  item_effects.cpp's ContinualReplenishmentUpdate sets the percent from the charges after adding
+  one, as every spend does, so an obelisk's recharge never takes charges back. Delve and Undead
+  Tide rewards can put Replenishment1 on a staff (rewards.cpp), so it could happen on NoX Core's
+  own servers.
 
 ### OB-081: A .plr's map name is written twice its length, and read into 32 bytes
 - **Where:** plr_rwGameData copies the map's name into the player's saved map name (32 bytes),
