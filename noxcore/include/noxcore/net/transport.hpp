@@ -159,7 +159,7 @@ public:
         Joining,          ///< TRY_JOIN sent, waiting for the lobby answer
         PasswordRequired, ///< server wants SERVER_PASSWORD
         JoinOk,           ///< lobby accepted; call connect()
-        JoinRefused,      ///< SERVER_ERROR or JOIN_FAIL; see joinError()
+        JoinRefused,      ///< SERVER_ERROR; see joinError() (JOIN_FAIL is JoinAgain)
         Connecting,       ///< connect sent, waiting for SERVER_ACCEPT
         Connected,
         ConnectRefused,   ///< 0x02/0x03/0x04, or no answer within kConnectTimeoutMs

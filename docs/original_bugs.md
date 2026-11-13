@@ -822,6 +822,21 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   reading of it (a mode's chat, the map vote, the host's log) is the same narrow text. A stock
   client shows such a line as it did; every other line goes on byte for byte as it came.
 
+### OB-429: A staff that recharged itself loses charges at an obelisk
+- **Where:** a staff keeps its charges and a charge percent beside them. Every spend (WandUse,
+  WandCastUse, Plasma's and Chain Lightning's staff charge a frame) sets the percent from the
+  charges left; ContinualReplenishmentUpdate (attribContinualReplen) adds a charge every so many
+  frames and leaves the percent where it was. An obelisk's recharge (rechargeItem, from the
+  obelisk's update while the percent is under 100) raises the percent by the rate and sets the
+  charges to most x percent / 100 whenever that differs from the charges held, lower or higher.
+- **Effect:** a staff carrying a Continual Replenishment enchantment that has refilled itself
+  (its percent still low from its spends) and is held near an obelisk with mana in it drops to
+  the charges its percent gives: from full to a handful, then climbs back as the obelisk fills
+  the percent. Only a staff with that enchantment (it is a wand's; whether stock maps or loot put
+  it on one of the staffs an obelisk recharges wasn't checked).
+- **Ours:** the same (item_effects.cpp's ContinualReplenishmentUpdate, objects.cpp's obelisk,
+  trade.cpp's recharge). Logged, not changed.
+
 ### OB-081: A .plr's map name is written twice its length, and read into 32 bytes
 - **Where:** plr_rwGameData copies the map's name into the player's saved map name (32 bytes),
   then writes u16 its length and 2 x that many bytes from there; reading, it reads 2 x the length
@@ -2164,6 +2179,18 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   its forward arrow.
 
 ## Menus
+
+### OB-430: A join refused with an error code past the client's table shows another string, or reads anywhere
+- **Where:** the client's lobby receive takes SERVER_ERROR's code byte as it comes, and the join's
+  failure dialog looks its text up in the 14-entry table of the join's errors (ErrLowPing to
+  ErrWrongVer) by that code, unchecked.
+- **Effect:** a host that refuses with code 14 has the stock client show the missing-string text of
+  the next string in the program ("640x480"); a code past that takes a pointer from whatever
+  follows the table: a garbled box, or a crash. No stock host sends one (its codes are all in the
+  table); a host built to can.
+- **Ours:** noxsdl's join dialog (noxsdl/src/join_wait.hpp, lobbyFailure) shows the game's own
+  unknown connection error text (netclint.c:UnknownConnError) for a code past the table, titled as
+  the table's. NoX Core's server sends only codes in it. Not reproduced.
 
 ### OB-189: The game list's description box takes a LAN game's last weapons from its map's name
 - **Where:** the game list's entry from a SERVER_INFO reply (a LAN / server-list game) copies the
