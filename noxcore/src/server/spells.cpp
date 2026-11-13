@@ -2922,12 +2922,15 @@ int Spells::chainLightning(DurationSpell& s, ServerObject* caster)
             if (caster->player->mana == 0) {
                 return 1;
             }
-        } else { // a charge of its staff a frame (MSG_REPORT_CHARGES), the staff's pose (0x16)
+        } else { // a charge of its staff a frame (MSG_REPORT_CHARGES), its charge percent with it, the staff's pose (0x16)
             ServerObject* w = world.byExtent(s.staff);
             if (!w || w->charges == 0) {
                 return 1;
             }
             --w->charges;
+            if (w->maxCharges != 0) {
+                w->chargePercent = w->charges * 100 / w->maxCharges;
+            }
             fight.setPlayerState(*caster, 0x16);
             tell(*caster, {0x64, lo(w->extent), hi(w->extent), w->charges, w->maxCharges});
             if (w->charges == 0) {
@@ -3347,10 +3350,13 @@ int Spells::lastingUpdate(DurationSpell& s)
         if (s.value == 0) {  // not behind (no count): its search time renewed
             s.end = frame + static_cast<std::uint32_t>(world.number("PlasmaSearchTime"));
         }
-        if (s.staff != 0) { // a charge of its staff a frame
+        if (s.staff != 0) { // a charge of its staff a frame, its charge percent with it (what an obelisk tops up)
             ServerObject* w = world.byExtent(s.staff);
             if (w && w->charges != 0) {
                 --w->charges;
+                if (w->maxCharges != 0) {
+                    w->chargePercent = w->charges * 100 / w->maxCharges;
+                }
                 if (caster->player) {
                     fight.setPlayerState(*caster, 0x16);
                     tell(*caster, {0x64, lo(w->extent), hi(w->extent), w->charges, w->maxCharges});
