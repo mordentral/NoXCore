@@ -165,6 +165,10 @@ struct App {
     /// --save-dir DIR, DIR's parent when DIR is a "Save" folder, else DIR.
     std::filesystem::path saveRoot;
     bool soloFromMenus = false; ///< the game was the main menu's Solo (its end goes back there)
+    /// A join from the menus waiting for the host (join_wait.hpp): the menus stay up with the
+    /// 1.2b client's "Attempting to connect" dialog till the host lets us in or the join fails.
+    bool joinWaiting = false;
+    bool joinWaitShow = false; ///< the dialog's still to be put up (next frame, outside the menus' handlers)
 
     nox::things::ThingDb things;
     nox::things::ModifierDb modifiers; ///< item colours (empty if modifier.bin is missing)

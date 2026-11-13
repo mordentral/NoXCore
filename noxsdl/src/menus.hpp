@@ -22,7 +22,10 @@
 //          connection), Back logs off to 1700.
 //   10000  the game browser (game_showGameSel, noxworld.wnd): the world map and
 //          its game list are replaced by our game list, drawn in the same frame. Joining a
-//          game goes on to 500 when there are saved characters.
+//          game goes on to 500 when there are saved characters. Joining another's game
+//          (listed, saved or LAN) comes back here with the 1.2b client's "Attempting to
+//          connect" dialog and its Cancel till the host lets us in, or the dialog says why not
+//          (showJoinWait, join_wait.hpp).
 //   500    character select (game_showSelChar, SelChar.wnd): the Save folder's
 //          characters that suit the game (findAutosaves: quest ones for a quest game,
 //          the others otherwise); Load joins the game as the one picked, Delete asks and
@@ -59,6 +62,7 @@
 
 #include "browser_screen.hpp"
 #include "gui.hpp"
+#include "join_wait.hpp"
 #include "mode_list.hpp"
 #include "options_trip.hpp"
 
@@ -179,6 +183,18 @@ public:
     /// typed); OK joins `host` (the game list's game just left) again with `profile` and what was
     /// typed, Cancel stays here.
     void askJoinPassword(const std::string& host, const nox::client::PlayerProfile& profile, bool wrong);
+    /// The join's wait (join_wait.hpp), as the 1.2b client's: the game list (as it was, not fetched
+    /// again) with "Attempting to connect" and its Cancel over it, from the join till the host lets
+    /// us in. Cancel (or Escape) runs `onCancel` (the join dropped), then the game list again.
+    void showJoinWait(std::function<void()> onCancel);
+    /// The wait's words now (join_wait::waiting): the dialog follows when they change.
+    void joinWaitWords(const join_wait::Words& words);
+    /// The join failed while waiting: the dialog says why; OK (or Escape) goes back to the game
+    /// list, fetched again.
+    void joinWaitFailed(const join_wait::Words& words);
+    /// The host let us in: the dialog goes, the game takes over.
+    void endJoinWait();
+    bool joinWaitUp() const noexcept { return joinWaitUp_; }
     /// Where characters are listed from and saved to (default: the game's Save folder).
     void setSaveDir(std::filesystem::path dir) { saveDir_ = std::move(dir); }
     /// The folder a solo game's Save\ is under (default: the game's).
@@ -416,6 +432,14 @@ private:
     /// the one up; true when it took the key.
     std::function<bool(const SDL_KeyboardEvent&)> dialogKeys_;
     std::function<bool(const SDL_Event&)> dialogEvents_; ///< popup scrolling and Escape before the dialog closes
+    /// What Escape does over the dialog up, instead of closing it (the join's: its Cancel or OK).
+    std::function<void()> dialogEscape_;
+    // The join's wait (showJoinWait): its dialog up, its words now, its Cancel's callback.
+    bool joinWaitUp_ = false;
+    join_wait::Words joinWords_;
+    std::function<void()> joinCancel_;
+    bool keepList_ = false; ///< the game list entered as it was, not fetched again (the join's wait)
+    void cancelJoinWait();
     gui::Window* dialogKeysOf_ = nullptr;
     std::string hostModeChosen_; ///< Host Custom's row chosen (mode_list.hpp's modeListKey; none: Quest), kept for next time
     std::string soloModeChosen_; ///< Game Modes' row chosen, the same way

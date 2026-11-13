@@ -29,9 +29,12 @@ public:
     /// `realm`: the host's client key realm, when known before (the game list's answer, or our own
     /// host's): the first query carries our secret for it (client_keys.hpp); else a keyed query
     /// follows as soon as the host's answer names one.
+    /// `stockShaped`: the host was listed by XWIS and never answered the game list's ping (a
+    /// GAME.EXE host started from Westwood Online, which answers no ping): the join sends it only
+    /// what the 1.2b client sends, the TRY_JOIN, and no extended query.
     LiveSession(const std::string& hostAndPort, nox::client::PlayerProfile profile, const nox::things::ThingDb& things,
                 const std::filesystem::path& gameDir, const std::filesystem::path& mapCache, bool identifyFirst = false,
-                bool knownStock = false, std::uint64_t realm = 0);
+                bool knownStock = false, std::uint64_t realm = 0, bool stockShaped = false);
 
     /// Receives, runs the client and sends. Call every frame.
     void update();
@@ -92,6 +95,23 @@ private:
     std::uint64_t keyedRealm_ = 0;
     /// Our extended query, with our secret for `realm` when it's not 0.
     std::vector<std::uint8_t> query(std::uint64_t realm);
+
+    // The join's diagnostics ("join:" log lines): each datagram that
+    // came while joining (where from, which socket, its first bytes, and whether it was taken),
+    // each lobby send, our sockets' ports. Only from the join's start till we're in the game (or
+    // the join failed), and at most kJoinLogLines lines: nothing during a game.
+    static constexpr int kJoinLogLines = 48;
+    void joinLog(const char* fmt, ...);
+    void logJoinDatagram(const char* socket, const nox::net::Endpoint& from, std::span<const std::uint8_t> d, const char* verdict);
+    bool joinLogging_ = true;
+    int joinLogLines_ = 0;
+    std::uint32_t joinStartedAt_ = 0;
+    std::uint32_t lobbyHeard_ = 0; ///< datagrams on the lobby socket while joining (any sender)
+    std::uint32_t gameHeard_ = 0;  ///< and on the game socket
+    std::uint32_t joinDropped_ = 0; ///< of them, from somewhere other than the host
+    /// Where the host's lobby answers come from (its address, any port, as the 1.2b client takes
+    /// them): its ping test's pong goes back there.
+    std::optional<nox::net::Endpoint> lobbyFrom_;
 };
 
 } // namespace noxsdl

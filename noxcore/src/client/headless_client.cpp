@@ -37,7 +37,10 @@ namespace {
 constexpr std::uint32_t kFrameMs = 33;          // the server runs 30 frames a second
 constexpr std::uint32_t kFreshInputMs = 8;      // setFreshInput's sends at most this often
 constexpr std::uint32_t kKeepAliveMs = 250;     // carry our ack at least this often
-constexpr std::uint32_t kLobbyTimeoutMs = 10'000;
+// The 1.2b client's wait for the lobby's answer to its TRY_JOIN (sent once, never again unless the
+// host asks: JOIN_FAIL), 20 s from the join and from each of the host's ping tests.
+constexpr std::uint32_t kLobbyTimeoutMs = 20'000;
+constexpr std::uint32_t kJoinAgainMs = 1'000; // JOIN_FAIL: the join sent again a second later
 constexpr std::uint32_t kMaxDownloadedMap = 64u << 20; // a downloaded map's size at most (finishDownload)
 
 // UTF-8 to UTF-16. Code points past 0xFFFF become '?'; continuation bytes aren't checked.
@@ -187,16 +190,27 @@ void HeadlessClient::pushEvent(ClientEvent e)
 // The lobby join: TRY_JOIN with our name, class, serial and account; tick() takes it from there.
 void HeadlessClient::start(std::uint32_t nowMs)
 {
+    stage_ = Stage::Joining;
+    nowMs_ = nowMs;
+    sendTryJoin(nowMs);
+}
+
+void HeadlessClient::sendTryJoin(std::uint32_t nowMs)
+{
     msg::ServerTryJoin join;
     putUtf16(join.playerName, fromUtf8(profile_.name));
     join.playerClass = profile_.playerClass;
     putAscii(join.serial, profile_.serial);
     putAscii(join.account, profile_.account);
     conn_.tryJoin(join);
-    stage_ = Stage::Joining;
-    nowMs_ = nowMs;
+    joinAgainAt_ = 0;
+    lobbyPingsSeen_ = conn_.lobbyPings();
     nextFrameAt_ = nowMs + kLobbyTimeoutMs; // reused as the lobby deadline until connected
-    event(ClientEvent::Kind::Log, "sent TRY_JOIN");
+    // (What it carries that a host could look at: the name, the class, the WOL account, which the
+    // 1.2b client fills with its own XWIS nick, the one in the game's channel, and the serial.)
+    event(ClientEvent::Kind::Log, "sent TRY_JOIN (name " + profile_.name + ", class " + std::to_string(profile_.playerClass) +
+                                      ", account " + (profile_.account.empty() ? std::string("none") : profile_.account) +
+                                      ", serial " + (profile_.serial.empty() ? "none" : "set") + ")");
 }
 
 // A lobby reply. A password request is answered with the profile's password, or fails without one.
@@ -213,6 +227,9 @@ void HeadlessClient::receiveLobby(std::span<const std::uint8_t> datagram)
         msg::ServerPassword pw;
         putUtf16(pw.password, fromUtf8(profile_.password));
         conn_.sendPassword(pw);
+        if (stage_ == Stage::Joining) {
+            nextFrameAt_ = nowMs_ + kLobbyTimeoutMs; // (the password sent: a new 20 s wait, as the 1.2b client's)
+        }
         event(ClientEvent::Kind::Log, "sent password");
     }
 }
@@ -308,8 +325,24 @@ void HeadlessClient::tick(std::uint32_t nowMs)
             stage_ = Stage::Failed;
             event(ClientEvent::Kind::Disconnected, "connect refused or timed out");
             break;
+        case CS::JoinAgain:
+            // JOIN_FAIL: the host made room; the join again a second later (the 1.2b client's
+            // states 8 and 9, then its join anew with a new 20 s wait).
+            if (joinAgainAt_ == 0) {
+                joinAgainAt_ = nowMs + kJoinAgainMs;
+                joinAgainAt_ += joinAgainAt_ == 0 ? 1 : 0;
+                event(ClientEvent::Kind::Log, "the server made room (JOIN_FAIL); joining again in a second");
+            } else if (static_cast<std::int32_t>(nowMs - joinAgainAt_) >= 0) {
+                sendTryJoin(nowMs);
+            }
+            break;
         case CS::Joining:
         case CS::PasswordRequired:
+            if (conn_.lobbyPings() != lobbyPingsSeen_) {
+                // The host's ping test (SERVER_PING, answered): the wait starts again ("TestCon").
+                lobbyPingsSeen_ = conn_.lobbyPings();
+                nextFrameAt_ = nowMs + kLobbyTimeoutMs;
+            }
             if (static_cast<std::int32_t>(nowMs - nextFrameAt_) >= 0) {
                 stage_ = Stage::Failed;
                 event(ClientEvent::Kind::Disconnected, "no answer from the server's lobby");

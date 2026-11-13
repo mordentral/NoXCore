@@ -60,4 +60,15 @@ inline bool joinWaits(bool addsTypes, bool identifyFirst, bool knownStock)
     return (addsTypes || identifyFirst) && !knownStock;
 }
 
+/// Whether the listed game `entry` is joined as the 1.2b client joins it, with nothing of NoX
+/// Core's sent first (LiveSession's `stockShaped`): one the list had from XWIS and never heard
+/// from. A GAME.EXE host started from Westwood Online answers no discover ping (its receive takes
+/// 0x0C only in a LAN game) and the 1.2b client sends a listed game nothing before its TRY_JOIN; a
+/// NoX Core host always answers the ping. A game typed in or from servers.txt / the LAN is asked
+/// as before.
+inline bool joinStockShaped(const nox::lobby::ServerEntry* entry)
+{
+    return entry && (entry->sources & nox::lobby::kFromXwis) != 0 && !entry->answered && !entry->extended;
+}
+
 } // namespace noxsdl

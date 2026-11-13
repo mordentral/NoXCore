@@ -530,6 +530,11 @@ private:
     const things::ModifierDb* modifiers_ = nullptr;
     std::uint64_t datagramsReceived_ = 0;
     bool passwordAsked_ = false; ///< (passwordAsked)
+    /// The lobby join: when a JOIN_FAIL's join again goes (0: none waiting), and the host's ping
+    /// tests answered when the wait was last restarted (each one restarts it, as the 1.2b client's).
+    std::uint32_t joinAgainAt_ = 0;
+    std::uint32_t lobbyPingsSeen_ = 0;
+    void sendTryJoin(std::uint32_t nowMs);
     std::uint16_t swappingOut_ = 0; ///< g_guiInvEquippedWeaponDrawable: the weapon being taken off
     std::uint16_t pendingSecondary_ = 0; ///< it, to become the secondary once the other is on
     std::uint16_t lastQuiver_ = 0;       ///< g_guiInvLastQuiverNetCode: put back on with a bow

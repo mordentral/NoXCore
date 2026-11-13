@@ -8,6 +8,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+#include <cstdarg>
+#include <cstdio>
 #include <stdexcept>
 
 namespace noxsdl {
@@ -63,11 +66,66 @@ const char* kindName(nox::client::ClientEvent::Kind kind)
     return "?";
 }
 
+// The lobby's and the handshake's opcodes by name, for the join's log lines.
+const char* joinOpName(std::uint8_t op)
+{
+    switch (op) {
+    case 0x00: return "CONNECT";
+    case 0x01: return "ACCEPT";
+    case 0x02: case 0x03: case 0x04: return "CONNECT REFUSED";
+    case 0x0C: return "DISCOVER";
+    case 0x0D: return "SERVER_INFO";
+    case 0x0E: return "TRY_JOIN";
+    case 0x0F: return "PASSWORD_REQUIRED";
+    case 0x10: return "SERVER_PING";
+    case 0x11: return "PASSWORD";
+    case 0x12: return "SERVER_PONG";
+    case 0x13: return "SERVER_ERROR";
+    case 0x14: return "JOIN_OK";
+    case 0x15: return "JOIN_FAIL";
+    case nox::lobby::kExtendedOp: return "NoX Core query/answer";
+    default: return "";
+    }
+}
+
 } // namespace
+
+void LiveSession::joinLog(const char* fmt, ...)
+{
+    if (!joinLogging_ || joinLogLines_ >= kJoinLogLines) {
+        return;
+    }
+    char line[512];
+    va_list args;
+    va_start(args, fmt);
+    std::vsnprintf(line, sizeof(line), fmt, args);
+    va_end(args);
+    ++joinLogLines_;
+    SDL_Log("join: %s%s", line, joinLogLines_ == kJoinLogLines ? " (no more join lines)" : "");
+}
+
+void LiveSession::logJoinDatagram(const char* socket, const nox::net::Endpoint& from, std::span<const std::uint8_t> d,
+                                  const char* verdict)
+{
+    if (!joinLogging_ || joinLogLines_ >= kJoinLogLines) {
+        return;
+    }
+    char hex[3 * 12 + 1] = {};
+    std::size_t at = 0;
+    for (std::size_t i = 0; i < d.size() && i < 12; ++i) {
+        at += static_cast<std::size_t>(std::snprintf(hex + at, sizeof(hex) - at, i == 0 ? "%02X" : " %02X", d[i]));
+    }
+    // (Named on the lobby socket, and the NoX Core answer on the game one; the game socket's
+    // others are the handshake's and the game's, XORed once connected: shown as they came.)
+    const bool lobby = socket[0] == 'l';
+    const char* op = d.size() >= 3 && (lobby || d[2] == nox::lobby::kExtendedOp) ? joinOpName(d[2]) : "";
+    joinLog("+%u ms got %zu bytes on the %s socket from %s: %s%s%s%s (%s)", nowMs() - joinStartedAt_, d.size(), socket,
+            from.toString().c_str(), hex, d.size() > 12 ? " ..." : "", *op ? " = " : "", op, verdict);
+}
 
 LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProfile profile,
                          const nox::things::ThingDb& things, const fs::path& gameDir, const fs::path& mapCache, bool identifyFirst,
-                         bool knownStock, std::uint64_t realm)
+                         bool knownStock, std::uint64_t realm, bool stockShaped)
     : server_(resolve(hostAndPort))
     , client_(std::move(profile), &things, gameDir / "maps", mapCache)
     , lobby_(nox::net::UdpSocket::open())
@@ -77,13 +135,21 @@ LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProf
     , keyring_(gameDir / "noxcore_keys.txt")
 {
     SDL_Log("joining %s", server_.toString().c_str());
+    joinStartedAt_ = nowMs();
+    const bool asks = !SDL_getenv("NOX_STOCK_STREAM") && !stockShaped;
+    joinLog("to %s from our lobby socket's port %u (the join) and game socket's port %u (the game); %s", server_.toString().c_str(),
+            lobby_.localPort(), game_.localPort(),
+            asks ? "the NoX Core query twice from the game socket first"
+                 : stockShaped ? "nothing before the join (an XWIS game that answered no ping: a GAME.EXE host's join)"
+                               : "nothing before the join (NOX_STOCK_STREAM)");
     // noxcpp's: the extended query from the socket the game will connect from, before it does (a
     // stock server drops it: lobby/extended.hpp), twice in case one's lost. A noxcpp server then
     // sends us its own extras (MSG_NOXCPP_SUBSTEP: the important objects between frames).
     // (Tests: with NOX_STOCK_STREAM set it isn't sent, so a noxcpp server sends us a stock client's
     // 30 Hz stream, as a GAME.EXE host does; a host whose content packs add object types then
-    // refuses us as it does a stock client.)
-    if (!SDL_getenv("NOX_STOCK_STREAM")) {
+    // refuses us as it does a stock client.) Never to a host the game list knows only from XWIS
+    // and never heard from (`stockShaped`): there the join is the 1.2b client's alone.
+    if (asks) {
         // (We take a script mode's UI, of API 2 with its assets too: a server that knows
         // ClientFeature reads it, an older one the token alone. The object types our content
         // packs add, if any: a host with added types lets in only a game with the same ones. Our
@@ -122,13 +188,29 @@ void LiveSession::update()
 {
     const std::uint32_t now = nowMs();
     std::uint8_t buffer[2048];
-    // Lobby packets, then game packets, only from our server; a noxcpp server's extended reply is taken here.
+    // Lobby packets from our server's address (from any port, as the 1.2b client's lobby receive
+    // takes them: it compares the address alone), then game packets from our server alone; a
+    // noxcpp server's extended reply is taken here.
     while (const auto got = lobby_.receive(buffer)) {
-        if (got->from == server_) {
-            client_.receiveLobby(std::span(buffer, got->size));
+        const std::span<const std::uint8_t> d(buffer, got->size);
+        const bool host = got->from.address == server_.address;
+        if (joinLogging_) {
+            ++lobbyHeard_;
+            joinDropped_ += host ? 0 : 1;
+            logJoinDatagram("lobby", got->from, d, host ? "taken" : "dropped: not the host's address");
+        }
+        if (host) {
+            lobbyFrom_ = got->from;
+            client_.receiveLobby(d);
         }
     }
     while (const auto got = game_.receive(buffer)) {
+        if (joinLogging_) {
+            ++gameHeard_;
+            joinDropped_ += got->from == server_ ? 0 : 1;
+            logJoinDatagram("game", got->from, std::span(buffer, got->size),
+                            got->from == server_ ? "taken" : "dropped: not the host's address and port");
+        }
         if (got->from == server_) {
             const std::span<const std::uint8_t> d(buffer, got->size);
             if (beforeDatagram) {
@@ -185,7 +267,31 @@ void LiveSession::update()
         beforeSend();
     }
     for (const auto& d : outgoing) {
-        (d.lobby ? lobby_ : game_).sendTo(server_, d.bytes);
+        // (The ping test's pong goes back where the ping came from, as the 1.2b client's.)
+        const bool pong = d.lobby && d.bytes.size() >= 3 && d.bytes[2] == static_cast<std::uint8_t>(nox::net::Op::ServerPong);
+        const nox::net::Endpoint to = pong && lobbyFrom_ ? *lobbyFrom_ : server_;
+        if (joinLogging_ && d.bytes.size() >= 3 &&
+            (d.lobby || client_.stage() == nox::client::HeadlessClient::Stage::Joining)) {
+            // (each lobby send; on the game socket, the handshake's: the connect and our ACCEPT)
+            joinLog("+%u ms sent %zu bytes (%s%s%02X %02X %02X) from the %s socket's port %u to %s", now - joinStartedAt_,
+                    d.bytes.size(), d.lobby ? joinOpName(d.bytes[2]) : "", d.lobby ? ": " : "", d.bytes[0], d.bytes[1], d.bytes[2],
+                    d.lobby ? "lobby" : "game", (d.lobby ? lobby_ : game_).localPort(), to.toString().c_str());
+        }
+        (d.lobby ? lobby_ : game_).sendTo(to, d.bytes);
+    }
+    // (The join's log lines end once we're in the game, or with a summary when the join failed.)
+    if (joinLogging_ && started_) {
+        using Stage = nox::client::HeadlessClient::Stage;
+        const auto stage = client_.stage();
+        if (stage == Stage::Failed) {
+            joinLogLines_ = std::min(joinLogLines_, kJoinLogLines - 1); // (the summary always)
+            joinLog("ended after %u ms: heard %u datagram(s) on the lobby socket and %u on the game socket (%u of them not "
+                    "from the host), %u of our sends bounced (port unreachable)",
+                    now - joinStartedAt_, lobbyHeard_, gameHeard_, joinDropped_, lobby_.bounced() + game_.bounced());
+        }
+        if (stage == Stage::InGame || stage == Stage::Failed || stage == Stage::Closed) {
+            joinLogging_ = false;
+        }
     }
     for (const auto& e : client_.takeEvents()) {
         if (e.name.empty()) {

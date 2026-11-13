@@ -164,6 +164,9 @@ public:
         Connected,
         ConnectRefused,   ///< 0x02/0x03/0x04, or no answer within kConnectTimeoutMs
         Closed,           ///< the server disconnected
+        /// JOIN_FAIL (0x15): the host made room (an observer put out) and wants the join again;
+        /// the 1.2b client waits a second and sends a new TRY_JOIN (HeadlessClient::tick).
+        JoinAgain,
     };
 
     struct Datagram {
@@ -184,6 +187,9 @@ public:
     void sendPassword(const msg::ServerPassword& password);
     /// A datagram that arrived on the lobby socket from the server's address.
     void receiveLobby(std::span<const std::uint8_t> datagram);
+    /// SERVER_PINGs (0x10, the host's ping test) answered while joining, so far: each one restarts
+    /// the 1.2b client's 20 s wait for the lobby's answer.
+    std::uint32_t lobbyPings() const noexcept { return lobbyPings_; }
 
     /// Starts the connect handshake; `accept` is sent once the server accepts.
     void connect(const msg::ClientAccept& accept, std::uint32_t nowMs);
@@ -217,6 +223,7 @@ private:
 
     State state_ = State::Idle;
     int joinError_ = -1;
+    std::uint32_t lobbyPings_ = 0;
     Stream stream_;
     std::uint8_t key_ = 0;
     std::uint32_t playerId_ = 0;

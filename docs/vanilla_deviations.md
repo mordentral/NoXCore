@@ -155,6 +155,29 @@ What follows from it:
 - **Risk:** low; the server decoder accepts 0xBE at any time (it only advances past it).
 - **Revert:** remove the keep-alive block in `gameFrame`.
 
+### VD-72: Downloaded maps go to NoX Core's own noxsdl_maps folder, never the game's maps folder
+
+- **Vanilla:** a map the host sends (the server's map not found in the game's maps folder, or found
+  with another CRC) is written into the game's own `maps\<name>\` folder, over a same-named map
+  that was there, and loaded from there; the game's copy of that map is gone.
+- **Ours:** noxsdl saves a downloaded map (its `.map` and the `.nxz` as sent) in `noxsdl_maps\<name>\`
+  beside noxcore.exe, or in the player's settings folder (SDL's pref folder) when the program's own
+  folder can't be written (noxsdl/src/map_cache_dir.cpp; `--map-cache` sets another), and never
+  writes into the game's maps folder. A join looks for the server's map by name and CRC in the
+  game's maps folder first, then in noxsdl_maps (HeadlessClient's map check); only when neither
+  holds it with the server's CRC is it downloaded. A same-named map in the game's folder with
+  another CRC is left as it is: both stay, and each server gets the one with its CRC. The folder
+  chosen is logged at start ("downloaded maps: ...").
+- **Why:** by the owner's decision, 2026-11-13 ("im fine with nox core downloaded maps being in the
+  noxcore folder, and it should be listed as a difference"): NoX Core never writes into the game's
+  install (often in Program Files, where it may not be allowed to), and a download never replaces
+  the player's own copy of a map.
+- **Risk:** the stock client (GAME.EXE) doesn't see NoX Core's downloads: it downloads the map again
+  into its own maps folder. A map downloaded by NoX Core isn't in the game's map lists for hosting
+  or solo play until copied there.
+- **Revert:** pass the game's maps folder as the map cache (`--map-cache <game>\maps`), and let a
+  download overwrite a same-named map there.
+
 ## Client display (no effect on the wire)
 
 These change only what noxsdl shows; every one is off with `--stock-effects` or the matching
@@ -520,6 +543,11 @@ older one, or another port's, leaves it a stock client's, sent none of noxcpp's 
 messages), a stock server drops
 the query (its packet handler: no connection yet), and a stock client never asks, so neither ever sees the
 message. Checked live against a stock GAME.EXE server on XWIS: the join went as usual.
+Not to a game the list had from XWIS alone that answered none of its pings (a GAME.EXE host
+started from Westwood Online answers no discover ping: its receive takes 0x0C only in a LAN
+game): that join sends nothing before its TRY_JOIN, as the 1.2b client's (LiveSession's
+`stockShaped`), and the game list sends such a host only the stock ping, its query only to a
+server that answered one (ServerBrowser::pollUdp).
 
 ### VD-12: noxsdl on a noxcpp server: fresh input (HeadlessClient::setFreshInput)
 
@@ -1718,7 +1746,15 @@ The engine's logic is the exe's; these are where the output differs.
 
 - **Vanilla:** WOLAPI's one session lasts from the login through the chat, the game list and the
   game (a host's game is its channel on that session; a guest stays logged in too), till the
-  player logs off.
+  player logs off. A guest picking a listed game first joins its channel (WOLAPI's
+  RequestChannelJoin: `JOINGAME #<host>'s_game 1 <key>`) and sends the host its TRY_JOIN only once
+  XWIS has said it's in (the event sink's channel-join answer, in the "joining a game" state);
+  the host's own game code does nothing when a guest joins its channel (no check of the channel's
+  users at its TRY_JOIN, nothing sent to the guest), and WOLAPI sends no UDP of its own (its pings
+  are ICMP).
+- **Ours (the join):** noxsdl never joins a game's channel: logged off, it sends the TRY_JOIN to the
+  listed address at once. A host behind something that lets in only the players in its channel
+  (a community tool, not GAME.EXE) would never hear it; not settled (2026-11-13).
 - **Ours:** noxsdl logs off (QUIT, then waits up to 3 seconds for XWIS to close) before it joins
   or hosts a game (Menus::join), since a hosted game posts itself on a connection of its own with
   the same nick (lobby/xwis_host) and the menus aren't run during a game to answer XWIS's pings.

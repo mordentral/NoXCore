@@ -270,6 +270,7 @@ void ClientConnection::receiveLobby(std::span<const std::uint8_t> datagram)
             Datagram d{true, {datagram.begin(), datagram.begin() + 8}};
             d.bytes[2] = static_cast<std::uint8_t>(Op::ServerPong);
             outgoing_.push_back(std::move(d));
+            ++lobbyPings_;
         }
         break;
     case Op::ServerError:
@@ -284,8 +285,10 @@ void ClientConnection::receiveLobby(std::span<const std::uint8_t> datagram)
         }
         break;
     case Op::ServerJoinFail:
+        // (The 1.2b client's lobby receive, 0x15: not a refusal. The host put an observer out to
+        // make room and wants the join again: a second later the join is sent anew.)
         if (waiting) {
-            state_ = State::JoinRefused;
+            state_ = State::JoinAgain;
         }
         break;
     default:

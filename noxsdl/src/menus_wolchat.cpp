@@ -206,6 +206,7 @@ void Menus::closeDialog()
     dialogEvents_ = nullptr;
     dialogKeys_ = nullptr;
     dialogKeysOf_ = nullptr;
+    dialogEscape_ = nullptr;
 }
 
 std::string Menus::lobbyText(int index) const

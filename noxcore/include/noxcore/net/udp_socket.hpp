@@ -59,6 +59,8 @@ public:
     };
     /// One datagram into `buffer`, or nullopt if none is waiting.
     std::optional<Received> receive(std::span<std::uint8_t> buffer);
+    /// How many of our sends came back as "port unreachable" (ICMP, seen by receive), so far.
+    std::uint32_t bounced() const noexcept { return bounced_; }
 
 private:
     explicit UdpSocket(std::uintptr_t handle)
@@ -68,6 +70,7 @@ private:
     void close() noexcept;
 
     std::uintptr_t handle_;
+    std::uint32_t bounced_ = 0;
 };
 
 } // namespace nox::net

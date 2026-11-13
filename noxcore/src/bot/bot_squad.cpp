@@ -314,10 +314,12 @@ std::optional<int> BotSquad::others(std::uint32_t nowMs)
 
 bool BotSquad::pingHost(std::uint32_t nowMs)
 {
-    // A ping and the extended query beside it (a game list's: lobby::ServerBrowser), once: a host
-    // that answers the ping but not the query is a stock one.
+    // A ping, then the extended query once it's answered (a game list's: lobby::ServerBrowser): a
+    // host that answers the ping but not the query is a stock one.
     constexpr std::uint32_t kPingWaitMs = 3000;  // (no answer at all by then: joined as a stock one)
-    constexpr std::uint32_t kQueryGraceMs = 50; // (the query's answer comes just after the ping's)
+    // (The query goes when the ping's answer comes: its answer a round trip later, the ping's own
+    // time again, and a little more.)
+    constexpr std::uint32_t kQueryGraceMs = 50;
     if (!hostProbe_) {
         lobby::ServerBrowser::Options o;
         o.xwis = false;
@@ -336,7 +338,7 @@ bool BotSquad::pingHost(std::uint32_t nowMs)
             hostAnswers_ = true;
         } else if (e.answered) {
             hostPingAnsweredAt_ = hostPingAnsweredAt_ != 0 ? hostPingAnsweredAt_ : nowMs;
-            if (nowMs - hostPingAnsweredAt_ >= kQueryGraceMs) {
+            if (nowMs - hostPingAnsweredAt_ >= kQueryGraceMs + 2 * e.pingMs.value_or(0)) {
                 hostSilent_ = true;
                 log("the server answers as a stock one: the bots join at once");
             }

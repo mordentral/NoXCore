@@ -105,6 +105,7 @@ bool UdpSocket::addressInUse(const std::error_code& error) noexcept
 
 UdpSocket::UdpSocket(UdpSocket&& other) noexcept
     : handle_(std::exchange(other.handle_, kInvalid))
+    , bounced_(std::exchange(other.bounced_, 0))
 {
 }
 
@@ -113,6 +114,7 @@ UdpSocket& UdpSocket::operator=(UdpSocket&& other) noexcept
     if (this != &other) {
         close();
         handle_ = std::exchange(other.handle_, kInvalid);
+        bounced_ = std::exchange(other.bounced_, 0);
     }
     return *this;
 }
@@ -171,7 +173,14 @@ std::optional<UdpSocket::Received> UdpSocket::receive(std::span<std::uint8_t> bu
         const int err = lastError();
 #ifdef _WIN32
         if (err == WSAECONNRESET || err == WSAEMSGSIZE) {
+            if (err == WSAECONNRESET) {
+                ++bounced_; // (ICMP port unreachable: nothing listens where a send went)
+            }
             continue; // a previous send bounced, or an oversized datagram: skip it
+        }
+#else
+        if (err == ECONNREFUSED) {
+            ++bounced_;
         }
 #endif
         if (wouldBlock(err)) {

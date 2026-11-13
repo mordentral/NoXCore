@@ -719,8 +719,11 @@ void joinLive(App& app, const std::string& host)
         const bool identifyFirst = joinWaitsForIdentity(listed) && isListed;
         const bool knownStock = app.browser && app.browser->sawStock(host);
         const std::uint64_t realm = isListed && listed->extended ? listed->extended->realm : 0;
+        // (An XWIS game that answered none of the list's pings, as a GAME.EXE host started from
+        // Westwood Online: joined as the 1.2b client joins it, nothing of NoX Core's first.)
+        const bool stockShaped = isListed && joinStockShaped(listed);
         app.live = std::make_unique<LiveSession>(host, app.profile, app.things, app.gameDir, app.mapCache, identifyFirst,
-                                                 knownStock, realm);
+                                                 knownStock, realm, stockShaped);
     }
     setUpLiveSession(app, host);
     if (app.audio) {

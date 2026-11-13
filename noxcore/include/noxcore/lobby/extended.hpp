@@ -1,5 +1,8 @@
-// Finding noxcpp servers in the game list: a query noxsdl's browser sends beside each
-// MSG_SERVER_DISCOVER ping, which only a noxcpp server answers.
+// Finding noxcpp servers in the game list: a query noxsdl's browser sends a server once it has
+// answered its MSG_SERVER_DISCOVER ping, which only a noxcpp server answers. (A GAME.EXE host
+// started from Westwood Online answers no ping, so it's never sent one: nothing of NoX Core's
+// goes to a host that hasn't shown itself, as the 1.2b client sends a listed game nothing before
+// its TRY_JOIN.)
 //
 //   query  00 00 F0 "NXSD" u16 version, u32 token          (browser -> server)
 //          [version 2: u32 the client's feature bits]
