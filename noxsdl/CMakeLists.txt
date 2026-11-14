@@ -78,6 +78,7 @@ add_executable(noxsdl WIN32
     src/editor/session_panel.cpp
     src/editor/session_setup.cpp
     src/editor/thing_thumbnails.cpp
+    src/editor_glue.cpp
     src/effects.cpp
     src/effects_beams.cpp
     src/effects_enchant.cpp
@@ -152,6 +153,7 @@ add_executable(noxsdl WIN32
     src/text_wrap.cpp
     src/typeface.cpp
     src/font_choice.cpp
+    src/frame.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/caudex_font.cpp
     src/test_drive.cpp
     src/thing_art.cpp

@@ -21,21 +21,6 @@ namespace {
 
 constexpr int kTab = 4;
 
-bool continuation(char c)
-{
-    return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
-}
-
-bool identStart(char c)
-{
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-}
-
-bool identChar(char c)
-{
-    return identStart(c) || (c >= '0' && c <= '9');
-}
-
 /// The palette, by theme: Dark's on its near-black, neutral greys; Medium's on the warm stone
 /// greys; Light's on pale panels.
 ImU32 colour(CodeEditor::Tok t, Theme theme)
@@ -188,16 +173,7 @@ int CodeEditor::prevCol(int line, int col) const
 
 int CodeEditor::nextCol(int line, int col) const
 {
-    const std::string& s = lines_[static_cast<std::size_t>(line)];
-    const int n = static_cast<int>(s.size());
-    if (col >= n) {
-        return n;
-    }
-    ++col;
-    while (col < n && continuation(s[static_cast<std::size_t>(col)])) {
-        ++col;
-    }
-    return col;
+    return editor::nextCol(lines_[static_cast<std::size_t>(line)], col);
 }
 
 int CodeEditor::visualCol(int line, int col) const

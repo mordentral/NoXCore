@@ -33,6 +33,38 @@ std::vector<TokSpan> lexLine(CodeLanguage language, std::string_view line, std::
 inline constexpr std::uint8_t kLuauLongComment = 1;
 inline constexpr std::uint8_t kLuauLongString = 64;
 
+/// A UTF-8 continuation byte (not a character's first): columns are byte offsets, and the lexer
+/// and the code editor step over a letter whole.
+inline bool continuation(char c)
+{
+    return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
+}
+
+/// A name's first character (an ASCII letter or '_'), and any of its others (digits too).
+inline bool identStart(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+inline bool identChar(char c)
+{
+    return identStart(c) || (c >= '0' && c <= '9');
+}
+
+/// The column after the character at `col` (a UTF-8 letter whole).
+inline int nextCol(std::string_view s, int col)
+{
+    const int n = static_cast<int>(s.size());
+    if (col >= n) {
+        return n;
+    }
+    ++col;
+    while (col < n && continuation(s[static_cast<std::size_t>(col)])) {
+        ++col;
+    }
+    return col;
+}
+
 /// The language's line comment ("//", "--").
 std::string_view lineComment(CodeLanguage language);
 

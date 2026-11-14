@@ -38,16 +38,12 @@ namespace {
 
 using editor::help;
 using editor::pathText;
+using editor::u8path;
 using nox::util::lowered;
 
 constexpr std::uint64_t kAnalysisPauseMs = 600; ///< typing paused this long: the files checked
 constexpr std::uintmax_t kExportCap = 64u << 20; ///< the most an exported mod holds
 constexpr std::uint64_t kFilesCheckMs = 1000;    ///< how often Mod Files looks at the folder again
-
-fs::path u8path(std::string_view s)
-{
-    return fs::path(std::u8string(reinterpret_cast<const char8_t*>(s.data()), s.size()));
-}
 
 /// An InputText over a std::string (at most `cap` bytes).
 bool inputText(const char* id, std::string& s, std::size_t cap, ImGuiInputTextFlags flags = 0)

@@ -1,6 +1,8 @@
 // A mod project (mod_project.hpp).
 #include "editor/mod_project.hpp"
 
+#include "editor/editor_text.hpp"
+
 #include "noxcore/mapedit/mod_files.hpp"
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/manifest.hpp"
@@ -20,11 +22,6 @@ namespace {
 /// mode.json's members in the order a new one is put among them.
 constexpr std::string_view kOrder[] = {"api",    "id",     "name", "description", "order",     "players", "stockClients",
                                        "levels", "mapPrefix", "server", "ui",  "uiApi",     "looksLike", "options"};
-
-fs::path u8path(std::string_view s)
-{
-    return fs::path(std::u8string(reinterpret_cast<const char8_t*>(s.data()), s.size()));
-}
 
 std::string u8text(const fs::path& p)
 {

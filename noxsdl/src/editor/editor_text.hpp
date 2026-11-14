@@ -20,6 +20,12 @@ inline std::string pathText(const std::filesystem::path& p)
     return std::string(u.begin(), u.end());
 }
 
+/// UTF-8 text as a path (pathText's way back: a mod's file names, mode.json's paths).
+inline std::filesystem::path u8path(std::string_view s)
+{
+    return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(s.data()), s.size()));
+}
+
 /// The numbers in `s` after `prefix` (any separators between them), or nothing when `s` doesn't
 /// start with `prefix` or has fewer than `count` numbers ("place:120,340" after "place:").
 inline std::optional<std::vector<float>> numbersAfter(std::string_view s, std::string_view prefix, std::size_t count)

@@ -10,35 +10,6 @@ namespace noxsdl::editor {
 
 namespace {
 
-bool continuation(char c)
-{
-    return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
-}
-
-bool identStart(char c)
-{
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-}
-
-bool identChar(char c)
-{
-    return identStart(c) || (c >= '0' && c <= '9');
-}
-
-/// The column after the character at `col` (a UTF-8 letter whole).
-int nextCol(std::string_view s, int col)
-{
-    const int n = static_cast<int>(s.size());
-    if (col >= n) {
-        return n;
-    }
-    ++col;
-    while (col < n && continuation(s[static_cast<std::size_t>(col)])) {
-        ++col;
-    }
-    return col;
-}
-
 // ---- NoxScript (the map scripts')
 
 bool isNoxKeyword(std::string_view w)

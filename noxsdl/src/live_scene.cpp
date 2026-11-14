@@ -302,7 +302,7 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
     // The front pick and the cursor's (cursor_pick.hpp): a Glyph is the cursor's only for a
     // wizard, and then only while nothing else is under it.
     pick::Picks<std::variant<std::uint16_t, MapView::Useable>> hover;
-    const TypeArt* glyphArt = app.art->get("Glyph");
+    const TypeArt* glyphArt = app.art->get(app.glyphArt, "Glyph");
     const auto* ownRecord = ownPlayer(client);
     const pick::CursorRole glyphRole =
         ownRecord && ownRecord->playerClass == 1 ? pick::CursorRole::LastResort : pick::CursorRole::None;
