@@ -289,8 +289,8 @@ void applyMouse(App& app)
     if (!app.window) {
         return;
     }
-    int outW = 0, outH = 0;
-    SDL_GetCurrentRenderOutputSize(app.renderer, &outW, &outH);
+    // layoutView has already fitted the menu/game to this frame's usable area.
+    const int outW = app.camera.viewWidth, outH = app.camera.viewHeight;
     const float gamePixel = app.live ? app.camera.zoom // (viewZoom, set this frame)
                                      : std::min(static_cast<float>(outW) / 640.0f, static_cast<float>(outH) / 480.0f);
     // (Events are in window points: the density the pointer mapping uses, layoutView's this frame.)
