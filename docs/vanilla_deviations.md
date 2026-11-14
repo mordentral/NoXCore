@@ -155,6 +155,22 @@ What follows from it:
 - **Risk:** low; the server decoder accepts 0xBE at any time (it only advances past it).
 - **Revert:** remove the keep-alive block in `gameFrame`.
 
+### VD-74: Every game tells a player's health and mana changes at once, Westwood Online games too
+
+- **Vanilla:** in a Westwood Online game, the server tells a player a change of their health (or
+  mana) only when it is a tenth of the most or more, or when more than 7 frames have passed since
+  the last one it told; smaller changes wait. LAN games tell every change.
+- **Ours:** every change is told at once, in every game (noxcore/src/server/game_host.cpp,
+  GameHost::sendReports).
+- **Why:** by the owner's decision, 2026-11-13: the throttle saved bandwidth on the connections of
+  its day, which today's don't need. It matters more since a game hosted after Skip Login is a
+  Westwood Online game too (VD-38).
+- **Risk:** low: a stock client in a Westwood Online game gets up to about eight times the health
+  and mana messages while they change a point at a time, and its bars move as smoothly as in a
+  LAN game.
+- **Revert:** in sendReports, in a Westwood Online game, hold a health or mana change until it is a
+  tenth of the most or more than 7 frames have passed since the last one told.
+
 ### VD-73: Continual Replenishment keeps a staff's charge percent with its charges (OB-429)
 
 - **Vanilla:** Continual Replenishment adds a charge to a wand or staff every so many frames but
@@ -167,7 +183,9 @@ What follows from it:
 - **Why:** by the owner's decision, 2026-11-13 ("fix it and note it as an original bug"). Delve and
   Undead Tide rewards can put Replenishment1 on a staff.
 - **Risk:** none known: only the percent changes, and only on items with Continual Replenishment.
-  A stock client is told the charges as before (MSG_REPORT_CHARGES).
+  A stock client is told the charges as before (MSG_REPORT_CHARGES). What follows from it: an
+  obelisk no longer spends its mana on such a staff once it has refilled itself (its percent is
+  100), and a shop's repair or an item's respawn, which fill the charges, leave it as they find it.
 - **Revert:** remove the percent update after `item->charges = now` in ContinualReplenishmentUpdate.
 
 ### VD-72: Downloaded maps go to NoX Core's own noxsdl_maps folder, never the game's maps folder
@@ -562,7 +580,10 @@ Not to a game the list had from XWIS alone that answered none of its pings (a GA
 started from Westwood Online answers no discover ping: its receive takes 0x0C only in a LAN
 game): that join sends nothing before its TRY_JOIN, as the 1.2b client's (LiveSession's
 `stockShaped`), and the game list sends such a host only the stock ping, its query only to a
-server that answered one (ServerBrowser::pollUdp).
+server that answered one (ServerBrowser::pollUdp). An XWIS game chosen while its ping is still
+out ("Checking...") is joined once the ping has answered or run out, or after at most 3 seconds
+(identify_wait.hpp's PingWait), the "Attempting to connect" dialog and its Cancel up meanwhile;
+the 1.2b client waits for no ping (only for XWIS to let it into the game's channel: VD-25).
 
 ### VD-12: noxsdl on a noxcpp server: fresh input (HeadlessClient::setFreshInput)
 
