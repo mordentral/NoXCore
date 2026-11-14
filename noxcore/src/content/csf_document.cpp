@@ -14,45 +14,9 @@ namespace nox::content {
 
 namespace {
 
-// The u32s the game compares (string_table.cpp's).
-constexpr std::uint32_t kMagic = 0x43534620;      // "CSF "
-constexpr std::uint32_t kTagLabel = 0x4C424C20;   // "LBL "
-constexpr std::uint32_t kTagStr = 0x53545220;     // "STR "
-constexpr std::uint32_t kTagStrW = 0x53545257;    // "STRW"
-constexpr std::uint32_t kTagStrInv = 0x53747220;  // "Str "
-constexpr std::uint32_t kTagStrWInv = 0x53747257; // "StrW"
-
-/// The game's whitespace pass (string_table.cpp's collapseWhitespace).
-std::u16string collapse(const std::u16string& in)
-{
-    std::u16string out;
-    char16_t prev = 0xFFFF;
-    bool lineStart = true;
-    for (char16_t c : in) {
-        if (c == u' ') {
-            if (prev != u' ' && !lineStart) {
-                out.push_back(c);
-                lineStart = false;
-                prev = c;
-            }
-        } else if (c == u'\n' || c == u'\t') {
-            if (prev == u' ') {
-                out.pop_back();
-            }
-            out.push_back(c);
-            lineStart = true;
-            prev = c;
-        } else {
-            out.push_back(c);
-            lineStart = false;
-            prev = c;
-        }
-    }
-    if (prev == u' ') {
-        out.pop_back();
-    }
-    return out;
-}
+// The u32s the game compares and its whitespace pass: string_table.hpp's.
+using namespace strings::csf;
+constexpr auto collapse = strings::collapseWhitespace;
 
 } // namespace
 

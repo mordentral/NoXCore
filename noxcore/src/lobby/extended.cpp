@@ -2,6 +2,7 @@
 #include "noxcore/lobby/extended.hpp"
 
 #include "noxcore/crypto/sha256.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 #include <string_view>
@@ -13,16 +14,18 @@ namespace {
 constexpr std::string_view kQueryMagic = "NXSD";
 constexpr std::string_view kReplyMagic = "NXSV";
 
+constexpr auto get16 = util::u16At;
+constexpr auto get32 = util::u32At;
+constexpr auto put16 = util::putU16;
+constexpr auto put32 = util::putU32;
+
 // 00 00, the opcode, the 4-byte magic, u16 version, u32 token (13 bytes, little-endian).
 void header(std::vector<std::uint8_t>& out, std::string_view magic, std::uint16_t version, std::uint32_t token)
 {
     out = {0, 0, kExtendedOp};
     out.insert(out.end(), magic.begin(), magic.end());
-    out.push_back(static_cast<std::uint8_t>(version));
-    out.push_back(static_cast<std::uint8_t>(version >> 8));
-    for (int i = 0; i < 4; ++i) {
-        out.push_back(static_cast<std::uint8_t>(token >> (8 * i)));
-    }
+    put16(out, version);
+    put32(out, token);
 }
 
 /// The version and token after `magic`, if the datagram starts so; `at` then points past them.
@@ -33,17 +36,10 @@ std::optional<std::pair<std::uint16_t, std::uint32_t>> readHeader(std::span<cons
         !std::equal(magic.begin(), magic.end(), d.begin() + 3)) {
         return std::nullopt;
     }
-    const auto version = static_cast<std::uint16_t>(d[7] | d[8] << 8);
-    const std::uint32_t token = d[9] | d[10] << 8 | d[11] << 16 | static_cast<std::uint32_t>(d[12]) << 24;
+    const std::uint16_t version = get16(d, 7);
+    const std::uint32_t token = get32(d, 9);
     at = 13;
     return std::pair{version, token};
-}
-
-void put32(std::vector<std::uint8_t>& out, std::uint32_t v)
-{
-    for (int i = 0; i < 4; ++i) {
-        out.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
-    }
 }
 
 void put64(std::vector<std::uint8_t>& out, std::uint64_t v)
@@ -51,22 +47,6 @@ void put64(std::vector<std::uint8_t>& out, std::uint64_t v)
     for (int i = 0; i < 8; ++i) {
         out.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
     }
-}
-
-void put16(std::vector<std::uint8_t>& out, std::uint16_t v)
-{
-    out.push_back(static_cast<std::uint8_t>(v));
-    out.push_back(static_cast<std::uint8_t>(v >> 8));
-}
-
-std::uint16_t get16(std::span<const std::uint8_t> d, std::size_t at)
-{
-    return static_cast<std::uint16_t>(d[at] | d[at + 1] << 8);
-}
-
-std::uint32_t get32(std::span<const std::uint8_t> d, std::size_t at)
-{
-    return d[at] | d[at + 1] << 8 | d[at + 2] << 16 | static_cast<std::uint32_t>(d[at + 3]) << 24;
 }
 
 std::uint64_t get64(std::span<const std::uint8_t> d, std::size_t at)

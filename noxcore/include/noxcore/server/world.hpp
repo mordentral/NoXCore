@@ -2340,8 +2340,6 @@ public:
     /// .plr's things), and those are kept by number for this. 0 names none. (A group's members, a
     /// mover's thing, a map object's net code: bit 15 and the number.)
     ServerObject* byMapNumber(MapNumber number);
-    /// Its map number given after it was put in the world (kept for byMapNumber).
-    void setMapNumber(ServerObject& o, MapNumber number);
     /// A client's code for a thing as packetDynamicUnitCode, then Obj_GetByNetCode, take it: with
     /// bit 15 a map object's, by its map number (byMapNumber); else the thing it's the code of.
     ServerObject* byPacketCode(NetCode code);

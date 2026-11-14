@@ -114,7 +114,6 @@ public:
     /// the game's, which the new map's join at their heads).
     void appendUpdatable(std::span<ServerObject* const> objects);
     void appendMissiles(std::span<ServerObject* const> objects);
-    ServerObject* firstUpdatable() const noexcept { return listFirst(updHead_); }
     /// The units update's first walk (updateUnits): each one's next taken before its turn, as the
     /// exe's; one taken off the list keeps its link, so the walk goes on from it.
     template <class Fn>

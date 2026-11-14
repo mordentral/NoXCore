@@ -33,12 +33,7 @@ constexpr std::array<std::string_view, 23> kCategories{
     "combat", "health",   "spells",  "enchants",  "owners",   "sound",    "messages",  "dialog",
     "quest",  "players",  "triggers", "math",     "strings",  "game",     "unused"};
 
-std::string_view trim(std::string_view s)
-{
-    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) s.remove_prefix(1);
-    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.remove_suffix(1);
-    return s;
-}
+using util::trim;
 
 std::vector<std::string_view> splitLines(std::string_view text)
 {

@@ -46,6 +46,13 @@ constexpr std::uint32_t be32(const std::uint8_t* p)
 constexpr std::uint8_t lo(std::uint32_t v) { return static_cast<std::uint8_t>(v); }
 constexpr std::uint8_t hi(std::uint32_t v) { return static_cast<std::uint8_t>(v >> 8); }
 
+/// A u16 appended, little-endian.
+inline void putU16(std::vector<std::uint8_t>& out, std::uint16_t v)
+{
+    out.push_back(static_cast<std::uint8_t>(v));
+    out.push_back(static_cast<std::uint8_t>(v >> 8));
+}
+
 /// A u32 appended, little-endian.
 inline void putU32(std::vector<std::uint8_t>& out, std::uint32_t v)
 {

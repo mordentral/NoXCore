@@ -1834,12 +1834,6 @@ void World::noteRenumbered(const ServerObject& o)
     }
 }
 
-void World::setMapNumber(ServerObject& o, MapNumber number)
-{
-    o.fileExtent = number;
-    noteRenumbered(o);
-}
-
 ServerObject* World::byMapNumber(MapNumber number)
 {
     // (netGetUnitByExtent) The object list from its head: the first not destroyed (0x20) whose

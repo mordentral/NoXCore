@@ -24,6 +24,21 @@
 
 namespace nox::strings {
 
+/// The file's tags as the u32 the game compares (the file stores them byte-reversed); shared by
+/// the table's reader and content/csf_document.cpp's.
+namespace csf {
+inline constexpr std::uint32_t kMagic = 0x43534620;      // "CSF "
+inline constexpr std::uint32_t kTagLabel = 0x4C424C20;   // "LBL "
+inline constexpr std::uint32_t kTagStr = 0x53545220;     // "STR "
+inline constexpr std::uint32_t kTagStrW = 0x53545257;    // "STRW"
+inline constexpr std::uint32_t kTagStrInv = 0x53747220;  // "Str " (inverted text)
+inline constexpr std::uint32_t kTagStrWInv = 0x53747257; // "StrW" (inverted text)
+} // namespace csf
+
+/// The game's whitespace pass on a string's text: drops leading spaces and spaces before a
+/// newline or tab or at the end, and collapses runs of spaces.
+std::u16string collapseWhitespace(const std::u16string& in);
+
 struct StringVariant {
     std::u16string text; // as the game shows it: decoded, cut at a NUL, whitespace collapsed
     std::string extra;   // W tags only: an 8-bit string (a speech file name)

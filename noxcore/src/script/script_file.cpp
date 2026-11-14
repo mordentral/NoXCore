@@ -105,6 +105,7 @@ ScriptFile ScriptFile::parse(std::span<const std::uint8_t> data)
     }
     r.expect("CODE");
     const std::uint32_t count = r.u32();
+    std::uint64_t scriptWords = 0; // (every function's locals so far)
     for (std::uint32_t index = 0; index < count; ++index) {
         Function fn;
         r.expect("FUNC");
@@ -147,6 +148,10 @@ ScriptFile ScriptFile::parse(std::span<const std::uint8_t> data)
             total += fn.symbolSizes[i];
         }
         fn.localWords = total;
+        scriptWords += total;
+        if (scriptWords > kMaxScriptLocalWords) {
+            throw std::runtime_error("script: its functions' locals are too big in all");
+        }
         r.expect("DATA");
         const auto code = r.raw(r.u32());
         // A code length that isn't a whole number of words is zero-padded.

@@ -90,15 +90,18 @@ void writeHeader(ByteWriter& w, const ObjectHeader& h)
 }
 
 // Recursive: the owner's items are the next `inventoryCount` records, each followed by its own
-// items, so `next` advances depth first through the flat record list.
-void buildChildren(std::span<const ObjectXfer> objects, std::size_t& next, ObjectTree& owner)
+// items, so `next` advances depth first through the flat record list. `depth`: the owner's.
+void buildChildren(std::span<const ObjectXfer> objects, std::size_t& next, ObjectTree& owner, int depth)
 {
     for (std::uint8_t i = 0; i < objects[owner.record].header.inventoryCount(); ++i) {
         if (next >= objects.size()) {
             throw FormatError("ObjectData: inventory count runs past the last object");
         }
+        if (depth >= kMaxInventoryDepth) {
+            throw FormatError("ObjectData: inventories nested too deep");
+        }
         ObjectTree item{next++, {}};
-        buildChildren(objects, next, item);
+        buildChildren(objects, next, item, depth + 1);
         owner.inventory.push_back(std::move(item));
     }
 }
@@ -156,7 +159,7 @@ std::vector<ObjectTree> buildObjectTree(std::span<const ObjectXfer> objects)
     std::size_t next = 0;
     while (next < objects.size()) {
         ObjectTree top{next++, {}};
-        buildChildren(objects, next, top);
+        buildChildren(objects, next, top, 0);
         out.push_back(std::move(top));
     }
     return out;

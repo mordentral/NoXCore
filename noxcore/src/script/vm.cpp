@@ -31,6 +31,12 @@ bool among(std::uint32_t id, std::span<const std::uint32_t> list)
 
 const std::string kEmpty;
 
+// Word offsets negated, added to and taken from as the game's 32-bit integers do: wrapping
+// (done unsigned, so an offset from the stack near INT_MIN can't overflow a signed int).
+std::int32_t negated(std::int32_t v) { return static_cast<std::int32_t>(0u - static_cast<std::uint32_t>(v)); }
+std::int32_t plus(std::int32_t a, std::int32_t b) { return static_cast<std::int32_t>(static_cast<std::uint32_t>(a) + static_cast<std::uint32_t>(b)); }
+std::int32_t minus(std::int32_t a, std::int32_t b) { return static_cast<std::int32_t>(static_cast<std::uint32_t>(a) - static_cast<std::uint32_t>(b)); }
+
 // Two strings joined, cut to 255 characters (sprintf "%s%s" into 256 bytes on the
 // interpreter's stack: the game's runs over it past that, an original bug).
 std::string joined255(const std::string& a, const std::string& b)
@@ -248,7 +254,7 @@ std::uint32_t Vm::read(std::size_t fn, bool global, std::int32_t offset) const
 {
     // Negative offsets (locals only) are the trigger object's script variables.
     if (!global && offset < 0) {
-        return host_->objectVar(-offset);
+        return host_->objectVar(negated(offset));
     }
     const auto& words = locals_[global ? 1 : fn];
     return offset >= 0 && static_cast<std::size_t>(offset) < words.size() ? words[static_cast<std::size_t>(offset)] : 0;
@@ -257,7 +263,7 @@ std::uint32_t Vm::read(std::size_t fn, bool global, std::int32_t offset) const
 void Vm::write(std::size_t fn, bool global, std::int32_t offset, std::uint32_t value)
 {
     if (!global && offset < 0) {
-        host_->setObjectVar(-offset, value);
+        host_->setObjectVar(negated(offset), value);
         return;
     }
     if (global && locals_.size() < 2) {
@@ -286,7 +292,9 @@ bool Vm::run(std::size_t index, int depth, std::size_t begin, std::size_t end)
     // A ranged call (callRange: the editor's hot reload) pops no arguments.
     const bool ranged = begin != 0 || end != SIZE_MAX;
     // Arguments into the first local words: the last one pushed is popped first, into word 0.
-    for (std::uint32_t i = 0; i < fn.args && !ranged; ++i) {
+    // (Once past the locals with the stack empty, a pop changes nothing: stopped there, so a
+    // script's argument count of billions can't hold the server for seconds.)
+    for (std::uint32_t i = 0; i < fn.args && !ranged && (i < locals.size() || top_ > 0); ++i) {
         const std::uint32_t v = pop();
         if (i < locals.size()) {
             locals[i] = v;
@@ -513,13 +521,13 @@ bool Vm::run(std::size_t index, int depth, std::size_t begin, std::size_t end)
             if (op == static_cast<std::uint32_t>(Op::IndexPtr)) {
                 push(globalWord);
                 // Object-variable offsets are negative, so their elements count downwards.
-                push(static_cast<std::uint32_t>(offset < 0 ? offset - i : offset + i));
+                push(static_cast<std::uint32_t>(offset < 0 ? minus(offset, i) : plus(offset, i)));
             } else if (!global && offset < 0) {
                 // (The game reads object arrays below the variables here, a word -offset-i off:
                 // its own bug, kept, OB-210. The host has no such word and gives 0.)
-                push(host_->objectVar(offset - i));
+                push(host_->objectVar(minus(offset, i)));
             } else {
-                push(read(index, global, offset + i));
+                push(read(index, global, plus(offset, i)));
             }
             if (out) {
                 finish();

@@ -196,16 +196,18 @@ void ServerTransport::pollPingTests(std::uint32_t nowMs)
         if (kLostAllowed < t.lost) {
             refuse(t.at, 0, JoinError::PingTooHigh);
         } else {
-            int sum = 0;
+            // (Summed as the exe's 32-bit add, wrapping: a client can echo any time, and a signed
+            // int's overflow would be undefined.)
+            std::uint32_t sum = 0;
             int n = 0;
             // Average only the answered pings; lost ones were marked -1.
             for (const int r : t.rtt) {
                 if (0 < r) {
-                    sum += r;
+                    sum += static_cast<std::uint32_t>(r);
                     ++n;
                 }
             }
-            const int average = n != 0 ? sum / n : 0; // (the exe divides by none: an original bug)
+            const int average = n != 0 ? static_cast<int>(sum) / n : 0; // (the exe divides by none: an original bug)
             if (access_.minPing && average < *access_.minPing) {
                 refuse(t.at, 0, JoinError::PingTooLow);
             }

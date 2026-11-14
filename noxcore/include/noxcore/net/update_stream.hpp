@@ -48,7 +48,6 @@ public:
 
     void set(std::uint8_t alias, const Slot& slot) { slots_[alias] = slot; }
     const Slot& operator[](std::uint8_t alias) const { return slots_[alias]; }
-    void clear() { slots_ = {}; }
 
 private:
     std::array<Slot, 256> slots_{};

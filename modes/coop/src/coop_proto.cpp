@@ -1,6 +1,7 @@
 // MSG_NOXCPP_COOP's encoding (coop_proto.hpp has the layouts).
 #include "noxcore/coop/coop_proto.hpp"
 #include "noxcore/modes/mode_frame.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 
@@ -9,11 +10,7 @@ namespace nox::coop::coopmsg {
 namespace {
 
 // Little-endian, as every Nox message.
-void put16(std::vector<std::uint8_t>& out, std::uint16_t v)
-{
-    out.push_back(static_cast<std::uint8_t>(v));
-    out.push_back(static_cast<std::uint8_t>(v >> 8));
-}
+constexpr auto put16 = util::putU16;
 
 // A u8 length, then the bytes (cut to `most`).
 void putText(std::vector<std::uint8_t>& out, std::string_view s, std::size_t most)

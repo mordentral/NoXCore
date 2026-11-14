@@ -68,8 +68,14 @@ struct ObjectTree {
     std::vector<ObjectTree> inventory;
 };
 
+/// How deep inventories may nest in a map's records (an owner's item holding items holding...):
+/// far past any real map's two or three, low enough that the readers' recursion through a
+/// crafted file's chain can't run out of stack.
+inline constexpr int kMaxInventoryDepth = 64;
+
 /// Nests records by their headers' inventory counts: an owner's items are the records that
-/// follow it (each with its own nested items). Throws FormatError if the counts overrun.
+/// follow it (each with its own nested items). Throws FormatError if the counts overrun or nest
+/// deeper than kMaxInventoryDepth.
 std::vector<ObjectTree> buildObjectTree(std::span<const ObjectXfer> objects);
 
 } // namespace nox::map

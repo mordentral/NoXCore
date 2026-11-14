@@ -63,7 +63,28 @@ struct Value {
 class Reader {
 public:
     explicit Reader(std::string_view s) : s_(s) {}
+    /// The next value; nothing if it's malformed or nests deeper than kMaxNesting (each level
+    /// is a call deeper: a file of a million '[' would otherwise run off the end of the stack).
     std::optional<Value> value()
+    {
+        if (depth_ >= kMaxNesting) {
+            return std::nullopt;
+        }
+        ++depth_;
+        auto v = valueHere();
+        --depth_;
+        return v;
+    }
+    bool atEnd()
+    {
+        space();
+        return at_ >= s_.size();
+    }
+
+private:
+    static constexpr int kMaxNesting = 256;
+
+    std::optional<Value> valueHere()
     {
         space();
         if (at_ >= s_.size()) {
@@ -153,13 +174,6 @@ public:
         at_ = static_cast<std::size_t>(r.ptr - s_.data());
         return Value{d};
     }
-    bool atEnd()
-    {
-        space();
-        return at_ >= s_.size();
-    }
-
-private:
     bool peek(char c) const { return at_ < s_.size() && s_[at_] == c; }
     void space()
     {
@@ -207,6 +221,7 @@ private:
     }
     std::string_view s_;
     std::size_t at_ = 0;
+    int depth_ = 0;
 };
 
 Type typeFrom(const std::string& s)
@@ -219,7 +234,14 @@ Type typeFrom(const std::string& s)
     return Type::Int;
 }
 
-std::uint32_t u(const Value* v) { return v ? static_cast<std::uint32_t>(v->number()) : 0; }
+/// A number as a u32 (toJson's are all in range): through a 64-bit integer, as x64 compilers
+/// convert it (so -1 is still 0xFFFFFFFF); one no integer holds (a NaN, an infinity, 1e300) is 0
+/// instead of undefined behaviour.
+std::uint32_t u(const Value* v)
+{
+    const double d = v ? v->number() : 0;
+    return d > -9.2e18 && d < 9.2e18 ? static_cast<std::uint32_t>(static_cast<std::int64_t>(d)) : 0;
+}
 
 const Value* field(const Object& o, std::string_view k)
 {

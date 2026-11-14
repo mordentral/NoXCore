@@ -25,6 +25,7 @@
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include "gather.hpp"
 #include "horde.hpp"
@@ -1248,11 +1249,7 @@ namespace tidemsg {
 namespace {
 
 // Little-endian, as every Nox message.
-void put16(std::vector<std::uint8_t>& out, std::uint16_t v)
-{
-    out.push_back(static_cast<std::uint8_t>(v));
-    out.push_back(static_cast<std::uint8_t>(v >> 8));
-}
+constexpr auto put16 = util::putU16;
 
 // A u8 length, then the bytes (cut to kNameMost).
 void putName(std::vector<std::uint8_t>& out, std::string_view s)

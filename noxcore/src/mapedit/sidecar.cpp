@@ -5,6 +5,8 @@
 
 #include <cctype>
 #include <cstdio>
+#include <stdexcept>
+#include <string>
 
 namespace nox::mapedit {
 
@@ -72,7 +74,11 @@ public:
                 case 'f': c = '\f'; break;
                 case 'u': {
                     if (i_ + 4 > t_.size()) fail("bad escape");
-                    c = static_cast<char>(std::stoi(std::string(t_.substr(i_, 4)), nullptr, 16) & 0xFF);
+                    try {
+                        c = static_cast<char>(std::stoi(std::string(t_.substr(i_, 4)), nullptr, 16) & 0xFF);
+                    } catch (const std::logic_error&) { // (std::stoi's on no hex digits: a FormatError as the rest)
+                        fail("bad escape");
+                    }
                     i_ += 4;
                     break;
                 }
@@ -86,8 +92,27 @@ public:
         return out;
     }
 
-    /// The raw text of the next value.
+    /// The raw text of the next value. (Nesting past kMaxNesting fails: each level is a call
+    /// deeper, and a file of a million '[' would otherwise run off the end of the stack.)
     std::string_view value()
+    {
+        if (depth_ >= kMaxNesting) fail("nested too deep");
+        ++depth_;
+        const std::string_view v = valueHere();
+        --depth_;
+        return v;
+    }
+
+    bool atEnd()
+    {
+        ws();
+        return i_ == t_.size();
+    }
+
+private:
+    static constexpr int kMaxNesting = 256;
+
+    std::string_view valueHere()
     {
         ws();
         const std::size_t start = i_;
@@ -116,15 +141,9 @@ public:
         return t_.substr(start, i_ - start);
     }
 
-    bool atEnd()
-    {
-        ws();
-        return i_ == t_.size();
-    }
-
-private:
     std::string_view t_;
     std::size_t i_ = 0;
+    int depth_ = 0;
 };
 
 } // namespace
@@ -176,16 +195,25 @@ Sidecar Sidecar::fromJson(std::string_view text)
                 Scanner v(raw);
                 return v.string();
             };
+            // (std::stoi's and std::stoul's throws on a value that isn't a number: a FormatError
+            // as the rest.)
+            const auto number = [&](auto convert) {
+                try {
+                    return convert(std::string(raw));
+                } catch (const std::logic_error&) {
+                    s.fail("expected a number");
+                }
+            };
             if (key == "format") {
                 if (unquote() != "nxe") s.fail("not an editor sidecar");
             } else if (key == "formatVersion") {
-                out.formatVersion = std::stoi(std::string(raw));
+                out.formatVersion = number([](const std::string& t) { return std::stoi(t); });
             } else if (key == "origin") {
                 out.origin = unquote();
             } else if (key == "originStock") {
                 out.originStock = raw == "true";
             } else if (key == "revision") {
-                out.revision = static_cast<std::uint32_t>(std::stoul(std::string(raw)));
+                out.revision = static_cast<std::uint32_t>(number([](const std::string& t) { return std::stoul(t); }));
             } else {
                 out.other[key] = std::string(raw);
             }

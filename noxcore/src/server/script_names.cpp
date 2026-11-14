@@ -10,18 +10,6 @@
 
 namespace nox::server {
 
-std::string_view effectKindName(EffectKind kind)
-{
-    switch (kind) {
-    case EffectKind::Point: return "point";
-    case EffectKind::Ray: return "ray";
-    case EffectKind::Burst: return "burst";
-    case EffectKind::Quake: return "screen shake";
-    case EffectKind::None: break;
-    }
-    return "none";
-}
-
 EffectKind scriptEffectKind(std::uint8_t op)
 {
     switch (op) {

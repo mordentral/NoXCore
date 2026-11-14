@@ -38,8 +38,6 @@ public:
 
     /// Substeps run per second.
     int rate() const noexcept { return kFrameRate * multiplier_; }
-    /// Seconds a substep lasts.
-    double stepSeconds() const noexcept { return 1.0 / rate(); }
 
 private:
     int multiplier_ = 1;

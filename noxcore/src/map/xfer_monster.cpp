@@ -733,14 +733,17 @@ ObjectRecord readEmbeddedRecord(ByteReader& r, std::size_t base)
     return rec;
 }
 
-/// A record followed by its inventory records (nested), in stream order.
-void readRecordWithInventory(ByteReader& r, std::size_t base, std::vector<ObjectRecord>& out)
+/// A record followed by its inventory records (nested), in stream order. `depth`: the record's.
+void readRecordWithInventory(ByteReader& r, std::size_t base, std::vector<ObjectRecord>& out, int depth)
 {
     out.push_back(readEmbeddedRecord(r, base));
     // The header's inventory count says how many records follow (each may carry its own inventory).
     const auto items = ObjectXfer::parse(out.back().data).header.inventoryCount();
+    if (items != 0 && depth >= kMaxInventoryDepth) {
+        r.fail("MonsterGenerator: a template's inventories nested too deep");
+    }
     for (std::uint8_t i = 0; i < items; ++i) {
-        readRecordWithInventory(r, base, out);
+        readRecordWithInventory(r, base, out, depth + 1);
     }
 }
 
@@ -810,7 +813,7 @@ MonsterGenerator readGenerator(ByteReader& r, std::uint16_t v, std::size_t base)
             t.type = readString8(r);
             // A template is its type name, then its own record followed by its inventory records.
             std::vector<ObjectRecord> records;
-            readRecordWithInventory(r, base, records);
+            readRecordWithInventory(r, base, records, 0);
             t.record = std::move(records.front());
             t.inventory.assign(std::make_move_iterator(records.begin() + 1),
                                std::make_move_iterator(records.end()));

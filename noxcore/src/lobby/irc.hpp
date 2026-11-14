@@ -4,6 +4,7 @@
 #pragma once
 
 #include "noxcore/lobby/servserv.hpp" // (kWolSku, kWolapiSku, kWolapiVersion)
+#include "noxcore/util/text.hpp"
 
 #include <cctype>
 #include <cstdint>
@@ -41,13 +42,15 @@ inline std::vector<std::string> xwisLoginLines(const std::string& nick, std::str
 }
 
 /// Appends `bytes` to `partial` and hands each whole line in it (CR LF or LF) to `line`; a partial
-/// last line waits in `partial` for more.
+/// last line waits in `partial` for more. (`partial` is only ever what this left: no '\n' in it,
+/// so the first line's end is looked for in the new bytes alone, not the waiting part again.)
 template <class Line>
 void splitLines(std::string& partial, std::span<const std::uint8_t> bytes, Line&& line)
 {
+    const std::size_t waiting = partial.size();
     partial.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     std::size_t start = 0;
-    for (auto end = partial.find('\n'); end != std::string::npos; end = partial.find('\n', start)) {
+    for (auto end = partial.find('\n', waiting); end != std::string::npos; end = partial.find('\n', start)) {
         std::string_view l(partial.data() + start, end - start);
         if (!l.empty() && l.back() == '\r') {
             l.remove_suffix(1);
@@ -73,15 +76,7 @@ inline std::string_view ircWord(std::string_view& rest)
 /// Case-insensitive ASCII equality (IRC nicks and channels).
 inline bool ircSameName(std::string_view a, std::string_view b)
 {
-    if (a.size() != b.size()) {
-        return false;
-    }
-    for (std::size_t i = 0; i < a.size(); ++i) {
-        if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i]))) {
-            return false;
-        }
-    }
-    return true;
+    return util::equalsNoCase(a, b);
 }
 
 /// Whether `text` is an error numeric (4xx / 5xx) answering the login's verchk or SETOPT (": 421

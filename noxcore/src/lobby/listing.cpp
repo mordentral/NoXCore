@@ -120,8 +120,8 @@ std::optional<GameListing> parseWolRecord(std::span<const std::uint8_t> r)
     // resolution, the spells, the weapons and the armour.)
     g.resolution = r[2];
     std::copy(r.begin() + 35, r.begin() + 55, g.spells.begin());
-    g.weapons = static_cast<std::uint32_t>(r[55] | r[56] << 8 | r[57] << 16) | static_cast<std::uint32_t>(r[58]) << 24;
-    g.armor = static_cast<std::uint32_t>(r[59] | r[60] << 8 | r[61] << 16) | static_cast<std::uint32_t>(r[62]) << 24;
+    g.weapons = util::u32At(r, 55);
+    g.armor = util::u32At(r, 59);
     return g;
 }
 

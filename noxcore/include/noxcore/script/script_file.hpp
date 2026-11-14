@@ -51,6 +51,10 @@ struct Function {
 /// The most words of locals one function may have (its symbols' sizes in all): 16 MB, far past
 /// any map's. ScriptFile::parse refuses more.
 inline constexpr std::uint32_t kMaxLocalWords = 1u << 22;
+/// The most words of locals all a script's functions may have together (the VM makes every
+/// function's when it starts): 64 MB, so a thousand functions each just under kMaxLocalWords can't
+/// ask for gigabytes. ScriptFile::parse refuses more.
+inline constexpr std::uint64_t kMaxScriptLocalWords = 1u << 24;
 
 struct ScriptFile {
     std::vector<std::string> strings;

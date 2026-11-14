@@ -25,7 +25,6 @@ enum class EffectKind : std::uint8_t {
     Burst, ///< a spark burst at (x1, y1), x2 its size (netSparkExplosionFx)
     Quake, ///< a screen shake round (x1, y1), x2 its strength (earthquakeSend)
 };
-std::string_view effectKindName(EffectKind kind);
 
 /// The range of messages Effect looks a name up in ("MSG_FX_" + name, any case).
 inline constexpr std::uint8_t kFirstScriptEffectOp = 0x7E;

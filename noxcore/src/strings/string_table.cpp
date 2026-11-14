@@ -10,18 +10,6 @@
 
 namespace nox::strings {
 
-namespace {
-
-// Tags as the u32 the game compares (the file stores them byte-reversed).
-constexpr std::uint32_t kTagLabel = 0x4C424C20;   // "LBL "
-constexpr std::uint32_t kTagStr = 0x53545220;     // "STR "
-constexpr std::uint32_t kTagStrW = 0x53545257;    // "STRW"
-constexpr std::uint32_t kTagStrInv = 0x53747220;  // "Str " (inverted text)
-constexpr std::uint32_t kTagStrWInv = 0x53747257; // "StrW" (inverted text)
-constexpr std::uint32_t kMagic = 0x43534620;      // "CSF "
-
-/// The game's whitespace pass: drops leading spaces and spaces before a newline or
-/// tab or at the end, and collapses runs of spaces.
 std::u16string collapseWhitespace(const std::u16string& in)
 {
     std::u16string out;
@@ -53,6 +41,10 @@ std::u16string collapseWhitespace(const std::u16string& in)
     }
     return out;
 }
+
+namespace {
+
+using namespace csf;
 
 std::u16string readText(ByteReader& r, std::uint32_t length, bool inverted)
 {
