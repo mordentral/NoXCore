@@ -177,8 +177,8 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             // (Local tests) the game hosted here (--host, --host-edit) binds 127.0.0.1 alone.
             app.hostLoopback = true;
         } else if (a == "--menu-host-port") {
-            // (Local tests, recordings) a game hosted from the menus (Host Custom > a campaign mode,
-            // the Map Editor's session) on this port instead of the game's own.
+            // (Local tests, recordings) a game hosted from the menus (Host, Host Custom > a campaign
+            // mode, the Map Editor's session) on this port instead of the game's own.
             app.menuHostPort = static_cast<std::uint16_t>(std::atoi(next()));
         } else if (a == "--session-editor") {
             // (Tests) a joining noxsdl client opens the session's editor as soon as it's greeted.

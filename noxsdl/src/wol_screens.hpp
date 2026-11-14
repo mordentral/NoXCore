@@ -32,7 +32,8 @@ constexpr int linesShown(int boxHeight, bool hasTitle, int fontLine, int lineHei
 /// 260 x 380), wrapped `kLoginHelpInset` in from its sides and top, in the default font.
 inline constexpr std::string_view kLoginHelp =
     "Log in with your XWIS account. A new name becomes your account with the password you type; for a "
-    "name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays without one.";
+    "name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a "
+    "game you host is listed under a generated one).";
 inline constexpr std::int32_t kLoginHelpPanel = 0;
 inline constexpr int kLoginHelpInset = 12;
 

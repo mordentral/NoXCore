@@ -75,17 +75,17 @@ void startXwisPost(App& app, const nox::io::SavedLogin& login)
     app.xwisError.clear();
 }
 
-/// Where a game the menus host is listed (host_listing.hpp): on XWIS with the menus' login, else
-/// the LAN only; `listed` false: a local one (a test's, Solo Quest's).
+/// Where a game the menus host is listed (host_listing.hpp): on XWIS under the menus' host login
+/// (the WOL login, or Skip Login's generated one), else the LAN only; `listed` false: a local one
+/// (a test's, Solo Quest's).
 HostListing menusHostListing(const App& app, bool listed)
 {
-    const auto& login = app.menus ? app.menus->wolLogin() : std::optional<nox::io::SavedLogin>{};
-    // Network (LAN play): never posted, the reason being Network's (not --no-xwis, nor an
-    // earlier Skip Login's).
+    const auto& login = app.menus ? app.menus->hostLogin() : std::optional<nox::io::SavedLogin>{};
+    // Network (LAN play): never posted, the reason being Network's (not --no-xwis).
     if (app.menus && app.menus->lanOnly()) {
-        return hostListing(listed, true, false, {});
+        return hostListing(listed, true, {});
     }
-    return hostListing(listed, app.online, app.menus && app.menus->skippedLogin(), login ? login->nick : std::string());
+    return hostListing(listed, app.online, login ? login->nick : std::string());
 }
 
 /// The Bots tab's choice for the game we host: the squad made on first use (joined to our port

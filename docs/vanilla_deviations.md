@@ -1810,8 +1810,11 @@ The engine's logic is the exe's; these are where the output differs.
     folder) or with --server, marked "list" in the From column; in Network's list they come
     after the LAN's games.
   - Westwood Online's list also has the LAN's games, beside XWIS's.
-  - Register is Skip Login (Menus::onLogin): Westwood Online's list without a login, XWIS
-    listed through a throwaway listing nick.
+  - Register is Skip Login (Menus::onLogin): Westwood Online's list with no login name, XWIS
+    listed through a throwaway listing nick, games joined with no account name. A game hosted
+    from there is posted to XWIS (and is a WOL game, as a logged-in host's) under a generated
+    login, "NoX" and six hex digits with the nick as its password (lobby::xwisGuestNick,
+    Menus::hostLogin); before 2026-11-13 it was LAN only.
   - --browse opens Network's list.
 - **Revert:** Options::servers left empty (no servers.txt); in Westwood Online's list,
   Options::lan off; Register's own screen back in place of Skip Login.

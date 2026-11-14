@@ -593,6 +593,7 @@ void Menus::showFakeXwisGames(std::vector<nox::lobby::GameListing> games)
     reset();
     skippedLogin_ = true;
     wolLogin_.reset();
+    guestLogin_.reset(); // (a test's: nothing hosted from it goes to the real XWIS)
     wolMode_ = false;
     lanOnly_ = false;
     stack_ = {State::MainMenu, State::Online, State::Login};

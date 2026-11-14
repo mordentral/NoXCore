@@ -120,6 +120,13 @@ std::string xwisNick(std::uint32_t random)
     return buf;
 }
 
+std::string xwisGuestNick(std::uint32_t random)
+{
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "NoX%06x", static_cast<unsigned>(random & 0xFFFFFF));
+    return buf;
+}
+
 std::string apgar(std::string_view password)
 {
     static constexpr std::string_view kLookup = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";

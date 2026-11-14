@@ -44,6 +44,11 @@ std::optional<GameListing> parseXwisGameLine(std::string_view line);
 /// characters).
 std::string xwisNick(std::uint32_t random);
 
+/// The XWIS login of a player who gave no login name (the login screen's Skip Login): "NoX" and
+/// six hex digits, its password the nick itself (XWIS makes the account on the spot). A game they
+/// host is posted under it ("#NoX1a2b3c's_game").
+std::string xwisGuestNick(std::uint32_t random);
+
 /// WOLAPI's password encoding (in WOLAPI.dll), what the login's `apgar` line and the
 /// saved logins carry: for each of the first 8 characters c (pairing c[i] with c[n - i], n the
 /// length up to 8, c[n] the terminator), c even gives c ^ pair, odd (c << 1) & pair; the 8

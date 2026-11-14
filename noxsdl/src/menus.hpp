@@ -15,7 +15,8 @@
 //          the login if asked and goes on to 1900 with the nick as our account name, the
 //          connection kept. Register is "Skip Login" here (XWIS makes an account on its first
 //          login): on to 10000 without one, joining with no account name (not even a saved
-//          login's) and listing XWIS through a throwaway login. Bots log in their own way (a
+//          login's) and listing XWIS through a throwaway login; a game hosted from there is posted
+//          to XWIS under a generated login (lobby::xwisGuestNick). Bots log in their own way (a
 //          throwaway listing nick), untouched.
 //   1900   the WOL chat lobby (wolchat.c, wolchat.wnd; menus_wolchat.cpp): the lobbies,
 //          one joined, its users and chat; Games goes on to 10000 (listing XWIS through the same
@@ -208,8 +209,11 @@ public:
     /// Whether the player chose Skip Login (since its last login): games are joined with no
     /// account name, and XWIS is listed through a throwaway login.
     bool skippedLogin() const { return skippedLogin_; }
-    /// The WOL login XWIS took (its nick and encoded password), for posting a game we host.
+    /// The WOL login XWIS took (its nick and encoded password): the chat's.
     const std::optional<nox::io::SavedLogin>& wolLogin() const { return wolLogin_; }
+    /// The login a game we host is posted to XWIS under: the WOL login, else Skip Login's
+    /// generated one (lobby::xwisGuestNick, its password the nick); none in Network's list.
+    const std::optional<nox::io::SavedLogin>& hostLogin() const { return wolLogin_ ? wolLogin_ : guestLogin_; }
     /// Whether the game list is Network's (LAN play: no XWIS listed, nothing posted there),
     /// not Westwood Online's (logged in, or Skip Login). --browse's list is Network's.
     bool lanOnly() const { return lanOnly_; }
@@ -425,6 +429,7 @@ private:
     nox::client::PlayerProfile profile_;
     bool skippedLogin_ = false;
     std::optional<nox::io::SavedLogin> wolLogin_;
+    std::optional<nox::io::SavedLogin> guestLogin_; ///< (Skip Login's, for posting a hosted game)
     std::string pendingHost_;
     std::vector<Character> characters_;
     gui::Window* dialog_ = nullptr;

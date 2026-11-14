@@ -961,6 +961,7 @@ bool Menus::onOnline(gui::Window& from)
         wolMode_ = false;
         lanOnly_ = true;
         wolLogin_.reset();
+        guestLogin_.reset();
         browser_.setXwisListing(false);
         leave([this] { enter(State::Browser); });
         return true;
@@ -1002,7 +1003,7 @@ void Menus::setupLogin()
     // Register: XWIS makes an account on its first login, so it's our way to go on without one.
     if (gui::Window* skip = screen_->find(kLoginSkip)) {
         skip->text = "Skip Login";
-        skip->tooltip = "Go to the game list without logging in to XWIS (no account name is sent)";
+        skip->tooltip = "Go to the game list with no login name (a game you host is listed on XWIS under a generated one)";
     }
     if (gui::Window* go = screen_->find(kLoginGo)) {
         go->tooltip = "Log in to XWIS (a new name makes a new account with this password)";
@@ -1085,11 +1086,18 @@ bool Menus::onLogin(int message, gui::Window& from)
         scrollLogins(list ? list->scroll + 1 : 0);
         return true;
     case kLoginSkip:
-        // On to the game list without logging in: no account name at all (not a saved login's,
+        // On to the game list with no login name: no account name at all (not a saved login's,
         // nor an earlier login's), XWIS listed through a throwaway login (Westwood Online's list,
-        // not Network's).
+        // not Network's), and a game hosted from there posted to XWIS under a generated login,
+        // its password the nick (XWIS lists a game under its host's login, and makes the account
+        // on the spot).
         skippedLogin_ = true;
         wolLogin_.reset();
+        {
+            std::random_device entropy;
+            const std::string guest = nox::lobby::xwisGuestNick(static_cast<std::uint32_t>(entropy()));
+            guestLogin_ = nox::io::SavedLogin{guest, guest};
+        }
         wolMode_ = false;
         lanOnly_ = false;
         profile_.account.clear();
@@ -1198,6 +1206,7 @@ void Menus::loginDone()
     profile_.account = pendingLogin_.nick;
     skippedLogin_ = false;
     wolLogin_ = pendingLogin_;
+    guestLogin_.reset();
     browser_.setXwisLogin(pendingLogin_.nick, pendingLogin_.password); // (lists without the connection)
     if (callbacks_.loggedIn) {
         callbacks_.loggedIn(pendingLogin_.nick);

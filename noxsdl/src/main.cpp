@@ -1455,7 +1455,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                     HostSettings settings;
                     if (hostGame) {
                         hostSettingsFromConfig(*app, settings);
-                        settings.wolGame = app->online && app->menus && app->menus->wolLogin();
+                        settings.wolGame = app->online && app->menus && app->menus->hostLogin();
                         settings.map = "So_Druid";
                     }
                     if (host == Menus::kHostQuestGame) {
@@ -1494,16 +1494,23 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                         app->profile.account.clear();
                         app->soloFromMenus = true;
                     }
+                    if (hostGame) {
+                        // (Local tests: --menu-host-port, --host-loopback; normally the game's port.)
+                        if (app->menuHostPort != 0) {
+                            settings.port = app->menuHostPort;
+                        }
+                        settings.loopbackOnly = app->hostLoopback;
+                    }
                     try {
                         app->host = makeHost(*app, settings);
                         address = app->host->address();
                         SDL_Log("hosting at %s", address.c_str());
                         startPortMapping(*app, hostGame); // (Solo Quest: a LAN game)
-                        // Logged in to XWIS (the game's online, WOL): posted there, as GAME.EXE's
-                        // host's game is. (Solo Quest is a LAN game: not posted.)
+                        // Westwood Online's list (logged in, or Skip Login's generated login): posted
+                        // to XWIS, as GAME.EXE's host's game is. (Solo Quest is a LAN game: not posted.)
                         app->xwisHost.reset();
-                        if (hostGame && app->online && app->menus && app->menus->wolLogin()) {
-                            startXwisPost(*app, *app->menus->wolLogin());
+                        if (hostGame && app->online && app->menus && app->menus->hostLogin()) {
+                            startXwisPost(*app, *app->menus->hostLogin());
                         }
                         SDL_Log("%s", hostListingLog(menusHostListing(*app, hostGame), "hosting", app->host->port()).c_str());
                     } catch (const std::exception& ex) {
@@ -1609,8 +1616,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                     app->host = makeHost(*app, settings);
                     startPortMapping(*app, !app->hostLoopback);
                     app->xwisHost.reset();
-                    if (app->online && app->menus && app->menus->wolLogin()) {
-                        startXwisPost(*app, *app->menus->wolLogin());
+                    if (app->online && app->menus && app->menus->hostLogin()) {
+                        startXwisPost(*app, *app->menus->hostLogin());
                     }
                 } catch (const std::exception& ex) {
                     SDL_Log("%s: %s", how.logTag.c_str(), ex.what());
@@ -2403,7 +2410,7 @@ std::string hostEditSession(App& app, const editor::SessionSetup& setup, std::ui
     s.mapCycle = false;
     s.mapVote = false;
     s.testCommands = true;
-    s.wolGame = listed && app.online && app.menus && app.menus->wolLogin();
+    s.wolGame = listed && app.online && app.menus && app.menus->hostLogin();
     nox::server::EditSessionDirector::Options o;
     o.mapsDir = mapsDir;
     o.mapName = setup.name;
@@ -2441,7 +2448,7 @@ std::string hostEditSession(App& app, const editor::SessionSetup& setup, std::ui
     if (listed) {
         startPortMapping(app, true);
         if (where.where == HostListing::Where::Xwis) {
-            startXwisPost(app, *app.menus->wolLogin());
+            startXwisPost(app, *app.menus->hostLogin());
         }
     } else {
         app.online = false;

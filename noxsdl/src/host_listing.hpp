@@ -1,7 +1,7 @@
 // Where a game hosted from the menus is listed (no SDL: the tests include it). A listed game
 // answers the game list's LAN query on its port (LAN lists ask on 18590) and is posted to XWIS
-// (the online game list) only with the host logged in to XWIS: XWIS lists a game under its
-// host's login ("#<nick>'s_game"), so a host who chose Skip Login or Network posts nothing there.
+// (the online game list) under the host's XWIS login ("#<nick>'s_game"): the WOL login, or Skip
+// Login's generated one (lobby::xwisGuestNick). A host who chose Network posts nothing there.
 // What the host is told: the session dialog's line before Host, the log's line once hosted.
 #pragma once
 
@@ -22,9 +22,9 @@ struct HostListing {
 };
 
 /// `listed`: the menus' network game (not a test's); `online`: the game list's XWIS on (not
-/// --no-xwis); `skippedLogin`: the login screen's Skip Login; `nick`: the XWIS login, empty when
-/// not logged in (Skip Login, or Network from the Online screen).
-inline HostListing hostListing(bool listed, bool online, bool skippedLogin, const std::string& nick)
+/// --no-xwis); `nick`: the XWIS login it's posted under (Menus::hostLogin), empty in Network's
+/// game list (from the Online screen).
+inline HostListing hostListing(bool listed, bool online, const std::string& nick)
 {
     HostListing l;
     if (!listed) {
@@ -36,9 +36,8 @@ inline HostListing hostListing(bool listed, bool online, bool skippedLogin, cons
         return l;
     }
     l.where = HostListing::Where::LanOnly;
-    l.why = !online       ? "XWIS is off here (--no-xwis)"
-            : skippedLogin ? "you chose Skip Login, and XWIS lists a game under its host's login"
-                           : "you aren't logged in to XWIS (Online > Network), and XWIS lists a game under its host's login";
+    l.why = !online ? "XWIS is off here (--no-xwis)"
+                    : "you aren't logged in to XWIS (Online > Network), and XWIS lists a game under its host's login";
     return l;
 }
 
