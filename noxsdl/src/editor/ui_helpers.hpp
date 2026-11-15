@@ -3,6 +3,7 @@
 // the next frame.
 #pragma once
 
+#include "editor/file_pick.hpp"
 #include "editor/held_edit.hpp"
 
 #include <SDL3/SDL.h>
@@ -10,10 +11,7 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <mutex>
 #include <optional>
-#include <string>
-#include <utility>
 
 namespace noxsdl::editor {
 
@@ -61,16 +59,26 @@ inline std::optional<int> heldInputInt(HeldValue<int>& held, const char* id, int
     return held.after(ImGui::IsItemActive(), ImGui::IsItemDeactivatedAfterEdit(), current);
 }
 
-/// What the system's file dialog picked, for the editor's next frame: `userdata` is a
-/// std::pair<std::mutex*, std::optional<std::string>*> (the callback may come from another thread).
+/// The system's file dialog's answer, into the FilePick that asked (file_pick.hpp: it may come from
+/// another thread, and after the panel that opened the dialog is gone).
 inline void SDLCALL storePickedFile(void* userdata, const char* const* files, int /*filter*/)
 {
-    if (!files || !files[0]) {
-        return; // (cancelled, or an error)
-    }
-    auto* picked = static_cast<std::pair<std::mutex*, std::optional<std::string>*>*>(userdata);
-    std::lock_guard lock(*picked->first);
-    *picked->second = files[0];
+    FilePick::answer(userdata, files);
+}
+
+/// The system's dialog for a file to open (one), its answer for `pick.take()` on a later frame.
+/// `filters` must outlive the dialog (a static table).
+inline void openFileDialog(FilePick& pick, SDL_Window* window, const SDL_DialogFileFilter* filters, int filterCount,
+                           const char* start = nullptr)
+{
+    SDL_ShowOpenFileDialog(storePickedFile, pick.ask(), window, filters, filterCount, start, false);
+}
+
+/// The system's dialog for a file to save as, its answer for `pick.take()` on a later frame.
+inline void saveFileDialog(FilePick& pick, SDL_Window* window, const SDL_DialogFileFilter* filters, int filterCount,
+                           const char* start = nullptr)
+{
+    SDL_ShowSaveFileDialog(storePickedFile, pick.ask(), window, filters, filterCount, start);
 }
 
 } // namespace noxsdl::editor

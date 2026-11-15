@@ -21,6 +21,7 @@
 
 #include "editor/builtin_list.hpp"
 #include "editor/code_editor.hpp"
+#include "editor/file_pick.hpp"
 #include "editor/play_test.hpp"
 
 #include "noxcore/mapedit/document.hpp"
@@ -32,7 +33,6 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -269,9 +269,9 @@ private:
     std::uintmax_t watchedSize_ = 0;
     std::uint64_t watchSeenMs_ = 0;   ///< when a change was first seen (the 200 ms settle)
     std::uint64_t watchPollMs_ = 0;
-    // A file picked in the system's dialog (its callback may come from another thread).
-    std::mutex pickedMutex_;
-    std::optional<std::string> picked_;
+    // A file picked in the system's dialog (its answer may come from another thread, and after this
+    // panel is gone).
+    editor::FilePick filePick_;
 };
 
 } // namespace noxsdl

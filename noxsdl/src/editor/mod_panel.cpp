@@ -186,12 +186,10 @@ void ModPanel::registerCommands()
         sessionModId_.clear(); // (opened afresh at the next frame)
     }, [this] { return session() && session()->mod() && !sessionMod_; });
     add("mod.export", "Export Mod...", "Write the mod's folder as a zip for someone to unzip into their own mods\\ (nothing is uploaded).", [this] {
-        static std::pair<std::mutex*, std::optional<std::string>*> target;
-        target = {&pickedMutex_, &picked_};
         static const SDL_DialogFileFilter filters[] = {{"Zip archive", "zip"}};
         static std::string start;
         start = pathText(modsDir().parent_path() / (project_->folderName() + ".zip"));
-        SDL_ShowSaveFileDialog(editor::storePickedFile, &target, ed_.ctx_.window, filters, 1, start.c_str());
+        editor::saveFileDialog(filePick_, ed_.ctx_.window, filters, 1, start.c_str());
     }, open);
     add("mod.close", "Close Mod", "Close the mod's windows (unsaved changes are asked about).", [this] {
         askThen([this] {
@@ -1001,11 +999,7 @@ void ModPanel::tick()
             requestAnalysis();
         }
     }
-    std::optional<std::string> picked;
-    {
-        std::lock_guard lock(pickedMutex_);
-        picked = std::exchange(picked_, std::nullopt);
-    }
+    const std::optional<std::string> picked = filePick_.take();
     if (picked && project_) {
         fs::path p = u8path(*picked);
         if (p.extension().empty()) {

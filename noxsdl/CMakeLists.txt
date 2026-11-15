@@ -144,6 +144,7 @@ add_executable(noxsdl WIN32
     src/server_options_advanced.cpp
     src/server_options_server.cpp
     src/sight.cpp
+    src/wall_grid.cpp
     src/spell_chant.cpp
     src/spellbook.cpp
     src/spell_limits.cpp

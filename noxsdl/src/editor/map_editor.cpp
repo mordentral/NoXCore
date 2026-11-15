@@ -1437,14 +1437,10 @@ void MapEditor::frame()
         queued_.erase(queued_.begin());
         runStep(std::move(step));
     }
-    {
-        std::lock_guard lock(pickedMutex_);
-        if (picked_) {
-            const fs::path path(reinterpret_cast<const char8_t*>(picked_->c_str()));
-            picked_.reset();
-            openOpen_ = false;
-            guarded(Pending::Open, [this, path] { open(path); });
-        }
+    if (const auto picked = filePick_.take()) {
+        const fs::path path(reinterpret_cast<const char8_t*>(picked->c_str()));
+        openOpen_ = false;
+        guarded(Pending::Open, [this, path] { open(path); });
     }
     if (styleDirty_) {
         styleDirty_ = false;

@@ -711,6 +711,8 @@ void MapView::setWallState(const std::set<std::uint16_t>& destroyed, const std::
     for (std::size_t i = 0; i < walls_.size(); ++i) {
         wallByKey_[wallKey(walls_[i].x, walls_[i].y)] = i; // (a later wall in a cell over an earlier)
     }
+    // (The only place walls_ changes: a map loaded, setWalls, and every change the server sends.)
+    wallGrid_.build(walls_);
 }
 
 void MapView::setTile(int gx, int gy, const nox::map::FloorTile* tile)

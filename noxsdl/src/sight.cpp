@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <limits>
 
 namespace noxsdl {
 
@@ -22,8 +24,9 @@ SightMap::~SightMap()
     }
 }
 
-void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls, const std::set<std::uint16_t>& windows,
-                     const nox::things::ThingDb& things, std::span<const Blocker> blockers, int eyeShiftY)
+void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls, const WallGrid* grid,
+                     const std::set<std::uint16_t>& windows, const nox::things::ThingDb& things,
+                     std::span<const Blocker> blockers, int eyeShiftY)
 {
     // The game's view: the world rectangle on screen in whole units (its viewport's World and
     // Size), the eye at its centre (shifted by the shake's swing).
@@ -43,10 +46,7 @@ void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls
     const int cy0 = grown.top / 23 - 1;
     const int cx1 = (grown.left + grown.width) / 23 + 1;
     const int cy1 = (grown.top + grown.height) / 23 + 1;
-    for (const auto& w : walls) {
-        if (w.x < cx0 || w.x > cx1 || w.y < cy0 || w.y > cy1) {
-            continue;
-        }
+    const auto add = [&](const nox::map::Wall& w) {
         nox::client::SightRegion::Wall c;
         c.x = w.x;
         c.y = w.y;
@@ -54,6 +54,20 @@ void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls
         c.blocksSight = w.material < things.walls.size() && (things.walls[w.material].flags & 1);
         c.window = windows.contains(static_cast<std::uint16_t>((w.x << 8) | w.y));
         cells.push_back(c);
+    };
+    if (grid && grid->size() == walls.size()) {
+        // Those in the cells, in the list's order, from the walls near them alone.
+        grid->find(cx0, cy0, cx1, cy1, found_);
+        for (const std::uint32_t i : found_) {
+            add(walls[i]);
+        }
+    } else {
+        for (const auto& w : walls) {
+            if (w.x < cx0 || w.x > cx1 || w.y < cy0 || w.y > cy1) {
+                continue;
+            }
+            add(w);
+        }
     }
     auto& objects = objects_;
     objects.clear();
@@ -67,10 +81,11 @@ void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls
             o.corners = nox::client::SightRegion::boxCorners(b.boxWidth, b.boxHeight);
         }
         if (b.key != 0) {
-            keys_[b.key] = objects.size();
+            keys_.emplace_back(b.key, static_cast<std::uint32_t>(objects.size()));
         }
         objects.push_back(o);
     }
+    std::sort(keys_.begin(), keys_.end());
     region_.build(view, cells, objects);
     if (!classicWalls_) {
         // The improved wall culling (a deliberate deviation): the same sight over the grown view,
@@ -87,11 +102,12 @@ void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls
 
 std::optional<bool> SightMap::reached(std::uint32_t key) const
 {
-    const auto it = keys_.find(key);
-    if (it == keys_.end()) {
+    // The last of the key's entries: its latest index in the build.
+    const auto it = std::upper_bound(keys_.begin(), keys_.end(), std::pair{key, std::numeric_limits<std::uint32_t>::max()});
+    if (it == keys_.begin() || std::prev(it)->first != key) {
         return std::nullopt;
     }
-    return region_.blockerSeen(it->second);
+    return region_.blockerSeen(std::prev(it)->second);
 }
 
 bool SightMap::drawableSeen(const TypeArt& art, std::uint32_t key, float x, float y, float z, std::uint8_t doorAngle,

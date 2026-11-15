@@ -290,10 +290,8 @@ void ScriptPanel::registerCommands()
         [this] { exportNs(); });
     add("script.importObj", "Import nsc .obj...", "Script", "", "Replace the map's script with a compiled .obj (nsc's, or the game's nc.obj) and decompile it.",
         [this] {
-            static std::pair<std::mutex*, std::optional<std::string>*> target;
-            target = {&pickedMutex_, &picked_};
             static const SDL_DialogFileFilter filters[] = {{"Compiled NoxScript", "obj"}, {"All files", "*"}};
-            SDL_ShowOpenFileDialog(editor::storePickedFile, &target, ed_.ctx_.window, filters, 2, nullptr, false);
+            editor::openFileDialog(filePick_, ed_.ctx_.window, filters, 2);
         });
     add("script.reimportSave", "Re-import .obj and Save", "Script", "",
         "Import the last imported .obj again (after compiling it outside) and save the map (the old editor's F10).",
@@ -850,12 +848,7 @@ void ScriptPanel::tick()
         playing_ = false; // (the test ended in the game: its quit menu, a failure)
         ed_.status("The play-test ended");
     }
-    std::optional<std::string> picked;
-    {
-        std::lock_guard lock(pickedMutex_);
-        picked = std::exchange(picked_, std::nullopt);
-    }
-    if (picked) {
+    if (const auto picked = filePick_.take()) {
         importObj(fs::path(reinterpret_cast<const char8_t*>(picked->c_str())));
     }
 }

@@ -1,11 +1,12 @@
 // What a few of the front end's windows decide, kept apart from their SDL windows so the tests can
 // run it: the solo save menu's buttons and message box (cinematics.cpp), the in-game menu's
-// AutoSave (quit_menu.cpp), the Westwood Online chat's lobby list and users (menus_wolchat.cpp) and
-// the shell's Options / Back bar (menus.cpp).
+// AutoSave (quit_menu.cpp), the Westwood Online chat's lobby list and users (menus_wolchat.cpp),
+// the shell's Options / Back bar (menus.cpp) and where the menus' pointer sparks go (main.cpp).
 // All but the bar were original bugs the owner decided to fix (2026-11-04; original_bugs.md, the
 // entry's "Fixed" line; vanilla_deviations.md VD-64); the bar is as the game's.
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 namespace noxsdl {
@@ -65,6 +66,15 @@ constexpr int lobbyToJoin(int clicked, int current, bool sameAsCurrent)
         return clicked;
     }
     return sameAsCurrent ? -1 : clicked;
+}
+
+/// The menus' 640 x 480 scaled whole into a `width` x `height` output (the smaller ratio), where
+/// the pointer's sparks go; 0 for an output with no area (a minimised window's 0 x 0), when they
+/// skip that frame (the pointer's place in them would be a division by 0 made an int).
+constexpr float menuSparkScale(float width, float height)
+{
+    const float s = std::min(width / 640.0f, height / 480.0f);
+    return s > 0 ? s : 0;
 }
 
 } // namespace noxsdl

@@ -154,13 +154,6 @@ float lightIntensityNow(const xf::InvisibleLight& l, std::uint32_t frame)
     return l.intensity;
 }
 
-/// The radius the game works out from an intensity (lightRadiusFromIntensity).
-float radiusOf(float intensity)
-{
-    const float a = std::fabs(intensity);
-    return a <= 1 ? 0 : std::sqrt(((4 + std::min(a, 31.0f)) / 5 + 1) * a * a / 0.961f);
-}
-
 } // namespace
 
 std::optional<lightcone::Cone> lightConeNow(const me::MapDocument& doc, const nox::things::ThingDb& things, const me::DocObject& o,
@@ -987,17 +980,14 @@ void PropertyPanel::pointField(const me::SharedField& sf, const Apply& apply, st
 {
     const me::FieldDesc& f = sf.desc;
     const me::FieldValue& v = sf.value;
+    // The stored point every frame, typed into or not: ImGui keeps the text being typed, and as a
+    // part's typing ends (Tab to the other, Return, a click elsewhere) it writes that text's value
+    // into p for the frame the pair reports the edit's end, so each part's edit commits on its own,
+    // the other part as stored.
     float p[2] = {static_cast<float>(v.f), static_cast<float>(v.g)};
-    const ImGuiID key = ImGui::GetID("##v");
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 80 * ed_.imgui_->scale());
-    static float editing[2];
-    if (ImGui::GetActiveID() == key || ImGui::GetActiveID() == key + 1) {
-        p[0] = editing[0];
-        p[1] = editing[1];
-    }
+    focusIfAsked(sf.desc.id);
     ImGui::InputFloat2("##v", p, "%.1f");
-    editing[0] = p[0];
-    editing[1] = p[1];
     if (ImGui::IsItemDeactivatedAfterEdit()) {
         me::FieldValue nv = v;
         nv.f = std::clamp(static_cast<double>(p[0]), 0.0, static_cast<double>(me::kWorldSize - 1));
@@ -1603,7 +1593,7 @@ void PropertyPanel::lightKeys(ObjId id)
     dl->AddCircleFilled(ImVec2(at.x + r, at.y + r), r * glow, IM_COL32(c[0], c[1], c[2], l.isAnti ? 90 : 220));
     ImGui::Dummy(ImVec2(r * 2, r * 2));
     ImGui::SameLine();
-    ImGui::TextDisabled("now: colour %d %d %d, intensity %.1f, reach %.0f%s", c[0], c[1], c[2], i, radiusOf(i), l.isAnti ? " (anti-light)" : "");
+    ImGui::TextDisabled("now: colour %d %d %d, intensity %.1f, reach %d%s", c[0], c[1], c[2], i, lightcone::radiusOf(i), l.isAnti ? " (anti-light)" : "");
     if (const auto cone = lightConeNow(ed_.doc_, ed_.things_, ed_.doc_.objects.at(id), frame)) {
         // (whole degrees, as the game turns them; a cone never darkens: the game's cone path ignores "anti")
         ImGui::TextDisabled("cone: facing %d, %d either side%s", lightcone::degreesFromAngle(cone->direction),
@@ -1833,7 +1823,8 @@ void PropertyPanel::drawOverlay(ImDrawList* dl, const ImVec2& origin)
         const ImVec2 p = S(o.header.x, o.header.y);
         if (const auto* l = std::get_if<xf::InvisibleLight>(&o.data)) {
             const auto c = lightColourNow(*l, frame);
-            const float reach = radiusOf(lightIntensityNow(*l, frame));
+            // (The game's radius for the intensity: whole, as the drawable's LightRadius holds it.)
+            const auto reach = static_cast<float>(lightcone::radiusOf(lightIntensityNow(*l, frame)));
             const float r = reach * z;
             if (const auto cone = lightConeNow(doc, ed_.things_, o, frame)) {
                 // A cone: the kite the game lights (as it turns, sweeps or aims), and its reach faintly.

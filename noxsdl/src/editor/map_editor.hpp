@@ -20,6 +20,7 @@
 #include "editor/chat_log.hpp"
 #include "editor/commands.hpp"
 #include "editor/editor_settings.hpp"
+#include "editor/file_pick.hpp"
 #include "editor/held_edit.hpp"
 #include "editor/imgui_host.hpp"
 #include "editor/play_test.hpp"
@@ -589,9 +590,9 @@ private:
     std::uint64_t validatedRevision_ = ~0ull;
     std::uint64_t changedMs_ = 0;
 
-    // A file picked in the system's dialog (its callback may come from another thread).
-    std::mutex pickedMutex_;
-    std::optional<std::string> picked_;
+    // A file picked in the system's dialog (its answer may come from another thread, and after the
+    // editor is gone).
+    editor::FilePick filePick_;
 
     std::unique_ptr<ScriptPanel> scriptPanel_; ///< the Script panels, play-test and hot reload
     std::unique_ptr<ModPanel> modPanel_;       ///< mod projects: the Mod menu and windows

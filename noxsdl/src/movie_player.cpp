@@ -2,6 +2,8 @@
 // with the movie's sound, draws them letterboxed and handles skipping.
 #include "movie_player.hpp"
 
+#include "movie_clock.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -165,6 +167,10 @@ void MoviePlayer::play(const std::string& name, movies::Skip skip, std::function
     if (!opened) {
         state_ = State::Done;
         return;
+    }
+    if (hasSound_ && !movieSoundTimes(hasSound_, soundRate_)) {
+        SDL_Log("movie %s: its sound has no rate; played without it", name.c_str());
+        hasSound_ = false;
     }
     SDL_Log("movie %s: %s, %dx%d, %d frames at %.3g fps", name.c_str(), hd_ ? "HD" : "VQA", width_, height_, frames_, fps_);
     if (texture_) {

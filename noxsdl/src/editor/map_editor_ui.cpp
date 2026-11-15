@@ -949,10 +949,8 @@ void MapEditor::openDialog()
     if (ImGui::Button("Browse...")) {
         // The system's file dialog, for a map anywhere (.map or the download's .nxz).
         static const SDL_DialogFileFilter filters[] = {{"Nox maps", "map;nxz"}, {"All files", "*"}};
-        static std::pair<std::mutex*, std::optional<std::string>*> target;
-        target = {&pickedMutex_, &picked_};
         const std::string start = pathText(ctx_.mapsDir);
-        SDL_ShowOpenFileDialog(editor::storePickedFile, &target, ctx_.window, filters, 2, start.c_str(), false);
+        editor::openFileDialog(filePick_, ctx_.window, filters, 2, start.c_str());
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();

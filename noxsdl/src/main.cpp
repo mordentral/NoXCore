@@ -50,6 +50,7 @@
 #include "leaving_notice.hpp"
 #include "log_output.hpp"
 #include "map_cache_dir.hpp"
+#include "menu_rules.hpp"
 #include "mods_folder.hpp"
 #include "new_game.hpp"
 #include "predicted_drop.hpp"
@@ -2211,15 +2212,15 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
     if (app.inputConfig) {
         app.inputConfig->draw(app.renderer, app.camera.viewWidth, app.camera.viewHeight);
     }
-    {
+    if (const float scale = menuSparkScale(static_cast<float>(app.camera.viewWidth), static_cast<float>(app.camera.viewHeight));
+        scale > 0) {
         // The pointer's sparks (mainloop) in the menus' 640 x 480, over everything but the
-        // pointer itself.
+        // pointer itself. (None while the output has no area: a minimised window.)
         if (!app.shellSparks) {
             app.shellSparks = std::make_unique<ScreenParticles>();
         }
         const float w = static_cast<float>(app.camera.viewWidth);
         const float h = static_cast<float>(app.camera.viewHeight);
-        const float scale = std::min(w / 640.0f, h / 480.0f);
         const float ox = std::floor((w - 640 * scale) / 2);
         const float oy = std::floor((h - 480 * scale) / 2);
         const std::uint64_t now = SDL_GetTicks();
@@ -2664,7 +2665,7 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
         const int jiggle = app.effects->jiggle();
         const int eyeShift = jiggle > 0 ? 1 - jiggle : jiggle < 0 ? -1 - jiggle : 0;
         app.sight.setClassicWalls(app.classicWalls);
-        app.sight.build(app.camera, app.view->walls(), app.view->windows(), app.things, blockers, eyeShift);
+        app.sight.build(app.camera, app.view->walls(), &app.view->wallGrid(), app.view->windows(), app.things, blockers, eyeShift);
         app.sight.setSoftEdges(app.softShadowEdge);
         sight = &app.sight;
     }

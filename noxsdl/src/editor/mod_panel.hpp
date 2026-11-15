@@ -21,6 +21,7 @@
 #pragma once
 
 #include "editor/code_editor.hpp"
+#include "editor/file_pick.hpp"
 #include "editor/mod_analysis.hpp"
 #include "editor/mod_project.hpp"
 
@@ -34,7 +35,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -214,9 +214,9 @@ private:
     char refSearch_[64] = {};
     int refHalf_ = 0;               ///< 0 server, 1 UI
     std::string status_;
-    // A file picked in the system's dialog (Export: its callback may come from another thread).
-    std::mutex pickedMutex_;
-    std::optional<std::string> picked_;
+    // A file picked in the system's dialog (Export: its answer may come from another thread, and
+    // after this panel is gone).
+    editor::FilePick filePick_;
 };
 
 } // namespace noxsdl

@@ -17,6 +17,7 @@
 
 #include "camera.hpp"
 #include "thing_art.hpp"
+#include "wall_grid.hpp"
 
 #include "noxcore/client/sight.hpp"
 #include "noxcore/map/sections.hpp"
@@ -50,11 +51,13 @@ public:
     };
 
     /// Rebuilds the visible region for the camera's view, from its centre. `walls` are the ones
-    /// standing (MapView::walls: broken and open secret walls left out); `windows` holds the
-    /// window walls (x << 8 | y). `eyeShiftY` is the screen shake as swung for this frame
-    /// (SightRegion::View::eyeShiftY).
-    void build(const Camera& camera, std::span<const nox::map::Wall> walls, const std::set<std::uint16_t>& windows,
-               const nox::things::ThingDb& things, std::span<const Blocker> blockers = {}, int eyeShiftY = 0);
+    /// standing (MapView::walls: broken and open secret walls left out), `grid` them by where they
+    /// stand (MapView::wallGrid: only those near the view are looked at; null, or a grid of
+    /// another list's length, and every wall is); `windows` holds the window walls (x << 8 | y).
+    /// `eyeShiftY` is the screen shake as swung for this frame (SightRegion::View::eyeShiftY).
+    void build(const Camera& camera, std::span<const nox::map::Wall> walls, const WallGrid* grid,
+               const std::set<std::uint16_t>& windows, const nox::things::ThingDb& things,
+               std::span<const Blocker> blockers = {}, int eyeShiftY = 0);
 
     /// Whether the sight reached the blocker with this key (its interval made it into the
     /// sweep): how the game decides a sight-blocking object is drawn. Nullopt when no blocker
@@ -107,9 +110,13 @@ private:
     nox::client::SightRegion wallRegion_; ///< the improved culling's (unused when classic)
     bool classicWalls_ = false;
     std::vector<SDL_FPoint> polygon_;
-    std::unordered_map<std::uint32_t, std::size_t> keys_; ///< a blocker's key: its index in the build
-    /// build()'s wall cells and blockers as the region takes them (kept for their memory).
+    /// The blockers' keys and their indexes in the build, sorted (a key twice: the later index
+    /// counts, the one reached() answers for). Kept for its memory.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> keys_;
+    /// build()'s wall cells and blockers as the region takes them, and the grid's walls found
+    /// (kept for their memory).
     std::vector<nox::client::SightRegion::Wall> cells_;
+    std::vector<std::uint32_t> found_;
     std::vector<nox::client::SightRegion::Blocker> objects_;
     bool softEdges_ = true;
     SDL_Texture* mask_ = nullptr;

@@ -31,6 +31,7 @@
 #include "sight.hpp"
 #include "sprite_cache.hpp"
 #include "thing_art.hpp"
+#include "wall_grid.hpp"
 
 #include "noxcore/client/world.hpp"
 #include "noxcore/map/objects.hpp"
@@ -215,6 +216,9 @@ public:
 
     /// The walls as they stand: the map's, less the broken and open ones, plus Wall-spell walls.
     const std::vector<nox::map::Wall>& walls() const { return walls_; }
+    /// walls() by where they stand (wall_grid.hpp), built again with them (setWallState), for a
+    /// frame's sight to visit only those near its view.
+    const WallGrid& wallGrid() const { return wallGrid_; }
 
     /// Applies the server's wall state:
     /// - `destroyed` indexes the map's DestructableWalls; broken walls are gone (flag 0x20);
@@ -522,6 +526,7 @@ private:
     std::unordered_map<std::int32_t, std::size_t> tileIndex_;
     std::vector<nox::map::Wall> walls_;     ///< as they stand (setWallState)
     std::unordered_map<std::uint16_t, std::size_t> wallByKey_; ///< walls_ by wallKey (the last there), with them
+    WallGrid wallGrid_;                     ///< walls_ by block, with them
     std::vector<nox::map::Wall> mapWalls_;  ///< as the map places them
     std::vector<std::uint16_t> breakable_;  ///< DestructableWalls cells (wallKey), by wall id
     std::set<std::uint16_t> breakableStanding_; ///< breakable_'s cells whose map wall stands (setWallState)
