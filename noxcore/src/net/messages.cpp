@@ -395,6 +395,40 @@ constexpr SubOpEntry kSubOps[] = {
     {0xF0, 0x21, {"formatted notice", 0x34, 0x0}},
 };
 
+/// Where each (op, sub) pair sits in kSubOps, worked out from it at compile time: row[op] is op's
+/// row of index (kNoSubOp if op has no sub-ops), index[row][sub] the pair's place in kSubOps
+/// (kNoSubOp if it isn't there). Were a pair listed twice, its first entry would win.
+constexpr std::uint8_t kNoSubOp = 0xFF;
+static_assert(std::size(kSubOps) < kNoSubOp);
+
+struct SubOpIndex {
+    std::array<std::uint8_t, 256> row;
+    std::array<std::array<std::uint8_t, 256>, 7> index;
+};
+
+constexpr SubOpIndex makeSubOpIndex()
+{
+    SubOpIndex t{};
+    t.row.fill(kNoSubOp);
+    for (auto& r : t.index) {
+        r.fill(kNoSubOp);
+    }
+    std::uint8_t rows = 0;
+    for (std::size_t i = 0; i < std::size(kSubOps); ++i) {
+        const SubOpEntry& e = kSubOps[i];
+        if (t.row[e.op] == kNoSubOp) {
+            t.row[e.op] = rows++;
+        }
+        std::uint8_t& at = t.index[t.row[e.op]][e.sub];
+        if (at == kNoSubOp) {
+            at = static_cast<std::uint8_t>(i);
+        }
+    }
+    return t;
+}
+
+constexpr SubOpIndex kSubOpIndex = makeSubOpIndex();
+
 } // namespace
 
 const OpInfo& opInfo(Op op) noexcept
@@ -404,12 +438,12 @@ const OpInfo& opInfo(Op op) noexcept
 
 const SubOpInfo* subOpInfo(Op op, std::uint8_t sub) noexcept
 {
-    for (const auto& e : kSubOps) {
-        if (e.op == static_cast<std::uint8_t>(op) && e.sub == sub) {
-            return &e.info;
-        }
+    const std::uint8_t row = kSubOpIndex.row[static_cast<std::uint8_t>(op)];
+    if (row == kNoSubOp) {
+        return nullptr;
     }
-    return nullptr;
+    const std::uint8_t i = kSubOpIndex.index[row][sub];
+    return i == kNoSubOp ? nullptr : &kSubOps[i].info;
 }
 
 namespace msg {
