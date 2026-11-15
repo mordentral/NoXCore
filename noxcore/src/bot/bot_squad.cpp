@@ -67,6 +67,7 @@ struct BotSquad::Seat {
     bool wasDead = false;
     int deaths = 0;
     bool failNoted = false; ///< a join that failed has held the next back (joinRetryAt_)
+    bool sendFailNoted = false; ///< a send failed and was logged (again only after one goes)
     const Persona* persona = nullptr; ///< who it is (null: a plain "[BOT] " name, the roster used up)
     std::uint32_t banteredAt = 0;     ///< its last taunt or whine (0 none yet)
     std::uint32_t nagAt = 0;          ///< a chat map: its next nudge to the host (0: not yet set)
@@ -139,10 +140,22 @@ std::size_t BotSquad::add(std::uint8_t playerClass, std::size_t count, std::uint
     return count;
 }
 
-void BotSquad::addSeat(std::uint8_t playerClass, std::uint32_t atMs)
+bool BotSquad::addSeat(std::uint8_t playerClass, std::uint32_t atMs)
 {
-    // The NetBot is made below, once the profile is filled in.
-    auto seat = std::make_unique<Seat>(Seat{nullptr, net::UdpSocket::open(), net::UdpSocket::open()});
+    // The NetBot is made below, once the profile is filled in. Sockets that can't be opened (none
+    // left, the network down): no seat this time, balance() tries again later; said once until
+    // one opens.
+    std::unique_ptr<Seat> seat;
+    try {
+        seat = std::make_unique<Seat>(Seat{nullptr, net::UdpSocket::open(), net::UdpSocket::open()});
+    } catch (const std::exception& ex) {
+        if (!openFailNoted_) {
+            openFailNoted_ = true;
+            log(std::string("a bot's sockets couldn't be opened (tried again in a while): ") + ex.what());
+        }
+        return false;
+    }
+    openFailNoted_ = false;
     client::PlayerProfile profile;
     // Who: a bot coming back is the one that went (one of its class gone, not in again, of the
     // difficulties wanted now);
@@ -174,13 +187,21 @@ void BotSquad::addSeat(std::uint8_t playerClass, std::uint32_t atMs)
     }
     if (name.empty()) {
         persona = pickPersona(playerClass, options_.minTier, options_.maxTier, inUse, rng_);
-        name = persona ? playerNameOf(*persona) : botName(rng_, names_);
+        if (!persona) {
+            // A plain name none of our seats has (a gone one kept may come back as itself).
+            std::set<std::string> ours;
+            for (const auto& s : seats_) {
+                ours.insert(s->name);
+            }
+            name = botName(rng_, ours);
+        } else {
+            name = playerNameOf(*persona);
+        }
     }
     profile.name = name;
     profile.playerClass = playerClass;
     profile.serial = serialFor(rng_);
     profile.password = options_.password;
-    names_.insert(profile.name);
     seat->name = profile.name;
     seat->serial = profile.serial;
     seat->playerClass = playerClass;
@@ -219,6 +240,7 @@ void BotSquad::addSeat(std::uint8_t playerClass, std::uint32_t atMs)
         return drop;
     });
     seats_.push_back(std::move(seat));
+    return true;
 }
 
 bool BotSquad::mayJoin(std::uint32_t nowMs)
@@ -409,8 +431,9 @@ void BotSquad::balance(std::uint32_t nowMs)
         }
         for (const auto c : wanted_) {
             if (short_[c] > 0) {
-                addSeat(c, nowMs);
-                log("[" + seats_.back()->name + "] " + (mine.empty() && balancedAt_ == 0 ? "joining" : "room for it: joining"));
+                if (addSeat(c, nowMs)) {
+                    log("[" + seats_.back()->name + "] " + (mine.empty() && balancedAt_ == 0 ? "joining" : "room for it: joining"));
+                }
                 break;
             }
         }
@@ -587,6 +610,19 @@ void BotSquad::tick(std::uint32_t nowMs)
         listener = speaker;
     }
     listener_ = listener;
+    // A datagram to the server from one of a seat's sockets. One that can't be sent (the network
+    // down, say) is lost, as one dropped on the way would be: logged once until a send goes again.
+    const auto sendOut = [&](Seat& s, net::UdpSocket& socket, std::span<const std::uint8_t> bytes) {
+        try {
+            socket.sendTo(options_.server, bytes);
+            s.sendFailNoted = false;
+        } catch (const std::exception& ex) {
+            if (!s.sendFailNoted) {
+                s.sendFailNoted = true;
+                log("[" + s.name + "] network error: " + ex.what());
+            }
+        }
+    };
     // Our own lines are remembered for 5 s, to drop the server's echo of them.
     std::erase_if(said_, [&](const Said& s) { return nowMs - s.atMs > 5000; });
     // A bot that never got in (the server full, refusing, not answering): the next try a while
@@ -625,8 +661,8 @@ void BotSquad::tick(std::uint32_t nowMs)
             if (asks && !mayAnswer) {
                 // (the query beside the join all the same, twice: a stock host drops it)
                 const auto query = lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel);
-                s.game.sendTo(options_.server, query);
-                s.game.sendTo(options_.server, query);
+                sendOut(s, s.game, query);
+                sendOut(s, s.game, query);
             }
             if (asks && mayAnswer && !s.typesAnswered) {
                 constexpr std::uint32_t kTypesWaitMs = 3000;
@@ -639,7 +675,7 @@ void BotSquad::tick(std::uint32_t nowMs)
                 }
                 if (nowMs - s.typesFirstAt < kTypesWaitMs) {
                     if (nowMs - s.typesAskedAt >= kTypesResendMs) {
-                        s.game.sendTo(options_.server, lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel));
+                        sendOut(s, s.game, lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel));
                         s.typesAskedAt = nowMs;
                     }
                     try {
@@ -679,7 +715,7 @@ void BotSquad::tick(std::uint32_t nowMs)
             }
             s.bot->tick(nowMs);
             for (const auto& d : c.takeOutgoing()) {
-                (d.lobby ? s.lobby : s.game).sendTo(options_.server, d.bytes);
+                sendOut(s, d.lobby ? s.lobby : s.game, d.bytes);
             }
         } catch (const std::exception& ex) {
             log("[" + s.name + "] network error: " + ex.what());

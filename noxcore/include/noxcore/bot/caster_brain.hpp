@@ -111,6 +111,12 @@ public:
     /// For logs: the last spell cast (0 none yet), and how often each has been.
     std::uint32_t lastSpell() const noexcept { return lastSpell_; }
     const std::map<std::uint32_t, int>& castCounts() const noexcept { return castCounts_; }
+    /// For tests: the casts on enemies remembered now (worthOn's; those past kDebuffAgain are let
+    /// go as the next is added).
+    std::size_t debuffsRemembered() const noexcept { return debuffedAt_.size(); }
+    /// The spells whose casts worthOn looks back on (the debuffs, Fumble and Charm): only theirs
+    /// are remembered.
+    static bool remembered(std::uint32_t spell);
     /// The class's bar.
     virtual const SpellPages& pages() const = 0;
 
@@ -234,7 +240,7 @@ private:
     std::optional<std::pair<float, float>> teleportedFrom_; ///< a teleport cast from here (the path's planned again once it takes)
     std::uint32_t moveAfterShotUntil_ = 0; ///< on the move after a taunt-cut shot until this frame
     std::map<std::uint32_t, std::uint32_t> buffedAt_; ///< each buff spell's last cast
-    std::map<std::pair<std::uint16_t, std::uint32_t>, std::uint32_t> debuffedAt_; ///< (enemy, spell): last cast
+    std::map<std::pair<std::uint16_t, std::uint32_t>, std::uint32_t> debuffedAt_; ///< (enemy, remembered spell): last cast (stale ones dropped as one's added)
     static constexpr std::uint32_t kBuffAgain = 300;  ///< 10 s before the same buff again
     std::uint32_t nextSwap_ = 0;           ///< no weapon change before this frame
     Style style_ = Style::Balanced;

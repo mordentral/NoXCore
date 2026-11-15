@@ -382,7 +382,7 @@ protected:
     std::uint32_t respawnAt_ = 0;
     std::uint32_t observeAskedAt_ = 0; ///< standing down: when we last asked to observe
     std::uint32_t nextItemAction_ = 0; ///< potions and equipping, at most so often
-    std::set<std::uint16_t> triedEquip_;
+    std::set<std::uint16_t> triedEquip_; ///< gear we've tried on, while it's still in our pack (play)
     std::uint16_t fetching_ = 0;       ///< an item it's going for
     std::uint32_t fetchSince_ = 0;
     int pickupTries_ = 0;

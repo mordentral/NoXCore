@@ -573,7 +573,8 @@ float PlayerBrain::gearWorth(const BotView& view, const SeenItem& item) const
 void PlayerBrain::tendGear(const BotView& view, BotBody& body)
 {
     // The best weapon we carry if it beats the one in hand, else the armour piece that beats
-    // most what's worn there. Each tried once: the server says no to what doesn't fit.
+    // most what's worn there. Each tried once while we carry it: the server says no to what
+    // doesn't fit.
     float wielded = -1;
     for (const auto& i : view.inventory) {
         if (i.kind == ItemKind::Weapon && i.equipped) {
@@ -855,6 +856,13 @@ void PlayerBrain::play(const BotView& view, BotBody& body)
 {
     ++thinks_;
     frame_ = view.frame;
+    // Gear tried on and gone from our pack since (dropped, lost with a death, its net code another
+    // object's now) is tried again should it come back.
+    if (!triedEquip_.empty()) {
+        std::erase_if(triedEquip_, [&](std::uint16_t code) {
+            return std::ranges::find(view.inventory, code, &OwnItem::netCode) == view.inventory.end();
+        });
+    }
     noteBodies(view);
     // Everyone's and every missile's movement, for leading shots and dodging.
     for (const auto* seen : {&view.players, &view.creatures}) {

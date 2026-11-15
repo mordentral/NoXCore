@@ -41,24 +41,44 @@ inline std::vector<std::string> xwisLoginLines(const std::string& nick, std::str
     };
 }
 
+/// The most bytes a server's line may have before its LF (its CR counted). IRC allows 512 with the
+/// CR LF; this is far past anything a server sends. A longer line is dropped whole, however its
+/// bytes arrive: a server that never ends one can't make the waiting part grow without end.
+inline constexpr std::size_t kMaxIrcLine = 64 * 1024;
+
 /// Appends `bytes` to `partial` and hands each whole line in it (CR LF or LF) to `line`; a partial
 /// last line waits in `partial` for more. (`partial` is only ever what this left: no '\n' in it,
-/// so the first line's end is looked for in the new bytes alone, not the waiting part again.)
+/// so the first line's end is looked for in the new bytes alone, not the waiting part again. The
+/// one exception: "\n" alone while the rest of a line past kMaxIrcLine is skipped, to its end.)
 template <class Line>
 void splitLines(std::string& partial, std::span<const std::uint8_t> bytes, Line&& line)
 {
+    std::string_view in(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    if (partial == "\n") {
+        const std::size_t end = in.find('\n');
+        if (end == std::string_view::npos) {
+            return; // (still the over-long line)
+        }
+        partial.clear();
+        in.remove_prefix(end + 1);
+    }
     const std::size_t waiting = partial.size();
-    partial.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    partial.append(in);
     std::size_t start = 0;
     for (auto end = partial.find('\n', waiting); end != std::string::npos; end = partial.find('\n', start)) {
-        std::string_view l(partial.data() + start, end - start);
-        if (!l.empty() && l.back() == '\r') {
-            l.remove_suffix(1);
+        if (end - start <= kMaxIrcLine) {
+            std::string_view l(partial.data() + start, end - start);
+            if (!l.empty() && l.back() == '\r') {
+                l.remove_suffix(1);
+            }
+            line(l);
         }
-        line(l);
         start = end + 1;
     }
     partial.erase(0, start);
+    if (partial.size() > kMaxIrcLine) {
+        partial = "\n"; // (too long already: dropped, and the rest of it as it comes)
+    }
 }
 
 /// The next space-separated word of `rest` (consumed).

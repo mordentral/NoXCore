@@ -45,6 +45,20 @@ bool CasterBrain::knows(const BotView& view, std::uint32_t spell)
     return std::ranges::find(view.spells, spell, &BotView::KnownSpell::id) != view.spells.end();
 }
 
+bool CasterBrain::remembered(std::uint32_t spell)
+{
+    // (worthOn's spells past its default.)
+    switch (spell) {
+    case Spell::Slow:
+    case Spell::Confuse:
+    case Spell::Stun:
+    case Spell::Poison:
+    case Spell::Fumble:
+    case Spell::Charm: return true;
+    default: return false;
+    }
+}
+
 bool CasterBrain::worthOn(const BotView& view, const SeenPlayer& enemy, std::uint32_t spell) const
 {
     // What each debuff puts on them (bit n = ENCHANT n; poison is the player's status).
@@ -337,8 +351,10 @@ void CasterBrain::fight(const BotView& view, BotBody& body, const SeenPlayer& en
         const auto clearOfIt = [&] { return distance(view.x, view.y, lx, ly) > splash(*s) && d > splash(*s); };
         if (s && can(view, *s) && worthOn(view, enemy, *s) && clearOfIt()) {
             casted = cast(view, body, *s, lx, ly);
-            if (casted) {
-                debuffedAt_[{enemy.netCode, *s}] = view.frame; // (only debuffs are ever looked up)
+            if (casted && remembered(*s)) {
+                // (Kept only while it holds a cast back: older ones are as good as none.)
+                std::erase_if(debuffedAt_, [&](const auto& d) { return view.frame - d.second >= kDebuffAgain; });
+                debuffedAt_[{enemy.netCode, *s}] = view.frame;
             }
         }
     }

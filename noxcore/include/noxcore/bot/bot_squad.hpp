@@ -201,6 +201,8 @@ public:
     const std::vector<SquadPerson>& humans() const noexcept { return humans_; }
     /// What happened since the last call: joins, notices, leaving.
     std::vector<std::string> takeLog();
+    /// A line of the caller's into that log (the program running the squad: an error out of tick).
+    void note(std::string line) { log(std::move(line)); }
     /// The game's chat since the last call, heard by one bot (each bot hears the same).
     std::vector<ChatLine> takeChat() { return std::exchange(chat_, {}); }
 
@@ -236,7 +238,9 @@ private:
     void announce(const std::string& why, std::uint32_t nowMs);
     void log(std::string line);
     /// A new seat for a bot of `playerClass`, joining at `atMs` (a name from one gone, if any).
-    void addSeat(std::uint8_t playerClass, std::uint32_t atMs);
+    /// False (logged once until one opens) if its sockets couldn't be opened: no seat added.
+    bool addSeat(std::uint8_t playerClass, std::uint32_t atMs);
+    bool openFailNoted_ = false; ///< addSeat's sockets failed to open, and that was logged
     /// Keeps the wanted count as far as room allows: one bot out when people need the place,
     /// one in (a missing class) when there's room again, kBalanceMs apart.
     void balance(std::uint32_t nowMs);
@@ -257,7 +261,6 @@ private:
     const ItemKinds& kinds_;
     std::mt19937 rng_;
     std::vector<std::unique_ptr<Seat>> seats_;
-    std::set<std::string> names_;
     std::vector<std::string> log_;
     std::vector<ChatLine> chat_;
     /// What our bots said lately: the server's echo of it isn't shown twice.
