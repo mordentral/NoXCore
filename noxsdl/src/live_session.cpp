@@ -187,7 +187,7 @@ std::vector<std::uint8_t> LiveSession::query(std::uint64_t realm)
 void LiveSession::update()
 {
     const std::uint32_t now = nowMs();
-    std::uint8_t buffer[2048];
+    std::uint8_t buffer[nox::net::kDatagramBufferSize];
     // Lobby packets from our server's address (from any port, as the 1.2b client's lobby receive
     // takes them: it compares the address alone), then game packets from our server alone; a
     // noxcpp server's extended reply is taken here.

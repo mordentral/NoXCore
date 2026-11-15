@@ -112,9 +112,14 @@ public:
     /// The trigger's (self's) object-variable words, by word offset (function 0's layout): 0
     /// until written. GAME.EXE never allocates them, so it faults where these are used
     /// (OB-210); NoX Core keeps them per object, for its own scripts. Never saved (nor are
-    /// they in the exe's ScriptData).
+    /// they in the exe's ScriptData). A store past objectVarWords() is lost (a script's own
+    /// arithmetic could name any word up to 2^31, gigabytes per object); one at it is kept, as the
+    /// game's element store one past an array's end writes the next word (OB-211).
     std::uint32_t objectVar(std::int32_t word) override;
     void setObjectVar(std::int32_t word, std::uint32_t value) override;
+    /// The object-variable words the script declares (function 0's, at most
+    /// script::kMaxLocalWords: ScriptFile::parse refuses more).
+    std::size_t objectVarWords() const;
     /// Every object's object-variable words, by extent (only objects that had one written).
     const std::map<std::uint32_t, std::vector<std::uint32_t>>& objectVars() const noexcept { return objectVars_; }
 

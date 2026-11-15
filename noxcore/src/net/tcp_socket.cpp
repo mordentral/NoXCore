@@ -6,6 +6,10 @@
 #include <system_error>
 #include <utility>
 
+#ifndef _WIN32
+#include <poll.h>
+#endif
+
 namespace nox::net {
 
 using namespace detail;
@@ -86,6 +90,8 @@ TcpSocket::State TcpSocket::state()
         return state_;
     }
     // A pending connect is done once the socket is writable (or, on Windows, in the except set).
+#ifdef _WIN32
+    // (Winsock's fd_set is a list of sockets, not a bitmap: any handle fits.)
     fd_set writable;
     fd_set failed;
     FD_ZERO(&writable);
@@ -93,11 +99,21 @@ TcpSocket::State TcpSocket::state()
     FD_SET(raw(handle_), &writable);
     FD_SET(raw(handle_), &failed);
     timeval now{0, 0};
-    if (::select(static_cast<int>(raw(handle_)) + 1, nullptr, &writable, &failed, &now) > 0) {
+    const bool done = ::select(static_cast<int>(raw(handle_)) + 1, nullptr, &writable, &failed, &now) > 0;
+    const bool refused = done && FD_ISSET(raw(handle_), &failed);
+#else
+    // poll, not select: an fd_set is a bitmap of FD_SETSIZE (1024) descriptors, and a process with
+    // more open (a bot manager's) would have FD_SET write past it.
+    // (A failed connect is writable too, select's and poll's; SO_ERROR says which.)
+    pollfd p{static_cast<int>(raw(handle_)), POLLOUT, 0};
+    const bool done = ::poll(&p, 1, 0) > 0 && (p.revents & (POLLOUT | POLLERR | POLLHUP)) != 0;
+    const bool refused = false;
+#endif
+    if (done) {
         int error = 0;
         SocketLength len = sizeof(error);
         ::getsockopt(raw(handle_), SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &len);
-        state_ = (error == 0 && !FD_ISSET(raw(handle_), &failed)) ? State::Connected : State::Failed;
+        state_ = (error == 0 && !refused) ? State::Connected : State::Failed;
     }
     return state_;
 }

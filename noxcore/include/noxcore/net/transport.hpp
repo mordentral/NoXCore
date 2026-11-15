@@ -44,6 +44,13 @@ inline constexpr std::uint8_t kReliableBit = 0x80;
 inline constexpr std::size_t kMaxReliablePayload = 0x400; ///< Net init's (200, 0x400)
 inline constexpr std::size_t kMaxQueuedReliable = 200;
 inline constexpr std::size_t kClientBufferSize = 0x800;   ///< client stream buffer
+/// The largest datagram a stream sends, the game's or ours: the 2-byte header and an unreliable
+/// buffer of kClientBufferSize less one (Net_Send refuses at write pointer + length + 1 past the
+/// end: Stream::queueUnreliable's check). The game's servers and clients both have 0x800.
+inline constexpr std::size_t kMaxDatagram = 2 + kClientBufferSize - 1;
+/// A receive buffer for game datagrams: the game's own size (its stream buffer and the header),
+/// one byte past kMaxDatagram. (UdpSocket::receive skips a datagram that doesn't fit.)
+inline constexpr std::size_t kDatagramBufferSize = kClientBufferSize + 2;
 inline constexpr std::uint32_t kResendDelayMs = 2000;
 inline constexpr std::uint32_t kResendTimerMs = 1000;
 inline constexpr std::uint32_t kConnectTimeoutMs = 60 * 1000; ///< cliWaitServerResponse

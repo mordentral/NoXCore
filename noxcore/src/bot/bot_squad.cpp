@@ -593,7 +593,7 @@ void BotSquad::tick(std::uint32_t nowMs)
         }
     }
     // One datagram's worth for receiving.
-    std::uint8_t buffer[2048];
+    std::uint8_t buffer[net::kDatagramBufferSize];
     // One bot listens to the chat (they all hear the same): the voice, else the first in the game.
     const Seat* listener = nullptr;
     for (const auto& s : seats_) {

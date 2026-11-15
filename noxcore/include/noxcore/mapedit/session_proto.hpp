@@ -362,7 +362,12 @@ private:
     std::map<std::uint32_t, Parts> parts_;
 };
 
-/// {u8 deflated, u32 raw size, bytes}.
+/// The most bytes a packed body may unpack to (a session document, an op): 32 MB, far past any
+/// map's (the largest stock map is under 700 KB). unpack refuses a larger raw size before it
+/// unpacks anything (a peer's u32 could otherwise ask for 4 GB).
+inline constexpr std::size_t kMaxUnpacked = 32u << 20;
+
+/// {u8 deflated, u32 raw size, bytes}. unpack throws FormatError past kMaxUnpacked.
 std::vector<std::uint8_t> pack(std::span<const std::uint8_t> raw);
 std::vector<std::uint8_t> unpack(std::span<const std::uint8_t> packed);
 

@@ -87,6 +87,11 @@ MapDocument decodeSessionDocument(std::span<const std::uint8_t> bytes, const thi
     }
     fresh.objects = std::move(objects);
     fresh.nextObjId = r.u32();
+    // (Every path that sets it keeps it past every id: a map's load, an add, never lowered by a
+    // removal. At or below one, a new object would land on an id in use.)
+    if (fresh.nextObjId == 0 || (!fresh.objects.empty() && fresh.nextObjId <= fresh.objects.rbegin()->first)) {
+        throw FormatError("session document: the next object id isn't past the ids in use");
+    }
     fresh.polygonKeys.resize(r.count(r.u32(), 4));
     for (auto& k : fresh.polygonKeys) k = r.u32();
     fresh.nextPolygonKey = r.u32();

@@ -139,7 +139,8 @@ void EditSessionClient::handle(const ss::Message& m)
             catchUpAgain(std::string("The session's snapshot didn't apply (") + ex.what() + ")");
             break;
         }
-        doc_->nextObjId = s.nextObjId;
+        // (Never below the ids the op added: the host's is past them all, as an add leaves it.)
+        doc_->nextObjId = std::max(doc_->nextObjId, s.nextObjId);
         doc_->nextPolygonKey = s.nextPolygonKey;
         doc_->nextGroupKey = s.nextGroupKey;
         redoPending();

@@ -609,11 +609,17 @@ std::uint32_t ScriptHost::objectVar(std::int32_t word)
     return it->second[static_cast<std::size_t>(word)];
 }
 
+std::size_t ScriptHost::objectVarWords() const
+{
+    const auto& functions = vm_.file().functions;
+    return functions.empty() ? 0 : functions[0].localWords;
+}
+
 void ScriptHost::setObjectVar(std::int32_t word, std::uint32_t value)
 {
     const std::uint32_t trigger = vm_.trigger();
-    if (!trigger || word < 0) {
-        return;
+    if (!trigger || word < 0 || static_cast<std::size_t>(word) > objectVarWords()) {
+        return; // (past the words the script declared: lost, as a local's store past its function's)
     }
     auto& vars = objectVars_[trigger];
     if (static_cast<std::size_t>(word) >= vars.size()) {

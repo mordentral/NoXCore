@@ -164,6 +164,15 @@ struct CompileResult {
 /// nsc's marker in front of the source it keeps in string 0.
 constexpr std::string_view kEmbeddedSourcePrefix = "NOXSCRIPT3.0";
 
+/// Statements and expressions nested deeper than this are a compile error (and the parse stops
+/// there): each level is a call in the parser, the code generator and the syntax tree's
+/// destructor, so source nested a hundred thousand deep (a peer's, compiled by an edit session's
+/// host) would run off the stack. A level is each statement, expression, assignment and prefix
+/// operator, and each operator or index in a chain (`a + b + c`, `a[1][2]`: the tree deepens
+/// with each); `( ... )` takes two. Far past any real script's: every stock map's script,
+/// decompiled and compiled back, reaches 19 at most.
+inline constexpr int kMaxNesting = 256;
+
 CompileResult compile(std::string_view source, const CompileOptions& options = {});
 
 /// The source kept in string 0 (nsc's habit, or ours with embedSource), if there is one.

@@ -428,7 +428,7 @@ public:
     std::vector<TopItem> program()
     {
         std::vector<TopItem> items;
-        while (peek().kind != Tk::End) {
+        while (peek().kind != Tk::End && !tooDeep_) {
             const std::size_t before = p_;
             const std::size_t errorsBefore = errors();
             topLevel(items);
@@ -443,6 +443,40 @@ public:
     }
 
 private:
+    /// One level deeper (kMaxNesting): false once past it (the error said once, the parse over).
+    bool enter()
+    {
+        if (++depth_ > kMaxNesting && !tooDeep_) {
+            tooDeep_ = true;
+            error(peek().loc, "nested too deeply (more than " + std::to_string(kMaxNesting) + " levels of statements and expressions)");
+        }
+        return !tooDeep_;
+    }
+    /// A level for a scope: `ok` false when it's one too many.
+    struct Nest {
+        explicit Nest(Parser& parser) : p(parser), ok(parser.enter()) {}
+        ~Nest() { --p.depth_; }
+        Nest(const Nest&) = delete;
+        Nest& operator=(const Nest&) = delete;
+        Parser& p;
+        const bool ok;
+    };
+    /// The levels a chain adds as it grows (a left operand or indexed array made deeper), given
+    /// back at the scope's end.
+    struct Chain {
+        explicit Chain(Parser& parser) : p(parser) {}
+        ~Chain() { p.depth_ -= n; }
+        Chain(const Chain&) = delete;
+        Chain& operator=(const Chain&) = delete;
+        bool more()
+        {
+            ++n;
+            return p.enter();
+        }
+        Parser& p;
+        int n = 0;
+    };
+
     const Token& peek(std::size_t k = 0) const { return t_[std::min(p_ + k, t_.size() - 1)]; }
     const Token& next()
     {
@@ -702,7 +736,7 @@ private:
         b->k = Stmt::K::Block;
         b->loc = peek().loc;
         expect("{");
-        while (!isPunct("}") && peek().kind != Tk::End) {
+        while (!isPunct("}") && peek().kind != Tk::End && !tooDeep_) {
             const std::size_t before = p_;
             const std::size_t errorsBefore = errors();
             auto s = statement();
@@ -730,6 +764,10 @@ private:
 
     StmtP statement()
     {
+        const Nest nest(*this);
+        if (!nest.ok) {
+            return nullptr;
+        }
         const Token& t = peek();
         const SourceLoc loc = t.loc;
         if (isPunct("{")) {
@@ -917,8 +955,21 @@ private:
         return s;
     }
 
+    /// What's put in place of an expression past kMaxNesting (the parse is over by then).
+    ExprP nothing()
+    {
+        auto e = std::make_unique<Expr>();
+        e->k = Expr::K::Int;
+        e->loc = peek().loc;
+        return e;
+    }
+
     ExprP assignment()
     {
+        const Nest nest(*this);
+        if (!nest.ok) {
+            return nothing();
+        }
         auto lhs = expression();
         static constexpr std::string_view kOps[] = {"=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="};
         for (const auto op : kOps) {
@@ -948,13 +999,18 @@ private:
 
     ExprP binary(int minPrec)
     {
+        const Nest nest(*this);
+        if (!nest.ok) {
+            return nothing();
+        }
         auto lhs = unary();
+        Chain chain(*this);
         for (;;) {
             if (peek().kind != Tk::Punct) {
                 return lhs;
             }
             const int prec = precedence(peek().text);
-            if (prec < 0 || prec <= minPrec - 1 || prec < minPrec) {
+            if (prec < 0 || prec <= minPrec - 1 || prec < minPrec || !chain.more()) {
                 return lhs;
             }
             auto e = std::make_unique<Expr>();
@@ -970,6 +1026,10 @@ private:
     ExprP unary()
     {
         if (isPunct("-") || isPunct("!") || isPunct("~") || isPunct("+")) {
+            const Nest nest(*this);
+            if (!nest.ok) {
+                return nothing();
+            }
             auto e = std::make_unique<Expr>();
             e->k = Expr::K::Unary;
             e->loc = peek().loc;
@@ -983,7 +1043,8 @@ private:
     ExprP postfix()
     {
         auto e = primary();
-        while (e && isPunct("[")) {
+        Chain chain(*this);
+        while (e && isPunct("[") && chain.more()) {
             auto idx = std::make_unique<Expr>();
             idx->k = Expr::K::Index;
             idx->loc = next().loc;
@@ -1070,6 +1131,8 @@ private:
     std::vector<Token> t_;
     std::size_t p_ = 0;
     std::vector<Diagnostic>& diags_;
+    int depth_ = 0;        ///< levels open now (kMaxNesting)
+    bool tooDeep_ = false; ///< past kMaxNesting: the error said, the parse over
 };
 
 // ---------------------------------------------------------------------------------------------

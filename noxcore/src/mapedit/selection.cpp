@@ -3,6 +3,7 @@
 #include "noxcore/mapedit/markers.hpp"
 
 #include "noxcore/io/byte_reader.hpp"
+#include "noxcore/map/objects.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -47,10 +48,12 @@ void forEachTile(const MapDocument& d, F f)
     }
 }
 
-/// Whether `id`'s owner chain reaches an object in `set`.
+/// Whether `id`'s owner chain reaches an object in `set`. (At most map::kMaxInventoryDepth owners:
+/// applyOp keeps chains within it.)
 bool ownedByAny(const MapDocument& d, ObjId id, const std::set<ObjId>& set)
 {
-    for (ObjId p = d.objects.at(id).parent; p != 0;) {
+    int links = 0;
+    for (ObjId p = d.objects.at(id).parent; p != 0 && links++ < map::kMaxInventoryDepth;) {
         if (set.contains(p)) {
             return true;
         }

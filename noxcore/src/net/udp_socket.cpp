@@ -6,6 +6,10 @@
 #include <system_error>
 #include <utility>
 
+#ifndef _WIN32
+#include <sys/uio.h>
+#endif
+
 namespace nox::net {
 
 using namespace detail;
@@ -164,9 +168,24 @@ std::optional<UdpSocket::Received> UdpSocket::receive(std::span<std::uint8_t> bu
 {
     for (;;) {
         sockaddr_in a{};
+#ifdef _WIN32
         SocketLength len = sizeof(a);
         const auto got = ::recvfrom(raw(handle_), reinterpret_cast<char*>(buffer.data()),
                                     static_cast<int>(buffer.size()), 0, reinterpret_cast<sockaddr*>(&a), &len);
+#else
+        // recvmsg for its MSG_TRUNC: a datagram bigger than `buffer` is cut to fit without an
+        // error, so it's skipped as Winsock's WSAEMSGSIZE is (below), never read cut short.
+        iovec io{buffer.data(), buffer.size()};
+        msghdr m{};
+        m.msg_name = &a;
+        m.msg_namelen = sizeof(a);
+        m.msg_iov = &io;
+        m.msg_iovlen = 1;
+        const auto got = ::recvmsg(raw(handle_), &m, 0);
+        if (got >= 0 && (m.msg_flags & MSG_TRUNC) != 0) {
+            continue; // an oversized datagram: skip it
+        }
+#endif
         if (got >= 0) {
             return Received{{ntohl(a.sin_addr.s_addr), ntohs(a.sin_port)}, static_cast<std::size_t>(got)};
         }

@@ -3076,7 +3076,7 @@ void DelveDirector::pumpBotBoss()
     // The server on loopback (127.0.0.1), at its own port.
     const net::Endpoint server{0x7F000001, serverPort_};
     auto& c = b.bot->client();
-    std::uint8_t buffer[2048];
+    std::uint8_t buffer[net::kDatagramBufferSize];
     try {
         // What the server sent the bot on either socket, then the bot's turn and what it sends back.
         while (const auto got = b.lobby.receive(buffer)) {

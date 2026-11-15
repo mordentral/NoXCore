@@ -9,8 +9,11 @@
 #include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <set>
 #include <type_traits>
+#include <unordered_map>
+#include <utility>
 
 namespace nox::mapedit {
 
@@ -134,6 +137,10 @@ RemoveObjects apply(MapDocument& d, const AddObjects& p)
     for (const ObjectEntry& e : p.objects) {
         if (e.id == 0 || d.objects.contains(e.id)) {
             throw FormatError("map editor op: object id " + std::to_string(e.id) + " is in use");
+        }
+        if (e.id == std::numeric_limits<ObjId>::max()) {
+            // (The next id is kept past every id: past this one there's none.)
+            throw FormatError("map editor op: object id " + std::to_string(e.id) + " is out of range");
         }
         if (e.object.parent != 0 && !d.objects.contains(e.object.parent)) {
             throw FormatError("map editor op: object " + std::to_string(e.id) + "'s owner doesn't exist");
@@ -278,6 +285,86 @@ Part swapKeyed(Section& field, std::vector<std::uint32_t>& keys, std::uint32_t& 
     for (const std::uint32_t k : keys) next = std::max(next, k + 1);
     for (const std::uint32_t k : inv.keys) next = std::max(next, k + 1);
     return inv;
+}
+
+/// Owner links from `id` up to its root, or more than map::kMaxInventoryDepth (a loop never ends,
+/// so it's caught here too).
+int linksAbove(const MapDocument& d, ObjId id)
+{
+    int links = 0;
+    for (auto it = d.objects.find(id); it != d.objects.end() && it->second.parent != 0; it = d.objects.find(it->second.parent)) {
+        if (++links > map::kMaxInventoryDepth) {
+            break;
+        }
+    }
+    return links;
+}
+
+/// Every object's owner links in `d` are at most map::kMaxInventoryDepth (no loop): false if not.
+bool ownersBounded(const MapDocument& d)
+{
+    std::unordered_map<ObjId, int> depth;
+    depth.reserve(d.objects.size());
+    std::vector<ObjId> chain;
+    for (const auto& [id, o] : d.objects) {
+        chain.clear();
+        int base = -1; // (the depth just above the chain's last: a root's owner)
+        for (ObjId at = id;;) {
+            if (const auto m = depth.find(at); m != depth.end()) {
+                base = m->second;
+                break;
+            }
+            chain.push_back(at);
+            if (chain.size() > static_cast<std::size_t>(map::kMaxInventoryDepth) + 1) {
+                return false;
+            }
+            const auto it = d.objects.find(at);
+            if (it == d.objects.end() || it->second.parent == 0) {
+                break;
+            }
+            at = it->second.parent;
+        }
+        for (auto c = chain.rbegin(); c != chain.rend(); ++c) {
+            if (++base > map::kMaxInventoryDepth) {
+                return false;
+            }
+            depth.emplace(*c, base);
+        }
+    }
+    return true;
+}
+
+/// After a whole op (its parts applied, `inverse` their inverses in op order): the owners it set
+/// make no loop (A in B, B in A) and nest no deeper than a map can hold (map::kMaxInventoryDepth,
+/// the map reader's limit), else FormatError. Checked once everything is in, so an op that swaps
+/// two objects' owners passes; a peer's op that loops would hang or overflow every walk up or
+/// down the inventories.
+void checkOwners(const MapDocument& d, const Op& op, const std::vector<OpPart>& inverse)
+{
+    std::set<std::pair<ObjId, ObjId>> had; // (id, owner) before a SetObjects
+    for (const OpPart& part : inverse) {
+        if (const auto* s = std::get_if<SetObjects>(&part)) {
+            for (const auto& e : s->objects) had.emplace(e.id, e.object.parent);
+        }
+    }
+    bool reowned = false; // (an existing object, its items with it, under a new owner)
+    for (const OpPart& part : op.parts) {
+        if (const auto* a = std::get_if<AddObjects>(&part)) {
+            // (New objects have no items but the op's own, so the walk up from each covers them.)
+            for (const auto& e : a->objects) {
+                if (e.object.parent != 0 && linksAbove(d, e.id) > map::kMaxInventoryDepth) {
+                    throw FormatError("map editor op: object " + std::to_string(e.id) + "'s owners nest too deep");
+                }
+            }
+        } else if (const auto* s = std::get_if<SetObjects>(&part)) {
+            for (const auto& e : s->objects) {
+                reowned = reowned || (e.object.parent != 0 && !had.contains({e.id, e.object.parent}));
+            }
+        }
+    }
+    if (reowned && !ownersBounded(d)) {
+        throw FormatError("map editor op: an object's owners go round in a loop or nest too deep");
+    }
 }
 
 std::size_t polygonCount(const map::Polygons& p) { return p.polygons.size(); }
@@ -812,6 +899,7 @@ Op applyOp(MapDocument& doc, const Op& op)
         for (const OpPart& part : op.parts) {
             inv.parts.push_back(applyPart(doc, part));
         }
+        checkOwners(doc, op, inv.parts);
     } catch (...) {
         // Roll back what was applied, last first.
         for (auto it = inv.parts.rbegin(); it != inv.parts.rend(); ++it) {

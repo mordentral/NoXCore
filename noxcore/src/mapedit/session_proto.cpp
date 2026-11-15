@@ -220,6 +220,9 @@ std::vector<std::uint8_t> unpack(std::span<const std::uint8_t> packed)
     ByteReader r(packed, "map editor session packed bytes");
     const std::uint8_t deflated = r.u8();
     const std::uint32_t size = r.u32();
+    if (size > kMaxUnpacked) {
+        throw FormatError("map editor session: packed bytes over " + std::to_string(kMaxUnpacked >> 20) + " MB");
+    }
     const auto rest = r.bytes(r.remaining());
     if (deflated == 1) {
         return video::nxzDecompress(rest, size);
