@@ -896,6 +896,16 @@ std::vector<std::uint8_t> objectWordReport(net::Op op, std::uint16_t code, std::
             static_cast<std::uint8_t>(value >> 16), static_cast<std::uint8_t>(value >> 24)};
 }
 
+/// Whether `bit` is owed in `owed`, cleared from it if so (a report taken to be sent).
+bool takeOwed(std::uint32_t& owed, std::uint32_t bit)
+{
+    if (!(owed & bit)) {
+        return false;
+    }
+    owed &= ~bit;
+    return true;
+}
+
 /// What's owed to the player (`bit`: its slot's) of an object it's sent (netUpdateObjectSpecial),
 /// sent to `peer` in this order: its animation frame, its turning on or off, its xStatus, its
 /// height, its enchantments, its modifiers, an NPC's colours and worn things' classes. Each
@@ -905,35 +915,30 @@ void sendOwedReports(net::ServerTransport& transport, std::uint8_t peer, World& 
     namespace oc = things::ObjectClass;
     const std::uint16_t code = netCodeOf(o); // (a map object's: bit 15)
     // Its animation frame (MSG_REPORT_ANIMATION_FRAME 0x6B: the object and the frame, u32).
-    if (o.animOwed & bit) {
-        o.animOwed &= ~bit;
+    if (takeOwed(o.animOwed, bit)) {
         transport.sendReliable(peer, objectWordReport(net::Op::ReportAnimationFrame, code, o.animFrame));
     }
     // Turned on or off (SrvNet_SendEnableDisableObject: MSG_ENABLE / DISABLE_OBJECT 0x37 /
     // 0x38, the object; only the VISIBLE_ENABLE kinds, 0x800000), its xStatus
     // (SrvNet_SendReportXStatus: MSG_REPORT_X_STATUS 0x65, the object and the bits, u32).
-    if (o.enableOwed & bit) {
-        o.enableOwed &= ~bit;
+    if (takeOwed(o.enableOwed, bit)) {
         if (o.classes & oc::VisibleEnable) {
             transport.sendReliable(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(o.enabled() ? net::Op::EnableObject
                                                                                                          : net::Op::DisableObject),
                                                                    static_cast<std::uint8_t>(code), static_cast<std::uint8_t>(code >> 8)});
         }
     }
-    if (o.xStatusOwed & bit) {
-        o.xStatusOwed &= ~bit;
+    if (takeOwed(o.xStatusOwed, bit)) {
         transport.sendReliable(peer, objectWordReport(net::Op::ReportXStatus, code, o.xStatus));
     }
     // Its height (SrvNet_SendUnitHeight: MSG_REPORT_Z_PLUS 0x5E, or _MINUS 0x5F
     // below the floor with its depth, the object and the height truncated to a byte; under a
     // DeltaZ spell, xStatus 0x20, MSG_FX_DELTAZ_SPELL_START 0x9F instead: heightReport).
-    if (o.heightOwed & bit) {
-        o.heightOwed &= ~bit;
+    if (takeOwed(o.heightOwed, bit)) {
         transport.sendReliable(peer, heightReport(o));
     }
     // Its enchantments (MSG_REPORT_ENCHANTMENT 0x5A: the object and its bits, u32).
-    if (o.enchantOwed & bit) {
-        o.enchantOwed &= ~bit;
+    if (takeOwed(o.enchantOwed, bit)) {
         // (noxcpp, VD-69: whom it last told bits, so their "0" stays owed when they clear)
         o.enchantTold = o.buffs != 0 ? o.enchantTold | bit : o.enchantTold & ~bit;
         transport.sendReliable(peer, objectWordReport(net::Op::ReportEnchantment, code, o.buffs));
@@ -942,16 +947,14 @@ void sendOwedReports(net::ServerTransport& transport, std::uint8_t peer, World& 
     // object and its four ids, 0xFF for none), owed as a weapon, armour or flag (class
     // 0x13001000) gets known, or as anything's are set (Items::setModifiers, a TeamBase's
     // too). On the ground the client colours it by them (a CTF flag by its MaterialTeam...).
-    if (o.modifierOwed & bit) {
-        o.modifierOwed &= ~bit;
+    if (takeOwed(o.modifierOwed, bit)) {
         transport.sendReliable(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportModifier),
                                                                static_cast<std::uint8_t>(code), static_cast<std::uint8_t>(code >> 8),
                                                                o.modifiers[0], o.modifiers[1], o.modifiers[2], o.modifiers[3]});
     }
     // An NPC's colours (SrvNet_SendReportNPC, 0x4000000), then each worn thing's
     // class to this player (SrvNet_SendReportEquipClass).
-    if (o.npcOwed & bit) {
-        o.npcOwed &= ~bit;
+    if (takeOwed(o.npcOwed, bit)) {
         transport.sendReliable(peer, npcReport(o));
         for (const std::uint32_t e : o.inventory) {
             const ServerObject* item = world.byExtent(e);
