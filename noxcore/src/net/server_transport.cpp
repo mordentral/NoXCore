@@ -557,10 +557,7 @@ void ServerTransport::control(std::uint8_t id, Peer& p, std::span<const std::uin
             if (id < latency_.size()) {
                 latency_[id].pingedAt = u32At(body, 0);
             }
-            std::vector<std::uint8_t> reply = {kServerStreamIndex, p.stream.expectedSeq(),
-                                               static_cast<std::uint8_t>(Op::ClientPong)};
-            putU32(reply, u32At(body, 0));
-            sendPeer(p, std::move(reply));
+            sendPeer(p, clientPong(kServerStreamIndex, p.stream.expectedSeq(), u32At(body, 0)));
             return;
         }
         case Op::Code9: { // case 9: the client's clock as our echo came back
@@ -593,8 +590,8 @@ void ServerTransport::control(std::uint8_t id, Peer& p, std::span<const std::uin
             close(id);
             return;
         case Op::Accepted: // case 0x1F: an explicit ack
-            if (p.stream.applyAck(body[0])) {
-                events_.push_back({Event::Kind::Payload, id, {static_cast<std::uint8_t>(Op::Code38), body[0]}});
+            if (auto ack = applyAccepted(p.stream, body[0]); !ack.empty()) {
+                events_.push_back({Event::Kind::Payload, id, std::move(ack)});
             }
             break;
         default:
@@ -751,16 +748,8 @@ void ServerTransport::poll(std::uint32_t nowMs)
     lastPoll_ = nowMs;
     pollPingTests(nowMs);
     for (auto& [id, p] : peers_) {
-        bool timer = false;
         // The resend timer, run at most once per kResendTimerMs per peer.
-        if (!p.timerStarted) {
-            p.timerStarted = true;
-            p.lastTimer = nowMs;
-        } else if (static_cast<std::int32_t>(nowMs - p.lastTimer) > static_cast<std::int32_t>(kResendTimerMs)) {
-            p.stream.markOverdue(nowMs);
-            p.lastTimer = nowMs;
-            timer = true;
-        }
+        const bool timer = runResendTimer(p.stream, p.timerStarted, p.lastTimer, nowMs);
         if (p.held) {
             // (holdFlush: only the timer's resends.)
             if (timer) {

@@ -5,9 +5,9 @@
 // byte-reversed (a little-endian u32 of 'FLOR' reads "ROLF"), ended by a zero tag and zero
 // padding. Alignment ("align8") is counted from the start of the file.
 //
-// Sources: community format notes and NoXLib ThingDb.cs, cross-checked by parsing the
-// retail file with every byte accounted for. Fields whose meaning isn't known yet are named
-// unknownN; draw payloads are kept undecoded until the renderer needs them.
+// The layout is checked by parsing the retail file with every byte accounted for. Fields whose
+// meaning isn't known yet are named unknownN; draw payloads are kept undecoded until the
+// renderer needs them.
 #pragma once
 
 #include <array>

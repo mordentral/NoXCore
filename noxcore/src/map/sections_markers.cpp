@@ -122,10 +122,9 @@ void Polygons::write(ByteWriter& w) const
         w.u16(countOf<std::uint16_t>(poly.points.size(), "polygon points"));
         std::vector<std::uint8_t> ids; // one call for the whole list
         for (auto id : poly.points) {
-            for (int i = 0; i < 4; ++i) {
-                ids.push_back(static_cast<std::uint8_t>(id >> (8 * i)));
-            }
+            util::putU32(ids, id);
         }
+
         w.bytes(ids);
         writeScriptHandler(w, poly.playerEnter);
         writeScriptHandler(w, poly.monsterEnter);

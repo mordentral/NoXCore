@@ -1,5 +1,5 @@
-// Based on opennox-lib datapath (data.go, data_gog.go, data_reloaded.go, data_origin.go,
-// registry.go, paths.go), MIT licence, Copyright (c) 2022 NoX World; see THIRD_PARTY_NOTICES.txt.
+// Based on opennox-lib datapath (MIT licence, Copyright (c) 2022 NoX World); see
+// THIRD_PARTY_NOTICES.txt.
 #include "noxcore/io/game_dir.hpp"
 
 #include "noxcore/io/file.hpp"

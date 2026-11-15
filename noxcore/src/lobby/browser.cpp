@@ -5,6 +5,8 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 
+#include "irc.hpp"
+
 #include <algorithm>
 #include <charconv>
 #include <exception>
@@ -284,15 +286,7 @@ void ServerBrowser::pollXwis(std::uint32_t nowMs)
         return;
     }
     // Connected: send what the session queued (the rest waits for the next poll), then feed it every reply.
-    for (const auto& line : xwis_->takeOutgoing()) {
-        xwisSend_ += line;
-        xwisSend_ += "\r\n";
-    }
-    if (!xwisSend_.empty()) {
-        const auto sent = xwisSocket_->send(
-            std::span(reinterpret_cast<const std::uint8_t*>(xwisSend_.data()), xwisSend_.size()));
-        xwisSend_.erase(0, sent);
-    }
+    detail::sendLines(xwis_->takeOutgoing(), xwisSend_, &*xwisSocket_);
     std::uint8_t buffer[4096];
     while (const auto got = xwisSocket_->receive(buffer)) {
         xwis_->receive(std::span(buffer, *got));

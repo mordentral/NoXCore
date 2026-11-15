@@ -595,110 +595,19 @@ void BotSquad::tick(std::uint32_t nowMs)
     // One datagram's worth for receiving.
     std::uint8_t buffer[net::kDatagramBufferSize];
     // One bot listens to the chat (they all hear the same): the voice, else the first in the game.
-    const Seat* listener = nullptr;
-    for (const auto& s : seats_) {
-        if (s->started && s->bot->client().stage() == Stage::InGame) {
-            listener = s.get();
-            if (const int limit = s->bot->client().world().game().playerLimit; limit > 0) {
-                gameLimit_ = limit;
-            }
-            break;
-        }
-    }
-    const Seat* const speaker = voiceSeat();
-    if (speaker && speaker->started && speaker->bot->client().stage() == Stage::InGame) {
-        listener = speaker;
-    }
+    const Seat* listener = chooseListener();
     listener_ = listener;
-    // A datagram to the server from one of a seat's sockets. One that can't be sent (the network
-    // down, say) is lost, as one dropped on the way would be: logged once until a send goes again.
-    const auto sendOut = [&](Seat& s, net::UdpSocket& socket, std::span<const std::uint8_t> bytes) {
-        try {
-            socket.sendTo(options_.server, bytes);
-            s.sendFailNoted = false;
-        } catch (const std::exception& ex) {
-            if (!s.sendFailNoted) {
-                s.sendFailNoted = true;
-                log("[" + s.name + "] network error: " + ex.what());
-            }
-        }
-    };
     // Our own lines are remembered for 5 s, to drop the server's echo of them.
     std::erase_if(said_, [&](const Said& s) { return nowMs - s.atMs > 5000; });
-    // A bot that never got in (the server full, refusing, not answering): the next try a while
-    // later. (Noted the tick it fails, before balance() puts a fresh bot in its place.)
-    const auto noteFailed = [&](Seat& s) {
-        if (s.failNoted || s.leaving || s.inGameAt != 0 || s.bot->client().stage() != Stage::Failed) {
-            return;
-        }
-        s.failNoted = true;
-        const std::uint32_t wait = joinRetryAfter(++joinFails_);
-        joinRetryAt_ = nowMs + wait;
-        log("[" + s.name + "] couldn't join: trying again in " +
-            (wait >= 60'000 ? std::to_string(wait / 60'000) + " min" : std::to_string(wait / 1000) + " s"));
-    };
     for (auto& sp : seats_) {
         Seat& s = *sp;
         auto& c = s.bot->client();
         // A seat not started yet starts at its staggered time (startAt).
-        if (!s.started) {
-            if (s.leaving || static_cast<std::int32_t>(nowMs - s.startAt) < 0 || !mayJoin(nowMs)) {
-                continue; // (not yet; or a NoX Core-only game: never, SquadOptions::skipNoxCoreOnly)
-            }
-            // Our content packs' added object types, if any: a host with added types lets in only a
-            // game whose query named the same ones (from the socket it connects from, as noxsdl's).
-            // Only then does a bot identify itself (naming our client level in it too): our level
-            // alone never does, so bots keep a stock client's join, updates and class wherever no
-            // added types ask for more (and a host with a lowest level takes them as stock ones).
-            // A host known not to answer (a stock one: the options', the ping's, or a seat's wait
-            // unanswered) is joined at once, never slower than before (a ping's round trip first).
-            const std::uint64_t types = content::newThingTypes().hash;
-            const bool asks = types != 0;
-            if (asks && !options_.knownStock && !hostSilent_ && !hostAnswers_ && !pingHost(nowMs)) {
-                continue; // (the ping's answer awaited)
-            }
-            const bool mayAnswer = !options_.knownStock && !hostSilent_;
-            if (asks && !mayAnswer) {
-                // (the query beside the join all the same, twice: a stock host drops it)
-                const auto query = lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel);
-                sendOut(s, s.game, query);
-                sendOut(s, s.game, query);
-            }
-            if (asks && mayAnswer && !s.typesAnswered) {
-                constexpr std::uint32_t kTypesWaitMs = 3000;
-                constexpr std::uint32_t kTypesResendMs = 250;
-                if (!s.typesAsked) {
-                    log("[" + s.name + "] joining");
-                    s.typesAsked = true;
-                    s.typesFirstAt = nowMs;
-                    s.typesAskedAt = nowMs - kTypesResendMs;
-                }
-                if (nowMs - s.typesFirstAt < kTypesWaitMs) {
-                    if (nowMs - s.typesAskedAt >= kTypesResendMs) {
-                        sendOut(s, s.game, lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel));
-                        s.typesAskedAt = nowMs;
-                    }
-                    try {
-                        while (const auto got = s.game.receive(buffer)) {
-                            s.typesAnswered = s.typesAnswered || (got->from == options_.server && lobby::decodeExtendedReply(std::span(buffer, got->size)));
-                        }
-                    } catch (const std::exception& ex) {
-                        log("[" + s.name + "] network error: " + ex.what());
-                    }
-                    if (!s.typesAnswered) {
-                        continue; // (the join waits for it)
-                    }
-                } else {
-                    hostSilent_ = true; // (unanswered: a stock host, the next bots join at once)
-                }
-            } else {
-                log("[" + s.name + "] joining");
-            }
-            c.start(nowMs);
-            s.started = true;
+        if (!s.started && !startSeat(s, nowMs)) {
+            continue;
         }
         if (s.done(nowMs)) {
-            noteFailed(s);
+            noteFailed(s, nowMs);
             continue; // left, failed, or the server never took the leave (25 s)
         }
         // Read what came from the server on each socket, let the bot think, send what it queued.
@@ -722,66 +631,7 @@ void BotSquad::tick(std::uint32_t nowMs)
         }
         // What happened to this bot: in game, chat, kills, disconnects, notices.
         // (Chat and kills from the listening bot only: they all hear the same.)
-        for (const auto& e : c.takeEvents()) {
-            using K = client::ClientEvent::Kind;
-            switch (e.kind) {
-            case K::InGame:
-                log("[" + s.name + "] in game on " + e.text);
-                s.inGameAt = nowMs;
-                joinFails_ = 0;
-                everIn_ = true;
-                s.bot->setStandDown(standingDown_); // (a late joiner does as the rest)
-                break;
-            case K::Chat: {
-                if (&s != listener) {
-                    break;
-                }
-                // Our own line back from the server: it's in already (say()).
-                const auto echo = std::ranges::find_if(said_, [&](const Said& d) { return d.bot == e.name && d.text == e.text; });
-                if (echo != said_.end()) {
-                    said_.erase(echo);
-                    break;
-                }
-                const auto* who = c.world().player(e.netCode);
-                chat_.push_back({nowMs, e.name, e.text, e.team, who ? who->account : ""});
-                // Kept to the last 500-1000 lines.
-                if (chat_.size() > 1000) {
-                    chat_.erase(chat_.begin(), chat_.begin() + 500);
-                }
-                break;
-            }
-            case K::Kill:
-                if (&s != listener) {
-                    break;
-                }
-                banterOn(e.attacker, e.netCode, nowMs);
-                noteKill(e.attacker, e.netCode, nowMs);
-                if (e.attacker != 0 && e.attacker == e.netCode) {
-                    // Killed themselves: with what (a thing, or a kind of damage).
-                    // killKind 1: `weapon` is a thing type (index + 1); otherwise a kind of damage.
-                    const bool thing = e.killKind == 1 && e.weapon > 0 && e.weapon <= things_.things.size();
-                    log("  (by " + (thing ? things_.things[e.weapon - 1u].name : "damage type " + std::to_string(e.weapon)) +
-                        ", kind " + std::to_string(e.killKind) + ")");
-                }
-                break;
-            case K::Disconnected:
-                log("[" + s.name + "] disconnected: " + e.text);
-                if (s.inGameAt == 0) {
-                    lastJoinFailure_ = e.text; // (never got in: why)
-                }
-                break;
-            case K::Notice:
-                // Every bot hears the game's notices (and the server repeats some each frame):
-                // each once, not again within kNoticeMs.
-                std::erase_if(notices_, [&](const auto& n) { return nowMs - n.second > kNoticeMs; });
-                if (notices_.try_emplace(e.text, nowMs).second) {
-                    log(e.text);
-                }
-                break;
-            default:
-                break;
-            }
-        }
+        seatEvents(s, listener, nowMs);
         // Count deaths: an edge to dead (or the DIE / DEAD animation, 1 or 2).
         if (c.stage() == Stage::InGame) {
             const auto* me = c.world().player(c.netCode());
@@ -793,7 +643,7 @@ void BotSquad::tick(std::uint32_t nowMs)
             }
             s.wasDead = fallen;
         }
-        noteFailed(s);
+        noteFailed(s, nowMs);
     }
     assignRoles();
     // Who's having a hard time against us: the easy bots go easy on them.
@@ -807,6 +657,198 @@ void BotSquad::tick(std::uint32_t nowMs)
     // it). Room for people is kept by balance().
     people_.reset();
     humans_.clear();
+    listHumans();
+    noteStillness(nowMs);
+    countPeople(nowMs);
+    balance(nowMs);
+    sayPending(nowMs);
+}
+
+// tick()'s steps, in its order.
+
+/// The bot that listens this tick (tick()'s comment), noting the game's player limit.
+const BotSquad::Seat* BotSquad::chooseListener()
+{
+    const Seat* listener = nullptr;
+    for (const auto& s : seats_) {
+        if (s->started && s->bot->client().stage() == Stage::InGame) {
+            listener = s.get();
+            if (const int limit = s->bot->client().world().game().playerLimit; limit > 0) {
+                gameLimit_ = limit;
+            }
+            break;
+        }
+    }
+    const Seat* const speaker = voiceSeat();
+    if (speaker && speaker->started && speaker->bot->client().stage() == Stage::InGame) {
+        listener = speaker;
+    }
+    return listener;
+}
+
+// A datagram to the server from one of a seat's sockets. One that can't be sent (the network
+// down, say) is lost, as one dropped on the way would be: logged once until a send goes again.
+void BotSquad::sendOut(Seat& s, net::UdpSocket& socket, std::span<const std::uint8_t> bytes)
+{
+    try {
+        socket.sendTo(options_.server, bytes);
+        s.sendFailNoted = false;
+    } catch (const std::exception& ex) {
+        if (!s.sendFailNoted) {
+            s.sendFailNoted = true;
+            log("[" + s.name + "] network error: " + ex.what());
+        }
+    }
+}
+
+// A bot that never got in (the server full, refusing, not answering): the next try a while
+// later. (Noted the tick it fails, before balance() puts a fresh bot in its place.)
+void BotSquad::noteFailed(Seat& s, std::uint32_t nowMs)
+{
+    if (s.failNoted || s.leaving || s.inGameAt != 0 || s.bot->client().stage() != Stage::Failed) {
+        return;
+    }
+    s.failNoted = true;
+    const std::uint32_t wait = joinRetryAfter(++joinFails_);
+    joinRetryAt_ = nowMs + wait;
+    log("[" + s.name + "] couldn't join: trying again in " +
+        (wait >= 60'000 ? std::to_string(wait / 60'000) + " min" : std::to_string(wait / 1000) + " s"));
+}
+
+/// A seat not started yet starts at its staggered time (startAt): whether it has (false: not yet,
+/// tick() goes on to the next seat).
+bool BotSquad::startSeat(Seat& s, std::uint32_t nowMs)
+{
+    auto& c = s.bot->client();
+    // One datagram's worth for receiving.
+    std::uint8_t buffer[net::kDatagramBufferSize];
+    if (s.leaving || static_cast<std::int32_t>(nowMs - s.startAt) < 0 || !mayJoin(nowMs)) {
+        return false; // (not yet; or a NoX Core-only game: never, SquadOptions::skipNoxCoreOnly)
+    }
+    // Our content packs' added object types, if any: a host with added types lets in only a
+    // game whose query named the same ones (from the socket it connects from, as noxsdl's).
+    // Only then does a bot identify itself (naming our client level in it too): our level
+    // alone never does, so bots keep a stock client's join, updates and class wherever no
+    // added types ask for more (and a host with a lowest level takes them as stock ones).
+    // A host known not to answer (a stock one: the options', the ping's, or a seat's wait
+    // unanswered) is joined at once, never slower than before (a ping's round trip first).
+    const std::uint64_t types = content::newThingTypes().hash;
+    const bool asks = types != 0;
+    if (asks && !options_.knownStock && !hostSilent_ && !hostAnswers_ && !pingHost(nowMs)) {
+        return false; // (the ping's answer awaited)
+    }
+    const bool mayAnswer = !options_.knownStock && !hostSilent_;
+    if (asks && !mayAnswer) {
+        // (the query beside the join all the same, twice: a stock host drops it)
+        const auto query = lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel);
+        sendOut(s, s.game, query);
+        sendOut(s, s.game, query);
+    }
+    if (asks && mayAnswer && !s.typesAnswered) {
+        constexpr std::uint32_t kTypesWaitMs = 3000;
+        constexpr std::uint32_t kTypesResendMs = 250;
+        if (!s.typesAsked) {
+            log("[" + s.name + "] joining");
+            s.typesAsked = true;
+            s.typesFirstAt = nowMs;
+            s.typesAskedAt = nowMs - kTypesResendMs;
+        }
+        if (nowMs - s.typesFirstAt < kTypesWaitMs) {
+            if (nowMs - s.typesAskedAt >= kTypesResendMs) {
+                sendOut(s, s.game, lobby::encodeExtendedQuery(nowMs, 0, types, lobby::kClientLevel));
+                s.typesAskedAt = nowMs;
+            }
+            try {
+                while (const auto got = s.game.receive(buffer)) {
+                    s.typesAnswered = s.typesAnswered || (got->from == options_.server && lobby::decodeExtendedReply(std::span(buffer, got->size)));
+                }
+            } catch (const std::exception& ex) {
+                log("[" + s.name + "] network error: " + ex.what());
+            }
+            if (!s.typesAnswered) {
+                return false; // (the join waits for it)
+            }
+        } else {
+            hostSilent_ = true; // (unanswered: a stock host, the next bots join at once)
+        }
+    } else {
+        log("[" + s.name + "] joining");
+    }
+    c.start(nowMs);
+    s.started = true;
+    return true;
+}
+
+/// What happened to a seat's bot this tick (tick()'s comment): in game, chat, kills, disconnects,
+/// notices.
+void BotSquad::seatEvents(Seat& s, const Seat* listener, std::uint32_t nowMs)
+{
+    auto& c = s.bot->client();
+    for (const auto& e : c.takeEvents()) {
+        using K = client::ClientEvent::Kind;
+        switch (e.kind) {
+        case K::InGame:
+            log("[" + s.name + "] in game on " + e.text);
+            s.inGameAt = nowMs;
+            joinFails_ = 0;
+            everIn_ = true;
+            s.bot->setStandDown(standingDown_); // (a late joiner does as the rest)
+            break;
+        case K::Chat: {
+            if (&s != listener) {
+                break;
+            }
+            // Our own line back from the server: it's in already (say()).
+            const auto echo = std::ranges::find_if(said_, [&](const Said& d) { return d.bot == e.name && d.text == e.text; });
+            if (echo != said_.end()) {
+                said_.erase(echo);
+                break;
+            }
+            const auto* who = c.world().player(e.netCode);
+            chat_.push_back({nowMs, e.name, e.text, e.team, who ? who->account : ""});
+            // Kept to the last 500-1000 lines.
+            if (chat_.size() > 1000) {
+                chat_.erase(chat_.begin(), chat_.begin() + 500);
+            }
+            break;
+        }
+        case K::Kill:
+            if (&s != listener) {
+                break;
+            }
+            banterOn(e.attacker, e.netCode, nowMs);
+            noteKill(e.attacker, e.netCode, nowMs);
+            if (e.attacker != 0 && e.attacker == e.netCode) {
+                // Killed themselves: with what (a thing, or a kind of damage).
+                // killKind 1: `weapon` is a thing type (index + 1); otherwise a kind of damage.
+                const bool thing = e.killKind == 1 && e.weapon > 0 && e.weapon <= things_.things.size();
+                log("  (by " + (thing ? things_.things[e.weapon - 1u].name : "damage type " + std::to_string(e.weapon)) +
+                    ", kind " + std::to_string(e.killKind) + ")");
+            }
+            break;
+        case K::Disconnected:
+            log("[" + s.name + "] disconnected: " + e.text);
+            if (s.inGameAt == 0) {
+                lastJoinFailure_ = e.text; // (never got in: why)
+            }
+            break;
+        case K::Notice:
+            // Every bot hears the game's notices (and the server repeats some each frame):
+            // each once, not again within kNoticeMs.
+            std::erase_if(notices_, [&](const auto& n) { return nowMs - n.second > kNoticeMs; });
+            if (notices_.try_emplace(e.text, nowMs).second) {
+                log(e.text);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+/// humans_: the people as the first bot in the game sees them.
+void BotSquad::listHumans()
+{
     for (const auto& s : seats_) {
         // Who they are, for the UI: as the first bot in the game sees them.
         if (s->bot->client().stage() != Stage::InGame) {
@@ -831,6 +873,10 @@ void BotSquad::tick(std::uint32_t nowMs)
         }
         break;
     }
+}
+
+void BotSquad::noteStillness(std::uint32_t nowMs)
+{
     // Who's standing still, as every bot in the game sees them (each sees only what's near it):
     // a person in some bot's view at the same place since `since`; out of every bot's view, not
     // counted as idle (a person away from the bots may well be playing). Looked at once a second.
@@ -866,6 +912,11 @@ void BotSquad::tick(std::uint32_t nowMs)
             h.inView = true;
         }
     }
+}
+
+/// people_ (tick()'s comment), and the bots standing down while nobody else plays.
+void BotSquad::countPeople(std::uint32_t nowMs)
+{
     for (const auto& s : seats_) {
         if (s->inGameAt != 0 && nowMs - s->inGameAt > 5000 && s->bot->client().stage() == Stage::InGame) {
             people_ = static_cast<std::size_t>(std::ranges::count_if(s->bot->client().world().players(), [&](const auto& p) {
@@ -891,8 +942,6 @@ void BotSquad::tick(std::uint32_t nowMs)
             standDownChangeAt_ = 0;
         }
     }
-    balance(nowMs);
-    sayPending(nowMs);
 }
 
 // A kill between a bot of ours and a person: maybe a taunt or a whine, queued for later.

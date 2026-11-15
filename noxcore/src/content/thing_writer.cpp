@@ -7,6 +7,8 @@
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/util/text.hpp"
 
+#include "../things/thing_io.hpp"
+
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -293,21 +295,10 @@ std::string readTag(ByteReader& r)
     return t;
 }
 
-std::string readString8(ByteReader& r)
-{
-    return r.rawString(r.u8());
-}
+// (thing.bin's string8 and image refs, read as the parser reads them: things/thing_io.hpp.)
+using things::detail::readImageRef;
+using things::detail::readString8;
 
-things::ImageRef readImageRef(ByteReader& r)
-{
-    things::ImageRef ref;
-    ref.index = r.i32();
-    if (ref.index == -1) {
-        ref.type = r.u8();
-        ref.name = readString8(r);
-    }
-    return ref;
-}
 
 /// A THNG's binary attributes and where they sit, read from the file (an earlier one of a kind
 /// given again keeps its value: the reader keeps only the last).

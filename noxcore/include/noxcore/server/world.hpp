@@ -1898,9 +1898,8 @@ public:
     std::uint32_t chosenMode = GameFlag::Arena;
     /// The flags on the map.
     int flagCount = 0;
-    /// The dead come back by themselves, half a second on (often misnamed
-    /// ruleSetNoRespawn; read by server_doPlayersAutoRespawn, not in a
-    /// quest): on for elimination, a host's option; and the host's setting that keeps it from map
+    /// The dead come back by themselves, half a second on (read by server_doPlayersAutoRespawn,
+    /// not in a quest): on for elimination, a host's option; and the host's setting that keeps it from map
     /// to map (a game settings bit).
     bool autoRespawn = false;
     bool keepAutoRespawn = false;

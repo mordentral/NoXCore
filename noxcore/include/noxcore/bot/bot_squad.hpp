@@ -335,6 +335,15 @@ private:
     /// Those who struggle (struggles()) now, by netCode; records old or of people gone dropped.
     std::vector<std::uint16_t> strugglers(std::uint32_t nowMs);
     void nagHost(std::uint32_t nowMs);
+    // tick()'s steps (bot_squad.cpp), in its order.
+    const Seat* chooseListener();
+    void sendOut(Seat& s, net::UdpSocket& socket, std::span<const std::uint8_t> bytes);
+    void noteFailed(Seat& s, std::uint32_t nowMs);
+    bool startSeat(Seat& s, std::uint32_t nowMs);
+    void seatEvents(Seat& s, const Seat* listener, std::uint32_t nowMs);
+    void listHumans();
+    void noteStillness(std::uint32_t nowMs);
+    void countPeople(std::uint32_t nowMs);
     std::uint32_t leaveAt_ = 0; ///< when they all go, once the reason's been said
     bool quitting_ = false;
     std::uint32_t lastTick_ = 0;

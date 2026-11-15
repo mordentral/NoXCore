@@ -177,6 +177,7 @@ void Stream::flushInto(std::uint32_t nowMs, std::vector<std::vector<std::uint8_t
     }
 }
 
+
 void Stream::markOverdue(std::uint32_t nowMs)
 {
     for (auto& p : queue_) {
@@ -371,10 +372,7 @@ void ClientConnection::control(std::span<const std::uint8_t> d, std::uint32_t no
         }
         case Op::ClientPing: { // answer CLIENT_PONG and tell the game
             inject({static_cast<std::uint8_t>(Op::Code37)});
-            std::vector<std::uint8_t> reply = {stream_.id(), stream_.expectedSeq(),
-                                               static_cast<std::uint8_t>(Op::ClientPong)};
-            putU32(reply, u32At(body, 0));
-            sendGame(std::move(reply));
+            sendGame(clientPong(stream_.id(), stream_.expectedSeq(), u32At(body, 0)));
             return;
         }
         case Op::ClientPong: { // the server's echo of our ping (case 8)
@@ -397,8 +395,8 @@ void ClientConnection::control(std::span<const std::uint8_t> d, std::uint32_t no
             state_ = State::Closed;
             return;
         case Op::Accepted:
-            if (stream_.applyAck(body[0])) {
-                inject({static_cast<std::uint8_t>(Op::Code38), body[0]});
+            if (auto ack = applyAccepted(stream_, body[0]); !ack.empty()) {
+                inject(std::move(ack));
             }
             break;
         default: // 0x07 / 0x09 answer pings we don't send that way; anything else ends the datagram
@@ -447,14 +445,8 @@ void ClientConnection::poll(std::uint32_t nowMs)
     if (state_ != State::Connecting && state_ != State::Connected) {
         return;
     }
-    if (!timerStarted_) {
-        timerStarted_ = true;
-        lastTimer_ = nowMs;
     // The resend check runs at most once per kResendTimerMs, as the exe's timer does.
-    } else if (static_cast<std::int32_t>(nowMs - lastTimer_) > static_cast<std::int32_t>(kResendTimerMs)) {
-        stream_.markOverdue(nowMs);
-        lastTimer_ = nowMs;
-    }
+    runResendTimer(stream_, timerStarted_, lastTimer_, nowMs);
     // Our ping, every 2 s (over 1999 ms since the last): the server times its round
     // trip by our clock (cases 6 / 9) and reports it to everyone as our latency
     // (MSG_REPORT_ALL_LATENCY). Without it the server has no latency for us: 0.

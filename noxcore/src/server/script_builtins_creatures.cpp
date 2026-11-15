@@ -248,15 +248,182 @@ void reportPlayerStatus(World& world, const ServerObject& unit)
 
 int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
 {
+    switch (id) {
+    case LookAtObject: case LookWithAngle: case LookAtDirection: case GroupLookAtDirection:
+        return creatureFacing(id, vm);
+    case AggressionLevel: case GroupAggressionLevel: case RetreatLevel: case ResumeLevel: case GroupRetreatLevel:
+    case GroupResumeLevel: case SetRoamFlag: case GroupSetRoamFlag:
+        return creatureLevels(id, vm);
+    case CreatureIdle: case CreatureGroupIdle: case CreatureHunt: case CreatureGroupHunt: case Wander: case GroupWander:
+    case GoBackHome: case CreatureGuard: case CreatureGroupGuard: case CreatureFollow: case CreatureGroupFollow:
+    case AttackBuiltin: case GroupAttack: case HitLocation: case HitFarLocation: case GroupHitLocation:
+    case GroupHitFarLocation: case RunAway: case GroupRunAway: case PauseObject: case GroupPauseObject: case Walk:
+    case GroupWalk:
+        return creatureOrders(id, vm);
+    case Damage: case GroupDamage: case EnchantBuiltin: case GroupEnchant: case EnchantOff: case HasEnchant:
+    case CurrentHealth: case MaxHealth: case RestoreHealth:
+        return creatureHealth(id, vm);
+    case IsAttackedBy: case IsVisibleTo: case IsOwnedBy: case GroupIsOwnedBy: case IsOwnedByAny: case GroupIsOwnedByAny:
+    case HasClass: case HasSubclass: case IsSummoned:
+        return creatureTests(id, vm);
+    case HasItem: case GetLastItem: case GetPreviousItem: case Pickup: case Drop: case GetGold: case ChangeGold:
+    case SetHalberd:
+        return creatureItems(id, vm);
+    case AwardSpell: case GroupAwardSpell: case CastSpellObjectObject: case CastSpellObjectLocation:
+    case CastSpellLocationObject: case CastSpellLocationLocation:
+        return creatureSpells(id, vm);
+    case Frozen: case PushObjectTo: case PushObject: case Raise: case GetElevatorStatus: case DeleteObjectTimer:
+    case ZombieStayDown: case ZombieGroupStayDown: case RaiseZombie: case RaiseZombieGroup:
+        return creatureState(id, vm);
+    default:
+        return -1;
+    }
+}
+
+// creatureBuiltin's groups, each the builtins' cases as they were, with the helpers only they use.
+
+/// Facing: LookAtObject, LookWithAngle, LookAtDirection, GroupLookAtDirection.
+int ScriptHost::creatureFacing(std::uint32_t id, script::Vm& vm)
+{
+    Fight fight{world_, creatureRng_, frame_, &things_, modifiers_};
+    Monsters ai{fight};
+    const auto popObject = [&] { return object(vm.popInt()); };
+    const auto lookAt = [&](ServerObject& o, int index) { // monsterLookAt
+        // (The grid's index past 0-8 reads past the table in the exe: an original bug.)
+        if (index < 0 || static_cast<int>(kGridAngles.size()) <= index) {
+            return;
+        }
+        if (aliveMonster(o)) {
+            const auto [dx, dy] = directionVector(kGridAngles[static_cast<std::size_t>(index)]);
+            const float x = (util::X87(dx) * 10.0f + o.x).f(); // (on the x87, one store)
+            const float y = (util::X87(dy) * 10.0f + o.y).f();
+            if (Item* it = ai.push(o, MonsterAction::FaceLocation)) {
+                it->args[0] = bitsOf(x);
+                it->args[1] = bitsOf(y);
+            }
+        }
+    };
+
+    switch (id) {
+    case LookAtObject: { // LookAtObject(object, target): both its facings at it
+        ServerObject* target = popObject();
+        ServerObject* o = popObject();
+        if (o && target) {
+            const int d = directionOf(target->x - o->x, target->y - o->y);
+            o->direction = static_cast<std::uint16_t>(d);
+            if (o->monster) {
+                o->monster->turnTo = d; // (Direction2)
+            }
+        }
+        return 0;
+    }
+    case LookWithAngle: { // LookWithAngle(object, angle): both facings, the angle mod 256
+        auto a = vm.popInt();
+        if (ServerObject* o = popObject()) {
+            // Wrap the angle into 0-255 (a negative one is first brought up by a multiple of 256).
+            if (a < 0) {
+                a = static_cast<std::int32_t>((static_cast<std::uint32_t>(0xFF - a) & 0xFFFFFF00u) + static_cast<std::uint32_t>(a));
+            }
+            if (0xFF < a) {
+                a = a - (a >> 8) * 0x100;
+            }
+            o->direction = static_cast<std::uint16_t>(a);
+            if (o->monster) {
+                o->monster->turnTo = static_cast<std::uint16_t>(a);
+            }
+        }
+        return 0;
+    }
+    case LookAtDirection: { // LookAtDirection(monster, grid way): FACE_LOCATION pushed
+        const std::int32_t way = vm.popInt();
+        if (ServerObject* o = popObject()) {
+            lookAt(*o, way);
+        }
+        return 0;
+    }
+    case GroupLookAtDirection: {
+        const std::int32_t way = vm.popInt();
+        if (const ServerGroup* g = world_.group(vm.popInt())) {
+            eachMemberOf(world_, *g, [&](ServerObject& o) { lookAt(o, way); });
+        }
+        return 0;
+    }
+    default:
+        return -1;
+    }
+}
+
+/// The AI's levels: AggressionLevel, RetreatLevel, ResumeLevel, SetRoamFlag and their groups'.
+int ScriptHost::creatureLevels(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+
+    switch (id) {
+    case AggressionLevel: { // both its aggression numbers
+        const float v = vm.popFloat();
+        if (ServerObject* o = popObject(); o && (o->classes & oc::Monster) && o->monster) {
+            o->monster->aggression = o->monster->aggression2 = v;
+        }
+        return 0;
+    }
+    case GroupAggressionLevel: {
+        const float v = vm.popFloat();
+        eachObjectOf(world_, vm.popInt(), [&](ServerObject& o) {
+            if (isMonster(o)) {
+                o.monster->aggression = o.monster->aggression2 = v;
+            }
+        });
+        return 0;
+    }
+    case RetreatLevel:
+    case ResumeLevel: {
+        const float v = vm.popFloat();
+        if (ServerObject* o = popObject(); o && isMonster(*o)) {
+            (id == RetreatLevel ? o->monster->retreatLevel : o->monster->resumeLevel) = v;
+        }
+        return 0;
+    }
+    case GroupRetreatLevel:
+    case GroupResumeLevel: {
+        const float v = vm.popFloat();
+        eachObjectOf(world_, vm.popInt(), [&](ServerObject& o) {
+            if (isMonster(o)) {
+                (id == GroupRetreatLevel ? o.monster->retreatLevel : o.monster->resumeLevel) = v;
+            }
+        });
+        return 0;
+    }
+    case SetRoamFlag: { // (script_SetRoamFlag) its roaming flags (a byte)
+        const auto v = static_cast<std::uint8_t>(vm.pop());
+        if (ServerObject* o = popObject(); o && isMonster(*o)) {
+            o->monster->field333 = v;
+        }
+        return 0;
+    }
+    case GroupSetRoamFlag: {
+        const auto v = static_cast<std::uint8_t>(vm.pop());
+        eachObjectOf(world_, vm.popInt(), [&](ServerObject& o) {
+            if (isMonster(o)) {
+                o.monster->field333 = v;
+            }
+        });
+        return 0;
+    }
+    default:
+        return -1;
+    }
+}
+
+/// The AI's orders: idle, hunt, wander, home, guard, follow, attack, hit, run away, pause, walk,
+/// each for one creature and for a group.
+int ScriptHost::creatureOrders(std::uint32_t id, script::Vm& vm)
+{
     Fight fight{world_, creatureRng_, frame_, &things_, modifiers_};
     Monsters ai{fight};
     const auto popObject = [&] { return object(vm.popInt()); };
     // A point moved by the prefab's offset: FILD, FADD, stored (chopped).
     const auto offsetX = [&](float x) { return (util::X87::fromDouble(vm.context().x) + x).f(); };
     const auto offsetY = [&](float y) { return (util::X87::fromDouble(vm.context().y) + y).f(); };
-    const auto items = [&] { return Items{world_, things_, modifiers_, creatureRng_, frame_}; };
-    const auto spells = [&] { return Spells{world_, things_, modifiers_, creatureRng_, frame_}; };
-
     // Most orders clear the monster's action stack first; a REPORT pushed under the action runs its
     // end-of-waypoint handler once the action is done.
     // The AI's orders (each as the exe's helper, also run for a group's members).
@@ -281,21 +448,6 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
             if (Item* it = ai.push(o, MonsterAction::Roam)) {
                 it->args[0] = 0;
                 it->args[2] = (it->args[2] & ~0xFFu) | o.monster->field333; // (its byte alone)
-            }
-        }
-    };
-    const auto lookAt = [&](ServerObject& o, int index) { // monsterLookAt
-        // (The grid's index past 0-8 reads past the table in the exe: an original bug.)
-        if (index < 0 || static_cast<int>(kGridAngles.size()) <= index) {
-            return;
-        }
-        if (aliveMonster(o)) {
-            const auto [dx, dy] = directionVector(kGridAngles[static_cast<std::size_t>(index)]);
-            const float x = (util::X87(dx) * 10.0f + o.x).f(); // (on the x87, one store)
-            const float y = (util::X87(dy) * 10.0f + o.y).f();
-            if (Item* it = ai.push(o, MonsterAction::FaceLocation)) {
-                it->args[0] = bitsOf(x);
-                it->args[1] = bitsOf(y);
             }
         }
     };
@@ -405,151 +557,8 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
             }
         }
     };
-    const auto damage = [&](ServerObject& t, ServerObject* source, std::int32_t amount, std::int32_t type) {
-        if (0 < amount) {
-            fight.damage(t, fight.parentPlayer(source), source ? source->extent : 0, amount, type);
-        }
-    };
-    const auto enchantFor = [&](ServerObject& o, int e, float seconds) {
-        // (gameFPS x the seconds, chopped (__ftol), as a short; at power 5)
-        const auto frames = util::ftol(util::X87::fromDouble(30.0) * seconds);
-        enchant(world_, o, e, static_cast<std::int16_t>(frames), 5);
-    };
-    const auto grant = [&](ServerObject& o, std::uint32_t spell, bool show) { // Spell_GrantToPlayer(o, spell, 1, show, 0)
-        return grantSpell(world_, things_, o, static_cast<int>(spell), true, show, 0);
-    };
-    const auto zombieStayDown = [&](ServerObject& o) {
-        if (isMonster(o)) {
-            o.monster->status |= ms::StayDead;
-        }
-    };
-    const auto raiseZombie = [&](ServerObject& o) {
-        if (isMonster(o) && (o.flags & ObjFlag::Dead)) {
-            o.monster->status &= ~ms::StayDead;
-            ai.raiseZombie(o);
-        }
-    };
-    const auto spellNamed = [&](std::uint32_t name) -> std::uint32_t { // spellNameToN (0: none)
-        const auto s = things::spellId(vm.string(name));
-        return s ? *s : 0u;
-    };
-    const auto imaginaryCaster = [&]() -> ServerObject* {
-        // imagCasterUnit: the exe's ImaginaryCaster, made at each map's load at
-        // (2944, 2944) (Server::loadMapKeeping: World::imaginaryCaster). A world made without that
-        // load (a test's) gets one as it's first wanted.
-        if (ServerObject* c = world_.imaginaryCaster ? world_.byExtent(world_.imaginaryCaster) : nullptr) {
-            return c;
-        }
-        ServerObject* c = world_.createAt(things_, "ImaginaryCaster", 2944.0f, 2944.0f, frame_);
-        world_.imaginaryCaster = c ? c->extent : 0;
-        return c;
-    };
 
     switch (id) {
-    case Frozen: { // Frozen(object, on): 1 freezes it (unitFreeze(o, 1)), else thaws
-        const std::int32_t on = vm.popInt();
-        if (ServerObject* o = popObject()) {
-            if (on == 1) {
-                freezeUnit(fight, *o, 1);
-            } else {
-                unfreezeUnit(fight, *o, 1);
-            }
-        }
-        return 0;
-    }
-    case LookAtObject: { // LookAtObject(object, target): both its facings at it
-        ServerObject* target = popObject();
-        ServerObject* o = popObject();
-        if (o && target) {
-            const int d = directionOf(target->x - o->x, target->y - o->y);
-            o->direction = static_cast<std::uint16_t>(d);
-            if (o->monster) {
-                o->monster->turnTo = d; // (Direction2)
-            }
-        }
-        return 0;
-    }
-    case LookWithAngle: { // LookWithAngle(object, angle): both facings, the angle mod 256
-        auto a = vm.popInt();
-        if (ServerObject* o = popObject()) {
-            // Wrap the angle into 0-255 (a negative one is first brought up by a multiple of 256).
-            if (a < 0) {
-                a = static_cast<std::int32_t>((static_cast<std::uint32_t>(0xFF - a) & 0xFFFFFF00u) + static_cast<std::uint32_t>(a));
-            }
-            if (0xFF < a) {
-                a = a - (a >> 8) * 0x100;
-            }
-            o->direction = static_cast<std::uint16_t>(a);
-            if (o->monster) {
-                o->monster->turnTo = static_cast<std::uint16_t>(a);
-            }
-        }
-        return 0;
-    }
-    case LookAtDirection: { // LookAtDirection(monster, grid way): FACE_LOCATION pushed
-        const std::int32_t way = vm.popInt();
-        if (ServerObject* o = popObject()) {
-            lookAt(*o, way);
-        }
-        return 0;
-    }
-    case GroupLookAtDirection: {
-        const std::int32_t way = vm.popInt();
-        if (const ServerGroup* g = world_.group(vm.popInt())) {
-            eachMemberOf(world_, *g, [&](ServerObject& o) { lookAt(o, way); });
-        }
-        return 0;
-    }
-    case AggressionLevel: { // both its aggression numbers
-        const float v = vm.popFloat();
-        if (ServerObject* o = popObject(); o && (o->classes & oc::Monster) && o->monster) {
-            o->monster->aggression = o->monster->aggression2 = v;
-        }
-        return 0;
-    }
-    case GroupAggressionLevel: {
-        const float v = vm.popFloat();
-        eachObjectOf(world_, vm.popInt(), [&](ServerObject& o) {
-            if (isMonster(o)) {
-                o.monster->aggression = o.monster->aggression2 = v;
-            }
-        });
-        return 0;
-    }
-    case RetreatLevel:
-    case ResumeLevel: {
-        const float v = vm.popFloat();
-        if (ServerObject* o = popObject(); o && isMonster(*o)) {
-            (id == RetreatLevel ? o->monster->retreatLevel : o->monster->resumeLevel) = v;
-        }
-        return 0;
-    }
-    case GroupRetreatLevel:
-    case GroupResumeLevel: {
-        const float v = vm.popFloat();
-        eachObjectOf(world_, vm.popInt(), [&](ServerObject& o) {
-            if (isMonster(o)) {
-                (id == GroupRetreatLevel ? o.monster->retreatLevel : o.monster->resumeLevel) = v;
-            }
-        });
-        return 0;
-    }
-    case SetRoamFlag: { // (script_SetRoamFlag) its roaming flags (a byte)
-        const auto v = static_cast<std::uint8_t>(vm.pop());
-        if (ServerObject* o = popObject(); o && isMonster(*o)) {
-            o->monster->field333 = v;
-        }
-        return 0;
-    }
-    case GroupSetRoamFlag: {
-        const auto v = static_cast<std::uint8_t>(vm.pop());
-        eachObjectOf(world_, vm.popInt(), [&](ServerObject& o) {
-            if (isMonster(o)) {
-                o.monster->field333 = v;
-            }
-        });
-        return 0;
-    }
     case CreatureIdle:
         if (ServerObject* o = popObject()) {
             idle(*o);
@@ -715,6 +724,29 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
+    default:
+        return -1;
+    }
+}
+
+/// Damage, the enchantments and health: Damage, Enchant, EnchantOff, HasEnchant, CurrentHealth,
+/// MaxHealth, RestoreHealth (and the groups' Damage and Enchant).
+int ScriptHost::creatureHealth(std::uint32_t id, script::Vm& vm)
+{
+    Fight fight{world_, creatureRng_, frame_, &things_, modifiers_};
+    const auto popObject = [&] { return object(vm.popInt()); };
+    const auto damage = [&](ServerObject& t, ServerObject* source, std::int32_t amount, std::int32_t type) {
+        if (0 < amount) {
+            fight.damage(t, fight.parentPlayer(source), source ? source->extent : 0, amount, type);
+        }
+    };
+    const auto enchantFor = [&](ServerObject& o, int e, float seconds) {
+        // (gameFPS x the seconds, chopped (__ftol), as a short; at power 5)
+        const auto frames = util::ftol(util::X87::fromDouble(30.0) * seconds);
+        enchant(world_, o, e, static_cast<std::int16_t>(frames), 5);
+    };
+
+    switch (id) {
     case Damage: { // Damage(target, source, amount, type)
         const std::int32_t type = vm.popInt();
         const std::int32_t amount = vm.popInt();
@@ -781,6 +813,17 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
+    default:
+        return -1;
+    }
+}
+
+/// The tests: IsAttackedBy, IsVisibleTo, the owner tests, HasClass, HasSubclass, IsSummoned.
+int ScriptHost::creatureTests(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+
+    switch (id) {
     case IsAttackedBy: { // IsAttackedBy(a, b): Obj_IsEnemyTo(a, b)
         ServerObject* b = popObject();
         ServerObject* a = popObject();
@@ -851,6 +894,57 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         vm.push(all ? 1 : 0);
         return 0;
     }
+    case HasClass: { // HasClass(object, "CLASS"): an unknown name pushes nothing
+        const std::string name = vm.string(vm.pop());
+        ServerObject* o = popObject();
+        if (!o) {
+            vm.push(0);
+            return 0;
+        }
+        for (std::size_t i = 0; i < std::size(kScriptClassNames); ++i) {
+            if (kScriptClassNames[i] == name) {
+                vm.push((o->classes & (1u << i)) != 0 ? 1 : 0);
+                return 0;
+            }
+        }
+        return 0; // (no result: an original bug)
+    }
+    case HasSubclass: { // HasSubclass(object, "SUBCLASS"): the first table naming it, whatever its class
+        const std::string name = vm.string(vm.pop());
+        ServerObject* o = popObject();
+        if (!o) {
+            vm.push(0);
+            return 0;
+        }
+        for (const ScriptSubclassTable& table : scriptSubclassTables()) {
+            for (std::size_t i = 0; i < table.names.size(); ++i) {
+                if (table.names[i] == name) {
+                    vm.push((o->subclasses & (1u << i)) != 0 ? 1 : 0);
+                    return 0;
+                }
+            }
+        }
+        return 0; // (the exe reads on past its tables: an original bug)
+    }
+    case IsSummoned: { // a monster's SUMMONED bit
+        ServerObject* o = popObject();
+        vm.push(o && isMonster(*o) && (o->monster->status & ms::Summoned) ? 1 : 0);
+        return 0;
+    }
+    default:
+        return -1;
+    }
+}
+
+/// Items and gold: HasItem, GetLastItem, GetPreviousItem, Pickup, Drop, GetGold, ChangeGold,
+/// SetHalberd.
+int ScriptHost::creatureItems(std::uint32_t id, script::Vm& vm)
+{
+    Fight fight{world_, creatureRng_, frame_, &things_, modifiers_};
+    const auto popObject = [&] { return object(vm.popInt()); };
+    const auto items = [&] { return Items{world_, things_, modifiers_, creatureRng_, frame_}; };
+
+    switch (id) {
     case HasItem: { // HasItem(holder, item)
         ServerObject* item = popObject();
         ServerObject* holder = popObject();
@@ -945,43 +1039,6 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         vm.push(items().drop(*holder, *item, x, y) ? 1 : 0);
         return 0;
     }
-    case HasClass: { // HasClass(object, "CLASS"): an unknown name pushes nothing
-        const std::string name = vm.string(vm.pop());
-        ServerObject* o = popObject();
-        if (!o) {
-            vm.push(0);
-            return 0;
-        }
-        for (std::size_t i = 0; i < std::size(kScriptClassNames); ++i) {
-            if (kScriptClassNames[i] == name) {
-                vm.push((o->classes & (1u << i)) != 0 ? 1 : 0);
-                return 0;
-            }
-        }
-        return 0; // (no result: an original bug)
-    }
-    case HasSubclass: { // HasSubclass(object, "SUBCLASS"): the first table naming it, whatever its class
-        const std::string name = vm.string(vm.pop());
-        ServerObject* o = popObject();
-        if (!o) {
-            vm.push(0);
-            return 0;
-        }
-        for (const ScriptSubclassTable& table : scriptSubclassTables()) {
-            for (std::size_t i = 0; i < table.names.size(); ++i) {
-                if (table.names[i] == name) {
-                    vm.push((o->subclasses & (1u << i)) != 0 ? 1 : 0);
-                    return 0;
-                }
-            }
-        }
-        return 0; // (the exe reads on past its tables: an original bug)
-    }
-    case IsSummoned: { // a monster's SUMMONED bit
-        ServerObject* o = popObject();
-        vm.push(o && isMonster(*o) && (o->monster->status & ms::Summoned) ? 1 : 0);
-        return 0;
-    }
     case GetGold: { // (object_getGold) a player's
         ServerObject* o = popObject();
         vm.push(o && (o->classes & oc::Player) && o->player ? o->player->gold : 0u);
@@ -998,6 +1055,61 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
+    case SetHalberd: { // (script_OblivionGive) SetHalberd(kind): the host's Oblivion staff swapped
+        const std::int32_t kind = vm.popInt();
+        ServerObject* host = hostPlayer(world_); // (Plr_GetByIndex(0x1F)->PlayerUnit: none, the exe crashes)
+        static constexpr std::array<std::string_view, 4> kStaffs{"OblivionHalberd", "OblivionHeart", "OblivionWierdling", "OblivionOrb"};
+        if (!host || kind < 0 || static_cast<int>(kStaffs.size()) <= kind) {
+            return 0;
+        }
+        bool worn = false;
+        auto it = items();
+        for (const std::uint32_t e : keysOf(host->inventory)) {
+            ServerObject* i = world_.byExtent(e);
+            if (i && (i->classes & oc::Weapon) && (i->subclasses & 0x7800000u)) {  // the Oblivion staffs (subclass bits 23-26)
+                worn = (i->flags & ObjFlag::Equipped) != 0;
+                it.removeFromInventory(*host, *i); // (delayedDeleteObject)
+                i->pendingDelete = true;
+                break;
+            }
+        }
+        // (playerRespawnItem(host, staff, 0, 1, 1), then Plr_TryEquip when it wore one;
+        // the last 1: worn as given, told to every client)
+        ServerObject* staff = it.give(*host, kStaffs[static_cast<std::size_t>(kind)], {0xFF, 0xFF, 0xFF, 0xFF}, true);
+        if (staff && worn) {
+            it.tryEquip(*host, *staff);
+        }
+        return 0;
+    }
+    default:
+        return -1;
+    }
+}
+
+/// Spells: AwardSpell, GroupAwardSpell and the four CastSpell builtins.
+int ScriptHost::creatureSpells(std::uint32_t id, script::Vm& vm)
+{
+    const auto spells = [&] { return Spells{world_, things_, modifiers_, creatureRng_, frame_}; };
+    const auto grant = [&](ServerObject& o, std::uint32_t spell, bool show) { // Spell_GrantToPlayer(o, spell, 1, show, 0)
+        return grantSpell(world_, things_, o, static_cast<int>(spell), true, show, 0);
+    };
+    const auto spellNamed = [&](std::uint32_t name) -> std::uint32_t { // spellNameToN (0: none)
+        const auto s = things::spellId(vm.string(name));
+        return s ? *s : 0u;
+    };
+    const auto imaginaryCaster = [&]() -> ServerObject* {
+        // imagCasterUnit: the exe's ImaginaryCaster, made at each map's load at
+        // (2944, 2944) (Server::loadMapKeeping: World::imaginaryCaster). A world made without that
+        // load (a test's) gets one as it's first wanted.
+        if (ServerObject* c = world_.imaginaryCaster ? world_.byExtent(world_.imaginaryCaster) : nullptr) {
+            return c;
+        }
+        ServerObject* c = world_.createAt(things_, "ImaginaryCaster", 2944.0f, 2944.0f, frame_);
+        world_.imaginaryCaster = c ? c->extent : 0;
+        return c;
+    };
+
+    switch (id) {
     case AwardSpell: { // AwardSpell(player, "SPELL_..."): Spell_GrantToPlayer(p, spell, 1, 0, 0)
         const std::uint32_t spell = spellNamed(vm.pop());
         const std::int32_t who = vm.popInt();
@@ -1076,6 +1188,42 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
+    default:
+        return -1;
+    }
+}
+
+/// The body's state: Frozen, the pushes, Raise, GetElevatorStatus, DeleteObjectTimer, the
+/// zombies'.
+int ScriptHost::creatureState(std::uint32_t id, script::Vm& vm)
+{
+    Fight fight{world_, creatureRng_, frame_, &things_, modifiers_};
+    Monsters ai{fight};
+    const auto popObject = [&] { return object(vm.popInt()); };
+    const auto zombieStayDown = [&](ServerObject& o) {
+        if (isMonster(o)) {
+            o.monster->status |= ms::StayDead;
+        }
+    };
+    const auto raiseZombie = [&](ServerObject& o) {
+        if (isMonster(o) && (o.flags & ObjFlag::Dead)) {
+            o.monster->status &= ~ms::StayDead;
+            ai.raiseZombie(o);
+        }
+    };
+
+    switch (id) {
+    case Frozen: { // Frozen(object, on): 1 freezes it (unitFreeze(o, 1)), else thaws
+        const std::int32_t on = vm.popInt();
+        if (ServerObject* o = popObject()) {
+            if (on == 1) {
+                freezeUnit(fight, *o, 1);
+            } else {
+                unfreezeUnit(fight, *o, 1);
+            }
+        }
+        return 0;
+    }
     case PushObjectTo: { // PushObjectTo(object, x, y): its force up by (x, y)
         const float y = vm.popFloat();
         const float x = vm.popFloat();
@@ -1139,32 +1287,6 @@ int ScriptHost::creatureBuiltin(std::uint32_t id, script::Vm& vm)
     case RaiseZombieGroup:
         eachObjectOf(world_, vm.popInt(), raiseZombie);
         return 0;
-    case SetHalberd: { // (script_OblivionGive) SetHalberd(kind): the host's Oblivion staff swapped
-        const std::int32_t kind = vm.popInt();
-        ServerObject* host = hostPlayer(world_); // (Plr_GetByIndex(0x1F)->PlayerUnit: none, the exe crashes)
-        static constexpr std::array<std::string_view, 4> kStaffs{"OblivionHalberd", "OblivionHeart", "OblivionWierdling", "OblivionOrb"};
-        if (!host || kind < 0 || static_cast<int>(kStaffs.size()) <= kind) {
-            return 0;
-        }
-        bool worn = false;
-        auto it = items();
-        for (const std::uint32_t e : keysOf(host->inventory)) {
-            ServerObject* i = world_.byExtent(e);
-            if (i && (i->classes & oc::Weapon) && (i->subclasses & 0x7800000u)) {  // the Oblivion staffs (subclass bits 23-26)
-                worn = (i->flags & ObjFlag::Equipped) != 0;
-                it.removeFromInventory(*host, *i); // (delayedDeleteObject)
-                i->pendingDelete = true;
-                break;
-            }
-        }
-        // (playerRespawnItem(host, staff, 0, 1, 1), then Plr_TryEquip when it wore one;
-        // the last 1: worn as given, told to every client)
-        ServerObject* staff = it.give(*host, kStaffs[static_cast<std::size_t>(kind)], {0xFF, 0xFF, 0xFF, 0xFF}, true);
-        if (staff && worn) {
-            it.tryEquip(*host, *staff);
-        }
-        return 0;
-    }
     default:
         return -1;
     }

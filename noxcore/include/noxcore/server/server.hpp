@@ -235,6 +235,19 @@ private:
     /// The tick's end: the timed pause, the next frame's count, the map's start, the level-up's end.
     void tickEnd();
     void loadMapKeeping(const map::MapFile& map, World* old, std::string_view fileName, std::string_view waypoint = {});
+    // loadMapKeeping's steps (server.cpp), in its order.
+    std::vector<std::uint32_t> leaveOldMap(World* old);
+    void takeOptions(World* old);
+    void carryGameState(World* old);
+    std::unordered_map<std::uint32_t, std::uint32_t> renumberKept(World* old, const std::vector<std::uint32_t>& kept,
+                                                                  std::vector<std::uint32_t>& carriedOver);
+    void moveKept(World* old, const std::vector<std::uint32_t>& kept, const std::unordered_map<std::uint32_t, std::uint32_t>& renumbered);
+    void tellRenumbered(const std::vector<std::uint32_t>& kept, const std::unordered_map<std::uint32_t, std::uint32_t>& renumbered);
+    void ownClassesBack();
+    void toPlayerStart(ServerObject& o, bool teamBases);
+    void setupNetworkGame(const map::MapFile& map, World* old, std::string_view fileName);
+    void creaturesFollowExit();
+    void startMapScript(const map::MapFile& map, bool fromSave, bool hostThere);
     void substep(int k, int m);
     /// The host's own client as the world sees it: a mode's in its place (ModeHooks::hostClient),
     /// else the one set.

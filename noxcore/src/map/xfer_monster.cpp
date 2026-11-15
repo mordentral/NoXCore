@@ -11,7 +11,7 @@
 
 namespace nox::map::xfer::monster {
 
-using nox::map::detail::countOf;
+using nox::countOf;
 using nox::map::detail::findAiAction;
 using nox::map::detail::kAiActions;
 using nox::map::detail::readArray;

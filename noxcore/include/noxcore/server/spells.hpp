@@ -186,10 +186,48 @@ private:
     /// Somewhere to drop a thing within `reach` of `o` (a random way, nearer each
     /// of 64 tries, the first with a clear ray (flags 1); else on it).
     std::pair<float, float> dropSpot(const ServerObject& o, float reach);
+    /// The spell's own sound (SPEL's; 0 cast, 1 on) at `at`, where its function plays it.
+    void castSound(std::uint32_t spell, const ServerObject& at, int which = 0);
+    /// The point unseen from the source: a player source told so (MSG_INFORM 0, 2), and no cast.
+    bool unseenFrom(const ServerObject& source);
+    /// A player casting at another player (not itself) noted for the kill feed's assist.
+    void noteAssist(const ServerObject& caster, ServerObject* target);
+    // cast()'s spells with the most to do, each its case there (whether it worked).
+    bool castLock(std::uint32_t spell, ServerObject& caster, ServerObject& source);
+    bool castFumble(std::uint32_t spell, ServerObject& source, ServerObject* target);
+    bool castEarthquake(std::uint32_t spell, ServerObject& source, std::size_t level);
+    bool castDeathRay(std::uint32_t spell, ServerObject& caster, ServerObject& source, float x, float y);
+    /// Burn, Fist of Vengeance, Meteor, Meteor Shower and Toxic Cloud: what each makes at the point.
+    bool castAtPoint(std::uint32_t spell, ServerObject& caster, ServerObject& source, float x, float y, int power, std::size_t level);
+    bool castCurePoison(std::uint32_t spell, ServerObject& caster, ServerObject* target, const things::SpellDef* def, int power);
+    bool castCounterspell(std::uint32_t spell, ServerObject& source);
+    /// The enchantments at a target: each its gamedata time at the spell's power.
+    bool castEnchantment(std::uint32_t spell, ServerObject& caster, ServerObject& source, ServerObject* target, int power,
+                         std::size_t level);
+    bool castPixies(std::uint32_t spell, ServerObject& caster, ServerObject& source, std::size_t level);
+    /// Cleansing Flame, Cleansing Mana Flame.
+    bool castCleansingFlame(std::uint32_t spell, ServerObject& caster, ServerObject& source, int power);
+    /// Mark Location (the first free mark, else the longest unused), Mark 1-4 (that mark).
+    bool castMark(std::uint32_t spell, ServerObject& caster, ServerObject& source);
+    bool castFireball(std::uint32_t spell, ServerObject& caster, ServerObject& source, int power, std::size_t level);
+    bool castMagicMissile(std::uint32_t spell, ServerObject& caster, ServerObject& source, ServerObject* target, std::size_t level);
     /// The lasting spells' own start (0: begun), update (non-zero: it ends) and end.
     int lastingStart(DurationSpell& s);
     int lastingUpdate(DurationSpell& s);
     void lastingEnd(DurationSpell& s);
+    /// A player's MSG_INFORM of the string `id` (a lasting spell's say to its caster).
+    void inform(const ServerObject& p, std::string_view id);
+    // lastingUpdate's spells, each its frame (non-zero: it ends).
+    int lastingSummon(DurationSpell& s, ServerObject* caster);
+    int lastingCharm(DurationSpell& s, ServerObject* caster, ServerObject* target);
+    int lastingGreaterHeal(DurationSpell& s, ServerObject* caster, ServerObject* target);
+    int lastingDrainMana(DurationSpell& s, ServerObject* caster);
+    int lastingChannelLife(DurationSpell& s, ServerObject* caster, ServerObject* target);
+    int lastingPlasma(DurationSpell& s, ServerObject* caster, ServerObject* target);
+    int lastingForceOfNature(DurationSpell& s, ServerObject* caster);
+    int lastingManaBomb(DurationSpell& s, ServerObject* caster);
+    int lastingFirewalk(DurationSpell& s, ServerObject* target);
+    int lastingLightning(DurationSpell& s, ServerObject* caster, ServerObject* target);
     /// A cancelled one gone: its end, its caster idle again.
     void finishLasting(std::list<DurationSpell>::iterator it);
     /// Health up to its most (unitAdjustHP).

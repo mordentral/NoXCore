@@ -100,33 +100,6 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     // ImaginaryCaster takes the next script id ahead of the map's things (made below, once the kept
     // things have their extents).
     const bool caster = things_.findThing("ImaginaryCaster") != nullptr;
-    // What stays (the map change's sweep(1)): the players and what they hold (a player its direct holder);
-    // out of a network game the creatures friendly to them (isUnit) and a player's Moonglow; in
-    // a solo game a player's pixies. What anything else holds, those creatures'
-    // too, goes (its holder isn't a player).
-    const auto keptOf = [](World& from) {
-        std::vector<std::uint32_t> kept;
-        for (auto& [extent, o] : from.objects()) {
-            if (o.gone() || o.pendingDelete) {
-                continue;
-            }
-            const ServerObject* owner = o.owner ? from.byExtent(o.owner) : nullptr;
-            const bool moonglow = o.typeName == "Moonglow" && owner && (owner->classes & things::ObjectClass::Player);
-            if (o.player || (o.holder == 0 && (isUnit(from, o) || (!from.network() && moonglow) || playersPixie(from, o)))) {
-                kept.push_back(extent);
-            }
-        }
-        for (std::size_t i = 0; i < kept.size(); ++i) { // (what the players hold)
-            if (const ServerObject* k = from.byExtent(kept[i]); k && k->player) {
-                for (const std::uint32_t e : k->inventory) {
-                    if (std::ranges::find(kept, e) == kept.end()) {
-                        kept.push_back(e);
-                    }
-                }
-            }
-        }
-        return kept;
-    };
     // A map change (mapSwitchLevel): first, before the new map is read, each player
     // thawed (unfreezeUnit with lock 1: its creatures with it) and its trade cancelled, on the old
     // map (trade.hpp: what it offered back to it; the sessions end with the old map).
@@ -134,44 +107,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     carry_.keys_.clear(); // (a map change's: set below)
     carry_.switched_ = old != nullptr;
     if (old) {
-        Fight f{*old, rng_, clock_.frame(), &things_, options_.modifiers};
-        mapChangeTrades(f);
-        // (mapSwitchLevel's loop: the new things' pass, unitsNewAddToList, ahead of each sweep.)
-        // What was made since the last pass goes on the lists and into the motion first, so what
-        // of it stays has its place there as the rest does (below).
-        queueNewObjects(*old);
-        kept = keptOf(*old); // (what the trades gave back among it)
-        // What doesn't stay is freed (all of it marked deleted
-        // first): what it owns passed up to its owner (unitTransferSlaves: past
-        // the deleted), it let go of by its own (unitClearOwner: a player's
-        // creature is lost to it, MSG_REPORT_LOSE_CREATURE, important: the client's cage empties
-        // at its CLIENT_READY), then out of its team (servFinalizeDelObject:
-        // MSG_TEAM_MSG 2, an empty team gone as removeTeamMember has it).
-        const std::unordered_set<std::uint32_t> stays(kept.begin(), kept.end());
-        std::vector<std::uint32_t> left;
-        std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> slaves;
-        for (auto& [extent, o] : old->objects()) {
-            if (!stays.contains(extent)) {
-                left.push_back(extent);
-                o.pendingDelete = true;
-            }
-            if (o.owner != 0) {
-                slaves[o.owner].push_back(extent);
-            }
-        }
-        for (const std::uint32_t e : left) {
-            ServerObject& o = old->objects().at(e);
-            if (const auto it = slaves.find(e); it != slaves.end()) {
-                ServerObject* to = o.owner ? old->byExtent(o.owner) : nullptr;
-                for (const std::uint32_t s : it->second) {
-                    if (ServerObject* slave = old->byExtent(s); slave && slave->owner == e) {
-                        setOwner(*old, to, *slave); // (past the deleted: never to one that goes)
-                    }
-                }
-            }
-            clearOwner(*old, o);
-            removeTeamMember(*old, o);
-        }
+        kept = leaveOldMap(old);
     }
     // (The exe's things keep their net codes through a map change: the new map's things, a saved
     // copy's made in play among them, don't take the numbers of those that stay, what the trades
@@ -184,39 +120,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         world_.broadcasts().insert(world_.broadcasts().begin(), std::make_move_iterator(old->broadcasts().begin()),
                                    std::make_move_iterator(old->broadcasts().end()));
     }
-    world_.strings = options_.strings;
-    world_.rng = &rng_;
-    world_.hostClient = seenHostClient();
-    world_.modeHooks = modeHooks_;
-    world_.questScreens = options_.questScreens;
-    world_.questSaves = options_.questSaves;
-    world_.forceClass = options_.forceClass;
-    world_.multiclass = options_.multiclass;
-    world_.monstersAlert = options_.monstersAlert;
-    world_.keepThingsOnDeath = options_.keepThingsOnDeath;
-    world_.modeOwnsBook = options_.modeOwnsBook;
-    world_.sandboxPlayersCantDie = options_.playersCantDie;
-    world_.sandboxNoScoring = options_.noScoring;
-    world_.modeOwnsLimits = options_.modeOwnsLimits;
-    world_.pickupAnyClass = options_.pickupAnyClass;
-    world_.pickupDuplicates = options_.pickupDuplicates;
-    world_.soundSets = options_.soundSets;
-    world_.soundTable = &soundTable_;
-    world_.soundLimit = options_.frameSounds;
-    world_.playerAnimations = &playerAnimations_;
-    world_.gameplayFlags = old ? old->gameplayFlags : options_.gameplayFlags;
-    world_.lessonLimits = old ? old->lessonLimits : options_.lessonLimits;
-    world_.timeLimits = old ? old->timeLimits : options_.timeLimits;
-    world_.serverOptions = old ? old->serverOptions : options_.serverOptions;
-    world_.autoRespawn = old ? old->autoRespawn : options_.autoRespawn;
-    world_.keepAutoRespawn = old ? old->keepAutoRespawn : options_.autoRespawn;
-    world_.clanTeams = old ? old->clanTeams : false;
-    world_.wolGame = old ? old->wolGame : options_.wolGame;
-    world_.leaveBones = old ? old->leaveBones : false;
-    world_.gestures = old ? old->gestures : true;
-    world_.questMaps = &questMaps_;
-    world_.questSendSave = questSendSave_;
-    world_.questSaveAndKick = questSaveAndKick_;
+    takeOptions(old);
     {
         // (MonsterXfer's read of a saved record's enchantments and poison: object_save.hpp.)
         Fight f = fight();
@@ -232,50 +136,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         world_.mapTypes = info.gameFlags; // (mapLoad's)
     }
     if (old) {
-        // The quest's numbers and the classes' multipliers: the exe's globals.
-        world_.questDamage = old->questDamage;
-        world_.questHealth = old->questHealth;
-        world_.mapDifficulty = old->mapDifficulty;
-        world_.questStage = old->questStage;
-        world_.questDifficulty = old->questDifficulty;
-        world_.warpGatesOn = old->warpGatesOn;
-        world_.questBosses = old->questBosses;
-        world_.questWarpState = old->questWarpState;
-        world_.questWarpGui = old->questWarpGui;
-        world_.questWarpEnterFrame = old->questWarpEnterFrame;
-        world_.questNextMap = old->questNextMap;
-        world_.questChosen = old->questChosen;
-        world_.soloQuestCountdown = old->soloQuestCountdown;
-        world_.questWarped = old->questWarped;
-        world_.questSecretsLast = old->questSecretsHere;
-        world_.questSlotSeenAt = old->questSlotSeenAt;
-        world_.ticks = old->ticks; // (the solo pause's globals, solo.hpp)
-        world_.pauseUntilTick = old->pauseUntilTick;
-        world_.levelUp = old->levelUp; // (its LevelUp went with the old map: carryLinks below)
-        world_.gameFlags |= old->gameFlags & GameFlag::Paused;
-        world_.saveRequest = old->saveRequest; // (requestSave's globals; its exit went with the old map: carryLinks below)
-        world_.saveName = old->saveName;
-        world_.cameByExit = old->cameByExit;
-        world_.saveByExit = old->saveByExit;
-        world_.switchToSolo = old->switchToSolo;
-        world_.noMultiplayer = old->noMultiplayer;
-        world_.soloPath = old->soloPath;
-        world_.loadingSavedGame = old->loadingSavedGame;
-        world_.savedGameLoadedAt = old->savedGameLoadedAt;
-        world_.healthMultiplier = old->healthMultiplier;
-        world_.manaMultiplier = old->manaMultiplier;
-        world_.strengthMultiplier = old->strengthMultiplier;
-        world_.speedMultiplier = old->speedMultiplier;
-        world_.multipliersBeforeQuest = old->multipliersBeforeQuest;
-        world_.questVariables = old->questVariables; // (the scripts' quest variables, a global list)
-        world_.pendingMagicWalls = old->pendingMagicWalls;
-        world_.pendingAbility = old->pendingAbility;
-        world_.briefingByte = old->briefingByte;
-        // The host's spells and types turned off (global tables in the exe: spellEnable)
-        // stay off from map to map; a solo game's start turns them all on (below).
-        world_.spellDisabled = old->spellDisabled;
-        world_.disabledTypes = old->disabledTypes;
-        world_.godMode = old->godMode; // (the engine flags' 0x30: the engine's, kept)
+        carryGameState(old);
     }
     // Map_GetCurrentName: the file's name less its four-letter extension.
     world_.mapName = std::string(fileName.size() > 4 ? fileName.substr(0, fileName.size() - 4) : fileName);
@@ -303,248 +164,13 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     std::vector<std::uint32_t> carriedOver;
     const bool fromSave = (old || startedFromSave) && world_.switchToSolo; // (a visited map's saved copy)
     if (old) {
-        // (The thaws and trades: mapChangeTrades above, before the load. Each player's freeze lock
-        // goes with it, as the thaws left it.)
-        // The players and what they hold stay (the
-        // teams with them), their links to the old map's things gone: the wall they touched,
-        // frozen, their marks, the crown frame, their last attacker.
-        world_.teams = old->teams; // (their bases and crowns the old map's: carryLinks below)
-        for (ServerTeam& t : world_.teams) {
-            std::erase_if(t.members, [&](std::uint32_t e) {
-                const ServerObject* m = old->byExtent(e);
-                return !m || !m->player;
-            });
-        }
-        // What stays: `kept`, as it was before the switch let go of the rest.
-        // Each kept under its own extent, a map's number too (a staff picked up off the last map):
-        // the exe's things stay the same objects with their NetCodes, so the clients see nothing
-        // change, their inventory windows' secondary weapon and quiver kept. The new map's thing
-        // of such a number took a fresh one at the load (World::load's reserved extents; its map
-        // number still names it). A new one only if the number were taken all the same (never
-        // expected), its links to the others carried with it and its client told below.
-        std::unordered_map<std::uint32_t, std::uint32_t> renumbered;
-        for (const std::uint32_t e : kept) {
-            if (!world_.byExtent(e)) {
-                renumbered[e] = e;
-            }
-        }
-        for (const std::uint32_t e : kept) {
-            if (!renumbered.contains(e)) {
-                std::uint32_t fresh = world_.newExtent();
-                while (renumbered.contains(fresh) || std::ranges::any_of(renumbered, [&](const auto& r) { return r.second == fresh; })) {
-                    fresh = world_.newExtent();
-                }
-                renumbered[e] = fresh;
-            }
-            carriedOver.push_back(renumbered.at(e));
-        }
-        // A link to a kept thing goes to its key now; to anything else, none (the exe's pointer to a
-        // freed thing, whose checks find it gone), never the new map's thing that has the number
-        // now. Every stored link is carried, cleared or kept by its rule in object_links.hpp
-        // (carryLinks): the World's carried state here, each lasting spell and each kept thing below.
-        const auto carried = [&](ObjectKey e) -> ObjectKey {
-            const auto it = renumbered.find(e);
-            return it != renumbered.end() ? it->second : 0u;
-        };
-        // (The same for the records outside the world: carry(), the host's and the modes' after
-        // the switch.)
-        carry_.keys_ = renumbered;
-        carryLinks(world_, carried); // (the teams' members, bases and crowns, the level-up's player and object, the save's exit)
-        // The lasting spells: a solo game's on a player go on (their links carried;
-        // one already cancelled too: its end runs at the next pass), the rest are over. (The ends of
-        // those the exe cancels here aren't run: not yet.)
-        if (world_.gameFlags & GameFlag::Solo) {
-            for (const DurationSpell& s : old->durationSpells()) {
-                const ServerObject* t = s.target ? old->byExtent(s.target) : nullptr;
-                if (t && (t->classes & things::ObjectClass::Player) && carried(s.target) != 0) {
-                    DurationSpell k = s;
-                    carryLinks(k, carried);
-                    if (s.spell == 0x36) { // (Moonglow's value: its Moonglow, a key in a number)
-                        k.value = static_cast<int>(carried(static_cast<std::uint32_t>(s.value)));
-                    }
-                    world_.durationSpells().push_back(std::move(k));
-                }
-            }
-        }
-        // Where what stays stood on the updatable list and the missiles' list (the order of their
-        // walks), before it leaves the old world.
-        std::vector<std::uint32_t> keptUpdatable;
-        std::vector<std::uint32_t> keptMissiles;
-        old->grid().eachUpdatable([&](ServerObject& o) {
-            if (renumbered.contains(o.extent)) {
-                keptUpdatable.push_back(o.extent);
-            }
-        });
-        old->grid().eachMissile([&](ServerObject& o) {
-            if (renumbered.contains(o.extent)) {
-                keptMissiles.push_back(o.extent);
-            }
-        });
-        for (const std::uint32_t e : kept) {
-            ServerObject o = std::move(old->objects().at(e));
-            o.extent = renumbered.at(e);
-            // (decayDestroy: the decay list emptied, each one's decay over; what stays stays,
-            // its time where the decay left it.)
-            if (o.decayAt != 0) {
-                o.timer = o.decayAt;
-                o.decayAt = 0;
-            }
-            // Its links: its owner, holder and inventory, its creature's and player's targets, its
-            // parts' (object_links.hpp: the weapon in hand, the spell's target, the minimap marks, a
-            // creature's generator, a carried glyph's target, a crown's next holder... carried; its
-            // hurtBy, cursor, harpoon, teleport marks, gates and what it heard cleared).
-            carryLinks(o, carried);
-            if (o.monster) {
-                o.monster->heardAt = 0; // (with heardFrom)
-            }
-            if (o.player) {
-                // (The pending casts' clear: the list emptied, each player's spell being
-                // spoken (hearsOwnPhonemes, castStart) and its trap's spells with it)
-                o.player->chant.reset();
-                o.player->castStart = 0;
-                o.player->hearsOwnPhonemes = false;
-                o.player->trapSpells = {};
-                o.player->trapCount = 0;
-                o.player->lastWallX = o.player->lastWallY = -1;
-                o.player->markUses = {}; // (with its marks)
-                o.player->crownAt = 0;
-                o.player->polygon = kPolygonUnknown; // (servResetPlayers: 0xDEADFACE)
-                // A minimap mark of a thing left behind names nothing now (carryLinks) and goes as
-                // the list's walk drops a gone thing's: those of bits 1 and 2 alone.
-                std::erase_if(o.player->minimapMarks, [](const PlayerControl::MinimapMark& m) { return m.object == 0 && (m.bits & ~3u) == 0; });
-            }
-            world_.adopt(std::move(o), false);
-        }
-        // The object lists are the game's too, not the map's: what stays is still in the grid where
-        // it stood, and on the updatable list and the missiles' list in its order, behind every
-        // new map thing (the load's new things' pass puts those at the lists' heads). It isn't new:
-        // the new things' pass doesn't take it again (it would also join the motion, which only a
-        // move does for it here: setPosition).
-        for (const std::uint32_t e : kept) {
-            if (ServerObject* o = world_.byExtent(renumbered.at(e))) {
-                world_.gridLink(*o, o->x, o->y);
-            }
-        }
-        const auto relist = [&](const std::vector<std::uint32_t>& order) {
-            std::vector<ServerObject*> objects;
-            objects.reserve(order.size());
-            for (const std::uint32_t e : order) {
-                if (ServerObject* o = world_.byExtent(renumbered.at(e))) {
-                    objects.push_back(o);
-                }
-            }
-            return objects;
-        };
-        world_.grid().appendUpdatable(relist(keptUpdatable));
-        world_.grid().appendMissiles(relist(keptMissiles));
-        // The motion queue is one list for the game, not the map's: the switch leaves it be, and
-        // only a thing's deletion takes one out (servFinalizeDelObject). So what was in it and
-        // stays is in it still, ahead of anything the new map adds, in its order. (Ours is the
-        // World's: without this a thing that stayed marked in the queue never joined the new one,
-        // and never moved again: a player who reached the exit running stood frozen on the next
-        // map, running on the spot.)
-        std::vector<std::pair<std::uint32_t, std::uint64_t>> stillQueued;
-        for (const auto& [e, ticket] : old->motionQueue) {
-            const auto r = renumbered.find(e);
-            ServerObject* o = r != renumbered.end() ? world_.byExtent(r->second) : nullptr;
-            if (!o || !o->inMotion || o->motionTicket != ticket) {
-                continue; // (gone with the old map, or a stale place: left and joined again since)
-            }
-            o->motionTicket = ++world_.motionTicket;
-            stillQueued.emplace_back(o->extent, o->motionTicket);
-        }
-        for (const std::uint32_t e : kept) {
-            ServerObject* o = world_.byExtent(renumbered.at(e));
-            if (o && o->inMotion && std::ranges::none_of(stillQueued, [&](const auto& q) { return q.first == o->extent; })) {
-                o->inMotion = false; // (marked but in no queue: free to join again)
-            }
-        }
-        world_.motionQueue.insert(world_.motionQueue.begin(), stillQueued.begin(), stillQueued.end());
-        world_.reservedExtents.clear();
-        // A player's thing numbered afresh (the guard above; none expected) would be unknown to its
-        // client, which knows it by the old number: ours is the extent the net code, the exe's
-        // keep their NetCode across the switch. Its client told, a drop of the old and a pickup
-        // of the new with its health, charges and wearing; else its potion keys, its inventory's
-        // clicks and drops name a thing it no longer holds. (A quest's .plr load numbers them
-        // all afresh and tells them: this is for a carry without one, as a mode's.)
-        for (const std::uint32_t e : kept) {
-            const std::uint32_t code = renumbered.at(e);
-            const ServerObject* item = code != e ? world_.byExtent(code) : nullptr;
-            ServerObject* holder = item && item->holder ? world_.byExtent(item->holder) : nullptr;
-            if (!holder || !holder->player) {
-                continue;
-            }
-            const auto u8 = [](std::uint32_t v) { return static_cast<std::uint8_t>(v); };
-            const auto tell = [&](std::vector<std::uint8_t> m) { world_.broadcasts().push_back({std::move(m), true, holder->extent}); };
-            tell({0x4D, u8(e), u8(e >> 8), u8(item->type), u8(item->type >> 8)}); // MSG_REPORT_DROP
-            if (item->classes & 0x13001000u) { // (weapons, wands, armour, flags: items.cpp's kModifiable)
-                tell({0x4C, u8(code), u8(code >> 8), u8(item->type), u8(item->type >> 8), item->modifiers[0], item->modifiers[1],  // MSG_REPORT_MODIFIABLE_PICKUP
-                      item->modifiers[2], item->modifiers[3]});
-            } else {
-                tell({0x4B, u8(code), u8(code >> 8), u8(item->type), u8(item->type >> 8)});  // MSG_REPORT_PICKUP
-            }
-            if (item->maxHealth != 0) {
-                tell({0x44, u8(code), u8(code >> 8), u8(item->health), u8(item->health >> 8), u8(item->maxHealth), u8(item->maxHealth >> 8)});  // MSG_REPORT_ITEM_HEALTH
-            }
-            if (item->maxCharges != 0) {
-                tell({0x64, u8(code), u8(code >> 8), item->charges, item->maxCharges});  // MSG_REPORT_CHARGES
-            }
-            if (item->flags & ObjFlag::Equipped) {
-                tell({0x60, u8(code), u8(code >> 8)}); // MSG_REPORT_EQUIP
-                if (things::weaponBitOf(item->typeName) == 2) {
-                    holder->player->lastQuiver = netCodeOf(*item); // (a quiver: its window's last one now)
-                }
-            }
-        }
-        // noxcpp: a forced class gone with the game that forced it (a mode's lobby again,
-        // its quest over): each player its character's own class back (GameHost tells its client
-        // before the map loads there), what it carries kept. Only on a server that forces one: a
-        // stock game's player keeps the class its .plr gave it.
-        if (world_.forceClass && !forcedClass(world_)) {
-            Fight back{world_, rng_, clock_.frame(), &things_, options_.modifiers};
-            for (auto& [e, o] : world_.objects()) {
-                if (o.player && o.player->ownClass <= 2 && o.player->classId != o.player->ownClass) {
-                    forceClass(back, o, o.player->ownClass);
-                }
-            }
-        }
+        const auto renumbered = renumberKept(old, kept, carriedOver);
+        moveKept(old, kept, renumbered);
+        tellRenumbered(kept, renumbered);
+        ownClassesBack();
         // (Each player was thawed, unitUnFreeze(unit, 1) with its creatures, on the
         // old map before its trade's cancel: mapChangeTrades above, the exe's order.)
     }
-    // (The map's load, each player before its start): out of a solo game its glyphs
-    // out (CurTraps) are those it carries.
-    const auto glyphsCarried = [&](ServerObject& o) {
-        if (world_.gameFlags & GameFlag::Solo) {
-            return;
-        }
-        int n = 0;
-        for (const std::uint32_t e : o.inventory) {
-            if (const ServerObject* i = world_.byExtent(e); i && i->typeName == "Glyph") {
-                ++n;
-            }
-        }
-        o.player->curTraps = static_cast<std::uint8_t>(n);
-    };
-    // A player at a player start (with `teamBases`, a chat game's with teams: its team's base,
-    // within 50), its score and deaths cleared and told (not in a co-op game).
-    const auto toPlayerStart = [&](ServerObject& o, bool teamBases) {
-        glyphsCarried(o);
-        auto [x, y] = findPlayerStart(world_, &o, rng_);
-        if (teamBases && (world_.gameFlags & GameFlag::Chat) && teamCount(world_) != 0 && !(world_.gameplayFlags & 2u) &&
-            !(world_.gameFlags & 0x8000u)) {
-            if (const ServerTeam* t = teamById(world_, o.team); t && t->base) {
-                if (const ServerObject* base = world_.byExtent(t->base)) {
-                    std::tie(x, y) = clearPointNear(world_, rng_, base->x, base->y, 50.0f);
-                }
-            }
-        }
-        setPosition(world_, o, x, y, clock_.frame());
-        if (!(world_.gameFlags & GameFlag::Coop)) {
-            o.player->lessons = 0;
-            o.player->deaths = 0;
-            reportLesson(world_, o);
-        }
-    };
     if (caster) {
         // The ImaginaryCaster at (2944, 2944) (createAt), its script id the one kept
         // for it above.
@@ -599,43 +225,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     // objects of a team in their teams first. (mapReadSetFlags runs for every map but
     // with game flag 0x200000.)
     if (world_.network() && !(world_.gameFlags & GameFlag::SoloOther)) {
-        const std::uint32_t mapFlags = map.find(map::MapInfo::kName) ? map::decodeSection<map::MapInfo>(map).gameFlags : 0;
-        placeTeamMembers(world_, mapFlags, rng_, clock_.frame());
-        Fight f = fight();
-        const std::uint32_t chosen = old ? old->chosenMode : options_.gameFlags & 0x17F0u;
-        setupMode(f, mapFlags, chosen != 0 ? chosen : GameFlag::Arena);
-        if (old && !(world_.gameFlags & GameFlag::Chat)) {
-            // The timer: running with anyone in play and a limit, at the limit. Told
-            // first (Game_SetTimerRunning's SrvNet_SendTimerStatus: the time left of the end it
-            // still has, g_gameTimerEndTicks, the old match's), then set: an
-            // original bug.
-            world_.timerEnd = old->timerEnd;
-            setTimerRunning(world_, anyonePlaying(world_) && enforcedTimeLimit(world_) != 0, clock_.frame());
-            world_.timerEnd = clock_.frame() + static_cast<std::uint32_t>(enforcedTimeLimit(world_)) * 60u * 30u;
-        }
-        if (old) {
-            // Each player at a player start (a chat game's team base, within 50), its score and
-            // deaths cleared and told.
-            for (auto& [extent, o] : world_.objects()) {
-                if (o.player) {
-                    toPlayerStart(o, true);
-                }
-            }
-        }
-        // (past the map's checks) Team play (gameplay flag 4) or game flag 0x8000:
-        // the teams' scores reset (Team_ResetAllScores, told).
-        if ((world_.gameplayFlags & 4u) || (world_.gameFlags & 0x8000u)) {
-            resetTeamScores(world_);
-        }
-        // (the map's start) Team KotR: each team's crown to a random player of it.
-        if ((world_.gameFlags & GameFlag::KingOfTheRealm) && (world_.gameplayFlags & 4u)) {
-            crownsToTeams(f);
-        }
-        // A quest map: the stage up, its generators, bosses and difficulty.
-        if (world_.quest()) {
-            questMapLoaded(f, fileName);
-        }
-        resetSuddenDeath(f);
+        setupNetworkGame(map, old, fileName);
     }
     if (old && !world_.network()) {
         // Out of a network game too, each player at a player start, its score
@@ -675,46 +265,7 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     // (an NPC's colours sent again). (Its pixies' branch tests the player's class
     // for a missile's, never true: an original bug.)
     if (old && world_.cameByExit) {
-        Fight f = fight();
-        Monsters mons{f};
-        for (auto& [pe, p] : world_.objects()) {
-            if (!p.player) {
-                continue;
-            }
-            std::vector<ServerObject*> owned;
-            for (auto& [e, o] : world_.objects()) {
-                if (o.owner == p.extent && &o != &p && isUnit(world_, o)) {
-                    owned.push_back(&o);
-                }
-            }
-            std::ranges::sort(owned, [](const ServerObject* a, const ServerObject* b) {
-                return a->ownedOrder != b->ownedOrder ? a->ownedOrder > b->ownedOrder : a->extent > b->extent;
-            });
-            for (ServerObject* o : owned) {
-                const auto [x, y] = clearPointNear(world_, rng_, p.x, p.y, 50.0f);
-                setPosition(world_, *o, x, y, clock_.frame());
-                if (!o->monster) {
-                    continue;
-                }
-                o->monster->heard = 0;
-                mons.clear(*o);
-                o->hurtBy = 0;
-                o->monster->enemy = 0;
-                o->monster->focus = 0;
-                o->monster->seenCount = 0;
-                o->monster->polygon = kPolygonUnknown; // (its polygon 0xDEADFACE: unknown)
-                if (auto* it = mons.push(*o, MonsterAction::Escort)) {
-                    it->args[0] = std::bit_cast<std::uint32_t>(p.x);
-                    it->args[1] = std::bit_cast<std::uint32_t>(p.y);
-                    it->args[2] = p.extent;
-                }
-                // An NPC's (subclass 0x30) colours told again: its first set to itself.
-                if (npcReported(*o)) {
-                    setNpcColor(*o, 0, o->monster->colors[0]);
-                }
-            }
-        }
-        world_.cameByExit = false;
+        creaturesFollowExit();
     }
     // A solo game's map loaded (not a saved game's: with the loads): an AUTOSAVE asked for, 30
     // frames on.
@@ -723,6 +274,531 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         requestSave(world_, true, 0, 0x1E, clock_.frame());
     }
     world_.loadingSavedGame = false; // (mapLoadOrSaveMB(0))
+    startMapScript(map, fromSave, hostThere);
+    // (noxcpp: a mode's say once the map's in, before its first frame. None: nothing.)
+    if (modeHooks_) {
+        modeHooks_->mapLoaded(*this);
+    }
+}
+
+// loadMapKeeping's steps, in its order.
+
+/// A map change's first step on the old map, before the new one is read: what stays (returned) and
+/// what goes, as loadMapKeeping says.
+std::vector<std::uint32_t> Server::leaveOldMap(World* old)
+{
+    // What stays (the map change's sweep(1)): the players and what they hold (a player its direct holder);
+    // out of a network game the creatures friendly to them (isUnit) and a player's Moonglow; in
+    // a solo game a player's pixies. What anything else holds, those creatures'
+    // too, goes (its holder isn't a player).
+    const auto keptOf = [](World& from) {
+        std::vector<std::uint32_t> kept;
+        for (auto& [extent, o] : from.objects()) {
+            if (o.gone() || o.pendingDelete) {
+                continue;
+            }
+            const ServerObject* owner = o.owner ? from.byExtent(o.owner) : nullptr;
+            const bool moonglow = o.typeName == "Moonglow" && owner && (owner->classes & things::ObjectClass::Player);
+            if (o.player || (o.holder == 0 && (isUnit(from, o) || (!from.network() && moonglow) || playersPixie(from, o)))) {
+                kept.push_back(extent);
+            }
+        }
+        for (std::size_t i = 0; i < kept.size(); ++i) { // (what the players hold)
+            if (const ServerObject* k = from.byExtent(kept[i]); k && k->player) {
+                for (const std::uint32_t e : k->inventory) {
+                    if (std::ranges::find(kept, e) == kept.end()) {
+                        kept.push_back(e);
+                    }
+                }
+            }
+        }
+        return kept;
+    };
+    std::vector<std::uint32_t> kept;
+    Fight f{*old, rng_, clock_.frame(), &things_, options_.modifiers};
+    mapChangeTrades(f);
+    // (mapSwitchLevel's loop: the new things' pass, unitsNewAddToList, ahead of each sweep.)
+    // What was made since the last pass goes on the lists and into the motion first, so what
+    // of it stays has its place there as the rest does (below).
+    queueNewObjects(*old);
+    kept = keptOf(*old); // (what the trades gave back among it)
+    // What doesn't stay is freed (all of it marked deleted
+    // first): what it owns passed up to its owner (unitTransferSlaves: past
+    // the deleted), it let go of by its own (unitClearOwner: a player's
+    // creature is lost to it, MSG_REPORT_LOSE_CREATURE, important: the client's cage empties
+    // at its CLIENT_READY), then out of its team (servFinalizeDelObject:
+    // MSG_TEAM_MSG 2, an empty team gone as removeTeamMember has it).
+    const std::unordered_set<std::uint32_t> stays(kept.begin(), kept.end());
+    std::vector<std::uint32_t> left;
+    std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> slaves;
+    for (auto& [extent, o] : old->objects()) {
+        if (!stays.contains(extent)) {
+            left.push_back(extent);
+            o.pendingDelete = true;
+        }
+        if (o.owner != 0) {
+            slaves[o.owner].push_back(extent);
+        }
+    }
+    for (const std::uint32_t e : left) {
+        ServerObject& o = old->objects().at(e);
+        if (const auto it = slaves.find(e); it != slaves.end()) {
+            ServerObject* to = o.owner ? old->byExtent(o.owner) : nullptr;
+            for (const std::uint32_t s : it->second) {
+                if (ServerObject* slave = old->byExtent(s); slave && slave->owner == e) {
+                    setOwner(*old, to, *slave); // (past the deleted: never to one that goes)
+                }
+            }
+        }
+        clearOwner(*old, o);
+        removeTeamMember(*old, o);
+    }
+    return kept;
+}
+
+/// The new world's settings: the server's options, a map change's from the old world.
+void Server::takeOptions(World* old)
+{
+    world_.strings = options_.strings;
+    world_.rng = &rng_;
+    world_.hostClient = seenHostClient();
+    world_.modeHooks = modeHooks_;
+    world_.questScreens = options_.questScreens;
+    world_.questSaves = options_.questSaves;
+    world_.forceClass = options_.forceClass;
+    world_.multiclass = options_.multiclass;
+    world_.monstersAlert = options_.monstersAlert;
+    world_.keepThingsOnDeath = options_.keepThingsOnDeath;
+    world_.modeOwnsBook = options_.modeOwnsBook;
+    world_.sandboxPlayersCantDie = options_.playersCantDie;
+    world_.sandboxNoScoring = options_.noScoring;
+    world_.modeOwnsLimits = options_.modeOwnsLimits;
+    world_.pickupAnyClass = options_.pickupAnyClass;
+    world_.pickupDuplicates = options_.pickupDuplicates;
+    world_.soundSets = options_.soundSets;
+    world_.soundTable = &soundTable_;
+    world_.soundLimit = options_.frameSounds;
+    world_.playerAnimations = &playerAnimations_;
+    world_.gameplayFlags = old ? old->gameplayFlags : options_.gameplayFlags;
+    world_.lessonLimits = old ? old->lessonLimits : options_.lessonLimits;
+    world_.timeLimits = old ? old->timeLimits : options_.timeLimits;
+    world_.serverOptions = old ? old->serverOptions : options_.serverOptions;
+    world_.autoRespawn = old ? old->autoRespawn : options_.autoRespawn;
+    world_.keepAutoRespawn = old ? old->keepAutoRespawn : options_.autoRespawn;
+    world_.clanTeams = old ? old->clanTeams : false;
+    world_.wolGame = old ? old->wolGame : options_.wolGame;
+    world_.leaveBones = old ? old->leaveBones : false;
+    world_.gestures = old ? old->gestures : true;
+    world_.questMaps = &questMaps_;
+    world_.questSendSave = questSendSave_;
+    world_.questSaveAndKick = questSaveAndKick_;
+}
+
+/// A map change's lasting game state, from the old world.
+void Server::carryGameState(World* old)
+{
+    // The quest's numbers and the classes' multipliers: the exe's globals.
+    world_.questDamage = old->questDamage;
+    world_.questHealth = old->questHealth;
+    world_.mapDifficulty = old->mapDifficulty;
+    world_.questStage = old->questStage;
+    world_.questDifficulty = old->questDifficulty;
+    world_.warpGatesOn = old->warpGatesOn;
+    world_.questBosses = old->questBosses;
+    world_.questWarpState = old->questWarpState;
+    world_.questWarpGui = old->questWarpGui;
+    world_.questWarpEnterFrame = old->questWarpEnterFrame;
+    world_.questNextMap = old->questNextMap;
+    world_.questChosen = old->questChosen;
+    world_.soloQuestCountdown = old->soloQuestCountdown;
+    world_.questWarped = old->questWarped;
+    world_.questSecretsLast = old->questSecretsHere;
+    world_.questSlotSeenAt = old->questSlotSeenAt;
+    world_.ticks = old->ticks; // (the solo pause's globals, solo.hpp)
+    world_.pauseUntilTick = old->pauseUntilTick;
+    world_.levelUp = old->levelUp; // (its LevelUp went with the old map: carryLinks below)
+    world_.gameFlags |= old->gameFlags & GameFlag::Paused;
+    world_.saveRequest = old->saveRequest; // (requestSave's globals; its exit went with the old map: carryLinks below)
+    world_.saveName = old->saveName;
+    world_.cameByExit = old->cameByExit;
+    world_.saveByExit = old->saveByExit;
+    world_.switchToSolo = old->switchToSolo;
+    world_.noMultiplayer = old->noMultiplayer;
+    world_.soloPath = old->soloPath;
+    world_.loadingSavedGame = old->loadingSavedGame;
+    world_.savedGameLoadedAt = old->savedGameLoadedAt;
+    world_.healthMultiplier = old->healthMultiplier;
+    world_.manaMultiplier = old->manaMultiplier;
+    world_.strengthMultiplier = old->strengthMultiplier;
+    world_.speedMultiplier = old->speedMultiplier;
+    world_.multipliersBeforeQuest = old->multipliersBeforeQuest;
+    world_.questVariables = old->questVariables; // (the scripts' quest variables, a global list)
+    world_.pendingMagicWalls = old->pendingMagicWalls;
+    world_.pendingAbility = old->pendingAbility;
+    world_.briefingByte = old->briefingByte;
+    // The host's spells and types turned off (global tables in the exe: spellEnable)
+    // stay off from map to map; a solo game's start turns them all on (below).
+    world_.spellDisabled = old->spellDisabled;
+    world_.disabledTypes = old->disabledTypes;
+    world_.godMode = old->godMode; // (the engine flags' 0x30: the engine's, kept)
+}
+
+/// A map change's teams and the kept things' keys (renumbered: each kept thing's old key to its
+/// new one; carriedOver: the new keys, in `kept`'s order).
+std::unordered_map<std::uint32_t, std::uint32_t> Server::renumberKept(World* old, const std::vector<std::uint32_t>& kept,
+                                                                       std::vector<std::uint32_t>& carriedOver)
+{
+    // (The thaws and trades: mapChangeTrades above, before the load. Each player's freeze lock
+    // goes with it, as the thaws left it.)
+    // The players and what they hold stay (the
+    // teams with them), their links to the old map's things gone: the wall they touched,
+    // frozen, their marks, the crown frame, their last attacker.
+    world_.teams = old->teams; // (their bases and crowns the old map's: carryLinks below)
+    for (ServerTeam& t : world_.teams) {
+        std::erase_if(t.members, [&](std::uint32_t e) {
+            const ServerObject* m = old->byExtent(e);
+            return !m || !m->player;
+        });
+    }
+    // What stays: `kept`, as it was before the switch let go of the rest.
+    // Each kept under its own extent, a map's number too (a staff picked up off the last map):
+    // the exe's things stay the same objects with their NetCodes, so the clients see nothing
+    // change, their inventory windows' secondary weapon and quiver kept. The new map's thing
+    // of such a number took a fresh one at the load (World::load's reserved extents; its map
+    // number still names it). A new one only if the number were taken all the same (never
+    // expected), its links to the others carried with it and its client told below.
+    std::unordered_map<std::uint32_t, std::uint32_t> renumbered;
+    for (const std::uint32_t e : kept) {
+        if (!world_.byExtent(e)) {
+            renumbered[e] = e;
+        }
+    }
+    for (const std::uint32_t e : kept) {
+        if (!renumbered.contains(e)) {
+            std::uint32_t fresh = world_.newExtent();
+            while (renumbered.contains(fresh) || std::ranges::any_of(renumbered, [&](const auto& r) { return r.second == fresh; })) {
+                fresh = world_.newExtent();
+            }
+            renumbered[e] = fresh;
+        }
+        carriedOver.push_back(renumbered.at(e));
+    }
+    return renumbered;
+}
+
+/// A map change's kept things moved into the new world: their links, the lasting spells, their
+/// places on the game's lists and in the motion queue.
+void Server::moveKept(World* old, const std::vector<std::uint32_t>& kept,
+                      const std::unordered_map<std::uint32_t, std::uint32_t>& renumbered)
+{
+    // A link to a kept thing goes to its key now; to anything else, none (the exe's pointer to a
+    // freed thing, whose checks find it gone), never the new map's thing that has the number
+    // now. Every stored link is carried, cleared or kept by its rule in object_links.hpp
+    // (carryLinks): the World's carried state here, each lasting spell and each kept thing below.
+    const auto carried = [&](ObjectKey e) -> ObjectKey {
+        const auto it = renumbered.find(e);
+        return it != renumbered.end() ? it->second : 0u;
+    };
+    // (The same for the records outside the world: carry(), the host's and the modes' after
+    // the switch.)
+    carry_.keys_ = renumbered;
+    carryLinks(world_, carried); // (the teams' members, bases and crowns, the level-up's player and object, the save's exit)
+    // The lasting spells: a solo game's on a player go on (their links carried;
+    // one already cancelled too: its end runs at the next pass), the rest are over. (The ends of
+    // those the exe cancels here aren't run: not yet.)
+    if (world_.gameFlags & GameFlag::Solo) {
+        for (const DurationSpell& s : old->durationSpells()) {
+            const ServerObject* t = s.target ? old->byExtent(s.target) : nullptr;
+            if (t && (t->classes & things::ObjectClass::Player) && carried(s.target) != 0) {
+                DurationSpell k = s;
+                carryLinks(k, carried);
+                if (s.spell == 0x36) { // (Moonglow's value: its Moonglow, a key in a number)
+                    k.value = static_cast<int>(carried(static_cast<std::uint32_t>(s.value)));
+                }
+                world_.durationSpells().push_back(std::move(k));
+            }
+        }
+    }
+    // Where what stays stood on the updatable list and the missiles' list (the order of their
+    // walks), before it leaves the old world.
+    std::vector<std::uint32_t> keptUpdatable;
+    std::vector<std::uint32_t> keptMissiles;
+    old->grid().eachUpdatable([&](ServerObject& o) {
+        if (renumbered.contains(o.extent)) {
+            keptUpdatable.push_back(o.extent);
+        }
+    });
+    old->grid().eachMissile([&](ServerObject& o) {
+        if (renumbered.contains(o.extent)) {
+            keptMissiles.push_back(o.extent);
+        }
+    });
+    for (const std::uint32_t e : kept) {
+        ServerObject o = std::move(old->objects().at(e));
+        o.extent = renumbered.at(e);
+        // (decayDestroy: the decay list emptied, each one's decay over; what stays stays,
+        // its time where the decay left it.)
+        if (o.decayAt != 0) {
+            o.timer = o.decayAt;
+            o.decayAt = 0;
+        }
+        // Its links: its owner, holder and inventory, its creature's and player's targets, its
+        // parts' (object_links.hpp: the weapon in hand, the spell's target, the minimap marks, a
+        // creature's generator, a carried glyph's target, a crown's next holder... carried; its
+        // hurtBy, cursor, harpoon, teleport marks, gates and what it heard cleared).
+        carryLinks(o, carried);
+        if (o.monster) {
+            o.monster->heardAt = 0; // (with heardFrom)
+        }
+        if (o.player) {
+            // (The pending casts' clear: the list emptied, each player's spell being
+            // spoken (hearsOwnPhonemes, castStart) and its trap's spells with it)
+            o.player->chant.reset();
+            o.player->castStart = 0;
+            o.player->hearsOwnPhonemes = false;
+            o.player->trapSpells = {};
+            o.player->trapCount = 0;
+            o.player->lastWallX = o.player->lastWallY = -1;
+            o.player->markUses = {}; // (with its marks)
+            o.player->crownAt = 0;
+            o.player->polygon = kPolygonUnknown; // (servResetPlayers: 0xDEADFACE)
+            // A minimap mark of a thing left behind names nothing now (carryLinks) and goes as
+            // the list's walk drops a gone thing's: those of bits 1 and 2 alone.
+            std::erase_if(o.player->minimapMarks, [](const PlayerControl::MinimapMark& m) { return m.object == 0 && (m.bits & ~3u) == 0; });
+        }
+        world_.adopt(std::move(o), false);
+    }
+    // The object lists are the game's too, not the map's: what stays is still in the grid where
+    // it stood, and on the updatable list and the missiles' list in its order, behind every
+    // new map thing (the load's new things' pass puts those at the lists' heads). It isn't new:
+    // the new things' pass doesn't take it again (it would also join the motion, which only a
+    // move does for it here: setPosition).
+    for (const std::uint32_t e : kept) {
+        if (ServerObject* o = world_.byExtent(renumbered.at(e))) {
+            world_.gridLink(*o, o->x, o->y);
+        }
+    }
+    const auto relist = [&](const std::vector<std::uint32_t>& order) {
+        std::vector<ServerObject*> objects;
+        objects.reserve(order.size());
+        for (const std::uint32_t e : order) {
+            if (ServerObject* o = world_.byExtent(renumbered.at(e))) {
+                objects.push_back(o);
+            }
+        }
+        return objects;
+    };
+    world_.grid().appendUpdatable(relist(keptUpdatable));
+    world_.grid().appendMissiles(relist(keptMissiles));
+    // The motion queue is one list for the game, not the map's: the switch leaves it be, and
+    // only a thing's deletion takes one out (servFinalizeDelObject). So what was in it and
+    // stays is in it still, ahead of anything the new map adds, in its order. (Ours is the
+    // World's: without this a thing that stayed marked in the queue never joined the new one,
+    // and never moved again: a player who reached the exit running stood frozen on the next
+    // map, running on the spot.)
+    std::vector<std::pair<std::uint32_t, std::uint64_t>> stillQueued;
+    for (const auto& [e, ticket] : old->motionQueue) {
+        const auto r = renumbered.find(e);
+        ServerObject* o = r != renumbered.end() ? world_.byExtent(r->second) : nullptr;
+        if (!o || !o->inMotion || o->motionTicket != ticket) {
+            continue; // (gone with the old map, or a stale place: left and joined again since)
+        }
+        o->motionTicket = ++world_.motionTicket;
+        stillQueued.emplace_back(o->extent, o->motionTicket);
+    }
+    for (const std::uint32_t e : kept) {
+        ServerObject* o = world_.byExtent(renumbered.at(e));
+        if (o && o->inMotion && std::ranges::none_of(stillQueued, [&](const auto& q) { return q.first == o->extent; })) {
+            o->inMotion = false; // (marked but in no queue: free to join again)
+        }
+    }
+    world_.motionQueue.insert(world_.motionQueue.begin(), stillQueued.begin(), stillQueued.end());
+    world_.reservedExtents.clear();
+}
+
+/// A kept thing numbered afresh told to its holder's client.
+void Server::tellRenumbered(const std::vector<std::uint32_t>& kept,
+                            const std::unordered_map<std::uint32_t, std::uint32_t>& renumbered)
+{
+    // A player's thing numbered afresh (the guard above; none expected) would be unknown to its
+    // client, which knows it by the old number: ours is the extent the net code, the exe's
+    // keep their NetCode across the switch. Its client told, a drop of the old and a pickup
+    // of the new with its health, charges and wearing; else its potion keys, its inventory's
+    // clicks and drops name a thing it no longer holds. (A quest's .plr load numbers them
+    // all afresh and tells them: this is for a carry without one, as a mode's.)
+    for (const std::uint32_t e : kept) {
+        const std::uint32_t code = renumbered.at(e);
+        const ServerObject* item = code != e ? world_.byExtent(code) : nullptr;
+        ServerObject* holder = item && item->holder ? world_.byExtent(item->holder) : nullptr;
+        if (!holder || !holder->player) {
+            continue;
+        }
+        const auto u8 = [](std::uint32_t v) { return static_cast<std::uint8_t>(v); };
+        const auto tell = [&](std::vector<std::uint8_t> m) { world_.broadcasts().push_back({std::move(m), true, holder->extent}); };
+        tell({0x4D, u8(e), u8(e >> 8), u8(item->type), u8(item->type >> 8)}); // MSG_REPORT_DROP
+        if (item->classes & 0x13001000u) { // (weapons, wands, armour, flags: items.cpp's kModifiable)
+            tell({0x4C, u8(code), u8(code >> 8), u8(item->type), u8(item->type >> 8), item->modifiers[0], item->modifiers[1],  // MSG_REPORT_MODIFIABLE_PICKUP
+                  item->modifiers[2], item->modifiers[3]});
+        } else {
+            tell({0x4B, u8(code), u8(code >> 8), u8(item->type), u8(item->type >> 8)});  // MSG_REPORT_PICKUP
+        }
+        if (item->maxHealth != 0) {
+            tell({0x44, u8(code), u8(code >> 8), u8(item->health), u8(item->health >> 8), u8(item->maxHealth), u8(item->maxHealth >> 8)});  // MSG_REPORT_ITEM_HEALTH
+        }
+        if (item->maxCharges != 0) {
+            tell({0x64, u8(code), u8(code >> 8), item->charges, item->maxCharges});  // MSG_REPORT_CHARGES
+        }
+        if (item->flags & ObjFlag::Equipped) {
+            tell({0x60, u8(code), u8(code >> 8)}); // MSG_REPORT_EQUIP
+            if (things::weaponBitOf(item->typeName) == 2) {
+                holder->player->lastQuiver = netCodeOf(*item); // (a quiver: its window's last one now)
+            }
+        }
+    }
+}
+
+void Server::ownClassesBack()
+{
+    // noxcpp: a forced class gone with the game that forced it (a mode's lobby again,
+    // its quest over): each player its character's own class back (GameHost tells its client
+    // before the map loads there), what it carries kept. Only on a server that forces one: a
+    // stock game's player keeps the class its .plr gave it.
+    if (world_.forceClass && !forcedClass(world_)) {
+        Fight back{world_, rng_, clock_.frame(), &things_, options_.modifiers};
+        for (auto& [e, o] : world_.objects()) {
+            if (o.player && o.player->ownClass <= 2 && o.player->classId != o.player->ownClass) {
+                forceClass(back, o, o.player->ownClass);
+            }
+        }
+    }
+}
+
+// A player at a player start (with `teamBases`, a chat game's with teams: its team's base,
+// within 50), its score and deaths cleared and told (not in a co-op game).
+void Server::toPlayerStart(ServerObject& o, bool teamBases)
+{
+    // (The map's load, each player before its start): out of a solo game its glyphs
+    // out (CurTraps) are those it carries.
+    const auto glyphsCarried = [&](ServerObject& o) {
+        if (world_.gameFlags & GameFlag::Solo) {
+            return;
+        }
+        int n = 0;
+        for (const std::uint32_t e : o.inventory) {
+            if (const ServerObject* i = world_.byExtent(e); i && i->typeName == "Glyph") {
+                ++n;
+            }
+        }
+        o.player->curTraps = static_cast<std::uint8_t>(n);
+    };
+    glyphsCarried(o);
+    auto [x, y] = findPlayerStart(world_, &o, rng_);
+    if (teamBases && (world_.gameFlags & GameFlag::Chat) && teamCount(world_) != 0 && !(world_.gameplayFlags & 2u) &&
+        !(world_.gameFlags & 0x8000u)) {
+        if (const ServerTeam* t = teamById(world_, o.team); t && t->base) {
+            if (const ServerObject* base = world_.byExtent(t->base)) {
+                std::tie(x, y) = clearPointNear(world_, rng_, base->x, base->y, 50.0f);
+            }
+        }
+    }
+    setPosition(world_, o, x, y, clock_.frame());
+    if (!(world_.gameFlags & GameFlag::Coop)) {
+        o.player->lessons = 0;
+        o.player->deaths = 0;
+        reportLesson(world_, o);
+    }
+}
+
+/// A network game's mode for this map (loadMapKeeping's comment).
+void Server::setupNetworkGame(const map::MapFile& map, World* old, std::string_view fileName)
+{
+    const std::uint32_t mapFlags = map.find(map::MapInfo::kName) ? map::decodeSection<map::MapInfo>(map).gameFlags : 0;
+    placeTeamMembers(world_, mapFlags, rng_, clock_.frame());
+    Fight f = fight();
+    const std::uint32_t chosen = old ? old->chosenMode : options_.gameFlags & 0x17F0u;
+    setupMode(f, mapFlags, chosen != 0 ? chosen : GameFlag::Arena);
+    if (old && !(world_.gameFlags & GameFlag::Chat)) {
+        // The timer: running with anyone in play and a limit, at the limit. Told
+        // first (Game_SetTimerRunning's SrvNet_SendTimerStatus: the time left of the end it
+        // still has, g_gameTimerEndTicks, the old match's), then set: an
+        // original bug.
+        world_.timerEnd = old->timerEnd;
+        setTimerRunning(world_, anyonePlaying(world_) && enforcedTimeLimit(world_) != 0, clock_.frame());
+        world_.timerEnd = clock_.frame() + static_cast<std::uint32_t>(enforcedTimeLimit(world_)) * 60u * 30u;
+    }
+    if (old) {
+        // Each player at a player start (a chat game's team base, within 50), its score and
+        // deaths cleared and told.
+        for (auto& [extent, o] : world_.objects()) {
+            if (o.player) {
+                toPlayerStart(o, true);
+            }
+        }
+    }
+    // (past the map's checks) Team play (gameplay flag 4) or game flag 0x8000:
+    // the teams' scores reset (Team_ResetAllScores, told).
+    if ((world_.gameplayFlags & 4u) || (world_.gameFlags & 0x8000u)) {
+        resetTeamScores(world_);
+    }
+    // (the map's start) Team KotR: each team's crown to a random player of it.
+    if ((world_.gameFlags & GameFlag::KingOfTheRealm) && (world_.gameplayFlags & 4u)) {
+        crownsToTeams(f);
+    }
+    // A quest map: the stage up, its generators, bosses and difficulty.
+    if (world_.quest()) {
+        questMapLoaded(f, fileName);
+    }
+    resetSuddenDeath(f);
+}
+
+/// Come by an exit: each player's creatures with it (loadMapKeeping's comment).
+void Server::creaturesFollowExit()
+{
+    Fight f = fight();
+    Monsters mons{f};
+    for (auto& [pe, p] : world_.objects()) {
+        if (!p.player) {
+            continue;
+        }
+        std::vector<ServerObject*> owned;
+        for (auto& [e, o] : world_.objects()) {
+            if (o.owner == p.extent && &o != &p && isUnit(world_, o)) {
+                owned.push_back(&o);
+            }
+        }
+        std::ranges::sort(owned, [](const ServerObject* a, const ServerObject* b) {
+            return a->ownedOrder != b->ownedOrder ? a->ownedOrder > b->ownedOrder : a->extent > b->extent;
+        });
+        for (ServerObject* o : owned) {
+            const auto [x, y] = clearPointNear(world_, rng_, p.x, p.y, 50.0f);
+            setPosition(world_, *o, x, y, clock_.frame());
+            if (!o->monster) {
+                continue;
+            }
+            o->monster->heard = 0;
+            mons.clear(*o);
+            o->hurtBy = 0;
+            o->monster->enemy = 0;
+            o->monster->focus = 0;
+            o->monster->seenCount = 0;
+            o->monster->polygon = kPolygonUnknown; // (its polygon 0xDEADFACE: unknown)
+            if (auto* it = mons.push(*o, MonsterAction::Escort)) {
+                it->args[0] = std::bit_cast<std::uint32_t>(p.x);
+                it->args[1] = std::bit_cast<std::uint32_t>(p.y);
+                it->args[2] = p.extent;
+            }
+            // An NPC's (subclass 0x30) colours told again: its first set to itself.
+            if (npcReported(*o)) {
+                setNpcColor(*o, 0, o->monster->colors[0]);
+            }
+        }
+    }
+    world_.cameByExit = false;
+}
+
+/// The map's script made and started (or a saved copy's read), its monsters' INIT first.
+void Server::startMapScript(const map::MapFile& map, bool fromSave, bool hostThere)
+{
     if (map.find(map::ScriptObject::kName)) {
         lastScriptCode_ = map::decodeSection<map::ScriptObject>(map).code; // (nc.obj)
     }
@@ -770,10 +846,6 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
     if (world_.gameFlags & GameFlag::Solo) {
         pauseFor(world_, 0x1E);
         countNextFrame_ = !(world_.gameFlags & GameFlag::Paused);
-    }
-    // (noxcpp: a mode's say once the map's in, before its first frame. None: nothing.)
-    if (modeHooks_) {
-        modeHooks_->mapLoaded(*this);
     }
 }
 

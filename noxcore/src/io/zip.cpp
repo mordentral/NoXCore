@@ -2,6 +2,7 @@
 #include "noxcore/io/zip.hpp"
 
 #include "noxcore/crypto/crc.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -18,16 +19,10 @@ constexpr std::uint16_t kUtf8Flag = 0x0800;  ///< general purpose bit 11: the na
 constexpr std::uint16_t kVersion = 10;       ///< 1.0: stored entries, folders
 constexpr std::uint32_t kDosFolder = 0x10;   ///< an external attribute: MS-DOS's directory bit
 
-void u16(std::vector<std::uint8_t>& out, std::uint16_t v)
-{
-    out.push_back(static_cast<std::uint8_t>(v));
-    out.push_back(static_cast<std::uint8_t>(v >> 8));
-}
+// (The little-endian fields: util/bytes.hpp's putU16 / putU32.)
+using util::putU16;
+using util::putU32;
 
-void u32(std::vector<std::uint8_t>& out, std::uint32_t v)
-{
-    for (int i = 0; i < 4; ++i) out.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
-}
 
 std::uint16_t flagsFor(std::string_view name)
 {
@@ -91,17 +86,17 @@ void ZipWriter::add(std::string_view name, std::span<const std::uint8_t> data, s
     c.offset = static_cast<std::uint32_t>(body_.size());
     c.time = dosTime;
     c.date = dosDate;
-    u32(body_, kLocalSig);
-    u16(body_, kVersion);
-    u16(body_, flagsFor(name));
-    u16(body_, 0); // (stored)
-    u16(body_, c.time);
-    u16(body_, c.date);
-    u32(body_, c.crc);
-    u32(body_, c.size); // (compressed: the same, stored)
-    u32(body_, c.size);
-    u16(body_, static_cast<std::uint16_t>(name.size()));
-    u16(body_, 0); // (no extra field)
+    putU32(body_, kLocalSig);
+    putU16(body_, kVersion);
+    putU16(body_, flagsFor(name));
+    putU16(body_, 0); // (stored)
+    putU16(body_, c.time);
+    putU16(body_, c.date);
+    putU32(body_, c.crc);
+    putU32(body_, c.size); // (compressed: the same, stored)
+    putU32(body_, c.size);
+    putU16(body_, static_cast<std::uint16_t>(name.size()));
+    putU16(body_, 0); // (no extra field)
     body_.insert(body_.end(), name.begin(), name.end());
     body_.insert(body_.end(), data.begin(), data.end());
     central_.push_back(std::move(c));
@@ -112,34 +107,34 @@ std::vector<std::uint8_t> ZipWriter::finish() const
     std::vector<std::uint8_t> out = body_;
     const auto start = static_cast<std::uint32_t>(out.size());
     for (const Central& c : central_) {
-        u32(out, kCentralSig);
-        u16(out, 20); // (made by: 2.0, MS-DOS's attributes)
-        u16(out, kVersion);
-        u16(out, flagsFor(c.name));
-        u16(out, 0);
-        u16(out, c.time);
-        u16(out, c.date);
-        u32(out, c.crc);
-        u32(out, c.size);
-        u32(out, c.size);
-        u16(out, static_cast<std::uint16_t>(c.name.size()));
-        u16(out, 0); // (extra)
-        u16(out, 0); // (comment)
-        u16(out, 0); // (disk)
-        u16(out, 0); // (internal attributes)
-        u32(out, c.name.back() == '/' ? kDosFolder : 0);
-        u32(out, c.offset);
+        putU32(out, kCentralSig);
+        putU16(out, 20); // (made by: 2.0, MS-DOS's attributes)
+        putU16(out, kVersion);
+        putU16(out, flagsFor(c.name));
+        putU16(out, 0);
+        putU16(out, c.time);
+        putU16(out, c.date);
+        putU32(out, c.crc);
+        putU32(out, c.size);
+        putU32(out, c.size);
+        putU16(out, static_cast<std::uint16_t>(c.name.size()));
+        putU16(out, 0); // (extra)
+        putU16(out, 0); // (comment)
+        putU16(out, 0); // (disk)
+        putU16(out, 0); // (internal attributes)
+        putU32(out, c.name.back() == '/' ? kDosFolder : 0);
+        putU32(out, c.offset);
         out.insert(out.end(), c.name.begin(), c.name.end());
     }
     const auto size = static_cast<std::uint32_t>(out.size() - start);
-    u32(out, kEndSig);
-    u16(out, 0);
-    u16(out, 0);
-    u16(out, static_cast<std::uint16_t>(central_.size()));
-    u16(out, static_cast<std::uint16_t>(central_.size()));
-    u32(out, size);
-    u32(out, start);
-    u16(out, 0); // (no comment)
+    putU32(out, kEndSig);
+    putU16(out, 0);
+    putU16(out, 0);
+    putU16(out, static_cast<std::uint16_t>(central_.size()));
+    putU16(out, static_cast<std::uint16_t>(central_.size()));
+    putU32(out, size);
+    putU32(out, start);
+    putU16(out, 0); // (no comment)
     return out;
 }
 

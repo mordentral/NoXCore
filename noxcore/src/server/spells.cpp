@@ -827,7 +827,7 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
     const int power = std::clamp(powerOverride != 0 ? powerOverride : this->power(caster, spell), 1, 5);
     const auto level = static_cast<std::size_t>(power - 1);
     // The spell's own sound (SPEL's; 0 cast, 1 on), where its function plays it.
-    const auto ownSound = [&](const ServerObject& at, int which = 0) { playSound(world, spellSound(things, spell, which), at); };
+    const auto ownSound = [&](const ServerObject& at, int which = 0) { castSound(spell, at, which); };
     bool viaLasting = false; // (a lasting spell's start answers for itself)
     // A lasting spell begun (startLasting): `on` its record's caster, `frames` its first wait.
     const auto lasting = [&](ServerObject* on, std::uint32_t frames) {
@@ -835,70 +835,17 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         return startLasting(spell, &first, on, &source, target, x, y, power, frames);
     };
     // The point unseen from the source: a player source told so (MSG_INFORM 0, 2), and no cast.
-    const auto unseen = [&] {
-        if (source.player) {
-            tell(source, {0xA9, 0, 2, 0, 0, 0});
-        }
-        return false;
-    };
+    const auto unseen = [&] { return unseenFrom(source); };
     // A player casting at another player (not itself) noted for the kill feed's assist.
-    const auto noted = [&] {
-        if (caster.player && target->player && target != &caster) {
-            target->player->assistBy = caster.extent;
-            target->player->assistFrame = frame;
-        }
-    };
+    const auto noted = [&] { noteAssist(caster, target); };
     const bool worked = [&]() -> bool {
     switch (spell) {
     case 0x06: // Cancel, Detonate, Phantom: nothing
     case 0x12: // but "cast" (an original bug)
     case 0x39:
         return true;
-    case 0x2C: { // Lock (Spell_CastLock): of the doors in a 150 box about the caster, the
-        // nearest within 150 of the source whose leaf's middle it sees (ray flags 0); unless
-        // another's magic lock is on it, it and the doors about its wall cell (a 34 box)
-        // are the caster's for 60 s: only it passes (DoorCollide).
-        ServerObject* door = nullptr;
-        float best = 1e8f;
-        world.unitsInRect(caster.x - 150.0f, caster.y - 150.0f, caster.x + 150.0f, caster.y + 150.0f, [&](ServerObject& o) { // (by the grid)
-            if (!(o.classes & oc::Door)) { // (no 0x20 test)
-                return;
-            }
-            const float dx = source.x - o.x;
-            const float dy = source.y - o.y;
-            const float d2 = dx * dx + dy * dy;
-            const auto [lx, ly] = doorLeaf(o.doorDirection);
-            if (d2 <= 22500.0f && d2 < best &&
-                world.traceRay(source.x, source.y, static_cast<float>(lx) * 0.5f + o.x, static_cast<float>(ly) * 0.5f + o.y, 0)) {
-                door = &o;
-                best = d2;
-            }
-        });
-        if (!door) {
-            return false;
-        }
-        if (door->owner != 0 && door->owner != caster.extent) {
-            if (caster.player) {
-                tell(caster, informStringBytes("ExecSpel.c:DoorAlreadyLocked"));
-            }
-            return false;
-        }
-        const std::uint32_t until = frame + 30u * 60u;
-        door->owner = caster.extent;
-        door->timer = until;
-        if (const auto cell = world.doorCell(door->extent)) {
-            const float cellX = static_cast<float>(cell->first * 23);
-            const float cellY = static_cast<float>(cell->second * 23);
-            world.unitsInRect(cellX - 34.0f, cellY - 34.0f, cellX + 34.0f, cellY + 34.0f, [&](ServerObject& o) { // (by the grid)
-                if (o.classes & oc::Door) { // (no 0x20 test)
-                    o.owner = caster.extent;
-                    o.timer = until;
-                }
-            });
-        }
-        ownSound(*door);
-        return true;
-    }
+    case 0x2C: // Lock
+        return castLock(spell, caster, source);
     case 0x22: // Glyph (Spell_CastGlyph)
         return castGlyph(caster, source, x, y);
     case 0x13: // Detonate Glyphs
@@ -932,189 +879,20 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         ownSound(caster);
         return true;
     }
-    case 0x21: { // Fumble (castFumble)
-        if (!target) {
-            return false;
-        }
-        if (target->player || ((target->classes & oc::Monster) && (target->subclasses & 0x10u))) {
-            // What it holds and its shield fall, each somewhere within 50 (invForceDropItem).
-            for (const std::uint32_t e : keysOf(target->inventory)) {
-                ServerObject* item = world.byExtent(e);
-                if (item && (item->flags & ObjFlag::Equipped) &&
-                    ((item->classes & (oc::Weapon | oc::Wand)) || ((item->classes & oc::Armor) && (item->subclasses & 2u)))) {
-                    const auto [dx, dy] = dropSpot(*target, 50.0f);
-                    Items{world, things, modifiers, rng, frame}.drop(*target, *item, dx, dy);
-                }
-            }
-            // The flagball it holds knocked away (force 100), nobody's, with 0x39E at it.
-            if (ServerObject* ball = heldBall(world, *target)) {
-                applyForce(world, *ball, target->x, target->y, 100.0f);
-                clearOwner(world, *ball);
-                playSound(world, 0x39E, *target);
-            }
-        } else if (!(target->classes & oc::Monster) || !(target->subclasses & 0x2000u)) {
-            // Anything else (but a bomber): all it carries dropped (dropAllItems),
-            // pushed off 50 from the source.
-            Items{world, things, modifiers, rng, frame}.dropAll(*target);
-            applyForce(world, *target, source.x, source.y, 50.0f);
-        }
-        ownSound(*target);
-        return true;
-    }
-    case 0x17: { // Earthquake (castEquake), about the source
-        const float range = world.number("EarthquakeRange");
-        const float most = world.number("EarthquakeDamage", level);
-        Fight fight{world, rng, frame, &things, modifiers};
-        ServerObject* from = fight.parentPlayer(&source);
-        // (unitsGetInCircle by the grid; each shaken as it's found,
-        // equakeDamage: less with the distance)
-        world.unitsInCircle(source.x, source.y, range, [&](ServerObject& o) {
-            if (&o != &source && !(o.flags & ObjFlag::Airborne) && o.health != 0) { // (no 0x20 test: a deleted one shaken too)
-                // (The share stored; the damage on the stack, chopped by __ftol.)
-                const float share = (X87(1.0f) - X87(edgeDistance(o, source)) / range).f();
-                fight.damage(o, from, source.extent, util::ftol(X87(most) * share), 0xB, HitCause::Spell);
-            }
-        });
-        jiggle(source.x, source.y, static_cast<int>(world.number("EarthquakeJiggle", level)));
-        ownSound(source);
-        return true;
-    }
-    case 0x10: { // Death Ray (Spell_CastDeathRay): at the cursor if the ray (flags 9) from the
-        // source is clear, its harm the caster's
-        if (!world.traceRay(source.x, source.y, x, y, Trace::Doors | Trace::NearWindows)) {
-            return unseen();
-        }
-        Missiles{world, things, modifiers, rng, frame}.damageAt(x, y, world.number("DeathRayOutRadius"), world.number("DeathRayInRadius"),
-                                                              static_cast<int>(world.number("DeathRayDamage")), 0x10, &caster, nullptr, true,
-                                                              HitCause::Spell);
-        const auto i16 = [](float v) { return static_cast<std::uint16_t>(static_cast<int>(v)); };
-        const std::uint16_t ray[4] = {i16(source.x), i16(source.y), i16(x), i16(y)};
-        std::vector<std::uint8_t> fx = {0x94}; // MSG_FX_DEATH_RAY (to those who see the line)
-        for (const std::uint16_t v : ray) {
-            fx.push_back(lo(v));
-            fx.push_back(hi(v));
-        }
-        world.broadcasts().push_back({std::move(fx), false, 0});
-        makeScorch(world, things, x, y, 1, rng, frame); // (sMakeScorch, medium)
-        ownSound(source);
-        return true;
-    }
+    case 0x21: // Fumble
+        return castFumble(spell, source, target);
+    case 0x17: // Earthquake
+        return castEarthquake(spell, source, level);
+    case 0x10: // Death Ray
+        return castDeathRay(spell, caster, source, x, y);
     case 0x05: // Burn (Spell_CastBurn): a MediumFlame where the cursor is, if the ray's clear
     case 0x1D: // Fist of Vengeance (Spell_CastFistOfVengeance)
     case 0x34: // Meteor (Spell_CastMeteor)
     case 0x35: // Meteor Shower (Spell_CastMeteorShower)
-    case 0x80: { // Toxic Cloud (Spell_CastToxicCloud)
-        const auto owns = [&](std::initializer_list<std::string_view> types) {
-            return std::ranges::any_of(world.objects(), [&](const auto& e) {
-                return e.second.owner == caster.extent && !e.second.gone() && !e.second.pendingDelete &&
-                       std::ranges::find(types, std::string_view(e.second.typeName)) != types.end();
-            });
-        };
-        const auto says = [&](std::string_view id) {
-            if (!caster.player) {
-                return;
-            }
-            tell(caster, informStringBytes(id));
-        };
-        if (spell == 0x1D && owns({"SmallFist", "MediumFist", "LargeFist"})) {
-            says("ExecSpel.c:TooManyFists");
-            return false;
-        }
-        if (spell == 0x34 && owns({"Meteor"})) {
-            says("ExecSpel.c:TooManyMeteors");
-            return false;
-        }
-        // The ray from the source: flags 9 (the falling ones: + 0x40, but in the campaign). A
-        // glyph's Burn needs none: its flame goes on the glyph.
-        const bool burnOnGlyph = spell == 0x05 && source.typeName == "Glyph";
-        const std::uint8_t flags = (spell == 0x1D || spell == 0x34 || spell == 0x35) && !(world.gameFlags & GameFlag::Solo)
-                                       ? static_cast<std::uint8_t>(Trace::Doors | Trace::NearWindows | Trace::SightOnly)
-                                       : static_cast<std::uint8_t>(Trace::Doors | Trace::NearWindows);
-        if (!burnOnGlyph && !world.traceRay(source.x, source.y, x, y, flags)) {
-            return unseen();
-        }
-        static constexpr const char* kFists[6] = {"", "SmallFist", "MediumFist", "LargeFist", "LargeFist", "LargeFist"};
-        const char* kind = spell == 0x05 ? "MediumFlame" : spell == 0x1D ? kFists[power] : spell == 0x34 ? "Meteor"
-                                                         : spell == 0x35 ? "MeteorShower" : "ToxicCloud";
-        if (!things.findThing(kind)) {
-            return true;
-        }
-        ServerObject& o = burnOnGlyph ? world.spawn(things, kind, source.x, source.y) : world.spawn(things, kind, x, y);
-        // (Burn's flame and the fist are the source's, the rest the caster's.)
-        o.owner = spell == 0x05 || spell == 0x1D ? source.extent : caster.extent;
-        if (spell == 0x05 || spell == 0x1D) {
-            creditFrom(o, source, caster);
-        }
-        o.born = frame;
-        o.flags |= ObjFlag::Active;
-        o.touch();
-        switch (spell) {
-        case 0x05: { // burning BurnDuration, a spark burst (64) to show it
-            o.decayAt = frame + static_cast<std::uint32_t>(world.number("BurnDuration"));
-            const auto ix = static_cast<std::uint16_t>(static_cast<int>(o.x));
-            const auto iy = static_cast<std::uint16_t>(static_cast<int>(o.y));
-            world.broadcasts().push_back({{0x93, lo(ix), hi(ix), lo(iy), hi(iy), 0x40}, false, 0});
-            break;
-        }
-        case 0x1D: // from 255 at FistSpeed, bouncing
-            o.value = static_cast<int>(world.number("FistOfVengeanceDamage", level));
-            o.xStatus |= 0x20; // (its height goes as MSG_FX_DELTAZ_SPELL_START: SrvNet_SendUnitHeight)
-            o.raise(255.0f); // (unitRaise)
-            o.zVel = -world.number("FistSpeed");
-            o.flags |= ObjFlag::Bouncing;
-            o.bounce = 9.0f;
-            break;
-        case 0x34: // from 255 at MeteorSpeed
-            o.value = static_cast<int>(world.number("MeteorDamage", level));
-            o.xStatus |= 0x20; // (its height goes as MSG_FX_DELTAZ_SPELL_START: SrvNet_SendUnitHeight)
-            o.raise(255.0f); // (unitRaise)
-            o.zVel = -world.number("MeteorSpeed");
-            break;
-        case 0x35:
-            o.value = static_cast<int>(world.number("MeteorDamage", level));
-            break;
-        default: // the cloud: ToxicCloudLifetime seconds
-            o.value = util::floatToInt(X87(world.number("ToxicCloudLifetime")) * X87::fromDouble(30)); // (stored, Math_FloatToInt)
-            break;
-        }
-        // Its sound: Burn's at its flame and Meteor's at the point (audCreate), the
-        // fist's at the source, the shower's at the caster, the cloud's at the cloud.
-        if (spell == 0x05 || spell == 0x34) {
-            playSoundAt(world, spellSound(things, spell, 0), spell == 0x05 ? o.x : x, spell == 0x05 ? o.y : y);
-        } else {
-            ownSound(spell == 0x1D ? source : spell == 0x35 ? caster : o);
-        }
-        return true;
-    }
-    case 0x0E: { // Cure Poison (Spell_CastCurePoison)
-        if (!target) {
-            return false;
-        }
-        Fight fight{world, rng, frame, &things, modifiers};
-        if (target->poison == 0) {
-            if (target == &caster && caster.player && def) { // (on itself unpoisoned: its mana back)
-                if (paying) {
-                    refund(caster, *paying); // (noxcpp: what the cast paid, a mode's price too)
-                    paying.reset();
-                } else {
-                    caster.player->mana = static_cast<std::uint16_t>(std::min<int>(caster.player->mana + def->manaCost, caster.player->maxMana));
-                }
-            }
-            return true;
-        }
-        const char* said = "ExecSpel.c:PoisonClean";
-        if (power < target->poison) {
-            fight.reducePoison(*target, power);
-            said = "ExecSpel.c:PoisonCure";
-        } else {
-            fight.removePoison(*target);
-        }
-        if (target->player) {
-            tell(*target, informStringBytes(said));
-        }
-        ownSound(*target);
-        return true;
-    }
+    case 0x80: // Toxic Cloud (Spell_CastToxicCloud)
+        return castAtPoint(spell, caster, source, x, y, power, level);
+    case 0x0E: // Cure Poison
+        return castCurePoison(spell, caster, target, def, power);
     case 0x3C: { // Poison (castPoison): its power, to at most its power
         if (!target) {
             return false;
@@ -1123,152 +901,15 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         noted();
         return true;
     }
-    case 0x0D: { // Counterspell (castCounterSpell), about the source
-        const float range = world.number("CounterspellRange");
-        const auto near = [&](float px, float py) { // (both squares on the stack)
-            const X87 dx = X87(px) - source.x;
-            const X87 dy = X87(py) - source.y;
-            return !(X87(range) * range < dx * dx + dy * dy);
-        };
-        const auto pointFx = [&](float px, float py) { this->pointFx(0x87, px, py); }; // (0x87, netSendPointFx)
-        // Spell missiles that can be countered (subclass 1) burst or go (cspellRemoveSpell).
-        Missiles missiles{world, things, modifiers, rng, frame};
-        // (getMissilesInCircle by the grid, each as it's found)
-        world.missilesInCircle(source.x, source.y, range, [&](ServerObject& missile) {
-            ServerObject* m = &missile;
-            if (!(m->subclasses & 1u) || m->gone() || m->pendingDelete) {
-                return;
-            }
-            pointFx(m->x, m->y);
-            if (m->typeName == NameId::DeathBall) {
-                // deathBallCreateFragments: three DeathBallFragments where it is,
-                // its owner's (createAt), each a random way (randInt 0-255) at its
-                // speed; then it goes.
-                ServerObject* owner = m->owner ? world.byExtent(m->owner) : nullptr;
-                for (int i = 0; i < 3; ++i) {
-                    if (ServerObject* f = world.createAt(things, "DeathBallFragment", m->x, m->y, frame)) {
-                        if (owner) {
-                            setOwner(world, owner, *f);
-                        }
-                        const int way = nox::util::uniform_int_distribution<int>(0, 255)(rng);
-                        f->direction = static_cast<std::uint16_t>(way);
-                        const auto [dx, dy] = directionVector(way);
-                        f->vx = (X87(dx) * f->speedCur).f();
-                        f->vy = (X87(dy) * f->speedCur).f();
-                    }
-                }
-                m->pendingDelete = true;
-            } else if (m->typeName != NameId::Magic) {
-                missiles.burst(*m);
-                m->pendingDelete = true;
-            } else {
-                m->pendingDelete = true;
-            }
-        });
-        // Lasting spells that can be countered (flag 0x40000), cast within its reach (not one a
-        // staff cast, but Chain Lightning).
-        for (DurationSpell& s : world.durationSpells()) {
-            const things::SpellDef* d = things.findSpell(s.spell);
-            if (d && (d->flags & 0x40000u) && (!s.fromStaff || s.spell == 0x2B) && near(s.x, s.y)) {
-                cancelDurationSpell(world, s);
-            }
-        }
-        // The creatures about it lose their counterable timed enchantments.
-        world.unitsInCircle(source.x, source.y, range, [&](ServerObject& o) { // (by the grid)
-            if (&o == &source || (o.flags & (ObjFlag::Dead | ObjFlag::Destroyed)) || o.pendingDelete || o.buffs == 0) {
-                return;
-            }
-            bool shown = false;
-            for (int e = 0; e < 32; ++e) {
-                const std::uint32_t from = enchanted(o, e) && enchantTime(o, e) != 0 ? enchantmentSpell(e) : 0;
-                const things::SpellDef* d = from ? things.findSpell(from) : nullptr;
-                if (d && (d->flags & 0x40000u)) {
-                    if (!shown) {
-                        pointFx(o.x, o.y);
-                        shown = true;
-                    }
-                    disenchant(world, o, e);
-                }
-            }
-        });
-        ownSound(source);
-        return true;
-    }
+    case 0x0D: // Counterspell
+        return castCounterspell(spell, source);
     case 7: case 0x14: case 0x19: case 0x1E: case 0x49: case 0x4F: case 0x86: case 0x87: case 0x88:
         return true; // (the dispatcher's default: nothing, but it "worked")
     // The enchantments at a target: each its gamedata time at the spell's
     // power, and a player casting at a player noted for the kill feed's assist.
     case 0x01: case 0x03: case 0x0C: case 0x0F: case 0x11: case 0x20: case 0x24: case 0x25: case 0x27: case 0x28: case 0x2A:
-    case 0x37: case 0x3D: case 0x3E: case 0x40: case 0x46: case 0x47: case 0x48: case 0x4A: case 0x82: case 0x83: {
-        if (!target) {
-            return false;
-        }
-        const auto frames = [&](const char* name) { return static_cast<int>(world.number(name)); };
-        const auto onTarget = [&](int e, int time) { enchant(world, *target, e, time, power); };
-        switch (spell) {
-        case 0x01: onTarget(Enchant::Anchored, frames("AnchorEnchantDuration")); noted(); break;      // Anchor
-        case 0x03: onTarget(Enchant::Blinded, 30 * 4); noted(); break;                                // Blind
-        case 0x0C: onTarget(Enchant::Confused, frames("ConfuseEnchantDuration")); noted(); break;     // Confuse
-        case 0x0F: // Death: not on one marked already; 15 s
-            if (enchanted(*target, Enchant::Death)) {
-                return false;
-            }
-            onTarget(Enchant::Death, 450);
-            noted();
-            break;
-        case 0x11: onTarget(Enchant::Detecting, 30 * 60); break;                                      // Detect Magic
-        case 0x20: onTarget(Enchant::Freeze, 30 * 4); noted(); break;                                 // Freeze
-        case 0x24: onTarget(Enchant::Hasted, frames("HasteEnchantDuration")); break;                  // Haste
-        case 0x25: onTarget(Enchant::Infravision, frames("InfravisionEnchantDuration")); break;       // Infravision
-        case 0x27: // Invisibility: its own hostile lasting spells end first
-        case 0x28: { // Invulnerability
-            endHostileLasting(*target);
-            if (spell == 0x27) {
-                onTarget(Enchant::Invisible, frames("InvisibilityEnchantDuration"));
-                pointFx(0x8A, target->x, target->y); // (point FX 0x8A)
-            } else {
-                onTarget(Enchant::Invulnerable, frames("InvulnerabilityEnchantDuration"));
-            }
-            break;
-        }
-        case 0x2A: onTarget(Enchant::Light, frames("LightEnchantDuration")); noted(); break;          // Light
-        case 0x37: // Nullify: anti-magic for War Cry's time (the ability table's)
-            onTarget(Enchant::AntiMagic, frames("WarCryDuration"));
-            noted();
-            break;
-        case 0x3D: onTarget(Enchant::ProtectFromElectricity, frames("ProtectElectricityEnchantDuration")); break;
-        case 0x3E: onTarget(Enchant::ProtectFromFire, frames("ProtectFireEnchantDuration")); break;
-        case 0x40: onTarget(Enchant::ProtectFromPoison, frames("ProtectPoisonEnchantDuration")); break;
-        case 0x46: onTarget(Enchant::Run, frames("RunEnchantDuration")); noted(); break;              // Run
-        case 0x47: // Shock (useShock); a glyph's: ShockTrapDamage at once (type 9)
-            if (source.typeName == "Glyph") {
-                Fight{world, rng, frame, &things, modifiers}.damage(*target, &caster, caster.extent,
-                                                                    static_cast<int>(world.number("ShockTrapDamage", level)), 9, HitCause::Spell);
-                break;
-            }
-            onTarget(Enchant::Shock, frames("ShockEnchantDuration"));
-            break;
-        case 0x48: onTarget(Enchant::Slowed, frames("SlowEnchantDuration")); noted(); break;          // Slow
-        case 0x4A: { // Stun: held, but a warrior (and a monster heavier than 15) slowed
-            const bool slowed = target->player ? target->player->classId == 0
-                                               : (target->classes & oc::Monster) && 15.0f < target->mass;
-            onTarget(slowed ? Enchant::Slowed : Enchant::Held, frames("StunEnchantDuration"));
-            noted();
-            break;
-        }
-        case 0x82: { // Vampirism (a quest's x QuestVampDurMultiplier)
-            int time = frames("VampirismEnchantDuration");
-            if (world.quest()) {
-                time = util::floatToInt(X87(world.number("QuestVampDurMultiplier")) * X87::fromDouble(time)); // (stored, Math_FloatToInt)
-            }
-            onTarget(Enchant::Vampirism, time);
-            break;
-        }
-        case 0x83: onTarget(Enchant::Villain, 30 * power * 12); noted(); break;                       // Villain
-        default: break;
-        }
-        return true;
-    }
+    case 0x37: case 0x3D: case 0x3E: case 0x40: case 0x46: case 0x47: case 0x48: case 0x4A: case 0x82: case 0x83:
+        return castEnchantment(spell, caster, source, target, power, level);
     case 0x3F: // Protection from Magic: nothing (its cast returns 1; an original bug)
         return true;
     case 0x44: // Restore Health
@@ -1305,114 +946,11 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         return lasting(target, 0);
     case 0x1C: // Firewalk: lasting 3 s, flames left in its target's wake
         return lasting(&caster, 90);
-    case 0x3A: { // Pixie Swarm (castPixies): up to PixieCount of its own
-        const int owned = static_cast<int>(std::ranges::count_if(world.objects(), [&](const auto& e) {
-            return e.second.owner == caster.extent && e.second.typeName == "Pixie" && !e.second.pendingDelete && !e.second.gone();
-        }));
-        const int most = static_cast<int>(world.number("PixieCount", level));
-        if (owned < most && things.findThing("Pixie")) { // (about the source, the caster's)
-            const float r = (X87(source.radius) + 4.0f).f(); // (stored; so is each coordinate)
-            for (int i = most - owned; 0 < i; --i) {
-                const int way = nox::util::uniform_int_distribution<int>(0, 255)(rng);
-                const auto [dx, dy] = directionVector(way);
-                const float px = (X87(r) * dx + source.x).f();
-                const float py = (X87(r) * dy + source.y).f();
-                if (!world.traceRay(source.x, source.y, px, py, Trace::Doors | Trace::ThroughWindows)) {
-                    continue;
-                }
-                ServerObject& p = world.spawn(things, "Pixie", px, py);
-                p.owner = caster.extent;
-                p.team = caster.team;
-                p.born = frame;
-                p.flags |= ObjFlag::Active;
-                p.direction = static_cast<std::uint16_t>(way);
-                p.vx = p.vy = 0;
-                p.newX = px;
-                p.newY = py;
-                p.homeX = source.x; // (Pos39: where it came from)
-                p.homeY = source.y;
-                ServerObject* prey = searchTarget(world, nullptr, &p, 0x20, 600.0f, 0, &caster);
-                p.seekTarget = prey ? prey->extent : 0;
-                p.castBy = spell;
-                p.expiresAt = frame + static_cast<std::uint32_t>(nox::util::uniform_int_distribution<int>(30, 90)(rng)) * 30u;
-                p.seenOwnerAt = frame;
-                p.touch();
-            }
-            ownSound(source); // (only with room for some: castPixies)
-        }
-        return true;
-    }
+    case 0x3A: // Pixie Swarm
+        return castPixies(spell, caster, source, level);
     case 0x0A: // Cleansing Flame, Cleansing Mana Flame (Spell_CastCleansingFlame)
-    case 0x0B: {
-        static constexpr const char* kFlames[10] = {"SmallFlameCleanse", "SmallFlameCleanse", "MediumFlameCleanse", "FlameCleanse", "LargeFlameCleanse",
-                                                    "SmallBlueFlameCleanse", "SmallBlueFlameCleanse", "MediumBlueFlameCleanse", "BlueFlameCleanse",
-                                                    "LargeBlueFlameCleanse"};
-        for (const auto& [e, o] : world.objects()) { // one ring of its own at a time
-            if (o.owner == caster.extent && !o.pendingDelete && std::ranges::find(kFlames, std::string_view(o.typeName)) != std::end(kFlames)) {
-                if (caster.player) {
-                    tell(caster, informStringBytes("plyrspel.c:TooManySpells"));
-                }
-                return false;
-            }
-        }
-        // Outside a solo game, always size 4. (At 5, a red ring reads the blue table and a blue
-        // one past its end: an original bug; here clamped to it.)
-        const int size = (world.gameFlags & GameFlag::Solo) ? power : 4;
-        for (int i = 0; i < 48; ++i) {
-            const int s = size - nox::util::uniform_int_distribution<int>(0, 1)(rng);
-            const int index = std::min(s + (spell != 0x0A ? 5 : 0), 9);
-            if (s <= 0 || !things.findThing(kFlames[index])) {
-                continue;
-            }
-            const int way = nox::util::uniform_int_distribution<int>(0, 255)(rng);
-            const auto [dx, dy] = directionVector(way);
-            // Its radius (its thing's EXTENT) and the caster's, and 4, out from it.
-            float radius = 0;
-            if (const auto e = things.findThing(kFlames[index])->lastAttribute("EXTENT"); e && e->starts_with("CIRCLE")) {
-                radius = textNumber(e->substr(6));
-            }
-            // (From the source, and the source's: a glyph's ring isn't the caster's; its kills
-            // are credited to it, creditFrom.)
-            // (On the x87: the reach kept on the stack for both; each place one store.)
-            const X87 reach = X87(radius) + source.radius + 4.0f;
-            const float fx = (reach * dx + source.x).f();
-            const float fy = (reach * dy + source.y).f();
-            if (!world.traceRay(source.x, source.y, fx, fy, Trace::Doors | Trace::SightOnly)) {
-                continue;
-            }
-            ServerObject& f = world.spawn(things, kFlames[index], fx, fy);
-            f.owner = source.extent;
-            creditFrom(f, source, caster);
-            f.born = frame;
-            f.direction = static_cast<std::uint16_t>(way);
-            f.vx = dx * 4.0f;
-            f.vy = dy * 4.0f;
-            f.timer = frame + static_cast<std::uint32_t>(nox::util::uniform_int_distribution<int>(30 * 3, 30 * 6)(rng));
-            f.homeX = source.x;
-            f.homeY = source.y;
-            f.lastX = fx;
-            f.lastY = fy;
-            f.drag = 0; // (Float28: no friction)
-            f.updateFn = "FlameCleanseUpdate"; // (updateFlameCleanse, set by hand)
-            f.updates = true;
-            f.alwaysMoves = true;
-            world.addUpdatable(f); // (Spell_CastCleansingFlame's unitAddToUpdatable)
-            f.classes |= 0x40000000u; // (not streamed: the clients run it themselves)
-            f.flags |= ObjFlag::Active;
-            // MSG_CLIENT_PREDICT_LINEAR (0xB5) to every player: its code, type, spot, facing and
-            // velocities x 16.
-            const auto u16 = [](float v) { return static_cast<std::uint16_t>(static_cast<int>(v)); };
-            const auto i8 = [](float v) { return static_cast<std::uint8_t>(static_cast<std::int8_t>(static_cast<int>(v * 16.0f))); };
-            const std::uint16_t px = u16(fx);
-            const std::uint16_t py = u16(fy);
-            world.broadcasts().push_back({{0xB5, lo(f.extent), hi(f.extent), lo(f.type), hi(f.type), lo(px), hi(px), lo(py), hi(py), lo(f.direction),
-                                           hi(f.direction), 0, i8(f.vx), i8(f.vy)},
-                                          false,
-                                          0});
-        }
-        ownSound(source);
-        return true;
-    }
+    case 0x0B:
+        return castCleansingFlame(spell, caster, source, power);
     case 0x84: // Wall: lasting (power + 5) minutes
     case 0x74: // Tag: lasting TagDurationPerLevel x power
         return lasting(&caster, 0);
@@ -1453,98 +991,15 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
     case 0x2E: // Mark 1-4: that mark
     case 0x2F:
     case 0x30:
-    case 0x31: {
-        if (!caster.player) {
-            return true;
-        }
-        PlayerControl& p = *caster.player;
-        int slot = 0;
-        if (spell == 0x2D) {
-            // The first slot with no live mark.
-            while (slot < 4 && p.marks[static_cast<std::size_t>(slot)] != 0 && world.byExtent(p.marks[static_cast<std::size_t>(slot)])) {
-                ++slot;
-            }
-            if (slot == 4) { // (all four set: the one used longest ago)
-                std::uint32_t oldest = frame;
-                slot = 0;
-                for (int i = 0; i < 4; ++i) {
-                    const ServerObject* m = world.byExtent(p.marks[static_cast<std::size_t>(i)]);
-                    if (m && m->timer < oldest) {
-                        oldest = m->timer;
-                        slot = i;
-                    }
-                }
-            }
-        } else {
-            slot = static_cast<int>(spell) - 0x2E;
-        }
-        // Where a glyph cast it, else where the caster is; moved (its last use now) or
-        // made; three uses either way.
-        const ServerObject& at = source.typeName == "Glyph" ? source : caster;
-        const auto i = static_cast<std::size_t>(slot);
-        ServerObject* mark = p.marks[i] ? world.byExtent(p.marks[i]) : nullptr;
-        if (mark) {
-            setPosition(world, *mark, at.x, at.y, frame);
-            mark->timer = frame;
-        } else {
-            static constexpr const char* kMarks[4] = {"TeleportGlyph1", "TeleportGlyph2", "TeleportGlyph3", "TeleportGlyph4"};
-            if (things.findThing(kMarks[i])) {
-                ServerObject& m = world.spawn(things, kMarks[i], at.x, at.y);
-                m.owner = caster.extent;
-                m.born = m.timer = frame;
-                m.touch();
-                p.marks[i] = m.extent;
-                mark = &m;
-            }
-        }
-        if (mark) {
-            p.markUses[i] = 3;
-        }
-        ownSound(caster);
-        return true;
-    }
+    case 0x31:
+        return castMark(spell, caster, source);
     case 0x08: // Channel Life, Drain Mana, Greater Heal: lasting while they work
     case 0x16:
     case 0x23:
     case 0x09: // Charm: lasting while the creature's being charmed (Spell_CharmStart)
         return lasting(&caster, 0);
-    case kFireball: { // castFireball
-        static constexpr const char* kKinds[6] = {"", "Fireball", "StrongFireball", "TitanFireball", "TitanFireball", "TitanFireball"};
-        const char* kind = kKinds[power];
-        if (!things.findThing(kind)) {
-            return true;
-        }
-        // From the source (its own: a glyph's fireball is the glyph's; its kills credited to the
-        // caster, creditFrom): twice its radius ahead, and its motion on; at it if a wall's between.
-        // (Twice the radius kept on the stack; x's sum stored before its velocity's added, y's
-        // kept.)
-        const auto [fx, fy] = directionVector(source.direction & 0xFF);
-        const X87 r = X87(source.radius) + source.radius;
-        float sx = (X87((r * fx + source.x).f()) + source.vx).f();
-        float sy = (r * fy + source.y + source.vy).f();
-        if (!world.traceRay(source.x, source.y, sx, sy, Trace::Doors | Trace::ThroughWindows)) {
-            sx = source.x;
-            sy = source.y;
-        }
-        ServerObject& m = world.spawn(things, kind, sx, sy);
-        m.owner = source.extent;
-        creditFrom(m, source, caster);
-        m.team = caster.team;
-        m.born = frame;
-        m.flags |= ObjFlag::Active;
-        // (The speed kept on the stack as it's stored; x's part stored before the source's
-        // velocity's added, y's kept.)
-        const X87 speed = X87(world.number("FireballSpeedCoeff", level)) * m.speedCur;
-        m.speedCur = speed.f();
-        m.vx = (X87((speed * fx).f()) + source.vx).f();
-        m.vy = (speed * fy + source.vy).f();
-        m.newX = sx;
-        m.newY = sy;
-        m.direction = source.direction;
-        m.touch();
-        ownSound(source);
-        return true;
-    }
+    case kFireball: // castFireball
+        return castFireball(spell, caster, source, power, level);
     case kLesserHeal: {
         if (!target) {
             return false;
@@ -1557,71 +1012,8 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         ownSound(*target, 1);
         return true;
     }
-    case kMagicMissile: { // Spell_CastMagicMissile
-        if (!things.findThing("MagicMissile")) {
-            return true;
-        }
-        // MagicMissileCount at its power, less those of its own still flying.
-        const int most = static_cast<int>(world.number("MagicMissileCount", level));
-        const auto flying = static_cast<int>(std::ranges::count_if(world.objects(), [&](const auto& e) {
-            return e.second.owner == caster.extent && e.second.typeName == "MagicMissile" && !e.second.gone() && !e.second.pendingDelete;
-        }));
-        // (Below zero, with more of its own flying than it may have: nothing fired, the mana
-        // taken: an original bug.)
-        const int count = flying > 0 ? most - flying : most;
-        if (count == 0) {
-            if (caster.player) {
-                tell(caster, informStringBytes("mmissile.c:TooManyMissiles"));
-            }
-            return false;
-        }
-        static constexpr int kSpread[5] = {0, -0x10, 0x10, -0x20, 0x20};
-        // (From the source, the caster's.)
-        // (The exe's switch has five cases: a sixth missile (a quest's level 5, the ARENA table's
-        // 6) keeps the fifth's heading: an original bug.)
-        for (int i = 0; i < count; ++i) {
-            const int d = ((source.direction & 0xFF) + kSpread[std::min(i, 4)]) & 0xFF;
-            const auto [fx, fy] = directionVector(d);
-            const auto [sx, sy] = launchPoint(source, fx, fy);
-            if (!world.traceRay(source.x, source.y, sx, sy, Trace::Doors | Trace::ThroughWindows)) {
-                continue;
-            }
-            ServerObject& m = world.spawn(things, "MagicMissile", sx, sy);
-            m.owner = caster.extent;
-            m.team = caster.team;
-            m.born = frame;
-            m.flags |= ObjFlag::Active | ObjFlag::Airborne;
-            // (The speed kept on the stack as it's stored; each part stored, then the source's
-            // velocity added.)
-            const X87 speed = util::randomFloat(rng, 0.8f, 1.2f) * m.speedCur; // (randomFloat's stack value)
-            m.speedCur = speed.f();
-            m.direction = static_cast<std::uint16_t>(d);
-            m.vx = (X87((speed * fx * 0.1f).f()) + source.vx).f();
-            m.vy = (X87((speed * fy * 0.1f).f()) + source.vy).f();
-            m.newX = sx;
-            m.newY = sy;
-            m.touch();
-            // spellFlySearchTarget, the spell's target never read: the enemy under the owner's
-            // cursor, else the nearest enemy to the source player's cursor (to the missile when
-            // it doesn't see the cursor); a glyph's, the nearest to the missile. So a cast on
-            // itself homes on the cursor's enemy too. (A mode script's own cast at a foe it chose,
-            // nox.cast's `direct`: that foe, as before.)
-            ServerObject* t = direct && target && target != &caster ? target : nullptr;
-            if (!t) {
-                float cursor[2] = {};
-                const float* at = nullptr;
-                if (source.player) {
-                    cursor[0] = source.player->cursorX;
-                    cursor[1] = source.player->cursorY;
-                    at = cursor;
-                }
-                t = searchTarget(world, at, &m, kHostile, 600.0f, 0, &caster);
-            }
-            m.seekTarget = t ? t->extent : 0;
-        }
-        ownSound(caster);
-        return true;
-    }
+    case kMagicMissile: // Spell_CastMagicMissile
+        return castMagicMissile(spell, caster, source, target, level);
     default:
         if (0x4A < spell && spell < 0x73) {
             // A summoning: lasting while the creature comes (Spell_SummonStart).
@@ -1634,6 +1026,690 @@ bool Spells::cast(std::uint32_t spell, ServerObject& caster, ServerObject* targe
         playSound(world, 0xE7, source); // (its function said no: spellAccept's "can't" at the source)
     }
     return worked;
+}
+
+// cast()'s spells with the most to do, each its case moved out whole.
+
+void Spells::castSound(std::uint32_t spell, const ServerObject& at, int which)
+{
+    playSound(world, spellSound(things, spell, which), at);
+}
+
+bool Spells::unseenFrom(const ServerObject& source)
+{
+    if (source.player) {
+        tell(source, {0xA9, 0, 2, 0, 0, 0});
+    }
+    return false;
+}
+
+void Spells::noteAssist(const ServerObject& caster, ServerObject* target)
+{
+    if (caster.player && target->player && target != &caster) {
+        target->player->assistBy = caster.extent;
+        target->player->assistFrame = frame;
+    }
+}
+
+bool Spells::castLock(std::uint32_t spell, ServerObject& caster, ServerObject& source)
+{
+    // Lock (Spell_CastLock): of the doors in a 150 box about the caster, the
+    // nearest within 150 of the source whose leaf's middle it sees (ray flags 0); unless
+    // another's magic lock is on it, it and the doors about its wall cell (a 34 box)
+    // are the caster's for 60 s: only it passes (DoorCollide).
+    ServerObject* door = nullptr;
+    float best = 1e8f;
+    world.unitsInRect(caster.x - 150.0f, caster.y - 150.0f, caster.x + 150.0f, caster.y + 150.0f, [&](ServerObject& o) { // (by the grid)
+        if (!(o.classes & oc::Door)) { // (no 0x20 test)
+            return;
+        }
+        const float dx = source.x - o.x;
+        const float dy = source.y - o.y;
+        const float d2 = dx * dx + dy * dy;
+        const auto [lx, ly] = doorLeaf(o.doorDirection);
+        if (d2 <= 22500.0f && d2 < best &&
+            world.traceRay(source.x, source.y, static_cast<float>(lx) * 0.5f + o.x, static_cast<float>(ly) * 0.5f + o.y, 0)) {
+            door = &o;
+            best = d2;
+        }
+    });
+    if (!door) {
+        return false;
+    }
+    if (door->owner != 0 && door->owner != caster.extent) {
+        if (caster.player) {
+            tell(caster, informStringBytes("ExecSpel.c:DoorAlreadyLocked"));
+        }
+        return false;
+    }
+    const std::uint32_t until = frame + 30u * 60u;
+    door->owner = caster.extent;
+    door->timer = until;
+    if (const auto cell = world.doorCell(door->extent)) {
+        const float cellX = static_cast<float>(cell->first * 23);
+        const float cellY = static_cast<float>(cell->second * 23);
+        world.unitsInRect(cellX - 34.0f, cellY - 34.0f, cellX + 34.0f, cellY + 34.0f, [&](ServerObject& o) { // (by the grid)
+            if (o.classes & oc::Door) { // (no 0x20 test)
+                o.owner = caster.extent;
+                o.timer = until;
+            }
+        });
+    }
+    castSound(spell, *door);
+    return true;
+}
+
+bool Spells::castFumble(std::uint32_t spell, ServerObject& source, ServerObject* target)
+{
+    // Fumble (castFumble)
+    if (!target) {
+        return false;
+    }
+    if (target->player || ((target->classes & oc::Monster) && (target->subclasses & 0x10u))) {
+        // What it holds and its shield fall, each somewhere within 50 (invForceDropItem).
+        for (const std::uint32_t e : keysOf(target->inventory)) {
+            ServerObject* item = world.byExtent(e);
+            if (item && (item->flags & ObjFlag::Equipped) &&
+                ((item->classes & (oc::Weapon | oc::Wand)) || ((item->classes & oc::Armor) && (item->subclasses & 2u)))) {
+                const auto [dx, dy] = dropSpot(*target, 50.0f);
+                Items{world, things, modifiers, rng, frame}.drop(*target, *item, dx, dy);
+            }
+        }
+        // The flagball it holds knocked away (force 100), nobody's, with 0x39E at it.
+        if (ServerObject* ball = heldBall(world, *target)) {
+            applyForce(world, *ball, target->x, target->y, 100.0f);
+            clearOwner(world, *ball);
+            playSound(world, 0x39E, *target);
+        }
+    } else if (!(target->classes & oc::Monster) || !(target->subclasses & 0x2000u)) {
+        // Anything else (but a bomber): all it carries dropped (dropAllItems),
+        // pushed off 50 from the source.
+        Items{world, things, modifiers, rng, frame}.dropAll(*target);
+        applyForce(world, *target, source.x, source.y, 50.0f);
+    }
+    castSound(spell, *target);
+    return true;
+}
+
+bool Spells::castEarthquake(std::uint32_t spell, ServerObject& source, std::size_t level)
+{
+    // Earthquake (castEquake), about the source
+    const float range = world.number("EarthquakeRange");
+    const float most = world.number("EarthquakeDamage", level);
+    Fight fight{world, rng, frame, &things, modifiers};
+    ServerObject* from = fight.parentPlayer(&source);
+    // (unitsGetInCircle by the grid; each shaken as it's found,
+    // equakeDamage: less with the distance)
+    world.unitsInCircle(source.x, source.y, range, [&](ServerObject& o) {
+        if (&o != &source && !(o.flags & ObjFlag::Airborne) && o.health != 0) { // (no 0x20 test: a deleted one shaken too)
+            // (The share stored; the damage on the stack, chopped by __ftol.)
+            const float share = (X87(1.0f) - X87(edgeDistance(o, source)) / range).f();
+            fight.damage(o, from, source.extent, util::ftol(X87(most) * share), 0xB, HitCause::Spell);
+        }
+    });
+    jiggle(source.x, source.y, static_cast<int>(world.number("EarthquakeJiggle", level)));
+    castSound(spell, source);
+    return true;
+}
+
+bool Spells::castDeathRay(std::uint32_t spell, ServerObject& caster, ServerObject& source, float x, float y)
+{
+    // Death Ray (Spell_CastDeathRay): at the cursor if the ray (flags 9) from the
+    // source is clear, its harm the caster's
+    if (!world.traceRay(source.x, source.y, x, y, Trace::Doors | Trace::NearWindows)) {
+        return unseenFrom(source);
+    }
+    Missiles{world, things, modifiers, rng, frame}.damageAt(x, y, world.number("DeathRayOutRadius"), world.number("DeathRayInRadius"),
+                                                          static_cast<int>(world.number("DeathRayDamage")), 0x10, &caster, nullptr, true,
+                                                          HitCause::Spell);
+    const auto i16 = [](float v) { return static_cast<std::uint16_t>(static_cast<int>(v)); };
+    const std::uint16_t ray[4] = {i16(source.x), i16(source.y), i16(x), i16(y)};
+    std::vector<std::uint8_t> fx = {0x94}; // MSG_FX_DEATH_RAY (to those who see the line)
+    for (const std::uint16_t v : ray) {
+        fx.push_back(lo(v));
+        fx.push_back(hi(v));
+    }
+    world.broadcasts().push_back({std::move(fx), false, 0});
+    makeScorch(world, things, x, y, 1, rng, frame); // (sMakeScorch, medium)
+    castSound(spell, source);
+    return true;
+}
+
+bool Spells::castAtPoint(std::uint32_t spell, ServerObject& caster, ServerObject& source, float x, float y, int power, std::size_t level)
+{
+    const auto owns = [&](std::initializer_list<std::string_view> types) {
+        return std::ranges::any_of(world.objects(), [&](const auto& e) {
+            return e.second.owner == caster.extent && !e.second.gone() && !e.second.pendingDelete &&
+                   std::ranges::find(types, std::string_view(e.second.typeName)) != types.end();
+        });
+    };
+    const auto says = [&](std::string_view id) {
+        if (!caster.player) {
+            return;
+        }
+        tell(caster, informStringBytes(id));
+    };
+    if (spell == 0x1D && owns({"SmallFist", "MediumFist", "LargeFist"})) {
+        says("ExecSpel.c:TooManyFists");
+        return false;
+    }
+    if (spell == 0x34 && owns({"Meteor"})) {
+        says("ExecSpel.c:TooManyMeteors");
+        return false;
+    }
+    // The ray from the source: flags 9 (the falling ones: + 0x40, but in the campaign). A
+    // glyph's Burn needs none: its flame goes on the glyph.
+    const bool burnOnGlyph = spell == 0x05 && source.typeName == "Glyph";
+    const std::uint8_t flags = (spell == 0x1D || spell == 0x34 || spell == 0x35) && !(world.gameFlags & GameFlag::Solo)
+                                   ? static_cast<std::uint8_t>(Trace::Doors | Trace::NearWindows | Trace::SightOnly)
+                                   : static_cast<std::uint8_t>(Trace::Doors | Trace::NearWindows);
+    if (!burnOnGlyph && !world.traceRay(source.x, source.y, x, y, flags)) {
+        return unseenFrom(source);
+    }
+    static constexpr const char* kFists[6] = {"", "SmallFist", "MediumFist", "LargeFist", "LargeFist", "LargeFist"};
+    const char* kind = spell == 0x05 ? "MediumFlame" : spell == 0x1D ? kFists[power] : spell == 0x34 ? "Meteor"
+                                                     : spell == 0x35 ? "MeteorShower" : "ToxicCloud";
+    if (!things.findThing(kind)) {
+        return true;
+    }
+    ServerObject& o = burnOnGlyph ? world.spawn(things, kind, source.x, source.y) : world.spawn(things, kind, x, y);
+    // (Burn's flame and the fist are the source's, the rest the caster's.)
+    o.owner = spell == 0x05 || spell == 0x1D ? source.extent : caster.extent;
+    if (spell == 0x05 || spell == 0x1D) {
+        creditFrom(o, source, caster);
+    }
+    o.born = frame;
+    o.flags |= ObjFlag::Active;
+    o.touch();
+    switch (spell) {
+    case 0x05: { // burning BurnDuration, a spark burst (64) to show it
+        o.decayAt = frame + static_cast<std::uint32_t>(world.number("BurnDuration"));
+        const auto ix = static_cast<std::uint16_t>(static_cast<int>(o.x));
+        const auto iy = static_cast<std::uint16_t>(static_cast<int>(o.y));
+        world.broadcasts().push_back({{0x93, lo(ix), hi(ix), lo(iy), hi(iy), 0x40}, false, 0});
+        break;
+    }
+    case 0x1D: // from 255 at FistSpeed, bouncing
+        o.value = static_cast<int>(world.number("FistOfVengeanceDamage", level));
+        o.xStatus |= 0x20; // (its height goes as MSG_FX_DELTAZ_SPELL_START: SrvNet_SendUnitHeight)
+        o.raise(255.0f); // (unitRaise)
+        o.zVel = -world.number("FistSpeed");
+        o.flags |= ObjFlag::Bouncing;
+        o.bounce = 9.0f;
+        break;
+    case 0x34: // from 255 at MeteorSpeed
+        o.value = static_cast<int>(world.number("MeteorDamage", level));
+        o.xStatus |= 0x20; // (its height goes as MSG_FX_DELTAZ_SPELL_START: SrvNet_SendUnitHeight)
+        o.raise(255.0f); // (unitRaise)
+        o.zVel = -world.number("MeteorSpeed");
+        break;
+    case 0x35:
+        o.value = static_cast<int>(world.number("MeteorDamage", level));
+        break;
+    default: // the cloud: ToxicCloudLifetime seconds
+        o.value = util::floatToInt(X87(world.number("ToxicCloudLifetime")) * X87::fromDouble(30)); // (stored, Math_FloatToInt)
+        break;
+    }
+    // Its sound: Burn's at its flame and Meteor's at the point (audCreate), the
+    // fist's at the source, the shower's at the caster, the cloud's at the cloud.
+    if (spell == 0x05 || spell == 0x34) {
+        playSoundAt(world, spellSound(things, spell, 0), spell == 0x05 ? o.x : x, spell == 0x05 ? o.y : y);
+    } else {
+        castSound(spell, spell == 0x1D ? source : spell == 0x35 ? caster : o);
+    }
+    return true;
+}
+
+bool Spells::castCurePoison(std::uint32_t spell, ServerObject& caster, ServerObject* target, const things::SpellDef* def, int power)
+{
+    // Cure Poison (Spell_CastCurePoison)
+    if (!target) {
+        return false;
+    }
+    Fight fight{world, rng, frame, &things, modifiers};
+    if (target->poison == 0) {
+        if (target == &caster && caster.player && def) { // (on itself unpoisoned: its mana back)
+            if (paying) {
+                refund(caster, *paying); // (noxcpp: what the cast paid, a mode's price too)
+                paying.reset();
+            } else {
+                caster.player->mana = static_cast<std::uint16_t>(std::min<int>(caster.player->mana + def->manaCost, caster.player->maxMana));
+            }
+        }
+        return true;
+    }
+    const char* said = "ExecSpel.c:PoisonClean";
+    if (power < target->poison) {
+        fight.reducePoison(*target, power);
+        said = "ExecSpel.c:PoisonCure";
+    } else {
+        fight.removePoison(*target);
+    }
+    if (target->player) {
+        tell(*target, informStringBytes(said));
+    }
+    castSound(spell, *target);
+    return true;
+}
+
+bool Spells::castCounterspell(std::uint32_t spell, ServerObject& source)
+{
+    // Counterspell (castCounterSpell), about the source
+    const float range = world.number("CounterspellRange");
+    const auto near = [&](float px, float py) { // (both squares on the stack)
+        const X87 dx = X87(px) - source.x;
+        const X87 dy = X87(py) - source.y;
+        return !(X87(range) * range < dx * dx + dy * dy);
+    };
+    const auto pointFx = [&](float px, float py) { this->pointFx(0x87, px, py); }; // (0x87, netSendPointFx)
+    // Spell missiles that can be countered (subclass 1) burst or go (cspellRemoveSpell).
+    Missiles missiles{world, things, modifiers, rng, frame};
+    // (getMissilesInCircle by the grid, each as it's found)
+    world.missilesInCircle(source.x, source.y, range, [&](ServerObject& missile) {
+        ServerObject* m = &missile;
+        if (!(m->subclasses & 1u) || m->gone() || m->pendingDelete) {
+            return;
+        }
+        pointFx(m->x, m->y);
+        if (m->typeName == NameId::DeathBall) {
+            // deathBallCreateFragments: three DeathBallFragments where it is,
+            // its owner's (createAt), each a random way (randInt 0-255) at its
+            // speed; then it goes.
+            ServerObject* owner = m->owner ? world.byExtent(m->owner) : nullptr;
+            for (int i = 0; i < 3; ++i) {
+                if (ServerObject* f = world.createAt(things, "DeathBallFragment", m->x, m->y, frame)) {
+                    if (owner) {
+                        setOwner(world, owner, *f);
+                    }
+                    const int way = nox::util::uniform_int_distribution<int>(0, 255)(rng);
+                    f->direction = static_cast<std::uint16_t>(way);
+                    const auto [dx, dy] = directionVector(way);
+                    f->vx = (X87(dx) * f->speedCur).f();
+                    f->vy = (X87(dy) * f->speedCur).f();
+                }
+            }
+            m->pendingDelete = true;
+        } else if (m->typeName != NameId::Magic) {
+            missiles.burst(*m);
+            m->pendingDelete = true;
+        } else {
+            m->pendingDelete = true;
+        }
+    });
+    // Lasting spells that can be countered (flag 0x40000), cast within its reach (not one a
+    // staff cast, but Chain Lightning).
+    for (DurationSpell& s : world.durationSpells()) {
+        const things::SpellDef* d = things.findSpell(s.spell);
+        if (d && (d->flags & 0x40000u) && (!s.fromStaff || s.spell == 0x2B) && near(s.x, s.y)) {
+            cancelDurationSpell(world, s);
+        }
+    }
+    // The creatures about it lose their counterable timed enchantments.
+    world.unitsInCircle(source.x, source.y, range, [&](ServerObject& o) { // (by the grid)
+        if (&o == &source || (o.flags & (ObjFlag::Dead | ObjFlag::Destroyed)) || o.pendingDelete || o.buffs == 0) {
+            return;
+        }
+        bool shown = false;
+        for (int e = 0; e < 32; ++e) {
+            const std::uint32_t from = enchanted(o, e) && enchantTime(o, e) != 0 ? enchantmentSpell(e) : 0;
+            const things::SpellDef* d = from ? things.findSpell(from) : nullptr;
+            if (d && (d->flags & 0x40000u)) {
+                if (!shown) {
+                    pointFx(o.x, o.y);
+                    shown = true;
+                }
+                disenchant(world, o, e);
+            }
+        }
+    });
+    castSound(spell, source);
+    return true;
+}
+
+bool Spells::castEnchantment(std::uint32_t spell, ServerObject& caster, ServerObject& source, ServerObject* target,
+                             int power, std::size_t level)
+{
+    const auto noted = [&] { noteAssist(caster, target); };
+    if (!target) {
+        return false;
+    }
+    const auto frames = [&](const char* name) { return static_cast<int>(world.number(name)); };
+    const auto onTarget = [&](int e, int time) { enchant(world, *target, e, time, power); };
+    switch (spell) {
+    case 0x01: onTarget(Enchant::Anchored, frames("AnchorEnchantDuration")); noted(); break;      // Anchor
+    case 0x03: onTarget(Enchant::Blinded, 30 * 4); noted(); break;                                // Blind
+    case 0x0C: onTarget(Enchant::Confused, frames("ConfuseEnchantDuration")); noted(); break;     // Confuse
+    case 0x0F: // Death: not on one marked already; 15 s
+        if (enchanted(*target, Enchant::Death)) {
+            return false;
+        }
+        onTarget(Enchant::Death, 450);
+        noted();
+        break;
+    case 0x11: onTarget(Enchant::Detecting, 30 * 60); break;                                      // Detect Magic
+    case 0x20: onTarget(Enchant::Freeze, 30 * 4); noted(); break;                                 // Freeze
+    case 0x24: onTarget(Enchant::Hasted, frames("HasteEnchantDuration")); break;                  // Haste
+    case 0x25: onTarget(Enchant::Infravision, frames("InfravisionEnchantDuration")); break;       // Infravision
+    case 0x27: // Invisibility: its own hostile lasting spells end first
+    case 0x28: { // Invulnerability
+        endHostileLasting(*target);
+        if (spell == 0x27) {
+            onTarget(Enchant::Invisible, frames("InvisibilityEnchantDuration"));
+            pointFx(0x8A, target->x, target->y); // (point FX 0x8A)
+        } else {
+            onTarget(Enchant::Invulnerable, frames("InvulnerabilityEnchantDuration"));
+        }
+        break;
+    }
+    case 0x2A: onTarget(Enchant::Light, frames("LightEnchantDuration")); noted(); break;          // Light
+    case 0x37: // Nullify: anti-magic for War Cry's time (the ability table's)
+        onTarget(Enchant::AntiMagic, frames("WarCryDuration"));
+        noted();
+        break;
+    case 0x3D: onTarget(Enchant::ProtectFromElectricity, frames("ProtectElectricityEnchantDuration")); break;
+    case 0x3E: onTarget(Enchant::ProtectFromFire, frames("ProtectFireEnchantDuration")); break;
+    case 0x40: onTarget(Enchant::ProtectFromPoison, frames("ProtectPoisonEnchantDuration")); break;
+    case 0x46: onTarget(Enchant::Run, frames("RunEnchantDuration")); noted(); break;              // Run
+    case 0x47: // Shock (useShock); a glyph's: ShockTrapDamage at once (type 9)
+        if (source.typeName == "Glyph") {
+            Fight{world, rng, frame, &things, modifiers}.damage(*target, &caster, caster.extent,
+                                                                static_cast<int>(world.number("ShockTrapDamage", level)), 9, HitCause::Spell);
+            break;
+        }
+        onTarget(Enchant::Shock, frames("ShockEnchantDuration"));
+        break;
+    case 0x48: onTarget(Enchant::Slowed, frames("SlowEnchantDuration")); noted(); break;          // Slow
+    case 0x4A: { // Stun: held, but a warrior (and a monster heavier than 15) slowed
+        const bool slowed = target->player ? target->player->classId == 0
+                                           : (target->classes & oc::Monster) && 15.0f < target->mass;
+        onTarget(slowed ? Enchant::Slowed : Enchant::Held, frames("StunEnchantDuration"));
+        noted();
+        break;
+    }
+    case 0x82: { // Vampirism (a quest's x QuestVampDurMultiplier)
+        int time = frames("VampirismEnchantDuration");
+        if (world.quest()) {
+            time = util::floatToInt(X87(world.number("QuestVampDurMultiplier")) * X87::fromDouble(time)); // (stored, Math_FloatToInt)
+        }
+        onTarget(Enchant::Vampirism, time);
+        break;
+    }
+    case 0x83: onTarget(Enchant::Villain, 30 * power * 12); noted(); break;                       // Villain
+    default: break;
+    }
+    return true;
+}
+
+bool Spells::castPixies(std::uint32_t spell, ServerObject& caster, ServerObject& source, std::size_t level)
+{
+    // Pixie Swarm (castPixies): up to PixieCount of its own
+    const int owned = static_cast<int>(std::ranges::count_if(world.objects(), [&](const auto& e) {
+        return e.second.owner == caster.extent && e.second.typeName == "Pixie" && !e.second.pendingDelete && !e.second.gone();
+    }));
+    const int most = static_cast<int>(world.number("PixieCount", level));
+    if (owned < most && things.findThing("Pixie")) { // (about the source, the caster's)
+        const float r = (X87(source.radius) + 4.0f).f(); // (stored; so is each coordinate)
+        for (int i = most - owned; 0 < i; --i) {
+            const int way = nox::util::uniform_int_distribution<int>(0, 255)(rng);
+            const auto [dx, dy] = directionVector(way);
+            const float px = (X87(r) * dx + source.x).f();
+            const float py = (X87(r) * dy + source.y).f();
+            if (!world.traceRay(source.x, source.y, px, py, Trace::Doors | Trace::ThroughWindows)) {
+                continue;
+            }
+            ServerObject& p = world.spawn(things, "Pixie", px, py);
+            p.owner = caster.extent;
+            p.team = caster.team;
+            p.born = frame;
+            p.flags |= ObjFlag::Active;
+            p.direction = static_cast<std::uint16_t>(way);
+            p.vx = p.vy = 0;
+            p.newX = px;
+            p.newY = py;
+            p.homeX = source.x; // (Pos39: where it came from)
+            p.homeY = source.y;
+            ServerObject* prey = searchTarget(world, nullptr, &p, 0x20, 600.0f, 0, &caster);
+            p.seekTarget = prey ? prey->extent : 0;
+            p.castBy = spell;
+            p.expiresAt = frame + static_cast<std::uint32_t>(nox::util::uniform_int_distribution<int>(30, 90)(rng)) * 30u;
+            p.seenOwnerAt = frame;
+            p.touch();
+        }
+        castSound(spell, source); // (only with room for some: castPixies)
+    }
+    return true;
+}
+
+bool Spells::castCleansingFlame(std::uint32_t spell, ServerObject& caster, ServerObject& source, int power)
+{
+    static constexpr const char* kFlames[10] = {"SmallFlameCleanse", "SmallFlameCleanse", "MediumFlameCleanse", "FlameCleanse", "LargeFlameCleanse",
+                                                "SmallBlueFlameCleanse", "SmallBlueFlameCleanse", "MediumBlueFlameCleanse", "BlueFlameCleanse",
+                                                "LargeBlueFlameCleanse"};
+    for (const auto& [e, o] : world.objects()) { // one ring of its own at a time
+        if (o.owner == caster.extent && !o.pendingDelete && std::ranges::find(kFlames, std::string_view(o.typeName)) != std::end(kFlames)) {
+            if (caster.player) {
+                tell(caster, informStringBytes("plyrspel.c:TooManySpells"));
+            }
+            return false;
+        }
+    }
+    // Outside a solo game, always size 4. (At 5, a red ring reads the blue table and a blue
+    // one past its end: an original bug; here clamped to it.)
+    const int size = (world.gameFlags & GameFlag::Solo) ? power : 4;
+    for (int i = 0; i < 48; ++i) {
+        const int s = size - nox::util::uniform_int_distribution<int>(0, 1)(rng);
+        const int index = std::min(s + (spell != 0x0A ? 5 : 0), 9);
+        if (s <= 0 || !things.findThing(kFlames[index])) {
+            continue;
+        }
+        const int way = nox::util::uniform_int_distribution<int>(0, 255)(rng);
+        const auto [dx, dy] = directionVector(way);
+        // Its radius (its thing's EXTENT) and the caster's, and 4, out from it.
+        float radius = 0;
+        if (const auto e = things.findThing(kFlames[index])->lastAttribute("EXTENT"); e && e->starts_with("CIRCLE")) {
+            radius = textNumber(e->substr(6));
+        }
+        // (From the source, and the source's: a glyph's ring isn't the caster's; its kills
+        // are credited to it, creditFrom.)
+        // (On the x87: the reach kept on the stack for both; each place one store.)
+        const X87 reach = X87(radius) + source.radius + 4.0f;
+        const float fx = (reach * dx + source.x).f();
+        const float fy = (reach * dy + source.y).f();
+        if (!world.traceRay(source.x, source.y, fx, fy, Trace::Doors | Trace::SightOnly)) {
+            continue;
+        }
+        ServerObject& f = world.spawn(things, kFlames[index], fx, fy);
+        f.owner = source.extent;
+        creditFrom(f, source, caster);
+        f.born = frame;
+        f.direction = static_cast<std::uint16_t>(way);
+        f.vx = dx * 4.0f;
+        f.vy = dy * 4.0f;
+        f.timer = frame + static_cast<std::uint32_t>(nox::util::uniform_int_distribution<int>(30 * 3, 30 * 6)(rng));
+        f.homeX = source.x;
+        f.homeY = source.y;
+        f.lastX = fx;
+        f.lastY = fy;
+        f.drag = 0; // (Float28: no friction)
+        f.updateFn = "FlameCleanseUpdate"; // (updateFlameCleanse, set by hand)
+        f.updates = true;
+        f.alwaysMoves = true;
+        world.addUpdatable(f); // (Spell_CastCleansingFlame's unitAddToUpdatable)
+        f.classes |= 0x40000000u; // (not streamed: the clients run it themselves)
+        f.flags |= ObjFlag::Active;
+        // MSG_CLIENT_PREDICT_LINEAR (0xB5) to every player: its code, type, spot, facing and
+        // velocities x 16.
+        const auto u16 = [](float v) { return static_cast<std::uint16_t>(static_cast<int>(v)); };
+        const auto i8 = [](float v) { return static_cast<std::uint8_t>(static_cast<std::int8_t>(static_cast<int>(v * 16.0f))); };
+        const std::uint16_t px = u16(fx);
+        const std::uint16_t py = u16(fy);
+        world.broadcasts().push_back({{0xB5, lo(f.extent), hi(f.extent), lo(f.type), hi(f.type), lo(px), hi(px), lo(py), hi(py), lo(f.direction),
+                                       hi(f.direction), 0, i8(f.vx), i8(f.vy)},
+                                      false,
+                                      0});
+    }
+    castSound(spell, source);
+    return true;
+}
+
+bool Spells::castMark(std::uint32_t spell, ServerObject& caster, ServerObject& source)
+{
+    if (!caster.player) {
+        return true;
+    }
+    PlayerControl& p = *caster.player;
+    int slot = 0;
+    if (spell == 0x2D) {
+        // The first slot with no live mark.
+        while (slot < 4 && p.marks[static_cast<std::size_t>(slot)] != 0 && world.byExtent(p.marks[static_cast<std::size_t>(slot)])) {
+            ++slot;
+        }
+        if (slot == 4) { // (all four set: the one used longest ago)
+            std::uint32_t oldest = frame;
+            slot = 0;
+            for (int i = 0; i < 4; ++i) {
+                const ServerObject* m = world.byExtent(p.marks[static_cast<std::size_t>(i)]);
+                if (m && m->timer < oldest) {
+                    oldest = m->timer;
+                    slot = i;
+                }
+            }
+        }
+    } else {
+        slot = static_cast<int>(spell) - 0x2E;
+    }
+    // Where a glyph cast it, else where the caster is; moved (its last use now) or
+    // made; three uses either way.
+    const ServerObject& at = source.typeName == "Glyph" ? source : caster;
+    const auto i = static_cast<std::size_t>(slot);
+    ServerObject* mark = p.marks[i] ? world.byExtent(p.marks[i]) : nullptr;
+    if (mark) {
+        setPosition(world, *mark, at.x, at.y, frame);
+        mark->timer = frame;
+    } else {
+        static constexpr const char* kMarks[4] = {"TeleportGlyph1", "TeleportGlyph2", "TeleportGlyph3", "TeleportGlyph4"};
+        if (things.findThing(kMarks[i])) {
+            ServerObject& m = world.spawn(things, kMarks[i], at.x, at.y);
+            m.owner = caster.extent;
+            m.born = m.timer = frame;
+            m.touch();
+            p.marks[i] = m.extent;
+            mark = &m;
+        }
+    }
+    if (mark) {
+        p.markUses[i] = 3;
+    }
+    castSound(spell, caster);
+    return true;
+}
+
+bool Spells::castFireball(std::uint32_t spell, ServerObject& caster, ServerObject& source, int power, std::size_t level)
+{
+    // castFireball
+    static constexpr const char* kKinds[6] = {"", "Fireball", "StrongFireball", "TitanFireball", "TitanFireball", "TitanFireball"};
+    const char* kind = kKinds[power];
+    if (!things.findThing(kind)) {
+        return true;
+    }
+    // From the source (its own: a glyph's fireball is the glyph's; its kills credited to the
+    // caster, creditFrom): twice its radius ahead, and its motion on; at it if a wall's between.
+    // (Twice the radius kept on the stack; x's sum stored before its velocity's added, y's
+    // kept.)
+    const auto [fx, fy] = directionVector(source.direction & 0xFF);
+    const X87 r = X87(source.radius) + source.radius;
+    float sx = (X87((r * fx + source.x).f()) + source.vx).f();
+    float sy = (r * fy + source.y + source.vy).f();
+    if (!world.traceRay(source.x, source.y, sx, sy, Trace::Doors | Trace::ThroughWindows)) {
+        sx = source.x;
+        sy = source.y;
+    }
+    ServerObject& m = world.spawn(things, kind, sx, sy);
+    m.owner = source.extent;
+    creditFrom(m, source, caster);
+    m.team = caster.team;
+    m.born = frame;
+    m.flags |= ObjFlag::Active;
+    // (The speed kept on the stack as it's stored; x's part stored before the source's
+    // velocity's added, y's kept.)
+    const X87 speed = X87(world.number("FireballSpeedCoeff", level)) * m.speedCur;
+    m.speedCur = speed.f();
+    m.vx = (X87((speed * fx).f()) + source.vx).f();
+    m.vy = (speed * fy + source.vy).f();
+    m.newX = sx;
+    m.newY = sy;
+    m.direction = source.direction;
+    m.touch();
+    castSound(spell, source);
+    return true;
+}
+
+bool Spells::castMagicMissile(std::uint32_t spell, ServerObject& caster, ServerObject& source, ServerObject* target, std::size_t level)
+{
+    // Spell_CastMagicMissile
+    if (!things.findThing("MagicMissile")) {
+        return true;
+    }
+    // MagicMissileCount at its power, less those of its own still flying.
+    const int most = static_cast<int>(world.number("MagicMissileCount", level));
+    const auto flying = static_cast<int>(std::ranges::count_if(world.objects(), [&](const auto& e) {
+        return e.second.owner == caster.extent && e.second.typeName == "MagicMissile" && !e.second.gone() && !e.second.pendingDelete;
+    }));
+    // (Below zero, with more of its own flying than it may have: nothing fired, the mana
+    // taken: an original bug.)
+    const int count = flying > 0 ? most - flying : most;
+    if (count == 0) {
+        if (caster.player) {
+            tell(caster, informStringBytes("mmissile.c:TooManyMissiles"));
+        }
+        return false;
+    }
+    static constexpr int kSpread[5] = {0, -0x10, 0x10, -0x20, 0x20};
+    // (From the source, the caster's.)
+    // (The exe's switch has five cases: a sixth missile (a quest's level 5, the ARENA table's
+    // 6) keeps the fifth's heading: an original bug.)
+    for (int i = 0; i < count; ++i) {
+        const int d = ((source.direction & 0xFF) + kSpread[std::min(i, 4)]) & 0xFF;
+        const auto [fx, fy] = directionVector(d);
+        const auto [sx, sy] = launchPoint(source, fx, fy);
+        if (!world.traceRay(source.x, source.y, sx, sy, Trace::Doors | Trace::ThroughWindows)) {
+            continue;
+        }
+        ServerObject& m = world.spawn(things, "MagicMissile", sx, sy);
+        m.owner = caster.extent;
+        m.team = caster.team;
+        m.born = frame;
+        m.flags |= ObjFlag::Active | ObjFlag::Airborne;
+        // (The speed kept on the stack as it's stored; each part stored, then the source's
+        // velocity added.)
+        const X87 speed = util::randomFloat(rng, 0.8f, 1.2f) * m.speedCur; // (randomFloat's stack value)
+        m.speedCur = speed.f();
+        m.direction = static_cast<std::uint16_t>(d);
+        m.vx = (X87((speed * fx * 0.1f).f()) + source.vx).f();
+        m.vy = (X87((speed * fy * 0.1f).f()) + source.vy).f();
+        m.newX = sx;
+        m.newY = sy;
+        m.touch();
+        // spellFlySearchTarget, the spell's target never read: the enemy under the owner's
+        // cursor, else the nearest enemy to the source player's cursor (to the missile when
+        // it doesn't see the cursor); a glyph's, the nearest to the missile. So a cast on
+        // itself homes on the cursor's enemy too. (A mode script's own cast at a foe it chose,
+        // nox.cast's `direct`: that foe, as before.)
+        ServerObject* t = direct && target && target != &caster ? target : nullptr;
+        if (!t) {
+            float cursor[2] = {};
+            const float* at = nullptr;
+            if (source.player) {
+                cursor[0] = source.player->cursorX;
+                cursor[1] = source.player->cursorY;
+                at = cursor;
+            }
+            t = searchTarget(world, at, &m, kHostile, 600.0f, 0, &caster);
+        }
+        m.seekTarget = t ? t->extent : 0;
+    }
+    castSound(spell, caster);
+    return true;
 }
 
 void revertMagicWalls(World& world, const std::function<bool(const MagicWall&)>& which)
@@ -3060,426 +3136,32 @@ int Spells::lastingUpdate(DurationSpell& s)
     }
     ServerObject* caster = s.caster ? world.byExtent(s.caster) : nullptr;
     ServerObject* target = s.target ? world.byExtent(s.target) : nullptr;
-    Fight fight{world, rng, frame, &things, modifiers};
-    const auto inform = [&](const ServerObject& p, std::string_view id) {
-        if (p.player) {
-            tell(p, informStringBytes(id));
-        }
-    };
     if (0x4A < s.spell && s.spell < 0x73) {  // the summon spells
-        // Spell_SummonFinish: the frame before its end it comes, unless the caster's
-        // gone (a player's checked again: its field guide in a co-op game, its room); 899 at it.
-        if (!caster || (caster->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
-            return 1;
-        }
-        if (s.end - 1 != frame) {
-            return 0;
-        }
-        const int index = static_cast<int>(s.spell) - 0x4A;
-        if (caster->player) {
-            if ((world.gameFlags & GameFlag::Coop) && !caster->player->fieldGuide[static_cast<std::size_t>(index)]) {
-                inform(*caster, "Summon.c:NeedGuideToSummon");
-                return 1;
-            }
-            if (!roomFor(world, things, *caster, index)) {
-                inform(*caster, "Summon.c:CreatureControlFailed");
-                return 1;
-            }
-        }
-        if (ServerObject* made = summonAt(fight, s.summonType, s.summonX, s.summonY, caster, s.summonDir)) {
-            playSound(world, 899, *made);
-        }
-        s.summoned = true;
-        return 1;
+        return lastingSummon(s, caster);
     }
     if (s.spell == 0x09) {  // Charm
-        // Spell_CharmFinish: broken by its going or by the caster's straying past 300;
-        // at the end (but for those never controlled: subclass 0x2000; a player's: its room) the
-        // creature's the caster's: SUMMONED, out of its team, a quest's health its own again, at
-        // the caster's creature order (a monster's: escorting it), its player told.
-        // Broken: its caster (a player) told why, and the charm's end sound (0x10) at it.
-        const auto broken = [&](std::string_view why) {
-            inform(*caster, why);
-            playSound(world, 0x10, *caster);
-            return 1;
-        };
-        if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) || !caster) {
-            if (caster) {
-                playSound(world, 0x10, *caster);
-            }
-            return 1;
-        }
-        if (X87(300.0f) < edgeDistance53(*caster, *target)) {
-            return broken("Summon.c:CharmBrokenDistance");
-        }
-        if (target->monster && target->monster->notCharmable) { // (noxcpp: made so mid-charm, a mode's: ended now)
-            return broken("Summon.c:CreatureControlImpossible");
-        }
-        if (s.end - 1 != frame) {
-            return 0;
-        }
-        if (target->subclasses & 0x2000u) {
-            return broken("Summon.c:CreatureControlImpossible");
-        }
-        if (caster->player && !roomFor(world, things, *caster, guideIndex(target->typeName))) {
-            return broken("Summon.c:CreatureControlFailed");
-        }
-        disenchant(world, *target, Enchant::Charming);
-        if (fight.parentPlayer(target) == caster) {
-            return broken("Summon.c:CreatureAlreadyOwned");
-        }
-        clearOwner(world, *target); // (another player's: lost to it)
-        setOwner(world, caster, *target);
-        if (target->team != 0) {
-            removeTeamMember(world, *target);
-        }
-        if (target->monster) {
-            target->monster->status |= things::MonsterStatus::Summoned;
-            if (world.quest()) {
-                const auto most = static_cast<std::uint16_t>(target->monster->def ? target->monster->def->questHealth : target->maxHealth);
-                target->maxHealth = most;
-                if (most < target->health) {
-                    target->health = most;
-                    target->touch();
-                }
-            }
-        }
-        if (!caster->player) {
-            orderCreatures(fight, *caster, target, 4);
-        } else {
-            orderCreatures(fight, *caster, target, caster->player->creatureOrder);
-            target->subclasses |= 0x180u;  // monster subclasses MONITOR (0x80) and MIGRATE (0x100)
-            reportAcquired(world, *caster, *target); // (and its minimap mark)
-            simpleObjTo(world, *caster, *target);    // (SrvNet_SendSimpleObjReliable)
-            if (world.quest()) {
-                unlinkSpawn(world, *target); // (its generator's no more)
-            }
-        }
-        playSound(world, spellSound(things, s.spell, 1), *caster); // (at the record's caster)
-        return 1;
+        return lastingCharm(s, caster, target);
     }
     switch (s.spell) {
     case 0x33: { // Shield: ends with its target
         return !target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) ? 1 : 0;
     }
-    case 0x23: { // Greater Heal
-        if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
-            return 1;
-        }
-        if (caster && enchanted(*caster, Enchant::Run)) {
-            return 1;
-        }
-        if (!caster || !canInteract(world, *caster, *target)) {
-            return 1;
-        }
-        if (manaOf(*caster) == 0) {
-            return 1;
-        }
-        if (((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) || justHurt(*caster, frame)) {
-            return 1;
-        }
-        if (target->maxHealth == target->health) {
-            return 1;
-        }
-        // Its amount a frame at its power (0.5-1.5), the fraction kept (x a player
-        // caster's class health multiplier, 1).
-        static constexpr float kHeal[6] = {0, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f};
-        const int whole = wholePoints(s, kHeal[std::clamp(s.power, 0, 5)]);
-        addHealth(*target, whole);
-        addMana(*caster, -1);
-        return 0;
-    }
-    case 0x16: { // Drain Mana (spellDrainMana)
-        if (casterGoneOrRunning(s, caster)) {
-            return 1;
-        }
-        if (s.glyph) { // a glyph's: 50 off the nearest at once
-            const float px = caster ? caster->x : s.x;
-            const float py = caster ? caster->y : s.y;
-            if (ServerObject* t = drainTarget(px, py, caster)) {
-                addMana(*t, -50);
-            }
-            return 1;
-        }
-        if (caster->player && caster->player->maxMana <= caster->player->mana) {
-            return 1;
-        }
-        if ((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) {
-            return 1;
-        }
-        // It stands where it cast and isn't hurt.
-        if (justHurt(*caster, frame) || !(std::fabs(s.x - caster->x) < 5.0f) || !(std::fabs(s.y - caster->y) < 5.0f)) {
-            return 1;
-        }
-        ServerObject* from = drainTarget(caster->x, caster->y, caster);
-        s.target = from ? from->extent : 0;
-        if (!from) {
-            if (s.rayTarget != 0) {
-                rayFx(world, s, false, s.rayTarget);
-            }
-            return 1;
-        }
-        const int whole = wholePoints(s, world.number("ManaDrainCoeff", static_cast<std::size_t>(s.power - 1)));
-        if (s.target != s.rayTarget) {
-            if (s.rayTarget != 0) {
-                rayFx(world, s, false, s.rayTarget);
-            }
-            rayFx(world, s, true, s.target);
-        }
-        if (drainMana(*caster, *from, whole) && frame % 15u == 0) { // (gameFPS >> 1: its hum, twice a second)
-            playSound(world, 0xE6, *caster);
-            playSound(world, 0xE5, *from);
-        }
-        s.rayTarget = s.target;
-        return 0;
-    }
-    case 0x08: { // Channel Life: the caster's health into the target's mana
-        if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
-            return 1;
-        }
-        if (s.glyph) {
-            addMana(*target, 20);
-            fight.takeHealth(*target, 20);
-            return 1;
-        }
-        if (caster && enchanted(*caster, Enchant::Run)) {
-            return 1;
-        }
-        if ((target->classes & oc::Monster) && movedFrom(*target, s.x, s.y)) {
-            return 1;
-        }
-        // Full: ends (a monster's most, 0, is never its 1000: it runs on, the caster paying).
-        if ((target->player ? target->player->maxMana : 0) == manaOf(*target)) {
-            return 1;
-        }
-        if (!caster || caster->health < 2) {
-            return 1;
-        }
-        const int whole = wholePoints(s, world.number("ChannelLifeCoeff", static_cast<std::size_t>(s.power - 1)));
-        addMana(*target, whole);
-        fight.takeHealth(*caster, 1);
-        return 0;
-    }
+    case 0x23: // Greater Heal
+        return lastingGreaterHeal(s, caster, target);
+    case 0x16: // Drain Mana
+        return lastingDrainMana(s, caster);
+    case 0x08: // Channel Life
+        return lastingChannelLife(s, caster, target);
     case 0x2B:
         return chainLightning(s, caster);
-    case 0x3B: { // Plasma (plasmaShot)
-        if (!caster) {
-            return 1;
-        }
-        if ((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) {
-            return 1;
-        }
-        // Its target kept while it lives, within 400 and in reach (FPS x 3 frames more, once it's
-        // behind the caster: s.value counts them down); else the enemy under the cursor within
-        // 400 (a monster's record read as a player's: with the monsters), else the nearest
-        // enemy creature within 400 it sees.
-        bool kept = false;
-        if (target) {
-            if (!(target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
-                if (!(facingSides(caster->x, caster->y, caster->direction, target->x, target->y) & 2)) {  // bit 2: behind the caster
-                    s.value = 0;
-                } else if (s.value == 0) {
-                    s.value = 30 * 3;
-                }
-                kept = edgeDistance53(*target, *caster) <= X87(400.0f) && canInteract(world, *caster, *target);
-            }
-            if (!kept) {
-                s.target = 0;
-                target = nullptr;
-            }
-        }
-        if (!kept) {
-            ServerObject* found = nullptr;
-            if (caster->player && caster->player->cursorObject != 0) {
-                ServerObject* under = world.byExtent(caster->player->cursorObject);
-                if (under && isEnemy(world, *caster, *under) && edgeDistance53(*caster, *under) <= X87(400.0f)) {
-                    found = under;
-                }
-            }
-            if (!found) {
-                float best = 160000.0f; // (0x481C4000)
-                world.unitsInCircle(caster->x, caster->y, 400.0f, [&](ServerObject& o) { // (unitsGetInCircle, by the grid)
-                    if (!(o.classes & 0x20006u) || (o.flags & (ObjFlag::Dead | ObjFlag::Destroyed)) || o.pendingDelete || &o == caster || o.holder != 0 ||  // classes Monster | Player | MonsterGenerator
-                        ((o.classes & oc::Monster) && (o.subclasses & 0x8000u)) || !isEnemy(world, *caster, o)) {
-                        return;
-                    }
-                    const float dx = o.x - caster->x;
-                    const float dy = o.y - caster->y;
-                    const float d2 = dx * dx + dy * dy;
-                    if (d2 < best && canInteract(world, *caster, o)) {
-                        best = d2;
-                        found = &o;
-                    }
-                });
-            }
-            target = found;
-            s.target = found ? found->extent : 0;
-            s.value = 0;
-        }
-        if (s.value != 0 && --s.value == 0) {  // its 3 s behind the caster ran out
-            s.target = 0;
-            target = nullptr;
-        }
-        // The beam (MSG_FX_DURATION_SPELL 1 / 8) to it as it changes.
-        if (!target) {
-            if (s.rayTarget != 0) {
-                rayFx(world, s, false, s.rayTarget);
-                s.rayTarget = 0;
-            }
-            return 0;
-        }
-        if (target->extent != s.rayTarget) {
-            if (s.rayTarget != 0) {
-                rayFx(world, s, false, s.rayTarget);
-            }
-            rayFx(world, s, true, target->extent);
-        }
-        const bool hecubah = target->typeName == "Hecubah" || target->typeName == "HecubahWithOrb";
-        fight.damage(*target, caster, 0, static_cast<int>(world.number(hecubah ? "PlasmaDamageHecubah" : "PlasmaDamage")), 0xE, HitCause::Spell);
-        if (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
-            pointFx(0x83, target->x, target->y);
-        }
-        s.rayTarget = target->extent;
-        if (caster->player) {
-            fight.setPlayerState(*caster, 0x16);
-        }
-        if (frame % 10u == 0) { // (gameFPS / 3: its hum at both ends)
-            playSound(world, 0x62, *caster);
-            playSound(world, 0x62, *target);
-        }
-        if (s.value == 0) {  // not behind (no count): its search time renewed
-            s.end = frame + static_cast<std::uint32_t>(world.number("PlasmaSearchTime"));
-        }
-        if (s.staff != 0) { // a charge of its staff a frame, its charge percent with it (what an obelisk tops up)
-            ServerObject* w = world.byExtent(s.staff);
-            if (w && w->charges != 0) {
-                --w->charges;
-                if (w->maxCharges != 0) {
-                    w->chargePercent = w->charges * 100 / w->maxCharges;
-                }
-                if (caster->player) {
-                    fight.setPlayerState(*caster, 0x16);
-                    tell(*caster, {0x64, lo(w->extent), hi(w->extent), w->charges, w->maxCharges});
-                }
-                if (w->charges != 0) {
-                    return 0;
-                }
-            }
-            return 1;
-        }
-        return 0;
-    }
+    case 0x3B: // Plasma
+        return lastingPlasma(s, caster, target);
     case 0x74: // Tag: its target gone
         return !target || (target->flags & ObjFlag::Destroyed) ? 1 : 0;
-    case 0x1F: { // Force of Nature
-        if (caster && enchanted(*caster, Enchant::Run)) {
-            return 1;
-        }
-        if (s.end - 7 == frame && s.object) { // the charge goes just before
-            if (ServerObject* charge = world.byExtent(s.object)) {
-                charge->pendingDelete = true;
-            }
-        }
-        if (s.end - 1 != frame) {
-            if (!s.glyph && caster && caster->player) {
-                fight.setPlayerState(*caster, 10);
-            }
-            return 0;
-        }
-        if (!things.findThing("DeathBall")) {
-            return 1;
-        }
-        // From the caster, its shape's reach + 4 ahead (a point's 4, else 24) the way it faces
-        // now; a glyph's from where it was cast, its facing then, at rest.
-        float fx = s.x;
-        float fy = s.y;
-        int way = s.value;
-        X87 ahead = X87(0.0f); // (on the stack)
-        if (!s.glyph && caster) {
-            fx = caster->x;
-            fy = caster->y;
-            way = caster->direction;
-            switch (caster->shape) {
-            case ShapeKind::Center: ahead = X87(4.0f); break;
-            case ShapeKind::Circle: ahead = X87(caster->radius) + 4.0f; break;
-            case ShapeKind::Box: ahead = X87(std::max(caster->boxWidth, caster->boxHeight)) + 4.0f; break;
-            default: ahead = X87(24.0f); break;
-            }
-        }
-        const auto [dx, dy] = directionVector(way & 0xFF);
-        float bx = (X87(dx) * ahead + fx).f();
-        float by = (X87(dy) * ahead + fy).f();
-        if (!world.traceRay(fx, fy, bx, by, Trace::Doors | Trace::ThroughWindows)) {
-            bx = fx;
-            by = fy;
-        }
-        ServerObject& ball = world.spawn(things, "DeathBall", bx, by);
-        ball.owner = caster ? caster->extent : 0;
-        ball.born = frame;
-        ball.flags |= ObjFlag::Active;
-        ball.newX = bx;
-        ball.newY = by;
-        if (s.glyph) {
-            ball.vx = ball.vy = 0;
-        } else {
-            ball.vx = (X87(dx) * ball.speedCur).f();
-            ball.vy = (X87(dy) * ball.speedCur).f();
-        }
-        ball.direction = static_cast<std::uint16_t>(way);
-        ball.touch();
-        if (caster) {
-            playSound(world, 0x26, *caster);
-        }
-        return 1;
-    }
-    case 0x38: { // Mana Bomb (manaBombBoom)
-        if (!caster && !s.glyph) {
-            return 1;
-        }
-        bool goes = s.end - 1 == frame;
-        if (caster && caster->player && caster->player->mana == 0) {
-            goes = true;
-        }
-        if (s.object) { // the charge goes when the mana's nearly out (a glyph's: 9 frames before)
-            const bool keep = !s.glyph && caster && caster->player ? 14 < caster->player->mana : 9u < s.end - frame;
-            if (!keep) {
-                if (ServerObject* charge = world.byExtent(s.object)) {
-                    charge->pendingDelete = true;
-                }
-                s.object = 0;
-            }
-        }
-        const int power = s.value;  // the power charged so far; it grows each frame till it goes
-        if (!goes) {
-            s.value += static_cast<int>(world.number("ManaBombDeltaPower", static_cast<std::size_t>(s.power - 1)));
-            if (!s.glyph && caster && caster->player) {
-                addMana(*caster, -s.power);
-            }
-            return 0;
-        }
-        float bx = s.x;
-        float by = s.y;
-        if (!s.glyph) {
-            if (!caster) {
-                return 1;
-            }
-            bx = caster->x;
-            by = caster->y;
-        }
-        // (The walls take it too: with the walls' damage.) Its power, less past ManaBombInRadius,
-        // out to ManaBombOutRadius, as mana-bomb harm (15), from its caster: the caster too
-        // (gameSetWallsDamage(1): its source not spared).
-        Missiles{world, things, modifiers, rng, frame}.damageAt(bx, by, world.number("ManaBombOutRadius"), world.number("ManaBombInRadius"),
-                                                                 power, 15, caster, nullptr, false, HitCause::Spell);
-        jiggle(bx, by, static_cast<int>(world.number("ManaBombShakeMag")));
-        pointFx(0x81, bx, by);
-        pointFx(0x9A, bx, by);
-        if (caster) {
-            playSound(world, 0x51, *caster);
-        }
-        s.burst = true;
-        return 1;
-    }
+    case 0x1F: // Force of Nature
+        return lastingForceOfNature(s, caster);
+    case 0x38: // Mana Bomb
+        return lastingManaBomb(s, caster);
     case 0x43: // Oval Shield: its target running, a monster moved, or dead
         if (!target || enchanted(*target, Enchant::Run)) {
             return 1;
@@ -3488,46 +3170,8 @@ int Spells::lastingUpdate(DurationSpell& s)
             return 1;
         }
         return (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) ? 1 : 0;
-    case 0x1C: { // Firewalk (firewalkTick)
-        if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
-            return 1;
-        }
-        if (s.start == s.last) { // the first pass: the trail starts where it stands
-            s.trail = {target->x, target->y, target->x, target->y};
-            ++s.last;
-            return 0;
-        }
-        const X87 dx = X87(target->x) - s.trail[0]; // (the distance on the stack)
-        const X87 dy = X87(target->y) - s.trail[1];
-        // (Small flames at 1, up to medium at 2-3, up to big at 4-5.)
-        const int most = s.power < 2 ? 0 : (3 < s.power) + 1;
-        if (X87(15.0f) < util::sqrt(dx * dx + dy * dy) - target->radius) {
-            static constexpr const char* kFlames[3] = {"SmallFlame", "MediumFlame", "Flame"};
-            float px = s.trail[0];
-            float py = s.trail[1];
-            for (int i = 0; i < 2; ++i) { // two, the second halfway back towards the last
-                const char* kind = kFlames[nox::util::uniform_int_distribution<int>(0, most)(rng)];
-                if (things.findThing(kind)) {
-                    ServerObject& f = world.spawn(things, kind, px, py);
-                    f.born = frame;
-                    f.flags |= ObjFlag::Active;
-                    f.decayAt = frame + 30 * 25;
-                    playSoundAt(world, 0x2E, px, py);
-                }
-                // (Only when it moved both ways from the last: a straight run along an axis lays
-                // both on one spot.)
-                // (Each difference stored.)
-                const float backX = (X87(px) - s.trail[2]).f();
-                const float backY = (X87(py) - s.trail[3]).f();
-                if (backX != 0 && backY != 0) {
-                    px = (X87(px) - X87(backX) * 0.5f).f();
-                    py = (X87(py) - X87(backY) * 0.5f).f();
-                }
-            }
-            s.trail = {target->x, target->y, s.trail[0], s.trail[1]};
-        }
-        return 0;
-    }
+    case 0x1C: // Firewalk
+        return lastingFirewalk(s, target);
     case 0x04:
     case 0x73:
     case 0x7A:
@@ -3536,88 +3180,581 @@ int Spells::lastingUpdate(DurationSpell& s)
     case 0x7D:
     case 0x7E:
         return teleportSpell(s, caster, target);
-    case 0x18: { // Lightning (spellEnergyBoltTick)
-        if (casterGoneOrRunning(s, caster)) {
-            return 1;
-        }
-        const float range = world.number("LightningRange");
-        if (s.glyph) { // a glyph's: one strike at the nearest enemy, and done
-            if (ServerObject* t = boltTarget(s.x, s.y, range, caster, true)) {
-                ServerObject* source = s.source ? world.byExtent(s.source) : nullptr;
-                fight.damage(*t, source, 0, static_cast<int>(world.number("EnergyBoltGlyphDamage")), 17, HitCause::Spell);
-                pointFx(0x82, t->x, t->y);
-                playSound(world, spellSound(things, 0x18, 0), *t);
-            }
-            return 1;
-        }
-        if ((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) {
-            return 1;
-        }
-        if (2u < frame - s.start && justHurt(*caster, frame)) {
-            return 1;
-        }
-        // Its target kept while it lives, is in front, in range and in sight; else the enemy
-        // under a player's cursor in range, else the nearest it can strike.
-        if (target && ((target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) ||
-                       !(facingSides(caster->x, caster->y, caster->direction, target->x, target->y) & 1) ||
-                       X87(range) < edgeDistance53(*target, *caster) || !canInteract(world, *caster, *target))) {
-            target = nullptr;
-        }
-        if (!target) {
-            s.target = 0;
-            if (caster->player && caster->player->cursorObject != 0) {
-                ServerObject* under = world.byExtent(caster->player->cursorObject);
-                if (under && isEnemy(world, *caster, *under) && edgeDistance53(*caster, *under) <= X87(range)) {
-                    target = under;
-                }
-            }
-            if (!target) {
-                target = boltTarget(caster->x, caster->y, range, caster, false);
-            }
-            s.target = target ? target->extent : 0;
-        }
-        if (!target) {
-            if (s.rayTarget != 0) {
-                rayFx(world, s, false, s.rayTarget);
-                s.rayTarget = 0;
-            }
-            return 0;
-        }
-        const int whole = wholePoints(s, world.number("EnergyBoltDamage", static_cast<std::size_t>(s.power - 1)));
-        if (s.target != s.rayTarget) {
-            if (s.rayTarget != 0) {
-                rayFx(world, s, false, s.rayTarget);
-            }
-            rayFx(world, s, true, s.target);
-        }
-        fight.damage(*target, caster, 0, whole, 17, HitCause::Spell);
-        if (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
-            pointFx(0x82, target->x, target->y);
-        }
-        s.rayTarget = s.target;
-        if (caster->player) {
-            fight.setPlayerState(*caster, 10);
-        }
-        if (frame % 10u == 0) { // (gameFPS / 3: its hum at both ends)
-            playSound(world, 0x20, *caster);
-            playSound(world, 0x20, *target);
-        }
-        s.end = frame + static_cast<std::uint32_t>(world.number("LightningSearchTime"));  // renewed each frame it strikes
-        if (caster->player) {
-            fight.setPlayerState(*caster, 10);
-            addMana(*caster, -1);
-            if (caster->player->mana == 0) {
-                return 1;
-            }
-        }
-        if (target->flags & ObjFlag::Dead) {  // a kill ends it next frame
-            s.end = frame + 1;
-        }
-        return 0;
-    }
+    case 0x18: // Lightning
+        return lastingLightning(s, caster, target);
     default:
         return 0;
     }
+}
+
+// lastingUpdate's spells, each its case moved out whole.
+
+void Spells::inform(const ServerObject& p, std::string_view id)
+{
+    if (p.player) {
+        tell(p, informStringBytes(id));
+    }
+}
+
+int Spells::lastingSummon(DurationSpell& s, ServerObject* caster)
+{
+    // the summon spells
+    // Spell_SummonFinish: the frame before its end it comes, unless the caster's
+    // gone (a player's checked again: its field guide in a co-op game, its room); 899 at it.
+    Fight fight{world, rng, frame, &things, modifiers};
+    if (!caster || (caster->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+        return 1;
+    }
+    if (s.end - 1 != frame) {
+        return 0;
+    }
+    const int index = static_cast<int>(s.spell) - 0x4A;
+    if (caster->player) {
+        if ((world.gameFlags & GameFlag::Coop) && !caster->player->fieldGuide[static_cast<std::size_t>(index)]) {
+            inform(*caster, "Summon.c:NeedGuideToSummon");
+            return 1;
+        }
+        if (!roomFor(world, things, *caster, index)) {
+            inform(*caster, "Summon.c:CreatureControlFailed");
+            return 1;
+        }
+    }
+    if (ServerObject* made = summonAt(fight, s.summonType, s.summonX, s.summonY, caster, s.summonDir)) {
+        playSound(world, 899, *made);
+    }
+    s.summoned = true;
+    return 1;
+}
+
+int Spells::lastingCharm(DurationSpell& s, ServerObject* caster, ServerObject* target)
+{
+    // Charm
+    // Spell_CharmFinish: broken by its going or by the caster's straying past 300;
+    // at the end (but for those never controlled: subclass 0x2000; a player's: its room) the
+    // creature's the caster's: SUMMONED, out of its team, a quest's health its own again, at
+    // the caster's creature order (a monster's: escorting it), its player told.
+    // Broken: its caster (a player) told why, and the charm's end sound (0x10) at it.
+    Fight fight{world, rng, frame, &things, modifiers};
+    const auto broken = [&](std::string_view why) {
+        inform(*caster, why);
+        playSound(world, 0x10, *caster);
+        return 1;
+    };
+    if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) || !caster) {
+        if (caster) {
+            playSound(world, 0x10, *caster);
+        }
+        return 1;
+    }
+    if (X87(300.0f) < edgeDistance53(*caster, *target)) {
+        return broken("Summon.c:CharmBrokenDistance");
+    }
+    if (target->monster && target->monster->notCharmable) { // (noxcpp: made so mid-charm, a mode's: ended now)
+        return broken("Summon.c:CreatureControlImpossible");
+    }
+    if (s.end - 1 != frame) {
+        return 0;
+    }
+    if (target->subclasses & 0x2000u) {
+        return broken("Summon.c:CreatureControlImpossible");
+    }
+    if (caster->player && !roomFor(world, things, *caster, guideIndex(target->typeName))) {
+        return broken("Summon.c:CreatureControlFailed");
+    }
+    disenchant(world, *target, Enchant::Charming);
+    if (fight.parentPlayer(target) == caster) {
+        return broken("Summon.c:CreatureAlreadyOwned");
+    }
+    clearOwner(world, *target); // (another player's: lost to it)
+    setOwner(world, caster, *target);
+    if (target->team != 0) {
+        removeTeamMember(world, *target);
+    }
+    if (target->monster) {
+        target->monster->status |= things::MonsterStatus::Summoned;
+        if (world.quest()) {
+            const auto most = static_cast<std::uint16_t>(target->monster->def ? target->monster->def->questHealth : target->maxHealth);
+            target->maxHealth = most;
+            if (most < target->health) {
+                target->health = most;
+                target->touch();
+            }
+        }
+    }
+    if (!caster->player) {
+        orderCreatures(fight, *caster, target, 4);
+    } else {
+        orderCreatures(fight, *caster, target, caster->player->creatureOrder);
+        target->subclasses |= 0x180u;  // monster subclasses MONITOR (0x80) and MIGRATE (0x100)
+        reportAcquired(world, *caster, *target); // (and its minimap mark)
+        simpleObjTo(world, *caster, *target);    // (SrvNet_SendSimpleObjReliable)
+        if (world.quest()) {
+            unlinkSpawn(world, *target); // (its generator's no more)
+        }
+    }
+    playSound(world, spellSound(things, s.spell, 1), *caster); // (at the record's caster)
+    return 1;
+}
+
+int Spells::lastingGreaterHeal(DurationSpell& s, ServerObject* caster, ServerObject* target)
+{
+    // Greater Heal
+    if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+        return 1;
+    }
+    if (caster && enchanted(*caster, Enchant::Run)) {
+        return 1;
+    }
+    if (!caster || !canInteract(world, *caster, *target)) {
+        return 1;
+    }
+    if (manaOf(*caster) == 0) {
+        return 1;
+    }
+    if (((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) || justHurt(*caster, frame)) {
+        return 1;
+    }
+    if (target->maxHealth == target->health) {
+        return 1;
+    }
+    // Its amount a frame at its power (0.5-1.5), the fraction kept (x a player
+    // caster's class health multiplier, 1).
+    static constexpr float kHeal[6] = {0, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f};
+    const int whole = wholePoints(s, kHeal[std::clamp(s.power, 0, 5)]);
+    addHealth(*target, whole);
+    addMana(*caster, -1);
+    return 0;
+}
+
+int Spells::lastingDrainMana(DurationSpell& s, ServerObject* caster)
+{
+    // Drain Mana (spellDrainMana)
+    if (casterGoneOrRunning(s, caster)) {
+        return 1;
+    }
+    if (s.glyph) { // a glyph's: 50 off the nearest at once
+        const float px = caster ? caster->x : s.x;
+        const float py = caster ? caster->y : s.y;
+        if (ServerObject* t = drainTarget(px, py, caster)) {
+            addMana(*t, -50);
+        }
+        return 1;
+    }
+    if (caster->player && caster->player->maxMana <= caster->player->mana) {
+        return 1;
+    }
+    if ((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) {
+        return 1;
+    }
+    // It stands where it cast and isn't hurt.
+    if (justHurt(*caster, frame) || !(std::fabs(s.x - caster->x) < 5.0f) || !(std::fabs(s.y - caster->y) < 5.0f)) {
+        return 1;
+    }
+    ServerObject* from = drainTarget(caster->x, caster->y, caster);
+    s.target = from ? from->extent : 0;
+    if (!from) {
+        if (s.rayTarget != 0) {
+            rayFx(world, s, false, s.rayTarget);
+        }
+        return 1;
+    }
+    const int whole = wholePoints(s, world.number("ManaDrainCoeff", static_cast<std::size_t>(s.power - 1)));
+    if (s.target != s.rayTarget) {
+        if (s.rayTarget != 0) {
+            rayFx(world, s, false, s.rayTarget);
+        }
+        rayFx(world, s, true, s.target);
+    }
+    if (drainMana(*caster, *from, whole) && frame % 15u == 0) { // (gameFPS >> 1: its hum, twice a second)
+        playSound(world, 0xE6, *caster);
+        playSound(world, 0xE5, *from);
+    }
+    s.rayTarget = s.target;
+    return 0;
+}
+
+int Spells::lastingChannelLife(DurationSpell& s, ServerObject* caster, ServerObject* target)
+{
+    // Channel Life: the caster's health into the target's mana
+    Fight fight{world, rng, frame, &things, modifiers};
+    if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+        return 1;
+    }
+    if (s.glyph) {
+        addMana(*target, 20);
+        fight.takeHealth(*target, 20);
+        return 1;
+    }
+    if (caster && enchanted(*caster, Enchant::Run)) {
+        return 1;
+    }
+    if ((target->classes & oc::Monster) && movedFrom(*target, s.x, s.y)) {
+        return 1;
+    }
+    // Full: ends (a monster's most, 0, is never its 1000: it runs on, the caster paying).
+    if ((target->player ? target->player->maxMana : 0) == manaOf(*target)) {
+        return 1;
+    }
+    if (!caster || caster->health < 2) {
+        return 1;
+    }
+    const int whole = wholePoints(s, world.number("ChannelLifeCoeff", static_cast<std::size_t>(s.power - 1)));
+    addMana(*target, whole);
+    fight.takeHealth(*caster, 1);
+    return 0;
+}
+
+int Spells::lastingPlasma(DurationSpell& s, ServerObject* caster, ServerObject* target)
+{
+    // Plasma (plasmaShot)
+    Fight fight{world, rng, frame, &things, modifiers};
+    if (!caster) {
+        return 1;
+    }
+    if ((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) {
+        return 1;
+    }
+    // Its target kept while it lives, within 400 and in reach (FPS x 3 frames more, once it's
+    // behind the caster: s.value counts them down); else the enemy under the cursor within
+    // 400 (a monster's record read as a player's: with the monsters), else the nearest
+    // enemy creature within 400 it sees.
+    bool kept = false;
+    if (target) {
+        if (!(target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+            if (!(facingSides(caster->x, caster->y, caster->direction, target->x, target->y) & 2)) {  // bit 2: behind the caster
+                s.value = 0;
+            } else if (s.value == 0) {
+                s.value = 30 * 3;
+            }
+            kept = edgeDistance53(*target, *caster) <= X87(400.0f) && canInteract(world, *caster, *target);
+        }
+        if (!kept) {
+            s.target = 0;
+            target = nullptr;
+        }
+    }
+    if (!kept) {
+        ServerObject* found = nullptr;
+        if (caster->player && caster->player->cursorObject != 0) {
+            ServerObject* under = world.byExtent(caster->player->cursorObject);
+            if (under && isEnemy(world, *caster, *under) && edgeDistance53(*caster, *under) <= X87(400.0f)) {
+                found = under;
+            }
+        }
+        if (!found) {
+            float best = 160000.0f; // (0x481C4000)
+            world.unitsInCircle(caster->x, caster->y, 400.0f, [&](ServerObject& o) { // (unitsGetInCircle, by the grid)
+                if (!(o.classes & 0x20006u) || (o.flags & (ObjFlag::Dead | ObjFlag::Destroyed)) || o.pendingDelete || &o == caster || o.holder != 0 ||  // classes Monster | Player | MonsterGenerator
+                    ((o.classes & oc::Monster) && (o.subclasses & 0x8000u)) || !isEnemy(world, *caster, o)) {
+                    return;
+                }
+                const float dx = o.x - caster->x;
+                const float dy = o.y - caster->y;
+                const float d2 = dx * dx + dy * dy;
+                if (d2 < best && canInteract(world, *caster, o)) {
+                    best = d2;
+                    found = &o;
+                }
+            });
+        }
+        target = found;
+        s.target = found ? found->extent : 0;
+        s.value = 0;
+    }
+    if (s.value != 0 && --s.value == 0) {  // its 3 s behind the caster ran out
+        s.target = 0;
+        target = nullptr;
+    }
+    // The beam (MSG_FX_DURATION_SPELL 1 / 8) to it as it changes.
+    if (!target) {
+        if (s.rayTarget != 0) {
+            rayFx(world, s, false, s.rayTarget);
+            s.rayTarget = 0;
+        }
+        return 0;
+    }
+    if (target->extent != s.rayTarget) {
+        if (s.rayTarget != 0) {
+            rayFx(world, s, false, s.rayTarget);
+        }
+        rayFx(world, s, true, target->extent);
+    }
+    const bool hecubah = target->typeName == "Hecubah" || target->typeName == "HecubahWithOrb";
+    fight.damage(*target, caster, 0, static_cast<int>(world.number(hecubah ? "PlasmaDamageHecubah" : "PlasmaDamage")), 0xE, HitCause::Spell);
+    if (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
+        pointFx(0x83, target->x, target->y);
+    }
+    s.rayTarget = target->extent;
+    if (caster->player) {
+        fight.setPlayerState(*caster, 0x16);
+    }
+    if (frame % 10u == 0) { // (gameFPS / 3: its hum at both ends)
+        playSound(world, 0x62, *caster);
+        playSound(world, 0x62, *target);
+    }
+    if (s.value == 0) {  // not behind (no count): its search time renewed
+        s.end = frame + static_cast<std::uint32_t>(world.number("PlasmaSearchTime"));
+    }
+    if (s.staff != 0) { // a charge of its staff a frame, its charge percent with it (what an obelisk tops up)
+        ServerObject* w = world.byExtent(s.staff);
+        if (w && w->charges != 0) {
+            --w->charges;
+            if (w->maxCharges != 0) {
+                w->chargePercent = w->charges * 100 / w->maxCharges;
+            }
+            if (caster->player) {
+                fight.setPlayerState(*caster, 0x16);
+                tell(*caster, {0x64, lo(w->extent), hi(w->extent), w->charges, w->maxCharges});
+            }
+            if (w->charges != 0) {
+                return 0;
+            }
+        }
+        return 1;
+    }
+    return 0;
+}
+
+int Spells::lastingForceOfNature(DurationSpell& s, ServerObject* caster)
+{
+    // Force of Nature
+    Fight fight{world, rng, frame, &things, modifiers};
+    if (caster && enchanted(*caster, Enchant::Run)) {
+        return 1;
+    }
+    if (s.end - 7 == frame && s.object) { // the charge goes just before
+        if (ServerObject* charge = world.byExtent(s.object)) {
+            charge->pendingDelete = true;
+        }
+    }
+    if (s.end - 1 != frame) {
+        if (!s.glyph && caster && caster->player) {
+            fight.setPlayerState(*caster, 10);
+        }
+        return 0;
+    }
+    if (!things.findThing("DeathBall")) {
+        return 1;
+    }
+    // From the caster, its shape's reach + 4 ahead (a point's 4, else 24) the way it faces
+    // now; a glyph's from where it was cast, its facing then, at rest.
+    float fx = s.x;
+    float fy = s.y;
+    int way = s.value;
+    X87 ahead = X87(0.0f); // (on the stack)
+    if (!s.glyph && caster) {
+        fx = caster->x;
+        fy = caster->y;
+        way = caster->direction;
+        switch (caster->shape) {
+        case ShapeKind::Center: ahead = X87(4.0f); break;
+        case ShapeKind::Circle: ahead = X87(caster->radius) + 4.0f; break;
+        case ShapeKind::Box: ahead = X87(std::max(caster->boxWidth, caster->boxHeight)) + 4.0f; break;
+        default: ahead = X87(24.0f); break;
+        }
+    }
+    const auto [dx, dy] = directionVector(way & 0xFF);
+    float bx = (X87(dx) * ahead + fx).f();
+    float by = (X87(dy) * ahead + fy).f();
+    if (!world.traceRay(fx, fy, bx, by, Trace::Doors | Trace::ThroughWindows)) {
+        bx = fx;
+        by = fy;
+    }
+    ServerObject& ball = world.spawn(things, "DeathBall", bx, by);
+    ball.owner = caster ? caster->extent : 0;
+    ball.born = frame;
+    ball.flags |= ObjFlag::Active;
+    ball.newX = bx;
+    ball.newY = by;
+    if (s.glyph) {
+        ball.vx = ball.vy = 0;
+    } else {
+        ball.vx = (X87(dx) * ball.speedCur).f();
+        ball.vy = (X87(dy) * ball.speedCur).f();
+    }
+    ball.direction = static_cast<std::uint16_t>(way);
+    ball.touch();
+    if (caster) {
+        playSound(world, 0x26, *caster);
+    }
+    return 1;
+}
+
+int Spells::lastingManaBomb(DurationSpell& s, ServerObject* caster)
+{
+    // Mana Bomb (manaBombBoom)
+    if (!caster && !s.glyph) {
+        return 1;
+    }
+    bool goes = s.end - 1 == frame;
+    if (caster && caster->player && caster->player->mana == 0) {
+        goes = true;
+    }
+    if (s.object) { // the charge goes when the mana's nearly out (a glyph's: 9 frames before)
+        const bool keep = !s.glyph && caster && caster->player ? 14 < caster->player->mana : 9u < s.end - frame;
+        if (!keep) {
+            if (ServerObject* charge = world.byExtent(s.object)) {
+                charge->pendingDelete = true;
+            }
+            s.object = 0;
+        }
+    }
+    const int power = s.value;  // the power charged so far; it grows each frame till it goes
+    if (!goes) {
+        s.value += static_cast<int>(world.number("ManaBombDeltaPower", static_cast<std::size_t>(s.power - 1)));
+        if (!s.glyph && caster && caster->player) {
+            addMana(*caster, -s.power);
+        }
+        return 0;
+    }
+    float bx = s.x;
+    float by = s.y;
+    if (!s.glyph) {
+        if (!caster) {
+            return 1;
+        }
+        bx = caster->x;
+        by = caster->y;
+    }
+    // (The walls take it too: with the walls' damage.) Its power, less past ManaBombInRadius,
+    // out to ManaBombOutRadius, as mana-bomb harm (15), from its caster: the caster too
+    // (gameSetWallsDamage(1): its source not spared).
+    Missiles{world, things, modifiers, rng, frame}.damageAt(bx, by, world.number("ManaBombOutRadius"), world.number("ManaBombInRadius"),
+                                                             power, 15, caster, nullptr, false, HitCause::Spell);
+    jiggle(bx, by, static_cast<int>(world.number("ManaBombShakeMag")));
+    pointFx(0x81, bx, by);
+    pointFx(0x9A, bx, by);
+    if (caster) {
+        playSound(world, 0x51, *caster);
+    }
+    s.burst = true;
+    return 1;
+}
+
+int Spells::lastingFirewalk(DurationSpell& s, ServerObject* target)
+{
+    // Firewalk (firewalkTick)
+    if (!target || (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
+        return 1;
+    }
+    if (s.start == s.last) { // the first pass: the trail starts where it stands
+        s.trail = {target->x, target->y, target->x, target->y};
+        ++s.last;
+        return 0;
+    }
+    const X87 dx = X87(target->x) - s.trail[0]; // (the distance on the stack)
+    const X87 dy = X87(target->y) - s.trail[1];
+    // (Small flames at 1, up to medium at 2-3, up to big at 4-5.)
+    const int most = s.power < 2 ? 0 : (3 < s.power) + 1;
+    if (X87(15.0f) < util::sqrt(dx * dx + dy * dy) - target->radius) {
+        static constexpr const char* kFlames[3] = {"SmallFlame", "MediumFlame", "Flame"};
+        float px = s.trail[0];
+        float py = s.trail[1];
+        for (int i = 0; i < 2; ++i) { // two, the second halfway back towards the last
+            const char* kind = kFlames[nox::util::uniform_int_distribution<int>(0, most)(rng)];
+            if (things.findThing(kind)) {
+                ServerObject& f = world.spawn(things, kind, px, py);
+                f.born = frame;
+                f.flags |= ObjFlag::Active;
+                f.decayAt = frame + 30 * 25;
+                playSoundAt(world, 0x2E, px, py);
+            }
+            // (Only when it moved both ways from the last: a straight run along an axis lays
+            // both on one spot.)
+            // (Each difference stored.)
+            const float backX = (X87(px) - s.trail[2]).f();
+            const float backY = (X87(py) - s.trail[3]).f();
+            if (backX != 0 && backY != 0) {
+                px = (X87(px) - X87(backX) * 0.5f).f();
+                py = (X87(py) - X87(backY) * 0.5f).f();
+            }
+        }
+        s.trail = {target->x, target->y, s.trail[0], s.trail[1]};
+    }
+    return 0;
+}
+
+int Spells::lastingLightning(DurationSpell& s, ServerObject* caster, ServerObject* target)
+{
+    // Lightning (spellEnergyBoltTick)
+    Fight fight{world, rng, frame, &things, modifiers};
+    if (casterGoneOrRunning(s, caster)) {
+        return 1;
+    }
+    const float range = world.number("LightningRange");
+    if (s.glyph) { // a glyph's: one strike at the nearest enemy, and done
+        if (ServerObject* t = boltTarget(s.x, s.y, range, caster, true)) {
+            ServerObject* source = s.source ? world.byExtent(s.source) : nullptr;
+            fight.damage(*t, source, 0, static_cast<int>(world.number("EnergyBoltGlyphDamage")), 17, HitCause::Spell);
+            pointFx(0x82, t->x, t->y);
+            playSound(world, spellSound(things, 0x18, 0), *t);
+        }
+        return 1;
+    }
+    if ((caster->classes & oc::Monster) && movedFrom(*caster, s.x, s.y)) {
+        return 1;
+    }
+    if (2u < frame - s.start && justHurt(*caster, frame)) {
+        return 1;
+    }
+    // Its target kept while it lives, is in front, in range and in sight; else the enemy
+    // under a player's cursor in range, else the nearest it can strike.
+    if (target && ((target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) ||
+                   !(facingSides(caster->x, caster->y, caster->direction, target->x, target->y) & 1) ||
+                   X87(range) < edgeDistance53(*target, *caster) || !canInteract(world, *caster, *target))) {
+        target = nullptr;
+    }
+    if (!target) {
+        s.target = 0;
+        if (caster->player && caster->player->cursorObject != 0) {
+            ServerObject* under = world.byExtent(caster->player->cursorObject);
+            if (under && isEnemy(world, *caster, *under) && edgeDistance53(*caster, *under) <= X87(range)) {
+                target = under;
+            }
+        }
+        if (!target) {
+            target = boltTarget(caster->x, caster->y, range, caster, false);
+        }
+        s.target = target ? target->extent : 0;
+    }
+    if (!target) {
+        if (s.rayTarget != 0) {
+            rayFx(world, s, false, s.rayTarget);
+            s.rayTarget = 0;
+        }
+        return 0;
+    }
+    const int whole = wholePoints(s, world.number("EnergyBoltDamage", static_cast<std::size_t>(s.power - 1)));
+    if (s.target != s.rayTarget) {
+        if (s.rayTarget != 0) {
+            rayFx(world, s, false, s.rayTarget);
+        }
+        rayFx(world, s, true, s.target);
+    }
+    fight.damage(*target, caster, 0, whole, 17, HitCause::Spell);
+    if (target->flags & (ObjFlag::Dead | ObjFlag::Destroyed)) {
+        pointFx(0x82, target->x, target->y);
+    }
+    s.rayTarget = s.target;
+    if (caster->player) {
+        fight.setPlayerState(*caster, 10);
+    }
+    if (frame % 10u == 0) { // (gameFPS / 3: its hum at both ends)
+        playSound(world, 0x20, *caster);
+        playSound(world, 0x20, *target);
+    }
+    s.end = frame + static_cast<std::uint32_t>(world.number("LightningSearchTime"));  // renewed each frame it strikes
+    if (caster->player) {
+        fight.setPlayerState(*caster, 10);
+        addMana(*caster, -1);
+        if (caster->player->mana == 0) {
+            return 1;
+        }
+    }
+    if (target->flags & ObjFlag::Dead) {  // a kill ends it next frame
+        s.end = frame + 1;
+    }
+    return 0;
 }
 
 ServerObject* Spells::boltTarget(float x, float y, float range, ServerObject* caster, bool glyph)

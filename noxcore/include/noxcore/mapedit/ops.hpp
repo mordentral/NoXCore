@@ -74,6 +74,8 @@ struct ObjectEntry {
     ObjId id = 0;
     DocObject object;
 };
+/// `id` and its inventory appended to `out`, owner first, in record order.
+void appendSubtree(const MapDocument& d, ObjId id, std::vector<ObjectEntry>& out);
 /// Adds objects with the ids, parents and record order keys given (an owner before its items).
 struct AddObjects {
     std::vector<ObjectEntry> objects;

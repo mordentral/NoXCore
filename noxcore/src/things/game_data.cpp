@@ -40,7 +40,10 @@ std::vector<std::string_view> splitWords(std::string_view s)
 }
 
 /// The names compare without case ("WarCryDuration" finds the file's
-/// "WarcryDuration").
+/// "WarcryDuration"). (This and NoCaseHash below fold to upper case, util/text.hpp's helpers to
+/// lower: the same names match either way, ASCII letters only, but the hash's numbers differ from
+/// util::'s. They are kept as a pair of their own, the table's hash and its compare, never mixed
+/// with util's.)
 bool sameName(std::string_view a, std::string_view b)
 {
     if (a.size() != b.size()) {

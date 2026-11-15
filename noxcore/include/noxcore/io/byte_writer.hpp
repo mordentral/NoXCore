@@ -2,12 +2,15 @@
 #pragma once
 
 #include "noxcore/crypto/crc.hpp"
+#include "noxcore/io/byte_reader.hpp"
 
 #include <array>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -92,5 +95,16 @@ private:
     bool crcOn_ = false;
     std::uint32_t crc_ = crypto::kCrcInit;
 };
+
+/// A container's size `n` as a count field of type T (the map and .plr writers'); one that doesn't
+/// fit throws FormatError naming `what`.
+template <class T>
+T countOf(std::size_t n, std::string_view what)
+{
+    if (n > std::numeric_limits<T>::max()) {
+        throw FormatError(std::string(what) + ": too many entries (" + std::to_string(n) + ")");
+    }
+    return static_cast<T>(n);
+}
 
 } // namespace nox

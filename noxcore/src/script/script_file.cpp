@@ -1,6 +1,8 @@
 // Reading and writing a map's compiled NoxScript (the layout is in script_file.hpp).
 #include "noxcore/script/script_file.hpp"
 
+#include "noxcore/io/byte_reader.hpp"
+
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -9,64 +11,24 @@ namespace nox::script {
 
 namespace {
 
-// Little-endian reads over the section's bytes; throws on reading past the end.
-class Reader {
-public:
-    explicit Reader(std::span<const std::uint8_t> data) : data_(data) {}
+/// `n` bytes as a string, ended at its first NUL (a string stops there).
+std::string text(ByteReader& r, std::size_t n)
+{
+    std::string s = r.rawString(n);
+    if (const auto nul = s.find('\0'); nul != std::string::npos) {
+        s.resize(nul);
+    }
+    return s;
+}
 
-    /// `n` items of at least `each` bytes each checked against what's left, before anything is
-    /// sized by the count (a u32 that may say billions).
-    std::size_t count(std::uint64_t n, std::size_t each)
-    {
-        if (n > (data_.size() - at_) / each) {
-            throw std::runtime_error("script: count " + std::to_string(n) + " past the end at " + std::to_string(at_));
-        }
-        return static_cast<std::size_t>(n);
+/// The tag's length in bytes, compared with it.
+void expect(ByteReader& r, std::string_view tag)
+{
+    const std::size_t at = r.offset();
+    if (text(r, tag.size()) != tag) {
+        throw FormatError("script: expected " + std::string(tag) + " at " + std::to_string(at));
     }
-
-    std::uint32_t u32()
-    {
-        need(4);
-        const std::uint32_t v = data_[at_] | (data_[at_ + 1] << 8) | (data_[at_ + 2] << 16) |
-                                (static_cast<std::uint32_t>(data_[at_ + 3]) << 24);
-        at_ += 4;
-        return v;
-    }
-    std::span<const std::uint8_t> raw(std::size_t n)
-    {
-        need(n);
-        const auto s = data_.subspan(at_, n);
-        at_ += n;
-        return s;
-    }
-    std::string bytes(std::size_t n)
-    {
-        const auto b = raw(n);
-        std::string s(reinterpret_cast<const char*>(b.data()), n);
-        // (ends it with a NUL: a string stops at its first NUL.)
-        if (const auto nul = s.find('\0'); nul != std::string::npos) {
-            s.resize(nul);
-        }
-        return s;
-    }
-    /// the tag's length in bytes, compared with it.
-    void expect(std::string_view tag)
-    {
-        if (bytes(tag.size()) != tag) {
-            throw std::runtime_error("script: expected " + std::string(tag) + " at " + std::to_string(at_ - tag.size()));
-        }
-    }
-
-private:
-    void need(std::size_t n) const
-    {
-        if (at_ + n > data_.size()) {
-            throw std::runtime_error("script: truncated at " + std::to_string(at_));
-        }
-    }
-    std::span<const std::uint8_t> data_;
-    std::size_t at_ = 0;
-};
+}
 
 /// strtok(…, "%") over a copy: the non-empty pieces.
 std::vector<std::string> pieces(const std::string& name)
@@ -95,21 +57,21 @@ ScriptFile ScriptFile::parse(std::span<const std::uint8_t> data)
     if (data.empty()) {
         return f; // a map without a script (28 of the game's own)
     }
-    Reader r(data);
-    r.expect("SCRIPT03");
-    r.expect("STRG");
+    ByteReader r(data, "script");
+    expect(r, "SCRIPT03");
+    expect(r, "STRG");
     const std::uint32_t strings = r.u32();
     f.strings.reserve(r.count(strings, 4)); // (each string at least its length)
     for (std::uint32_t i = 0; i < strings; ++i) {
-        f.strings.push_back(r.bytes(r.u32()));
+        f.strings.push_back(text(r, r.u32()));
     }
-    r.expect("CODE");
+    expect(r, "CODE");
     const std::uint32_t count = r.u32();
     std::uint64_t scriptWords = 0; // (every function's locals so far)
     for (std::uint32_t index = 0; index < count; ++index) {
         Function fn;
-        r.expect("FUNC");
-        fn.name = r.bytes(r.u32());
+        expect(r, "FUNC");
+        fn.name = text(r, r.u32());
         if (fn.name.size() > 0x3FF) {
             throw std::runtime_error("script: a function's name is over 1023 bytes");
         }
@@ -123,7 +85,7 @@ ScriptFile ScriptFile::parse(std::span<const std::uint8_t> data)
         }
         fn.returns = r.u32();
         fn.args = r.u32();
-        r.expect("SYMB");
+        expect(r, "SYMB");
         std::uint32_t symbols = r.u32();
         // Function 0's symbol 0 isn't stored: it is a size-0 placeholder, so object-variable symbol
         // indexes (negated in the code) start at 1.
@@ -152,14 +114,14 @@ ScriptFile ScriptFile::parse(std::span<const std::uint8_t> data)
         if (scriptWords > kMaxScriptLocalWords) {
             throw std::runtime_error("script: its functions' locals are too big in all");
         }
-        r.expect("DATA");
-        const auto code = r.raw(r.u32());
+        expect(r, "DATA");
+        const auto code = r.bytes(r.u32());
         // A code length that isn't a whole number of words is zero-padded.
         fn.code.assign((code.size() + 3) / 4, 0);
         std::memcpy(fn.code.data(), code.data(), code.size()); // (little-endian words)
         f.functions.push_back(std::move(fn));
     }
-    r.expect("DONE");
+    expect(r, "DONE");
     f.reindex();
     return f;
 }

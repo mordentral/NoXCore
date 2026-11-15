@@ -6,6 +6,7 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 
@@ -16,10 +17,7 @@ namespace {
 // Every pad in the container aligns to the 8-byte cipher block.
 constexpr std::size_t kBlock = crypto::Blowfish::kBlockSize;
 
-bool allZero(std::span<const std::uint8_t> b)
-{
-    return std::all_of(b.begin(), b.end(), [](std::uint8_t v) { return v == 0; });
-}
+using util::allZero;
 
 // Skips to the next 8-byte boundary, insisting the skipped bytes are zero.
 void expectZeroPad(ByteReader& r)

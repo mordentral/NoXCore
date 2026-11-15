@@ -93,6 +93,35 @@ inline std::string_view ircWord(std::string_view& rest)
     return w;
 }
 
+/// A session's queued `lines` added to `pending`, each with its CR LF, then what `to` takes of
+/// `pending` sent (nothing sent without `to`); the rest waits for the next call.
+inline void sendLines(std::vector<std::string> lines, std::string& pending, XwisConnection* to)
+{
+    for (const auto& line : lines) {
+        pending += line;
+        pending += "\r\n";
+    }
+    if (!pending.empty() && to) {
+        pending.erase(0, to->send(std::span(reinterpret_cast<const std::uint8_t*>(pending.data()), pending.size())));
+    }
+}
+
+/// An IRC line's head: its optional ":prefix" (without the ':'; empty when there's none) and its
+/// command word, both split off `rest`.
+struct IrcHead {
+    std::string_view prefix;
+    std::string_view command;
+};
+inline IrcHead ircHead(std::string_view& rest)
+{
+    IrcHead h;
+    if (!rest.empty() && rest.front() == ':') {
+        h.prefix = ircWord(rest).substr(1);
+    }
+    h.command = ircWord(rest);
+    return h;
+}
+
 /// Case-insensitive ASCII equality (IRC nicks and channels).
 inline bool ircSameName(std::string_view a, std::string_view b)
 {
@@ -106,10 +135,7 @@ inline bool ircSameName(std::string_view a, std::string_view b)
 inline bool isStockLoginExtraReply(std::string_view text)
 {
     std::string_view rest = text;
-    if (!rest.empty() && rest.front() == ':') {
-        ircWord(rest); // (the server's prefix)
-    }
-    const std::string_view command = ircWord(rest);
+    const std::string_view command = ircHead(rest).command; // (past the server's prefix)
     if (command.size() != 3 || (command[0] != '4' && command[0] != '5')) {
         return false;
     }

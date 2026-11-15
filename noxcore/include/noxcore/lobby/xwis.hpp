@@ -6,7 +6,7 @@
 // itself (XWIS makes the account on the spot), then `LIST -1 37` (37 = Nox) answers one
 // `326` line per game and `323` at the end. A game's topic is "G1P3", the game version (three
 // bytes, 0x1039A) and the host's server-info record packed seven bits per byte with the top bit
-// set, so it stays printable (GAME.EXE's packer is the record is parseWolRecord's).
+// set, so it stays printable (as GAME.EXE packs it; the record as parseWolRecord reads it).
 //
 // XwisSession is the conversation without sockets: queue its lines to the server, feed it what
 // comes back (ServerBrowser drives it over a TcpSocket).

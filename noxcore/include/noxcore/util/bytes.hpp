@@ -2,6 +2,7 @@
 // save and file code shares. No bounds checks: the caller keeps the offset inside the data.
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -59,6 +60,12 @@ inline void putU32(std::vector<std::uint8_t>& out, std::uint32_t v)
     for (int i = 0; i < 4; ++i) {
         out.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
     }
+}
+
+/// Whether every byte is 0 (the map and .plr files' padding).
+inline bool allZero(std::span<const std::uint8_t> b)
+{
+    return std::all_of(b.begin(), b.end(), [](std::uint8_t v) { return v == 0; });
 }
 
 } // namespace nox::util

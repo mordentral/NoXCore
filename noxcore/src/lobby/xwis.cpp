@@ -170,10 +170,7 @@ void XwisSession::line(std::string_view text)
         return;
     }
     std::string_view rest = text;
-    if (rest.front() == ':') {
-        token(rest);
-    }
-    const std::string_view command = token(rest);
+    const std::string_view command = detail::ircHead(rest).command;
     if (command == "PING") {
         outgoing_.push_back("PONG " + std::string(rest));
     } else if (command == "ERROR") {

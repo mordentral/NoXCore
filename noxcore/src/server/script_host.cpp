@@ -639,6 +639,60 @@ int ScriptHost::builtin(std::uint32_t id, script::Vm& vm)
     return gameBuiltin(id, vm);
 }
 
+namespace {
+
+/// forGroup's walk (each group's forGroup): the group whose id `vm` pops, of `kind`, `fn` for each
+/// of its members.
+template <class F>
+void walkGroups(World& world, script::Vm& vm, ServerGroup::Kind kind, F fn)
+{
+    // server_scriptExecuteFnForEachGroupObj: a group of that kind, its members; a
+    // group of groups (3) each of its groups in turn, of whatever kind. A wall group's walk
+    // falls on into case 3 (its switch has no break there: an original bug), taking each
+    // wall's x as a group's id. (A group met again on the way: the exe recurses till its
+    // stack runs out; ours goes no further.)
+    std::vector<const ServerGroup*> walking;
+    const auto walk = [&](const auto& self, const ServerGroup* g) -> void {
+        if (!g || std::ranges::find(walking, g) != walking.end()) {
+            return;
+        }
+        walking.push_back(g);
+        switch (g->kind) {
+        case ServerGroup::Kind::Walls:
+            if (kind != ServerGroup::Kind::Walls) {
+                break;
+            }
+            if constexpr (std::is_invocable_v<decltype(fn), std::uint32_t>) { // (a wall group's walk: wall handles)
+                for (const auto& [x, y] : g->walls) {
+                    fn(wallHandle(x, y));
+                }
+            }
+            for (const auto& [x, y] : g->walls) {
+                self(self, world.group(x));
+            }
+            break;
+        case ServerGroup::Kind::Unknown3:
+            for (const GroupMember m : g->members) {
+                self(self, world.group(m.groupId()));
+            }
+            break;
+        default:
+            if constexpr (std::is_invocable_v<decltype(fn), GroupMember>) { // (an object or waypoint group's: its members)
+                if (g->kind == kind) {
+                    for (const GroupMember m : g->members) {
+                        fn(m);
+                    }
+                }
+            }
+            break;
+        }
+        walking.pop_back();
+    };
+    walk(walk, world.group(vm.popInt()));
+}
+
+} // namespace
+
 // A map script's builtin call: its arguments popped off the VM's stack (last argument first),
 // its result pushed. 0 to go on, 1 to stop the script (StopScript). Every one of the game's 211
 // is here (checked one by one); the fallback at the end (pop, push 0, counted) is left for
@@ -646,67 +700,104 @@ int ScriptHost::builtin(std::uint32_t id, script::Vm& vm)
 int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
 {
     const auto popObject = [&] { return object(vm.popInt()); };
-    const auto forGroup = [&](ServerGroup::Kind kind, auto fn) {
-        // server_scriptExecuteFnForEachGroupObj: a group of that kind, its members; a
-        // group of groups (3) each of its groups in turn, of whatever kind. A wall group's walk
-        // falls on into case 3 (its switch has no break there: an original bug), taking each
-        // wall's x as a group's id. (A group met again on the way: the exe recurses till its
-        // stack runs out; ours goes no further.)
-        std::vector<const ServerGroup*> walking;
-        const auto walk = [&](const auto& self, const ServerGroup* g) -> void {
-            if (!g || std::ranges::find(walking, g) != walking.end()) {
-                return;
-            }
-            walking.push_back(g);
-            switch (g->kind) {
-            case ServerGroup::Kind::Walls:
-                if (kind != ServerGroup::Kind::Walls) {
-                    break;
-                }
-                if constexpr (std::is_invocable_v<decltype(fn), std::uint32_t>) { // (a wall group's walk: wall handles)
-                    for (const auto& [x, y] : g->walls) {
-                        fn(wallHandle(x, y));
-                    }
-                }
-                for (const auto& [x, y] : g->walls) {
-                    self(self, world_.group(x));
-                }
-                break;
-            case ServerGroup::Kind::Unknown3:
-                for (const GroupMember m : g->members) {
-                    self(self, world_.group(m.groupId()));
-                }
-                break;
-            default:
-                if constexpr (std::is_invocable_v<decltype(fn), GroupMember>) { // (an object or waypoint group's: its members)
-                    if (g->kind == kind) {
-                        for (const GroupMember m : g->members) {
-                            fn(m);
-                        }
-                    }
-                }
-                break;
-            }
-            walking.pop_back();
-        };
-        walk(walk, world_.group(vm.popInt()));
-    };
-    const auto eachGroupObject = [&](auto fn) {
-        // (each member by its map number, netGetUnitByExtent: one on the map)
-        forGroup(ServerGroup::Kind::Objects, [&](GroupMember m) {
-            if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
-                fn(*o);
-            }
-        });
-    };
-    const auto eachGroupWaypoint = [&](auto fn) {
-        forGroup(ServerGroup::Kind::Waypoints, [&](GroupMember m) {
-            if (ServerWaypoint* w = world_.waypoint(m.waypointId())) {
-                fn(*w);
-            }
-        });
-    };
-    const auto pushName = [&](std::string s) { vm.push(vm.addString(std::move(s))); };
+
+    switch (id) {
+    case Wall: case WallOpen: case WallClose: case WallToggle: case WallBreak: case WallGroupOpen: case WallGroupClose:
+    case WallGroupToggle: case WallGroupBreak: case NoWallSound:
+        return gameWalls(id, vm);
+    case SecondTimer: case FrameTimer: case SecondTimerWithArg: case FrameTimerWithArg: case CancelTimer:
+    case RandomFloat: case Random: case IntToString: case FloatToString: case SetQuestStatus: case SetQuestStatusFloat:
+    case GetQuestStatus: case GetQuestStatusFloat: case ResetQuestStatus:
+        return gameValues(id, vm);
+    case ObjectOn: case ObjectOff: case ObjectToggle: case Move: case GiveXp: case TrapSpells: case GroupMove:
+    case ObjectGroupOn: case ObjectGroupOff: case ObjectGroupToggle: case Delete: case GroupDelete: case UnlockDoor:
+    case LockDoor: case CreateObject: case CreateMover: case GroupCreateMover: case MoveObject: case SetCallback:
+        return gameObjects(id, vm);
+    case BecomePet: case BecomeEnemy: case SetOwner: case GroupSetOwner: case SetOwners: case GroupSetOwners:
+    case ClearOwner: case MakeFriendly: case MakeEnemy: case IsFriendly: case IsPet:
+        return gameOwners(id, vm);
+    case WaypointOn: case WaypointOff: case WaypointToggle: case WaypointGroupOn: case WaypointGroupOff:
+    case WaypointGroupToggle: case IsWaypointOn: case GetWaypointX: case GetWaypointY: case MoveWaypoint: case Waypoint:
+    case WaypointGroup: case ObjectGroup: case WallGroup:
+        return gameWaypoints(id, vm);
+    case AudioEvent: case Print: case PrintToAll: case Chat: case Effect: case DestroyChat: case DestroyEveryChat:
+    case Music: case ClearMessages:
+        return gameMessages(id, vm);
+    case IsObjectOn: case IsLocked: case Object: case GetObjectX: case GetObjectY: case GetObjectZ: case GetDirection:
+    case Distance: case IsTrigger: case IsCaller: case GetTrigger: case GetCaller: case IsGameBall: case IsCrown:
+    case GetHolder:
+        return gameQueries(id, vm);
+    case GetHost: case 174: case GetCharacterData: case ChangeScore: case GetScore:
+        return gamePlayers(id, vm);
+    case StopScript:
+        return 1;
+    // Dialog and the journal (script_builtins_dialog.cpp).
+    case 126: return dialogBuiltin(id, vm); // SetDialog
+    case 127: return dialogBuiltin(id, vm); // CancelDialog
+    case 128: return dialogBuiltin(id, vm); // StoryPic
+    case 129: return dialogBuiltin(id, vm); // TellStory
+    case 130: return dialogBuiltin(id, vm); // StartDialog
+    case 157: return dialogBuiltin(id, vm); // JournalEntry
+    case 158: return dialogBuiltin(id, vm); // JournalDelete
+    case 159: return dialogBuiltin(id, vm); // JournalEdit
+    case 171: return dialogBuiltin(id, vm); // GetAnswer
+    case 177: return dialogBuiltin(id, vm); // IsTalking
+    case 193: builtinIsTrading(world_, vm); return 0;                   // IsTrading (trade.hpp)
+    case 195: builtinSetShopkeeperText(world_, vm, popObject); return 0; // SetShopkeeperText (trade.hpp)
+    // The cinematic builtins (script_builtins_screen.cpp).
+    case 114: case 115: case 135: case 136: case 137: case 176: case 187: case 196: case 202: case 203: case 204: case 207: case 208:
+        return screenBuiltin(id, vm);
+    // S5's creature and object builtins (script_builtins_creatures.cpp).
+    case 13: case 14: case 29: case 30: case 33: case 51: case 52: case 55: case 56: case 57: case 58:
+    case 69: case 70: case 71: case 72: case 73: case 74: case 75: case 77: case 78: case 79: case 81:
+    case 82: case 83: case 84: case 85: case 87: case 96: case 97: case 98: case 105: case 106: case 107:
+    case 108: case 131: case 132: case 133: case 134: case 138: case 139: case 140: case 141: case 142:
+    case 143: case 144: case 145: case 146: case 147: case 148: case 149: case 150: case 151: case 152:
+    case 153: case 154: case 155: case 156: case 160: case 161: case 162: case 163: case 164: case 165:
+    case 166: case 167: case 168: case 169: case 170: case 173: case 186: case 188: case 191: case 197:
+    case 198: case 199: case 200: case 201:
+        return creatureBuiltin(id, vm);
+    // The table's empty ones: their arguments popped (an object looked up and let be), nothing
+    // done, nothing pushed.
+    case Unused1f:
+    case Unused20:
+        popObject();
+        return 0;
+    case Unused50:
+        return 0;
+    case Unused58: case Unused59: case Unused5a: case Unused5b: case Unused5c: case Unused5d: case Unused74:
+        vm.pop();
+        vm.pop();
+        return 0;
+    case Unused5e:
+        // The string's text looked up (Str_GetString) and its pointer put in a table of 1024
+        // that nothing reads; its index pushed: 0, 1, 2... from the script's load, 1023 once
+        // the table is full.
+        vm.pop();
+        vm.pushInt(static_cast<std::int32_t>(wideStrings_ < 0x400 ? wideStrings_++ : 0x3FF));
+        return 0;
+    default:
+        break;
+    }
+    // Not implemented yet: its arguments off, a 0 for its result.
+    ++unimplemented_[id];
+    if (id < kSignatures.size()) {
+        for (int i = 0; i < kSignatures[id].args; ++i) {
+            vm.pop();
+        }
+        if (kSignatures[id].returns) {
+            vm.push(0);
+        }
+    }
+    return 0;
+}
+
+// gameBuiltin's groups, each the builtins' cases as they were, with the helpers only they use.
+
+/// The walls: Wall, WallOpen / Close / Toggle / Break and their groups', NoWallSound.
+int ScriptHost::gameWalls(std::uint32_t id, script::Vm& vm)
+{
+    const auto forGroup = [&](ServerGroup::Kind kind, auto fn) { walkGroups(world_, vm, kind, fn); };
 
     switch (id) {
     case Wall: {
@@ -729,6 +820,20 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
     case WallGroupClose: forGroup(ServerGroup::Kind::Walls, [&](std::uint32_t h) { wallOp(1, h); }); return 0;
     case WallGroupToggle: forGroup(ServerGroup::Kind::Walls, [&](std::uint32_t h) { wallOp(2, h); }); return 0;
     case WallGroupBreak: forGroup(ServerGroup::Kind::Walls, [&](std::uint32_t h) { wallOp(3, h); }); return 0;
+    case NoWallSound:
+        wallSounds_ = vm.pop() == 0;
+        return 0;
+    default:
+        return -1;
+    }
+}
+
+/// The timers, the random numbers, the number strings and the quest variables.
+int ScriptHost::gameValues(std::uint32_t id, script::Vm& vm)
+{
+    const auto pushName = [&](std::string s) { vm.push(vm.addString(std::move(s))); };
+
+    switch (id) {
     case SecondTimer:
     case FrameTimer: {
         const std::uint32_t function = vm.pop();
@@ -754,6 +859,78 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         vm.push(found ? 1 : 0);
         return 0;
     }
+    case RandomFloat: {
+        const float hi = vm.popFloat();
+        const float lo = vm.popFloat();
+        vm.pushFloat(util::randomFloat(rng_, lo, hi).f()); // (randomFloat(lo, hi), FSTP: a top below the bottom draws downwards)
+        return 0;
+    }
+    case Random: {
+        // (randInt: lo plus a draw from the random table (rand()'s 0 - 32767) modulo the span
+        // hi - lo + 1, in 32 bits; a span of 0, hi with no draw. A span past 32768 never gets
+        // past lo + 32767, and with lo above hi the span is negative and the remainder lies in
+        // 0 .. lo - hi - 2: from lo up, not between them. Original bugs.)
+        const std::int32_t hi = vm.popInt();
+        const std::int32_t lo = vm.popInt();
+        const auto span = static_cast<std::int32_t>(static_cast<std::uint32_t>(hi) - static_cast<std::uint32_t>(lo) + 1u);
+        if (lo == hi) {
+            vm.pushInt(lo);
+        } else if (span == 0) {
+            vm.pushInt(hi);
+        } else if (0 < span && span <= 32768) {
+            vm.pushInt(nox::util::uniform_int_distribution<std::int32_t>(lo, hi)(rng_));
+        } else {
+            const std::int64_t width = span > 0 ? 32768 : std::min<std::int64_t>(32768, -static_cast<std::int64_t>(span));
+            const auto r = nox::util::uniform_int_distribution<std::int32_t>(0, static_cast<std::int32_t>(width - 1))(rng_);
+            vm.pushInt(static_cast<std::int32_t>(static_cast<std::uint32_t>(lo) + static_cast<std::uint32_t>(r)));
+        }
+        return 0;
+    }
+    case IntToString:
+        pushName(std::to_string(vm.popInt()));
+        return 0;
+    case FloatToString: {
+        char text[64];
+        std::snprintf(text, sizeof text, "%f", static_cast<double>(vm.popFloat()));
+        pushName(text);
+        return 0;
+    }
+    // The quest variables (quest_status.hpp): the world's one list, kept from map to map and in a
+    // solo .plr; a name without a ':' is the map's ("<map>:<name>"), found ignoring case.
+    case SetQuestStatus:      // journalQuestSet: a new one of type 0
+    case SetQuestStatusFloat: { // journalQuestSetBool: a new one of type 1
+        const std::string name = vm.string(vm.pop());
+        const std::uint32_t value = vm.pop();
+        setQuestVariable(world_, name, id == SetQuestStatus ? 0u : 1u, value);
+        return 0;
+    }
+    case GetQuestStatus:
+    case GetQuestStatusFloat: // (none: 0, the float 0)
+        vm.push(questVariableValue(world_, vm.string(vm.pop())));
+        return 0;
+    case ResetQuestStatus:
+        resetQuestVariables(world_, vm.string(vm.pop()));
+        return 0;
+    default:
+        return -1;
+    }
+}
+
+/// Objects: on / off, moved, deleted, made, doors, GiveXp, TrapSpells, SetCallback.
+int ScriptHost::gameObjects(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+    const auto forGroup = [&](ServerGroup::Kind kind, auto fn) { walkGroups(world_, vm, kind, fn); };
+    const auto eachGroupObject = [&](auto fn) {
+        // (each member by its map number, netGetUnitByExtent: one on the map)
+        forGroup(ServerGroup::Kind::Objects, [&](GroupMember m) {
+            if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
+                fn(*o);
+            }
+        });
+    };
+
+    switch (id) {
     case ObjectOn:
     case ObjectOff:
     case ObjectToggle:
@@ -779,6 +956,139 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
+    case TrapSpells: { // TrapSpells(bomber, spell, spell, spell): its glyph replaced by one of these
+        const std::int32_t c = vm.popInt();
+        const std::int32_t b = vm.popInt();
+        const std::int32_t a = vm.popInt();
+        ServerObject* o = popObject();
+        if (o && o->monster && (o->classes & things::ObjectClass::Monster) && (o->subclasses & 0x2000u)) {  // subclass 0x2000: BOMBER
+            const auto spell = [&](std::int32_t s) -> std::uint32_t {
+                const auto id = things::spellId(vm.string(s));
+                return id ? *id : 0u;
+            };
+            // (the first glyph it carries gone, delayedDeleteObject.)
+            for (const std::uint32_t e : o->inventory) {
+                if (ServerObject* g = world_.byExtent(e); g && g->typeName == "Glyph") {
+                    deleteObject(world_, *g);
+                    g->flags |= ObjFlag::Destroyed;
+                    break;
+                }
+            }
+            carriedGlyph(world_, things_, *o, std::array<std::uint32_t, 3>{spell(a), spell(b), spell(c)}, true);
+        }
+        return 0;
+    }
+    case GroupMove: { // GroupMove(group, waypoint): its members by map number, whatever its kind
+        const std::int32_t wp = vm.popInt();
+        const ServerGroup* g = world_.group(vm.popInt());
+        if (g && world_.waypoint(wp)) {
+            for (const GroupMember m : g->members) {
+                if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
+                    moveObject(world_, things_, frame_, *o, wp);
+                }
+            }
+        }
+        return 0;
+    }
+    case ObjectGroupOn:
+    case ObjectGroupOff:
+    case ObjectGroupToggle:
+        eachGroupObject([&](ServerObject& o) { setOn(o, id == ObjectGroupOn || (id == ObjectGroupToggle && !o.enabled())); });
+        return 0;
+    case Delete: // (delayedDeleteObject: a held one out of the inventory at once)
+        if (ServerObject* o = popObject()) {
+            deleteObject(world_, *o);
+        }
+        return 0;
+    case GroupDelete:
+        eachGroupObject([&](ServerObject& o) { deleteObject(world_, o); });
+        return 0;
+    case UnlockDoor:
+    case LockDoor:
+        if (ServerObject* o = popObject(); o && (o->classes & things::ObjectClass::Door)) {
+            o->lock = id == LockDoor ? 5 : 0;
+            addEvent({ScriptEvent::Kind::ObjectSound, 0, {}, o->extent, o->x, o->y, 0, 0, id == LockDoor ? kSoundLock : kSoundUnlock});
+            playSound(world_, static_cast<std::uint32_t>(id == LockDoor ? kSoundLock : kSoundUnlock), *o);
+        }
+        return 0;
+    case CreateObject: {
+        ServerWaypoint* w = world_.waypoint(vm.popInt());
+        const std::uint32_t type = vm.pop();
+        // (Nothing at all is pushed without the waypoint: the game's own slip.)
+        if (w) {
+            if (!things_.findThing(vm.string(type))) {
+                vm.push(0);
+            } else {
+                vm.pushInt(world_.spawn(things_, vm.string(type), w->x, w->y).scriptId);
+            }
+        }
+        return 0;
+    }
+    case CreateMover: { // CreateMover(object, waypoint, speed): the mover's script id
+        const float speed = vm.popFloat();
+        const std::int32_t wp = vm.popInt();
+        ServerObject* o = popObject();
+        vm.pushInt(o ? createMover(world_, things_, *o, wp, speed, frame_) : 0); // (none: the lookup's 0)
+        return 0;
+    }
+    case GroupCreateMover: { // GroupCreateMover(group, waypoint, speed): one each, nothing pushed
+        const float speed = vm.popFloat();
+        const std::int32_t wp = vm.popInt();
+        eachGroupObject([&](ServerObject& o) { createMover(world_, things_, o, wp, speed, frame_); });
+        return 0;
+    }
+    case MoveObject: {
+        const float y = vm.popFloat();
+        const float x = vm.popFloat();
+        if (ServerObject* o = popObject()) {
+            // (Obj_SetPosition, its IMMOBILE return, sync, relink, motion,
+            // harpoon and the rest)
+            // (The offset by FILD, FADD, stored: chopped.)
+            setPosition(world_, *o, (util::X87::fromDouble(vm.context().x) + x).f(), (util::X87::fromDouble(vm.context().y) + y).f(), frame_);
+        }
+        return 0;
+    }
+    case SetCallback: {
+        // SetCallback(monster, event, function): the function's index into that
+        // event's block (the block's flags kept): 3 enemy sighted, 4 looking for an
+        // enemy, 5 death, 6 change of focus, 7 hit, 8 retreat, 9 collision, 10 enemy heard, 11
+        // end of waypoint, 13 lost enemy; other events nothing.
+        const std::uint32_t function = vm.pop();
+        const std::uint32_t event = vm.pop();
+        ServerObject* o = popObject();
+        if (!o || !(o->classes & things::ObjectClass::Monster) || !o->monster) {
+            return 0;
+        }
+        auto& m = *o->monster;
+        ServerObject::ScriptBlock* block = nullptr;
+        switch (event) {
+        case 3: block = &m.onEnemySighted; break;
+        case 4: block = &m.onLookingForEnemy; break;
+        case 5: block = &m.onDeath; break;
+        case 6: block = &m.onChangeFocus; break;
+        case 7: block = &m.onIsHit; break;
+        case 8: block = &m.onRetreat; break;
+        case 9: block = &m.onCollision; break;
+        case 10: block = &m.onHearEnemy; break;
+        case 11: block = &m.onEndOfWaypoint; break;
+        case 13: block = &m.onLostEnemy; break;
+        default: return 0;
+        }
+        const auto& functions = vm_.file().functions;
+        block->function = function < functions.size() ? functions[function].name : std::string{};
+        return 0;
+    }
+    default:
+        return -1;
+    }
+}
+
+/// Owners and sides: BecomePet / Enemy, the owner builtins, MakeFriendly / Enemy, IsFriendly / IsPet.
+int ScriptHost::gameOwners(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+
+    switch (id) {
     case BecomePet:   // (script_BecomePet) BecomePet(object): the host's (player 0x1F) pet
     case BecomeEnemy: { // (script_BecomeEnemy) BecomeEnemy(object): no longer
         ServerObject* o = popObject();
@@ -863,45 +1173,39 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
-    case TrapSpells: { // TrapSpells(bomber, spell, spell, spell): its glyph replaced by one of these
-        const std::int32_t c = vm.popInt();
-        const std::int32_t b = vm.popInt();
-        const std::int32_t a = vm.popInt();
-        ServerObject* o = popObject();
-        if (o && o->monster && (o->classes & things::ObjectClass::Monster) && (o->subclasses & 0x2000u)) {  // subclass 0x2000: BOMBER
-            const auto spell = [&](std::int32_t s) -> std::uint32_t {
-                const auto id = things::spellId(vm.string(s));
-                return id ? *id : 0u;
-            };
-            // (the first glyph it carries gone, delayedDeleteObject.)
-            for (const std::uint32_t e : o->inventory) {
-                if (ServerObject* g = world_.byExtent(e); g && g->typeName == "Glyph") {
-                    deleteObject(world_, *g);
-                    g->flags |= ObjFlag::Destroyed;
-                    break;
-                }
-            }
-            carriedGlyph(world_, things_, *o, std::array<std::uint32_t, 3>{spell(a), spell(b), spell(c)}, true);
+    // IsFriendly / IsPet (the community's Unknownb8 / Unknownb9): the object's subclass bit 0x100
+    // (MIGRATE: MakeFriendly sets it, MakeEnemy clears it) / 0x80 (MONITOR: BecomePet's,
+    // BecomeEnemy's), whatever its class. With no object they push the register they saved on
+    // entry: what the builtin call left in it, 0 from an ordinary function, and from a prefab
+    // function the pointer its offset check stopped at, one past the end of the offset builtins'
+    // table.
+    case IsFriendly:
+    case IsPet:
+        if (const ServerObject* o = popObject()) {
+            vm.push(id == IsFriendly ? (o->subclasses >> 8) & 1u : (o->subclasses & 0xFFu) >> 7);
+        } else {
+            constexpr std::uint32_t kOffsetTableEnd = 0x5C3408u; // (the game's value)
+            vm.push(vm.context().prefab ? kOffsetTableEnd : 0u);
         }
         return 0;
+    default:
+        return -1;
     }
-    case GroupMove: { // GroupMove(group, waypoint): its members by map number, whatever its kind
-        const std::int32_t wp = vm.popInt();
-        const ServerGroup* g = world_.group(vm.popInt());
-        if (g && world_.waypoint(wp)) {
-            for (const GroupMember m : g->members) {
-                if (ServerObject* o = world_.byMapNumber(m.mapNumber())) {
-                    moveObject(world_, things_, frame_, *o, wp);
-                }
+}
+
+/// Waypoints, and the groups found by name.
+int ScriptHost::gameWaypoints(std::uint32_t id, script::Vm& vm)
+{
+    const auto forGroup = [&](ServerGroup::Kind kind, auto fn) { walkGroups(world_, vm, kind, fn); };
+    const auto eachGroupWaypoint = [&](auto fn) {
+        forGroup(ServerGroup::Kind::Waypoints, [&](GroupMember m) {
+            if (ServerWaypoint* w = world_.waypoint(m.waypointId())) {
+                fn(*w);
             }
-        }
-        return 0;
-    }
-    case ObjectGroupOn:
-    case ObjectGroupOff:
-    case ObjectGroupToggle:
-        eachGroupObject([&](ServerObject& o) { setOn(o, id == ObjectGroupOn || (id == ObjectGroupToggle && !o.enabled())); });
-        return 0;
+        });
+    };
+
+    switch (id) {
     case WaypointOn:
     case WaypointOff:
     case WaypointToggle:
@@ -914,14 +1218,57 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
     case WaypointGroupToggle:
         eachGroupWaypoint([&](ServerWaypoint& w) { w.enabled = id == WaypointGroupOn || (id == WaypointGroupToggle && !w.enabled); });
         return 0;
-    case Delete: // (delayedDeleteObject: a held one out of the inventory at once)
-        if (ServerObject* o = popObject()) {
-            deleteObject(world_, *o);
+    case IsWaypointOn: {
+        ServerWaypoint* w = world_.waypoint(vm.popInt());
+        vm.push(w && w->enabled ? 1 : 0);
+        return 0;
+    }
+    case GetWaypointX:
+    case GetWaypointY: {
+        ServerWaypoint* w = world_.waypoint(vm.popInt());
+        if (!w) {
+            vm.push(0);
+        } else {
+            vm.pushFloat(id == GetWaypointX ? w->x : w->y);
         }
         return 0;
-    case GroupDelete:
-        eachGroupObject([&](ServerObject& o) { deleteObject(world_, o); });
+    }
+    case MoveWaypoint: {
+        const float y = vm.popFloat();
+        const float x = vm.popFloat();
+        if (ServerWaypoint* w = world_.waypoint(vm.popInt())) {
+            w->x = (util::X87::fromDouble(vm.context().x) + x).f(); // (FILD, FADD, stored)
+            w->y = (util::X87::fromDouble(vm.context().y) + y).f();
+        }
         return 0;
+    }
+    case Waypoint: { // (the names matched past their "scope:")
+        ServerWaypoint* w = world_.waypointMatching(lookupName(vm.string(vm.pop())));
+        vm.pushInt(w ? w->id : 0);
+        return 0;
+    }
+    case WaypointGroup:
+    case ObjectGroup:
+    case WallGroup: {
+        // The group of that name (matched past its "scope:") and kind.
+        const auto kind = id == ObjectGroup ? ServerGroup::Kind::Objects
+                          : id == WaypointGroup ? ServerGroup::Kind::Waypoints
+                                                : ServerGroup::Kind::Walls;
+        ServerGroup* g = world_.groupMatching(lookupName(vm.string(vm.pop())), kind);
+        vm.pushInt(g ? g->id : 0);
+        return 0;
+    }
+    default:
+        return -1;
+    }
+}
+
+/// What players see and hear: sounds, prints, chat, effects, music, ClearMessages.
+int ScriptHost::gameMessages(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+
+    switch (id) {
     case AudioEvent: {
         ServerWaypoint* w = world_.waypoint(vm.popInt());
         const std::uint32_t name = vm.pop();
@@ -959,96 +1306,68 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
-    case StopScript:
-        return 1;
-    case UnlockDoor:
-    case LockDoor:
-        if (ServerObject* o = popObject(); o && (o->classes & things::ObjectClass::Door)) {
-            o->lock = id == LockDoor ? 5 : 0;
-            addEvent({ScriptEvent::Kind::ObjectSound, 0, {}, o->extent, o->x, o->y, 0, 0, id == LockDoor ? kSoundLock : kSoundUnlock});
-            playSound(world_, static_cast<std::uint32_t>(id == LockDoor ? kSoundLock : kSoundUnlock), *o);
+    case Effect: {
+        const float y2 = vm.popFloat();
+        const float x2 = vm.popFloat();
+        const float y1 = vm.popFloat();
+        const float x1 = vm.popFloat();
+        const std::uint32_t name = vm.pop();
+        const auto& c = vm.context();
+        addEvent({ScriptEvent::Kind::Effect, 0, vm.string(name), 0, x1 + static_cast<float>(c.x), y1 + static_cast<float>(c.y),
+                  x2 + static_cast<float>(c.x), y2 + static_cast<float>(c.y)});
+        effect(vm.string(name), x1, y1, x2, y2, c.x, c.y);
+        return 0;
+    }
+    case DestroyChat:
+        if (ServerObject* o = popObject()) {
+            addEvent({ScriptEvent::Kind::DestroyChat, 0, {}, o->extent});
+            world_.chatKill(o);
         }
         return 0;
+    case DestroyEveryChat:
+        addEvent({ScriptEvent::Kind::DestroyChat});
+        world_.chatKill(nullptr);
+        return 0;
+    case Music: {
+        const std::int32_t volume = vm.popInt();
+        const std::int32_t music = vm.popInt();
+        addEvent({ScriptEvent::Kind::Music, 0, {}, 0, 0, 0, 0, 0, music, volume});
+        // A solo game's host sets its own (Snd_SetMusic: host_client.hpp); else
+        // MSG_MUSIC_EVENT 0xE5 {u8 music, u8 volume} to everyone.
+        if (world_.gameFlags & GameFlag::Solo) {
+            if (world_.hostClient) {
+                world_.hostClient->music(music, volume);
+            }
+        } else {
+            world_.broadcasts().push_back({{0xE5, static_cast<std::uint8_t>(music), static_cast<std::uint8_t>(volume)}, true, 0});
+        }
+        return 0;
+    }
+    case ClearMessages: // (SrvNet_SendMessagesKill) a player's: MSG_MESSAGES_KILL to its client, reliably
+        if (ServerObject* o = popObject(); o && (o->classes & things::ObjectClass::Player) && o->player) {
+            world_.broadcasts().push_back({{0xCB}, true, o->extent});
+        }
+        return 0;
+    default:
+        return -1;
+    }
+}
+
+/// The questions about objects: IsObjectOn, IsLocked, Object, their place and facing,
+/// Distance, the trigger and caller, IsGameBall / IsCrown, GetHolder.
+int ScriptHost::gameQueries(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+
+    switch (id) {
     case IsObjectOn: {
         ServerObject* o = popObject();
         vm.push(o && o->enabled() ? 1 : 0);
         return 0;
     }
-    case IsWaypointOn: {
-        ServerWaypoint* w = world_.waypoint(vm.popInt());
-        vm.push(w && w->enabled ? 1 : 0);
-        return 0;
-    }
     case IsLocked: {
         ServerObject* o = popObject();
         vm.push(o && (o->classes & things::ObjectClass::Door) && o->lock != 0 ? 1 : 0);
-        return 0;
-    }
-    case RandomFloat: {
-        const float hi = vm.popFloat();
-        const float lo = vm.popFloat();
-        vm.pushFloat(util::randomFloat(rng_, lo, hi).f()); // (randomFloat(lo, hi), FSTP: a top below the bottom draws downwards)
-        return 0;
-    }
-    case Random: {
-        // (randInt: lo plus a draw from the random table (rand()'s 0 - 32767) modulo the span
-        // hi - lo + 1, in 32 bits; a span of 0, hi with no draw. A span past 32768 never gets
-        // past lo + 32767, and with lo above hi the span is negative and the remainder lies in
-        // 0 .. lo - hi - 2: from lo up, not between them. Original bugs.)
-        const std::int32_t hi = vm.popInt();
-        const std::int32_t lo = vm.popInt();
-        const auto span = static_cast<std::int32_t>(static_cast<std::uint32_t>(hi) - static_cast<std::uint32_t>(lo) + 1u);
-        if (lo == hi) {
-            vm.pushInt(lo);
-        } else if (span == 0) {
-            vm.pushInt(hi);
-        } else if (0 < span && span <= 32768) {
-            vm.pushInt(nox::util::uniform_int_distribution<std::int32_t>(lo, hi)(rng_));
-        } else {
-            const std::int64_t width = span > 0 ? 32768 : std::min<std::int64_t>(32768, -static_cast<std::int64_t>(span));
-            const auto r = nox::util::uniform_int_distribution<std::int32_t>(0, static_cast<std::int32_t>(width - 1))(rng_);
-            vm.pushInt(static_cast<std::int32_t>(static_cast<std::uint32_t>(lo) + static_cast<std::uint32_t>(r)));
-        }
-        return 0;
-    }
-    case IntToString:
-        pushName(std::to_string(vm.popInt()));
-        return 0;
-    case FloatToString: {
-        char text[64];
-        std::snprintf(text, sizeof text, "%f", static_cast<double>(vm.popFloat()));
-        pushName(text);
-        return 0;
-    }
-    case CreateObject: {
-        ServerWaypoint* w = world_.waypoint(vm.popInt());
-        const std::uint32_t type = vm.pop();
-        // (Nothing at all is pushed without the waypoint: the game's own slip.)
-        if (w) {
-            if (!things_.findThing(vm.string(type))) {
-                vm.push(0);
-            } else {
-                vm.pushInt(world_.spawn(things_, vm.string(type), w->x, w->y).scriptId);
-            }
-        }
-        return 0;
-    }
-    case CreateMover: { // CreateMover(object, waypoint, speed): the mover's script id
-        const float speed = vm.popFloat();
-        const std::int32_t wp = vm.popInt();
-        ServerObject* o = popObject();
-        vm.pushInt(o ? createMover(world_, things_, *o, wp, speed, frame_) : 0); // (none: the lookup's 0)
-        return 0;
-    }
-    case GroupCreateMover: { // GroupCreateMover(group, waypoint, speed): one each, nothing pushed
-        const float speed = vm.popFloat();
-        const std::int32_t wp = vm.popInt();
-        eachGroupObject([&](ServerObject& o) { createMover(world_, things_, o, wp, speed, frame_); });
-        return 0;
-    }
-    case GetHost: { // (the host's, player slot 0x1F; none, 0)
-        const ServerObject* host = hostPlayer(world_);
-        vm.pushInt(host ? host->scriptId : 0);
         return 0;
     }
     case Object: {
@@ -1067,39 +1386,9 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
-    case GetWaypointX:
-    case GetWaypointY: {
-        ServerWaypoint* w = world_.waypoint(vm.popInt());
-        if (!w) {
-            vm.push(0);
-        } else {
-            vm.pushFloat(id == GetWaypointX ? w->x : w->y);
-        }
-        return 0;
-    }
     case GetDirection: {
         ServerObject* o = popObject();
         vm.pushInt(o ? static_cast<std::int16_t>(o->direction) : 0);
-        return 0;
-    }
-    case MoveObject: {
-        const float y = vm.popFloat();
-        const float x = vm.popFloat();
-        if (ServerObject* o = popObject()) {
-            // (Obj_SetPosition, its IMMOBILE return, sync, relink, motion,
-            // harpoon and the rest)
-            // (The offset by FILD, FADD, stored: chopped.)
-            setPosition(world_, *o, (util::X87::fromDouble(vm.context().x) + x).f(), (util::X87::fromDouble(vm.context().y) + y).f(), frame_);
-        }
-        return 0;
-    }
-    case MoveWaypoint: {
-        const float y = vm.popFloat();
-        const float x = vm.popFloat();
-        if (ServerWaypoint* w = world_.waypoint(vm.popInt())) {
-            w->x = (util::X87::fromDouble(vm.context().x) + x).f(); // (FILD, FADD, stored)
-            w->y = (util::X87::fromDouble(vm.context().y) + y).f();
-        }
         return 0;
     }
     case Distance: {
@@ -1113,81 +1402,12 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         vm.pushFloat(util::sqrt(dx * dx + dy * dy).f());
         return 0;
     }
-    case Effect: {
-        const float y2 = vm.popFloat();
-        const float x2 = vm.popFloat();
-        const float y1 = vm.popFloat();
-        const float x1 = vm.popFloat();
-        const std::uint32_t name = vm.pop();
-        const auto& c = vm.context();
-        addEvent({ScriptEvent::Kind::Effect, 0, vm.string(name), 0, x1 + static_cast<float>(c.x), y1 + static_cast<float>(c.y),
-                  x2 + static_cast<float>(c.x), y2 + static_cast<float>(c.y)});
-        effect(vm.string(name), x1, y1, x2, y2, c.x, c.y);
-        return 0;
-    }
-    case Waypoint: { // (the names matched past their "scope:")
-        ServerWaypoint* w = world_.waypointMatching(lookupName(vm.string(vm.pop())));
-        vm.pushInt(w ? w->id : 0);
-        return 0;
-    }
-    case WaypointGroup:
-    case ObjectGroup:
-    case WallGroup: {
-        // The group of that name (matched past its "scope:") and kind.
-        const auto kind = id == ObjectGroup ? ServerGroup::Kind::Objects
-                          : id == WaypointGroup ? ServerGroup::Kind::Waypoints
-                                                : ServerGroup::Kind::Walls;
-        ServerGroup* g = world_.groupMatching(lookupName(vm.string(vm.pop())), kind);
-        vm.pushInt(g ? g->id : 0);
-        return 0;
-    }
-    case DestroyChat:
-        if (ServerObject* o = popObject()) {
-            addEvent({ScriptEvent::Kind::DestroyChat, 0, {}, o->extent});
-            world_.chatKill(o);
-        }
-        return 0;
-    case DestroyEveryChat:
-        addEvent({ScriptEvent::Kind::DestroyChat});
-        world_.chatKill(nullptr);
-        return 0;
-    // The quest variables (quest_status.hpp): the world's one list, kept from map to map and in a
-    // solo .plr; a name without a ':' is the map's ("<map>:<name>"), found ignoring case.
-    case SetQuestStatus:      // journalQuestSet: a new one of type 0
-    case SetQuestStatusFloat: { // journalQuestSetBool: a new one of type 1
-        const std::string name = vm.string(vm.pop());
-        const std::uint32_t value = vm.pop();
-        setQuestVariable(world_, name, id == SetQuestStatus ? 0u : 1u, value);
-        return 0;
-    }
-    case GetQuestStatus:
-    case GetQuestStatusFloat: // (none: 0, the float 0)
-        vm.push(questVariableValue(world_, vm.string(vm.pop())));
-        return 0;
-    case ResetQuestStatus:
-        resetQuestVariables(world_, vm.string(vm.pop()));
-        return 0;
     case IsTrigger:
     case IsCaller: {
         ServerObject* o = popObject();
         const std::uint32_t who = id == IsTrigger ? vm.trigger() : vm.caller();
         ServerObject* w = who ? world_.byExtent(who) : nullptr;
         vm.push(o && w && o->scriptId == w->scriptId ? 1 : 0);
-        return 0;
-    }
-    case Music: {
-        const std::int32_t volume = vm.popInt();
-        const std::int32_t music = vm.popInt();
-        addEvent({ScriptEvent::Kind::Music, 0, {}, 0, 0, 0, 0, 0, music, volume});
-        // A solo game's host sets its own (Snd_SetMusic: host_client.hpp); else
-        // MSG_MUSIC_EVENT 0xE5 {u8 music, u8 volume} to everyone.
-        if (world_.gameFlags & GameFlag::Solo) {
-            if (world_.hostClient) {
-                world_.hostClient->music(music, volume);
-            }
-        } else {
-            world_.broadcasts().push_back({{0xE5, static_cast<std::uint8_t>(music), static_cast<std::uint8_t>(volume)}, true, 0});
-        }
         return 0;
     }
     case GetTrigger:
@@ -1197,86 +1417,6 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         vm.pushInt(w ? w->scriptId : 0);
         return 0;
     }
-    case NoWallSound:
-        wallSounds_ = vm.pop() == 0;
-        return 0;
-    case SetCallback: {
-        // SetCallback(monster, event, function): the function's index into that
-        // event's block (the block's flags kept): 3 enemy sighted, 4 looking for an
-        // enemy, 5 death, 6 change of focus, 7 hit, 8 retreat, 9 collision, 10 enemy heard, 11
-        // end of waypoint, 13 lost enemy; other events nothing.
-        const std::uint32_t function = vm.pop();
-        const std::uint32_t event = vm.pop();
-        ServerObject* o = popObject();
-        if (!o || !(o->classes & things::ObjectClass::Monster) || !o->monster) {
-            return 0;
-        }
-        auto& m = *o->monster;
-        ServerObject::ScriptBlock* block = nullptr;
-        switch (event) {
-        case 3: block = &m.onEnemySighted; break;
-        case 4: block = &m.onLookingForEnemy; break;
-        case 5: block = &m.onDeath; break;
-        case 6: block = &m.onChangeFocus; break;
-        case 7: block = &m.onIsHit; break;
-        case 8: block = &m.onRetreat; break;
-        case 9: block = &m.onCollision; break;
-        case 10: block = &m.onHearEnemy; break;
-        case 11: block = &m.onEndOfWaypoint; break;
-        case 13: block = &m.onLostEnemy; break;
-        default: return 0;
-        }
-        const auto& functions = vm_.file().functions;
-        block->function = function < functions.size() ? functions[function].name : std::string{};
-        return 0;
-    }
-    // Dialog and the journal (script_builtins_dialog.cpp).
-    case 126: return dialogBuiltin(id, vm); // SetDialog
-    case 127: return dialogBuiltin(id, vm); // CancelDialog
-    case 128: return dialogBuiltin(id, vm); // StoryPic
-    case 129: return dialogBuiltin(id, vm); // TellStory
-    case 130: return dialogBuiltin(id, vm); // StartDialog
-    case 157: return dialogBuiltin(id, vm); // JournalEntry
-    case 158: return dialogBuiltin(id, vm); // JournalDelete
-    case 159: return dialogBuiltin(id, vm); // JournalEdit
-    case 171: return dialogBuiltin(id, vm); // GetAnswer
-    case 177: return dialogBuiltin(id, vm); // IsTalking
-    case 193: builtinIsTrading(world_, vm); return 0;                   // IsTrading (trade.hpp)
-    case 195: builtinSetShopkeeperText(world_, vm, popObject); return 0; // SetShopkeeperText (trade.hpp)
-    // The cinematic builtins (script_builtins_screen.cpp).
-    case 114: case 115: case 135: case 136: case 137: case 176: case 187: case 196: case 202: case 203: case 204: case 207: case 208:
-        return screenBuiltin(id, vm);
-    case 174: // AutoSave: a solo game's AUTOSAVE asked for, at once (requestSave(1, 0, 0)).
-        if (world_.gameFlags & GameFlag::Solo) {
-            world_.saveName = "AUTOSAVE"; // (setSaveFileName)
-            requestSave(world_, true, 0, 0, frame_);
-        }
-        return 0;
-    // S5's creature and object builtins (script_builtins_creatures.cpp).
-    case 13: case 14: case 29: case 30: case 33: case 51: case 52: case 55: case 56: case 57: case 58:
-    case 69: case 70: case 71: case 72: case 73: case 74: case 75: case 77: case 78: case 79: case 81:
-    case 82: case 83: case 84: case 85: case 87: case 96: case 97: case 98: case 105: case 106: case 107:
-    case 108: case 131: case 132: case 133: case 134: case 138: case 139: case 140: case 141: case 142:
-    case 143: case 144: case 145: case 146: case 147: case 148: case 149: case 150: case 151: case 152:
-    case 153: case 154: case 155: case 156: case 160: case 161: case 162: case 163: case 164: case 165:
-    case 166: case 167: case 168: case 169: case 170: case 173: case 186: case 188: case 191: case 197:
-    case 198: case 199: case 200: case 201:
-        return creatureBuiltin(id, vm);
-    // IsFriendly / IsPet (the community's Unknownb8 / Unknownb9): the object's subclass bit 0x100
-    // (MIGRATE: MakeFriendly sets it, MakeEnemy clears it) / 0x80 (MONITOR: BecomePet's,
-    // BecomeEnemy's), whatever its class. With no object they push the register they saved on
-    // entry: what the builtin call left in it, 0 from an ordinary function, and from a prefab
-    // function the pointer its offset check stopped at, one past the end of the offset builtins'
-    // table.
-    case IsFriendly:
-    case IsPet:
-        if (const ServerObject* o = popObject()) {
-            vm.push(id == IsFriendly ? (o->subclasses >> 8) & 1u : (o->subclasses & 0xFFu) >> 7);
-        } else {
-            constexpr std::uint32_t kOffsetTableEnd = 0x5C3408u; // (the game's value)
-            vm.push(vm.context().prefab ? kOffsetTableEnd : 0u);
-        }
-        return 0;
     // IsGameBall / IsCrown: whether the object is of that type. With no object, nothing is pushed.
     case IsGameBall:
     case IsCrown:
@@ -1284,24 +1424,35 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
             vm.push(o->typeName == (id == IsGameBall ? "GameBall" : "Crown") ? 1u : 0u);
         }
         return 0;
-    // The table's empty ones: their arguments popped (an object looked up and let be), nothing
-    // done, nothing pushed.
-    case Unused1f:
-    case Unused20:
-        popObject();
+    case GetHolder: {
+        // Its holder's script id. (Not held: the exe reads through a null holder and crashes, an
+        // original bug; ours 0.)
+        ServerObject* o = popObject();
+        const ServerObject* h = o && o->holder ? world_.byExtent(o->holder) : nullptr;
+        vm.pushInt(h ? h->scriptId : 0);
         return 0;
-    case Unused50:
+    }
+    default:
+        return -1;
+    }
+}
+
+/// The host and the players: GetHost, AutoSave, GetCharacterData, ChangeScore, GetScore.
+int ScriptHost::gamePlayers(std::uint32_t id, script::Vm& vm)
+{
+    const auto popObject = [&] { return object(vm.popInt()); };
+
+    switch (id) {
+    case GetHost: { // (the host's, player slot 0x1F; none, 0)
+        const ServerObject* host = hostPlayer(world_);
+        vm.pushInt(host ? host->scriptId : 0);
         return 0;
-    case Unused58: case Unused59: case Unused5a: case Unused5b: case Unused5c: case Unused5d: case Unused74:
-        vm.pop();
-        vm.pop();
-        return 0;
-    case Unused5e:
-        // The string's text looked up (Str_GetString) and its pointer put in a table of 1024
-        // that nothing reads; its index pushed: 0, 1, 2... from the script's load, 1023 once
-        // the table is full.
-        vm.pop();
-        vm.pushInt(static_cast<std::int32_t>(wideStrings_ < 0x400 ? wideStrings_++ : 0x3FF));
+    }
+    case 174: // AutoSave: a solo game's AUTOSAVE asked for, at once (requestSave(1, 0, 0)).
+        if (world_.gameFlags & GameFlag::Solo) {
+            world_.saveName = "AUTOSAVE"; // (setSaveFileName)
+            requestSave(world_, true, 0, 0, frame_);
+        }
         return 0;
     case GetCharacterData: {
         // The host's own character (getHostInfoPtr: the join block its client made, its
@@ -1327,19 +1478,6 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         }
         return 0;
     }
-    case GetHolder: {
-        // Its holder's script id. (Not held: the exe reads through a null holder and crashes, an
-        // original bug; ours 0.)
-        ServerObject* o = popObject();
-        const ServerObject* h = o && o->holder ? world_.byExtent(o->holder) : nullptr;
-        vm.pushInt(h ? h->scriptId : 0);
-        return 0;
-    }
-    case ClearMessages: // (SrvNet_SendMessagesKill) a player's: MSG_MESSAGES_KILL to its client, reliably
-        if (ServerObject* o = popObject(); o && (o->classes & things::ObjectClass::Player) && o->player) {
-            world_.broadcasts().push_back({{0xCB}, true, o->extent});
-        }
-        return 0;
     case ChangeScore: { // ChangeScore(player, by): its score and its team's up by `by`, told to all
         const std::int32_t by = vm.popInt();
         ServerObject* o = popObject();
@@ -1361,19 +1499,8 @@ int ScriptHost::gameBuiltin(std::uint32_t id, script::Vm& vm)
         return 0;
     }
     default:
-        break;
+        return -1;
     }
-    // Not implemented yet: its arguments off, a 0 for its result.
-    ++unimplemented_[id];
-    if (id < kSignatures.size()) {
-        for (int i = 0; i < kSignatures[id].args; ++i) {
-            vm.pop();
-        }
-        if (kSignatures[id].returns) {
-            vm.push(0);
-        }
-    }
-    return 0;
 }
 
 } // namespace nox::server

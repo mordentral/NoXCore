@@ -90,15 +90,6 @@ CharacterClass readClass(ByteReader& r)
     return static_cast<CharacterClass>(c);
 }
 
-// Casts a container size to a count field, throwing if it doesn't fit.
-template <class T>
-T countOf(std::size_t n, std::string_view what)
-{
-    if (n > std::numeric_limits<T>::max()) {
-        throw FormatError(std::string(".plr: too many ") + std::string(what));
-    }
-    return static_cast<T>(n);
-}
 
 std::vector<std::uint8_t> finish(ByteWriter& w)
 {

@@ -206,6 +206,16 @@ private:
     /// One of the creature / object builtins run (its result as builtin()'s), or -1 when `id`
     /// isn't one of them.
     int creatureBuiltin(std::uint32_t id, script::Vm& vm);
+    // creatureBuiltin's groups (script_builtins_creatures.cpp): facing, the AI's levels and
+    // orders, health and enchantments, the tests, items and gold, spells, the body's state.
+    int creatureFacing(std::uint32_t id, script::Vm& vm);
+    int creatureLevels(std::uint32_t id, script::Vm& vm);
+    int creatureOrders(std::uint32_t id, script::Vm& vm);
+    int creatureHealth(std::uint32_t id, script::Vm& vm);
+    int creatureTests(std::uint32_t id, script::Vm& vm);
+    int creatureItems(std::uint32_t id, script::Vm& vm);
+    int creatureSpells(std::uint32_t id, script::Vm& vm);
+    int creatureState(std::uint32_t id, script::Vm& vm);
     const things::ModifierDb* modifiers_ = nullptr;
     std::minstd_rand creatureRng_{1};     ///< what their fights, spells and drops draw
     std::uint32_t pickupFrame_ = 0;       ///< Pickup's co-op counts' frame
@@ -222,6 +232,16 @@ private:
     /// (ox, oy) added.
     void effect(std::string_view name, float x1, float y1, float x2, float y2, int ox, int oy);
     std::string lookupName(std::string_view name) const;
+
+    // gameBuiltin's groups (script_host.cpp), each a group of the game's builtins.
+    int gameWalls(std::uint32_t id, script::Vm& vm);
+    int gameValues(std::uint32_t id, script::Vm& vm);
+    int gameObjects(std::uint32_t id, script::Vm& vm);
+    int gameOwners(std::uint32_t id, script::Vm& vm);
+    int gameWaypoints(std::uint32_t id, script::Vm& vm);
+    int gameMessages(std::uint32_t id, script::Vm& vm);
+    int gameQueries(std::uint32_t id, script::Vm& vm);
+    int gamePlayers(std::uint32_t id, script::Vm& vm);
 
     // Dialog, the journal (script_builtins_dialog.cpp): SetDialog, CancelDialog,
     // StoryPic, TellStory, StartDialog, GetAnswer, IsTalking, JournalEntry / Delete / Edit.

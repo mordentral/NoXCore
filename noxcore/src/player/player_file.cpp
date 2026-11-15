@@ -6,6 +6,7 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 
@@ -15,10 +16,7 @@ namespace {
 
 constexpr std::size_t kBlock = crypto::Blowfish::kBlockSize;
 
-bool allZero(std::span<const std::uint8_t> b)
-{
-    return std::all_of(b.begin(), b.end(), [](std::uint8_t v) { return v == 0; });
-}
+using util::allZero;
 
 } // namespace
 

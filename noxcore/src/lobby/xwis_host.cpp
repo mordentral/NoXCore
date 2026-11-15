@@ -92,12 +92,9 @@ void XwisHostSession::line(std::string_view text)
         return;
     }
     std::string_view rest = text;
-    std::string_view from;
-    if (rest.front() == ':') {
-        const std::string_view prefix = word(rest).substr(1);
-        from = prefix.substr(0, prefix.find('!'));
-    }
-    const std::string_view command = word(rest);
+    const detail::IrcHead head = detail::ircHead(rest);
+    const std::string_view from = head.prefix.substr(0, head.prefix.find('!'));
+    const std::string_view command = head.command;
     if (command == "PING") {
         outgoing_.push_back("PONG " + std::string(rest));
     } else if (command == "ERROR") {
@@ -189,12 +186,8 @@ void XwisHost::setRecord(std::span<const std::uint8_t> record)
 
 void XwisHost::flush()
 {
-    for (const auto& line : session_->takeOutgoing()) {
-        send_ += line + "\r\n";
-    }
-    if (!send_.empty() && socket_ && socket_->state() == net::TcpSocket::State::Connected) {
-        send_.erase(0, socket_->send(std::span(reinterpret_cast<const std::uint8_t*>(send_.data()), send_.size())));
-    }
+    const bool open = socket_ && socket_->state() == net::TcpSocket::State::Connected;
+    detail::sendLines(session_->takeOutgoing(), send_, open ? &*socket_ : nullptr);
 }
 
 // A broken connection or failed session waits for retryAt_ and reconnects; otherwise sends and

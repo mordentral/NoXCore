@@ -79,14 +79,7 @@ void XwisLogin::poll(std::uint32_t nowMs)
     if (state == net::TcpSocket::State::Connecting) {
         return;
     }
-    const auto flush = [&] {
-        for (const auto& line : session_->takeOutgoing()) {
-            send_ += line + "\r\n";
-        }
-        if (!send_.empty()) {
-            send_.erase(0, socket_->send(std::span(reinterpret_cast<const std::uint8_t*>(send_.data()), send_.size())));
-        }
-    };
+    const auto flush = [&] { detail::sendLines(session_->takeOutgoing(), send_, &*socket_); };
     flush();
     std::uint8_t buffer[4096];
     while (const auto got = socket_->receive(buffer)) {

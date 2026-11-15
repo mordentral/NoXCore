@@ -144,10 +144,7 @@ void ServservSession::line(std::string_view text)
         return;
     }
     std::string_view rest = text;
-    if (!rest.empty() && rest.front() == ':') {
-        word(rest);
-    }
-    if (word(rest) == "607") {
+    if (detail::ircHead(rest).command == "607") {
         state_ = State::Done;
     }
 }

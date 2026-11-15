@@ -157,6 +157,39 @@ private:
     std::vector<std::uint8_t> unreliable_;
 };
 
+// The control messages both ends of a stream handle alike (ClientConnection, ServerTransport).
+
+/// The resend timer, as the exe's runs (at most once per kResendTimerMs): its first call starts
+/// it (`started`, `last`); once past its time, `stream`'s packets sent long enough ago are marked
+/// due again (Stream::markOverdue). Whether it ran.
+inline bool runResendTimer(Stream& stream, bool& started, std::uint32_t& last, std::uint32_t nowMs)
+{
+    if (!started) {
+        started = true;
+        last = nowMs;
+    } else if (static_cast<std::int32_t>(nowMs - last) > static_cast<std::int32_t>(kResendTimerMs)) {
+        stream.markOverdue(nowMs);
+        last = nowMs;
+        return true;
+    }
+    return false;
+}
+/// CLIENT_PONG answering a CLIENT_PING whose time was `pinged`: [stream id][expected seq][op][u32].
+inline std::vector<std::uint8_t> clientPong(std::uint8_t streamId, std::uint8_t expectedSeq, std::uint32_t pinged)
+{
+    return {streamId, expectedSeq, static_cast<std::uint8_t>(Op::ClientPong), static_cast<std::uint8_t>(pinged),
+            static_cast<std::uint8_t>(pinged >> 8), static_cast<std::uint8_t>(pinged >> 16), static_cast<std::uint8_t>(pinged >> 24)};
+}
+/// An explicit ack (Accepted, 0x1F) applied to `stream`: the game's "0x26 ack" message when it
+/// changed something, else empty.
+inline std::vector<std::uint8_t> applyAccepted(Stream& stream, std::uint8_t ack)
+{
+    if (stream.applyAck(ack)) {
+        return {static_cast<std::uint8_t>(Op::Code38), ack};
+    }
+    return {};
+}
+
 /// A client's connection to a 1.2b server: lobby join, connect handshake and the stream.
 /// It owns no sockets: feed it datagrams and the time, and send what it hands back.
 class ClientConnection {

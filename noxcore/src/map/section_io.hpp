@@ -4,6 +4,7 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/map/sections.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 #include <array>
@@ -108,9 +109,7 @@ inline void writeJoined(ByteWriter& w, std::initializer_list<std::uint32_t> valu
 {
     std::vector<std::uint8_t> b;
     for (auto v : values) {
-        for (int i = 0; i < 4; ++i) {
-            b.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
-        }
+        util::putU32(b, v);
     }
     w.bytes(b);
 }
@@ -183,16 +182,6 @@ inline void writeRecordPadding(ByteWriter& w, const ObjectRecord& rec)
     } else {
         w.align(8);
     }
-}
-
-/// Casts a container size to a count field, throwing if it doesn't fit.
-template <class T>
-T countOf(std::size_t n, std::string_view what)
-{
-    if (n > std::numeric_limits<T>::max()) {
-        throw FormatError(std::string(what) + ": too many entries (" + std::to_string(n) + ")");
-    }
-    return static_cast<T>(n);
 }
 
 } // namespace nox::map::detail

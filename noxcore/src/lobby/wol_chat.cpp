@@ -315,11 +315,9 @@ void WolChatSession::line(std::string_view text)
     }
     // Split off the optional ":prefix" (kept as the sender's nick) and the command word.
     std::string_view rest = text;
-    std::string_view from;
-    if (rest.front() == ':') {
-        from = senderOf(word(rest).substr(1));
-    }
-    const std::string_view command = word(rest);
+    const detail::IrcHead head = detail::ircHead(rest);
+    const std::string_view from = senderOf(head.prefix);
+    const std::string_view command = head.command;
     // The rest after " :" (a trailing parameter), or empty.
     const auto trailing = [&](std::string_view r) {
         const auto colon = r.find(':');
@@ -719,12 +717,8 @@ void WolChat::fail(std::string why, bool refused)
 // Queues the session's lines and sends what the socket takes; the rest waits for the next poll.
 void WolChat::flush()
 {
-    for (const auto& line : session_->takeOutgoing()) {
-        send_ += line + "\r\n";
-    }
-    if (!send_.empty() && socket_ && socket_->state() == net::TcpSocket::State::Connected) {
-        send_.erase(0, socket_->send(std::span(reinterpret_cast<const std::uint8_t*>(send_.data()), send_.size())));
-    }
+    const bool open = socket_ && socket_->state() == net::TcpSocket::State::Connected;
+    detail::sendLines(session_->takeOutgoing(), send_, open ? &*socket_ : nullptr);
 }
 
 void WolChat::logOff(std::uint32_t nowMs)

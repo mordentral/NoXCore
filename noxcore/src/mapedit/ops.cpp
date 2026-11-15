@@ -122,14 +122,6 @@ SetTiles apply(MapDocument& d, const SetTiles& p)
     return inv;
 }
 
-/// `id` and its inventory, owner first, in record order.
-void subtree(const MapDocument& d, ObjId id, std::vector<ObjectEntry>& out)
-{
-    out.push_back({id, d.objects.at(id)});
-    for (const ObjId child : d.childrenOf(id)) {
-        subtree(d, child, out);
-    }
-}
 
 RemoveObjects apply(MapDocument& d, const AddObjects& p)
 {
@@ -171,7 +163,7 @@ AddObjects apply(MapDocument& d, const RemoveObjects& p)
             throw FormatError("map editor op: object " + std::to_string(id) + " doesn't exist");
         }
         std::vector<ObjectEntry> tree;
-        subtree(d, id, tree);
+        appendSubtree(d, id, tree);
         d.removeObject(id);
         inv.objects.insert(inv.objects.end(), std::make_move_iterator(tree.begin()), std::make_move_iterator(tree.end()));
     }
@@ -854,6 +846,14 @@ OpPart getPart(ByteReader& r, const things::ThingDb& things, std::uint8_t format
 static_assert(std::variant_size_v<OpPart> == 16, "a new op part needs its byte form (put, getPart)");
 
 } // namespace
+
+void appendSubtree(const MapDocument& d, ObjId id, std::vector<ObjectEntry>& out)
+{
+    out.push_back({id, d.objects.at(id)});
+    for (const ObjId child : d.childrenOf(id)) {
+        appendSubtree(d, child, out);
+    }
+}
 
 std::optional<WallState> wallState(const MapDocument& d, Cell cell)
 {

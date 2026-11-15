@@ -2,6 +2,7 @@
 #include "noxcore/mapedit/mod_files.hpp"
 
 #include "noxcore/mapedit/session_proto.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 #include <array>
@@ -70,20 +71,12 @@ bool wellFormedUtf8(std::string_view s)
     return true;
 }
 
-std::string lowerAscii(std::string_view s)
-{
-    std::string out(s);
-    for (char& c : out) {
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    }
-    return out;
-}
 
 /// A name Windows keeps for a device (CON, PRN, AUX, NUL, COM0-9, LPT0-9), whatever follows its
 /// first dot ("aux.luau" is the device on older Windows).
 bool reservedName(std::string_view part)
 {
-    const std::string stem = lowerAscii(part.substr(0, part.find('.')));
+    const std::string stem = util::lowered(part.substr(0, part.find('.')));
     static constexpr std::array<std::string_view, 4> kNames{"con", "prn", "aux", "nul"};
     if (std::ranges::find(kNames, stem) != kNames.end()) {
         return true;
@@ -117,7 +110,7 @@ bool modPathValid(std::string_view rel)
         start = slash + 1;
     }
     // (A file being written goes through "<name>.saving": never a mod file's own name.)
-    return !lowerAscii(rel).ends_with(".saving");
+    return !util::lowered(rel).ends_with(".saving");
 }
 
 bool modPathsClash(std::string_view a, std::string_view b)
@@ -125,8 +118,8 @@ bool modPathsClash(std::string_view a, std::string_view b)
     if (a == b) {
         return false;
     }
-    const std::string la = lowerAscii(a);
-    const std::string lb = lowerAscii(b);
+    const std::string la = util::lowered(a);
+    const std::string lb = util::lowered(b);
     // One file on a disk that ignores case, or a file where the other has a folder.
     return la == lb || lb.starts_with(la + "/") || la.starts_with(lb + "/");
 }
