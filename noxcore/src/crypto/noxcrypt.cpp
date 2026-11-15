@@ -1,5 +1,5 @@
 // Nox Blowfish key table and file-to-key mapping.
-// Ported from opennox/noxcrypt crypt.go (MIT, Copyright (c) 2021 OpenNox). See THIRD_PARTY_NOTICES.txt.
+// Based on OpenNox noxcrypt crypt.go (MIT licence, Copyright (c) 2021 OpenNox); see THIRD_PARTY_NOTICES.txt.
 #include "noxcore/crypto/noxcrypt.hpp"
 
 #include <array>

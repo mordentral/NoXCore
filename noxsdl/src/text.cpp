@@ -266,8 +266,8 @@ void Font::drawGameText(std::string_view utf8, float gx, float gy, float scale, 
 GameFonts::GameFonts(SDL_Renderer* renderer, const std::filesystem::path& gameDir, std::filesystem::path fontDir)
     : renderer_(renderer), fontDir_(std::move(fontDir))
 {
-    // The plain face: the game folder's default.ttf / default.otf, the names OpenNox looks for when
-    // it swaps a TrueType font in for default.fnt, else Caudex Bold.
+    // The plain face: the game folder's default.ttf / default.otf, the usual names for a TrueType
+    // font swapped in for default.fnt, else Caudex Bold.
     for (const char* file : {"default.ttf", "default.otf"}) {
         const auto path = gameDir / file;
         std::error_code ec;

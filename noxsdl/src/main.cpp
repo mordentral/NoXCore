@@ -840,7 +840,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
     StartOptions opts = parseCommandLine(*app, argc, argv);
     // Without --game-dir: NOX_DATA, noxsdl's own folder, the current one, then the installed game
-    // as OpenNox finds it (the registry, GOG / Reloaded / Origin installs; io/game_dir.hpp); the
+    // (the registry, then the usual GOG / Program Files / Origin folders; io/game_dir.hpp); the
     // folder the build was set up with (NOX_GAME_DIR), if any, is the last resort.
     std::string gameDirReason = "--game-dir";
     if (!opts.gameDirGiven) {

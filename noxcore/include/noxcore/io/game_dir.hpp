@@ -1,15 +1,14 @@
-// Finding the installed game's data folder, the way OpenNox does (opennox-lib datapath, MIT; see
-// THIRD_PARTY_NOTICES.txt), with the program's own folder first. The first of these that holds the game's
-// data wins:
+// Finding the installed game's data folder (game_dir.cpp; see THIRD_PARTY_NOTICES.txt), with the
+// program's own folder first. The first of these that holds the game's data wins:
 //   1. the NOX_DATA environment variable;
 //   2. the program's own folder, then the current folder (if it's another);
 //   3. (not Windows) a "Nox" folder under the XDG data, Wine, Lutris, Heroic and home prefixes;
 //   4. the registry (HKLM, its 32-bit view too): Westwood\Nox InstallPath and FolderPath
-//      (the original install, GOG, Nox Reloaded), Westwood Studios\NOX "Install Dir" (Origin);
+//      (the original install and its repacks, GOG), Westwood Studios\NOX "Install Dir" (Origin);
 //      a value naming an .exe means its folder;
 //   5. GOG: the Galaxy game keys (Games\1207658964 PATH / WORKINGDIR), the offline installer's
 //      (GOGNOX PATH), Galaxy's client folder + Games\Nox, then the usual GOG folders;
-//   6. Nox Reloaded's folders (Program Files\Nox), then Origin's (Origin Games\Nox);
+//   6. the usual repack folders (Program Files\Nox), then Origin's (Origin Games\Nox);
 //   7. the folder the program was built with (`configured`, a build's NOX_GAME_DIR), if any.
 // The fixed folders are tried on C:\ and D:\ (elsewhere, under the prefixes of 3). A folder
 // holds the game's data if it has gamedata.bin, modifier.bin, monster.bin and thing.bin.
@@ -23,7 +22,7 @@
 
 namespace nox::io {
 
-/// Whether `dir` has the game's data files (OpenNox's CheckData).
+/// Whether `dir` has the game's data files (the four listed above).
 bool isGameDir(const std::filesystem::path& dir);
 
 /// A place the game is looked for, and why (for the log: "next to the program", ...).

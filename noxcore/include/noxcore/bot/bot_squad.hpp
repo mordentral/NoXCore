@@ -108,7 +108,7 @@ struct SquadPerson {
     bool observer = false; ///< spectating
     int kills = 0;
     std::uint16_t pingMs = 0;
-    std::string account;   ///< their XWIS login, "" if the game gives none (OpenNox's)
+    std::string account;   ///< their XWIS login, "" if the game gives none (some other clients' games)
     /// How long a bot has seen them standing in one place (0 while they move, or while no bot
     /// has had them in view lately: out of sight isn't idle).
     std::uint32_t idleMs = 0;

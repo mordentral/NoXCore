@@ -1,4 +1,4 @@
-// After OpenNox libs bag (MIT, Copyright (c) 2022 NoX World), checked against GAME.EXE; see
+// Based on OpenNox libs bag (MIT licence, Copyright (c) 2022 NoX World), checked against GAME.EXE; see
 // THIRD_PARTY_NOTICES.txt.
 #include "noxcore/video/video_bag.hpp"
 

@@ -4,8 +4,7 @@
 //   list      servers named directly ("host" or "host:port"), e.g. from a servers file
 // Every server found is pinged with MSG_SERVER_DISCOVER (header 00 00, a token the server
 // echoes); the MSG_SERVER_INFO reply gives the round trip and fresh details (full name, current
-// players). Entries are merged by address and port. OpenNox's discovery does the same (its HTTP
-// lobby could be another source).
+// players). Entries are merged by address and port (an HTTP lobby could be another source).
 //
 // The game list's Network (LAN play) mode asks no XWIS at all (setXwisListing(false)): as the
 // game's refreshServerList, which in network mode only broadcasts the LAN query.

@@ -6149,7 +6149,7 @@ struct Start {
     /// Whole message including the opcode and sub-op; kVariableSize if it has a variable tail.
     static constexpr std::size_t kSize = 140;
 
-    std::uint8_t action{}; ///< +2 1 MOTD, 2 SAVEDATA, 3 SAVE_SERVER (OpenNox: 10 = CBOR extension)
+    std::uint8_t action{}; ///< +2 1 MOTD, 2 SAVEDATA, 3 SAVE_SERVER (10 = a CBOR extension in some other clients)
     std::uint8_t unk{}; ///< +3
     std::uint32_t size{}; ///< +4 total bytes
     std::array<std::uint8_t, 128> type{}; ///< +8 ASCII type name, e.g. "MOTD", "SAVEDATA"

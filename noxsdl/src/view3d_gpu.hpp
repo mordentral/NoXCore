@@ -3,8 +3,8 @@
 // SDL_Renderer has no depth buffer, so View3D's triangles go straight to the renderer's
 // SDL_GPUDevice instead: into a texture the size of the view, which the renderer then draws
 // like any other (the HUD over it). Sprites are the renderer's own textures (their
-// SDL_GPUTexture), sampled as they are; material sprites (weapons, armour) through a port of
-// noxsdl's material shader.
+// SDL_GPUTexture), sampled as they are; material sprites (weapons, armour) through an SDL_GPU
+// version of noxsdl's material shader.
 //
 // Order: the renderer records its work (the floor texture, sprite uploads) into a command buffer
 // it submits only when it presents, and ours must run after that work. So before our pass the

@@ -72,7 +72,7 @@ public:
     /// A segment's bytes as stored in the bag (compressed or not), for copying it unchanged.
     std::vector<std::uint8_t> readStoredSegment(std::size_t segment);
 
-    /// Image index by name, case-insensitive and ignoring the extension (as OpenNox does), or -1;
+    /// Image index by name, case-insensitive and ignoring the extension, or -1;
     /// the first of a name. (By an index of the names made at the first call.)
     long findImage(std::string_view name) const;
 

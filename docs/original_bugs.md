@@ -22,7 +22,7 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - Each entry has **Where** (the original's code and what it does wrong), **Effect** (what a player
   or host sees) and **Ours** (where NoX Core keeps it, or what it does instead and why).
 - Name the original's code by logical name only: the game's own function name
-  (`SrvNet_OnPacket`, `Spell_CastMagicMissile`), an OpenNox name without its prefix and address
+  (`SrvNet_OnPacket`, `Spell_CastMagicMissile`), a community name without its prefix and address
   (`plrReadVals`), or a few words ("the host's ping test"). No addresses or offsets.
 - Say where our version lives (paths under `noxcore/` and `noxsdl/`, or class and function
   names), and refer only to public material: the source and these two documents.
@@ -1204,7 +1204,7 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 ### OB-120: The group owner tests push nothing without their group
 - **Where:** the script builtins GroupIsOwnedBy, IsOwnedByAny and GroupIsOwnedByAny return
   without a push when a group they name doesn't exist. (Their arguments also read as (object,
-  group), (group, object) and (group, group) whatever OpenNox's names suggest.)
+  group), (group, object) and (group, group) whatever their community names suggest.)
 - **Effect:** the stack a word short after the call.
 - **Ours:** the same.
 

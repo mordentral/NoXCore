@@ -1,8 +1,8 @@
 // Object CLASS and SUBCLASS bit sets, as thing.bin names them.
 //
 // Name tables verified against GAME.EXE's CLASS table and its SUBCLASS tables
-// (armor, weapon, monster, food, other, book, missile, generator, exit; 32 entries each). Names
-// from OpenNox libs `object` (MIT).
+// (armor, weapon, monster, food, other, book, missile, generator, exit; 32 entries each). The
+// tables and their attribution: object_class.cpp.
 #pragma once
 
 #include <cstdint>

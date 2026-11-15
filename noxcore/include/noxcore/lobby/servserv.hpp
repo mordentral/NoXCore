@@ -3,7 +3,7 @@
 // go, and the game connects to the chat server it names. XwisConnection does the same for every
 // XWIS connection NoX Core opens (the game list's listing login, the WOL chat login, a player's
 // login check, a hosted game's post). By decision (2026-11-11) it goes, in turn:
-//   1. servserv at xwis.net:4005 (where the community's patched WOLAPI.DLL, Nox Reloaded's, asks)
+//   1. servserv at xwis.net:4005 (where the community's patched WOLAPI.DLL asks)
 //      and the chat server it names;
 //   2. the chat server xwis.net:4000 directly;
 //   3. servserv at servserv.westwood.com:4005 (WOLAPI 1.20's) and the chat server it names

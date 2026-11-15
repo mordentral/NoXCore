@@ -1,4 +1,4 @@
-// Port of OpenNox libs noximage/pcx/pcx.go (MIT, Copyright (c) 2022 NoX World); see THIRD_PARTY_NOTICES.txt.
+// Based on OpenNox libs noximage/pcx/pcx.go (MIT licence, Copyright (c) 2022 NoX World); see THIRD_PARTY_NOTICES.txt.
 // Decodes video.bag's image formats to 8-bit RGBA; the formats are listed in sprite.hpp.
 #include "noxcore/video/sprite.hpp"
 

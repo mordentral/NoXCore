@@ -7,8 +7,8 @@ or links the following third-party code, each under its own licence, reproduced 
 
   Component                          Licence                    Where
   ---------------------------------  -------------------------  ---------------------------------
-  OpenNox noxcrypt                   MIT                        ported: noxcore/src/crypto/noxcrypt.cpp
-  OpenNox libs, opennox-lib          MIT                        ported: noxcore string table, object
+  OpenNox noxcrypt                   MIT                        based on: noxcore/src/crypto/noxcrypt.cpp
+  OpenNox libs, opennox-lib          MIT                        based on: noxcore string table, object
                                                                 classes, map sections, sprites, NXZ,
                                                                 video.bag, game folder detection
   SDL 3                              zlib                       noxcore.exe (static)

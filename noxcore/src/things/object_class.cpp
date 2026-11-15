@@ -1,4 +1,4 @@
-// Name tables ported from OpenNox libs `object` (MIT, Copyright (c) 2022 NoX World); see
+// Name tables based on OpenNox libs `object` (MIT licence, Copyright (c) 2022 NoX World); see
 // THIRD_PARTY_NOTICES.txt. Order verified against the GAME.EXE tables named in the header.
 #include "noxcore/things/object_class.hpp"
 

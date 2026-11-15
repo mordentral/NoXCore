@@ -1,4 +1,4 @@
-// Decoding video.bag images (16-bit video.bag formats; port of OpenNox noximage/pcx, MIT).
+// Decoding video.bag images (16-bit video.bag formats; attribution in sprite.cpp).
 //
 // Types:
 //   0        floor tile: a 46x46 diamond of RGB555 pixels (rows 1, 3, .. 45, 45, .. 1 wide,

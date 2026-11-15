@@ -38,7 +38,7 @@ What follows from it:
   similar lists are grouped under one id each; their items are cited by the id and the item's
   bold words.
 - Name the original's code by logical name only: the game's own function name
-  (`SrvNet_OnPacket`, `Spell_CastMagicMissile`), an OpenNox name without its prefix and address
+  (`SrvNet_OnPacket`, `Spell_CastMagicMissile`), a community name without its prefix and address
   (`plrReadVals`), or a few words ("the reliable queue's flush"). No addresses or offsets.
 - Say where our version lives (paths under `noxcore/` and `noxsdl/`, or class and function
   names), and refer only to public material: the source and these two documents.
@@ -1878,8 +1878,8 @@ The engine's logic is the exe's; these are where the output differs.
   install has no CD key in the registry), `USER UserName HostName irc.westwood.com
   :RealName`, `verchk 32512 720916` (WOLAPI's
   product code for the language and its chat version number) and `SETOPT 17,33` (others may
-  find and page the player). The community's patched WOLAPI.DLL (1.15, in the Nox Reloaded /
-  Nox Solution install) sends the same lines but asks servserv at xwis.net:4005 instead.
+  find and page the player). The community's patched WOLAPI.DLL (1.15, in community repack
+  installs) sends the same lines but asks servserv at xwis.net:4005 instead.
 - **Ours:** `lobby::XwisConnection` (noxcore/include/noxcore/lobby/servserv.hpp) sends the same query, always as
   English Nox (SKU 9472) and with an empty CD key, and takes the first matching chat server
   without a window. By decision, 2026-11-11, it goes in this order:

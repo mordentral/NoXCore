@@ -1,4 +1,4 @@
-// After OpenNox libs nxz (MIT, Copyright (c) 2022 NoX World), checked against GAME.EXE; see
+// Based on OpenNox libs nxz (MIT licence, Copyright (c) 2022 NoX World), checked against GAME.EXE; see
 // THIRD_PARTY_NOTICES.txt.
 #include "noxcore/video/nxz.hpp"
 

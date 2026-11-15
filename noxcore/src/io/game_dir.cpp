@@ -1,5 +1,5 @@
-// Ported from opennox-lib datapath (data.go, data_gog.go, data_reloaded.go, data_origin.go,
-// registry.go, paths.go), MIT, Copyright (c) 2022 NoX World. See THIRD_PARTY_NOTICES.txt.
+// Based on opennox-lib datapath (data.go, data_gog.go, data_reloaded.go, data_origin.go,
+// registry.go, paths.go), MIT licence, Copyright (c) 2022 NoX World; see THIRD_PARTY_NOTICES.txt.
 #include "noxcore/io/game_dir.hpp"
 
 #include "noxcore/io/file.hpp"
@@ -134,7 +134,7 @@ std::optional<fs::path> registryString([[maybe_unused]] std::wstring_view key, [
 #endif
 }
 
-/// registry.go: the install keys the original game, GOG, Nox Reloaded and Origin write.
+/// registry.go: the install keys the original game (and its repacks), GOG and Origin write.
 void registryPaths(Candidates& out)
 {
     struct Key {
@@ -230,7 +230,7 @@ std::vector<GameDirCandidate> gameDirSearch(const fs::path& exeDir, const fs::pa
     withPrefixes({"Nox"}, "a usual install folder", out);
 #endif
     registryPaths(out);
-    gogPaths(out); // GOG before Reloaded and Origin: patched and official
+    gogPaths(out); // GOG before the repack and Origin folders: patched and official
     withPrefixes({"Program Files (x86)\\Nox", "Program Files\\Nox"}, "a usual Nox Reloaded folder", out);
     withPrefixes({"Program Files (x86)\\Origin Games\\Nox", "Program Files\\Origin Games\\Nox"}, "a usual Origin folder", out);
     if (!configured.empty()) {

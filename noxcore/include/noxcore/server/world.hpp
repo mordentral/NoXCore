@@ -81,7 +81,7 @@ inline constexpr std::uint32_t CaptureTheFlag = 0x20;
 inline constexpr std::uint32_t FlagBall = 0x40;
 inline constexpr std::uint32_t Chat = 0x80;
 inline constexpr std::uint32_t Arena = 0x100;
-inline constexpr std::uint32_t Coop = 0x200;      ///< (OpenNox's name) players' glyphs spare players
+inline constexpr std::uint32_t Coop = 0x200;      ///< (its usual name) players' glyphs spare players
 inline constexpr std::uint32_t Elimination = 0x400;
 inline constexpr std::uint32_t Solo = 0x800;      ///< the campaign (co-op)
 inline constexpr std::uint32_t Quest = 0x1000;
@@ -1898,7 +1898,7 @@ public:
     std::uint32_t chosenMode = GameFlag::Arena;
     /// The flags on the map.
     int flagCount = 0;
-    /// The dead come back by themselves, half a second on (OpenNox's misnamed
+    /// The dead come back by themselves, half a second on (often misnamed
     /// ruleSetNoRespawn; read by server_doPlayersAutoRespawn, not in a
     /// quest): on for elimination, a host's option; and the host's setting that keeps it from map
     /// to map (a game settings bit).

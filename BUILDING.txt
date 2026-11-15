@@ -85,7 +85,7 @@ The game folder
 ---------------
 noxsdl looks for the game in this order: --game-dir DIR on its command line, the NOX_DATA
 environment variable, noxsdl's own folder, the current folder, then (Windows) the registry
-entries of the original, GOG, Nox Reloaded and Origin installs and their usual folders, or
+entries of the original (and its repacks), GOG and Origin installs and their usual folders, or
 (Linux) the usual Wine, Lutris, Heroic and ~/.local/share/Nox prefixes, and last NOX_GAME_DIR
 if the build set one. A folder counts if it holds gamedata.bin, modifier.bin, monster.bin and
 thing.bin. The folder it chose, and why, is written to noxcore-log.txt beside the executable.
