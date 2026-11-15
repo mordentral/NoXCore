@@ -17,7 +17,8 @@
 //            dialog or a shop); a useable map object or a Mimic still a chest, the Use hand within
 //            75. While an inventory item is dragged an item gets none. Under a cinematic's
 //            widescreen (the letterbox bars) none at all: the arrow stays, so a click there
-//            talks, trades, picks up or uses nothing.
+//            talks, trades, picks up or uses nothing. None either while the game is paused (a
+//            solo game's pause) or our player is dying or dead: the move cursor stays.
 #pragma once
 
 #include <cstdint>
@@ -105,7 +106,18 @@ struct Situation {
     bool dragging = false;    ///< an inventory item on the cursor
     bool canUse = true;       ///< our class may use the item (or a solo or quest game)
     bool wideScreen = false;  ///< a cinematic's widescreen is on (cursorUpdate skips the world)
+    bool paused = false;      ///< the game is paused (Game_IsPaused: cursorUpdate skips the world)
+    bool dying = false;       ///< our player is dying or dead, or has no drawable (playerAnimCheck: skips it too)
 };
+
+/// Whether cursorUpdate skips its world part (no Talk, Trade, pickup or Use cursor, no ground
+/// item's name): under a cinematic's widescreen, while the game is paused, or with our player
+/// dying or dead. (Its other tests, a play state other than 3 and an observer, are the caller's:
+/// not in a game, or not playing, the world's cursors aren't asked for.)
+constexpr bool worldSkipped(const Situation& s)
+{
+    return s.wideScreen || s.paused || s.dying;
+}
 
 WorldCursor worldCursor(const Target& target, const Situation& situation);
 

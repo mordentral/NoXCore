@@ -103,8 +103,8 @@ WorldCursor worldCursor(const Target& t, const Situation& s)
     constexpr std::uint32_t kTalks = 0x10;     // X_STATUS: something to say
     constexpr std::int64_t kTalkReach = 0x3D08; // 125 squared, less one (15624)
     constexpr std::int64_t kReach = 0x15F8;     // 75 squared, less one (5624)
-    if (s.wideScreen) {
-        return WorldCursor::None; // (cursorUpdate: no world cursor while the widescreen's on)
+    if (worldSkipped(s)) {
+        return WorldCursor::None; // (cursorUpdate: no world cursor under the widescreen, paused or dying)
     }
     const bool monster = (t.classes & oc::Monster) != 0;
     const bool talker = monster && (t.xStatus & kTalks);

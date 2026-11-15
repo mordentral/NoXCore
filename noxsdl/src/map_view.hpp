@@ -217,7 +217,7 @@ public:
     /// The walls as they stand: the map's, less the broken and open ones, plus Wall-spell walls.
     const std::vector<nox::map::Wall>& walls() const { return walls_; }
     /// walls() by where they stand (wall_grid.hpp), built again with them (setWallState), for a
-    /// frame's sight to visit only those near its view.
+    /// frame's sight, scene draw and 3D view to visit only those near the view.
     const WallGrid& wallGrid() const { return wallGrid_; }
 
     /// Applies the server's wall state:
@@ -527,6 +527,7 @@ private:
     std::vector<nox::map::Wall> walls_;     ///< as they stand (setWallState)
     std::unordered_map<std::uint16_t, std::size_t> wallByKey_; ///< walls_ by wallKey (the last there), with them
     WallGrid wallGrid_;                     ///< walls_ by block, with them
+    mutable std::vector<std::uint32_t> wallsNear_; ///< drawScene's walls near the view (wallGrid_), reused
     std::vector<nox::map::Wall> mapWalls_;  ///< as the map places them
     std::vector<std::uint16_t> breakable_;  ///< DestructableWalls cells (wallKey), by wall id
     std::set<std::uint16_t> breakableStanding_; ///< breakable_'s cells whose map wall stands (setWallState)

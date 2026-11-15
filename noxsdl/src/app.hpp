@@ -11,7 +11,8 @@
 //   overlays.cpp          what's drawn over the world: names, bars, bubbles, banner, tooltips
 //   test_drive.cpp        the tests' fake screens and scripted input
 //   frame.cpp             the frame's way to the screen: targets, gamma, present, screenshots
-//   editor_glue.cpp       the map editor's glue: opening it, its play-test and edit sessions
+//   game_cursor.cpp       the game's cursor: which one this frame shows, and its draw
+//   editor_glue.cpp      the map editor's glue: opening it, its play-test and edit sessions
 // main.cpp has SDL's callbacks, the frame and the input's routing; command_line.hpp the
 // command line's reading.
 #pragma once
@@ -928,6 +929,12 @@ void beginFrame(App& app);
 void endFrame(App& app);
 void present(App& app);
 SDL_AppResult showMovie(App& app, bool shotReady);
+
+// game_cursor.cpp
+/// The cursor update's gate on its world part, as a pick::Situation (pick::worldSkipped's fields).
+pick::Situation worldGate(App& app);
+void chooseCursor(App& app, bool inGame);
+void drawCursor(App& app, CursorType type, float scale);
 
 // editor_glue.cpp
 bool gameInPanel(const App& app);

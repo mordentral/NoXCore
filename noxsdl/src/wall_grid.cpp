@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <utility>
 
 namespace noxsdl {
@@ -14,7 +15,61 @@ constexpr std::size_t blockOf(std::uint8_t x, std::uint8_t y)
     return static_cast<std::size_t>(y / WallGrid::kBlock) * WallGrid::kBlocks + x / WallGrid::kBlock;
 }
 
+/// A wall cell's key (MapView::wallKey's).
+std::uint16_t wallKey(int x, int y)
+{
+    return static_cast<std::uint16_t>((x << 8) | (y & 0xFF));
+}
+
 } // namespace
+
+void standingWalls(std::span<const nox::map::Wall> mapWalls, std::span<const std::uint16_t> breakable,
+                   std::span<const std::pair<std::uint16_t, bool>> secret, const std::set<std::uint16_t>& destroyed,
+                   const std::set<std::uint16_t>& opened, const std::set<std::uint16_t>& closed,
+                   std::span<const std::pair<std::pair<int, int>, nox::map::Wall>> magic, std::vector<nox::map::Wall>& walls,
+                   std::set<std::uint16_t>& breakableStanding)
+{
+    // The cells of broken walls and open secret walls; Wall-spell walls replace whatever the map has in their cell.
+    std::set<std::uint16_t> gone;
+    for (const auto id : destroyed) {
+        if (id < breakable.size()) {
+            gone.insert(breakable[id]);
+        }
+    }
+    for (std::size_t id = 0; id < secret.size(); ++id) {
+        const auto key = static_cast<std::uint16_t>(id);
+        // Open when the server says so, or when the map starts it open and the server hasn't closed it.
+        const bool open = opened.contains(key) || (secret[id].second && !closed.contains(key));
+        if (open) {
+            gone.insert(secret[id].first);
+        }
+    }
+    std::set<std::uint16_t> raised;
+    for (const auto& [cell, wall] : magic) {
+        raised.insert(wallKey(cell.first, cell.second));
+    }
+    walls.clear();
+    for (const auto& w : mapWalls) {
+        const auto key = wallKey(w.x, w.y);
+        if (!gone.contains(key) && !raised.contains(key)) {
+            walls.push_back(w);
+        }
+    }
+    for (const auto& [cell, wall] : magic) {
+        auto w = wall;
+        w.x = static_cast<std::uint8_t>(cell.first);
+        w.y = static_cast<std::uint8_t>(cell.second);
+        walls.push_back(w);
+    }
+    // The breakable walls still standing as the map has them (a Wall-spell wall raised in a broken
+    // one's cell is a new wall: not breakable).
+    breakableStanding.clear();
+    for (const auto key : breakable) {
+        if (!gone.contains(key) && !raised.contains(key)) {
+            breakableStanding.insert(key);
+        }
+    }
+}
 
 void WallGrid::build(std::span<const nox::map::Wall> walls)
 {
@@ -75,6 +130,16 @@ void WallGrid::find(int x0, int y0, int x1, int y1, std::vector<std::uint32_t>& 
             m &= m - 1;
         }
     }
+}
+
+void WallGrid::findAround(float left, float top, float right, float bottom, float reach, std::vector<std::uint32_t>& out) const
+{
+    constexpr float kWallCell = 23; // world units a wall cell
+    // A world coordinate's cell, kept to just past the map's (find() clips them anyway).
+    const auto cell = [](float world) {
+        return static_cast<int>(std::clamp(std::floor(world / kWallCell), -2.0f, static_cast<float>(kCells + 1)));
+    };
+    find(cell(left - reach) - 1, cell(top - reach) - 1, cell(right + reach) + 1, cell(bottom + reach) + 1, out);
 }
 
 } // namespace noxsdl

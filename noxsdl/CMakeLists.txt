@@ -85,6 +85,7 @@ add_executable(noxsdl WIN32
     src/effects_rain.cpp
     src/effects_objects.cpp
     src/effects_puffs.cpp
+    src/game_cursor.cpp
     src/game_session.cpp
     src/game_windows.cpp
     src/gpu_atlas.cpp

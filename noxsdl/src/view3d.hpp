@@ -345,6 +345,7 @@ private:
         float height;
     };
     std::vector<WallLine> wallLines_;
+    std::vector<std::uint32_t> wallsNear_; ///< addWalls' walls near the eye (MapView::wallGrid), reused
     std::vector<SDL_Vertex> runVerts_; ///< drawSorted's merged batches
 
     std::unique_ptr<DepthPass> depth_; ///< the depth-buffered drawing, when the renderer's GPU allows it

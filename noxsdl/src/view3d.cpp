@@ -1101,9 +1101,14 @@ void View3D::addWalls(const Frame& f)
     std::map<std::pair<int, int>, std::uint8_t> ways;
     std::unordered_map<std::uint16_t, const nox::map::Wall*> cells; // (wallSprite's neighbours)
     std::vector<WallArm> arms;
+    // The walls near the eye, from the wall grid (those a walk of them all finds in range, in its
+    // order): a wall's centre, half a cell into it, within the draw distance and 40.
+    const auto& all = f.view.walls();
+    f.view.wallGrid().findAround(eyeX_, eyeY_, eyeX_, eyeY_, kDrawDistance + 40 + kCell, wallsNear_);
     // First pass, over the walls in range: count the arms ending at each point and the ways they
     // leave it.
-    for (const auto& w : f.view.walls()) {
+    for (const std::uint32_t index : wallsNear_) {
+        const auto& w = all[index];
         if (!inRange(w)) {
             continue;
         }
@@ -1123,7 +1128,8 @@ void View3D::addWalls(const Frame& f)
     wallLines_.clear();
     const float h = kWallThickness / 2;
     // Second pass: each arm stood up as a box kWallThickness thick.
-    for (const auto& w : f.view.walls()) {
+    for (const std::uint32_t index : wallsNear_) {
+        const auto& w = all[index];
         if (!inRange(w) || w.material >= things.walls.size()) {
             continue;
         }

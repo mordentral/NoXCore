@@ -58,7 +58,9 @@ struct LightSource {
     std::optional<lightcone::Cone> cone;
 };
 
-/// Light radius for an intensity (lightRadiusFromIntensity).
+/// Light radius for an intensity (lightRadiusFromIntensity), unrounded. (The game's round light
+/// tests against its drawable's whole LightRadius; the falloff's threshold ends the light inside
+/// that at every intensity, so both light the same points; a test pins this.)
 float lightRadius(float intensity);
 
 class LightMap {
