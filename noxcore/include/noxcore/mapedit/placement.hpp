@@ -21,6 +21,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace nox::things {
@@ -128,10 +129,22 @@ public:
     Op finish(Selection* placed = nullptr) const;
 
 private:
+    /// Whether a point taken is nearer `p` than the spacing (its square `spacing2`): the test
+    /// against every point, asked only of the points in `p`'s cell and the ones round it.
+    bool tooClose(WorldPoint p, float spacing2) const;
+    void take(WorldPoint p);
+
     const MapDocument& doc_;
     const ObjectFactory& factory_;
     ScatterBrush brush_;
-    std::vector<WorldPoint> taken_; ///< existing objects round the stroke, and those it placed
+    /// The points taken (existing objects round the stroke, and those it placed), by grid cell:
+    /// cells twice the spacing on a side, so any point near enough is in the cell or the eight
+    /// round it. Points a cell can't hold (not finite, or too far out for the cell numbers), and
+    /// every point when the spacing gives no usable cell (0, not finite), are in takenElse_,
+    /// which is always walked.
+    float cell_ = 0;
+    std::unordered_map<std::uint64_t, std::vector<WorldPoint>> takenCells_;
+    std::vector<WorldPoint> takenElse_;
     std::vector<DocObject> objects_;
     std::uint64_t counter_ = 0;
 };

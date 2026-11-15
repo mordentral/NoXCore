@@ -11,6 +11,7 @@
 
 #include "noxcore/client/solo_menu.hpp"
 #include "noxcore/client/spell_bars.hpp"
+#include "noxcore/client/text_fields.hpp"
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/server/rules.hpp"
 #include "noxcore/server/solo_save.hpp"
@@ -833,10 +834,6 @@ void Menus::fillSoloList()
         return;
     }
     namespace saves = nox::client::solo_saves;
-    const auto palette = [](int index) {
-        const SDL_Color c = paletteColor(static_cast<std::uint8_t>(index));
-        return nox::gui::Color{c.r, c.g, c.b, false};
-    };
     lists->lines.clear();
     dates->lines.clear();
     names->lines.clear();
@@ -844,7 +841,7 @@ void Menus::fillSoloList()
     soloSlots_ = saves::list(soloRoot());
     for (int i = 0; i < static_cast<int>(soloSlots_.size()); ++i) {
         const auto& slot = soloSlots_[static_cast<std::size_t>(i)];
-        const nox::gui::Color c = palette(saves::lineColor(slot));
+        const nox::gui::Color c = paletteWindowColor(saves::lineColor(slot));
         if (!slot.exists) {
             const std::string empty = i == 0 ? " " : gui_.text("EmptySlot", "GUISave.c");
             lists->lines.push_back({" ", c});
@@ -1254,13 +1251,9 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
     }
     const auto& g = entry.game;
     const nox::gui::Color plain = list->textColor;
-    const auto colour = [](int index) {
-        const SDL_Color c = paletteColor(static_cast<std::uint8_t>(index));
-        return nox::gui::Color{c.r, c.g, c.b, false};
-    };
     list->lines.clear();
     const auto add = [&](const std::string& text, std::optional<int> index = std::nullopt) {
-        list->lines.push_back({text.empty() ? std::string(" ") : text, index ? colour(*index) : plain});
+        list->lines.push_back({text.empty() ? std::string(" ") : text, index ? paletteWindowColor(*index) : plain});
     };
     const auto title = [&](const char* id) { add(gui_.text(std::string("Noxworld.c:") + id), 0xE); };
     const auto gap = [&] { add(" "); }; // (L"\n")
@@ -1685,34 +1678,10 @@ void Menus::update(std::uint64_t nowMs)
     }
 }
 
-std::string Menus::format(const std::string& id, std::initializer_list<std::string> args) const
+std::string Menus::format(const std::string& id, std::initializer_list<std::string_view> args) const
 {
     // The string table's formats are printf ones: %s / %S / %ls take the next argument.
-    const std::string f = gui_.text(id);
-    std::string out;
-    auto arg = args.begin();
-    for (std::size_t i = 0; i < f.size(); ++i) {
-        if (f[i] == '%' && i + 1 < f.size()) {
-            std::size_t j = i + 1;
-            if (f[j] == 'l' && j + 1 < f.size()) {
-                ++j;
-            }
-            if (f[j] == 's' || f[j] == 'S') {
-                if (arg != args.end()) {
-                    out += *arg++;
-                }
-                i = j;
-                continue;
-            }
-            if (f[j] == '%') {
-                out += '%';
-                i = j;
-                continue;
-            }
-        }
-        out += f[i];
-    }
-    return out;
+    return nox::client::fields::fill(gui_.text(id), args, nox::client::fields::kLongStrings);
 }
 
 void Menus::dialog(const std::string& title, const std::string& text, std::uint32_t flags,

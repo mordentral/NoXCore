@@ -390,7 +390,27 @@ void ThingDb::reindex()
         spellNumbers.push_back(spellId(s.id).value_or(0));
     }
     spellIndexOf = spells.size();
+    imageIndex.clear();
+    imageIndex.reserve(images.size());
+    for (std::size_t i = 0; i < images.size(); ++i) {
+        imageIndex.try_emplace(images[i].name, static_cast<std::uint32_t>(i)); // (the first of a name kept)
+    }
+    imageIndexOf = images.size();
     ++reindexCount;
+}
+
+const ImageDef* ThingDb::findImage(std::string_view name) const
+{
+    if (imageIndexOf == images.size()) {
+        const auto it = imageIndex.find(name);
+        return it == imageIndex.end() ? nullptr : &images[it->second];
+    }
+    for (const auto& i : images) {
+        if (i.name == name) {
+            return &i;
+        }
+    }
+    return nullptr;
 }
 
 const ThingDef* ThingDb::findThing(std::string_view name) const

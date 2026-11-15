@@ -372,8 +372,21 @@ ObjId MapDocument::addObject(DocObject obj)
     if (obj.parent != 0 && !objects.contains(obj.parent)) {
         throw FormatError("map editor: inventory owner doesn't exist");
     }
-    if (obj.header.extent == 0) {
-        obj.header.extent = nextFreeExtent();
+    // One walk: the highest extent (for a new one, as nextFreeExtent gives it) and the last order
+    // among the object's siblings.
+    const bool newExtent = obj.header.extent == 0;
+    std::uint32_t most = 0;
+    std::uint64_t last = 0;
+    bool any = false;
+    for (const auto& [id, o] : objects) {
+        most = std::max(most, o.header.extent);
+        if (o.parent == obj.parent) {
+            last = std::max(last, o.order);
+            any = true;
+        }
+    }
+    if (newExtent) {
+        obj.header.extent = most + 1;
     }
     // The header's optional fields follow its version (pickup handler from 0x3F, decay from 0x40).
     obj.header.detailsFlag = obj.header.details ? (obj.header.detailsFlag ? obj.header.detailsFlag : 0xFF) : 0;
@@ -382,14 +395,6 @@ ObjId MapDocument::addObject(DocObject obj)
         if (obj.header.version <= 0x3E) det->onPickup.reset();
         if (obj.header.version > 0x3F && !det->decayFrames) det->decayFrames = 0;
         if (obj.header.version <= 0x3F) det->decayFrames.reset();
-    }
-    std::uint64_t last = 0;
-    bool any = false;
-    for (const auto& [id, o] : objects) {
-        if (o.parent == obj.parent) {
-            last = std::max(last, o.order);
-            any = true;
-        }
     }
     obj.order = any ? last + 1 : 0;
     obj.tocId = 0;

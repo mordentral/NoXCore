@@ -8,8 +8,9 @@
 //   game_session.cpp      a game joined: the live session, the game's windows, chat and saves
 //   quickbar.cpp          the spell bars, traps and the award flight, as played
 //   live_scene.cpp        the world's drawables as the scene draws them, lights and sounds
+//   live_controls.cpp     what the bound controls do in a game, and picking up
 //   overlays.cpp          what's drawn over the world: names, bars, bubbles, banner, tooltips
-//   test_drive.cpp        the tests' fake screens and scripted input
+//   test_drive.cpp      the tests' fake screens and scripted input
 //   frame.cpp             the frame's way to the screen: targets, gamma, present, screenshots
 //   game_cursor.cpp       the game's cursor: which one this frame shows, and its draw
 //   editor_glue.cpp      the map editor's glue: opening it, its play-test and edit sessions
@@ -913,6 +914,14 @@ void drawDamageNumbers(App& app);
 void drawChatBubbles(App& app, std::uint32_t frame);
 std::string liveTooltip(App& app);
 void drawTooltip(App& app, bool below = false);
+
+// live_controls.cpp
+/// Picks up `netCode` (MSG_TRY_GET) unless there's no room for it (CliNet_SendPickup).
+void tryPickup(App& app, std::uint16_t netCode);
+/// Live: what a control does when its key is pressed; whether it did anything.
+bool liveControl(App& app, std::string_view control);
+/// The controls a key or button press fired; whether there were any.
+bool liveControls(App& app, const std::vector<std::string>& controls);
 
 // test_drive.cpp
 void pickupTest(App& app);

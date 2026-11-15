@@ -27,6 +27,19 @@ inline void help(const std::string& text, ImGuiHoveredFlags flags = ImGuiHovered
     help(text.c_str(), flags);
 }
 
+/// Help shown over a disabled field too: a panel takes these as its own help() with
+/// `using editor::disabled_too::help;`.
+namespace disabled_too {
+inline void help(const char* text)
+{
+    editor::help(text, ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled);
+}
+inline void help(const std::string& text)
+{
+    help(text.c_str());
+}
+} // namespace disabled_too
+
 /// A property row's label (dim, on the fields' baseline; its help when hovered), the field after it
 /// from `fieldX` to the row's end.
 inline void labelRow(const char* label, float fieldX, const char* helpText = nullptr, ImGuiHoveredFlags helpFlags = ImGuiHoveredFlags_DelayNormal)

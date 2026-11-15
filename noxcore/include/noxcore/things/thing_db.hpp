@@ -233,12 +233,13 @@ struct ThingDb {
     /// answer either way.)
     const ThingDef* findThing(std::string_view name) const;
     /// The one rebuild of every index and cache of this table: the names' index (each name's
-    /// first entry), each thing's class bits (ThingDef::bits) and the spells' index (each spell
-    /// id's first SPEL record, each record's spell id). parseThingDb calls it as the db is loaded;
-    /// ANYTHING that changes `things` or `spells` after load (an overlay, an editor) must call it
-    /// again. The size checks below only notice entries added or removed: an in-place change of
-    /// the same size (a renamed thing, an attribute, a SPEL record's id) leaves the caches stale
-    /// until this is called. Nothing of thing.bin's in the code: a cache of what was loaded.
+    /// first entry), each thing's class bits (ThingDef::bits), the spells' index (each spell
+    /// id's first SPEL record, each record's spell id) and the named images' index. parseThingDb
+    /// calls it as the db is loaded; ANYTHING that changes `things`, `spells` or `images` after
+    /// load (an overlay, an editor) must call it again. The size checks below only notice entries
+    /// added or removed: an in-place change of the same size (a renamed thing, an attribute, a
+    /// SPEL record's id) leaves the caches stale until this is called. Nothing of thing.bin's in
+    /// the code: a cache of what was loaded.
     void reindex();
 
     /// (findThing's cache, reindex's: each name's first entry in `things`, and how many entries it
@@ -250,6 +251,13 @@ struct ThingDb {
     std::unordered_map<std::string, std::uint32_t, NameHash, std::equal_to<>> thingIndex;
     std::size_t thingIndexOf = static_cast<std::size_t>(-1);
     std::uint32_t reindexCount = 0; ///< (counted by each reindex: what's cached from `things` is made afresh)
+    /// The first named image (IMAG) with this name (case-sensitive), or nullptr. (By reindex's
+    /// index when it's of `images` as they stand, else by walking the list: the same answer.)
+    /// The index lives in the db itself, so a db copied, moved or replaced carries its own.
+    const ImageDef* findImage(std::string_view name) const;
+    /// (findImage's cache, reindex's: each image name's first entry, and how many it was made from.)
+    std::unordered_map<std::string, std::uint32_t, NameHash, std::equal_to<>> imageIndex;
+    std::size_t imageIndexOf = static_cast<std::size_t>(-1);
     /// The SPEL record for a spell id (spell_ids.hpp), or nullptr: the first whose name is the
     /// id's. (By reindex's index when it's of `spells` as they stand, else by walking the list.)
     const SpellDef* findSpell(std::uint32_t id) const;

@@ -93,14 +93,6 @@ SDL_FPoint tileCorner(int gx, int gy)
     return odd ? SDL_FPoint{cx + kOddX, cy + kOddY} : SDL_FPoint{cx + kOddY, cy + kOddX};
 }
 
-/// An object's flags as the client has them once loaded: a new drawable starts enabled
-/// (Cli_CreateDrawableAt sets 0x1000000) and only a header with details replaces that
-/// (spriteLoadFromMap). Most maps' flames and torches have no details.
-std::uint32_t objectFlags(const nox::map::ObjectHeader& header)
-{
-    return header.details ? header.details->flags : kObjectEnabled;
-}
-
 } // namespace
 
 MapView::MapView(const nox::map::MapFile& map, const nox::things::ThingDb& things, ThingArt& art,

@@ -195,6 +195,23 @@ private:
     const nox::things::ThingDb& things_;
     ThingArt& art_;
     std::map<std::string, const nox::things::ImageDef*, std::less<>> images_;
+    /// The named images draw() uses, looked up in images_ once as the HUD is made (images_ never
+    /// changes after that; nullptr: thing.bin has none by that name, drawn as nothing).
+    struct Named {
+        using Def = const nox::things::ImageDef*;
+        std::array<Def, 5> nugget{}, nuggetLit{}, warriorNugget{}; ///< QuickBar(Warrior)Nugget1-5(Lit)
+        Def base = nullptr, warriorLeft = nullptr, warriorRight = nullptr;
+        Def trap = nullptr, trapHit = nullptr, bomber = nullptr, bomberHit = nullptr;
+        Def trapButton = nullptr, trapButtonLit = nullptr;
+        Def trapTray = nullptr, trapTrayUpLit = nullptr, trapTrayDownLit = nullptr;
+        Def spellSetBase = nullptr, spellSetUpLit = nullptr, spellSetDownLit = nullptr, spellSetMaxLit = nullptr;
+        Def title = nullptr, bookButton = nullptr, bookButtonLit = nullptr;
+        std::array<Def, 10> healthMana{}; ///< HealthMana1-10
+        Def warriorHealthTube = nullptr, healthManaTubes = nullptr, warriorPoisonTube = nullptr, poisonTube = nullptr;
+        /// The CTF icons' pictures: [FlagCarried, FlagDroppedInField, FlagAtHome][icon] + its colour.
+        std::array<std::array<Def, 16>, 3> flags{};
+        Def flagTeamBorder = nullptr;
+    } named_;
     std::array<std::array<Bubble, 64>, 2> bubbles_{};
     std::uint32_t bubbleFrame_ = 0;
     std::uint32_t seed_ = 12345;

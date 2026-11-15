@@ -48,11 +48,7 @@ using nox::util::lowered;
 
 constexpr float kPi = std::numbers::pi_v<float>;
 
-/// Help shown over a disabled field too.
-void help(const std::string& text)
-{
-    editor::help(text, ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled);
-}
+using editor::disabled_too::help; // (help shown over a disabled field too)
 
 /// A colour picker committed once, when its picking ends (held_edit.hpp's PickedColour, as
 /// MarkerTools::colourField). Whether `out` is a new colour.

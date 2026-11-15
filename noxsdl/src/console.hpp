@@ -24,6 +24,10 @@
 #include <string_view>
 #include <vector>
 
+namespace nox::gui {
+struct Color;
+}
+
 namespace noxsdl {
 
 /// The game's 17 console colours (the colours loadDefColor makes, in order).
@@ -48,6 +52,9 @@ enum ConsoleColor : std::uint8_t {
 };
 /// A palette colour's RGB (the console's, the scoreboard's).
 SDL_Color paletteColor(std::uint8_t index);
+/// The same colour as a window's colour (opaque), for the window lists' lines; `index` taken as
+/// its low byte.
+nox::gui::Color paletteWindowColor(int index);
 
 class Console {
 public:

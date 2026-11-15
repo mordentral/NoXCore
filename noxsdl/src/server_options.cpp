@@ -5,11 +5,13 @@
 
 #include "hud.hpp"
 
+#include "noxcore/client/text_fields.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cwchar>
+#include <utility>
 
 namespace noxsdl {
 
@@ -48,35 +50,11 @@ constexpr std::array<GameType, 7> kTypes{{
     {"Noxworld.c:Chat", 0x80},
 }};
 
-/// The format's %S / %s and %d's filled in turn (the exe's swprintf).
-std::string format(std::string f, const std::vector<std::string>& args)
+/// The format's %S / %s and %d's filled in turn (the exe's swprintf): each % and the character
+/// after it (text_fields.hpp's replacePercentPairs).
+std::string format(std::string f, std::initializer_list<std::string_view> args)
 {
-    std::size_t at = 0;
-    for (const auto& a : args) {
-        const auto p = f.find('%', at);
-        if (p == std::string::npos || p + 1 >= f.size()) {
-            break;
-        }
-        f.replace(p, 2, a);
-        at = p + a.size();
-    }
-    return f;
-}
-
-void enable(gui::Window* w, bool on)
-{
-    // The window and everything in it.
-    if (!w) {
-        return;
-    }
-    if (on) {
-        w->status |= nox::gui::status::Enabled;
-    } else {
-        w->status &= ~nox::gui::status::Enabled;
-    }
-    for (auto& c : w->children) {
-        enable(c.get(), on);
-    }
+    return nox::client::fields::replacePercentPairs(std::move(f), args);
 }
 
 /// wcstol's number at the front of the field (0 if none).
@@ -677,8 +655,8 @@ void ServerOptions::setLabels()
                                                        : "Servopts.wnd:KillLimit";
         w->text = gui_.text(label);
     }
-    enable(window_->find(kMapGroup), !newGame_);
-    enable(window_->find(kLimitsGroup), !newGame_);
+    gui::setEnabledTree(window_->find(kMapGroup), !newGame_);
+    gui::setEnabledTree(window_->find(kLimitsGroup), !newGame_);
     if (gui::Window* box = window_->find(kNewGame)) {
         box->state = newGame_ ? box->state | gui::kPressed : box->state & ~gui::kPressed;
     }

@@ -70,12 +70,7 @@ namespace noxsdl {
 namespace {
 
 using editor::col;
-
-/// Help shown over a disabled field too.
-void help(const char* text)
-{
-    editor::help(text, ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled);
-}
+using editor::disabled_too::help; // (help shown over a disabled field too)
 
 /// The fields of one element under its own ids: an edit still being typed when the selection
 /// changes ends with the old element's field (dropped), never written to the new element.

@@ -1336,7 +1336,7 @@ void MapEditor::edgeRulesWindow()
     if (ImGui::InputInt("Side seed", &seed)) paint_.edgeSeed = static_cast<std::uint32_t>(std::max(seed, 0));
     help("The seed side variants are picked with (the same seed: the same edges).");
     ImGui::SeparatorText("Priority (highest first)");
-    static int selected = -1;
+    int& selected = edgeRulesPanel_.selected;
     std::vector<int> order = rules_.order();
     ImGui::BeginChild("##order", ImVec2(0, 260 * imgui_->scale()), ImGuiChildFlags_Borders);
     for (int i = static_cast<int>(order.size()) - 1; i >= 0; --i) {
@@ -1369,14 +1369,17 @@ void MapEditor::edgeRulesWindow()
         rules_.setOrder(order);
     }
     ImGui::EndDisabled();
-    static int add = -1;
+    int& add = edgeRulesPanel_.add;
     ImGui::TextDisabled("Add a floor the list lacks (at the bottom):");
     if (floorPicker("addfloor", add, true) && add >= 0 && std::ranges::find(order, add) == order.end()) {
         order.insert(order.begin(), add);
         rules_.setOrder(order);
     }
     ImGui::SeparatorText("Pair overrides");
-    static int over = -1, base = -1, kind = 0, edge = -1;
+    int& over = edgeRulesPanel_.over;
+    int& base = edgeRulesPanel_.base;
+    int& kind = edgeRulesPanel_.kind;
+    int& edge = edgeRulesPanel_.edge;
     if (edge < 0) edge = edgeSet_;
     ImGui::TextDisabled("Floor lapping:");
     floorPicker("ovover", over);

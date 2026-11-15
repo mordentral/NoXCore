@@ -23,21 +23,6 @@ SDL_Color sdl(const Color& c)
     return {c.r, c.g, c.b, 255};
 }
 
-/// thing.bin's named images, by name.
-const std::map<std::string, const nox::things::ImageDef*>& imageIndex(const nox::things::ThingDb& things)
-{
-    static const nox::things::ThingDb* built = nullptr;
-    static std::map<std::string, const nox::things::ImageDef*> index;
-    if (built != &things) {
-        index.clear();
-        for (const auto& i : things.images) {
-            index.emplace(i.name, &i);
-        }
-        built = &things;
-    }
-    return index;
-}
-
 // client_gui_flag (setShellUp / shellUp).
 bool shellFlag = false;
 
@@ -221,12 +206,13 @@ std::optional<nox::things::ImageRef> namedImage(const nox::things::ThingDb& thin
     if (name.empty()) {
         return std::nullopt;
     }
-    const auto& index = imageIndex(things);
-    const auto it = index.find(name);
-    if (it == index.end()) {
+    // (By the db's own index: one kept here by the db's address could outlive the db and answer
+    // for another made at the same address.)
+    const nox::things::ImageDef* found = things.findImage(name);
+    if (!found) {
         return std::nullopt;
     }
-    const nox::things::ImageDef& def = *it->second;
+    const nox::things::ImageDef& def = *found;
     std::optional<nox::things::ImageRef> ref = def.image;
     // Animated named images run on the wall clock at the game's 30 frames a second.
     if (def.animation && !def.animation->frames.empty()) {

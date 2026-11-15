@@ -569,6 +569,15 @@ private:
     nox::mapedit::EdgeRules rules_;
     nox::mapedit::PaintSettings paint_;
     bool showEdgeRules_ = false;
+    /// The Edge Rules window's choices between frames (edgeRulesWindow): the priority list's
+    /// selected floor, the floor to add, and the pair override being made (the floor lapping, the
+    /// floor under it, its kind, and its edge: -1 until the window first shows, then the edge
+    /// tool's set). -1: none chosen.
+    struct EdgeRulesPanel {
+        int selected = -1;
+        int add = -1;
+        int over = -1, base = -1, kind = 0, edge = -1;
+    } edgeRulesPanel_;
     std::map<std::string, SDL_Texture*> thumbs_;
     char pickerFilter_[64] = {};
     /// A type's collision shape as the Extents layer draws it (its EXTENT, FLAGS and ZSIZE read

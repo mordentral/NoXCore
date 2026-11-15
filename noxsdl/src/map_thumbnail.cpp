@@ -192,12 +192,6 @@ struct Canvas {
     std::vector<float> scratch;
 };
 
-// As MapView has it: a header without details is enabled.
-std::uint32_t objectFlags(const nox::map::ObjectHeader& header)
-{
-    return header.details ? header.details->flags : kObjectEnabled;
-}
-
 } // namespace
 
 MapThumbnails::Pixels MapThumbnails::draw(const std::filesystem::path& path, const nox::things::ThingDb& things,

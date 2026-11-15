@@ -5,8 +5,9 @@
 #include "console.hpp"
 #include "hud.hpp"
 
+#include "noxcore/client/text_fields.hpp"
+
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <map>
 
@@ -27,36 +28,11 @@ std::uint8_t teamPalette(std::uint8_t color)
     return kTeam[color % 10];
 }
 
-/// The CSF text's printf fields (%d, %02d, %s, %S) filled in order.
-std::string format(std::string_view pattern, std::initializer_list<std::string> args)
+/// The CSF text's printf fields (%d, %02d, %s, %S) filled in order, a width starting with 0
+/// padding with zeros (text_fields.hpp's kZeroPadded).
+std::string format(std::string_view pattern, std::initializer_list<std::string_view> args)
 {
-    std::string out;
-    auto next = args.begin();
-    for (std::size_t i = 0; i < pattern.size(); ++i) {
-        if (pattern[i] != '%' || i + 1 >= pattern.size()) {
-            out += pattern[i];
-            continue;
-        }
-        std::size_t j = i + 1;
-        std::string width;
-        while (j < pattern.size() && std::isdigit(static_cast<unsigned char>(pattern[j]))) {
-            width += pattern[j++];
-        }
-        if (j < pattern.size() && (pattern[j] == 'd' || pattern[j] == 's' || pattern[j] == 'S')) {
-            std::string v = next != args.end() ? *next++ : std::string();
-            if (!width.empty() && width.front() == '0' && v.size() < static_cast<std::size_t>(std::stoi(width))) {
-                v.insert(0, static_cast<std::size_t>(std::stoi(width)) - v.size(), '0');
-            }
-            out += v;
-            i = j;
-        } else if (j < pattern.size() && pattern[j] == '%') {
-            out += '%';
-            i = j;
-        } else {
-            out += pattern[i];
-        }
-    }
-    return out;
+    return nox::client::fields::fill(pattern, args, nox::client::fields::kZeroPadded);
 }
 
 } // namespace

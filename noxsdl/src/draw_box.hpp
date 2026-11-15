@@ -13,6 +13,13 @@ inline bool inside(const SDL_FRect& r, float x, float y)
     return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
+/// (x, y) in the rw x rh box at (rx, ry), its right and bottom edges outside (the HUD's and the
+/// spellbook's tests, in game pixels).
+inline bool inside(float x, float y, float rx, float ry, float rw, float rh)
+{
+    return x >= rx && y >= ry && x < rx + rw && y < ry + rh;
+}
+
 inline void fill(SDL_Renderer* renderer, SDL_FRect r, SDL_Color c)
 {
     SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);

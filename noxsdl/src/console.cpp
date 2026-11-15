@@ -1,6 +1,7 @@
 // The game's console (console.hpp): its lines, typing, history, and the command table's parse.
 #include "console.hpp"
 
+#include "noxcore/gui/window_file.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
@@ -31,6 +32,12 @@ constexpr std::array<SDL_Color, 17> kColors{{
 SDL_Color paletteColor(std::uint8_t index)
 {
     return kColors[index < kColors.size() ? index : 4];  // out of range: white
+}
+
+nox::gui::Color paletteWindowColor(int index)
+{
+    const SDL_Color c = paletteColor(static_cast<std::uint8_t>(index));
+    return {c.r, c.g, c.b, false};
 }
 
 namespace {

@@ -376,8 +376,9 @@ private:
     /// why), laid out as the game list (mode_list.hpp's rows); the chosen row's settings under it;
     /// Host (Game Modes: Start), Open Mods Folder, Refresh. A double click or Enter starts a row.
     void modeList(ModeListFor list);
-    /// A string-table format ("%s the %s") filled in order.
-    std::string format(const std::string& id, std::initializer_list<std::string> args) const;
+    /// A string-table format ("%s the %s") filled in order: %s / %S / %ls, %% a percent sign
+    /// (text_fields.hpp's kLongStrings).
+    std::string format(const std::string& id, std::initializer_list<std::string_view> args) const;
 
     gui::Gui gui_;
     std::filesystem::path windowDir_;

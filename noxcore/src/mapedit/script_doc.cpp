@@ -9,18 +9,12 @@
 #include <cstdio>
 #include <map>
 #include <set>
+#include <type_traits>
 #include <variant>
 
 namespace nox::mapedit {
 
 namespace {
-
-template <class... Ts>
-struct Overloaded : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-Overloaded(Ts...) -> Overloaded<Ts...>;
 
 std::string jsonQuote(std::string_view s)
 {
@@ -139,18 +133,48 @@ std::optional<std::string> jsonUnquote(std::string_view s)
     return std::nullopt;
 }
 
-void addMonsterScripts(std::vector<std::pair<std::string, map::ScriptHandler*>>& out, map::xfer::MonsterScripts& s)
+/// Each script handler `o` has, in the order the editor lists them: f(label, handler), the handler
+/// as `o` gives it (const for a const object: nothing copied to read them).
+template <typename Obj, typename F>
+void eachHandler(Obj& o, F&& f)
 {
-    out.emplace_back("Enemy sighted", &s.enemySighted);
-    out.emplace_back("Death", &s.death);
-    out.emplace_back("Looking for enemy", &s.lookingForEnemy);
-    out.emplace_back("Change focus", &s.changeFocus);
-    out.emplace_back("Is hit", &s.isHit);
-    out.emplace_back("Retreat", &s.retreat);
-    out.emplace_back("Collision", &s.collision);
-    out.emplace_back("Hear enemy", &s.hearEnemy);
-    out.emplace_back("End of waypoint", &s.endOfWaypoint);
-    out.emplace_back("Lost enemy", &s.lostEnemy);
+    if (o.header.details && o.header.details->onPickup) {
+        f("Pickup", *o.header.details->onPickup);
+    }
+    const auto monster = [&](auto& s) {
+        f("Enemy sighted", s.enemySighted);
+        f("Death", s.death);
+        f("Looking for enemy", s.lookingForEnemy);
+        f("Change focus", s.changeFocus);
+        f("Is hit", s.isHit);
+        f("Retreat", s.retreat);
+        f("Collision", s.collision);
+        f("Hear enemy", s.hearEnemy);
+        f("End of waypoint", s.endOfWaypoint);
+        f("Lost enemy", s.lostEnemy);
+    };
+    std::visit(
+        [&](auto& d) {
+            using T = std::remove_cvref_t<decltype(d)>;
+            if constexpr (std::is_same_v<T, map::xfer::Trigger>) {
+                f("Pressed", d.onPressed);
+                f("Released", d.onReleased);
+                if (o.xferVersion > 0x1E) {
+                    f("Collided", d.onCollided);
+                }
+            } else if constexpr (std::is_same_v<T, map::xfer::Hole>) {
+                f("Stepped on", d.script);
+            } else if constexpr (std::is_same_v<T, map::xfer::Monster> || std::is_same_v<T, map::xfer::Npc>) {
+                monster(d.scripts);
+            } else if constexpr (std::is_same_v<T, map::xfer::MonsterGenerator>) {
+                // (the server reads them as hurt, die, collide, spawn: World::load)
+                f("Hurt", d.scripts[0]);
+                f("Die", d.scripts[1]);
+                f("Collide", d.scripts[2]);
+                f("Spawn", d.scripts[3]);
+            }
+        },
+        o.data);
 }
 
 std::string stripNul(std::string s)
@@ -205,30 +229,7 @@ std::string HandlerRef::where(const MapDocument& doc) const
 std::vector<std::pair<std::string, map::ScriptHandler*>> objectHandlers(DocObject& o)
 {
     std::vector<std::pair<std::string, map::ScriptHandler*>> out;
-    if (o.header.details && o.header.details->onPickup) {
-        out.emplace_back("Pickup", &*o.header.details->onPickup);
-    }
-    std::visit(Overloaded{
-                   [&](map::xfer::Trigger& t) {
-                       out.emplace_back("Pressed", &t.onPressed);
-                       out.emplace_back("Released", &t.onReleased);
-                       if (o.xferVersion > 0x1E) {
-                           out.emplace_back("Collided", &t.onCollided);
-                       }
-                   },
-                   [&](map::xfer::Hole& h) { out.emplace_back("Stepped on", &h.script); },
-                   [&](map::xfer::Monster& m) { addMonsterScripts(out, m.scripts); },
-                   [&](map::xfer::Npc& n) { addMonsterScripts(out, n.scripts); },
-                   [&](map::xfer::MonsterGenerator& g) {
-                       // (the server reads them as hurt, die, collide, spawn: World::load)
-                       out.emplace_back("Hurt", &g.scripts[0]);
-                       out.emplace_back("Die", &g.scripts[1]);
-                       out.emplace_back("Collide", &g.scripts[2]);
-                       out.emplace_back("Spawn", &g.scripts[3]);
-                   },
-                   [](auto&) {},
-               },
-               o.data);
+    eachHandler(o, [&](const char* label, map::ScriptHandler& h) { out.emplace_back(label, &h); });
     return out;
 }
 
@@ -236,15 +237,15 @@ std::vector<HandlerRef> handlerRefs(const MapDocument& doc)
 {
     std::vector<HandlerRef> out;
     for (const auto& [id, object] : doc.objects) {
-        DocObject copy = object; // (objectHandlers hands out pointers into what it's given)
-        for (const auto& [label, h] : objectHandlers(copy)) {
+        // (Read where they are: no copy of the object.)
+        eachHandler(object, [&](const char* label, const map::ScriptHandler& h) {
             HandlerRef r;
             r.owner = HandlerRef::Owner::Object;
             r.object = id;
             r.field = label;
-            r.function = h->function;
+            r.function = h.function;
             out.push_back(std::move(r));
-        }
+        });
     }
     for (std::size_t i = 0; i < doc.polygons.polygons.size(); ++i) {
         const auto& p = doc.polygons.polygons[i];
@@ -254,15 +255,25 @@ std::vector<HandlerRef> handlerRefs(const MapDocument& doc)
     return out;
 }
 
-std::vector<std::string> handlerNames(const MapDocument& doc)
+namespace {
+
+/// The functions `refs` name, each once, sorted.
+std::vector<std::string> namesOf(const std::vector<HandlerRef>& refs)
 {
     std::set<std::string> names;
-    for (const auto& r : handlerRefs(doc)) {
+    for (const auto& r : refs) {
         if (!r.function.empty()) {
             names.insert(r.function);
         }
     }
     return {names.begin(), names.end()};
+}
+
+} // namespace
+
+std::vector<std::string> handlerNames(const MapDocument& doc)
+{
+    return namesOf(handlerRefs(doc));
 }
 
 DecompiledSource decompileDocumentScript(const MapDocument& doc, const script::DebugInfo* names)
@@ -415,7 +426,9 @@ void addMapArgValues(script::ArgValueSets& sets, const MapDocument& doc, const t
 script::CompileResult compileForDocument(const MapDocument& doc, std::string_view source, bool allowObjectVariables,
                                          const script::ArgValueSets* gameValues)
 {
-    const std::vector<std::string> external = handlerNames(doc);
+    // The map's handlers, listed once for the external names and the check below.
+    const std::vector<HandlerRef> refs = handlerRefs(doc);
+    const std::vector<std::string> external = namesOf(refs);
     // The value sets: the game's (when given; else the built-in ones, which need no game data)
     // and the map's own names.
     static const script::ArgValueSets builtIn = script::ArgValueSets::build({});
@@ -436,7 +449,7 @@ script::CompileResult compileForDocument(const MapDocument& doc, std::string_vie
     };
     // Handlers naming functions the script doesn't define (each name once, its first owner).
     std::map<std::string, std::pair<std::string, int>> missing;
-    for (const auto& h : handlerRefs(doc)) {
+    for (const auto& h : refs) {
         if (!h.function.empty() && !file.find(h.function)) {
             auto& m = missing[h.function];
             if (m.second++ == 0) {

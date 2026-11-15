@@ -16,6 +16,8 @@
 #include <cmath>
 #include <map>
 #include <numbers>
+#include <optional>
+#include <utility>
 
 namespace nox::mapedit {
 
@@ -280,14 +282,66 @@ float scatterRandom(std::uint64_t seed, std::uint64_t n)
     return static_cast<float>(z >> 40) / static_cast<float>(1ull << 24);
 }
 
+namespace {
+
+/// The spacing grid's cell numbers for `p` (cells `cell` on a side); nothing when they'd be too
+/// big to number (or `p` isn't finite).
+std::optional<std::pair<std::int32_t, std::int32_t>> spacingCell(float cell, WorldPoint p)
+{
+    constexpr double kMost = 1 << 30; // (room for the cells round it either side)
+    const double cx = std::floor(static_cast<double>(p.x) / cell);
+    const double cy = std::floor(static_cast<double>(p.y) / cell);
+    if (!(std::abs(cx) < kMost && std::abs(cy) < kMost)) return std::nullopt;
+    return std::pair{static_cast<std::int32_t>(cx), static_cast<std::int32_t>(cy)};
+}
+
+std::uint64_t spacingKey(std::int32_t x, std::int32_t y)
+{
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) | static_cast<std::uint32_t>(y);
+}
+
+} // namespace
+
 ScatterStroke::ScatterStroke(const MapDocument& doc, const ObjectFactory& factory, ScatterBrush brush)
     : doc_(doc)
     , factory_(factory)
     , brush_(std::move(brush))
 {
+    // Cells twice the spacing on a side: a point of another cell than `p`'s or the eight round
+    // it is more than a cell, two spacings, away along x or y, so never nearer than the spacing.
+    const float cell = 2 * std::abs(brush_.spacing);
+    cell_ = std::isfinite(cell) && cell > 0 ? cell : 0;
     for (const auto& [id, o] : doc.objects) {
-        if (o.parent == 0) taken_.push_back({o.header.x, o.header.y});
+        if (o.parent == 0) take({o.header.x, o.header.y});
     }
+}
+
+void ScatterStroke::take(WorldPoint p)
+{
+    const auto c = cell_ > 0 ? spacingCell(cell_, p) : std::nullopt;
+    if (!c) {
+        takenElse_.push_back(p);
+        return;
+    }
+    takenCells_[spacingKey(c->first, c->second)].push_back(p);
+}
+
+bool ScatterStroke::tooClose(WorldPoint p, float spacing2) const
+{
+    const auto near = [&](const WorldPoint& q) { return (q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y) < spacing2; };
+    if (std::ranges::any_of(takenElse_, near)) return true;
+    const auto c = cell_ > 0 ? spacingCell(cell_, p) : std::nullopt;
+    if (!c) {
+        // (`p` in no cell: every point asked.)
+        return std::ranges::any_of(takenCells_, [&](const auto& kv) { return std::ranges::any_of(kv.second, near); });
+    }
+    for (std::int32_t dy = -1; dy <= 1; ++dy) {
+        for (std::int32_t dx = -1; dx <= 1; ++dx) {
+            const auto it = takenCells_.find(spacingKey(c->first + dx, c->second + dy));
+            if (it != takenCells_.end() && std::ranges::any_of(it->second, near)) return true;
+        }
+    }
+    return false;
 }
 
 std::vector<DocObject> ScatterStroke::dab(WorldPoint at)
@@ -308,7 +362,7 @@ std::vector<DocObject> ScatterStroke::dab(WorldPoint at)
         const float pickAt = scatterRandom(seed, counter_++) * total;
         const float facing = scatterRandom(seed, counter_++) * 360.0f;
         if (p.x < 1 || p.y < 1 || p.x >= kWorldSize - 1 || p.y >= kWorldSize - 1) continue;
-        if (std::ranges::any_of(taken_, [&](const WorldPoint& q) { return (q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y) < spacing2; })) continue;
+        if (tooClose(p, spacing2)) continue;
         if (brush_.avoidWalls) {
             if (const auto c = wallCellAt(p.x, p.y); c && doc_.walls.contains(*c)) continue;
         }
@@ -327,7 +381,7 @@ std::vector<DocObject> ScatterStroke::dab(WorldPoint at)
         }
         DocObject o = factory_.make(pick->type, p.x, p.y);
         if (brush_.randomFacing) setFacingDegrees(o, facing);
-        taken_.push_back(p);
+        take(p);
         objects_.push_back(o);
         added.push_back(std::move(o));
         ++placed;

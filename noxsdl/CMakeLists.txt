@@ -108,6 +108,7 @@ add_executable(noxsdl WIN32
     src/light_cone.cpp
     src/lighting.cpp
     src/legal_screen.cpp
+    src/live_controls.cpp
     src/live_scene.cpp
     src/live_session.cpp
     src/local_host.cpp

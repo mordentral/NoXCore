@@ -2,8 +2,9 @@
 // filled from the client's World each frame.
 #include "quest_windows.hpp"
 
+#include "noxcore/client/text_fields.hpp"
+
 #include <algorithm>
-#include <cctype>
 #include <string>
 
 namespace noxsdl {
@@ -16,31 +17,10 @@ constexpr std::int32_t kQuit = 10701, kContinue = 10702, kTitle = 10703, kQuesti
 // SKey.wnd
 constexpr std::int32_t kKeysOk = 10803;
 
-/// swprintf's %d / %s fields filled in order.
-std::string format(const std::string& f, std::initializer_list<std::string> args)
+/// swprintf's %d / %s fields filled in order, any width dropped (text_fields.hpp's kWidths).
+std::string format(std::string_view f, std::initializer_list<std::string_view> args)
 {
-    std::string out;
-    auto next = args.begin();
-    for (std::size_t i = 0; i < f.size(); ++i) {
-        if (f[i] != '%' || i + 1 >= f.size()) {
-            out += f[i];
-            continue;
-        }
-        std::size_t j = i + 1;
-        while (j < f.size() && (std::isdigit(static_cast<unsigned char>(f[j])) || f[j] == '-')) {
-            ++j;
-        }
-        if (j < f.size() && (f[j] == 'd' || f[j] == 's' || f[j] == 'S')) {
-            out += next != args.end() ? *next++ : std::string();
-            i = j;
-        } else if (j < f.size() && f[j] == '%') {
-            out += '%';
-            i = j;
-        } else {
-            out += f[i];
-        }
-    }
-    return out;
+    return nox::client::fields::fill(f, args, nox::client::fields::kWidths);
 }
 
 } // namespace

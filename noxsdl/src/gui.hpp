@@ -232,6 +232,18 @@ inline void setEnabled(Window* w, bool on)
     }
 }
 
+/// A window (if there is one) and everything in it enabled or not (setEnabled on each).
+inline void setEnabledTree(Window* w, bool on)
+{
+    if (!w) {
+        return;
+    }
+    setEnabled(w, on);
+    for (auto& c : w->children) {
+        setEnabledTree(c.get(), on);
+    }
+}
+
 /// (noxcpp) A window (if there is one) and everything in it greyed out: disabled and drawn dimmed
 /// (Window::dimDisabled), or back to usable and the stock look.
 inline void setGreyed(Window* w, bool greyed)

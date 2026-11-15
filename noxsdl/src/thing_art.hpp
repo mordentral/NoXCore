@@ -7,6 +7,7 @@
 
 #include "light_cone.hpp"
 
+#include "noxcore/map/objects.hpp"
 #include "noxcore/things/draw.hpp"
 #include "noxcore/things/thing_db.hpp"
 
@@ -106,6 +107,15 @@ SDL_Point doorLeaf(std::uint8_t angle);
 
 /// Object flag 0x1000000: enabled (kept in map object headers).
 inline constexpr std::uint32_t kObjectEnabled = 0x1000000;
+
+/// A map object's flags as the client has them once loaded: a new drawable starts enabled
+/// (Cli_CreateDrawableAt sets 0x1000000) and only a header with details replaces that
+/// (spriteLoadFromMap). Most maps' flames and torches have no details. (MapView's and the map
+/// thumbnails'.)
+inline std::uint32_t objectFlags(const nox::map::ObjectHeader& header)
+{
+    return header.details ? header.details->flags : kObjectEnabled;
+}
 
 /// What a live drawable is doing, for picking its image.
 struct Pose {

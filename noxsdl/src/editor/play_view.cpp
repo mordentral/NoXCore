@@ -17,11 +17,7 @@ namespace noxsdl {
 
 namespace {
 
-/// Help shown over a disabled field too.
-void help(const std::string& text)
-{
-    editor::help(text, ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled);
-}
+using editor::disabled_too::help; // (help shown over a disabled field too)
 
 enum class Icon { Play, Pause, Stop };
 

@@ -1,6 +1,7 @@
 // The HUD's layout, drawing, hit tests and tooltips (hud.hpp describes what it shows and where).
 #include "hud.hpp"
 
+#include "draw_box.hpp"
 #include "quickbar_mana.hpp"
 
 #include "noxcore/things/spell_ids.hpp"
@@ -63,10 +64,7 @@ Layout layoutFor(int w, int h)
     return l;
 }
 
-bool inside(float x, float y, float rx, float ry, float rw, float rh)
-{
-    return x >= rx && y >= ry && x < rx + rw && y < ry + rh;
-}
+using box::inside;
 
 // The CTF flag icons (GUI_CTF.wnd): an 80 x 312 window whose 32 x 32 children 8811-8826 are the
 // icons of teams 1-16, at these places in it, their pictures in these colours.
@@ -115,6 +113,48 @@ Hud::Hud(const nox::things::ThingDb& things, ThingArt& art) : things_(things), a
     for (const auto& i : things_.images) {
         images_.emplace(i.name, &i);
     }
+    // The pictures draw() uses, by the names it used to build each frame.
+    Named& n = named_;
+    for (int i = 0; i < kSlots; ++i) {
+        const std::string k = std::to_string(i + 1);
+        const auto at = static_cast<std::size_t>(i);
+        n.warriorNugget[at] = image("QuickBarWarriorNugget" + k);
+        n.nugget[at] = image("QuickBarNugget" + k);
+        n.nuggetLit[at] = image("QuickBarNugget" + k + "Lit");
+    }
+    n.base = image("QuickBarBase");
+    n.warriorLeft = image("QuickBarWarriorLeft");
+    n.warriorRight = image("QuickBarWarriorRight");
+    n.trap = image("QuickBarTrap");
+    n.trapHit = image("QuickBarTrapHit");
+    n.bomber = image("QuickBarBomber");
+    n.bomberHit = image("QuickBarBomberHit");
+    n.trapButton = image("QuickBarTrapButton");
+    n.trapButtonLit = image("QuickBarTrapButtonLit");
+    n.trapTray = image("QuickBarTrapTray");
+    n.trapTrayUpLit = image("QuickBarTrapTrayUpLit");
+    n.trapTrayDownLit = image("QuickBarTrapTrayDownLit");
+    n.spellSetBase = image("QuickBarSpellSetBase");
+    n.spellSetUpLit = image("QuickBarSpellSetUpLit");
+    n.spellSetDownLit = image("QuickBarSpellSetDownLit");
+    n.spellSetMaxLit = image("QuickBarSpellSetMaxLit");
+    n.title = image("QuickBarTitle");
+    n.bookButton = image("SpellbookButton");
+    n.bookButtonLit = image("SpellbookButtonLit");
+    for (std::size_t i = 0; i < n.healthMana.size(); ++i) {
+        n.healthMana[i] = image("HealthMana" + std::to_string(i + 1));
+    }
+    n.warriorHealthTube = image("WarriorHealthTube");
+    n.healthManaTubes = image("HealthManaTubes");
+    n.warriorPoisonTube = image("WarriorPoisonTube");
+    n.poisonTube = image("PoisonTube");
+    constexpr std::array<const char*, 3> kFlagPictures{"FlagCarried", "FlagDroppedInField", "FlagAtHome"};
+    for (std::size_t p = 0; p < kFlagPictures.size(); ++p) {
+        for (std::size_t i = 0; i < kCtfIcons.size(); ++i) {
+            n.flags[p][i] = image(std::string(kFlagPictures[p]) + kCtfIcons[i].colour);
+        }
+    }
+    n.flagTeamBorder = image("FlagTeamBorder");
 }
 
 float Hud::scale(int w, int h)
@@ -353,8 +393,8 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         drawSprite(renderer, *sp, nullptr, dst);
         SDL_SetTextureColorMod(sp->texture, 255, 255, 255);
     };
-    const auto drawNamed = [&](const std::string& name, float gx, float gy, std::size_t frameIndex = 0) {
-        const nox::things::ImageDef* def = image(name);
+    // A named image (named_, looked up once) at game pixel (gx, gy).
+    const auto drawNamed = [&](const nox::things::ImageDef* def, float gx, float gy, std::size_t frameIndex = 0) {
         if (!def) {
             return;
         }
@@ -400,16 +440,15 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         const auto& row = bars.rows[static_cast<std::size_t>(set)];
         for (int i = 0; i < kSlots; ++i) {
             const auto& slot = row[static_cast<std::size_t>(i)];
-            const std::string n = std::to_string(i + 1);
-            drawNamed(warrior ? "QuickBarWarriorNugget" + n
-                              : "QuickBarNugget" + n + (slot.target && slot.id != 0 ? "Lit" : ""),
+            const auto at = static_cast<std::size_t>(i);
+            drawNamed(warrior ? named_.warriorNugget[at] : slot.target && slot.id != 0 ? named_.nuggetLit[at] : named_.nugget[at],
                       l.baseX() - 60, l.baseY() - 18 + dy);
         }
     };
     // One box: its base and the icons.
     const auto box = [&](int set, bool main) {
         const float dy = main ? 0.0f : -static_cast<float>(60 * (4 - set));
-        drawNamed("QuickBarBase", l.baseX() - 61, l.baseY() - 18 + dy);
+        drawNamed(named_.base, l.baseX() - 61, l.baseY() - 18 + dy);
         const auto& row = bars.rows[static_cast<std::size_t>(set)];
         for (int i = 0; i < kSlots; ++i) {
             const float sx = l.slotX(i);
@@ -460,27 +499,27 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
     }
     box(bars.row, true);
     if (warrior) {
-        drawNamed("QuickBarWarriorLeft", bx, by);
-        drawNamed("QuickBarWarriorRight", bx - 3, by);
+        drawNamed(named_.warriorLeft, bx, by);
+        drawNamed(named_.warriorRight, bx - 3, by);
     } else {
         // The right end (quickBarCreate's window): the trap or bomber with the tray's button above,
         // or the warrior's end while there's no trap to lay; dropped while it slides.
         const float ry = by + qb.trapSlide;
         if (qb.trapAvailable) {
-            drawNamed(std::string(cls == 1 ? "QuickBarTrap" : "QuickBarBomber") + (qb.trapHit ? "Hit" : ""), bx - 3, ry);
-            drawNamed(qb.trapOpen ? "QuickBarTrapButtonLit" : "QuickBarTrapButton", bx - 5, ry - 4);
+            drawNamed(cls == 1 ? (qb.trapHit ? named_.trapHit : named_.trap) : (qb.trapHit ? named_.bomberHit : named_.bomber), bx - 3, ry);
+            drawNamed(qb.trapOpen ? named_.trapButtonLit : named_.trapButton, bx - 5, ry - 4);
         } else {
-            drawNamed("QuickBarWarriorRight", bx - 3, ry);
+            drawNamed(named_.warriorRight, bx - 3, ry);
         }
         if (qb.trapOpen) {
             // The tray: the trap set's three slots, its arrows and title.
             const float tx = l.trayX();
             const float ty = l.trayY();
-            drawNamed("QuickBarTrapTray", tx - 40, ty - 20);
+            drawNamed(named_.trapTray, tx - 40, ty - 20);
             if (qb.flash == 3) {
-                drawNamed("QuickBarTrapTrayUpLit", tx - 40, ty - 20);
+                drawNamed(named_.trapTrayUpLit, tx - 40, ty - 20);
             } else if (qb.flash == 4) {
-                drawNamed("QuickBarTrapTrayDownLit", tx - 40, ty - 20);
+                drawNamed(named_.trapTrayDownLit, tx - 40, ty - 20);
             }
             // Mana left for each slot once the slots before it are paid at their trap costs (quickBarWarriorDraw).
             int mana = self.mana;
@@ -510,17 +549,17 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
                 text(title, tx + 0x14 + (0x6E - tw) / 2 - 8, ty - 7, {255, 255, 255, 255});
             }
         }
-        drawNamed("QuickBarSpellSetBase", bx, by);
+        drawNamed(named_.spellSetBase, bx, by);
         // The arrows' and the all-sets button's lit images, a moment after a click (quickbarTrapUpDownDraw).
         if (qb.flash == 0) {
-            drawNamed("QuickBarSpellSetUpLit", bx, by);
+            drawNamed(named_.spellSetUpLit, bx, by);
         } else if (qb.flash == 1) {
-            drawNamed("QuickBarSpellSetDownLit", bx, by);
+            drawNamed(named_.spellSetDownLit, bx, by);
         } else if (qb.flash == 2) {
-            drawNamed("QuickBarSpellSetMaxLit", bx, by);
+            drawNamed(named_.spellSetMaxLit, bx, by);
         }
         if (!qb.expanded && !qb.trapOpen) {
-            drawNamed("QuickBarTitle", bx, by);
+            drawNamed(named_.title, bx, by);
             // "Spell Set n" over the bar: centred on QuickBarTitle's 101 x 14 child at (115, 6),
             // a pixel down (the small font's height + 1 less the default's).
             if (font) {
@@ -536,7 +575,7 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         }
     }
     nuggets(bars.row, true);
-    drawNamed(qb.bookOpen ? "SpellbookButtonLit" : "SpellbookButton", bx - 1, by + 35);
+    drawNamed(qb.bookOpen ? named_.bookButtonLit : named_.bookButton, bx - 1, by + 35);
     for (int i = 0; i < kSlots; ++i) {
         // The slot's key, on its plate's child at (13, 39): the key it's bound to as this keyboard
         // prints it (the game's own letters are default.cfg's, whatever the binding or layout: VD-66).
@@ -552,8 +591,8 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
     }
     // The frame's flash picture: HealthMana1-10, flashAcc_ / 8 choosing which.
     int flashFrame = flashAcc_ >> 3;
-    drawNamed("HealthMana" + std::to_string(flashFrame + 1), mx, my);
-    drawNamed(warrior ? "WarriorHealthTube" : "HealthManaTubes", mx, my);
+    drawNamed(flashFrame >= 0 && flashFrame < 10 ? named_.healthMana[static_cast<std::size_t>(flashFrame)] : image("HealthMana" + std::to_string(flashFrame + 1)), mx, my);
+    drawNamed(warrior ? named_.warriorHealthTube : named_.healthManaTubes, mx, my);
 
     // Bubbles and the flash move on at 30 a second.
     const bool step = frame != bubbleFrame_;
@@ -634,7 +673,7 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
     // Poisoned, the green frame goes over the tubes' picture, drawn by the health tube itself
     // before its column (guiHealthManaTubeDraw: PoisonTube / WarriorPoisonTube at the meters' window).
     if (poisoned) {
-        drawNamed(warrior ? "WarriorPoisonTube" : "PoisonTube", mx, my);
+        drawNamed(warrior ? named_.warriorPoisonTube : named_.poisonTube, mx, my);
     }
     tube(0, mx + kHealthTubeX, self.health, self.maxHealth);
     if (!warrior) {
@@ -694,10 +733,11 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
             const float x = o.x + static_cast<float>(c.x);
             const float y = o.y + static_cast<float>(c.y);
             const std::uint8_t state = game.ctfIconStates[static_cast<std::size_t>(i)];
-            const char* picture = state == 1 ? "FlagCarried" : state == 2 ? "FlagDroppedInField" : "FlagAtHome";
-            drawNamed(std::string(picture) + c.colour, x, y);
+            // FlagCarried, FlagDroppedInField or FlagAtHome + its colour.
+            const std::size_t picture = state == 1 ? 0 : state == 2 ? 1 : 2;
+            drawNamed(named_.flags[picture][static_cast<std::size_t>(i)], x, y);
             if (ours == static_cast<std::uint32_t>(i + 1)) {
-                drawNamed("FlagTeamBorder", x - 4, y - 4);
+                drawNamed(named_.flagTeamBorder, x - 4, y - 4);
             }
         }
     }

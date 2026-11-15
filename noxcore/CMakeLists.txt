@@ -29,6 +29,7 @@ add_library(noxcore
     src/content/thing_patch.cpp
     src/content/thing_writer.cpp
     src/client/inform_text.cpp
+    src/client/text_fields.cpp
     src/client/movies.cpp
     src/client/navigation.cpp
     src/client/sight.cpp

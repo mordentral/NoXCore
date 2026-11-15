@@ -84,18 +84,6 @@ nox::gui::Color teamColour(std::uint8_t color, const nox::gui::Color& none)
     return {c[0], c[1], c[2], false};
 }
 
-/// The window and everything in it.
-void enable(gui::Window* w, bool on)
-{
-    if (!w) {
-        return;
-    }
-    gui::setEnabled(w, on);
-    for (auto& c : w->children) {
-        enable(c.get(), on);
-    }
-}
-
 } // namespace
 
 void ServerOptions::addServerPages(nox::gui::WindowDef& def)
@@ -412,11 +400,11 @@ void ServerOptions::fillTeamOptions()
     // left as the file has it); their tooltips by the state.
     gui::Window* group = window_->find(kTeamsGroup);
     if (!group || !callbacks_.teams) {
-        enable(group, false);
+        gui::setEnabledTree(group, false);
         return;
     }
     const TeamsView t = callbacks_.teams();
-    enable(group, true);
+    gui::setEnabledTree(group, true);
     if (t.chat) {
         gui::setChecked(window_->find(kUseTeams), t.teams);
     }

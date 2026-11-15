@@ -70,7 +70,7 @@ Notice decode(std::span<const std::uint8_t> m, const Lookups& lookups);
 Notice decodeReport(std::span<const std::uint8_t> m, const Lookups& lookups);
 
 /// The formatting the game's strings use: %s, %S and %d filled in order from
-/// `values`, %% a percent sign.
+/// `values`, %% a percent sign (text_fields.hpp's kStringsAndInts).
 std::string format(std::string_view fmt, std::initializer_list<std::string_view> values);
 
 /// Team_GetColorTitle's label for a team colour (g_teamColorTitles: modifier.db:MaterialTeam<Colour>Desc),

@@ -51,12 +51,6 @@ constexpr int kActionColor = 13;  ///< emotes
 constexpr int kListColor = 14;    ///< the lobbies and users
 constexpr int kSquelchedColor = 2;
 
-nox::gui::Color palette(int index)
-{
-    const SDL_Color c = paletteColor(static_cast<std::uint8_t>(index));
-    return {c.r, c.g, c.b, false};
-}
-
 const nox::gui::ListBoxData* listData(const gui::Window& list)
 {
     return std::get_if<nox::gui::ListBoxData>(&list.data);
@@ -90,7 +84,7 @@ int mostScroll(const gui::Window& list)
 void insertLine(gui::Window& list, int at, std::string text, int color)
 {
     at = std::clamp(at, 0, static_cast<int>(list.lines.size()));
-    list.lines.insert(list.lines.begin() + at, {std::move(text), palette(color)});
+    list.lines.insert(list.lines.begin() + at, {std::move(text), paletteWindowColor(color)});
     if (list.selectedLine >= at) {
         ++list.selectedLine;
     }
@@ -260,7 +254,7 @@ void Menus::chatLine(const std::string& text, int color)
         }
         eraseLine(*list, 0);
     }
-    gui::Window::Line line{text, palette(color)};
+    gui::Window::Line line{text, paletteWindowColor(color)};
     gui::Painter p(nullptr, gui_.resources(), 640, 480);
     p.setLargeScale(list->largeScale);
     if (p.textWidth(text, list->largeFont) > list->rect.w - 7) {
@@ -305,7 +299,7 @@ void Menus::fillLobbies()
     list->selectedLine = -1;
     for (int i = 0; i < static_cast<int>(wolLists_.lobbies().size()); ++i) {
         list->lines.push_back({lobbyText(i) + "\t" + std::to_string(wolLists_.lobbies()[static_cast<std::size_t>(i)].users),
-                               palette(kListColor)});
+                               paletteWindowColor(kListColor)});
     }
     scrollList(kChatChannels, 0);
 }
@@ -358,7 +352,7 @@ void Menus::fillUsers()
         const auto& u = wolLists_.users()[static_cast<std::size_t>(i)];
         // ("%c%s": '@' an op, else a space.)
         list->lines.push_back({std::string(1, (u.flags & Session::User::kOp) ? '@' : ' ') + u.name,
-                               palette((u.flags & Session::User::kSquelched) ? kSquelchedColor : kListColor)});
+                               paletteWindowColor((u.flags & Session::User::kSquelched) ? kSquelchedColor : kListColor)});
     }
     scrollList(kChatUsers, 0);
 }

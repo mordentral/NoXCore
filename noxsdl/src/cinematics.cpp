@@ -7,6 +7,7 @@
 #include "menu_rules.hpp"
 
 #include "noxcore/client/movies.hpp"
+#include "noxcore/client/text_fields.hpp"
 #include "noxcore/player/player_file.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/util/bytes.hpp"
@@ -44,26 +45,11 @@ int chapterMusic(int chapter, int cls)
     return chapter + 3;
 }
 
-/// A string's %s / %S filled in order (the exe's swprintf on its own strings).
-std::string format(const std::string& f, std::initializer_list<std::string> values)
+/// A string's %s / %S filled in order (the exe's swprintf on its own strings); %% and a field
+/// past the values left as written (text_fields.hpp's kStringsKept).
+std::string format(std::string_view f, std::initializer_list<std::string_view> values)
 {
-    std::string out;
-    auto v = values.begin();
-    for (std::size_t i = 0; i < f.size(); ++i) {
-        if (f[i] == '%' && i + 1 < f.size() && (f[i + 1] == 's' || f[i + 1] == 'S') && v != values.end()) {
-            out += *v++;
-            ++i;
-            continue;
-        }
-        out += f[i];
-    }
-    return out;
-}
-
-nox::gui::Color palette(int index)
-{
-    const SDL_Color c = paletteColor(static_cast<std::uint8_t>(index));
-    return {c.r, c.g, c.b, false};
+    return nox::client::fields::fill(f, values, nox::client::fields::kStringsKept);
 }
 
 void enable(gui::Window* top, std::int32_t id, bool on)
@@ -1567,7 +1553,7 @@ void Cinematics::fillLoadMenu()
     int saved = 0;
     for (int i = 0; i < static_cast<int>(slots_.size()); ++i) {
         const auto& slot = slots_[static_cast<std::size_t>(i)];
-        const nox::gui::Color c = palette(nox::client::solo_saves::lineColor(slot));
+        const nox::gui::Color c = paletteWindowColor(nox::client::solo_saves::lineColor(slot));
         if (!slot.exists) {
             const std::string empty = i == 0 ? " " : gui_.text("EmptySlot", "GUISave.c");
             lists->lines.push_back({" ", c});

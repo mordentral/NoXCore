@@ -2,6 +2,8 @@
 // centred lines, a sound and the message box. The codes are listed in inform_text.hpp.
 #include "noxcore/client/inform_text.hpp"
 
+#include "noxcore/client/text_fields.hpp"
+
 #include <array>
 
 namespace nox::client::inform {
@@ -69,28 +71,7 @@ constexpr std::array<std::string_view, 10> kColorTitles{
 
 std::string format(std::string_view fmt, std::initializer_list<std::string_view> values)
 {
-    std::string out;
-    out.reserve(fmt.size());
-    auto value = values.begin();
-    for (std::size_t i = 0; i < fmt.size(); ++i) {
-        if (fmt[i] == '%' && i + 1 < fmt.size()) {
-            const char kind = fmt[i + 1];
-            if (kind == '%') {
-                out += '%';
-                ++i;
-                continue;
-            }
-            if (kind == 's' || kind == 'S' || kind == 'd') {
-                if (value != values.end()) {
-                    out += *value++;
-                }
-                ++i;
-                continue;
-            }
-        }
-        out += fmt[i];
-    }
-    return out;
+    return fields::fill(fmt, values, fields::kStringsAndInts);
 }
 
 Notice decodeReport(std::span<const std::uint8_t> m, const Lookups& l)
