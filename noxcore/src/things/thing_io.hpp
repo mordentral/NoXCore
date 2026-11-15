@@ -40,11 +40,15 @@ inline ImageRef readImageRef(ByteReader& r)
     return ref;
 }
 
-// `n` image refs back to back.
+/// The fewest bytes an image ref takes (its i32 index).
+inline constexpr std::size_t kImageRefMinBytes = 4;
+
+// `n` image refs back to back. (Room made for no more than the bytes left could hold: a count
+// read from the file, a FLOR's frames x cols x rows, can ask for 16 million.)
 inline std::vector<ImageRef> readImageRefs(ByteReader& r, std::size_t n)
 {
     std::vector<ImageRef> out;
-    out.reserve(n);
+    out.reserve(std::min(n, r.remaining() / kImageRefMinBytes));
     for (std::size_t i = 0; i < n; ++i) {
         out.push_back(readImageRef(r));
     }

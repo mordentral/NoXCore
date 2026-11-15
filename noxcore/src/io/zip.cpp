@@ -190,6 +190,12 @@ std::optional<std::vector<ZipEntry>> readStoredZip(std::span<const std::uint8_t>
         ZipEntry e;
         e.name.assign(reinterpret_cast<const char*>(bytes.data() + at + 46), nameLen);
         at += 46 + nameLen + skip;
+        // (A name the writer wouldn't write, one that leads out of the folder it's unpacked into
+        // above all: "..", a leading '/', a drive's ':', a '\\'.)
+        if (!goodName(e.name)) {
+            error = "\"" + e.name + "\" isn't a relative '/' path inside the archive";
+            return std::nullopt;
+        }
         if (method != 0 || csize != usize) {
             error = e.name + " is compressed (only stored entries are read)";
             return std::nullopt;

@@ -1982,6 +1982,8 @@ void GameHost::onNoxcppModeMessage(std::uint8_t peer, std::span<const std::uint8
 {
     // (each mode's own, by its opcode: Options::noxcppMessages)
     if (const auto h = options_.noxcppMessages.find(m[0]); h != options_.noxcppMessages.end() && h->second && transport_.identified(peer)) {
+        // (A handler that lets its sender go, a kick: nothing here touches the sender after it, and
+        // onPayload reads no more of its packet.)
         h->second(*this, peer, m);
     }
 }
@@ -2267,6 +2269,7 @@ void GameHost::onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> se
         chat_.erase(chat_.begin(), chat_.begin() + kChatKept / 2);
     }
     chat_.emplace_back(players_[peer].name, std::vector<std::uint8_t>(m.begin(), m.end()));
+    const std::uint32_t speakerSerial = players_[peer].joinSerial; // (its join: a hook that lets it go, below)
     // A line as text (noxcpp's: a stock client's map vote, and a mode's own answers and
     // "?" commands, a noxsdl player's too).
     std::u16string text;
@@ -2288,6 +2291,12 @@ void GameHost::onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> se
         }
         // (noxcpp, a mode's: an answer of its own taken, not relayed.)
         if (options_.onChat && !text.empty() && options_.onChat(*this, peer, text)) {
+            return;
+        }
+        // (noxcpp: a hook that let its speaker go, a kick, and didn't take the line: neither
+        // relayed nor read on. Read on, players_[peer] below made a blank player in its place, as
+        // onPayload's own check says.)
+        if (const auto it = players_.find(peer); it == players_.end() || it->second.joinSerial != speakerSerial) {
             return;
         }
     }
@@ -2844,7 +2853,13 @@ void GameHost::onFile(const Xfers::Received& file)
         players_[file.peer].accept.classId = *forced;
     }
     if (drop || (server_.world().quest() && !loaded)) {
+        const std::uint32_t joinSerial = players_[file.peer].joinSerial;
         disconnect(file.peer, drop ? 1 : 4); // (the Attrib's mode check: reason 1)
+        // (noxcpp: let go, it's no one's character now: the mode isn't told of it. Told, it
+        // marked a member who'd left, or a slot's next player, as without its own character.)
+        if (const auto it = players_.find(file.peer); it == players_.end() || it->second.joinSerial != joinSerial) {
+            return;
+        }
     } else if (server_.world().quest()) {
         unit->player->questAwaitingSave = false;
     }

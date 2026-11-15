@@ -12,6 +12,11 @@ namespace nox::lobby {
 namespace {
 
 constexpr char kHex[] = "0123456789abcdef";
+/// A line: the realm's hex digits (two a byte of its u64), a space, the secret's (two a byte).
+constexpr std::size_t kRealmDigits = sizeof(ClientSecret::realm) * 2;
+constexpr std::size_t kSecretAt = kRealmDigits + 1;
+constexpr std::size_t kLineChars = kSecretAt + kClientSecretBytes * 2;
+static_assert(kLineChars == 81, "the keys file's lines as they have always been (16 + 1 + 64)");
 
 int hexDigit(char c)
 {
@@ -21,11 +26,11 @@ int hexDigit(char c)
 /// A line's realm and secret; nullopt for anything else (a line that isn't one is left out).
 std::optional<ClientSecret> parseLine(std::string_view line)
 {
-    if (line.size() < 16 + 1 + 64 || line[16] != ' ') {
+    if (line.size() < kLineChars || line[kRealmDigits] != ' ') {
         return std::nullopt;
     }
     ClientSecret s;
-    for (std::size_t i = 0; i < 16; ++i) {
+    for (std::size_t i = 0; i < kRealmDigits; ++i) {
         const int d = hexDigit(line[i]);
         if (d < 0) {
             return std::nullopt;
@@ -33,7 +38,7 @@ std::optional<ClientSecret> parseLine(std::string_view line)
         s.realm = s.realm << 4 | static_cast<std::uint64_t>(d);
     }
     for (std::size_t i = 0; i < kClientSecretBytes; ++i) {
-        const int hi = hexDigit(line[17 + 2 * i]), lo = hexDigit(line[18 + 2 * i]);
+        const int hi = hexDigit(line[kSecretAt + 2 * i]), lo = hexDigit(line[kSecretAt + 1 + 2 * i]);
         if (hi < 0 || lo < 0) {
             return std::nullopt;
         }
@@ -48,7 +53,7 @@ std::optional<ClientSecret> parseLine(std::string_view line)
 std::string lineOf(const ClientSecret& s)
 {
     std::string line;
-    for (int i = 15; i >= 0; --i) {
+    for (int i = static_cast<int>(kRealmDigits) - 1; i >= 0; --i) {
         line += kHex[(s.realm >> (4 * i)) & 15];
     }
     line += ' ';

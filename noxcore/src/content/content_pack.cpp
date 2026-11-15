@@ -91,7 +91,7 @@ std::vector<ContentPack> findContentPacks(const fs::path& modsDir)
             continue;
         }
         ContentPack p;
-        p.id = it->path().filename().string();
+        p.id = pathUtf8(it->path().filename()); // (UTF-8: a folder named in any script)
         p.dir = content;
         for (const TableFormat f : kTableFormats) {
             if (fs::exists(findNoCase(content, patchFileName(f)), ec)) {

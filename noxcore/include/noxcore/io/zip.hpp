@@ -47,7 +47,9 @@ struct ZipEntry {
 };
 
 /// A stored archive's entries in its central directory's order, each one's CRC checked; none,
-/// with why in `error`: not a zip, one that's cut short or wrong, or an entry that's compressed.
+/// with why in `error`: not a zip, one that's cut short or wrong, an entry that's compressed, or
+/// an entry's name that ZipWriter::add refuses (one that leads out of the folder: "..", a leading
+/// '/', a drive letter's ':', a '\\').
 std::optional<std::vector<ZipEntry>> readStoredZip(std::span<const std::uint8_t> bytes, std::string& error);
 
 } // namespace nox::io

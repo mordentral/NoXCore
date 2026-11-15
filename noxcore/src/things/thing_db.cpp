@@ -51,16 +51,21 @@ void readBytes(ByteReader& r, std::array<std::uint8_t, N>& out)
     std::copy(b.begin(), b.end(), out.begin());
 }
 
-/// u64 count preceded by padding to a multiple of 8 from the file start.
-std::size_t readAlignedCount(ByteReader& r)
+/// u64 count preceded by padding to a multiple of 8 from the file start, of elements each at least
+/// `minBytes` long in the file: more than the bytes left could hold is refused before anything is
+/// made room for.
+std::size_t readAlignedCount(ByteReader& r, std::size_t minBytes)
 {
     r.align(8);
     const std::uint64_t n = r.u64();
-    if (n > r.remaining()) {
+    if (n > r.remaining() / minBytes) {
         r.fail("implausible count " + std::to_string(n));
     }
     return static_cast<std::size_t>(n);
 }
+
+/// The fewest bytes a wall's variant takes: each of its images an i32 x, an i32 y and an image ref.
+constexpr std::size_t kWallVariantMinBytes = std::tuple_size_v<WallVariant> * (4 + 4 + detail::kImageRefMinBytes);
 
 /// Every FLOR/EDGE/WALL record starts with a u32 the game skips; it is always 1.
 void expectRecordOne(ByteReader& r)
@@ -123,7 +128,7 @@ WallDef readWall(ByteReader& r)
     w.unused = r.i32();
     w.unused2 = r.u8();
     w.health = r.u8();
-    w.debris.resize(readAlignedCount(r));
+    w.debris.resize(readAlignedCount(r, 1)); // (each a string8: its length byte at least)
     for (auto& d : w.debris) {
         d = readString8(r);
     }
@@ -132,7 +137,7 @@ WallDef readWall(ByteReader& r)
     w.breakSound = readString8(r);
     w.randomVariations = r.u8();
     for (auto& dir : w.directions) {
-        dir.resize(readAlignedCount(r));
+        dir.resize(readAlignedCount(r, kWallVariantMinBytes));
         for (auto& variant : dir) {
             for (auto& img : variant) {
                 img.x = r.i32();
@@ -321,7 +326,7 @@ ThingDef readThing(ByteReader& r)
         if (equalsNoCase(key, "DRAW")) {
             ThingDraw d;
             d.type = readString8(r);
-            auto payload = r.bytes(readAlignedCount(r));
+            auto payload = r.bytes(readAlignedCount(r, 1));
             d.data.assign(payload.begin(), payload.end());
             t.draw = std::move(d);
         } else if (equalsNoCase(key, "MENUICON")) {

@@ -8,7 +8,7 @@
 //      a value naming an .exe means its folder;
 //   5. GOG: the Galaxy game keys (Games\1207658964 PATH / WORKINGDIR), the offline installer's
 //      (GOGNOX PATH), Galaxy's client folder + Games\Nox, then the usual GOG folders;
-//   6. the usual repack folders (Program Files\Nox), then Origin's (Origin Games\Nox);
+//   6. the usual Program Files folders (Program Files\Nox), then Origin's (Origin Games\Nox);
 //   7. the folder the program was built with (`configured`, a build's NOX_GAME_DIR), if any.
 // The fixed folders are tried on C:\ and D:\ (elsewhere, under the prefixes of 3). A folder
 // holds the game's data if it has gamedata.bin, modifier.bin, monster.bin and thing.bin.

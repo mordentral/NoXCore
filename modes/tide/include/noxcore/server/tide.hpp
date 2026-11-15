@@ -436,6 +436,7 @@ public:
     bool bossCame() const noexcept { return bossCame_; }
     std::size_t chests() const noexcept { return chests_.size(); }
     std::size_t charms() const noexcept { return charms_.size(); }
+    bool charmed(std::uint32_t item) const { return charms_.contains(ObjectRef{item}); }
     /// The revive shrine standing (0: none), and the fallen it has brought back (tests).
     std::uint32_t shrine() const noexcept { return shrine_; }
     int revived() const noexcept { return revived_; }

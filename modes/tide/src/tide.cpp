@@ -1943,8 +1943,9 @@ void TideDirector::beginArena(World& world, std::uint32_t frame)
         elitesSlain_ = 0;
         pickupsTaken_ = 0;
         revived_ = 0;
-        charms_.clear(); // (carried, the armour comes along under its own extent, its charm too:
-                         // runCharms drops one whose item is gone)
+        charms_.clear(); // (a new run's: none. Through a stage's load the carry keeps the charm of
+                         // armour carried along, under its key, and drops what stayed behind:
+                         // tide_links.hpp)
     }
     prepared_.clear();
     gemField_->items().clear();
@@ -2020,6 +2021,20 @@ void TideDirector::runArena(GameHost& host)
         r.unit = unit->extent;
         party.emplace_back(unit, &r);
         names.push_back(p.name);
+    }
+    // (D2295) A runner not in play this frame keeps its unit only while its own player still has
+    // it (one loading, say): one whose player left names none, its old key free for any thing the
+    // run makes later (a chest's reward, a pick, giveXp looked it up).
+    if (party.size() != runners_.size()) {
+        for (auto& [key, r] : runners_) {
+            if (r.unit == 0 || std::ranges::find(keys, key) != keys.end()) {
+                continue;
+            }
+            const bool held = std::ranges::any_of(host.players(), [&](const auto& e) { return e.second.extent == r.unit && runnerKey(e.second) == key; });
+            if (!held) {
+                r.unit = 0;
+            }
+        }
     }
     const std::uint32_t secs = seconds(frame);
     // (Its name built anew only as the minute changes: it's set each frame.)

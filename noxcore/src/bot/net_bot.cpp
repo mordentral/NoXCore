@@ -268,6 +268,11 @@ void viewInto(BotView& v, const client::HeadlessClient& client, const ItemKinds&
     }
 }
 
+std::uint32_t thingClassesById(const things::ThingDb* things, std::uint32_t typeId)
+{
+    return things && typeId != 0 && typeId <= things->things.size() ? things::thingClasses(things->things[typeId - 1u]) : 0;
+}
+
 NetBot::NetBot(client::PlayerProfile profile, const things::ThingDb& things, const ItemKinds& kinds,
                std::filesystem::path mapsDir, std::filesystem::path mapCache, std::unique_ptr<Brain> brain)
     : client_(std::move(profile), &things, std::move(mapsDir), std::move(mapCache))
@@ -297,9 +302,7 @@ void NetBot::tick(std::uint32_t nowMs)
                     mapItems_.push_back({0, o.typeId, info.kind, o.x, o.y, kinds_.usableBy(o.typeId, playerClass),
                                          info.value, info.slot});
                 }
-                const std::uint32_t classes = things && o.typeId <= things->things.size()
-                                                  ? things::thingClasses(things->things[o.typeId - 1u])
-                                                  : 0;
+                const std::uint32_t classes = thingClassesById(things, o.typeId); // (type 0: none)
                 // Each team's flag where it starts: its base.
                 if (o.team != 0 && (classes & things::ObjectClass::Flag)) {
                     flagBases_.push_back({o.team, o.x, o.y});

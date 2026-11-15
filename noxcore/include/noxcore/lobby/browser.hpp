@@ -20,6 +20,7 @@
 #include "noxcore/net/udp_socket.hpp"
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <random>
@@ -73,6 +74,8 @@ public:
         std::optional<net::Endpoint> lanQueryTo;
         /// The way to XWIS's chat server: servserv first (servserv.hpp; tests: loopback fakes).
         XwisRoute xwisRoute;
+        /// (Tests: a ping's send to `to` fails, as a network error's would, while this says so.)
+        std::function<bool(const net::Endpoint& to)> failSend;
     };
 
     explicit ServerBrowser(Options options);

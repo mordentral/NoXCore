@@ -12,15 +12,46 @@
 
 namespace nox {
 
+namespace {
+
+/// Windows' device names (CON, PRN, AUX, NUL, COM0-9, LPT0-9 and COM/LPT with a superscript 1, 2 or
+/// 3), any case, alone or before a dot ("nul.map"): opened as a file, each is the device.
+bool isDeviceName(std::string_view name) noexcept
+{
+    const std::string_view stem = name.substr(0, name.find('.'));
+    for (const std::string_view device : {"CON", "PRN", "AUX", "NUL"}) {
+        if (util::equalsNoCase(stem, device)) {
+            return true;
+        }
+    }
+    if (stem.size() < 4 || !(util::equalsNoCase(stem.substr(0, 3), "COM") || util::equalsNoCase(stem.substr(0, 3), "LPT"))) {
+        return false;
+    }
+    const std::string_view n = stem.substr(3);
+    return (n.size() == 1 && n[0] >= '0' && n[0] <= '9') || n == "\xC2\xB9" || n == "\xC2\xB2" || n == "\xC2\xB3"; // (UTF-8 ¹ ² ³)
+}
+
+} // namespace
+
 bool isPlainFileName(std::string_view name) noexcept
 {
     if (name.empty() || name == "." || name == "..") {
+        return false;
+    }
+    // (Windows drops a trailing dot or space: "Estate." is Estate's file, " " none.)
+    if (name.back() == '.' || name.back() == ' ' || isDeviceName(name)) {
         return false;
     }
     return std::none_of(name.begin(), name.end(), [](char c) {
         const auto u = static_cast<unsigned char>(c);
         return c == '/' || c == '\\' || c == ':' || u < 0x20 || u == 0x7F;
     });
+}
+
+std::string pathUtf8(const std::filesystem::path& path)
+{
+    const std::u8string s = path.u8string();
+    return {reinterpret_cast<const char*>(s.data()), s.size()};
 }
 
 std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path)
@@ -67,10 +98,12 @@ std::filesystem::path findNoCase(const std::filesystem::path& dir, const std::fi
             at = exact;
             continue;
         }
-        const std::string want = part.string();
+        // (UTF-8 both: a name the code page can't hold, a mod's in another script, is compared as
+        // any, not thrown on.)
+        const std::string want = pathUtf8(part);
         std::filesystem::path found;
         for (const auto& e : std::filesystem::directory_iterator(at, ec)) {
-            if (util::equalsNoCase(e.path().filename().string(), want)) {
+            if (util::equalsNoCase(pathUtf8(e.path().filename()), want)) {
                 found = e.path();
                 break;
             }

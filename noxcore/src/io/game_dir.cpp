@@ -230,8 +230,8 @@ std::vector<GameDirCandidate> gameDirSearch(const fs::path& exeDir, const fs::pa
     withPrefixes({"Nox"}, "a usual install folder", out);
 #endif
     registryPaths(out);
-    gogPaths(out); // GOG before the repack and Origin folders: patched and official
-    withPrefixes({"Program Files (x86)\\Nox", "Program Files\\Nox"}, "a usual Nox Reloaded folder", out);
+    gogPaths(out); // GOG before the Program Files and Origin folders: patched and official
+    withPrefixes({"Program Files (x86)\\Nox", "Program Files\\Nox"}, "a usual Program Files folder", out);
     withPrefixes({"Program Files (x86)\\Origin Games\\Nox", "Program Files\\Origin Games\\Nox"}, "a usual Origin folder", out);
     if (!configured.empty()) {
         out.push_back({configured, "the folder this build was set up with"}); // the last resort

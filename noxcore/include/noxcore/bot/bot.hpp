@@ -72,6 +72,10 @@ struct ItemInfo {
 /// 0 for bare hands (weaponGetStaminaByType).
 std::uint8_t swingStamina(std::uint32_t weaponBits);
 
+/// A type's CLASS bits by its type id (thing.bin THNG index + 1, as a map object names it): 0 with
+/// no thing.bin, for type 0 (none) and for one past the table.
+std::uint32_t thingClassesById(const things::ThingDb* things, std::uint32_t typeId);
+
 /// The gamedata.bin numbers the brains plan by, read once from the bots' own copy of the file (as
 /// a client reads its own) as a network game reads it.
 struct GameNumbers {

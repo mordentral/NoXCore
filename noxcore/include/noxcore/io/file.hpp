@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -22,10 +23,16 @@ void writeFileBytes(const std::filesystem::path& path, std::span<const std::uint
 std::filesystem::path findNoCase(const std::filesystem::path& dir, const std::filesystem::path& name);
 
 /// Whether `name` is a single file or folder name, safe to append to a folder: not empty, not "."
-/// or "..", without '/', '\\', ':' or a control character. A name from the network (a map a
-/// server names) must be one before it becomes part of a path: else "..\x" or "C:\x" would
-/// read or write outside the folder.
+/// or "..", without '/', '\\', ':' or a control character, not ending in a dot or a space, and
+/// not one of Windows' device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, any case, with or
+/// without an extension). A name from the network (a map a server names) must be one before it
+/// becomes part of a path: else "..\x" or "C:\x" would read or write outside the folder, "NUL"
+/// a device, "Estate." another name's file.
 bool isPlainFileName(std::string_view name) noexcept;
+
+/// `path` as UTF-8 text. (path::string() is the system's code page on Windows, and throws for a
+/// name it can't hold: a mod folder named in another script.)
+std::string pathUtf8(const std::filesystem::path& path);
 
 /// The game's data names its files in any case (Con01A.map in maps/con01a, inputcfg.wnd for
 /// InputCfg.wnd), as the case-insensitive file systems it ran on let it. On Windows `path` as it

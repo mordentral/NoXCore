@@ -163,7 +163,9 @@ What follows from it:
 - **Ours:** once the sender is no longer in the game, the rest of its packet is dropped, after any
   message (noxcore/src/server/game_host.cpp, GameHost::onPayload). Reading on had made a blank
   player in its place, which wiped the first slot's known objects and saves waiting, and told
-  everyone a player with net code 0 quit.
+  everyone a player with net code 0 quit. Inside one message too (NoX Core's own hooks, none of
+  them the exe's): a character file that lets its sender go isn't told to the mode (onCharacter),
+  and a chat line whose mode hook let its speaker go is neither relayed nor read on.
 - **Why:** by the owner's decision, 2026-11-14: a player who has been let go has no say in the game.
 - **Risk:** low: only the messages a player sent in the same packet after the one that let it go
   are dropped (a mouse move, an input frame).

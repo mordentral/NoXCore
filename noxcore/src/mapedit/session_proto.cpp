@@ -7,6 +7,7 @@
 #include "noxcore/video/nxz.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 namespace nox::mapedit::session {
 
@@ -157,6 +158,12 @@ std::optional<Message> unframe(std::span<const std::uint8_t> message)
     return Message{message[1], {message.begin() + 4, message.begin() + 4 + static_cast<std::ptrdiff_t>(len)}};
 }
 
+void Reassembler::drop(std::map<std::uint32_t, Parts>::iterator it)
+{
+    held_ -= it->second.bytes;
+    parts_.erase(it);
+}
+
 std::optional<Message> Reassembler::feed(std::span<const std::uint8_t> message)
 {
     auto m = unframe(message);
@@ -173,24 +180,51 @@ std::optional<Message> Reassembler::feed(std::span<const std::uint8_t> message)
         if (count == 0 || index >= count) {
             return std::nullopt;
         }
+        // (A chunk no sender makes, or a transfer past what any message comes to: refused, the
+        // transfer let go.)
+        if (bytes.size() > kChunkBytes || count > kMaxTransferChunks) {
+            if (const auto it = parts_.find(id); it != parts_.end()) {
+                drop(it);
+            }
+            return std::nullopt;
+        }
         if (!parts_.contains(id) && parts_.size() >= kMaxPending) {
-            parts_.erase(parts_.begin()); // (the oldest transfer: a sender's ids only go up)
+            drop(parts_.begin()); // (the oldest transfer: a sender's ids only go up)
         }
         Parts& p = parts_[id];
         if (!p.chunks.empty() && (p.count != count || p.sub != sub)) {
+            held_ -= p.bytes;
+            p.bytes = 0;
             p.chunks.clear(); // (a transfer that changed its mind: started afresh)
         }
         p.sub = sub;
         p.count = count;
-        p.chunks[index].assign(bytes.begin(), bytes.end());
+        std::vector<std::uint8_t>& chunk = p.chunks[index];
+        held_ -= chunk.size();
+        p.bytes -= chunk.size();
+        chunk.assign(bytes.begin(), bytes.end());
+        held_ += chunk.size();
+        p.bytes += chunk.size();
+        // (All the transfers' bytes within kMaxHeldBytes: the others let go, oldest first. This
+        // one alone is within it: its chunks and their count are.)
+        for (auto it = parts_.begin(); held_ > kMaxHeldBytes && it != parts_.end();) {
+            if (it->first == id) {
+                ++it;
+                continue;
+            }
+            const auto next = std::next(it);
+            drop(it);
+            it = next;
+        }
         if (p.chunks.size() < p.count) {
             return std::nullopt;
         }
         Message out{p.sub, {}};
+        out.body.reserve(p.bytes);
         for (auto& [i, c] : p.chunks) {
             out.body.insert(out.body.end(), c.begin(), c.end());
         }
-        parts_.erase(id);
+        drop(parts_.find(id));
         return out;
     } catch (const FormatError&) {
         return std::nullopt;

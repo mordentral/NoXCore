@@ -342,30 +342,47 @@ std::vector<std::vector<std::uint8_t>> frame(std::uint8_t sub, std::span<const s
 /// A message's sub and body ({0xF6, sub, u16 len, body}); nothing when it isn't one.
 std::optional<Message> unframe(std::span<const std::uint8_t> message);
 
+/// The most bytes a packed body may unpack to (a session document, an op): 32 MB, far past any
+/// map's (the largest stock map is under 700 KB). unpack refuses a larger raw size before it
+/// unpacks anything (a peer's u32 could otherwise ask for 4 GB).
+inline constexpr std::size_t kMaxUnpacked = 32u << 20;
+
+/// The most bytes one chunked message may come to: a body holds at most one packed field (an op,
+/// a document, a mod file: at most kMaxUnpacked sent raw, its 5-byte head) and a few small ones,
+/// so kMaxUnpacked and 64 KB more is past anything a good sender makes.
+inline constexpr std::size_t kMaxTransferBytes = kMaxUnpacked + (64u << 10);
+/// The chunks of such a message at most (each at most kChunkBytes).
+inline constexpr std::size_t kMaxTransferChunks = (kMaxTransferBytes + kChunkBytes - 1) / kChunkBytes;
+
 /// Puts chunked messages back together (per transfer); whole messages pass straight through.
 class Reassembler {
 public:
-    /// The message ready (whole, or a transfer's last chunk), or nothing yet / malformed.
+    /// The message ready (whole, or a transfer's last chunk), or nothing yet / malformed. A chunk
+    /// over kChunkBytes, or of a transfer of more than kMaxTransferChunks, is refused (and that
+    /// transfer let go); the bytes held for unfinished transfers stay within kMaxHeldBytes, the
+    /// oldest transfers let go first.
     std::optional<Message> feed(std::span<const std::uint8_t> message);
     std::size_t pending() const { return parts_.size(); }
+    /// The chunks' bytes held now, every unfinished transfer's.
+    std::size_t held() const { return held_; }
     /// Transfers held unfinished at most (a sender's chunks come in order, one
     /// transfer after another, so one is the most a good sender leaves): past it the oldest is let
     /// go, so a client that never finishes one can't grow the host's memory without end.
     static constexpr std::size_t kMaxPending = 4;
+    /// The bytes held at most, all unfinished transfers' (one transfer's most).
+    static constexpr std::size_t kMaxHeldBytes = kMaxTransferChunks * kChunkBytes;
 
 private:
     struct Parts {
         std::uint8_t sub = 0;
         std::uint16_t count = 0;
+        std::size_t bytes = 0; ///< its chunks' bytes
         std::map<std::uint16_t, std::vector<std::uint8_t>> chunks;
     };
+    void drop(std::map<std::uint32_t, Parts>::iterator it);
     std::map<std::uint32_t, Parts> parts_;
+    std::size_t held_ = 0;
 };
-
-/// The most bytes a packed body may unpack to (a session document, an op): 32 MB, far past any
-/// map's (the largest stock map is under 700 KB). unpack refuses a larger raw size before it
-/// unpacks anything (a peer's u32 could otherwise ask for 4 GB).
-inline constexpr std::size_t kMaxUnpacked = 32u << 20;
 
 /// {u8 deflated, u32 raw size, bytes}. unpack throws FormatError past kMaxUnpacked.
 std::vector<std::uint8_t> pack(std::span<const std::uint8_t> raw);

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <charconv>
 #include <exception>
+#include <stdexcept>
 
 namespace nox::lobby {
 
@@ -80,6 +81,9 @@ ServerEntry& ServerBrowser::upsert(std::uint32_t address, std::uint16_t port)
 void ServerBrowser::ping(const net::Endpoint& to, std::uint32_t nowMs, bool broadcast)
 {
     if (!udp_) {
+        if (!broadcast) {
+            markChecking(to, false); // (no socket: no answer coming, as a send that fails)
+        }
         return;
     }
     // MSG_SERVER_DISCOVER on the lobby channel (header 00 00); the server echoes the token.
@@ -95,6 +99,9 @@ void ServerBrowser::ping(const net::Endpoint& to, std::uint32_t nowMs, bool broa
     w.u8(0);
     discover.write(w);
     try {
+        if (options_.failSend && options_.failSend(to)) {
+            throw std::runtime_error("the send failed");
+        }
         udp_->sendTo(to, w.data());
         pings_[token] = {to, nowMs, 1, broadcast};
         if (!broadcast) {
@@ -105,6 +112,12 @@ void ServerBrowser::ping(const net::Endpoint& to, std::uint32_t nowMs, bool broa
         // nothing of NoX Core's, as the 1.2b client sends it nothing before its join.)
     } catch (const std::exception& ex) {
         log_.push_back("ping " + to.toString() + ": " + ex.what());
+        // Not sent, nothing waits for its answer: "No response" now, as when its last try runs
+        // out, whether it was the first try or a retry (a retry's failure left it on "Checking..."
+        // for good).
+        if (!broadcast) {
+            markChecking(to, false);
+        }
     }
 }
 
