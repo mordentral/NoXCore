@@ -244,7 +244,6 @@ private:
     const nox::strings::StringTable* strings_;
     SpriteCache& sprites_;
     Font* font_;
-    std::map<std::string, const nox::things::ImageDef*, std::less<>> images_;
     InventoryGrid grid_;
     /// The meters' bottle slots, re-picked as food goes into the grid or out of it.
     BottleSlots bottles_;

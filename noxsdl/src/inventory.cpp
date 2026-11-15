@@ -261,10 +261,6 @@ Inventory::Inventory(const nox::things::ThingDb& things, ThingArt& art, const no
       }),
       bottles_(BottleSlots::typesIn(things))
 {
-    // Index thing.db's images by name for drawNamed.
-    for (const auto& i : things_.images) {
-        images_.emplace(i.name, &i);
-    }
     bottles_.pick(grid_); // (the meters made: the empty grid's)
 }
 
@@ -277,8 +273,7 @@ bool Inventory::food(std::uint16_t typeId) const
 // A thing.db image by name; nullptr if there is none.
 const nox::things::ImageDef* Inventory::image(const std::string& name) const
 {
-    const auto it = images_.find(name);
-    return it == images_.end() ? nullptr : it->second;
+    return things_.findImage(name); // (each name's first image, as thing.bin lists them)
 }
 
 // A sprite at game pixel (gx, gy) plus its own offset, scaled by s; tinted when `materials` is given.

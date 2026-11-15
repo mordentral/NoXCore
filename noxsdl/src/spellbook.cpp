@@ -46,15 +46,11 @@ Spellbook::Spellbook(const nox::things::ThingDb& things, const nox::strings::Str
                      SpriteCache& sprites, Font* font, const Hud& hud)
     : things_(things), strings_(strings), sprites_(sprites), font_(font), hud_(hud)
 {
-    for (const auto& i : things_.images) {
-        images_.emplace(i.name, &i);
-    }
 }
 
 const nox::things::ImageDef* Spellbook::image(const std::string& name) const
 {
-    const auto it = images_.find(name);
-    return it == images_.end() ? nullptr : it->second;
+    return things_.findImage(name); // (each name's first image, as thing.bin lists them)
 }
 
 std::string Spellbook::text(const std::string& id) const

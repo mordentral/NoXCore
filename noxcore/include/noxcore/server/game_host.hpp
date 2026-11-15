@@ -664,9 +664,6 @@ public:
         bool mapVote = true;
     };
     HostSwitches hostSwitches();
-    /// The game's rules as they stand (the settings' slot 0: read from the map's user.rul at its
-    /// load, the map load's).
-    const RuleSet& currentRules() const noexcept { return rules_; }
     /// A map's rules for a mode as the window shows them on choosing it (flags 7):
     /// its user.rul, else its own .rul; `file` a rule set of its folder instead; in a WOL game
     /// internet.rul after.

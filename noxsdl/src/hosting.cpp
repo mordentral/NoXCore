@@ -5,6 +5,7 @@
 #include "noxcore/bot/bot_squad.hpp"
 #include "noxcore/client/solo_menu.hpp"
 #include "noxcore/client/solo_saves.hpp"
+#include "noxcore/io/file.hpp"
 #include "noxcore/lobby/listing.hpp"
 
 #include <algorithm>
@@ -339,10 +340,10 @@ void newSoloCharacter(App& app, const nox::client::PlayerProfile& profile, const
                                                                soloMusic(app), fs::path(map).stem().string(),
                                                                nox::client::solo_saves::localTime());
     if (plr.empty()) {
-        SDL_Log("solo: the new character couldn't be written under %s", app.saveRoot.string().c_str());
+        SDL_Log("solo: the new character couldn't be written under %s", nox::pathUtf8(app.saveRoot).c_str());
         return;
     }
-    SDL_Log("solo: a new character, %s", plr.string().c_str());
+    SDL_Log("solo: a new character, %s", nox::pathUtf8(plr).c_str());
     app.characterFile = plr;
     app.heldFileInfo = nox::client::solo_saves::readPlr(plr).info;
 }

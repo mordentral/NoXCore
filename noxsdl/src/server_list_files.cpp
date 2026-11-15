@@ -64,7 +64,7 @@ void replaceFile(const fs::path& path, const std::string& text)
     const bool exists = fs::exists(path, ec);
     if (exists && (fs::status(path).permissions() & (fs::perms::owner_write | fs::perms::group_write |
                                                      fs::perms::others_write)) == fs::perms::none) {
-        throw std::runtime_error("Read-only server list: " + path.string());
+        throw std::runtime_error("Read-only server list: " + nox::pathUtf8(path));
     }
     fs::path temp = path;
     temp += ".new";
@@ -72,7 +72,7 @@ void replaceFile(const fs::path& path, const std::string& text)
     out.write(text.data(), static_cast<std::streamsize>(text.size()));
     out.close();
     try {
-        if (!out) throw std::runtime_error("Cannot write " + temp.string());
+        if (!out) throw std::runtime_error("Cannot write " + nox::pathUtf8(temp));
         if (exists) fs::permissions(temp, fs::status(path).permissions());
         fs::rename(temp, path);
     } catch (...) {
@@ -157,7 +157,7 @@ std::vector<std::string> ServerListFiles::read(std::vector<std::string>* errors)
             text = readText(path);
         } catch (const std::exception& ex) {
             if (!errors) throw;
-            errors->push_back(path.string() + ": " + ex.what());
+            errors->push_back(nox::pathUtf8(path) + ": " + ex.what());
             continue;
         }
         const auto lines = nox::lobby::splitServerList({reinterpret_cast<const std::uint8_t*>(text.data()), text.size()});

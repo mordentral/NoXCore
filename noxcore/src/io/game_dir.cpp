@@ -245,7 +245,7 @@ std::optional<GameDirCandidate> locateGameDir(const fs::path& exeDir, const fs::
     for (auto& c : gameDirSearch(exeDir, configured)) {
         const bool found = isGameDir(c.dir);
         if (log) {
-            log((found ? "game data found in " : "no game data in ") + c.dir.string() + " (" + c.reason + ")");
+            log((found ? "game data found in " : "no game data in ") + pathUtf8(c.dir) + " (" + c.reason + ")");
         }
         if (found) {
             std::error_code ec;

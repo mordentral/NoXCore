@@ -1192,7 +1192,7 @@ std::unique_ptr<nox::video::ImagePackReader> SpriteCache::openPack(const std::fi
             const std::uint32_t crc = nox::video::packCrc(idx);
             if (crc != reader->sourceIdxCrc()) {
                 SDL_Log("image pack %s: made from another video.idx (CRC %08X, the game's is %08X); not used",
-                        pack.string().c_str(), reader->sourceIdxCrc(), crc);
+                        nox::pathUtf8(pack).c_str(), reader->sourceIdxCrc(), crc);
                 return nullptr;
             }
         }
@@ -1203,10 +1203,10 @@ std::unique_ptr<nox::video::ImagePackReader> SpriteCache::openPack(const std::fi
                 ++upscaled;
             }
         }
-        SDL_Log("image pack %s: %u images, %u in high definition", pack.string().c_str(), reader->size(), upscaled);
+        SDL_Log("image pack %s: %u images, %u in high definition", nox::pathUtf8(pack).c_str(), reader->size(), upscaled);
         return reader;
     } catch (const std::exception& ex) {
-        SDL_Log("image pack %s: %s", pack.string().c_str(), ex.what());
+        SDL_Log("image pack %s: %s", nox::pathUtf8(pack).c_str(), ex.what());
         return nullptr;
     }
 }

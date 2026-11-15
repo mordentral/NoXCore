@@ -6,6 +6,7 @@
 
 #include "noxcore/client/inform_text.hpp"
 #include "noxcore/client/solo_saves.hpp"
+#include "noxcore/io/file.hpp"
 #include "noxcore/things/field_guide.hpp"
 #include "noxcore/util/text.hpp"
 #include "noxcore/version.hpp"
@@ -301,7 +302,7 @@ void keepSaveData(App& app, std::span<const std::uint8_t> data)
         return;
     }
     if (kept == saves::KeptSave::Unwritten) {
-        SDL_Log("save: unable to open %s", app.characterFile.string().c_str());
+        SDL_Log("save: unable to open %s", nox::pathUtf8(app.characterFile).c_str());
         return;
     }
     const auto& client = app.live->client();
@@ -313,10 +314,10 @@ void keepSaveData(App& app, std::span<const std::uint8_t> data)
     const std::string& map = client.mapName();
     info.mapName = map.size() > 4 ? map.substr(0, map.size() - 4) : map; // (Map_GetCurrentName)
     if (!app.cinematics || !app.cinematics->appendNetworkSave(app.characterFile, info, flags)) {
-        SDL_Log("save: unable to save %s", app.characterFile.string().c_str());
+        SDL_Log("save: unable to save %s", nox::pathUtf8(app.characterFile).c_str());
         return;
     }
-    SDL_Log("save: kept the host's save in %s", app.characterFile.string().c_str());
+    SDL_Log("save: kept the host's save in %s", nox::pathUtf8(app.characterFile).c_str());
     if (app.console) {
         app.console->print(gameString(app, "CharacterSaved"), Blue);
     }

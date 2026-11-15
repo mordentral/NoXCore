@@ -33,7 +33,7 @@ public:
         : out_(bag, std::ios::binary | std::ios::trunc), compressed_(compressed)
     {
         if (!out_) {
-            throw std::system_error(errno, std::generic_category(), "cannot create " + bag.string());
+            throw std::system_error(errno, std::generic_category(), "cannot create " + pathUtf8(bag));
         }
     }
 

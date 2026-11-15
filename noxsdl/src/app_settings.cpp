@@ -6,6 +6,7 @@
 #include "effects_draw.hpp"
 #include "snapshot_pacing.hpp"
 
+#include "noxcore/io/file.hpp"
 #include "noxcore/things/object_class.hpp"
 
 #include <algorithm>
@@ -90,7 +91,7 @@ void saveSettings(App& app)
     try {
         const auto& dir = backend::settingsDirectory(app.gameDir);
         nox::config::saveConfig(dir, app.input->config());
-        SDL_Log("saved %s", (dir / "nox.cfg").string().c_str());
+        SDL_Log("saved %s", nox::pathUtf8(dir / "nox.cfg").c_str());
     } catch (const std::exception& ex) {
         SDL_Log("nox.cfg: %s", ex.what());
     }

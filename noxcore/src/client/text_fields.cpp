@@ -5,6 +5,27 @@
 
 namespace nox::client::fields {
 
+namespace {
+
+/// The number the width's leading digits spell, capped at kMaxZeroPadWidth (so a width of any
+/// length is read without overflow).
+std::size_t zeroPadWidth(std::string_view width)
+{
+    std::size_t wide = 0;
+    for (const char c : width) {
+        if (c < '0' || c > '9') {
+            break;
+        }
+        wide = wide * 10 + static_cast<std::size_t>(c - '0');
+        if (wide >= kMaxZeroPadWidth) {
+            return kMaxZeroPadWidth;
+        }
+    }
+    return wide;
+}
+
+} // namespace
+
 std::string fill(std::string_view f, std::initializer_list<std::string_view> values, const Rules& rules)
 {
     std::string out;
@@ -26,9 +47,9 @@ std::string fill(std::string_view f, std::initializer_list<std::string_view> val
             if (next != values.end() || !rules.keepPastValues) {
                 std::string v = next != values.end() ? std::string(*next++) : std::string();
                 if (rules.zeroPad && !width.empty() && width.front() == '0') {
-                    const int wide = std::stoi(std::string(width));
-                    if (v.size() < static_cast<std::size_t>(wide)) {
-                        v.insert(0, static_cast<std::size_t>(wide) - v.size(), '0');
+                    const std::size_t wide = zeroPadWidth(width);
+                    if (v.size() < wide) {
+                        v.insert(0, wide - v.size(), '0');
                     }
                 }
                 out += v;

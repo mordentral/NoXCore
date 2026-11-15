@@ -2,6 +2,8 @@
 // without NOXSDL_HD_VIDEO.
 #include "hd_video.hpp"
 
+#include "noxcore/io/file.hpp"
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
@@ -52,7 +54,7 @@ bool loadDlls(const std::filesystem::path& dir)
     for (const char* name : kDlls) {
         const std::filesystem::path p = dir / name;
         if (!LoadLibraryExW(p.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)) {
-            SDL_Log("HD video: %s not loaded (error %lu); the VQAs play", p.string().c_str(), GetLastError());
+            SDL_Log("HD video: %s not loaded (error %lu); the VQAs play", nox::pathUtf8(p).c_str(), GetLastError());
             return false;
         }
     }
@@ -62,7 +64,7 @@ bool loadDlls(const std::filesystem::path& dir)
             return false;
         }
     }
-    SDL_Log("HD video: FFmpeg %s from %s", av_version_info(), dir.string().c_str());
+    SDL_Log("HD video: FFmpeg %s from %s", av_version_info(), nox::pathUtf8(dir).c_str());
     return true;
 }
 
@@ -231,7 +233,7 @@ std::unique_ptr<HdVideo> HdVideo::open(const std::filesystem::path& file, std::s
         v->frameCount_ = static_cast<int>(static_cast<double>(m.format->duration) / AV_TIME_BASE * v->fps_ + 0.5);
     }
     v->sound_ = decodeSound(file);
-    SDL_Log("HD video: %s, %s %dx%d %.3g fps, %d frames, sound %u Hz x %u", file.string().c_str(),
+    SDL_Log("HD video: %s, %s %dx%d %.3g fps, %d frames, sound %u Hz x %u", nox::pathUtf8(file).c_str(),
             m.video->codec->name, v->width_, v->height_, v->fps_, v->frameCount_, v->sound_.rate, v->sound_.channels);
     return v;
 }

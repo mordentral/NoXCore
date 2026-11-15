@@ -13,10 +13,12 @@
 //   kStringsAndInts  %s / %S / %d, %% a percent, a field past the values empty
 //   kLongStrings     %s / %S / %ls, %% a percent, a field past the values empty
 //   kWidths          %[0-9-]*(d|s|S), the width dropped, %% a percent, past the values empty
-//   kZeroPadded      %[0-9]*(d|s|S), a width starting with 0 pads with zeros, %% a percent
+//   kZeroPadded      %[0-9]*(d|s|S), a width starting with 0 pads with zeros (to at most
+//                    kMaxZeroPadWidth), %% a percent
 // Every way works on bytes (UTF-8 in, UTF-8 out), values put in as they are (never scanned again).
 #pragma once
 
+#include <cstddef>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -41,8 +43,11 @@ inline constexpr Rules kLongStrings{.kinds = "sS", .longPrefix = true};
 inline constexpr Rules kWidths{.kinds = "dsS", .widthChars = "0123456789-"};
 inline constexpr Rules kZeroPadded{.kinds = "dsS", .widthChars = "0123456789", .zeroPad = true};
 
-/// `fmt` with its fields filled in order from `values` by `rules`. (A zero-padded width too big
-/// for an int throws std::out_of_range, as std::stoi does.)
+/// The widest a zero-padded field pads (a wider width, of any length, pads to this). No real
+/// string comes near it; it keeps a modded "%0999999999999d" from throwing or allocating gigabytes.
+inline constexpr std::size_t kMaxZeroPadWidth = 1024;
+
+/// `fmt` with its fields filled in order from `values` by `rules`. Never throws for any format.
 std::string fill(std::string_view fmt, std::initializer_list<std::string_view> values, const Rules& rules);
 
 /// Each % through the next letter after it (anything between skipped: %d, %s, %.2f, %%d) replaced

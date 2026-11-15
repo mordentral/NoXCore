@@ -202,7 +202,7 @@ void writeAudioBag(const std::filesystem::path& bagIn, const AudioIndex& index, 
         std::ifstream in(bagIn, std::ios::binary);
         std::ofstream o(bagOut, std::ios::binary | std::ios::trunc);
         if (!in || !o) {
-            throw std::runtime_error("Audio.bag: can't open " + (in ? bagOut.string() : bagIn.string()));
+            throw std::runtime_error("Audio.bag: can't open " + (in ? pathUtf8(bagOut) : pathUtf8(bagIn)));
         }
         o << in.rdbuf();
         std::uint64_t at = static_cast<std::uint64_t>(o.tellp());
@@ -236,7 +236,7 @@ void writeAudioBag(const std::filesystem::path& bagIn, const AudioIndex& index, 
             at += data.size();
         }
         if (!o) {
-            throw std::runtime_error("Audio.bag: writing " + bagOut.string() + " failed");
+            throw std::runtime_error("Audio.bag: writing " + pathUtf8(bagOut) + " failed");
         }
     }
     writeFileBytes(idxOut, out.write());

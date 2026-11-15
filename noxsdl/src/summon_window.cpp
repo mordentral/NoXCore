@@ -45,9 +45,6 @@ SummonWindow::SummonWindow(const nox::things::ThingDb& things, const nox::string
                            SpriteCache& sprites, Font* font)
     : things_(things), strings_(strings), sprites_(sprites), font_(font)
 {
-    for (const auto& i : things_.images) {
-        images_.emplace(i.name, &i);
-    }
 }
 
 std::string SummonWindow::text(const std::string& id) const
@@ -62,8 +59,7 @@ std::string SummonWindow::text(const std::string& id) const
 
 const nox::things::ImageDef* SummonWindow::image(const std::string& name) const
 {
-    const auto it = images_.find(name);
-    return it == images_.end() ? nullptr : it->second;
+    return things_.findImage(name); // (each name's first image, as thing.bin lists them)
 }
 
 void SummonWindow::drawNamed(SDL_Renderer* r, const std::string& name, float gx, float gy, float s) const

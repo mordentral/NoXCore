@@ -99,7 +99,6 @@ private:
     const nox::strings::StringTable* strings_;
     SpriteCache& sprites_;
     Font* font_;
-    std::map<std::string, const nox::things::ImageDef*, std::less<>> images_;
     std::function<void(std::uint32_t)> playSound_;
     int state_ = 0;   ///< 0 up (hidden), 1 coming down, 2 down, 3 going up
     int y_ = -0x91;   ///< the panel's top

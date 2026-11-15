@@ -180,7 +180,6 @@ private:
     SpriteCache& sprites_;
     Font* font_;
     const Hud& hud_;
-    std::map<std::string, const nox::things::ImageDef*, std::less<>> images_;
     std::function<void(std::uint32_t)> playSound_;
     std::function<void(const std::string&)> say_;
 

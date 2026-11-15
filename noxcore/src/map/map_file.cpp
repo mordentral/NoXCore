@@ -117,7 +117,7 @@ MapFile loadMapFile(const std::filesystem::path& path)
     auto data = readFileBytes(path);
     // Blowfish works on whole 8-byte blocks, so a valid file is always a multiple of 8.
     if (data.size() % kBlock != 0) {
-        throw FormatError(path.string() + ": size is not a multiple of the cipher block");
+        throw FormatError(pathUtf8(path) + ": size is not a multiple of the cipher block");
     }
     crypto::cipherForKey(crypto::FileKey::Map).decrypt(data);
     return parseMapFile(data);

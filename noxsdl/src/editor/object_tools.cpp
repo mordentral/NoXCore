@@ -599,7 +599,7 @@ void ObjectTools::savePrefab(const std::string& name)
     try {
         const fs::path file = me::savePrefab(writeDir_ / "prefabs", p, ed_.things_);
         reloadPrefabs();
-        ed_.status("Saved prefab " + name + " (" + std::to_string(p.objectCount()) + " objects) to " + file.string());
+        ed_.status("Saved prefab " + name + " (" + std::to_string(p.objectCount()) + " objects) to " + nox::pathUtf8(file));
     } catch (const std::exception& ex) {
         ed_.status(std::string("Prefab not saved: ") + ex.what());
     }

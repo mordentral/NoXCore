@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include "book_award.hpp"
 
+#include "noxcore/io/file.hpp"
 #include "noxcore/server/solo.hpp"
 #include "noxcore/things/field_guide.hpp"
 #include "noxcore/util/random.hpp"
@@ -936,12 +937,12 @@ void loadBars(App& app)
                 const auto gui = nox::player::Gui::parse(raw->data);
                 if (gui.characterClass == cls) {
                     app.bars = nox::client::SpellBars::fromGui(gui);
-                    SDL_Log("spell bars: from %s", app.characterFile.string().c_str());
+                    SDL_Log("spell bars: from %s", nox::pathUtf8(app.characterFile).c_str());
                     loaded = true;
                 }
             }
         } catch (const std::exception& ex) {
-            SDL_Log("spell bars: reading %s: %s", app.characterFile.string().c_str(), ex.what());
+            SDL_Log("spell bars: reading %s: %s", nox::pathUtf8(app.characterFile).c_str(), ex.what());
         }
     }
     if (!loaded) {

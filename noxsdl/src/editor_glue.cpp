@@ -167,7 +167,7 @@ void openEditor(App& app, const std::string& map)
     };
     c.hostSession = [&app] { showEditSessionSetup(app); };
     app.editor = std::make_unique<MapEditor>(std::move(c));
-    SDL_Log("map editor: open (maps in %s)", mapsDir.string().c_str());
+    SDL_Log("map editor: open (maps in %s)", nox::pathUtf8(mapsDir).c_str());
     editorMouse(app);
     SDL_Log("map editor: pointer %s, mouse %s", SDL_CursorVisible() ? "shown" : "hidden",
             SDL_GetWindowRelativeMouseMode(app.window) ? "relative" : "absolute");
@@ -252,7 +252,7 @@ std::string startPlayTest(App& app, const editor::PlayTestRequest& req)
                     return "the mod " + req.modeId + " doesn't load: " + b.why;
                 }
             }
-            return "no mod " + req.modeId + " in " + modsFolderPath().string();
+            return "no mod " + req.modeId + " in " + nox::pathUtf8(modsFolderPath());
         }
         s.modeId = req.modeId;
         if (req.modeMap) {

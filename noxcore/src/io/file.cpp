@@ -65,11 +65,11 @@ std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path)
     }
 #endif
     if (!in) {
-        throw std::system_error(errno, std::generic_category(), "cannot open " + path.string());
+        throw std::system_error(errno, std::generic_category(), "cannot open " + pathUtf8(path));
     }
     std::vector<std::uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
     if (in.bad()) {
-        throw std::system_error(errno, std::generic_category(), "cannot read " + path.string());
+        throw std::system_error(errno, std::generic_category(), "cannot read " + pathUtf8(path));
     }
     return out;
 }
@@ -78,11 +78,11 @@ void writeFileBytes(const std::filesystem::path& path, std::span<const std::uint
 {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) {
-        throw std::system_error(errno, std::generic_category(), "cannot create " + path.string());
+        throw std::system_error(errno, std::generic_category(), "cannot create " + pathUtf8(path));
     }
     out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
     if (!out) {
-        throw std::system_error(errno, std::generic_category(), "cannot write " + path.string());
+        throw std::system_error(errno, std::generic_category(), "cannot write " + pathUtf8(path));
     }
 }
 

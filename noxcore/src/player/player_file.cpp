@@ -89,7 +89,7 @@ PlayerFile loadPlayerFile(const std::filesystem::path& path)
 {
     auto data = readFileBytes(path);
     if (data.size() % kBlock != 0) {
-        throw FormatError(path.string() + ": size is not a multiple of the cipher block");
+        throw FormatError(pathUtf8(path) + ": size is not a multiple of the cipher block");
     }
     crypto::cipherForKey(crypto::FileKey::PlayerFile).decrypt(data);
     return parsePlayerFile(data);

@@ -146,8 +146,6 @@ public:
     /// for them (voice()) stays whatever its class; of the rest, those of a class there are now
     /// too many of leave, newest first; those missing join as there's room.
     void setWanted(const std::vector<std::uint8_t>& classes, std::uint32_t nowMs);
-    /// The classes wanted now, oldest first.
-    const std::vector<std::uint8_t>& wantedClasses() const noexcept { return wanted_; }
     /// The difficulties bots join at from now on; those in of another (but the voice) leave, to
     /// come back as one of these.
     void setTiers(Tier minTier, Tier maxTier, std::uint32_t nowMs);

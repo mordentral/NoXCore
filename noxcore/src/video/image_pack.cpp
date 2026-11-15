@@ -4,6 +4,7 @@
 #include "noxcore/crypto/crc.hpp"
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
+#include "noxcore/io/file.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <zstd.h>
@@ -385,7 +386,7 @@ ImagePackReader::ImagePackReader(const std::filesystem::path& path)
     : file_(path, std::ios::binary)
 {
     if (!file_) {
-        throw std::system_error(errno, std::generic_category(), "cannot open " + path.string());
+        throw std::system_error(errno, std::generic_category(), "cannot open " + pathUtf8(path));
     }
     file_.seekg(0, std::ios::end);
     fileSize_ = static_cast<std::uint64_t>(std::max<std::streamoff>(0, file_.tellg()));
@@ -394,7 +395,7 @@ ImagePackReader::ImagePackReader(const std::filesystem::path& path)
     ByteReader h(header, "image pack header");
     const auto magic = h.bytes(kMagic.size());
     if (std::memcmp(magic.data(), kMagic.data(), kMagic.size()) != 0) {
-        throw FormatError(path.string() + " is not an image pack");
+        throw FormatError(pathUtf8(path) + " is not an image pack");
     }
     // Version 1 packs have no gradient codec but are otherwise the same.
     const std::uint32_t version = h.u32();
@@ -573,7 +574,7 @@ ImagePackWriter::ImagePackWriter(const std::filesystem::path& path, std::uint32_
     , sourceIdxCrc_(sourceIdxCrc)
 {
     if (!file_) {
-        throw std::system_error(errno, std::generic_category(), "cannot create " + path.string());
+        throw std::system_error(errno, std::generic_category(), "cannot create " + pathUtf8(path));
     }
     // The header is rewritten by finish(); until then the file isn't a valid pack.
     const std::array<char, kHeaderSize> blank{};
@@ -649,7 +650,7 @@ void ImagePackWriter::finish()
     file_.write(reinterpret_cast<const char*>(h.data().data()), static_cast<std::streamsize>(h.size()));
     file_.close();
     if (!file_) {
-        throw std::system_error(errno, std::generic_category(), "writing " + path_.string());
+        throw std::system_error(errno, std::generic_category(), "writing " + pathUtf8(path_));
     }
     finished_ = true;
 }

@@ -342,7 +342,7 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
         const fs::path sessionMap = eo.mapsDir / eo.mapName / (eo.mapName + ".map");
         if (eo.mapName.empty() || !fs::exists(nox::resolveNoCase(sessionMap))) {
             throw std::runtime_error("no map " + (eo.mapName.empty() ? std::string("(unnamed)") : eo.mapName) + " for the edit session (" +
-                                     sessionMap.string() + ")");
+                                     nox::pathUtf8(sessionMap) + ")");
         }
         if (!eo.log) {
             eo.log = [](const std::string& line) { SDL_Log("session: %s", line.c_str()); };

@@ -224,12 +224,10 @@ public:
         std::uint32_t author = 0;    ///< who wrote the working version (0: the host's folder, or one who left)
         std::vector<std::uint8_t> body; ///< the working version's ModFile body (packed once a version)
     };
-    /// Whether the session carries a mod, its id (the folder's name), its files, and why it doesn't
-    /// when the folder couldn't be taken.
+    /// Whether the session carries a mod, its id (the folder's name) and its files.
     bool hasMod() const { return !modId_.empty(); }
     const std::string& modId() const { return modId_; }
     const std::map<std::string, ModEntry>& modFiles() const { return mod_; }
-    const std::string& modError() const { return modError_; }
     /// The owner's publish of the mod: every working version written into Options::modFolder
     /// (a deleted one removed); false (logged) when one couldn't be.
     bool publishMod(GameHost& host);

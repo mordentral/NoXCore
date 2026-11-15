@@ -125,7 +125,7 @@ void saveF12Screenshot(App& app)
     const bool saved = SDL_SaveBMP(shot, path.string().c_str());
     SDL_DestroySurface(shot);
     if (app.console) {
-        app.console->print(saved ? "screenshot: " + path.string() : "screenshot: couldn't write " + path.string(),
+        app.console->print(saved ? "screenshot: " + nox::pathUtf8(path) : "screenshot: couldn't write " + nox::pathUtf8(path),
                            saved ? Yellow : Red);
     }
 }

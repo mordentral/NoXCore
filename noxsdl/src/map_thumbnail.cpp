@@ -207,7 +207,7 @@ MapThumbnails::Pixels MapThumbnails::draw(const std::filesystem::path& path, con
         floor = nox::map::decodeSection<nox::map::FloorMap>(map);
         walls = nox::map::decodeSection<nox::map::WallMap>(map).walls;
     } catch (const std::exception& e) {
-        SDL_Log("map picture %s: %s", path.string().c_str(), e.what());
+        SDL_Log("map picture %s: %s", nox::pathUtf8(path).c_str(), e.what());
         return out;
     }
     // Window walls, and secret walls that start open, by cell (x << 8 | y, as MapView::wallKey).

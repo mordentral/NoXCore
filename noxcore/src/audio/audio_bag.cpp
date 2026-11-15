@@ -26,7 +26,7 @@ AudioBag::AudioBag(const std::filesystem::path& bag, const std::filesystem::path
     , overrideDir_(std::move(overrideDir))
 {
     if (!bag_) {
-        throw std::system_error(std::make_error_code(std::errc::no_such_file_or_directory), bag.string());
+        throw std::system_error(std::make_error_code(std::errc::no_such_file_or_directory), pathUtf8(bag));
     }
     bag_.seekg(0, std::ios::end);
     bagSize_ = static_cast<std::uint64_t>(std::max<std::streamoff>(0, bag_.tellg()));

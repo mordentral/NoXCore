@@ -1,6 +1,8 @@
 // The map editor's prefabs (prefab.hpp).
 #include "noxcore/mapedit/prefab.hpp"
 
+#include "noxcore/io/file.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -122,7 +124,7 @@ std::filesystem::path savePrefab(const std::filesystem::path& dir, const Prefab&
     {
         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
         f.write(text.data(), static_cast<std::streamsize>(text.size()));
-        if (!f) throw std::runtime_error("can't write " + tmp.string());
+        if (!f) throw std::runtime_error("can't write " + pathUtf8(tmp));
     }
     std::filesystem::rename(tmp, path);
     return path;

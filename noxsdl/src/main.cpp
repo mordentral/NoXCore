@@ -650,7 +650,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         }
         return SDL_APP_FAILURE;
     }
-    SDL_Log("game folder: %s (%s)", app->gameDir.string().c_str(), gameDirReason.c_str());
+    SDL_Log("game folder: %s (%s)", nox::pathUtf8(app->gameDir).c_str(), gameDirReason.c_str());
     if (!opts.mapPicture.empty()) {
         try {
             const auto things = nox::things::loadThingDb(app->gameDir / "thing.bin");
@@ -663,7 +663,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             const auto png = nox::encodePng(p.width, p.height, p.rgba);
             std::ofstream(opts.mapPictureOut, std::ios::binary).write(reinterpret_cast<const char*>(png.data()),
                                                                   static_cast<std::streamsize>(png.size()));
-            SDL_Log("map picture: %s %dx%d in %llu ms", opts.mapPictureOut.string().c_str(), p.width, p.height,
+            SDL_Log("map picture: %s %dx%d in %llu ms", nox::pathUtf8(opts.mapPictureOut).c_str(), p.width, p.height,
                     static_cast<unsigned long long>(SDL_GetTicks() - start));
         } catch (const std::exception& ex) {
             SDL_Log("map picture: %s", ex.what());
@@ -687,8 +687,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         const auto& settingsDir = backend::settingsDirectory(app->gameDir);
         const auto loaded = nox::config::loadConfig(settingsDir, app->gameDir, &fromDefault);
         if (!loaded) {
-            SDL_Log("neither %s nor %s read: no key bindings", (settingsDir / "nox.cfg").string().c_str(),
-                    (app->gameDir / "default.cfg").string().c_str());
+            SDL_Log("neither %s nor %s read: no key bindings", nox::pathUtf8(settingsDir / "nox.cfg").c_str(),
+                    nox::pathUtf8(app->gameDir / "default.cfg").c_str());
         }
         nox::config::Config config = loaded.value_or(nox::config::Config{});
         if (fromDefault || !config.setting("VideoMode")) {
@@ -790,7 +790,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 }
             }
             SDL_Log("image pack: %s", app->imagePack.empty() ? "none (Use HD Images is greyed)"
-                                                              : app->imagePack.string().c_str());
+                                                              : nox::pathUtf8(app->imagePack).c_str());
             OptionsWindow::Extras extras = loadExtras(backend::settingsDirectory(gameDir));
             extras.hdImages = (extras.hdImages || opts.hdImages) && !app->imagePack.empty();
             if (opts.originalFonts) {
@@ -1105,7 +1105,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             app->camera.x = app->view->centre().x;
             app->camera.y = app->view->centre().y;
         }
-        SDL_Log("noxsdl %s: %s", nox::version(), mapPath.string().c_str());
+        SDL_Log("noxsdl %s: %s", nox::version(), nox::pathUtf8(mapPath).c_str());
         const auto& lights = app->view->lights();
         const auto animated = std::ranges::count_if(lights, [](const MapView::MapLight& l) {
             return l.colorKeys.size() > 1 || l.intensityKeys.size() > 1;
@@ -1115,7 +1115,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("loading failed: %s", ex.what());
         if (app->screenshot.empty()) {
             // A windowed run would otherwise just vanish (the log goes to stderr).
-            const std::string text = std::string(ex.what()) + "\n\nGame folder: " + app->gameDir.string() +
+            const std::string text = std::string(ex.what()) + "\n\nGame folder: " + nox::pathUtf8(app->gameDir) +
 #ifdef _WIN32
                                      "\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE "
                                      "and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.";

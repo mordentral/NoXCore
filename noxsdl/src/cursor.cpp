@@ -44,9 +44,6 @@ Cursor::Cursor(const nox::things::ThingDb& things, SpriteCache& sprites, Font* f
                const nox::strings::StringTable* strings)
     : things_(things), sprites_(sprites), font_(font), strings_(strings)
 {
-    for (const auto& i : things_.images) {
-        images_.emplace(i.name, &i);
-    }
 }
 
 const nox::things::ImageDef* Cursor::image(CursorType type) const
@@ -55,8 +52,7 @@ const nox::things::ImageDef* Cursor::image(CursorType type) const
     if (index >= kCursorImages.size()) {
         return nullptr;
     }
-    const auto it = images_.find(kCursorImages[index]);
-    return it == images_.end() ? nullptr : it->second;
+    return things_.findImage(kCursorImages[index]); // (each name's first image, as thing.bin lists them)
 }
 
 std::string Cursor::label(const char* id) const

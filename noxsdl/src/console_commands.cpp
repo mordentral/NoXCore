@@ -140,7 +140,7 @@ std::vector<Console::Command> consoleCommands(App& app)
                      }
                      std::ifstream in(file);
                      if (!in) {
-                         con.print("can't read " + file.string(), Red);
+                         con.print("can't read " + nox::pathUtf8(file), Red);
                          return;
                      }
                      std::string line;
@@ -200,12 +200,12 @@ std::vector<Console::Command> consoleCommands(App& app)
     c.push_back({"log", 0x13, "", {},
                  {{"console", 3, "", [&app, &con](const Args&) {
                        con.logTo((app.gameDir / "console.log").string());
-                       con.print("logging to " + (app.gameDir / "console.log").string(), Yellow);
+                       con.print("logging to " + nox::pathUtf8(app.gameDir / "console.log"), Yellow);
                    }},
                   {"file", 3, "", [&app, &con](const Args& a) {
                        const fs::path file = app.gameDir / (a.empty() ? std::string("console.log") : a[0]);
                        con.logTo(file.string());
-                       con.print("logging to " + file.string(), Yellow);
+                       con.print("logging to " + nox::pathUtf8(file), Yellow);
                    }},
                   {"stop", 3, "", [&con](const Args&) { con.logTo({}); }}}});
     c.push_back({"macros", 3, "", {}, {{"on", 1, "", hostOnly}, {"off", 1, "", hostOnly}}});

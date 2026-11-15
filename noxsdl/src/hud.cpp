@@ -110,9 +110,6 @@ std::optional<int> ctfIconAt(const nox::client::World& world, const Layout& l, f
 
 Hud::Hud(const nox::things::ThingDb& things, ThingArt& art) : things_(things), art_(art)
 {
-    for (const auto& i : things_.images) {
-        images_.emplace(i.name, &i);
-    }
     // The pictures draw() uses, by the names it used to build each frame.
     Named& n = named_;
     for (int i = 0; i < kSlots; ++i) {
@@ -165,8 +162,7 @@ float Hud::scale(int w, int h)
 
 const nox::things::ImageDef* Hud::image(const std::string& name) const
 {
-    const auto it = images_.find(name);
-    return it == images_.end() ? nullptr : it->second;
+    return things_.findImage(name); // (each name's first image, as thing.bin lists them)
 }
 
 std::optional<nox::things::ImageRef> Hud::icon(std::uint32_t id, bool warrior, bool lit) const

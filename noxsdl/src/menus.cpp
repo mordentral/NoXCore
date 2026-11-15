@@ -12,6 +12,7 @@
 #include "noxcore/client/solo_menu.hpp"
 #include "noxcore/client/spell_bars.hpp"
 #include "noxcore/client/text_fields.hpp"
+#include "noxcore/io/file.hpp"
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/server/rules.hpp"
 #include "noxcore/server/solo_save.hpp"
@@ -2224,7 +2225,7 @@ void Menus::startNewSolo()
         characterSaveFailed(soloRoot() / "Save" / "WORKING", "Cannot write new solo character");
         return;
     }
-    SDL_Log("menus: saved %s", plr.string().c_str());
+    SDL_Log("menus: saved %s", nox::pathUtf8(plr).c_str());
     characterFile_ = plr;
     SoloStart start;
     start.info = nox::client::solo_saves::readPlr(plr).info; // (as the section writer left it)
@@ -2237,7 +2238,7 @@ void Menus::startNewSolo()
 
 void Menus::characterSaveFailed(const std::filesystem::path& path, const std::string& reason)
 {
-    SDL_Log("character save failed: %s: %s", path.string().c_str(), reason.c_str());
+    SDL_Log("character save failed: %s: %s", nox::pathUtf8(path).c_str(), reason.c_str());
     // Defer creation until the current button callback has returned.
     deferred_.push_back([this] {
         dialog("Save failed",
@@ -2325,7 +2326,7 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
         characterSaveFailed(path, ex.what());
         return std::nullopt;
     }
-    SDL_Log("menus: saved %s", path.string().c_str());
+    SDL_Log("menus: saved %s", nox::pathUtf8(path).c_str());
     characterFile_ = path;
 
     // The profile to join with, from the same looks: 5 colours (RGB each) and 5 clothing picks.

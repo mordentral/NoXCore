@@ -202,7 +202,7 @@ void writeFileReplacing(const std::filesystem::path& path, std::span<const std::
         std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
         out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
         if (!out) {
-            throw FormatError(std::string(who) + ": can't write " + tmp.string());
+            throw FormatError(std::string(who) + ": can't write " + pathUtf8(tmp));
         }
     }
     std::filesystem::rename(tmp, path);

@@ -194,9 +194,8 @@ private:
 
     const nox::things::ThingDb& things_;
     ThingArt& art_;
-    std::map<std::string, const nox::things::ImageDef*, std::less<>> images_;
-    /// The named images draw() uses, looked up in images_ once as the HUD is made (images_ never
-    /// changes after that; nullptr: thing.bin has none by that name, drawn as nothing).
+    /// The named images draw() uses, looked up once as the HUD is made (thing.bin's images never
+    /// change after that; nullptr: thing.bin has none by that name, drawn as nothing).
     struct Named {
         using Def = const nox::things::ImageDef*;
         std::array<Def, 5> nugget{}, nuggetLit{}, warriorNugget{}; ///< QuickBar(Warrior)Nugget1-5(Lit)

@@ -2,6 +2,8 @@
 // image's textures (its levels, tinted or in one colour).
 #include "image_decoder.hpp"
 
+#include "noxcore/io/file.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <exception>
@@ -398,7 +400,7 @@ void ImageDecoder::run()
                 reader = std::make_unique<nox::video::ImagePackReader>(path_);
             } catch (const std::exception& ex) {
                 if (!std::exchange(openFailed, true)) {
-                    SDL_Log("image decoder: %s: %s", path_.string().c_str(), ex.what());
+                    SDL_Log("image decoder: %s: %s", nox::pathUtf8(path_).c_str(), ex.what());
                 }
             }
         }

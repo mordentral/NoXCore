@@ -93,7 +93,6 @@ private:
     SpriteCache& sprites_;
     Font* font_;
     const nox::strings::StringTable* strings_;
-    std::map<std::string, const nox::things::ImageDef*> images_;
 };
 
 } // namespace noxsdl
