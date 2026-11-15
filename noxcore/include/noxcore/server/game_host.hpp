@@ -937,6 +937,32 @@ private:
     bool aiDebug_ = false;                ///< ("show ai": engine flag 8)
 
     void onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes);
+    /// onPayload's handlers, in its switch's order: each takes one game message `m` (of the size
+    /// net::messageSize gave it) of its op, or of the few ops it names (REQUEST_SAVE_PLAYER's
+    /// reads nothing past its op, so takes none). One that lets its sender go (disconnect: onFile's
+    /// refused character, onGauntlet's kick after its save, onRequestSavePlayer's out of turn, a
+    /// mode's kick) ends the packet: onPayload reads no more of it.
+    void onImportant(std::uint8_t peer, std::span<const std::uint8_t> m);             ///< IMPORTANT (0xAA): its ack
+    void onPlayerInput(std::uint8_t peer, std::span<const std::uint8_t> m);           ///< PLAYER_INPUT
+    void onTryGet(std::uint8_t peer, std::span<const std::uint8_t> m);                ///< TRY_GET (0x73)
+    void onTryCollide(std::uint8_t peer, std::span<const std::uint8_t> m);            ///< TRY_COLLIDE (0x7B)
+    void onTryHeldItem(std::uint8_t peer, std::span<const std::uint8_t> m);           ///< TRY_DROP, TRY_EQUIP, TRY_DEQUIP
+    void onTryUse(std::uint8_t peer, std::span<const std::uint8_t> m);                ///< TRY_USE (0x74)
+    void onTryCreatureCommand(std::uint8_t peer, std::span<const std::uint8_t> m);    ///< TRY_CREATURE_COMMAND (0x78)
+    void onTrySpell(std::uint8_t peer, std::span<const std::uint8_t> m);              ///< TRY_SPELL (0x79)
+    void onTryAbility(std::uint8_t peer, std::span<const std::uint8_t> m);            ///< TRY_ABILITY (0x7A)
+    void onReportSecondaryWeapon(std::uint8_t peer, std::span<const std::uint8_t> m); ///< REPORT_SECONDARY_WEAPON (0xE0)
+    void onInfoBookData(std::uint8_t peer, std::span<const std::uint8_t> m);          ///< INFO_BOOK_DATA (0xE2)
+    void onSocial(std::uint8_t peer, std::span<const std::uint8_t> m);                ///< SOCIAL (0xE3)
+    void onGauntlet(std::uint8_t peer, std::span<const std::uint8_t> m);              ///< GAUNTLET (0xF0)
+    void onRequestSavePlayer(std::uint8_t peer);                                     ///< REQUEST_SAVE_PLAYER (0xC1)
+    void onMouse(std::uint8_t peer, std::span<const std::uint8_t> m);                 ///< MOUSE (0xAC)
+    void onNewAlias(std::uint8_t peer, std::span<const std::uint8_t> m);              ///< NEW_ALIAS (0xA5)
+    void onTeamMsg(std::uint8_t peer, std::span<const std::uint8_t> m);               ///< TEAM_MSG (0xC4)
+    void onDialog(std::uint8_t peer, std::span<const std::uint8_t> m);                ///< DIALOG (0xD0)
+    void onTrade(std::uint8_t peer, std::span<const std::uint8_t> m);                 ///< TRADE (0xC9)
+    void onNoxcppMapVote(std::uint8_t peer, std::span<const std::uint8_t> m);         ///< noxcpp's map vote
+    void onNoxcppModeMessage(std::uint8_t peer, std::span<const std::uint8_t> m);     ///< the NoX Core modes' and the editor's (Options::noxcppMessages)
     void onClientReady(std::uint8_t peer);                                  ///< CLIENT_READY (SrvNet_OnClientReady)
     void onIncomingClient(std::uint8_t peer);                               ///< INCOMING_CLIENT (SrvNet_OnIncomingClient)
     void onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> m); ///< TEXT_MESSAGE (SrvNet_OnPacket 0xA8)

@@ -1483,9 +1483,16 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
         join(peer, bytes);
         return;
     }
-    if (!players_.contains(peer)) {
+    const auto sender = players_.find(peer);
+    if (sender == players_.end()) {
         return;
     }
+    // (noxcpp) A message that lets its sender go (disconnect: a kick, a mode's among them, its
+    // character file refused, its save asked for out of turn) ends the packet. Read on, the
+    // handlers' players_[peer] made a blank player in its place (no unit, slot 0), whose own
+    // removal later forgot slot 0's objects and told everyone net code 0 quit. Its join's serial
+    // tells it from such a blank one.
+    const std::uint32_t joinSerial = sender->second.joinSerial;
     // Game messages back to back (SrvNet_OnPacket's loop); stop at one we can't size.
     std::size_t off = 0;
     while (off < bytes.size()) {
@@ -1512,248 +1519,51 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             --quitPendingAcks_;
             break;
         case net::Op::Important: // (0xAA: u32 the client's frame) a stock client's important messages follow
-            // Answered with MSG_IMPORTANT_ACK {0xAB, the same u32} in the player's frame's datagram
-            // (unreliable), for a player with a unit, as GAME.EXE's server does: the client's
-            // important queue lets go of what it sent in that frame. Unanswered, it sent each of them
-            // again every 2 s for good (an emote played again, a team switch, a save asked, a console
-            // command run again). The messages after it are read as any: one sent again after a lost
-            // ack is taken again, as the exe's server takes it. (A NoX Core client sends its own on
-            // the reliable stream, never this.)
-            if (server_.world().byExtent(players_[peer].extent)) {
-                const std::array<std::uint8_t, 5> ack{static_cast<std::uint8_t>(net::Op::ImportantAck), m[1], m[2], m[3], m[4]};
-                transport_.sendUnreliable(peer, ack);
-            }
+            onImportant(peer, m);
             break;
         case net::Op::IncomingClient:
             onIncomingClient(peer);
             break;
         case net::Op::PlayerInput: // (SrvNet_OnPlayerInput: only once it's in)
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && players_[peer].ready) {
-                try {
-                    net::decodeControls(m.subspan(2, std::min<std::size_t>(m[1], m.size() - 2)), controlEntries_);
-                    addControls(*unit, controlEntries_);
-                } catch (const std::exception&) {
-                    // (a malformed batch is dropped)
-                }
-            }
+            onPlayerInput(peer, m);
             break;
-        case net::Op::TryGet: { // picking something up (SrvNet_OnPacket 0x73)
-            ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)}); // (packetDynamicUnitCode)
-            // Not while a save's asked for (Game_IsSavePending), observing (status & 3),
-            // trading (PlayerControl::trade), talking to an NPC (DialogWith, dialog.hpp) or frozen.
-            // (noxcpp: nor out of reach, kServerReach. The exe checks none, so a modified client
-            // could pick up items anywhere: OB-007, fixed.)
-            if (unit && unit->player && item && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) &&
-                !trading(*unit) && unit->player->dialogWith == 0 && !(unit->flags & ObjFlag::NoUpdate) && withinReach(*unit, *item)) {
-                int carried = 0;
-                for (const std::uint32_t e : unit->inventory) {
-                    if (const ServerObject* o = server_.world().byExtent(e)) {
-                        carried += o->weight;
-                    }
-                }
-                if (unit->carryCapacity < item->weight + carried) {
-                    // (SrvNet_SendInformString: Net_QueueMsg, the frame's datagram; none while its
-                    // .plr is applied.)
-                    if (!unit->player->transfer) {
-                        transport_.sendUnreliable(peer, informStringBytes("pickup.c:CarryingTooMuch"));
-                    }
-                } else {
-                    server_.pickUp(*unit, *item);
-                }
-            }
+        case net::Op::TryGet: // picking something up (SrvNet_OnPacket 0x73)
+            onTryGet(peer, m);
             break;
-        }
-        case net::Op::TryCollide: { // (0x7B: u16 object) working a lever, button... (SrvNet_OnPacket)
-            // Its COLLIDE with the player's unit. Not an observer's (status & 3), one trading
-            // (PlayerControl::trade) nor one talking to an NPC (DialogWith, dialog.hpp). (noxcpp:
-            // nor out of reach, kServerReach. The exe checks none, so a modified client could
-            // work levers anywhere: OB-009, fixed.)
-            ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            // (packetDynamicUnitCode: a map object's code is its map number with bit 15.)
-            ServerObject* o = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)});
-            if (unit && unit->player && players_[peer].ready && !(unit->player->statusFlags & 3u) && !trading(*unit) && unit->player->dialogWith == 0 && o &&
-                !o->gone() && o->collides && withinReach(*unit, *o)) {
-                Fight f = server_.fight();
-                collideFunction(f, *o, unit);
-            }
+        case net::Op::TryCollide: // (0x7B: u16 object) working a lever, button... (SrvNet_OnPacket)
+            onTryCollide(peer, m);
             break;
-        }
         case net::Op::TryDrop:    // (0x72: u16 item, u16 x, u16 y)
         case net::Op::TryEquip:   // (0x75: u16 item)
-        case net::Op::TryDequip: { // (0x76: u16 item)
-            ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            // (Its code taken as our key, no bit-15 test: only a thing the player holds will do, and
-            // no held thing has a map object's code.)
-            ServerObject* item = server_.world().byExtent(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)}.asExtent());
-            if (!unit || !unit->player || !item || !players_[peer].ready || item->holder != unit->extent) {
-                break;
-            }
-            auto items = server_.items();
-            const bool observing = (unit->player->statusFlags & 3u) != 0; // (status & 3)
-            if (m[0] == static_cast<std::uint8_t>(net::Op::TryDrop)) {
-                // Not observing, trading, talking nor frozen.
-                if (!observing && !trading(*unit) && unit->player->dialogWith == 0 && !(unit->flags & ObjFlag::NoUpdate)) {
-                    items.tryDrop(*unit, *item, static_cast<float>(m[3] | m[4] << 8), static_cast<float>(m[5] | m[6] << 8));
-                }
-            } else if (m[0] == static_cast<std::uint8_t>(net::Op::TryEquip)) {
-                // Not while a save's asked for (Game_IsSavePending) nor observing.
-                if (!server_.world().saveRequest.pending && !observing) {
-                    items.tryEquip(*unit, *item);
-                }
-            } else if (!observing) { // (0x76: not observing)
-                items.tryDequip(*unit, *item);
-            }
+        case net::Op::TryDequip:  // (0x76: u16 item)
+            onTryHeldItem(peer, m);
             break;
-        }
-        case net::Op::TryUse: { // (0x74: u16 item) using a thing it holds (Obj_UseItem)
-            // Not while a save's asked for (Game_IsSavePending) nor an observer (status 1
-            // or 2); the item in its inventory.
-            ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            ServerObject* item = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)});
-            if (unit && unit->player && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) && item &&
-                item->holder == unit->extent) {
-                server_.items().use(*unit, *item);
-            }
+        case net::Op::TryUse: // (0x74: u16 item) using a thing it holds (Obj_UseItem)
+            onTryUse(peer, m);
             break;
-        }
-        case net::Op::TryCreatureCommand: { // (0x78: u16 creature (0: all), u8 order) AI_OrderCreatures
-            // Not while observing. (noxcpp: one creature only of the sender's own, as the stock
-            // client's creature window lists them. The exe takes any by its code, its owner
-            // unchecked but for a banishing: OB-042, fixed.)
-            ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-            if (unit && unit->player && players_[peer].ready && !(unit->player->statusFlags & 1u) && m.size() >= 4) {
-                const std::uint32_t code = static_cast<std::uint32_t>(m[1] | m[2] << 8);
-                ServerObject* creature = nullptr;
-                if (code != 0) {
-                    creature = server_.world().byPacketCode(NetCode{code});
-                    if (!creature || (creature->owner != unit->extent && !controls(server_.world(), *unit, *creature))) {
-                        break;
-                    }
-                }
-                auto f = server_.fight();
-                orderCreatures(f, *unit, creature, m[3]);
-            }
+        case net::Op::TryCreatureCommand: // (0x78: u16 creature (0: all), u8 order) AI_OrderCreatures
+            onTryCreatureCommand(peer, m);
             break;
-        }
         case net::Op::TrySpell: // (0x79: five u32 spells, then "on itself")
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && players_[peer].ready) {
-                std::array<std::uint32_t, 5> spells{};
-                for (std::size_t i = 0; i < spells.size(); ++i) {
-                    const std::size_t at = 1 + i * 4;
-                    spells[i] = util::u32At(m, at);
-                }
-                server_.spells().request(*unit, spells, m[21] != 0);
-            }
+            onTrySpell(peer, m);
             break;
         case net::Op::TryAbility: // (0x7A: the ability, 1-5)
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && players_[peer].ready) {
-                server_.tryAbility(*unit, m[1]);
-            }
+            onTryAbility(peer, m);
             break;
-        case net::Op::ReportSecondaryWeapon: // (0xE0: u16 its net code, 0 none) the client's secondary
-            // weapon (Plr_SetSecondaryWeapon): one its class may not use
-            // (playerClassCanUseItem) or it isn't strong enough for
-            // (playerCheckStrength: the weapon's or armour's record's strength) is
-            // refused: SrvNet_SendReportSecondaryWeapon(.., null, 1), its client's "Weapon2CantUse".
-            // (Kept in the exe's player record: what reads it, the saves, takes the host's window.)
-            // noxcpp keeps the code, none when refused, for mods to read (nox.secondaryWeapon).
-            // (noxcpp: a solo game's guest's sent before it took a .plr read's tell is out of date,
-            // HostedPlayer::secondaryTell: not counted.)
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() >= 3) {
-                if (secondaryOutOfDate(players_[peer], *unit)) {
-                    break;
-                }
-                const std::uint16_t code = static_cast<std::uint16_t>(m[1] | (m[2] << 8));
-                unit->player->secondaryWeapon = code;
-                if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(NetCode{code}) : nullptr) {
-                    if (!server_.items().classMay(*unit, *item) || !server_.items().strongEnough(*unit, *item)) {
-                        unit->player->secondaryWeapon = 0;
-                        sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportSecondaryWeapon), 0, 0, 1});
-                    }
-                }
-            }
+        case net::Op::ReportSecondaryWeapon: // (0xE0: u16 its net code, 0 none) the client's secondary weapon
+            onReportSecondaryWeapon(peer, m);
             break;
         case net::Op::InfoBookData: // (0xE2: u16 a book's net code, u8 its kind) what a book holds
-            // (SrvNet_OnPacket 0xE2) The book among its things (Obj_FindInventoryItemByNetCode), the
-            // shop's (Trade_FindShopItemByNetCode) or anywhere (Obj_GetByNetCode): our extents find
-            // them all. The answer {0xE2, its code, the entry}: kind 2 a field guide's creature's
-            // index in the guide (Game_GetCreatureGuideIndex, 0 unknown), else a spell's or an
-            // ability's number (its UseData's first byte), important (Net_QueueImportant).
-            if (m.size() >= 4) {
-                const std::uint32_t code = static_cast<std::uint32_t>(m[1] | (m[2] << 8));
-                const ServerObject* book = server_.world().byPacketCode(NetCode{code});
-                if (!book && !(code & 0x8000u)) { // (a shop's stock: in its trade's keeping, out of the world)
-                    const auto kept = server_.world().tradeObjects.find(code);
-                    book = kept != server_.world().tradeObjects.end() ? &kept->second : nullptr;
-                }
-                if (book && !book->gone()) {
-                    std::uint8_t entry = static_cast<std::uint8_t>(book->bookEntry);
-                    if (m[3] == 2) {
-                        entry = 0;
-                        for (std::size_t i = 0; i < things::kGuideNames.size(); ++i) {
-                            if (book->guideCreature == things::kGuideNames[i]) {
-                                entry = static_cast<std::uint8_t>(i + 1);
-                                break;
-                            }
-                        }
-                    }
-                    const std::uint16_t nc = netCodeOf(*book);
-                    sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::InfoBookData), static_cast<std::uint8_t>(nc),
-                                                                  static_cast<std::uint8_t>(nc >> 8), entry},
-                                  true); // (Net_QueueImportant's onlyJoined 1)
-                }
-            }
+            onInfoBookData(peer, m);
             break;
         case net::Op::Social: // (0xE3: u8 1 laugh, 2 taunt, 4 point) an emote, whenever it's in
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
-                social(server_.world(), *unit, m[1], server_.clock().frame());
-            }
+            onSocial(peer, m);
             break;
         case net::Op::Gauntlet: // (SrvNet_OnPacket 0xF0: sub 3, game over's respawn while dead; 0x1B, its save in)
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() > 1 && m[1] == 3 &&
-                (unit->flags & ObjFlag::Dead)) {
-                unit->player->questGameOverAt = 0;
-                Fight f = server_.fight();
-                f.respawn(*unit);
-            } else if (const ServerObject* readyUnit = server_.world().byExtent(players_[peer].extent); readyUnit && m.size() > 1 && m[1] == 0x1B) {
-                // SrvNet_OnGauntletQuestReady: its client has its save. One to go once it
-                // had it, out (reason 4); else no save pending, MSG_GAUNTLET 0x1C {0}.
-                const std::uint32_t bit = 1u << (players_[peer].slot & 31u);
-                if (kickAfterSave_ & bit) {
-                    disconnect(peer, 4);
-                    return;
-                }
-                savePending_ &= ~bit;
-                // (SrvNet_SendGauntletSaveState: Net_QueueImportantSeq, onlyJoined 0: held for one
-                // still loading, after its held 0x1C {1}.)
-                sendImportant(peer, std::vector<std::uint8_t>{0xF0, 0x1C, 0});
-            }
+            onGauntlet(peer, m);
             break;
         case net::Op::RequestSavePlayer: // (0xC1) its saved player sent it (SrvNet_OnPacket)
-            // In a quest, one not in the game, with no unit, or whose own save isn't loaded yet is
-            // let go (reason 2) instead (not the host's own: SrvNet_OnPacket's 0xC1).
-            if (server_.world().quest() && !isHostPlayer(players_[peer])) {
-                const ServerObject* unit = server_.world().byExtent(players_[peer].extent);
-                if (!players_[peer].ready || !unit || !unit->player || unit->player->questAwaitingSave) {
-                    disconnect(peer, 2);
-                    return;
-                }
-            }
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
-                Fight f = server_.fight();
-                if (!server_.world().questSaves || refused(peer)) { // (noxcpp: a stock player held out never played)
-                    // (noxcpp's: a mode whose characters are the players' own, never the quest's
-                    // (World::questSaves off), in its runs and its lobby alike (a chat map: the
-                    // in-game Save is enabled there): a save the client refuses
-                    // (under its 700 bytes: writes nothing) so its .plr
-                    // stays as it was, and it leaves as after a save.
-                    // The unit here is the mode's: stripped, its run's. Stock: the unit's own.)
-                    sendSaveData(peer, players_[peer], std::vector<std::uint8_t>(kRefusedSaveBytes, 0));
-                } else if (auto file = savedPlayer(f, *unit, peer)) {
-                    sendSaveData(peer, players_[peer], std::move(*file));
-                }
-            }
+            onRequestSavePlayer(peer);
             break;
         case net::Op::XferMsg: // (0xC2: the file transfers, xfer.hpp)
             if (auto file = xfers_.receive(peer, m, server_.clock().frame())) {
@@ -1761,77 +1571,22 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             }
             break;
         case net::Op::Mouse: // its cursor in the world (0xAC: u16 x, u16 y)
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
-                unit->player->cursorX = static_cast<float>(m[1] | m[2] << 8);
-                unit->player->cursorY = static_cast<float>(m[3] | m[4] << 8);
-            }
+            onMouse(peer, m);
             break;
-        case net::Op::NewAlias: {
-            // The client's name for an object in our streams (SrvNet_OnPacket 0xA5).
-            const std::uint32_t expire = util::u32At(m, 6);
-            players_[peer].aliases.set(m[1], {util::u16At(m, 2), util::u16At(m, 4), expire});
+        case net::Op::NewAlias:
+            onNewAlias(peer, m);
             break;
-        }
-        case net::Op::TeamMsg: { // (SrvNet_OnPacket 0xC4: sub 10 join a team, sub 11 switch)
-            // {u32 team, u16 net code}. (noxcpp: only the sender's own player, the one the stock
-            // client names: its scoreboard's team flags and a team's news both send its own code,
-            // the host's too. The exe takes whoever the code names: OB-037, fixed.)
-            World& world = server_.world();
-            const std::uint32_t teamId = m[2] | m[3] << 8 | m[4] << 16 | static_cast<std::uint32_t>(m[5]) << 24;
-            ServerObject* o = world.byNetCode(NetCode{static_cast<std::uint32_t>(m[6] | m[7] << 8)}); // (Obj_GetByNetCode)
-            if (o && o->extent != players_[peer].extent) {
-                o = nullptr;
-            }
-            ServerTeam* team = teamId < 256 ? teamById(world, static_cast<std::uint8_t>(teamId)) : nullptr;
-            Fight f = server_.fight();
-            if (m[1] == 10) {
-                if (team && o) {
-                    addTeamMember(world, team->id, *o, true, true, f.rng, f.frame);
-                }
-            } else if (m[1] == 11 && o) {
-                if (!(world.gameFlags & GameFlag::Chat)) {
-                    const auto [x, y] = findPlayerStart(world, o, f.rng);
-                    setPosition(world, *o, x, y, f.frame);
-                }
-                if (team) {
-                    moveTeamMember(world, *o, *team, true, f.rng, f.frame);
-                }
-            }
+        case net::Op::TeamMsg: // (SrvNet_OnPacket 0xC4: sub 10 join a team, sub 11 switch)
+            onTeamMsg(peer, m);
             break;
-        }
         case net::Op::Dialog: // (SrvNet_OnPacket 0xD0: sub 1 {u16 the NPC's code}, sub 2 {u8 the answer})
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
-                World& world = server_.world();
-                Fight f = server_.fight();
-                if (m[1] == 1) {
-                    // Not while a save's asked for (Game_IsSavePending) nor observing (status
-                    // & 3); the NPC by its code (Obj_GetByNetCode alone, no packetDynamicUnitCode: none
-                    // destroyed, and a code with bit 15, a map object's, names nothing). Ours then checks
-                    // it's the thing's own code (a static thing's is its map number with bit 15).
-                    const NetCode code{static_cast<std::uint32_t>(m[2] | m[3] << 8)};
-                    ServerObject* npc = world.byNetCode(code);
-                    if (npc && (npc->gone() || netCodeOf(*npc) != code.code())) {
-                        npc = nullptr;
-                    }
-                    if (!world.saveRequest.pending && !(unit->player->statusFlags & 3u) && npc &&
-                        (!world.modeHooks || world.modeHooks->mayStartDialog(f, *unit, *npc))) { // (noxcpp: a mode may refuse it)
-                        dialogStart(f, *unit, *npc); // (SrvNet_OnDialogStart: dialog.hpp)
-                    }
-                } else if (m[1] == 2) {
-                    dialogAnswer(f, *unit, m[2]); // (SrvNet_OnDialogAnswer)
-                }
-                // (Any other sub: the exe's loop reads the same message again for ever, a hang:
-                // an original bug. Ours has no size for it and stops reading the packet.)
-            }
+            onDialog(peer, m);
             break;
         case net::Op::Vote:
             onVote(peer, m);
             break;
         case net::Op::Trade: // (0xC9: shops and trading, trade.hpp)
-            if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
-                Fight f = server_.fight();
-                onTradeMessage(f, *unit, m);
-            }
+            onTrade(peer, m);
             break;
         case net::Op::RequestTimerStatus: // (0xD4) MSG_TIMER_STATUS back
             // (SrvNet_SendTimerStatus: Net_QueueImportantSeq, onlyJoined 1: held for one not ready,
@@ -1842,23 +1597,14 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             onTextMessage(peer, m);
             break;
         case net::Op::NoxcppMapVote: // (noxcpp's, from a noxsdl player: its vote, or a vote called)
-            if (const auto v = mapvote::parse(m)) {
-                if (v->first == mapvote::kVote && !v->second.empty()) {
-                    castVote(peer, v->second[0]);
-                } else if (v->first == mapvote::kCall) {
-                    callVote(peer); // (the rules of a stock client's "?MapVote")
-                }
-            }
+            onNoxcppMapVote(peer, m);
             break;
         case net::Op::NoxcppModeF4: // (a NoX Core mode's, from a noxsdl player: a pick made in its window)
         case net::Op::NoxcppModeF5:  // (another NoX Core mode's, from a noxsdl player: a pick likewise)
         case net::Op::NoxcppEdit:  // (noxcpp's map editor session, from a noxsdl client: mapedit/session_proto.hpp)
         case net::Op::NoxcppCoop:  // (a NoX Core mode's, from a noxsdl player)
         case net::Op::NoxcppModeUi: // (a script mode's UI, from a noxsdl player that asked for it)
-            // (each mode's own, by its opcode: Options::noxcppMessages)
-            if (const auto h = options_.noxcppMessages.find(m[0]); h != options_.noxcppMessages.end() && h->second && transport_.identified(peer)) {
-                h->second(*this, peer, m);
-            }
+            onNoxcppModeMessage(peer, m);
             break;
         case net::Op::ServerCmd: // (0xBB) {cmd, u16 its code, u8 chars, UTF-16 text}
             if (m.size() >= 5) {
@@ -1871,7 +1617,372 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
         default:
             break;
         }
+        if (const auto it = players_.find(peer); it == players_.end() || it->second.joinSerial != joinSerial) {
+            return; // (it was let go: the rest of the packet unread)
+        }
         off += size;
+    }
+}
+
+// onPayload's handlers, in its switch's order: each takes one game message, `m`, of the size
+// net::messageSize gave it (onRequestSavePlayer the peer alone).
+
+void GameHost::onImportant(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // Answered with MSG_IMPORTANT_ACK {0xAB, the same u32} in the player's frame's datagram
+    // (unreliable), for a player with a unit, as GAME.EXE's server does: the client's
+    // important queue lets go of what it sent in that frame. Unanswered, it sent each of them
+    // again every 2 s for good (an emote played again, a team switch, a save asked, a console
+    // command run again). The messages after it are read as any: one sent again after a lost
+    // ack is taken again, as the exe's server takes it. (A NoX Core client sends its own on
+    // the reliable stream, never this.)
+    if (server_.world().byExtent(players_[peer].extent)) {
+        const std::array<std::uint8_t, 5> ack{static_cast<std::uint8_t>(net::Op::ImportantAck), m[1], m[2], m[3], m[4]};
+        transport_.sendUnreliable(peer, ack);
+    }
+}
+
+void GameHost::onPlayerInput(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && players_[peer].ready) {
+        try {
+            net::decodeControls(m.subspan(2, std::min<std::size_t>(m[1], m.size() - 2)), controlEntries_);
+            addControls(*unit, controlEntries_);
+        } catch (const std::exception&) {
+            // (a malformed batch is dropped)
+        }
+    }
+}
+
+void GameHost::onTryGet(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    ServerObject* unit = server_.world().byExtent(players_[peer].extent);
+    ServerObject* item = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)}); // (packetDynamicUnitCode)
+    // Not while a save's asked for (Game_IsSavePending), observing (status & 3),
+    // trading (PlayerControl::trade), talking to an NPC (DialogWith, dialog.hpp) or frozen.
+    // (noxcpp: nor out of reach, kServerReach. The exe checks none, so a modified client
+    // could pick up items anywhere: OB-007, fixed.)
+    if (unit && unit->player && item && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) &&
+        !trading(*unit) && unit->player->dialogWith == 0 && !(unit->flags & ObjFlag::NoUpdate) && withinReach(*unit, *item)) {
+        int carried = 0;
+        for (const std::uint32_t e : unit->inventory) {
+            if (const ServerObject* o = server_.world().byExtent(e)) {
+                carried += o->weight;
+            }
+        }
+        if (unit->carryCapacity < item->weight + carried) {
+            // (SrvNet_SendInformString: Net_QueueMsg, the frame's datagram; none while its
+            // .plr is applied.)
+            if (!unit->player->transfer) {
+                transport_.sendUnreliable(peer, informStringBytes("pickup.c:CarryingTooMuch"));
+            }
+        } else {
+            server_.pickUp(*unit, *item);
+        }
+    }
+}
+
+void GameHost::onTryCollide(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // Its COLLIDE with the player's unit. Not an observer's (status & 3), one trading
+    // (PlayerControl::trade) nor one talking to an NPC (DialogWith, dialog.hpp). (noxcpp:
+    // nor out of reach, kServerReach. The exe checks none, so a modified client could
+    // work levers anywhere: OB-009, fixed.)
+    ServerObject* unit = server_.world().byExtent(players_[peer].extent);
+    // (packetDynamicUnitCode: a map object's code is its map number with bit 15.)
+    ServerObject* o = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)});
+    if (unit && unit->player && players_[peer].ready && !(unit->player->statusFlags & 3u) && !trading(*unit) && unit->player->dialogWith == 0 && o &&
+        !o->gone() && o->collides && withinReach(*unit, *o)) {
+        Fight f = server_.fight();
+        collideFunction(f, *o, unit);
+    }
+}
+
+void GameHost::onTryHeldItem(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    ServerObject* unit = server_.world().byExtent(players_[peer].extent);
+    // (Its code taken as our key, no bit-15 test: only a thing the player holds will do, and
+    // no held thing has a map object's code.)
+    ServerObject* item = server_.world().byExtent(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)}.asExtent());
+    if (!unit || !unit->player || !item || !players_[peer].ready || item->holder != unit->extent) {
+        return;
+    }
+    auto items = server_.items();
+    const bool observing = (unit->player->statusFlags & 3u) != 0; // (status & 3)
+    if (m[0] == static_cast<std::uint8_t>(net::Op::TryDrop)) {
+        // Not observing, trading, talking nor frozen.
+        if (!observing && !trading(*unit) && unit->player->dialogWith == 0 && !(unit->flags & ObjFlag::NoUpdate)) {
+            items.tryDrop(*unit, *item, static_cast<float>(m[3] | m[4] << 8), static_cast<float>(m[5] | m[6] << 8));
+        }
+    } else if (m[0] == static_cast<std::uint8_t>(net::Op::TryEquip)) {
+        // Not while a save's asked for (Game_IsSavePending) nor observing.
+        if (!server_.world().saveRequest.pending && !observing) {
+            items.tryEquip(*unit, *item);
+        }
+    } else if (!observing) { // (0x76: not observing)
+        items.tryDequip(*unit, *item);
+    }
+}
+
+void GameHost::onTryUse(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // Not while a save's asked for (Game_IsSavePending) nor an observer (status 1
+    // or 2); the item in its inventory.
+    ServerObject* unit = server_.world().byExtent(players_[peer].extent);
+    ServerObject* item = server_.world().byPacketCode(NetCode{static_cast<std::uint32_t>(m[1] | m[2] << 8)});
+    if (unit && unit->player && players_[peer].ready && !server_.world().saveRequest.pending && !(unit->player->statusFlags & 3u) && item &&
+        item->holder == unit->extent) {
+        server_.items().use(*unit, *item);
+    }
+}
+
+void GameHost::onTryCreatureCommand(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // Not while observing. (noxcpp: one creature only of the sender's own, as the stock
+    // client's creature window lists them. The exe takes any by its code, its owner
+    // unchecked but for a banishing: OB-042, fixed.)
+    ServerObject* unit = server_.world().byExtent(players_[peer].extent);
+    if (unit && unit->player && players_[peer].ready && !(unit->player->statusFlags & 1u) && m.size() >= 4) {
+        const std::uint32_t code = static_cast<std::uint32_t>(m[1] | m[2] << 8);
+        ServerObject* creature = nullptr;
+        if (code != 0) {
+            creature = server_.world().byPacketCode(NetCode{code});
+            if (!creature || (creature->owner != unit->extent && !controls(server_.world(), *unit, *creature))) {
+                return;
+            }
+        }
+        auto f = server_.fight();
+        orderCreatures(f, *unit, creature, m[3]);
+    }
+}
+
+void GameHost::onTrySpell(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && players_[peer].ready) {
+        std::array<std::uint32_t, 5> spells{};
+        for (std::size_t i = 0; i < spells.size(); ++i) {
+            const std::size_t at = 1 + i * 4;
+            spells[i] = util::u32At(m, at);
+        }
+        server_.spells().request(*unit, spells, m[21] != 0);
+    }
+}
+
+void GameHost::onTryAbility(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && players_[peer].ready) {
+        server_.tryAbility(*unit, m[1]);
+    }
+}
+
+void GameHost::onReportSecondaryWeapon(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // The client's secondary weapon (Plr_SetSecondaryWeapon): one its class may not use
+    // (playerClassCanUseItem) or it isn't strong enough for
+    // (playerCheckStrength: the weapon's or armour's record's strength) is
+    // refused: SrvNet_SendReportSecondaryWeapon(.., null, 1), its client's "Weapon2CantUse".
+    // (Kept in the exe's player record: what reads it, the saves, takes the host's window.)
+    // noxcpp keeps the code, none when refused, for mods to read (nox.secondaryWeapon).
+    // (noxcpp: a solo game's guest's sent before it took a .plr read's tell is out of date,
+    // HostedPlayer::secondaryTell: not counted.)
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() >= 3) {
+        if (secondaryOutOfDate(players_[peer], *unit)) {
+            return;
+        }
+        const std::uint16_t code = static_cast<std::uint16_t>(m[1] | (m[2] << 8));
+        unit->player->secondaryWeapon = code;
+        if (const ServerObject* item = code != 0 ? server_.world().byPacketCode(NetCode{code}) : nullptr) {
+            if (!server_.items().classMay(*unit, *item) || !server_.items().strongEnough(*unit, *item)) {
+                unit->player->secondaryWeapon = 0;
+                sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::ReportSecondaryWeapon), 0, 0, 1});
+            }
+        }
+    }
+}
+
+void GameHost::onInfoBookData(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // (SrvNet_OnPacket 0xE2) The book among its things (Obj_FindInventoryItemByNetCode), the
+    // shop's (Trade_FindShopItemByNetCode) or anywhere (Obj_GetByNetCode): our extents find
+    // them all. The answer {0xE2, its code, the entry}: kind 2 a field guide's creature's
+    // index in the guide (Game_GetCreatureGuideIndex, 0 unknown), else a spell's or an
+    // ability's number (its UseData's first byte), important (Net_QueueImportant).
+    if (m.size() >= 4) {
+        const std::uint32_t code = static_cast<std::uint32_t>(m[1] | (m[2] << 8));
+        const ServerObject* book = server_.world().byPacketCode(NetCode{code});
+        if (!book && !(code & 0x8000u)) { // (a shop's stock: in its trade's keeping, out of the world)
+            const auto kept = server_.world().tradeObjects.find(code);
+            book = kept != server_.world().tradeObjects.end() ? &kept->second : nullptr;
+        }
+        if (book && !book->gone()) {
+            std::uint8_t entry = static_cast<std::uint8_t>(book->bookEntry);
+            if (m[3] == 2) {
+                entry = 0;
+                for (std::size_t i = 0; i < things::kGuideNames.size(); ++i) {
+                    if (book->guideCreature == things::kGuideNames[i]) {
+                        entry = static_cast<std::uint8_t>(i + 1);
+                        break;
+                    }
+                }
+            }
+            const std::uint16_t nc = netCodeOf(*book);
+            sendImportant(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::InfoBookData), static_cast<std::uint8_t>(nc),
+                                                          static_cast<std::uint8_t>(nc >> 8), entry},
+                          true); // (Net_QueueImportant's onlyJoined 1)
+        }
+    }
+}
+
+void GameHost::onSocial(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
+        social(server_.world(), *unit, m[1], server_.clock().frame());
+    }
+}
+
+void GameHost::onGauntlet(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player && m.size() > 1 && m[1] == 3 &&
+        (unit->flags & ObjFlag::Dead)) {
+        unit->player->questGameOverAt = 0;
+        Fight f = server_.fight();
+        f.respawn(*unit);
+    } else if (const ServerObject* readyUnit = server_.world().byExtent(players_[peer].extent); readyUnit && m.size() > 1 && m[1] == 0x1B) {
+        // SrvNet_OnGauntletQuestReady: its client has its save. One to go once it
+        // had it, out (reason 4); else no save pending, MSG_GAUNTLET 0x1C {0}.
+        const std::uint32_t bit = 1u << (players_[peer].slot & 31u);
+        if (kickAfterSave_ & bit) {
+            disconnect(peer, 4);
+            return;
+        }
+        savePending_ &= ~bit;
+        // (SrvNet_SendGauntletSaveState: Net_QueueImportantSeq, onlyJoined 0: held for one
+        // still loading, after its held 0x1C {1}.)
+        sendImportant(peer, std::vector<std::uint8_t>{0xF0, 0x1C, 0});
+    }
+}
+
+void GameHost::onRequestSavePlayer(std::uint8_t peer)
+{
+    // In a quest, one not in the game, with no unit, or whose own save isn't loaded yet is
+    // let go (reason 2) instead (not the host's own: SrvNet_OnPacket's 0xC1).
+    if (server_.world().quest() && !isHostPlayer(players_[peer])) {
+        const ServerObject* unit = server_.world().byExtent(players_[peer].extent);
+        if (!players_[peer].ready || !unit || !unit->player || unit->player->questAwaitingSave) {
+            disconnect(peer, 2);
+            return;
+        }
+    }
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
+        Fight f = server_.fight();
+        if (!server_.world().questSaves || refused(peer)) { // (noxcpp: a stock player held out never played)
+            // (noxcpp's: a mode whose characters are the players' own, never the quest's
+            // (World::questSaves off), in its runs and its lobby alike (a chat map: the
+            // in-game Save is enabled there): a save the client refuses
+            // (under its 700 bytes: writes nothing) so its .plr
+            // stays as it was, and it leaves as after a save.
+            // The unit here is the mode's: stripped, its run's. Stock: the unit's own.)
+            sendSaveData(peer, players_[peer], std::vector<std::uint8_t>(kRefusedSaveBytes, 0));
+        } else if (auto file = savedPlayer(f, *unit, peer)) {
+            sendSaveData(peer, players_[peer], std::move(*file));
+        }
+    }
+}
+
+void GameHost::onMouse(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
+        unit->player->cursorX = static_cast<float>(m[1] | m[2] << 8);
+        unit->player->cursorY = static_cast<float>(m[3] | m[4] << 8);
+    }
+}
+
+void GameHost::onNewAlias(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // The client's name for an object in our streams (SrvNet_OnPacket 0xA5).
+    const std::uint32_t expire = util::u32At(m, 6);
+    players_[peer].aliases.set(m[1], {util::u16At(m, 2), util::u16At(m, 4), expire});
+}
+
+void GameHost::onTeamMsg(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // {u32 team, u16 net code}. (noxcpp: only the sender's own player, the one the stock
+    // client names: its scoreboard's team flags and a team's news both send its own code,
+    // the host's too. The exe takes whoever the code names: OB-037, fixed.)
+    World& world = server_.world();
+    const std::uint32_t teamId = m[2] | m[3] << 8 | m[4] << 16 | static_cast<std::uint32_t>(m[5]) << 24;
+    ServerObject* o = world.byNetCode(NetCode{static_cast<std::uint32_t>(m[6] | m[7] << 8)}); // (Obj_GetByNetCode)
+    if (o && o->extent != players_[peer].extent) {
+        o = nullptr;
+    }
+    ServerTeam* team = teamId < 256 ? teamById(world, static_cast<std::uint8_t>(teamId)) : nullptr;
+    Fight f = server_.fight();
+    if (m[1] == 10) {
+        if (team && o) {
+            addTeamMember(world, team->id, *o, true, true, f.rng, f.frame);
+        }
+    } else if (m[1] == 11 && o) {
+        if (!(world.gameFlags & GameFlag::Chat)) {
+            const auto [x, y] = findPlayerStart(world, o, f.rng);
+            setPosition(world, *o, x, y, f.frame);
+        }
+        if (team) {
+            moveTeamMember(world, *o, *team, true, f.rng, f.frame);
+        }
+    }
+}
+
+void GameHost::onDialog(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
+        World& world = server_.world();
+        Fight f = server_.fight();
+        if (m[1] == 1) {
+            // Not while a save's asked for (Game_IsSavePending) nor observing (status
+            // & 3); the NPC by its code (Obj_GetByNetCode alone, no packetDynamicUnitCode: none
+            // destroyed, and a code with bit 15, a map object's, names nothing). Ours then checks
+            // it's the thing's own code (a static thing's is its map number with bit 15).
+            const NetCode code{static_cast<std::uint32_t>(m[2] | m[3] << 8)};
+            ServerObject* npc = world.byNetCode(code);
+            if (npc && (npc->gone() || netCodeOf(*npc) != code.code())) {
+                npc = nullptr;
+            }
+            if (!world.saveRequest.pending && !(unit->player->statusFlags & 3u) && npc &&
+                (!world.modeHooks || world.modeHooks->mayStartDialog(f, *unit, *npc))) { // (noxcpp: a mode may refuse it)
+                dialogStart(f, *unit, *npc); // (SrvNet_OnDialogStart: dialog.hpp)
+            }
+        } else if (m[1] == 2) {
+            dialogAnswer(f, *unit, m[2]); // (SrvNet_OnDialogAnswer)
+        }
+        // (Any other sub: the exe's loop reads the same message again for ever, a hang:
+        // an original bug. Ours has no size for it and stops reading the packet.)
+    }
+}
+
+void GameHost::onTrade(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (ServerObject* unit = server_.world().byExtent(players_[peer].extent); unit && unit->player) {
+        Fight f = server_.fight();
+        onTradeMessage(f, *unit, m);
+    }
+}
+
+void GameHost::onNoxcppMapVote(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    if (const auto v = mapvote::parse(m)) {
+        if (v->first == mapvote::kVote && !v->second.empty()) {
+            castVote(peer, v->second[0]);
+        } else if (v->first == mapvote::kCall) {
+            callVote(peer); // (the rules of a stock client's "?MapVote")
+        }
+    }
+}
+
+void GameHost::onNoxcppModeMessage(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // (each mode's own, by its opcode: Options::noxcppMessages)
+    if (const auto h = options_.noxcppMessages.find(m[0]); h != options_.noxcppMessages.end() && h->second && transport_.identified(peer)) {
+        h->second(*this, peer, m);
     }
 }
 
