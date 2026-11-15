@@ -155,6 +155,20 @@ What follows from it:
 - **Risk:** low; the server decoder accepts 0xBE at any time (it only advances past it).
 - **Revert:** remove the keep-alive block in `gameFrame`.
 
+### VD-75: A client's packet is read no further once a message in it has let that client go
+
+- **Vanilla:** the server reads the rest of a client's packet after one of its messages disconnects
+  that client (a refused character file, a kick), against the player and unit it looked up when
+  the packet began. Only a refused save request (0xC1) and its gauntlet messages stop there.
+- **Ours:** once the sender is no longer in the game, the rest of its packet is dropped, after any
+  message (noxcore/src/server/game_host.cpp, GameHost::onPayload). Reading on had made a blank
+  player in its place, which wiped the first slot's known objects and saves waiting, and told
+  everyone a player with net code 0 quit.
+- **Why:** by the owner's decision, 2026-11-14: a player who has been let go has no say in the game.
+- **Risk:** low: only the messages a player sent in the same packet after the one that let it go
+  are dropped (a mouse move, an input frame).
+- **Revert:** none safe: reading on needs the player kept until the packet ends.
+
 ### VD-74: Every game tells a player's health and mana changes at once, Westwood Online games too
 
 - **Vanilla:** in a Westwood Online game, the server tells a player a change of their health (or
