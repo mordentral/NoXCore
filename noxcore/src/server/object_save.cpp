@@ -199,7 +199,7 @@ const TypeFacts* Saver::facts(std::uint16_t type)
         f.flags |= things::thingFlags(t);
         f.flags |= 0x1000000u;
         f.clientFlags = f.flags;
-        const auto collide = t.attribute("COLLIDE");
+        const auto collide = t.lastAttribute("COLLIDE");
         if (!collide || collide->starts_with("NoCollide")) {
             f.flags |= 0x40u;
         }

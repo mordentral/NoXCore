@@ -2695,3 +2695,20 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   items.
 - **Ours:** the same (`Items::classMay` in `noxcore/src/server/items.cpp`, noxsdl's cursor). A
   multiclass player (a mode's) may, and a mode's pickupAnyClass carries them.
+
+### OB-431: A PhantomPlayer made by a map or a script faults at its first update
+- **Where:** thing.bin's PhantomPlayer has UPDATE PhantomPlayerUpdate, whose table entry gives it
+  no update data; the function reads the player it follows through that data at once. Nothing in
+  the game makes a PhantomPlayer (no code names the type), so only a map's object or a script's
+  `CreateObject` would.
+- **Effect:** such an object reads through a missing pointer on its first update: the host
+  crashes. Not tried (the original isn't run for this); found reading the function and its table.
+- **Ours:** fixed (a crash): the type's update does nothing, so one made by a map or a script
+  stands where it was put (`kUpdates` in `noxcore/src/server/world.cpp` keeps it on the update
+  list, as the game would).
+
+### OB-432: Hecubah's quest skill in gamedata.bin does nothing
+- **Where:** the quest's Hecubah (spawnHecubahQuest) reads gamedata's HecubahQuestSkill and drops
+  the number unstored (it sets her other numbers to fixed values).
+- **Effect:** changing HecubahQuestSkill (0.5 in the shipped file) changes nothing.
+- **Ours:** the same: the number isn't read (`spawnBoss` in `noxcore/src/server/quest.cpp`).

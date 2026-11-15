@@ -178,7 +178,7 @@ std::uint32_t typeFlags(const things::ThingDef& t)
     // FLAGS (things::thingFlags), then the type reader's own (read_things_alternative): every
     // type ENABLED, one without a COLLIDE function ("NoCollide" is none) NO_COLLIDE.
     std::uint32_t flags = things::thingFlags(t) | 0x1000000u;
-    const auto collide = t.attribute("COLLIDE");
+    const auto collide = t.lastAttribute("COLLIDE"); // (the last COLLIDE line stands, as each sets it)
     if (!collide || collide->starts_with("NoCollide")) {
         flags |= 0x40u;
     }
@@ -228,7 +228,7 @@ NOX_NOINLINE const things::ThingDef* describeTypeFresh(ServerObject& o, const th
         o.speedBase = o.speedCur = number(t->lastAttribute("SPEED"), 0) / 32; // (SPEED)
         o.speedBonus = 0;
         // (The names "NoCollide" and "NoUpdate" are no function at all.)
-        o.collides = t->attribute("COLLIDE").has_value() && !t->attribute("COLLIDE")->starts_with("NoCollide");
+        o.collides = t->lastAttribute("COLLIDE").has_value() && !t->lastAttribute("COLLIDE")->starts_with("NoCollide");
         // An UPDATE is a function only for the names in the exe's update table with one:
         // any other name (BoulderUpdate, SignUpdate, ImpEggUpdate, DefaultUpdate,
         // AnimateUpdate...), NoUpdate and WeaponArmorUpdate leave the thing without (so off the
@@ -318,7 +318,9 @@ NOX_NOINLINE const things::ThingDef* describeTypeFresh(ServerObject& o, const th
                 o.shape = ShapeKind::Center;
             }
         }
-        if (const auto c = t->attribute("COLLIDE")) {
+        // The last COLLIDE line: the reader sets the function and its data for each in turn, so
+        // PeriodicSpike's second line ("DamageCollide 2 DAMAGE_IMPALE") is the one it keeps.
+        if (const auto c = t->lastAttribute("COLLIDE")) {
             const std::string s(*c);
             const auto space = s.find(' ');
             o.collideFn = s.substr(0, space);
