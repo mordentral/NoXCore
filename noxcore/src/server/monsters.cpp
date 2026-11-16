@@ -3566,6 +3566,32 @@ void Monsters::deathFunction(ServerObject& o, const std::string& name)
     const auto rnd = [&](float a, float b) { return util::randomFloat(fight.rng, a, b).f(); }; // (randomFloat, each stored as it comes)
     const auto irnd = [&](int a, int b) { return nox::util::uniform_int_distribution<int>(a, b)(fight.rng); };
     const bool solo = (world.gameFlags & GameFlag::Solo) != 0;
+    // Generated death loot: the roll belongs to the callback in every mode; only a solo
+    // game creates the item. Its placement draw follows the roll (and any death effects).
+    const auto dropLoot = [&](const char* type, const char* power = nullptr, const char* material = nullptr,
+                              std::uint8_t charges = 0) {
+        if (!solo || !things.findThing(type)) {
+            return;
+        }
+        const auto [px, py] = clearPointNear(world, fight.rng, o.x, o.y, 50.0f);
+        if (ServerObject* item = world.createAt(things, type, px, py, fight.frame)) {
+            if ((power || material) && fight.modifiers && (item->classes & 0x13001000u)) {
+                const auto id = [&](const char* n) -> std::uint8_t {
+                    const things::ModifierDef* d = n ? fight.modifiers->findModifier(n) : nullptr;
+                    return d ? static_cast<std::uint8_t>(d->id) : 0xFF;
+                };
+                item->modifiers = {id(power), id(material), 0xFF, 0xFF};
+            }
+            if (charges && (item->classes & oc::Weapon) && (item->subclasses & 0x82u)) {
+                item->charges = charges;
+            }
+            if (item->classes & oc::Armor) {
+                armorDropSound(world, *item);
+            } else if (item->classes & 0x1001000u) {
+                weaponDropSound(world, *item);
+            }
+        }
+    };
     // A piece thrown up from it (bounding: FALLING with a bounce), gone in a while. Its draws in
     // the game's order: the spot (clearPointNear's angle), the height (`height`, a draw or not),
     // the fall, the push (when `pushHi` isn't 0: randomFloat(pushLo, pushHi)), then its seconds
@@ -3591,7 +3617,27 @@ void Monsters::deathFunction(ServerObject& o, const std::string& name)
         p->touch();
         return p;
     };
-    if (name == "EmberDemonDead" || name == "DemonDead") {
+    if (name == "SwordsmanDie" || name == "ArcherDie") {
+        const int roll = irnd(0, 100);
+        if (roll > 20) {
+            const bool weapon = roll <= 50;
+            if (name == "SwordsmanDie") {
+                dropLoot(weapon ? "Sword" : "WoodenShield", weapon ? "WeaponPower1" : nullptr, "Material1");
+            } else {
+                dropLoot(weapon ? "Bow" : "Quiver");
+            }
+        }
+    } else if (name == "OgreDie" || name == "UrchinShamanDie" || name == "OgreWarlordDie") {
+        if (irnd(0, 100) > 25) {
+            if (name == "OgreDie") {
+                dropLoot("OgreAxe", "WeaponPower1", "Material2");
+            } else if (name == "UrchinShamanDie") {
+                dropLoot("StaffWooden", "WeaponPower1");
+            } else {
+                dropLoot("FanChakram", nullptr, nullptr, 5);
+            }
+        }
+    } else if (name == "EmberDemonDead" || name == "DemonDead") {
         // The body bursts: a push and fire about it, a blast (0x2A).
         const bool ember = name == "EmberDemonDead";
         const float reach = ember ? 96.0f : 150.0f;
@@ -3630,8 +3676,7 @@ void Monsters::deathFunction(ServerObject& o, const std::string& name)
             world.golemRock = (world.golemRock + 1) % 12;
         }
     } else if (name == "SkeletonDead" || name == "SkeletonLordDead") {
-        // Its bones; in the solo game, a sword (21
-        // in 100) or its shield (49 in 100) dropped.
+        // Its bones; in the solo game, rolls 21-50 drop a sword, 51-100 its shield.
         const int roll = irnd(0, 100);
         playSound(world, 0x164, o); // (the bones' first)
         pointFx(0x8A);
@@ -3646,26 +3691,10 @@ void Monsters::deathFunction(ServerObject& o, const std::string& name)
                 world.nextBone = (world.nextBone + 1) % 2;
             }
         }
-        if (roll >= 21 && solo) {
+        if (roll >= 21) {
             const bool sword = roll < 51;
             const char* type = sword ? "Sword" : (name == "SkeletonDead" ? "WoodenShield" : "SteelShield");
-            if (things.findThing(type)) {
-                const auto [px, py] = clearPointNear(world, fight.rng, o.x, o.y, 50.0f);
-                if (ServerObject* item = world.createAt(things, type, px, py, fight.frame)) {
-                    if (fight.modifiers && (item->classes & 0x13001000u)) {
-                        const auto id = [&](const char* n) -> std::uint8_t {
-                            const things::ModifierDef* d = n ? fight.modifiers->findModifier(n) : nullptr;
-                            return d ? static_cast<std::uint8_t>(d->id) : 0xFF;
-                        };
-                        item->modifiers = {id(sword ? "WeaponPower1" : nullptr), id("Material2"), 0xFF, 0xFF};
-                    }
-                    if (sword) {
-                        weaponDropSound(world, *item);
-                    } else {
-                        armorDropSound(world, *item);
-                    }
-                }
-            }
+            dropLoot(type, sword ? "WeaponPower1" : nullptr, "Material2");
         }
     } else if (name == "TrollDead") {
         // monsterDeadTroll: a small toxic cloud, its own, and 0x284.
