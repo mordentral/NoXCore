@@ -11,7 +11,9 @@
 // A line led by SOLO is a solo game's (game flags 0x800 / 0x200000), ARENA a network game's
 // (0x2000): the other's skipped to its end, its own prefix passed over. Values are ints, floats,
 // a '+' list of status flags (unknown names count for nothing: CAN_HEAR), a missile's name
-// (NULL: none), a damage type (DAMAGE_<name>), or a strike / die / dead function's name.
+// (NULL: none), a damage type (DAMAGE_<name>), or a strike / die / dead function's name. A "//"
+// runs to the line's end (readStr's comment). What the game's reader would stop at, ours reads on
+// past and notes (MonsterDb::problems).
 #pragma once
 
 #include "noxcore/util/text.hpp"
@@ -84,13 +86,27 @@ struct MonsterDef {
     std::string strikeFn;        ///< MELEE_STRIKE_FUNCTION
 };
 
+struct ThingDb;
+
 struct MonsterDb {
+    /// One record a name (without case): of two in the file the later, in the earlier's place.
     std::vector<MonsterDef> monsters;
-    /// The first monster of that name (without case), or nullptr. (By reindex's index when it's
+    /// What the reader passed over or read otherwise than the game's would, a line each (empty for
+    /// the shipped file). The game's reader stops the whole file at an unknown key, strike / die /
+    /// dead name or damage type (the rest unread), frees every record when one names no thing
+    /// type, and loses a word's letters before a "//" inside it; ours reads on and notes each:
+    /// an unknown key is passed over with its value, an unknown function name is none, an
+    /// unknown damage type leaves the type as it was, a "//" ends the word (keepThingTypes for
+    /// the types). For the hosts to log; at most 100 from the reading, then one line for the rest.
+    std::vector<std::string> problems;
+    /// The monster of that name (without case), or nullptr. (By reindex's index when it's
     /// of `monsters` as they stand, else by walking the list.)
     const MonsterDef* find(std::string_view name) const;
+    /// Drops each record whose name is no thing type of `things` (nothing could be made with it)
+    /// and empties a MISSILE_NAME no type has (no missile), a problem noted for each.
+    void keepThingTypes(const ThingDb& things);
 
-    /// The one rebuild of this table's index (each name's first entry, without case).
+    /// The one rebuild of this table's index (each name's entry, without case).
     /// parseMonsterDb calls it; ANYTHING that changes `monsters` after load must call it again:
     /// the size check only notices entries added or removed, an in-place change of the same size
     /// (a renamed monster) leaves it stale until this is called. A cache of what was loaded.

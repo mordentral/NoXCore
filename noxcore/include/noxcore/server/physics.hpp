@@ -103,7 +103,7 @@ void settleOrQueue(World& world, ServerObject& o);
 /// The new things' pass (unitsNewAddToList: a map's load, a join, the tick's end):
 /// each put into the world since (World::noteNew), newest first, on the map: a missile on the
 /// missiles' list, one with an UPDATE or a velocity (not a door) on the updatable list, linked in
-/// the map grid, and one with a COLLIDE in the motion.
+/// the map grid, one with a COLLIDE in the motion, then its type's INIT run (runInit).
 void queueNewObjects(World& world);
 
 /// A door's own update (DoorUpdate): clients told when it has turned; untouched for

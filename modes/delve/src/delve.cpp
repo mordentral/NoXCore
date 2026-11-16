@@ -1743,7 +1743,7 @@ void DelveDirector::beginLevel(GameHost& host, World& world, std::uint32_t frame
             continue;
         }
         const things::ThingDef* def = things_.findThing(o.typeName);
-        if (def && def->attribute("INIT").value_or("") == "ChestInit" && o.inventory.empty()) {
+        if (def && def->lastAttribute("INIT").value_or("") == "ChestInit" && o.inventory.empty()) {
             chests.push_back(extent);
         } else if (o.monster && !o.shopkeeper && !(o.flags & ObjFlag::Dead)) {
             maybe.push_back(extent);

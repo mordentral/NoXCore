@@ -2712,3 +2712,18 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   the number unstored (it sets her other numbers to fixed values).
 - **Effect:** changing HecubahQuestSkill (0.5 in the shipped file) changes nothing.
 - **Ours:** the same: the number isn't read (`spawnBoss` in `noxcore/src/server/quest.cpp`).
+
+### OB-433: Using a WebWand faults making its spark
+- **Where:** the WebWand's USE, FireWandUse (useFireWand), draws the spark's speed and two
+  jitters, then createSpark makes a "Spark", puts it in the world (createAt) and writes its count
+  and kind into its update data and its damage into its collide data. thing.bin's Spark has no
+  UPDATE and no COLLIDE line, so it has neither: both writes go through a missing pointer.
+- **Effect:** the host crashes at the first use of a WebWand (Obj_UseItem, as an item's use from
+  the inventory calls it), before the wand's sound. Only reachable with a
+  WebWand in hand or pack: no stock map places one and no class may wield it (OB-421); in a solo
+  or quest game one can be picked up and used from the inventory. Not tried (the original isn't run
+  for this); found reading the functions and the type.
+- **Ours:** fixed (a crash): the spark is made as the rest of createSpark makes it, its two writes
+  left out, and goes after the 20 frames its count held (vanilla_deviations.md, VD-77);
+  sound 9 at most once a second as useFireWand goes on to do (`fireWandUse` in
+  `noxcore/src/server/items.cpp`).

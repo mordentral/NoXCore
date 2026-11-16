@@ -171,6 +171,10 @@ void Server::loadMapKeeping(const map::MapFile& map, World* old, std::string_vie
         // (Each player was thawed, unitUnFreeze(unit, 1) with its creatures, on the
         // old map before its trade's cancel: mapChangeTrades above, the exe's order.)
     }
+    // The map's things' INITs its load's new things' pass owed (World::load has no random stream:
+    // a gold pile its record left at 0), in that pass's order, now the players who stayed are in
+    // the world as they are in the game's parse.
+    runOwedInits(world_);
     if (caster) {
         // The ImaginaryCaster at (2944, 2944) (createAt), its script id the one kept
         // for it above.

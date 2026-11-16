@@ -12,6 +12,7 @@
 #include "noxcore/server/modes.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/npc.hpp"
+#include "noxcore/server/physics.hpp"
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/script_host.hpp"
 #include "noxcore/server/sound.hpp"
@@ -43,6 +44,53 @@ using util::chopToFloat;
 bool hasModifiers(const ServerObject& item)
 {
     return std::ranges::any_of(item.modifiers, [](std::uint8_t m) { return m != 0xFF; });
+}
+
+/// How long the WebWand's spark lasts: createSpark's count for it (20 frames), which only its
+/// update would count down (vanilla_deviations.md: the shipped Spark has none).
+constexpr std::uint32_t kWandSparkFrames = 20;
+
+/// FireWandUse (useFireWand, the WebWand's): one spark (createSpark, the "Spark" type) half again
+/// the user's radius ahead along its facing, flying on along it at 12-25 a frame with up to 2
+/// either way across (three randomFloats: the speed, then x's and y's jitter); then sound 9 at the
+/// user, at most once a second by the wand's own timer (its Field34: more than 30 frames since).
+/// The game's maker writes the spark's update and collide data, which the shipped Spark type
+/// doesn't have (no UPDATE, no COLLIDE): the host faults there, before the sound (OB-433). Ours
+/// makes the spark as the rest of the maker does and gives it the 20 frames that data held.
+void fireWandUse(Items& items, ServerObject& user, ServerObject& wand)
+{
+    using util::X87;
+    World& world = items.world;
+    const auto [cx, cy] = directionVector(user.direction);
+    // (Each offset: the table's x the radius x 1.5 on the x87, stored.)
+    const float ox = (X87(cx) * user.radius * 1.5f).f();
+    const float oy = (X87(cy) * user.radius * 1.5f).f();
+    // (Its loop of one turn: 0 + 1 < 1 fails.) The speed stored; each jitter on the stack, added to
+    // the speed x the table's, stored.
+    const float speed = util::randomFloat(items.rng, 12.0f, 25.0f).f();
+    const X87 jx = util::randomFloat(items.rng, -2.0f, 2.0f);
+    const float vx = (X87(speed) * cx + jx).f();
+    const X87 jy = util::randomFloat(items.rng, -2.0f, 2.0f);
+    const float vy = (X87(speed) * cy + jy).f();
+    const float sx = (X87(ox) + user.x).f();
+    const float sy = (X87(oy) + user.y).f();
+    // createSpark (kind 1, 20 frames): made at the spot (createAt, no owner), its timer now, its
+    // classes 0x2000 and 0x80000 on, NO_COLLIDE off and BOUNCY on, raised to 28, no rise, the
+    // velocity its own.
+    if (ServerObject* spark = world.createAt(items.things, "Spark", sx, sy, items.frame)) {
+        spark->timer = items.frame;
+        spark->classes |= 0x80000u | 0x2000u;
+        spark->flags = (spark->flags & 0xFF7FFFBFu) | 0x800000u;
+        spark->raise(28.0f);
+        spark->zVel = 0;
+        spark->vx = vx;
+        spark->vy = vy;
+        spark->decayAt = items.frame + kWandSparkFrames;
+    }
+    if (30u < items.frame - wand.timer) {
+        playSound(world, 9, user);
+        wand.timer = items.frame;
+    }
 }
 
 } // namespace
@@ -145,6 +193,7 @@ ServerObject* Items::give(ServerObject& player, std::string_view type, std::arra
         return nullptr;
     }
     ServerObject& item = world.spawn(things, type, player.x, player.y);
+    runInit(world, item); // (its INIT straight away: it never joins the lists on the map)
     setModifiers(item, mods);
     if (prepare && !prepare(item)) { // (noxcpp: a mode's own set-up, before anyone hears of it)
         item.pendingDelete = true;
@@ -1146,6 +1195,8 @@ void Items::use(ServerObject& player, ServerObject& item)
         }
         enchantFor(Enchant::Confused, 300, 5);
         usedUp();
+    } else if (item.useFn == "FireWandUse") {
+        fireWandUse(*this, player, item);
     } else {
         useBook(*this, player, item); // (books, guides, signs: books.hpp)
     }

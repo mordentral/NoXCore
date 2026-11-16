@@ -585,7 +585,7 @@ bool wantsQuiver(const ServerObject& item) { return (item.classes & oc::Weapon) 
 bool isChest(const World& world, const ServerObject& o)
 {
     const things::ThingDef* t = world.thingDb ? world.thingDb->findThing(o.typeName) : nullptr;
-    return t && t->attribute("INIT").value_or("") == "ChestInit"; // (Init == initChest)
+    return t && t->lastAttribute("INIT").value_or("") == "ChestInit"; // (Init == initChest: the last INIT line)
 }
 
 /// The map's objects as the exe's list holds them at its load (World::loadOrder), those still

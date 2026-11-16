@@ -577,6 +577,9 @@ struct ServerObject {
     /// Made and not yet through the new things' pass (unitsNewAddToList, at a
     /// tick's end), which puts one with a COLLIDE in the motion.
     bool fresh = true;
+    /// Its type's INIT is GoldInit (the last INIT line: Gold, QuestGoldPile, QuestGoldChest), which
+    /// the new things' pass runs as it joins (runInit).
+    bool goldInit = false;
     // Health (HealthData; max 0: none), and what last hurt it, with what and when.
     std::uint16_t health = 0;
     std::uint16_t maxHealth = 0;
@@ -1647,9 +1650,12 @@ public:
     Line line(std::string_view label) const;
     /// What Str_GetString's pick among a line's variants draws (a stream of its own here).
     mutable std::minstd_rand stringRng{1};
-    /// The server's random stream (randInt's), for an object's INIT as it's made
-    /// (GoldInit's pile); null in a world with no server.
+    /// The server's random stream (randInt's), for an object's INIT as it joins the lists
+    /// (GoldInit's pile: runInit); null in a world with no server.
     std::minstd_rand* rng = nullptr;
+    /// The things whose INIT the new things' pass couldn't run for want of `rng` (World::load's
+    /// world), in that pass's order: the server runs them once it's set (runOwedInits).
+    std::vector<std::uint32_t> initsOwed;
     /// A line to one player (SrvNet_SendTextMessageToUnit: MSG_TEXT_MESSAGE 0xA8 from
     /// no one), the string table's text for `label`.
     void textTo(const ServerObject& player, std::string_view label, std::optional<std::u16string_view> arg = std::nullopt);
@@ -2646,6 +2652,15 @@ ServerObject objectFromRecord(World& world, const map::ObjectXfer& xfer, std::st
                               const things::ModifierDb* modifiers);
 /// A type's flags as the type reader leaves them (FLAGS, ENABLED, NO_COLLIDE without a COLLIDE).
 std::uint32_t typeFlags(const things::ThingDef& t);
+/// Its type's INIT function as the game calls it: as a new thing joins the object lists, last of
+/// that (the new things' pass, unitsNewAddToList: after its maker's work, newest first), and
+/// straight after an item made to be handed over (playerRespawnItem: Items::give). Of the INITs
+/// ours runs, GoldInit's is here: a pile with no gold yet gets an amount by the players' mean
+/// experience (two draws). (The others' parts run as the thing is made: describe.) Without a
+/// random stream (World::load's world) it's owed (World::initsOwed) till the server has one.
+void runInit(World& w, ServerObject& o);
+/// The INITs a world with no random stream owed (World::load's pass), in that pass's order.
+void runOwedInits(World& w);
 /// A client-only type (not a missile, IMMOBILE, not VISIBLE_ENABLE, NO_COLLIDE without SHADOW
 /// in its typeFlags): the clients load its things from their own map; the
 /// server frees them at the load (servMapLoadPlaceObj).

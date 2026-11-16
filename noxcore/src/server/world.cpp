@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include <limits>
 #include <tuple>
+#include <utility>
 #include <variant>
 
 namespace nox::server {
@@ -111,45 +112,13 @@ NOX_NOINLINE float number(std::optional<std::string_view> text, float fallback)
 }
 
 /// Its INIT function's part that the server keeps: ChestInit / BreakInit (breakInit)
-/// shut one with no state yet (xStatus 2, none of 0xE).
-void applyInit(const World& w, ServerObject& o, const things::ThingDef& t, bool fresh = true)
+/// shut one with no state yet (xStatus 2, none of 0xE). (GoldInit's runs as it joins the lists:
+/// runInit.) The last INIT line: the type reader sets the function for each in turn.
+void applyInit(ServerObject& o, const things::ThingDef& t)
 {
-    const auto init = t.attribute("INIT");
+    const auto init = t.lastAttribute("INIT");
     if (!init) {
         return;
-    }
-    // (Not after a record's state: the exe's INIT runs as it's made, its file's gold read after.)
-    if (*init == "GoldInit" && fresh && o.goldAmount == 0 && w.rng) {
-        // unitInitGold: a pile with no gold yet, by the players' mean experience t
-        // (from each one's unit): randInt(t x 0.01, t x 0.02) - t x -0.02 + randInt(15, 30), each
-        // product __ftol'd (truncated). With no players t is 0 / 0, a NaN: __ftol gives 0 each time
-        // (the 64-bit indefinite's low half), randInt(0, 0) drawing all the same, so 15-30 (an
-        // original bug).
-        const auto randInt = [&](int lo, int hi) {
-            return hi - lo + 1 == 0 ? hi : nox::util::uniform_int_distribution<int>(lo, hi)(*w.rng);
-        };
-        // The players by index (Plr_GetFirst / Plr_GetNext's walk), each one's experience added in
-        // that order. (The game counts every player in the table, a unit or not; one is without a
-        // unit only on a hosting client between a leaver's removal and its own client's hearing of
-        // it, which ours hasn't: a player here is its unit, one that's left gone.)
-        std::vector<const ServerObject*> players;
-        for (const ServerObject* p : w.playerUnits()) {
-            if (!p->gone()) {
-                players.push_back(p);
-            }
-        }
-        std::ranges::sort(players, [](const ServerObject* a, const ServerObject* b) { return a->player->index < b->player->index; });
-        // (The game's x87: each sum stored, the mean stored, each product on the stack by a double.)
-        using util::X87;
-        float sum = 0;
-        for (const ServerObject* p : players) {
-            sum = (X87(sum) + p->experience).f();
-        }
-        const float mean = (X87(sum) / X87::fromDouble(static_cast<double>(players.size()))).f(); // (0 / 0: NaN)
-        const auto trunc = [&](double k) { return util::ftol(X87(mean) * X87::fromDouble(k)); };
-        const int least = randInt(trunc(0.01), trunc(0.02));
-        const std::int64_t amount = static_cast<std::int64_t>(least) - trunc(-0.02) + randInt(15, 30);
-        o.goldAmount = static_cast<std::uint32_t>(amount);
     }
     if ((*init == "ChestInit" || *init == "BreakInit") && !(o.xStatus & 0xEu)) {
         o.xStatus |= 2;
@@ -172,6 +141,59 @@ void applyInit(const World& w, ServerObject& o, const things::ThingDef& t, bool 
 }
 
 } // namespace
+
+void runInit(World& w, ServerObject& o)
+{
+    if (!o.goldInit || o.goldAmount != 0) {
+        return;
+    }
+    if (!w.rng) {
+        w.initsOwed.push_back(o.extent);
+        return;
+    }
+    // unitInitGold: a pile with no gold yet, by the players' mean experience t
+    // (from each one's unit): randInt(t x 0.01, t x 0.02) - t x -0.02 + randInt(15, 30), each
+    // product __ftol'd (truncated). With no players t is 0 / 0, a NaN: __ftol gives 0 each time
+    // (the 64-bit indefinite's low half), randInt(0, 0) drawing all the same, so 15-30 (an
+    // original bug).
+    const auto randInt = [&](int lo, int hi) {
+        return hi - lo + 1 == 0 ? hi : nox::util::uniform_int_distribution<int>(lo, hi)(*w.rng);
+    };
+    // The players by index (Plr_GetFirst / Plr_GetNext's walk), each one's experience added in
+    // that order. (The game counts every player in the table, a unit or not; one is without a
+    // unit only on a hosting client between a leaver's removal and its own client's hearing of
+    // it, which ours hasn't: a player here is its unit, one that's left gone.)
+    std::vector<const ServerObject*> players;
+    for (const ServerObject* p : w.playerUnits()) {
+        if (!p->gone()) {
+            players.push_back(p);
+        }
+    }
+    std::ranges::sort(players, [](const ServerObject* a, const ServerObject* b) { return a->player->index < b->player->index; });
+    // (The game's x87: each sum stored, the mean stored, each product on the stack by a double.)
+    using util::X87;
+    float sum = 0;
+    for (const ServerObject* p : players) {
+        sum = (X87(sum) + p->experience).f();
+    }
+    const float mean = (X87(sum) / X87::fromDouble(static_cast<double>(players.size()))).f(); // (0 / 0: NaN)
+    const auto trunc = [&](double k) { return util::ftol(X87(mean) * X87::fromDouble(k)); };
+    const int least = randInt(trunc(0.01), trunc(0.02));
+    const std::int64_t amount = static_cast<std::int64_t>(least) - trunc(-0.02) + randInt(15, 30);
+    o.goldAmount = static_cast<std::uint32_t>(amount);
+}
+
+void runOwedInits(World& w)
+{
+    if (!w.rng) {
+        return;
+    }
+    for (const std::uint32_t e : std::exchange(w.initsOwed, {})) {
+        if (ServerObject* o = w.byExtent(e); o && !o->gone() && !o->pendingDelete) {
+            runInit(w, *o);
+        }
+    }
+}
 
 std::uint32_t typeFlags(const things::ThingDef& t)
 {
@@ -285,9 +307,13 @@ NOX_NOINLINE const things::ThingDef* describeTypeFresh(ServerObject& o, const th
             o.useFn = use.substr(0, space);
             o.useArg = space == std::string::npos ? 0 : std::atoi(use.c_str() + space + 1);
         }
-        if (t->attribute("INIT").value_or("") == "GlyphInit") { // (its InitData: no spells yet)
+        // (The last INIT line, as the type reader keeps it: QuestGoldPile's and QuestGoldChest's
+        // NoInit then GoldInit are GoldInit.)
+        const std::string_view init = t->lastAttribute("INIT").value_or("");
+        if (init == "GlyphInit") { // (its InitData: no spells yet)
             o.trap.emplace();
         }
+        o.goldInit = init == "GoldInit";
         if (t->attribute("CREATE").value_or("").starts_with("RewardMarkerCreate")) {
             o.rewardMarker.emplace(); // (createRewardMarker: every kind, always)
         }
@@ -501,9 +527,7 @@ const things::ThingDef* describeType(ServerObject& o, const things::ThingDb& thi
 void describe(ServerObject& o, const things::ThingDb& things, std::string_view type, const World& w)
 {
     if (const things::ThingDef* t = describeType(o, things, type, w)) {
-        // Its INIT in the server's own rounding, past describeType's nearest: unitInitGold's
-        // figure is the game's x87 work (chopped), not the type reader's.
-        applyInit(w, o, *t);
+        applyInit(o, *t);
         if (o.classes & things::ObjectClass::Missile) { // a missile: drag 1, twice as fast
             o.drag = 1;
             o.speedCur += o.speedCur;
@@ -921,7 +945,7 @@ static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typ
             o.decayAt = frame + static_cast<std::uint32_t>(*h.details->decayFrames);
         }
         if (const things::ThingDef* t = things.findThing(o.typeName)) {
-            applyInit(w, o, *t, false); // (its INIT after the file's state)
+            applyInit(o, *t); // (its INIT after the file's state)
         }
     }
     if ((o.classes & things::ObjectClass::Door) && xfer.extra.size() >= 8) {

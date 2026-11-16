@@ -1971,6 +1971,38 @@ The engine's logic is the exe's; these are where the output differs.
 - **Ours:** MapGrid::registerWaypoint files it nowhere: the same searches, no memory written.
 - **Revert:** none wanted (memory safety).
 
+### VD-76: monster.bin's reader reads on where the game's stops
+
+- **Vanilla:** servParseMonsterDef stops reading the whole file at an unknown key (the record
+  being read freed), an unknown strike, die or dead function name, or damage type: every monster
+  after it is left without its numbers. readStr loses a word's letters before a `//` inside it
+  and reads on into the next line. monsterList frees every record when one names no thing type.
+  Of two records of one name the later is found (the list is built and searched from the front).
+  MISSILE_NAME's NULL is compared with case.
+- **Ours:** parseMonsterDb (`noxcore/src/things/monster_db.cpp`) reads on: an unknown key is
+  passed over with its value; an unknown function name is none; an unknown damage type leaves the
+  type as it was (always one of the 18); a `//` ends the word and runs to the line's end; NULL in
+  any case is none; of two records of a name the later stands, in the earlier's place (the game's
+  choice). MonsterDb::keepThingTypes drops a record whose name is no thing type and empties a
+  MISSILE_NAME no type has. Each is a line in MonsterDb::problems (at most 100, then one line for
+  the rest), which every host logs. The shipped file has none of these: it reads with no line
+  noted, exactly as the game reads it (a test holds this).
+- **Revert:** stop at the first noted place, as the game does (a modded file's later monsters then
+  without their numbers); not wanted: content packs patch monster.bin.
+
+### VD-77: A WebWand's spark is made and lasts 20 frames, where the game faults
+
+- **Vanilla:** FireWandUse's createSpark writes the spark's count and kind into update data and
+  its damage into collide data the shipped Spark type doesn't have: the host crashes
+  (original_bugs.md, OB-433), before useFireWand's sound.
+- **Ours:** the spark is made as the rest of createSpark makes it (its three draws, its place
+  and velocity, its classes and flags, raised to 28) and goes after 20 frames, the count the
+  missing data held (a decay: `fireWandUse` in `noxcore/src/server/items.cpp`); then sound 9 at
+  most once a second, by the wand's timer, as useFireWand goes on to do. The spark has no update
+  and no touch, as its type has none.
+- **Revert:** none wanted (a crash is no behaviour to keep); unreachable in a stock game (no map
+  places a WebWand, no class may wield one: OB-421).
+
 ### VD-37: "Exact Original Maths" switched off: the server's floats rounded to nearest
 
 - **Vanilla:** the game runs its FPU in chop mode (rounding towards zero) at 53 bits for all its

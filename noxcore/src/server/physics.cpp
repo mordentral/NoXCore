@@ -1353,6 +1353,10 @@ void queueNewObjects(World& world)
         if (o.collides && !(o.classes & things::ObjectClass::Missile)) {
             queueMotion(world, o);
         }
+        // Then its type's INIT (after its maker's work: a reward's gold pile has its amount).
+        if (o.goldInit) {
+            runInit(world, o);
+        }
     }
 }
 

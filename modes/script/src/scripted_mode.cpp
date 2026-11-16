@@ -3314,7 +3314,7 @@ int noxChests(lua_State* L)
             continue;
         }
         const things::ThingDef* def = f.things->findThing(o.typeName);
-        if (def && def->attribute("INIT").value_or("") == "ChestInit" && o.inventory.empty()) {
+        if (def && def->lastAttribute("INIT").value_or("") == "ChestInit" && o.inventory.empty()) {
             lua_pushnumber(L, extent);
             lua_rawseti(L, -2, ++n);
         }

@@ -247,6 +247,10 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
     }
     if (fs::exists(nox::resolveNoCase(gameDir / "monster.bin"))) {
         monsterDb_ = nox::things::loadMonsterDb(gameDir / "monster.bin", settings.solo); // (a solo or network game's numbers)
+        monsterDb_->keepThingTypes(things);
+        for (const std::string& p : monsterDb_->problems) { // (a modded file's: the shipped one has none)
+            SDL_Log("%s", p.c_str());
+        }
     }
     if (fs::exists(nox::resolveNoCase(gameDir / "soundset.bin"))) {
         soundSets_ = nox::things::loadSoundSets(gameDir / "soundset.bin");
