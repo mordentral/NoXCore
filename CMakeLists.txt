@@ -33,6 +33,21 @@ endif()
 # A developer's own builds set them on the command line or in an untracked CMakeUserPresets.json.
 set(NOX_GAME_DIR "" CACHE PATH "Nox install for the test fixtures and the programs' last resort: maps, thing.bin, video.bag, audio (empty: none)")
 set(NOX_SAVE_DIR "" CACHE PATH "Save directory with .plr and saved-map fixtures (empty: none)")
+# A mod library kept outside this tree: a folder with mods/<id>/ (copied into the mods folder beside
+# noxsdl, as mods/ is) and, optionally, tests/modes/*.cpp (built into noxcore_tests when the tests
+# are). Empty by default: none, and the build is as without it.
+set(NOX_MODS_LIBRARY "" CACHE PATH "Mod library outside this tree: its mods/ copied beside noxsdl, its tests/modes/*.cpp in noxcore_tests (empty: none)")
+set(NOX_MODS_LIBRARY_DIR "")
+if(NOX_MODS_LIBRARY)
+    get_filename_component(nox_mods_library_abs "${NOX_MODS_LIBRARY}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    file(TO_CMAKE_PATH "${nox_mods_library_abs}" nox_mods_library_abs)
+    if(IS_DIRECTORY "${nox_mods_library_abs}/mods")
+        set(NOX_MODS_LIBRARY_DIR "${nox_mods_library_abs}")
+        message(STATUS "Mod library: ${NOX_MODS_LIBRARY_DIR}")
+    else()
+        message(WARNING "NOX_MODS_LIBRARY (${NOX_MODS_LIBRARY}) has no mods/ folder: no mod library used")
+    endif()
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(NoxWarnings)

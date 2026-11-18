@@ -218,6 +218,13 @@ add_custom_command(TARGET noxsdl POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/mods $<TARGET_FILE_DIR:noxsdl>/mods
     VERBATIM
 )
+# A mod library's mods (NOX_MODS_LIBRARY, when set) into the same folder, after this tree's.
+if(NOX_MODS_LIBRARY_DIR)
+    add_custom_command(TARGET noxsdl POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${NOX_MODS_LIBRARY_DIR}/mods $<TARGET_FILE_DIR:noxsdl>/mods
+        VERBATIM
+    )
+endif()
 
 # Shaders for the GPU renderer (--gpu), from the same HLSL (shaders/), embedded in the exe
 # (src/gpu_shader_code.hpp lists them): DXIL for Direct3D 12 with dxc, the Windows SDK's; SPIR-V
