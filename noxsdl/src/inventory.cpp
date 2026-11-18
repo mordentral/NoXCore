@@ -137,7 +137,8 @@ int dollSlot(const TypeArt& a)
 /// (0x18, 0x33)), under the weapon: what's spent, from 12 o'clock clockwise, (256 - stamina * 256 /
 /// most) / 256 of the circle, radius 26 about the window's middle. At full stamina it shows only
 /// for a worn weapon, all but 1/256 of the circle: red under a quarter of its durability, yellow
-/// under a half. Purple (240, 0, 240), at alpha 0x40 on the game's scale (about half as it shows).
+/// under a half. Purple (240, 0, 240), half and half over what's there: the game sets alpha 0x40,
+/// but its 16-bit alpha fill blends half and half whatever the alpha.
 void drawStaminaPie(SDL_Renderer* r, float gx, float gy, int stamina, int most, const nox::client::InventoryItem* held,
                     float s)
 {
@@ -768,12 +769,13 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
                         continue;
                     }
                     const auto& item = inv.at(c.items.front());
-                    // Worn out: red under a quarter, yellow under a half (alpha 0x40).
+                    // Worn out: red under a quarter, yellow under a half. (The game sets alpha 0x40,
+                    // but its 16-bit alpha fill blends half and half whatever the alpha: so half.)
                     const int health = item.health.value_or(0);
                     const int maxHealth = item.maxHealth.value_or(0);
                     if (maxHealth > 0 && item.health && health * 2 < maxHealth) {
                         const bool red = health * 4 < maxHealth;
-                        SDL_SetRenderDrawColor(r, 255, red ? 0 : 255, 0, 0x40);
+                        SDL_SetRenderDrawColor(r, 255, red ? 0 : 255, 0, 128);
                         const SDL_FRect f{x * s, y * s, kCell * s, kCell * s};
                         SDL_RenderFillRect(r, &f);
                     }
