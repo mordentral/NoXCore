@@ -680,6 +680,10 @@ struct App {
     std::unique_ptr<Font> largeFont;
     /// Options' Original Style Fonts (noxcore.cfg's OriginalFonts): the Nox-style fonts, else Caudex.
     bool originalFonts = true;
+    /// noxcore.cfg's CsfText (OptionsWindow::Extras::kCsfText*), and what nox.csf's letters said
+    /// at load (auto's answer): applyTextCodepage puts the result on both fonts.
+    int csfText = OptionsWindow::Extras::kCsfTextAuto;
+    nox::strings::CodepageGuess csfGuess;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game
     bool autoSpawn = false;     ///< --spawn: leave observer mode once in the game (for tests)
@@ -828,6 +832,7 @@ void preloadMap(App& app, const std::string& name);
 void preloadSession(App& app);
 void applyExtras(App& app, const OptionsWindow::Extras& e);
 void applyFonts(App& app);
+void applyTextCodepage(App& app);
 void openOptions(App& app);
 int trackData(App& app);
 void setTrackData(App& app, int mask);

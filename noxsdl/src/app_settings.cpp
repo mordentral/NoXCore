@@ -149,6 +149,13 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
             e.hdImages = on;
         } else if (name == "OriginalFonts") {
             e.originalFonts = on;
+        } else if (name == "CsfText") {
+            std::string v = line.substr(eq + 1);
+            std::erase_if(v, [](char c) { return c == ' ' || c == '\t' || c == '\r'; });
+            v = nox::util::lowered(v);
+            e.csfText = v == "cp1251" ? OptionsWindow::Extras::kCsfTextCp1251
+                        : v == "latin1" ? OptionsWindow::Extras::kCsfTextLatin1
+                                        : OptionsWindow::Extras::kCsfTextAuto;
         } else if (name == "Gamma") {
             e.gamma = std::clamp(std::atoi(line.c_str() + eq + 1), 1, 10);
         } else if (name == "MouseAccel") {
@@ -197,7 +204,11 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
         << "\nMouseSpeed = " << e.mouseSpeed << "\nMouseSpeed3D = " << e.mouseSpeed3D << "\nKillFeed = " << e.killFeed << "\nDisplay = " << e.display
         << "\nVSync = " << e.vsync << "\nServerUpdateRate = " << e.serverUpdateRate
         << "\nServerMapVote = " << e.serverMapVote << "\nExactMaths = " << e.exactMaths << "\nPendingChanges = " << e.pendingView
-        << "\nWeatherEffects = " << e.weather << "\n";
+        << "\nWeatherEffects = " << e.weather << "\nCsfText = "
+        << (e.csfText == OptionsWindow::Extras::kCsfTextCp1251   ? "cp1251"
+            : e.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? "latin1"
+                                                                 : "auto")
+        << "\n";
     for (std::size_t i = 0; i < e.modAbilityKeys.size(); ++i) {
         out << "ModAbilityKey" << (i + 1) << " = " << e.modAbilityKeys[i] << "\n";
     }
@@ -219,6 +230,7 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.hdImages = app.sprites && app.sprites->usingPack();
     e.hdAvailable = !app.imagePack.empty();
     e.originalFonts = app.originalFonts;
+    e.csfText = app.csfText;
     e.gamma = app.gamma;
     e.gpu = app.shaders != nullptr && app.white != nullptr;
     e.mouseAccel = app.mouseAccel;
@@ -465,6 +477,8 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     // Original Style Fonts, and the HD Nox-style fonts with the HD images.
     app.originalFonts = e.originalFonts;
     applyFonts(app);
+    app.csfText = e.csfText;
+    applyTextCodepage(app);
     if (!app.shaders || !app.white) {
         return;
     }
@@ -492,6 +506,24 @@ void applyFonts(App& app)
     if (app.fontFaces && app.font && app.largeFont) {
         app.fontFaces->apply(*app.font, *app.largeFont, app.originalFonts, app.sprites && app.sprites->usingPack());
     }
+}
+
+/// The game text's U+0080-U+00FF onto the fonts: noxcore.cfg's CsfText, or with auto what nox.csf's
+/// letters said at load (App::csfGuess). Nothing before both fonts are made.
+void applyTextCodepage(App& app)
+{
+    if (!app.font || !app.largeFont) {
+        return;
+    }
+    using nox::strings::LegacyCodepage;
+    const LegacyCodepage cp = app.csfText == OptionsWindow::Extras::kCsfTextCp1251   ? LegacyCodepage::Cp1251
+                              : app.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? LegacyCodepage::Latin1
+                                                                                     : app.csfGuess.codepage;
+    if (cp != app.font->legacyCodepage()) {
+        SDL_Log("text: U+0080-U+00FF drawn as %s", cp == LegacyCodepage::Cp1251 ? "Windows-1251 (Cyrillic)" : "Latin-1");
+    }
+    app.font->setLegacyCodepage(cp);
+    app.largeFont->setLegacyCodepage(cp);
 }
 
 /// Opens the Options window on the current settings (in a game the resolution stays).

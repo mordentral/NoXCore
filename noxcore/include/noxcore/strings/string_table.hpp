@@ -5,7 +5,18 @@
 //   "LBL " u32 variantCount; u32 labelLength; label
 //   variantCount x { tag; u32 length; u16 text[length]; for W tags: u32 n; char extra[n] }
 // Tags are "STR ", "STRW", "Str " and "StrW" (stored byte-reversed); in the mixed-case ones the
-// text's bits are inverted. The game then collapses whitespace.
+// text's bits are inverted. The game then collapses whitespace. It reads the header's language only
+// to pick its multibyte fonts (6 and 8); the text itself is never converted, so a code point is
+// whatever the font draws at it.
+//
+// Two departures, both for files the game itself would show as garbage or rely on its fonts for:
+//  - A file whose text is stored without the inversion its tags call for (plain UTF-16 under "Str ",
+//    or inverted under "STR ", as a re-encoding tool can leave it) reads as nothing but U+F800 and
+//    up; when most of its strings do, every string is read the other way round (tagsSwapped).
+//  - Fan translations (the Russian ones) store each letter's Windows-1251 byte as the code point
+//    and ship .fnt fonts that draw Cyrillic there. guessLegacyCodepage tells such a file from a
+//    Latin-1 one; the text is kept as stored (it goes on the wire to clients with those fonts) and
+//    the client's fonts read it as Windows-1251 (legacyToUnicode).
 //
 // Lookup (Str_GetString) is a case-insensitive binary search over the labels, picking a random
 // variant when there are several.
@@ -57,6 +68,9 @@ public:
 
     std::uint32_t version() const { return version_; }
     std::uint32_t language() const { return language_; } // 0 before version 2
+    /// The file's text was stored without its tags' inversion (or with it under the plain tags) and
+    /// was read the other way round (see the top of this file).
+    bool tagsSwapped() const { return tagsSwapped_; }
     const std::vector<StringEntry>& entries() const { return entries_; }
     std::size_t variantCount() const { return variantCount_; }
 
@@ -80,12 +94,48 @@ public:
 private:
     std::uint32_t version_ = 0;
     std::uint32_t language_ = 0;
+    bool tagsSwapped_ = false;
     std::uint32_t headerEntryCount_ = 0;
     std::uint32_t headerVariantCount_ = 0;
     std::size_t variantCount_ = 0;
     std::vector<StringEntry> entries_;
     std::unordered_map<std::string, std::size_t, util::NoCaseHash, util::NoCaseEqual> byLabel_; // label (any case) -> index
 };
+
+/// How the text's U+0080-U+00FF is meant: Latin-1 (as the official translations use it) or each a
+/// Windows-1251 byte (the Russian fan translations, whose fonts draw Cyrillic there).
+enum class LegacyCodepage : std::uint8_t { Latin1, Cp1251 };
+
+/// What a table's letters say about its U+0080-U+00FF (guessLegacyCodepage).
+struct CodepageGuess {
+    LegacyCodepage codepage = LegacyCodepage::Latin1;
+    std::size_t asciiLetters = 0; ///< A-Z, a-z
+    std::size_t highLetters = 0;  ///< U+00C0-U+00FF but the signs U+00D7 and U+00F7 (Windows-1251's А-я)
+    std::size_t cyrillic = 0;     ///< real Cyrillic, U+0400-U+04FF
+    const char* reason = "";      ///< why, for the log
+};
+
+/// Whether a table's U+0080-U+00FF are Windows-1251 bytes, from its text, once at load:
+///  - the header's language 6 or 8 (the game's multibyte fonts): never;
+///  - any real Cyrillic (U+0400-U+04FF): never (the file is Unicode already);
+///  - else when at least kCp1251MinLetters letters are in U+00C0-U+00FF and they are at least
+///    kCp1251Percent of all letters. A Russian file's letters are nearly all there (cp1251's А-я);
+///    the official French, German, Italian, Spanish and Polish files have a few percent (accents,
+///    umlauts; Polish's own letters are mostly outside Latin-1), an English one none.
+/// The header's language can't say Russian (the fan files keep the English or German CD's), and an
+/// installed .fnt that differs from the stock one says nothing about which letters it draws.
+CodepageGuess guessLegacyCodepage(const StringTable& table);
+inline constexpr std::size_t kCp1251MinLetters = 50;
+inline constexpr std::size_t kCp1251Percent = 25; ///< (a part-translated file passes; Latin-1 ones stay under 10)
+
+/// The Windows-1251 character of a byte (0x00-0x7F themselves; 0x98, which has none, itself).
+char16_t cp1251Char(std::uint8_t byte);
+/// A character as `codepage` means it: under Cp1251, U+0080-U+00FF are Windows-1251 bytes; all
+/// else (and everything under Latin1) is itself.
+inline char32_t legacyToUnicode(char32_t c, LegacyCodepage codepage)
+{
+    return codepage == LegacyCodepage::Cp1251 && c >= 0x80 && c <= 0xFF ? cp1251Char(static_cast<std::uint8_t>(c)) : c;
+}
 
 /// UTF-16 to UTF-8 (unpaired surrogates become U+FFFD).
 std::string toUtf8(std::u16string_view s);

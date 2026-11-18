@@ -71,7 +71,15 @@ public:
         /// Original Style Fonts (the More page): the game's text in the Nox-style fonts (their HD
         /// forms with Use HD Images), off in Caudex Bold (text.hpp's GameFonts). On by default.
         bool originalFonts = true;
-        int gamma = 1;             ///< Insert / Delete's brightness, 1-10 (not on the panel)
+        /// Not shown here: how the game text's U+0080-U+00FF are drawn (noxcore.cfg's CsfText =
+        /// auto, latin1 or cp1251; kCsfText*): auto as nox.csf's letters say
+        /// (nox::strings::guessLegacyCodepage), cp1251 as the Russian fan translations' fonts draw
+        /// them, latin1 as themselves.
+        int csfText = kCsfTextAuto;
+        static constexpr int kCsfTextAuto = 0;
+        static constexpr int kCsfTextLatin1 = 1;
+        static constexpr int kCsfTextCp1251 = 2;
+        int gamma = 1;            ///< Insert / Delete's brightness, 1-10 (not on the panel)
         bool gpu = false;          ///< whether the GPU renderer's shaders are there (the last three need them)
         /// Win Mouse Accel: Windows' pointer speed and acceleration (Enhance Pointer Precision)
         /// on the mouse's raw movement. On by default; off it's the original's 1:1.

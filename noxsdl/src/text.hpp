@@ -14,6 +14,8 @@
 #include "text_wrap.hpp"
 #include "typeface.hpp"
 
+#include "noxcore/strings/string_table.hpp"
+
 #include <SDL3/SDL.h>
 
 #include <array>
@@ -85,6 +87,11 @@ public:
     /// sized by its own line height.
     void setFaces(std::vector<Link> chain, bool onGameCell);
     bool onGameCell() const { return onGameCell_; }
+    /// How U+0080-U+00FF are drawn: as themselves (Latin1), or as the Windows-1251 letters a
+    /// Russian fan translation's .fnt fonts draw there (Cp1251: its nox.csf, and the text a game
+    /// with it sends, keep the bytes as code points). Taken into each glyph as it is first found.
+    void setLegacyCodepage(nox::strings::LegacyCodepage codepage);
+    nox::strings::LegacyCodepage legacyCodepage() const { return legacy_; }
     /// The main face's name ("" before setFaces).
     const std::string& name() const;
 
@@ -146,6 +153,7 @@ private:
     std::vector<Link> chain_;
     std::vector<const Typeface*> faces_; ///< chain_'s faces (findInChain)
     bool onGameCell_ = false;
+    nox::strings::LegacyCodepage legacy_ = nox::strings::LegacyCodepage::Latin1;
     std::map<int, Face> sizes_;
 };
 

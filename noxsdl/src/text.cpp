@@ -116,6 +116,17 @@ void Font::setFaces(std::vector<Link> chain, bool onGameCell)
     sizes_.clear(); // (the glyphs found and the sizes' metrics were the old faces')
 }
 
+void Font::setLegacyCodepage(nox::strings::LegacyCodepage codepage)
+{
+    if (codepage == legacy_) {
+        return;
+    }
+    legacy_ = codepage;
+    for (auto& [size, f] : sizes_) {
+        f.glyphs.clear(); // (found under the old reading)
+    }
+}
+
 const std::string& Font::name() const
 {
     static const std::string none;
@@ -149,7 +160,8 @@ Font::Face& Font::face(int pixelSize)
     return f;
 }
 
-// A codepoint's glyph at face `f`, from the first face of the chain that has it, kept.
+// A codepoint's glyph at face `f`, from the first face of the chain that has it, kept (found as
+// the legacy codepage reads it: kept under the codepoint as given).
 const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
 {
     if (const auto it = f.glyphs.find(codepoint); it != f.glyphs.end()) {
@@ -159,7 +171,7 @@ const Font::Glyph& Font::glyph(Face& f, char32_t codepoint)
     // Control characters (some strings start with one) take no room and draw nothing, as in the
     // game's fonts; the font's "missing" box would show otherwise.
     if (codepoint >= 0x20 && !chain_.empty()) {
-        const ChainGlyph at = findInChain(faces_, codepoint);
+        const ChainGlyph at = findInChain(faces_, nox::strings::legacyToUnicode(codepoint, legacy_));
         const Link& l = chain_[at.face];
         const float scale = f.scales[at.face];
         g.advance = static_cast<float>(l.face->advanceUnits(at.index)) * scale;

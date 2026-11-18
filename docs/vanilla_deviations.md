@@ -406,6 +406,21 @@ Options switch unless noted.
   NoX Core's Nox-style fonts (fonts/ beside the program: the game's letters on its 9- and 15-row
   grid, drawn smooth with Use HD Images), off Caudex Bold, with Noto Sans for the characters a face
   lacks (text.hpp, font_choice.hpp). Revert: none (the game's bitmap fonts aren't drawn).
+- **Russian fan translations draw in Cyrillic:** their nox.csf stores each letter's Windows-1251
+  byte as the code point (U+00C0-U+00FF) and their .fnt files draw Cyrillic there; the game reads the
+  text as stored. NoX Core keeps the text as stored (a hosted game sends it on as the game does, for
+  stock clients with those fonts), and its fonts draw U+0080-U+00FF as Windows-1251 when nox.csf's
+  letters say so: at least 50 letters in U+00C0-U+00FF making 25% or more of its letters, no real
+  Cyrillic, and not the header's multibyte languages 6 and 8 (nox::strings::guessLegacyCodepage,
+  Font::setLegacyCodepage; logged at start). That covers every text the fonts draw, the server's
+  lines and stock players' names included, as the translation's fonts did. The official Latin-1
+  files (French, German, Italian, Spanish, Polish) have a few percent; noxcore.cfg's
+  `CsfText = latin1` or `cp1251` overrides the guess (`auto` by default).
+- **nox.csf stored without its tags' inversion is read the other way round:** when most of its
+  strings decode to nothing but U+F800 and up (plain UTF-16 under the inverted tags, or the reverse,
+  as a re-encoding tool can leave it), every string is read the other way round
+  (StringTable::tagsSwapped; a game hosted with it sends the text so read). The game shows such a
+  file as unknown characters. Revert: none wanted.
 
 ### VD-06: Solo cinematics and briefings (noxsdl/src/cinematics.cpp)
 
