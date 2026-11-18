@@ -313,7 +313,11 @@ inline constexpr std::string_view kGameImagePrefixes[] = {
     "MapParchment",  // the map's parchment
     "Arrow",         // the eight arrows
 };
-/// Whether nox.gameImage may draw the picture `name` (one of kGameImagePrefixes' kinds).
+/// (API 6) The end of the conversation and shop portraits' names (AirshipCaptainPic, ShopKeeperPic):
+/// nox.gameImage draws any of them too.
+inline constexpr std::string_view kGameImagePortraitSuffix = "Pic";
+/// Whether nox.gameImage may draw the picture `name` (one of kGameImagePrefixes' kinds, or a portrait
+/// named with kGameImagePortraitSuffix).
 bool gameImageAllowed(std::string_view name);
 
 /// (Client level 8) A spinning thing now (ui_proto.hpp's kSpin: nox.setSpin): how many eighths of

@@ -2020,6 +2020,9 @@ bool ScriptUiClient::coversHud() const noexcept
 
 bool gameImageAllowed(std::string_view name)
 {
+    if (name.size() > kGameImagePortraitSuffix.size() && name.ends_with(kGameImagePortraitSuffix)) {
+        return true;
+    }
     return !name.empty() && std::ranges::any_of(kGameImagePrefixes, [&](std::string_view p) { return name.starts_with(p); });
 }
 
