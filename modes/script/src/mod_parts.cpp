@@ -1,6 +1,7 @@
 // A script mode's parts' toolbox functions and configure's quest options (mod_parts.hpp).
 #include "mod_parts.hpp"
 
+#include "mod_camera.hpp"
 #include "mod_items.hpp"
 #include "toolbox.hpp"
 
@@ -179,6 +180,7 @@ void addPartsToolbox(lua_State* L, bool store, bool records)
     addDrawScaleToolbox(L);
     addLeapToolbox(L);
     addAbilityToolbox(L);
+    addCameraToolbox(L);
 }
 
 void applyHostOptions(lua_State* L, int t, server::GameHost::Options& o, const Generation& gen, const std::string& firstMap)

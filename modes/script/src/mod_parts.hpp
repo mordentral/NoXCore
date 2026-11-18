@@ -50,7 +50,7 @@ struct Parts {
 /// The parts' toolbox functions set in the `nox` table on top of L's stack: the scheduler's, the
 /// events', the store's (nox.store when the host keeps one), the records' (nox.records when the
 /// host keeps the mode's records: ServerContext::records), the items', the players', the
-/// generator's, the weather's, the draw scales'.
+/// generator's, the weather's, the draw scales', the observer camera's (mod_camera.hpp).
 void addPartsToolbox(lua_State* L, bool store, bool records);
 
 /// The toolbox's nox.records table pushed (its functions: mod_records.cpp).

@@ -1035,18 +1035,22 @@ bool goObserver(Fight& fight, ServerObject& unit, bool canJoin, bool force)
     if (!world.quest()) {
         nobodyLeftCheck(fight);
     }
-    std::vector<std::uint8_t> inform = {0xA9, 0x0C}; // (SrvNet_SendInform 0x0C: it may join)
-    putU32(inform, canJoin ? 1u : 0u);
-    world.broadcasts().push_back({std::move(inform), true, unit.extent});
+    if (!p.modCamera) { // (noxcpp: a camera a mode holds, nox.camera: nothing told, the camera left be)
+        std::vector<std::uint8_t> inform = {0xA9, 0x0C}; // (SrvNet_SendInform 0x0C: it may join)
+        putU32(inform, canJoin ? 1u : 0u);
+        world.broadcasts().push_back({std::move(inform), true, unit.extent});
+    }
     enchant(world, unit, Enchant::Invisible, 0, 5);
     unit.flags |= ObjFlag::NoCollide;
-    p.camX = unit.x;
-    p.camY = unit.y;
-    p.cameraFollow = 0;
-    if (world.gameFlags & GameFlag::Solo) {
-        p.freeCam = true;
-    } else if ((world.gameFlags & GameFlag::FlagBall) && !force) {
-        followNext(fight, unit);
+    if (!p.modCamera) {
+        p.camX = unit.x;
+        p.camY = unit.y;
+        p.cameraFollow = 0;
+        if (world.gameFlags & GameFlag::Solo) {
+            p.freeCam = true;
+        } else if ((world.gameFlags & GameFlag::FlagBall) && !force) {
+            followNext(fight, unit);
+        }
     }
     removeSpawned(world, unit);
     p.curTraps = 0; // (its glyphs out, gone with removeSpawned)
@@ -1065,6 +1069,11 @@ void leaveObserver(Fight& fight, ServerObject& unit)
     observingEnded(fight.world, fight.frame); // (Plr_ClearStatusFlags' part for status 1)
     disenchant(fight.world, unit, Enchant::Invisible);
     unit.player->observing = false;
+    unit.player->modCamera = false; // (noxcpp: a mode's camera hold ends with the watching)
+    if (unit.player->modHeld) {     // (noxcpp: so does a mode's hold out, nox.observe; the host's is kept)
+        unit.player->heldOut = false;
+        unit.player->modHeld = false;
+    }
     markFriends(fight.world, unit); // (monsterMarkUpdate)
     unit.flags &= ~ObjFlag::NoCollide;
     takeTeamCrown(fight, unit); // (team KotR: its team's crown, when nobody holds it)
@@ -1099,7 +1108,7 @@ void eliminated(Fight& fight, ServerObject& unit)
     p.cameraFollow = 0;
     for (ServerObject* pu : world.playerUnits()) {
         ServerObject& o = *pu;
-        if (o.player && o.player->cameraFollow == unit.extent) {
+        if (o.player && o.player->cameraFollow == unit.extent && !o.player->modCamera) { // (noxcpp: a mode's held camera stays)
             followNext(fight, o);
         }
     }
@@ -1139,6 +1148,9 @@ void updateObserver(Fight& fight, ServerObject& unit)
             p.moveHeld = false;
         }
         const auto code = static_cast<net::ControlCode>(e.code);
+        if (p.modCamera && (code == net::ControlCode::MoveForward || code == net::ControlCode::Jump)) {
+            continue; // (noxcpp: a camera a mode holds, nox.camera: neither moves it)
+        }
         if (code == net::ControlCode::MoveForward) {
             if (!p.freeCam) {
                 p.moveHeld = true;
@@ -1212,7 +1224,7 @@ void updateObserver(Fight& fight, ServerObject& unit)
                     p.camX = x;
                     p.camY = y;
                 }
-            } else {
+            } else if (!p.modCamera) { // (noxcpp: a camera a mode holds stays)
                 followNext(fight, unit);
             }
         } else if (code == net::ControlCode::Jump) {

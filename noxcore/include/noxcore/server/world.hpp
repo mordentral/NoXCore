@@ -270,6 +270,15 @@ struct PlayerControl {
     /// (noxcpp: a stock player a NoX Core-only mode holds out, GameHost::Options::stockRefusal)
     /// Action never brings it in, nor a quest's start or a map's change; never sent.
     bool heldOut = false;
+    /// (noxcpp: a script mode's, nox.observe) heldOut set by the mode, not the host: both cleared
+    /// as it leaves watching by any path (leaveObserver) and at the mode's end; the host's own
+    /// hold (heldOut alone) is kept through them. Never sent.
+    bool modHeld = false;
+    /// (noxcpp: a script mode's, nox.camera / nox.observe) Its camera held by the mode: while it
+    /// watches, its MoveForward and Jump leave the camera alone and Action never moves it, and a
+    /// goObserver tells it nothing and leaves the camera be. Off as it leaves watching
+    /// (leaveObserver), by nox.camera(unit, nil) and at the mode's end; never sent.
+    bool modCamera = false;
     float camX = 0;
     float camY = 0;
     ObjectRef cameraFollow;

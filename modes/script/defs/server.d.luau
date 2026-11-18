@@ -224,6 +224,10 @@ declare nox: {
     setCollide: (id: number, name: string) -> (),
     --- Brings a watching (observing, not dead) player's unit back into play as the quest does.
     backIntoPlay: (unit: number) -> (),
+    --- on: puts a player out of play watching (unseen, out of reach), held out (its Action never brings it in), its camera the mode's (nox.camera; where it is till then) and no "observation mode" told; off: back into play as nox.backIntoPlay brings it, the hold let go (as it is when anything else brings it into play: a later watch is a free one).
+    observe: (unit: number, on: boolean) -> (),
+    --- Holds a watching player's camera (the view it's sent and where it hears from) at (x, y), or on a thing (thingOrX alone: following it while it's in the world), so its own controls no longer move it; nil lets it go (the stock observer's controls again).
+    camera: (unit: number, thingOrX: number?, y: number?) -> (),
     --- The spot beside a soul gate where its fallen come back.
     nearSoulGate: (gate: number) -> (number, number),
     --- A present thing's x, y and radius (an error when it isn't present).

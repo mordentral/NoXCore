@@ -33,6 +33,7 @@
 #include "noxcore/video/nxz.hpp"
 
 #include "foes.hpp"
+#include "mod_camera.hpp"
 #include "mod_items.hpp"
 #include "mod_parts.hpp"
 #include "mod_store.hpp"
@@ -1681,14 +1682,12 @@ int noxSetCollide(lua_State* L)
 int noxBackIntoPlay(lua_State* L)
 {
     // A player watching (observing, not dead) brought back into play as the quest brings its
-    // watchers back: its team, out of observing, its camera its own.
+    // watchers back: its team, out of observing, its camera its own (nox.observe's hold let go).
     server::ServerObject& u = unitArg(L, 1);
     luaL_argcheck(L, (u.player->statusFlags & 1u) && !(u.flags & server::ObjFlag::Dead), 1, "not a player watching");
     luaL_argcheck(L, !implOf(L).hidden(u), 1, "not a player watching"); // (a stock player held out: never the mode's)
     server::Fight f = fightOf(L);
-    server::joinTeam(f, u);
-    server::leaveObserver(f, u);
-    u.player->cameraFollow = 0;
+    bringIntoPlay(f, u);
     return 0;
 }
 
@@ -4948,6 +4947,7 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
         }
         impl.clientReady(peer);
         impl.parts.weather.ready(h, peer); // (its join, or a map's load: its weather again, when the mode has any)
+        cameraReady(h, peer);              // (one nox.observe holds: unseen again after the ready's invulnerability)
         // A mode's book (configure's bookIsTheMod, World::modeOwnsBook): its NoX Core client told
         // (kBook: a client of level 2 or above that named ModeUi), before the script's playerReady
         // grants. In a quest: not told (a quest's book lists only what was granted anyway).
@@ -5118,6 +5118,7 @@ void ScriptedMode::detach(server::GameHost& host)
     parts.abilities.reset();
     parts.spins.reset();
     parts.anims.reset();
+    releaseCameras(host); // (nox.observe's and nox.camera's holds let go: each player left watching, free to join)
     host.server().world().modeBusy.clear();
     impl_->host = nullptr;
     impl_->dropAssets(); // (the mod's assets kept only while it's hosted)
