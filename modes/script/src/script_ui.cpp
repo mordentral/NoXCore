@@ -22,6 +22,7 @@
 #include <cmath>
 #include <deque>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <string_view>
 #include <utility>
@@ -56,6 +57,13 @@ int sparkBurstSize(const ::nox::things::ThingDef& def)
     const std::string arg(c->substr(kSpark.size() + 1));
     return std::atoi(arg.c_str()) & 0xFF;
 }
+
+/// (API 6) One of the game's pictures as nox.gameImage names it: video.bag's image `index`
+/// (index >= 0), else thing.bin's named image `name`.
+struct GamePic {
+    std::string_view name;
+    std::int32_t index = -1;
+};
 
 } // namespace
 
@@ -190,19 +198,45 @@ struct ScriptUiClient::Impl {
         w.x = std::clamp(w.x, left + inX, right - inX - w.w);
         w.y = std::clamp(w.y, top + inTop, bottom - inBottom - w.h);
     }
-    /// (API 6) nox.gameImageSize's hook (setGameImageSize).
-    std::function<std::optional<std::pair<int, int>>(std::string_view)> gameImageSize;
-    /// (API 6) Whether the game's picture `name` may be drawn and is there.
-    bool gameImageKnown(std::string_view name) const
+    /// (API 6) nox.gameImage's hooks (setGameImageIndex, setGameImageSize).
+    std::function<std::optional<std::int32_t>(std::string_view, int)> gameImageIndex;
+    std::function<std::optional<UiGameImageSize>(std::int32_t)> gameImageSize;
+    /// (API 6) video.bag's index of the named image's still (frame 0 alone) or its animation's
+    /// frame `frame`; none: none (unset hook: by the thing types' images, a ref by name none).
+    std::optional<std::int32_t> namedImageIndex(std::string_view name, int frame) const
     {
-        if (!gameImageAllowed(name)) {
-            return false;
-        }
-        if (gameImageSize) {
-            return gameImageSize(name).has_value();
+        if (gameImageIndex) {
+            return gameImageIndex(name, frame);
         }
         const ::nox::things::ThingDb* db = things();
-        return db && db->findImage(name);
+        const ::nox::things::ImageDef* def = db ? db->findImage(name) : nullptr;
+        const ::nox::things::ImageRef* ref = nullptr;
+        if (def && def->image) {
+            ref = frame == 0 ? &*def->image : nullptr;
+        } else if (def && def->animation && frame >= 0 && static_cast<std::size_t>(frame) < def->animation->frames.size()) {
+            ref = &def->animation->frames[static_cast<std::size_t>(frame)];
+        }
+        return ref && ref->index >= 0 ? std::optional<std::int32_t>(ref->index) : std::nullopt;
+    }
+    /// (API 6) The size of the game's picture `pic` in the program's art; none: not there, or
+    /// no size hook.
+    std::optional<UiGameImageSize> pictureSize(const GamePic& pic) const
+    {
+        if (!gameImageSize) {
+            return std::nullopt;
+        }
+        const std::optional<std::int32_t> index = pic.index >= 0 ? std::optional<std::int32_t>(pic.index) : namedImageIndex(pic.name, 0);
+        return index ? gameImageSize(*index) : std::nullopt;
+    }
+    /// (API 6) Whether the game's picture `pic` is there to draw (no size hook: a name the thing
+    /// types' images list; an index never).
+    bool pictureThere(const GamePic& pic) const
+    {
+        if (gameImageSize) {
+            return pictureSize(pic).has_value();
+        }
+        const ::nox::things::ThingDb* db = things();
+        return pic.index < 0 && db && db->findImage(pic.name);
     }
     /// (API 5) nox.hudReserve's box, as given (its anchor moves it as a window's).
     struct Reserve {
@@ -1104,15 +1138,19 @@ int uiHitArea(lua_State* L)
 
 // ---- UI API 6
 
-/// A game picture's draw pushed (the caller has checked it's known), the draws' cap checked.
-void pushGameImage(lua_State* L, UiWindow& w, std::string_view name, float x, float y, float dw, float dh)
+/// A game picture's draw pushed (the caller has checked it's there), the draws' cap checked.
+void pushGameImage(lua_State* L, UiWindow& w, const GamePic& pic, float x, float y, float dw, float dh)
 {
     if (w.draws.size() >= kMaxDraws) {
         luaL_error(L, "over %d draws in a window in one frame", static_cast<int>(kMaxDraws));
     }
     UiDraw d;
     d.kind = UiDraw::Kind::GameImage;
-    d.text.assign(name);
+    if (pic.index >= 0) {
+        d.index = pic.index;
+    } else {
+        d.text.assign(pic.name);
+    }
     d.x = x;
     d.y = y;
     d.w = dw;
@@ -1120,46 +1158,88 @@ void pushGameImage(lua_State* L, UiWindow& w, std::string_view name, float x, fl
     w.draws.push_back(std::move(d));
 }
 
+/// (API 6) A game picture argument: a name (kGameImageMaxName bytes at most), or a whole number:
+/// video.bag's image of that index. False: neither (an empty or longer name, a negative or
+/// fractional number); any other type is an error.
+bool gamePicArg(lua_State* L, int arg, GamePic& pic)
+{
+    if (lua_type(L, arg) == LUA_TNUMBER) {
+        const double v = lua_tonumber(L, arg);
+        if (!(v >= 0 && v <= static_cast<double>(std::numeric_limits<std::int32_t>::max())) || v != std::floor(v)) {
+            return false;
+        }
+        pic.index = static_cast<std::int32_t>(v);
+        return true;
+    }
+    size_t n = 0;
+    const char* s = luaL_checklstring(L, arg, &n);
+    if (n == 0 || n > kGameImageMaxName) {
+        return false;
+    }
+    pic.name = std::string_view(s, n);
+    return true;
+}
+
 int uiGameImage(lua_State* L)
 {
-    // nox.gameImage(name, x, y [, w, h]): one of the game's own pictures of the allowed kinds;
-    // whether it's drawn (not allowed, or not in the client's art: nothing, false).
+    // nox.gameImage(name, x, y [, w, h]): one of the game's own pictures, by name or by its
+    // video.bag index; whether it's drawn (not in the client's art: nothing, false).
     UiWindow& w = drawingWindow(L);
     const Impl& impl = implOf(L);
-    size_t n = 0;
-    const char* s = luaL_checklstring(L, 1, &n);
-    const std::string_view name(s, std::min<std::size_t>(n, 64));
+    GamePic pic;
+    const bool named = gamePicArg(L, 1, pic);
     constexpr float kFar = 100000;
     const float x = clampedFloat(luaL_checknumber(L, 2), -kFar, kFar, 0);
     const float y = clampedFloat(luaL_checknumber(L, 3), -kFar, kFar, 0);
     const float dw = clampedFloat(luaL_optnumber(L, 4, 0), 0, 4096, 0);
     const float dh = clampedFloat(luaL_optnumber(L, 5, 0), 0, 4096, 0);
-    if (n > 64 || !impl.gameImageKnown(name)) {
+    if (!named || !impl.pictureThere(pic)) {
         lua_pushboolean(L, 0);
         return 1;
     }
-    pushGameImage(L, w, name, x, y, dw, dh);
+    pushGameImage(L, w, pic, x, y, dw, dh);
     lua_pushboolean(L, 1);
     return 1;
 }
 
 int uiGameImageSize(lua_State* L)
 {
-    // nox.gameImageSize(name): its width and height in the client's art; nil: not allowed or not there.
+    // nox.gameImageSize(name): its width, height and own draw offset in the client's art (a name
+    // or an index); nil: not there.
     const Impl& impl = implOf(L);
-    size_t n = 0;
-    const char* s = luaL_checklstring(L, 1, &n);
-    const std::string_view name(s, n);
-    if (n > 64 || !gameImageAllowed(name) || !impl.gameImageSize) {
+    GamePic pic;
+    if (!gamePicArg(L, 1, pic)) {
         return 0;
     }
-    const auto size = impl.gameImageSize(name);
+    const auto size = impl.pictureSize(pic);
     if (!size) {
         return 0;
     }
-    lua_pushinteger(L, size->first);
-    lua_pushinteger(L, size->second);
-    return 2;
+    lua_pushinteger(L, size->w);
+    lua_pushinteger(L, size->h);
+    lua_pushinteger(L, size->offsetX);
+    lua_pushinteger(L, size->offsetY);
+    return 4;
+}
+
+int uiGameImageIndex(lua_State* L)
+{
+    // nox.gameImageIndex(name [, frame]): the video.bag index of the named image's still (frame 0
+    // or none) or its animation's frame (from 0); nil: none.
+    const Impl& impl = implOf(L);
+    size_t n = 0;
+    const char* s = luaL_checklstring(L, 1, &n);
+    const double f = luaL_optnumber(L, 2, 0);
+    std::optional<std::int32_t> index;
+    if (n > 0 && n <= kGameImageMaxName && f >= 0 && f <= 255 && f == std::floor(f)) {
+        index = impl.namedImageIndex(std::string_view(s, n), static_cast<int>(f));
+    }
+    if (index && *index >= 0) {
+        lua_pushinteger(L, *index);
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
 }
 
 int uiPanel(lua_State* L)
@@ -1184,7 +1264,7 @@ int uiPanel(lua_State* L)
         w.draws.push_back(std::move(d));
     }
     const auto piece = [&](std::string_view name, int px, int py) {
-        pushGameImage(L, w, name, static_cast<float>(px), static_cast<float>(py), 0, 0);
+        pushGameImage(L, w, GamePic{.name = name}, static_cast<float>(px), static_cast<float>(py), 0, 0);
     };
     const int top = y - 10;
     const int bottom = y - 10 + height;
@@ -1366,7 +1446,8 @@ void Impl::start()
         {"hudReserve", uiHudReserve}, {"overMap", uiOverMap},
     };
     static constexpr std::pair<const char*, lua_CFunction> kToolbox6[] = {
-        {"gameImage", uiGameImage}, {"gameImageSize", uiGameImageSize}, {"panel", uiPanel}, {"clip", uiClip}, {"view", uiView},
+        {"gameImage", uiGameImage}, {"gameImageSize", uiGameImageSize}, {"gameImageIndex", uiGameImageIndex}, {"panel", uiPanel}, {"clip", uiClip},
+        {"view", uiView},
     };
     lua_createtable(L, 0,
                     static_cast<int>(std::size(kToolbox) + std::size(kToolbox2) + std::size(kToolbox3) + std::size(kToolbox4) + std::size(kToolbox5) +
@@ -2007,7 +2088,12 @@ void ScriptUiClient::setThings(const things::ThingDb* things)
     impl_->thingsOverride = things;
 }
 
-void ScriptUiClient::setGameImageSize(std::function<std::optional<std::pair<int, int>>(std::string_view name)> size)
+void ScriptUiClient::setGameImageIndex(std::function<std::optional<std::int32_t>(std::string_view name, int frame)> index)
+{
+    impl_->gameImageIndex = std::move(index);
+}
+
+void ScriptUiClient::setGameImageSize(std::function<std::optional<UiGameImageSize>(std::int32_t index)> size)
 {
     impl_->gameImageSize = std::move(size);
 }
@@ -2016,14 +2102,6 @@ bool ScriptUiClient::coversHud() const noexcept
 {
     const Impl& impl = *impl_;
     return impl.vm && std::ranges::any_of(impl.windows, [](const UiWindow& w) { return w.cover; });
-}
-
-bool gameImageAllowed(std::string_view name)
-{
-    if (name.size() > kGameImagePortraitSuffix.size() && name.ends_with(kGameImagePortraitSuffix)) {
-        return true;
-    }
-    return !name.empty() && std::ranges::any_of(kGameImagePrefixes, [&](std::string_view p) { return name.starts_with(p); });
 }
 
 std::vector<UiSound> ScriptUiClient::takeSounds()

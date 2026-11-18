@@ -153,33 +153,29 @@ SDL_Texture* ModPanel::spellIconTexture(int index, float& w, float& h)
     return t;
 }
 
-SDL_Texture* ModPanel::gameImageTexture(const std::string& name, float& w, float& h, float& ox, float& oy)
+SDL_Texture* ModPanel::gameImageTexture(std::string_view name, std::int32_t index, float& w, float& h, float& ox, float& oy)
 {
-    // (API 6) One of the game's named pictures (an allowed one), as the original art has it.
-    if (!ed_.ctx_.sprites || !nox::modes::script::gameImageAllowed(name)) {
+    // (API 6) One of the game's pictures (by name or video.bag index), as the original art has it.
+    if (!ed_.ctx_.sprites) {
         return nullptr;
     }
-    const nox::things::ImageDef* def = ed_.things_.findImage(name);
-    const nox::things::ImageRef* ref = !def                ? nullptr
-                                       : def->image        ? &*def->image
-                                       : def->animation && !def->animation->frames.empty() ? &def->animation->frames.front()
-                                                                                           : nullptr;
-    if (!ref) {
+    const std::int32_t i = gamePictureIndex(ed_.things_, *ed_.ctx_.sprites, name, 0, index);
+    if (i < 0) {
         return nullptr;
     }
-    SDL_Texture* t = ed_.thumb("gameimage:" + name, [&](int& tw, int& th) -> std::vector<std::uint8_t> {
-        const auto* d = ed_.ctx_.sprites->decoded(ed_.ctx_.sprites->indexOf(*ref));
+    SDL_Texture* t = ed_.thumb("gameimage#" + std::to_string(i), [&](int& tw, int& th) -> std::vector<std::uint8_t> {
+        const auto* d = ed_.ctx_.sprites->decoded(i);
         if (!d) {
             return {};
         }
         tw = d->width;
         th = d->height;
-        gameImageOffsets_[name] = {static_cast<float>(d->offsetX), static_cast<float>(d->offsetY)};
+        gameImageOffsets_[i] = {static_cast<float>(d->offsetX), static_cast<float>(d->offsetY)};
         return d->rgba;
     });
     if (t) {
         SDL_GetTextureSize(t, &w, &h);
-        const auto it = gameImageOffsets_.find(name);
+        const auto it = gameImageOffsets_.find(i);
         ox = it != gameImageOffsets_.end() ? it->second.first : 0;
         oy = it != gameImageOffsets_.end() ? it->second.second : 0;
     }
@@ -552,12 +548,16 @@ void ModPanel::reloadPreview()
     // The mod's pictures and sounds, decoded as a host decodes them (a bad one: none, and why).
     auto assets = nox::modes::script::loadModAssets(project_->folder() / "assets");
     preview_.setThings(ed_.ctx_.things);
-    preview_.setGameImageSize([this](std::string_view name) -> std::optional<std::pair<int, int>> {
+    preview_.setGameImageIndex([this](std::string_view name, int frame) -> std::optional<std::int32_t> {
+        const std::int32_t i = ed_.ctx_.sprites ? gamePictureIndex(ed_.things_, *ed_.ctx_.sprites, name, frame) : -1;
+        return i >= 0 ? std::optional<std::int32_t>(i) : std::nullopt;
+    });
+    preview_.setGameImageSize([this](std::int32_t index) -> std::optional<nox::modes::script::UiGameImageSize> {
         float w = 0, h = 0, ox = 0, oy = 0;
-        if (!gameImageTexture(std::string(name), w, h, ox, oy)) {
+        if (index < 0 || !gameImageTexture({}, index, w, h, ox, oy)) {
             return std::nullopt;
         }
-        return std::pair{static_cast<int>(w), static_cast<int>(h)};
+        return nox::modes::script::UiGameImageSize{static_cast<int>(w), static_cast<int>(h), static_cast<int>(ox), static_cast<int>(oy)};
     });
     preview_.load(form_.id, form_.name, ui.value_or(""), samples ? std::optional<std::string_view>(*samples) : std::nullopt, form_.uiApi,
                   assets.assets);
@@ -1643,7 +1643,7 @@ void ModPanel::previewWindow()
             case nox::modes::script::UiDraw::Kind::GameImage: {
                 // (UI API 6) One of the game's pictures, its own offset kept, its size or w x h.
                 float iw = 0, ih = 0, ox = 0, oy = 0;
-                if (SDL_Texture* t = gameImageTexture(d.text, iw, ih, ox, oy); t && iw > 0 && ih > 0) {
+                if (SDL_Texture* t = gameImageTexture(d.text, d.index, iw, ih, ox, oy); t && iw > 0 && ih > 0) {
                     const float kx = d.w > 0 ? d.w / iw : 1, ky = d.h > 0 ? d.h / ih : 1;
                     const ImVec2 p0(a.x + ox * kx * scale, a.y + oy * ky * scale);
                     dl->AddImage(editor::texId(t), p0, ImVec2(p0.x + iw * kx * scale, p0.y + ih * ky * scale));

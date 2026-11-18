@@ -1952,4 +1952,21 @@ bool SpriteCache::compositePinAllowed() const
                      (openPinnedPage_ >= 0 && !pages_[static_cast<std::size_t>(openPinnedPage_)].full));
 }
 
+std::int32_t gamePictureIndex(const nox::things::ThingDb& things, SpriteCache& sprites, std::string_view name, int frame, std::int32_t index)
+{
+    std::int32_t i = index;
+    if (index < 0) {
+        // (By name: the IMAG's still, or its animation's frame; findImage and indexOf are indexed.)
+        const nox::things::ImageDef* def = things.findImage(name);
+        const nox::things::ImageRef* ref = nullptr;
+        if (def && def->image) {
+            ref = frame == 0 ? &*def->image : nullptr;
+        } else if (def && def->animation && frame >= 0 && static_cast<std::size_t>(frame) < def->animation->frames.size()) {
+            ref = &def->animation->frames[static_cast<std::size_t>(frame)];
+        }
+        i = ref ? sprites.indexOf(*ref) : -1;
+    }
+    return i >= 0 && static_cast<std::size_t>(i) < sprites.bagImages() ? i : -1;
+}
+
 } // namespace noxsdl

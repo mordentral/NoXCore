@@ -129,6 +129,9 @@ void UiPreview::load(const std::string& modeId, const std::string& modeName, std
     if (things_) {
         ui_->setThings(things_);
     }
+    if (gameImageIndex_) {
+        ui_->setGameImageIndex(gameImageIndex_);
+    }
     if (gameImageSize_) {
         ui_->setGameImageSize(gameImageSize_);
     }

@@ -110,6 +110,13 @@ struct Sprite {
 /// and alpha modulation and blend mode. Use it (or SpriteCache::render) for every sprite draw.
 void drawSprite(SDL_Renderer* renderer, const Sprite& sprite, const SDL_FRect* src, const SDL_FRect& dst);
 
+/// (UI API 6: nox.gameImage) The video.bag index of one of the game's pictures a mod's UI names:
+/// `index` itself (index >= 0), else thing.bin's named image `name`, its still (frame 0 alone) or
+/// its animation's frame `frame`; -1: none (no such image or frame, or past video.bag's images).
+/// The game's UI and the map editor's preview both look them up here.
+std::int32_t gamePictureIndex(const nox::things::ThingDb& things, SpriteCache& sprites, std::string_view name, int frame,
+                              std::int32_t index = -1);
+
 class SpriteCache {
     struct Entry; // (below)
 
@@ -264,6 +271,8 @@ public:
     void setHolding(bool holding) { holding_ = holding; }
 
     std::size_t loaded() const { return sprites_.size(); }
+    /// How many images video.bag has (their indexes 0 to this less one).
+    std::size_t bagImages() const { return bag_.images().size(); }
     /// Whether get(index) would hand out what's made already (nothing read or made), and the same
     /// for composite(key): MapView's make budget (setFloorMakeBudget) skips what isn't.
     bool cached(std::int32_t index) const { return sprites_.contains(index); }

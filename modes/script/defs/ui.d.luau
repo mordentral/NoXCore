@@ -66,10 +66,12 @@ declare nox: {
     --- Draws a thing type's picture from the client's own art (thing.bin's name), centred on (x, y) (UI API 2); UI API 6: fitted into a w x h box (h none: w), its shape kept.
     thing: (typeName: string, x: number, y: number, w: number?, h: number?) -> (),
     --- # The game's pictures and the view (UI API 6)
-    --- Draws one of the game's own pictures by name at its top left, its size or w x h (the HD pack's where it has one); true: drawn, false: not an allowed name or not in the client's art (draw your own then). Allowed names start with: UI (buttons Sm/Med/MedLg/Lg/Xlg/Huge with Lit and Dis, check boxes, radio buttons, scroll arrows, sliders, tabs), Border, DefaultLB, DefaultSlider, ProgressBar, CreatureCage (portraits), Spellbook (guide portraits), Book, SpellTab, GuideTab, QuickBar, Inventory, Shop, Trade, MapParchment, Arrow; also any name ending in Pic (the conversation and shop portraits, AirshipCaptainPic) (UI API 6).
-    gameImage: (name: string, x: number, y: number, w: number?, h: number?) -> boolean,
-    --- The width and height of one of the game's pictures (as nox.gameImage names them); nil: not allowed or not in the client's art (UI API 6).
-    gameImageSize: (name: string) -> (number?, number?),
+    --- Draws any of the game's own pictures at (x, y) moved by its own draw offset as the game draws it (nox.gameImageSize gives it), its size or w x h (the HD pack's where it has one): a named image of thing.bin (its still, or its animation's first frame: UIButtonMed, BorderCornerUL, CreatureCageWolf, AirshipCaptainPic, CursorBitmap...), or with a whole number the video.bag image of that index (any frame of any animation, walls, floors, items: nox.gameImageIndex gives a name's). True: drawn; false: not in the client's art (no such name, an index past video.bag's, a negative or fractional one; draw your own then) (UI API 6).
+    gameImage: (name: string | number, x: number, y: number, w: number?, h: number?) -> boolean,
+    --- The width, height and own draw offset (w, h, ox, oy) of one of the game's pictures (a name or a video.bag index, as nox.gameImage takes them): drawn at its size at (x, y), its top left is at (x + ox, y + oy), so nox.gameImage(p, x - ox, y - oy) puts its top left at (x, y) and nox.gameImage(p, cx - ox - w / 2, cy - oy - h / 2) centres it on (cx, cy); nil: not in the client's art (UI API 6).
+    gameImageSize: (name: string | number) -> (number?, number?, number?, number?),
+    --- The video.bag index of a named image's still (frame 0 or none), or of its animation's frame (from 0), for nox.gameImage to step through an animation; nil: no such name or frame in the client's art (UI API 6).
+    gameImageIndex: (name: string, frame: number?) -> number?,
     --- Draws a box in the game's own window look: filled (black, a colour, or false for none), the game's window border round it (10 units past its edge) (UI API 6).
     panel: (x: number, y: number, w: number, h: number, fill: (NoxColour | boolean)?) -> (),
     --- Keeps the window's later draws this frame inside a box of it; no box: the whole window again (inside ui.draw; UI API 6).

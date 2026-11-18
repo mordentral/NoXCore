@@ -21,8 +21,8 @@
 // their bursts (Effects::setBurstScale) at that scale. A client of level 8 draws the server's
 // leaps raised over a floor shadow (App::modeLifts) and shows its coloured lines, and keeps the
 // mod's abilities on a strip of buttons over the quickbar (their keys App::modAbilityKeys).
-// A UI of API 6 also draws the game's own named pictures (gamePicture: the HD pack's where it has
-// them) and things fitted to a box, clips a window's draws to a box of it, and may cover the game's
+// A UI of API 6 also draws any of the game's own pictures, by name or video.bag index (gamePicture:
+// the HD pack's where it has them) and things fitted to a box, clips a window's draws to a box of it, and may cover the game's
 // HUD pieces with a window (coversHud: gameHudShown hides them).
 #include "app.hpp"
 #include "audio.hpp"
@@ -116,19 +116,15 @@ bool gameWindowOver(const App& app, float x, float y, bool hud)
            (app.summon && gameHudShown(app) && app.summon->contains(x, y, w, h)) || (hud && app.book && app.book->contains(x, y, w, h));
 }
 
-/// (API 6) The game's named picture `name` (thing.bin's images: a still, or an animation's first
-/// frame) as a sprite; null: none.
-const Sprite* gamePicture(const App& app, std::string_view name)
+/// (API 6) One of the game's pictures as a sprite: video.bag's image `index` (index >= 0), else
+/// thing.bin's named image `name` (its still, or its animation's first frame); null: none.
+const Sprite* gamePicture(const App& app, std::string_view name, std::int32_t index)
 {
     if (!app.sprites) {
         return nullptr;
     }
-    const nox::things::ImageDef* def = app.things.findImage(name);
-    const nox::things::ImageRef* ref = !def                ? nullptr
-                                       : def->image        ? &*def->image
-                                       : def->animation && !def->animation->frames.empty() ? &def->animation->frames.front()
-                                                                                           : nullptr;
-    return ref ? app.sprites->get(*ref) : nullptr;
+    const std::int32_t i = gamePictureIndex(app.things, *app.sprites, name, 0, index);
+    return i >= 0 ? app.sprites->get(i) : nullptr;
 }
 
 /// A window, the game's own or one it opens, that the mod's tooltip and a release's mouseUp give
@@ -192,12 +188,17 @@ public:
                 return static_cast<int>(app_.font->measure(text, textSize()) / scale_);
             });
             // (API 6) The game's pictures as our art has them (the HD pack's in their place).
-            ui_->setGameImageSize([this](std::string_view name) -> std::optional<std::pair<int, int>> {
-                const Sprite* sp = gamePicture(app_, name);
+            ui_->setGameImageIndex([this](std::string_view name, int frame) -> std::optional<std::int32_t> {
+                const std::int32_t i = app_.sprites ? gamePictureIndex(app_.things, *app_.sprites, name, frame) : -1;
+                return i >= 0 ? std::optional<std::int32_t>(i) : std::nullopt;
+            });
+            ui_->setGameImageSize([this](std::int32_t index) -> std::optional<nox::modes::script::UiGameImageSize> {
+                const Sprite* sp = index >= 0 ? gamePicture(app_, {}, index) : nullptr;
                 if (!sp) {
                     return std::nullopt;
                 }
-                return std::pair{static_cast<int>(std::lround(sp->width)), static_cast<int>(std::lround(sp->height))};
+                return nox::modes::script::UiGameImageSize{static_cast<int>(std::lround(sp->width)), static_cast<int>(std::lround(sp->height)),
+                                                           static_cast<int>(std::lround(sp->offsetX)), static_cast<int>(std::lround(sp->offsetY))};
             });
         }
     }
@@ -870,11 +871,12 @@ private:
         drawSprite(renderer, *sp, nullptr, dst);
     }
 
-    /// (API 6) One of the game's named pictures, as the game's windows draw it (its own offset),
-    /// its size or scaled to w x h (the offset with it): the HD pack's where it has one.
+    /// (API 6) One of the game's pictures (by name or video.bag index), as the game's windows draw
+    /// it (its own offset), its size or scaled to w x h (the offset with it): the HD pack's where
+    /// it has one.
     void drawGameImage(App& app, SDL_Renderer* renderer, const UiDraw& d, float wx, float wy)
     {
-        const Sprite* sp = gamePicture(app, d.text);
+        const Sprite* sp = gamePicture(app, d.text, d.index);
         if (!sp || !(sp->width > 0) || !(sp->height > 0)) {
             return;
         }

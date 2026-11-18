@@ -58,8 +58,10 @@ public:
     void setTextWidth(std::function<int(std::string_view)> measure);
     /// The thing types nox.thing names (API 2), from the next load.
     void setThings(const things::ThingDb* things) { things_ = things; }
-    /// (API 6) The game's pictures' sizes, as ScriptUiClient::setGameImageSize, from the next load.
-    void setGameImageSize(std::function<std::optional<std::pair<int, int>>(std::string_view)> size) { gameImageSize_ = std::move(size); }
+    /// (API 6) The game's pictures' indexes and sizes, as ScriptUiClient::setGameImageIndex and
+    /// setGameImageSize, from the next load.
+    void setGameImageIndex(std::function<std::optional<std::int32_t>(std::string_view, int)> index) { gameImageIndex_ = std::move(index); }
+    void setGameImageSize(std::function<std::optional<UiGameImageSize>(std::int32_t)> size) { gameImageSize_ = std::move(size); }
 
     /// Once a frame: what was sent handed to the UI, then its windows drawn.
     void frame(std::uint64_t nowMs);
@@ -105,7 +107,8 @@ private:
     std::unique_ptr<ScriptUiClient> ui_;
     std::function<int(std::string_view)> textWidth_;
     const things::ThingDb* things_ = nullptr;
-    std::function<std::optional<std::pair<int, int>>(std::string_view)> gameImageSize_;
+    std::function<std::optional<std::int32_t>(std::string_view, int)> gameImageIndex_;
+    std::function<std::optional<UiGameImageSize>(std::int32_t)> gameImageSize_;
     std::vector<Sample> samples_;
     std::string previewError_;
     std::vector<std::string> sent_;

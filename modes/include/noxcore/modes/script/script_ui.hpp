@@ -126,14 +126,21 @@
 // ModeUi and ModeUi2: ui_proto.hpp's kUiApi6Level) adds, beside nox.api being 6:
 //   nox.thing(typeName, x, y, w, h)  w, h: the picture fitted into a w x h box centred on (x, y),
 //                                    its shape kept (h none: w); none: its own size, as before
-//   nox.gameImage(name, x, y [, w, h])  (inside draw) one of the game's own named pictures
-//                                    (thing.bin's images) of the allowed kinds (gameImageAllowed:
-//                                    the windows' pieces, buttons, scroll bars, slots, the cage's
-//                                    and the guide's portraits...), its top left at (x, y), its
-//                                    size or scaled to w x h; the HD pack's picture where it has
-//                                    one. True: drawn; false (nothing drawn): not allowed, or the
-//                                    client hasn't it
-//   nox.gameImageSize(name)          its width and height; nil: not allowed, or not there
+//   nox.gameImage(name, x, y [, w, h])  (inside draw) any of the game's own pictures: one of
+//                                    thing.bin's named images (its still, or its animation's first
+//                                    frame), or with a whole number for the name the video.bag
+//                                    image of that index (any frame of any animation, a wall, a
+//                                    floor tile, an item's picture...), at (x, y) moved by its own
+//                                    draw offset as the game draws it (scaled with it), its size or
+//                                    scaled to w x h; the HD pack's picture where it has one. True:
+//                                    drawn; false (nothing drawn): the client hasn't it (a name it
+//                                    hasn't, an index past video.bag's or negative)
+//   nox.gameImageSize(name)          its width, height and own draw offset: w, h, ox, oy (drawn at
+//                                    its size at (x, y), its top left is at (x + ox, y + oy)); a
+//                                    name or an index as gameImage's; nil: not there
+//   nox.gameImageIndex(name [, frame])  the video.bag index of a named image's still (frame 0 or
+//                                    none), or of its animation's frame `frame` (from 0); nil:
+//                                    none (no such name or frame, or the client hasn't it)
 //   nox.panel(x, y, w, h [, fill])   (inside draw) a box in the game's own window look: filled
 //                                    (black; a colour; false: none), and the game's window border
 //                                    pieces round it as its bordered windows have them (straddling
@@ -221,8 +228,9 @@ struct UiDraw {
         /// (API 4) a spell's icon (`index` its spell id) or a warrior ability's (`index` the
         /// ability's id with client::kAbilityTag), its top left at (x, y), w x h (0: its own size)
         SpellIcon,
-        /// (API 6) the game's named picture `text` (gameImageAllowed's), its top left at (x, y)
-        /// (moved by its own offset, scaled with it), w x h (0: its own size)
+        /// (API 6) one of the game's pictures: video.bag's image `index` (index >= 0), else
+        /// thing.bin's named image `text` (its still, or its animation's first frame); its top
+        /// left at (x, y) (moved by its own offset, scaled with it), w x h (0: its own size)
         GameImage,
         /// (API 6) the window's later draws kept inside (x, y, w, h) of it; w < 0: the whole window
         Clip,
@@ -231,7 +239,7 @@ struct UiDraw {
     float x = 0, y = 0, w = 0, h = 0; ///< (Text: its top left; Thing, API 6: the box it's fitted to, 0: none)
     UiColor color;
     std::string text;
-    int index = -1;    ///< (Image, Thing)
+    int index = -1;    ///< (Image, Thing, SpellIcon; GameImage: a video.bag index, -1 by `text`)
     float width = 1;   ///< (Line) 1-8 UI units
     float size = 1;    ///< (Text, API 5) times the UI's text size, 1-4
 };
@@ -292,33 +300,15 @@ inline constexpr std::size_t kUiMaxLeaps = 64;
 /// keeps them: Hud::icon draws either); none for any other name.
 std::optional<std::uint32_t> gameIconId(std::string_view name);
 
-/// (API 6) The kinds of the game's named pictures nox.gameImage draws, by the start of their
-/// names (case as thing.bin has them): what a UI needs to look like the game's own windows.
-inline constexpr std::string_view kGameImagePrefixes[] = {
-    "UI",            // the standard controls: buttons (Sm, Med, MedLg, Lg, Xlg, Huge; Lit, Dis), check
-                     // boxes, radio buttons, scroll arrows, sliders, tabs
-    "Border",        // the bordered windows' corners and edges (nox.panel's)
-    "DefaultLB",     // a list's scroll buttons
-    "DefaultSlider", // a slider's thumb
-    "ProgressBar",   // a bar's ground and meter
-    "CreatureCage",  // the summon cage's portraits, its frame and buttons
-    "Spellbook",     // the guide's portraits, the book's button
-    "Book",          // the book's pages and their buttons
-    "SpellTab",      // the book's tabs
-    "GuideTab",
-    "QuickBar",      // the spell bar's base, slots (nuggets) and title
-    "Inventory",     // the inventory's base, trays, rings and buttons
-    "Shop",          // the shop's base, its list's scroll pieces, its text border, the keepers
-    "Trade",         // the trade window's base and buttons
-    "MapParchment",  // the map's parchment
-    "Arrow",         // the eight arrows
+/// (API 6) The longest image name nox.gameImage, gameImageSize and gameImageIndex look up (longer:
+/// none).
+inline constexpr std::size_t kGameImageMaxName = 64;
+/// (API 6) One of the game's pictures in the program's art: its size and its own draw offset (a
+/// GameImage draw at its size puts its top left at the point given plus this), in the UI's units.
+struct UiGameImageSize {
+    int w = 0, h = 0;
+    int offsetX = 0, offsetY = 0;
 };
-/// (API 6) The end of the conversation and shop portraits' names (AirshipCaptainPic, ShopKeeperPic):
-/// nox.gameImage draws any of them too.
-inline constexpr std::string_view kGameImagePortraitSuffix = "Pic";
-/// Whether nox.gameImage may draw the picture `name` (one of kGameImagePrefixes' kinds, or a portrait
-/// named with kGameImagePortraitSuffix).
-bool gameImageAllowed(std::string_view name);
 
 /// (Client level 8) A spinning thing now (ui_proto.hpp's kSpin: nox.setSpin): how many eighths of
 /// a turn it has gone round since it began (negative: the other way).
@@ -447,10 +437,15 @@ public:
     void setPlayer(std::optional<UiPlayer> player);
     /// (API 2) The thing types nox.thing names (unset: the client's).
     void setThings(const things::ThingDb* things);
-    /// (API 6) The size of the game's named picture `name` in the program's art (none: it hasn't
-    /// it), for nox.gameImage and nox.gameImageSize. Unset: a name is there when the thing types'
-    /// images list it, its size unknown (nox.gameImageSize nil).
-    void setGameImageSize(std::function<std::optional<std::pair<int, int>>(std::string_view name)> size);
+    /// (API 6) The video.bag index of thing.bin's named image `name` in the program's art: its
+    /// still (frame 0 alone) or its animation's frame `frame` (none: no such image or frame, or
+    /// not in the program's video.bag), for nox.gameImage, gameImageSize and gameImageIndex.
+    /// Unset: by the thing types' images alone (an image they name by name: none).
+    void setGameImageIndex(std::function<std::optional<std::int32_t>(std::string_view name, int frame)> index);
+    /// (API 6) The size and own draw offset of video.bag's image `index` in the program's art
+    /// (none: it hasn't it), for nox.gameImage and nox.gameImageSize. Unset: an index is never
+    /// there, a name is when the thing types' images list it, its size unknown (nox.gameImageSize nil).
+    void setGameImageSize(std::function<std::optional<UiGameImageSize>(std::int32_t index)> size);
     /// (API 6) Whether a window opened with cover = true is open: the game's HUD pieces not drawn
     /// nor taking the mouse. False with no UI running.
     bool coversHud() const noexcept;
