@@ -153,6 +153,39 @@ SDL_Texture* ModPanel::spellIconTexture(int index, float& w, float& h)
     return t;
 }
 
+SDL_Texture* ModPanel::gameImageTexture(const std::string& name, float& w, float& h, float& ox, float& oy)
+{
+    // (API 6) One of the game's named pictures (an allowed one), as the original art has it.
+    if (!ed_.ctx_.sprites || !nox::modes::script::gameImageAllowed(name)) {
+        return nullptr;
+    }
+    const nox::things::ImageDef* def = ed_.things_.findImage(name);
+    const nox::things::ImageRef* ref = !def                ? nullptr
+                                       : def->image        ? &*def->image
+                                       : def->animation && !def->animation->frames.empty() ? &def->animation->frames.front()
+                                                                                           : nullptr;
+    if (!ref) {
+        return nullptr;
+    }
+    SDL_Texture* t = ed_.thumb("gameimage:" + name, [&](int& tw, int& th) -> std::vector<std::uint8_t> {
+        const auto* d = ed_.ctx_.sprites->decoded(ed_.ctx_.sprites->indexOf(*ref));
+        if (!d) {
+            return {};
+        }
+        tw = d->width;
+        th = d->height;
+        gameImageOffsets_[name] = {static_cast<float>(d->offsetX), static_cast<float>(d->offsetY)};
+        return d->rgba;
+    });
+    if (t) {
+        SDL_GetTextureSize(t, &w, &h);
+        const auto it = gameImageOffsets_.find(name);
+        ox = it != gameImageOffsets_.end() ? it->second.first : 0;
+        oy = it != gameImageOffsets_.end() ? it->second.second : 0;
+    }
+    return t;
+}
+
 // --- Commands ----------------------------------------------------------------------------------
 
 void ModPanel::registerCommands()
@@ -519,6 +552,13 @@ void ModPanel::reloadPreview()
     // The mod's pictures and sounds, decoded as a host decodes them (a bad one: none, and why).
     auto assets = nox::modes::script::loadModAssets(project_->folder() / "assets");
     preview_.setThings(ed_.ctx_.things);
+    preview_.setGameImageSize([this](std::string_view name) -> std::optional<std::pair<int, int>> {
+        float w = 0, h = 0, ox = 0, oy = 0;
+        if (!gameImageTexture(std::string(name), w, h, ox, oy)) {
+            return std::nullopt;
+        }
+        return std::pair{static_cast<int>(w), static_cast<int>(h)};
+    });
     preview_.load(form_.id, form_.name, ui.value_or(""), samples ? std::optional<std::string_view>(*samples) : std::nullopt, form_.uiApi,
                   assets.assets);
     previewLoaded_ = true;
@@ -1158,9 +1198,10 @@ void ModPanel::formWindow()
     editor::labelRow("UI API", fieldX,
                      "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more. 3: lines, tooltips, labels over things, HUD strips, "
                      "drags and the wheel. 4: the game's spell icons, hit areas, a tick, kept labels. 5: the game's top-left icons kept "
-                     "out of a box (each sent only to clients that run it; the rest get text).");
-    int api = std::clamp(form_.uiApi, 1, 5) - 1;
-    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0" "4\0" "5\0")) form_.uiApi = api + 1;
+                     "out of a box. 6: the game's own pictures and window look, clipping, the whole view, covering the HUD (each sent "
+                     "only to clients that run it; the rest get text).");
+    int api = std::clamp(form_.uiApi, 1, 6) - 1;
+    if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0" "4\0" "5\0" "6\0")) form_.uiApi = api + 1;
 
     ImGui::SeparatorText("Options");
     help("Settings shown under the mode's row in Host Custom; a script reads them with nox.option(key).");
@@ -1577,11 +1618,38 @@ void ModPanel::previewWindow()
             dl->AddText(font, textPx, ImVec2(o0.x + 4 * scale, o0.y + 2 * scale), IM_COL32(240, 180, 42, 255), label.c_str());
             dl->PopClipRect();
         }
-        dl->PushClipRect(pt(static_cast<float>(w.x), static_cast<float>(w.y)), pt(static_cast<float>(w.x + w.w), static_cast<float>(w.y + w.h)), true);
+        const ImVec2 w0 = pt(static_cast<float>(w.x), static_cast<float>(w.y));
+        const ImVec2 w1 = pt(static_cast<float>(w.x + w.w), static_cast<float>(w.y + w.h));
+        dl->PushClipRect(w0, w1, true);
+        bool clippedAway = false; // (UI API 6: a clip box off the window, nothing till the next)
         for (const auto& d : w.draws) {
             const ImU32 c = IM_COL32(d.color.r, d.color.g, d.color.b, d.color.a);
             const ImVec2 a = pt(static_cast<float>(w.x) + d.x, static_cast<float>(w.y) + d.y);
+            if (d.kind == nox::modes::script::UiDraw::Kind::Clip) {
+                // (UI API 6) The later draws inside a box of the window (or the whole window again).
+                dl->PopClipRect();
+                ImVec2 c0 = w0, c1 = w1;
+                if (d.w >= 0) {
+                    c0 = ImVec2(std::max(w0.x, a.x), std::max(w0.y, a.y));
+                    c1 = ImVec2(std::min(w1.x, a.x + d.w * scale), std::min(w1.y, a.y + d.h * scale));
+                }
+                clippedAway = c1.x <= c0.x || c1.y <= c0.y;
+                dl->PushClipRect(c0, clippedAway ? c0 : c1, true);
+                continue;
+            }
+            if (clippedAway) continue;
             switch (d.kind) {
+            case nox::modes::script::UiDraw::Kind::Clip: break;
+            case nox::modes::script::UiDraw::Kind::GameImage: {
+                // (UI API 6) One of the game's pictures, its own offset kept, its size or w x h.
+                float iw = 0, ih = 0, ox = 0, oy = 0;
+                if (SDL_Texture* t = gameImageTexture(d.text, iw, ih, ox, oy); t && iw > 0 && ih > 0) {
+                    const float kx = d.w > 0 ? d.w / iw : 1, ky = d.h > 0 ? d.h / ih : 1;
+                    const ImVec2 p0(a.x + ox * kx * scale, a.y + oy * ky * scale);
+                    dl->AddImage(editor::texId(t), p0, ImVec2(p0.x + iw * kx * scale, p0.y + ih * ky * scale));
+                }
+                break;
+            }
             case nox::modes::script::UiDraw::Kind::Box: dl->AddRectFilled(a, ImVec2(a.x + d.w * scale, a.y + d.h * scale), c); break;
             case nox::modes::script::UiDraw::Kind::Outline: dl->AddRect(a, ImVec2(a.x + d.w * scale, a.y + d.h * scale), c); break;
             case nox::modes::script::UiDraw::Kind::Text: dl->AddText(font, textPx * d.size, a, c, d.text.c_str()); break;
@@ -1609,7 +1677,7 @@ void ModPanel::previewWindow()
             case nox::modes::script::UiDraw::Kind::Thing: {
                 // A thing type's picture (the content browser's thumbnail), centred on the point.
                 if (d.index <= 0 || static_cast<std::size_t>(d.index) > ed_.things_.things.size()) break;
-                const float size = 32 * scale;
+                const float size = (d.w > 0 && d.h > 0 ? std::min(d.w, d.h) : 32) * scale; // (UI API 6: fitted to its box)
                 ed_.objects_->drawThumbnailAt(dl, ed_.things_.things[static_cast<std::size_t>(d.index) - 1].name, ImVec2(a.x - size / 2, a.y - size / 2), size);
                 break;
             }

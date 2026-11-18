@@ -58,6 +58,8 @@ public:
     void setTextWidth(std::function<int(std::string_view)> measure);
     /// The thing types nox.thing names (API 2), from the next load.
     void setThings(const things::ThingDb* things) { things_ = things; }
+    /// (API 6) The game's pictures' sizes, as ScriptUiClient::setGameImageSize, from the next load.
+    void setGameImageSize(std::function<std::optional<std::pair<int, int>>(std::string_view)> size) { gameImageSize_ = std::move(size); }
 
     /// Once a frame: what was sent handed to the UI, then its windows drawn.
     void frame(std::uint64_t nowMs);
@@ -103,6 +105,7 @@ private:
     std::unique_ptr<ScriptUiClient> ui_;
     std::function<int(std::string_view)> textWidth_;
     const things::ThingDb* things_ = nullptr;
+    std::function<std::optional<std::pair<int, int>>(std::string_view)> gameImageSize_;
     std::vector<Sample> samples_;
     std::string previewError_;
     std::vector<std::string> sent_;

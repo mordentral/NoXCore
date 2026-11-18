@@ -123,6 +123,9 @@ public:
         (void)app;
         return false;
     }
+    /// Whether the mode's windows cover the game's own HUD pieces now (a script UI's window opened
+    /// with cover = true): those aren't drawn and take no mouse (gameHudShown).
+    virtual bool coversHud() const { return false; }
     /// Each frame once the camera's set from our own player (it may move it: a scene's view).
     virtual void cameraSet(App& app) { (void)app; }
     /// A join of `game` refused (`joinError`, net::JoinError's): what the game list says, when

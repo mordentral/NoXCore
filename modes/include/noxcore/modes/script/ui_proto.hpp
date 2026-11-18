@@ -35,7 +35,8 @@
 //   kDrawScale  u16 the thing's net code, u16 its type (its net type id), u16 the scale in 1/256
 //               (128-768: 0.5-3; 256: as its type's, the scale let go)    (6 bytes)
 // A UI of API 4 (kBegin's api byte 4) and everything of it go only to a client at client level 5
-// or above (kUiApi4Level) that named ModeUi and ModeUi2; the bytes are API 2's.
+// or above (kUiApi4Level) that named ModeUi and ModeUi2; the bytes are API 2's. So for API 5 at
+// level 6 (kUiApi5Level) and API 6 at level 11 (kUiApi6Level).
 // and, only to a client at client level 6 or above (kBigDataLevel), a value too big for one kData
 // (nox.send over kMaxValue bytes, to kMaxBigValue), in order with the kData before and after it:
 //   kDataBegin  u32 the value's bytes, u8 coding (0 stored, 1 NXZ), u32 the coded bytes
@@ -161,6 +162,9 @@ inline constexpr std::uint16_t kUiApi3Level = 3;
 inline constexpr std::uint16_t kUiApi4Level = 5;
 /// The lowest client level a server sends a UI of API 5 to (nox.hudReserve: as kUiApi3Level's).
 inline constexpr std::uint16_t kUiApi5Level = 6;
+/// The lowest client level a server sends a UI of API 6 to (the game's pictures, clipping, the
+/// view: as kUiApi3Level's).
+inline constexpr std::uint16_t kUiApi6Level = 11;
 /// The lowest client level a server sends kDrawScale to (with ModeUi named).
 inline constexpr std::uint16_t kDrawScaleLevel = 5;
 /// The lowest client level a server sends kDataBegin and kDataChunk to (a big value).

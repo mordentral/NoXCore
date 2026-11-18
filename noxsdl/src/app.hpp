@@ -786,6 +786,9 @@ inline bool playing(const nox::client::HeadlessClient& client)
 }
 
 // app.cpp
+/// Whether the game's own HUD pieces are drawn and take the mouse this frame (hud_shown.hpp's
+/// hudShownTo: not while we observe, nor while a mode's window covers them); F11 aside.
+bool gameHudShown(const App& app);
 /// Whether intoGameArea changes a window point (letterboxed, or the pixel density over 1).
 bool mapsPointer(const App& app);
 void intoGameArea(const App& app, float& x, float& y);

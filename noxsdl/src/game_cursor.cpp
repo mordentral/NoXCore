@@ -84,10 +84,11 @@ void chooseCursor(App& app, bool inGame)
     }
     if (app.hud && inGame) {
         const SDL_FPoint m = mousePos(app);
-        if (app.hud->hit(client.world(), client.netCode(), quickbarState(app), m.x, m.y, app.camera.viewWidth,
-                         app.camera.viewHeight) ||
-            (app.inventory && app.inventory->contains(m.x, m.y, app.camera.viewWidth, app.camera.viewHeight)) ||
-            (app.summon && app.summon->contains(m.x, m.y, app.camera.viewWidth, app.camera.viewHeight))) {
+        const bool pieces = gameHudShown(app); // (hidden: not there to point at; an open inventory still is)
+        if ((pieces && app.hud->hit(client.world(), client.netCode(), quickbarState(app), m.x, m.y, app.camera.viewWidth,
+                                    app.camera.viewHeight)) ||
+            (app.inventory && (pieces || app.inventory->isOpen()) && app.inventory->contains(m.x, m.y, app.camera.viewWidth, app.camera.viewHeight)) ||
+            (pieces && app.summon && app.summon->contains(m.x, m.y, app.camera.viewWidth, app.camera.viewHeight))) {
             app.cursorType = CursorType::Select; // over the GUI
             return;
         }

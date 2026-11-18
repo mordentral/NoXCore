@@ -129,6 +129,9 @@ void UiPreview::load(const std::string& modeId, const std::string& modeName, std
     if (things_) {
         ui_->setThings(things_);
     }
+    if (gameImageSize_) {
+        ui_->setGameImageSize(gameImageSize_);
+    }
     // (nox.player: a stand-in, there being no game.)
     ui_->setPlayer(UiPlayer{.name = "Preview", .playerClass = 0, .level = 1, .health = 100, .maxHealth = 100, .mana = 50, .maxMana = 100});
     if (assets) {

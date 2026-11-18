@@ -149,6 +149,10 @@ private:
     /// (UI API 4) The game's icon for spell `index` (or an ability, tagged as the bars keep it) as
     /// a texture made once (the map editor's thumbnails), and its size; null: none.
     SDL_Texture* spellIconTexture(int index, float& w, float& h);
+    /// (UI API 6) One of the game's named pictures (nox.gameImage's) as a texture made once, its
+    /// size and its own draw offset; null: not allowed, or none.
+    SDL_Texture* gameImageTexture(const std::string& name, float& w, float& h, float& ox, float& oy);
+    std::map<std::string, std::pair<float, float>> gameImageOffsets_;
     /// (UI API 2) A key of the fixed set pressed over the preview's screen: to the window under the mouse.
     void previewKeys(float ux, float uy);
     /// (UI API 3) A press in one of the preview's windows (a drag's), as the game tells it.

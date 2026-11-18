@@ -1066,7 +1066,10 @@ bool leftMouse(App& app, bool down, float x, float y)
         }
         return true;
     }
-    if (app.summon) {
+    // (The HUD pieces hidden, gameHudShown: the cage, the shut inventory's panel and the bars take
+    // no press; a press they took before is let go as ever.)
+    const bool pieces = gameHudShown(app);
+    if (app.summon && (pieces || !down)) {
         // The cage and its command list (modal while it's up).
         auto& client = app.live->client();
         const auto command = [&client](std::uint16_t nc, std::uint8_t c) { client.commandCreature(nc, c); };
@@ -1080,10 +1083,10 @@ bool leftMouse(App& app, bool down, float x, float y)
             return true;
         }
     }
-    if (inventoryMouse(app, down, x, y)) {
+    if ((pieces || !down || (app.inventory && app.inventory->isOpen())) && inventoryMouse(app, down, x, y)) {
         return true;
     }
-    return barsMouse(app, down, x, y);
+    return (pieces || !down) && barsMouse(app, down, x, y);
 }
 
 } // namespace noxsdl

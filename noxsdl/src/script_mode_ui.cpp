@@ -21,6 +21,9 @@
 // their bursts (Effects::setBurstScale) at that scale. A client of level 8 draws the server's
 // leaps raised over a floor shadow (App::modeLifts) and shows its coloured lines, and keeps the
 // mod's abilities on a strip of buttons over the quickbar (their keys App::modAbilityKeys).
+// A UI of API 6 also draws the game's own named pictures (gamePicture: the HD pack's where it has
+// them) and things fitted to a box, clips a window's draws to a box of it, and may cover the game's
+// HUD pieces with a window (coversHud: gameHudShown hides them).
 #include "app.hpp"
 #include "audio.hpp"
 #include "chat_entry.hpp"
@@ -110,7 +113,22 @@ bool gameWindowOver(const App& app, float x, float y, bool hud)
     const int w = app.camera.viewWidth;
     const int h = app.camera.viewHeight;
     return (app.inventory && app.inventory->isOpen() && app.inventory->contains(x, y, w, h)) ||
-           (app.summon && app.summon->contains(x, y, w, h)) || (hud && app.book && app.book->contains(x, y, w, h));
+           (app.summon && gameHudShown(app) && app.summon->contains(x, y, w, h)) || (hud && app.book && app.book->contains(x, y, w, h));
+}
+
+/// (API 6) The game's named picture `name` (thing.bin's images: a still, or an animation's first
+/// frame) as a sprite; null: none.
+const Sprite* gamePicture(const App& app, std::string_view name)
+{
+    if (!app.sprites) {
+        return nullptr;
+    }
+    const nox::things::ImageDef* def = app.things.findImage(name);
+    const nox::things::ImageRef* ref = !def                ? nullptr
+                                       : def->image        ? &*def->image
+                                       : def->animation && !def->animation->frames.empty() ? &def->animation->frames.front()
+                                                                                           : nullptr;
+    return ref ? app.sprites->get(*ref) : nullptr;
 }
 
 /// A window, the game's own or one it opens, that the mod's tooltip and a release's mouseUp give
@@ -173,8 +191,18 @@ public:
                 }
                 return static_cast<int>(app_.font->measure(text, textSize()) / scale_);
             });
+            // (API 6) The game's pictures as our art has them (the HD pack's in their place).
+            ui_->setGameImageSize([this](std::string_view name) -> std::optional<std::pair<int, int>> {
+                const Sprite* sp = gamePicture(app_, name);
+                if (!sp) {
+                    return std::nullopt;
+                }
+                return std::pair{static_cast<int>(std::lround(sp->width)), static_cast<int>(std::lround(sp->height))};
+            });
         }
     }
+
+    bool coversHud() const override { return ui_ && ui_->coversHud(); }
 
     bool release(App& app, const SDL_Event& event) override
     {
@@ -550,12 +578,30 @@ private:
                 const std::string label = ui_->modeName() + ": " + w.title;
                 app.font->draw(fitted(label, inner.w - 6 * scale_, px), outer.x + 4 * scale_, outer.y + 2 * scale_, px, SDL_Color{240, 180, 42, 255});
             }
-            // Its draws, inside it alone.
+            // Its draws, inside it alone (API 6: or inside a box of it, nox.clip).
             const SDL_Rect clip{static_cast<int>(inner.x), static_cast<int>(inner.y), static_cast<int>(inner.w), static_cast<int>(inner.h)};
             SDL_SetRenderClipRect(renderer, &clip);
+            bool clippedAway = false; // (a clip box off the window: nothing drawn till the next)
             for (const UiDraw& d : w.draws) {
                 const SDL_Color c{d.color.r, d.color.g, d.color.b, d.color.a};
                 const SDL_FRect r = toScreen(static_cast<float>(w.x) + d.x, static_cast<float>(w.y) + d.y, d.w, d.h);
+                if (d.kind == UiDraw::Kind::Clip) {
+                    SDL_Rect box = clip;
+                    if (d.w >= 0) {
+                        const SDL_Rect want{static_cast<int>(std::floor(r.x)), static_cast<int>(std::floor(r.y)), static_cast<int>(std::ceil(r.x + r.w) - std::floor(r.x)),
+                                            static_cast<int>(std::ceil(r.y + r.h) - std::floor(r.y))};
+                        if (!SDL_GetRectIntersection(&clip, &want, &box)) {
+                            clippedAway = true;
+                            continue;
+                        }
+                    }
+                    clippedAway = false;
+                    SDL_SetRenderClipRect(renderer, &box);
+                    continue;
+                }
+                if (clippedAway) {
+                    continue;
+                }
                 switch (d.kind) {
                 case UiDraw::Kind::Box: box::fill(renderer, r, c); break;
                 case UiDraw::Kind::Outline: box::outline(renderer, r, c); break;
@@ -565,6 +611,8 @@ private:
                 case UiDraw::Kind::Image: drawImage(renderer, d, r); break;
                 case UiDraw::Kind::Thing: drawThing(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
                 case UiDraw::Kind::SpellIcon: drawSpellIcon(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
+                case UiDraw::Kind::GameImage: drawGameImage(app, renderer, d, static_cast<float>(w.x), static_cast<float>(w.y)); break;
+                case UiDraw::Kind::Clip: break; // (above)
                 case UiDraw::Kind::Line: {
                     const SDL_FRect to = toScreen(static_cast<float>(w.x) + d.w, static_cast<float>(w.y) + d.h, 0, 0);
                     drawLine(renderer, r.x, r.y, to.x, to.y, d.width * scale_, c);
@@ -694,7 +742,7 @@ private:
             (app.tradeScreens && app.tradeScreens->contains(x, y, app.camera.viewWidth, app.camera.viewHeight))) {
             return std::nullopt;
         }
-        if (app.hud && app.live) {
+        if (app.hud && app.live && gameHudShown(app)) {
             const auto& client = app.live->client();
             if (app.hud->hit(client.world(), client.netCode(), quickbarState(app), x, y, app.camera.viewWidth, app.camera.viewHeight)) {
                 return std::nullopt;
@@ -810,10 +858,30 @@ private:
         if (!sp) {
             return;
         }
-        // (Its picture centred on the point.)
-        const SDL_FRect dst = toScreen(wx + d.x - sp->width / 2, wy + d.y - sp->height / 2, sp->width, sp->height);
+        // (Its picture centred on the point; API 6: fitted into the box asked for, its shape kept.)
+        float w = sp->width, h = sp->height;
+        if (d.w > 0 && d.h > 0 && w > 0 && h > 0) {
+            const float k = std::min(d.w / w, d.h / h);
+            w *= k;
+            h *= k;
+        }
+        const SDL_FRect dst = toScreen(wx + d.x - w / 2, wy + d.y - h / 2, w, h);
         sp->scale = SDL_SCALEMODE_LINEAR;
         drawSprite(renderer, *sp, nullptr, dst);
+    }
+
+    /// (API 6) One of the game's named pictures, as the game's windows draw it (its own offset),
+    /// its size or scaled to w x h (the offset with it): the HD pack's where it has one.
+    void drawGameImage(App& app, SDL_Renderer* renderer, const UiDraw& d, float wx, float wy)
+    {
+        const Sprite* sp = gamePicture(app, d.text);
+        if (!sp || !(sp->width > 0) || !(sp->height > 0)) {
+            return;
+        }
+        const float kx = d.w > 0 ? d.w / sp->width : 1;
+        const float ky = d.h > 0 ? d.h / sp->height : 1;
+        sp->scale = SDL_SCALEMODE_LINEAR;
+        drawSprite(renderer, *sp, nullptr, toScreen(wx + d.x + sp->offsetX * kx, wy + d.y + sp->offsetY * ky, sp->width * kx, sp->height * ky));
     }
 
     /// (API 4) A spell's or an ability's icon as the book and the bars draw it (Hud::icon: the HD
@@ -911,7 +979,7 @@ private:
     /// sets folded): only then does it take keys and clicks.
     bool stripShown(const App& app) const
     {
-        return ui_ && app.renderGui && !app.barsExpanded && ui_->hudShown() && !ui_->abilities().empty();
+        return ui_ && app.renderGui && !app.barsExpanded && ui_->hudShown() && !ui_->abilities().empty() && gameHudShown(app);
     }
 
     /// A held ability let go when its key or button is up though its release went elsewhere (the

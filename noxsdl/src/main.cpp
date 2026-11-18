@@ -2370,7 +2370,9 @@ void drawGameHud(App& app)
     app.spellLimits.update(client.world(), client.netCode(), clockFrame());
     app.hud->setLimited(app.spellLimits.limited(client.world(), app.gameData, gameFlags(app), client.modeOwnsBook()));
     app.hud->setGameFlags(gameFlags(app)); // (the cooldowns and trap prices: the game's own gamedata lines)
-    if (app.renderGui && !(app.tradeScreens && app.tradeScreens->hidesHud())) {
+    // (The game's own HUD pieces: not while we observe, nor under a mod's covering window.)
+    const bool hudPieces = gameHudShown(app);
+    if (app.renderGui && hudPieces && !(app.tradeScreens && app.tradeScreens->hidesHud())) {
         app.hud->draw(app.renderer, app.font.get(), *app.sprites, client.world(), client.netCode(),
                        quickbarState(app), app.camera.viewWidth, app.camera.viewHeight,
                        gameFrame(app));
@@ -2405,14 +2407,15 @@ void drawGameHud(App& app)
             ui->drawHud(app, app.renderer, modeHud);
         }
     }
-    if (app.inventory && app.renderGui) {
+    if (app.inventory && app.renderGui && (hudPieces || app.inventory->isOpen())) {
+        // (Shut, it's the weapon panel and the buffs' row: HUD pieces.)
         app.inventory->setMulticlass(client.multiclass());
         app.inventory->setGameFlags(gameFlags(app));
         app.inventory->draw(app.renderer, client.world(), client.netCode(), app.camera.viewWidth,
                              app.camera.viewHeight, mousePos(app));
     }
     const bool hudHidden = app.tradeScreens && app.tradeScreens->hidesHud(); // (renderGUI off)
-    if (app.summon && app.renderGui && !hudHidden) {
+    if (app.summon && app.renderGui && !hudHidden && hudPieces) {
         app.summon->draw(app.renderer, client.world(), app.camera.viewWidth, app.camera.viewHeight,
                           mousePos(app));
     }

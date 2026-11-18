@@ -2,6 +2,7 @@
 // string table's texts, the centred messages, the game's flags as the client reads them.
 #include "app.hpp"
 
+#include "hud_shown.hpp"
 #include "pointer_map.hpp"
 
 #include "noxcore/client/inform_text.hpp"
@@ -19,6 +20,16 @@
 namespace fs = std::filesystem;
 
 namespace noxsdl {
+
+bool gameHudShown(const App& app)
+{
+    if (!app.live) {
+        return true;
+    }
+    const bool covered = std::ranges::any_of(app.modeUis, [](const auto& m) { return m.second && m.second->coversHud(); });
+    const auto& client = app.live->client();
+    return hudShownTo(client.world(), client.netCode(), covered);
+}
 
 bool mapsPointer(const App& app)
 {

@@ -505,12 +505,15 @@ struct ScriptedMode::Impl {
         return lobby::ClientFeature::ModeUi | (package->manifest.uiApi >= 2 ? lobby::ClientFeature::ModeUi2 : 0u);
     }
     /// Whether `peer` takes this UI: it named what the UI needs, and for a UI of API 3 its client
-    /// is at uimsg::kUiApi3Level or above, for API 4 at kUiApi4Level, for API 5 at kUiApi5Level
-    /// (asked each time: a slot may change hands).
+    /// is at uimsg::kUiApi3Level or above, for API 4 at kUiApi4Level, for API 5 at kUiApi5Level,
+    /// for API 6 at kUiApi6Level (asked each time: a slot may change hands).
     bool uiReaches(std::uint8_t peer) const
     {
         const int api = package->manifest.uiApi;
-        const std::uint16_t level = api >= 5 ? uimsg::kUiApi5Level : api >= 4 ? uimsg::kUiApi4Level : uimsg::kUiApi3Level;
+        const std::uint16_t level = api >= 6   ? uimsg::kUiApi6Level
+                                    : api >= 5 ? uimsg::kUiApi5Level
+                                    : api >= 4 ? uimsg::kUiApi4Level
+                                               : uimsg::kUiApi3Level;
         return host && (host->clientFeatures(peer) & uiNeeds()) == uiNeeds() && (api < 3 || host->clientLevel(peer) >= level);
     }
     void sendUi(std::uint8_t peer, uimsg::Sub sub, std::span<const std::uint8_t> payload = {})

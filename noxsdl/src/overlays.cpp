@@ -986,11 +986,13 @@ std::string liveTooltip(App& app)
         }
         return {};
     };
-    // The windows first, in turn: the first one under the mouse answers.
+    // The windows first, in turn: the first one under the mouse answers. (The HUD pieces hidden,
+    // gameHudShown: none of theirs; an open inventory's still.)
+    const bool pieces = gameHudShown(app);
     if (app.tradeScreens && app.tradeScreens->contains(m.x, m.y, w, h)) {
         return app.tradeScreens->tooltip(m.x, m.y, w, h, world);
     }
-    if (app.summon && app.summon->contains(m.x, m.y, w, h)) {
+    if (pieces && app.summon && app.summon->contains(m.x, m.y, w, h)) {
         return app.summon->tooltip(m.x, m.y, w, h, world);
     }
     if (app.book) {
@@ -998,7 +1000,7 @@ std::string liveTooltip(App& app)
             return app.book->tooltip(m.x, m.y, w, h, bookContext(app));
         }
     }
-    if (app.inventory) {
+    if (app.inventory && (pieces || app.inventory->isOpen())) {
         const auto hover = app.inventory->hoverAt(m.x, m.y, w, h, world);
         if (!hover.text.empty()) {
             return hover.text;
@@ -1030,7 +1032,7 @@ std::string liveTooltip(App& app)
             return {};
         }
     }
-    if (auto t = app.hud->tooltip(world, client.netCode(), quickbarState(app), m.x, m.y, w, h); !t.empty()) {
+    if (auto t = pieces ? app.hud->tooltip(world, client.netCode(), quickbarState(app), m.x, m.y, w, h) : std::string(); !t.empty()) {
         return t;
     }
     // (Not under a cinematic's widescreen, paused or dying: cursorUpdate skips the world there.)

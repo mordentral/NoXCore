@@ -146,7 +146,11 @@ struct ClientSecret {
 ///      spell or ability its player knows put in the bars' first empty slot where no slot holds it,
 ///      with no book, sound or sparks), sent only to a client of level 10 or above that named
 ///      ModeUi (ui_proto.hpp's kToBarsLevel); any other is sent nothing (nox.putOnBars says false)
-inline constexpr std::uint16_t kClientLevel = 10;
+///  11  UI API 6 (mode.json's "uiApi": 6: nox.gameImage, nox.gameImageSize, nox.panel, nox.clip,
+///      nox.view, nox.thing's size, windows the size of the whole view and cover), a UI of it sent
+///      only to a client of level 11 or above that named ModeUi and ModeUi2 (ui_proto.hpp's
+///      kUiApi6Level); any other gets the views as text
+inline constexpr std::uint16_t kClientLevel = 11;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).
 inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.

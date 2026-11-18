@@ -122,6 +122,34 @@
 //                                    pause), none leaves the game's name. A client before it never
 //                                    calls it (the game's name, as before)
 //
+// UI API 6 (mode.json's "uiApi": 6; sent only to a client at client level 11 or above that names
+// ModeUi and ModeUi2: ui_proto.hpp's kUiApi6Level) adds, beside nox.api being 6:
+//   nox.thing(typeName, x, y, w, h)  w, h: the picture fitted into a w x h box centred on (x, y),
+//                                    its shape kept (h none: w); none: its own size, as before
+//   nox.gameImage(name, x, y [, w, h])  (inside draw) one of the game's own named pictures
+//                                    (thing.bin's images) of the allowed kinds (gameImageAllowed:
+//                                    the windows' pieces, buttons, scroll bars, slots, the cage's
+//                                    and the guide's portraits...), its top left at (x, y), its
+//                                    size or scaled to w x h; the HD pack's picture where it has
+//                                    one. True: drawn; false (nothing drawn): not allowed, or the
+//                                    client hasn't it
+//   nox.gameImageSize(name)          its width and height; nil: not allowed, or not there
+//   nox.panel(x, y, w, h [, fill])   (inside draw) a box in the game's own window look: filled
+//                                    (black; a colour; false: none), and the game's window border
+//                                    pieces round it as its bordered windows have them (straddling
+//                                    its edge, 10 units out)
+//   nox.clip(x, y, w, h), nox.clip() (inside draw) the window's later draws kept inside that box
+//                                    of it (and the window); no box: the whole window again
+//   nox.view()                       { x, y, w, h }: the whole view in the UI's units (x, y its top
+//                                    left: negative where it reaches past the 640 x 480)
+//   NoxWindowSpec's bounds           a window (framed or not) may be anywhere on the whole view and
+//                                    as big as it (a framed one keeps its frame and title on it),
+//                                    kept to it again when the view changes
+//   NoxWindowSpec's cover            true: while the window is open the game's own HUD pieces (the
+//                                    spell bar, the meters and potion slots, the weapon panel, the
+//                                    buffs' row, the summon cage, the mod's ability strip) are
+//                                    neither drawn nor take the mouse (coversHud)
+//
 // The program calls frame() once a frame and draws windows(); a click in one goes to click().
 // Without a server (the map editor's UI preview), runLocal starts a UI from its source, useAssets
 // hands it a mod's assets, receive() feeds it messages as a server would, setSender takes what it
@@ -193,9 +221,14 @@ struct UiDraw {
         /// (API 4) a spell's icon (`index` its spell id) or a warrior ability's (`index` the
         /// ability's id with client::kAbilityTag), its top left at (x, y), w x h (0: its own size)
         SpellIcon,
+        /// (API 6) the game's named picture `text` (gameImageAllowed's), its top left at (x, y)
+        /// (moved by its own offset, scaled with it), w x h (0: its own size)
+        GameImage,
+        /// (API 6) the window's later draws kept inside (x, y, w, h) of it; w < 0: the whole window
+        Clip,
     };
     Kind kind = Kind::Box;
-    float x = 0, y = 0, w = 0, h = 0; ///< (Text: its top left)
+    float x = 0, y = 0, w = 0, h = 0; ///< (Text: its top left; Thing, API 6: the box it's fitted to, 0: none)
     UiColor color;
     std::string text;
     int index = -1;    ///< (Image, Thing)
@@ -258,6 +291,30 @@ inline constexpr std::size_t kUiMaxLeaps = 64;
 /// ("SPELL_FIREBALL"), or a warrior's ability's ("ABILITY_WARCRY", tagged as a multiclass book
 /// keeps them: Hud::icon draws either); none for any other name.
 std::optional<std::uint32_t> gameIconId(std::string_view name);
+
+/// (API 6) The kinds of the game's named pictures nox.gameImage draws, by the start of their
+/// names (case as thing.bin has them): what a UI needs to look like the game's own windows.
+inline constexpr std::string_view kGameImagePrefixes[] = {
+    "UI",            // the standard controls: buttons (Sm, Med, MedLg, Lg, Xlg, Huge; Lit, Dis), check
+                     // boxes, radio buttons, scroll arrows, sliders, tabs
+    "Border",        // the bordered windows' corners and edges (nox.panel's)
+    "DefaultLB",     // a list's scroll buttons
+    "DefaultSlider", // a slider's thumb
+    "ProgressBar",   // a bar's ground and meter
+    "CreatureCage",  // the summon cage's portraits, its frame and buttons
+    "Spellbook",     // the guide's portraits, the book's button
+    "Book",          // the book's pages and their buttons
+    "SpellTab",      // the book's tabs
+    "GuideTab",
+    "QuickBar",      // the spell bar's base, slots (nuggets) and title
+    "Inventory",     // the inventory's base, trays, rings and buttons
+    "Shop",          // the shop's base, its list's scroll pieces, its text border, the keepers
+    "Trade",         // the trade window's base and buttons
+    "MapParchment",  // the map's parchment
+    "Arrow",         // the eight arrows
+};
+/// Whether nox.gameImage may draw the picture `name` (one of kGameImagePrefixes' kinds).
+bool gameImageAllowed(std::string_view name);
 
 /// (Client level 8) A spinning thing now (ui_proto.hpp's kSpin: nox.setSpin): how many eighths of
 /// a turn it has gone round since it began (negative: the other way).
@@ -343,6 +400,11 @@ struct UiWindow {
     /// (API 4) This frame's hit areas (nox.hitArea, in its own units): a frameless window with any
     /// takes the mouse only inside them (windowTakes).
     std::vector<UiRect> hitAreas;
+    /// (API 6) Kept to the whole view (the margins' too) rather than the 640 x 480, at the size
+    /// asked (specW x specH) where it fits; and `cover`: the game's HUD pieces not drawn while open.
+    bool toView = false;
+    int specW = 0, specH = 0;
+    bool cover = false;
 };
 
 /// Whether `w` takes the mouse at (x, y) (the 640 x 480 units): inside its rectangle, and for a
@@ -381,6 +443,13 @@ public:
     void setPlayer(std::optional<UiPlayer> player);
     /// (API 2) The thing types nox.thing names (unset: the client's).
     void setThings(const things::ThingDb* things);
+    /// (API 6) The size of the game's named picture `name` in the program's art (none: it hasn't
+    /// it), for nox.gameImage and nox.gameImageSize. Unset: a name is there when the thing types'
+    /// images list it, its size unknown (nox.gameImageSize nil).
+    void setGameImageSize(std::function<std::optional<std::pair<int, int>>(std::string_view name)> size);
+    /// (API 6) Whether a window opened with cover = true is open: the game's HUD pieces not drawn
+    /// nor taking the mouse. False with no UI running.
+    bool coversHud() const noexcept;
     /// (API 2) The sounds the UI asked for since the last call.
     std::vector<UiSound> takeSounds();
 
@@ -480,7 +549,7 @@ public:
     bool running() const noexcept;
     const std::string& modeName() const noexcept;
     const std::string& error() const noexcept;
-    /// The running UI's API (1 to 4; 0: none running).
+    /// The running UI's API (1 to kUiApi; 0: none running).
     int api() const noexcept;
     /// How many UIs have started (each start one more): a UI running now that isn't the one that
     /// ran before (a stop and a start between two looks) has another number.
