@@ -2,7 +2,7 @@
 // (soloModes: on this computer, unlisted). One list, its rows mode_list.hpp's: first what's built
 // into the program (its modes, Quest and the Map Editor: marked "(built in)" on a faint gold band),
 // then the mods folder's modes, then each mods folder that didn't load, greyed with why. The chosen
-// row's settings are shown under the list (a choice, a toggle
+// row's whole description (the list's column cuts it) and its settings are shown under the list (a choice, a toggle
 // or a number: a click on the left half goes back, on the right half on); Host (Start) starts it,
 // Open Mods Folder shows mods\ beside noxcore.exe, Refresh reads it again.
 //
@@ -40,7 +40,8 @@ constexpr int kRowsY = 48;
 constexpr int kRowH = 18;
 constexpr int kVisibleRows = 9;
 constexpr int kPanelY = kRowsY + kVisibleRows * kRowH + 10;
-constexpr int kOptionsY = kPanelY + 18;
+constexpr int kAboutH = 28; ///< a mode's whole description, at the panel's top (two lines: a manifest's is at most 120 letters)
+constexpr int kOptionsY = kPanelY + kAboutH + 18;
 constexpr int kOptionH = 18;
 constexpr int kVisibleOptions = 5;
 constexpr int kButtonsY = kOptionsY + kVisibleOptions * kOptionH + 10;
@@ -323,16 +324,19 @@ void Menus::modeList(ModeListFor list)
                                : "Map Editor: your own maps, on this computer. Its File > Host a Session shares one with others.",
                        x, y, false, kDim, kWidth - 24);
                 break;
-            default:
+            default: {
+                p.text(row->description, x, y, false, kGold, kWidth - 24); // (whole: the list's column cuts it)
+                const int sy = y + kAboutH;
                 if (row->options.empty()) {
-                    p.text(fit(p, row->name + ": no settings to choose here.", kWidth - 24, false), x, y, false, kDim);
+                    p.text(fit(p, row->name + ": no settings to choose here.", kWidth - 24, false), x, sy, false, kDim);
                 } else {
-                    p.text(fit(p, row->name + " settings", kWidth - 24, false), x, y, false, kGold);
+                    p.text(fit(p, row->name + " settings", kWidth - 24, false), x, sy, false, kGold);
                     if (row->options.size() > static_cast<std::size_t>(kVisibleOptions)) {
-                        p.text("(the first " + std::to_string(kVisibleOptions) + ")", x + 300, y, false, kDim);
+                        p.text("(the first " + std::to_string(kVisibleOptions) + ")", x + 300, sy, false, kDim);
                     }
                 }
                 break;
+            }
             }
         };
     }
