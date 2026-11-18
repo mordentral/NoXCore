@@ -149,6 +149,8 @@ public:
     /// gameFlags reads it (the exe's class table: SOLO lines in a solo game, ARENA ones online).
     void setGameData(const nox::things::GameData* data) { gameData_ = data; }
     void setGameFlags(std::uint32_t gameFlags) { gameFlags_ = gameFlags; }
+    /// The game frame shown (the stamina pie counts back up from the server's last report).
+    void setGameFrame(std::uint32_t frame) { gameFrame_ = frame; }
     /// The item names (identify's title).
     void setItemNames(ItemNames* names) { names_ = names; }
     /// The amount box, for dropping part of a stack: label, the item, the most, at output point,
@@ -300,6 +302,7 @@ private:
 
     const nox::things::GameData* gameData_ = nullptr;
     std::uint32_t gameFlags_ = 0; ///< setGameFlags
+    std::uint32_t gameFrame_ = 0; ///< setGameFrame
     ItemNames* names_ = nullptr;
     AskAmount askAmount_;
     bool mapShown_ = false;

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <vector>
 
 namespace noxsdl {
 
@@ -130,6 +131,49 @@ int dollSlot(const TypeArt& a)
         return 7;
     }
     return 9;
+}
+
+/// The stamina pie in the weapon panel's ring (meter 4, the weapon's window: 53 x 53 at the panel's
+/// (0x18, 0x33)), under the weapon: what's spent, from 12 o'clock clockwise, (256 - stamina * 256 /
+/// most) / 256 of the circle, radius 26 about the window's middle. At full stamina it shows only
+/// for a worn weapon, all but 1/256 of the circle: red under a quarter of its durability, yellow
+/// under a half. Purple (240, 0, 240), at alpha 0x40 on the game's scale (about half as it shows).
+void drawStaminaPie(SDL_Renderer* r, float gx, float gy, int stamina, int most, const nox::client::InventoryItem* held,
+                    float s)
+{
+    if (most <= 0) {
+        return;
+    }
+    int share = stamina * 256 / most;
+    SDL_Color c{240, 0, 240, 128};
+    if (share > 0xFF) {
+        const int health = held && held->health ? *held->health : 0;
+        const int maxHealth = held && held->health ? held->maxHealth.value_or(0) : 0;
+        if (health * 2 >= maxHealth) {
+            return;
+        }
+        c = health * 4 < maxHealth ? SDL_Color{255, 0, 0, 128} : SDL_Color{255, 255, 0, 128};
+        share = 1;
+    }
+    share = std::max(share, 0);
+    const float cx = (gx + 0x18 + 26) * s;
+    const float cy = (gy + 0x33 + 26) * s;
+    const float radius = 26 * s;
+    const float turn = static_cast<float>(256 - share) / 256.0f;
+    const int steps = std::max(2, static_cast<int>(std::ceil(64 * turn)));
+    const SDL_FColor fc{c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f};
+    std::vector<SDL_Vertex> fan;
+    fan.reserve(static_cast<std::size_t>(steps) * 3);
+    const auto at = [&](int i) {
+        const float a = turn * static_cast<float>(i) / static_cast<float>(steps) * 6.2831853f;
+        return SDL_FPoint{cx + radius * std::sin(a), cy - radius * std::cos(a)};
+    };
+    for (int i = 0; i < steps; ++i) {
+        fan.push_back({{cx, cy}, fc, {}});
+        fan.push_back({at(i), fc, {}});
+        fan.push_back({at(i + 1), fc, {}});
+    }
+    SDL_RenderGeometry(r, nullptr, fan.data(), static_cast<int>(fan.size()), nullptr, 0);
 }
 
 /// The charges bar beside the weapon panel (meter 5): 61 one-pixel lines (x, y, width
@@ -631,6 +675,8 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
                 quiver = &item;
             }
         }
+        // The stamina pie under the weapon (the weapon window's draw: the pie, then the weapon).
+        drawStaminaPie(r, wx, wy, world.self().staminaAt(gameFrame_), 100, held, s);
         if (held) {
             drawItem(r, held->typeId, held->modifiers, wx + 24 + 26, wy + 51 + 26, s);
         } else if (!(swapPending_ && swapPending_())) {

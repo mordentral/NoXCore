@@ -2411,6 +2411,7 @@ void drawGameHud(App& app)
         // (Shut, it's the weapon panel and the buffs' row: HUD pieces.)
         app.inventory->setMulticlass(client.multiclass());
         app.inventory->setGameFlags(gameFlags(app));
+        app.inventory->setGameFrame(gameFrame(app));
         app.inventory->draw(app.renderer, client.world(), client.netCode(), app.camera.viewWidth,
                              app.camera.viewHeight, mousePos(app));
     }
