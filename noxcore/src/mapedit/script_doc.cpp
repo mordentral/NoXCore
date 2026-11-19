@@ -282,6 +282,14 @@ std::vector<SourceNote> callOrderMigrationNotes(const script::CallOrderMigration
                                                   m.skipped),
                                           {{"n", m.skipped}})});
     }
+    if (m.unparsed) {
+        // (The parser skips the code after each syntax error: calls there can't be found or counted.)
+        out.push_back({true, NOX_TR("editor.script.migrated.unparsed",
+                                    "the saved source was written for the old argument order (a call's first argument went to the "
+                                    "function's last parameter) and has syntax errors: the code the parser skips after each one isn't "
+                                    "read, so a call there of the script's own functions with two or more arguments is left as it was "
+                                    "saved and now binds the other way round; check the code around each syntax error")});
+    }
     return out;
 }
 

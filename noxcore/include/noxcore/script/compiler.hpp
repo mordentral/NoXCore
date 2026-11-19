@@ -196,6 +196,10 @@ struct CallOrderMigration {
     std::string source;      ///< the source to use (the old one unless turned round)
     std::size_t calls = 0;   ///< the calls turned round
     std::size_t skipped = 0; ///< such calls in code that doesn't parse, left as they are
+    /// The source has syntax errors: the parser skips what follows each one (the rest of the
+    /// statement; after one at the top level, a function's header's say, the next item too), so
+    /// calls there aren't found at all: neither turned nor counted in `skipped`.
+    bool unparsed = false;
 };
 /// (The check compiles with object variables allowed, whatever the editor's setting: it compares
 /// bytes, it doesn't decide whether the map may have them.)

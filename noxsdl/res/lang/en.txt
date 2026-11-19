@@ -9462,7 +9462,7 @@ editor.script.handler.end_of_waypoint = End of waypoint
 # noxcore/src/mapedit/script_doc.cpp:148
 #@ 01163863: Enemy sighted
 editor.script.handler.enemy_sighted = Enemy sighted
-# noxcore/src/mapedit/script_doc.cpp:348
+# noxcore/src/mapedit/script_doc.cpp:356
 #@ aff863ad: Enter
 editor.script.handler.enter = Enter
 # noxcore/src/mapedit/script_doc.cpp:155
@@ -9474,7 +9474,7 @@ editor.script.handler.hurt = Hurt
 # noxcore/src/mapedit/script_doc.cpp:152
 #@ a0296670: Is hit
 editor.script.handler.is_hit = Is hit
-# noxcore/src/mapedit/script_doc.cpp:349
+# noxcore/src/mapedit/script_doc.cpp:357
 #@ fa2f3260: Leave
 editor.script.handler.leave = Leave
 # noxcore/src/mapedit/script_doc.cpp:150
@@ -9501,10 +9501,10 @@ editor.script.handler.spawn = Spawn
 # noxcore/src/mapedit/script_doc.cpp:169
 #@ 4f5f2e25: Stepped on
 editor.script.handler.stepped_on = Stepped on
-# noxcore/src/mapedit/script_doc.cpp:563
+# noxcore/src/mapedit/script_doc.cpp:571
 #@ 39cd6c3c: {where} names the function {name}, which the script doesn't define
 editor.script.handler_undefined = {where} names the function {name}, which the script doesn't define
-# noxcore/src/mapedit/script_doc.cpp:560
+# noxcore/src/mapedit/script_doc.cpp:568
 #@ 4c711d36: {where} names the function {name}, which the script doesn't define (and {n} more handlers)
 editor.script.handler_undefined_more = {where} names the function {name}, which the script doesn't define (and {n} more handlers)
 # noxsdl/src/editor/script_panel.cpp:220
@@ -9610,6 +9610,9 @@ editor.script.migrated.type_errors[other] = the saved source was written for the
 #@ 7587fba6: the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} call of the script's own functions now has its arguments turned round to read in parameter order; look it over | the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of the script's own functions now have their arguments turned round to read in parameter order; look them over
 editor.script.migrated.unchecked[one] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} call of the script's own functions now has its arguments turned round to read in parameter order; look it over
 editor.script.migrated.unchecked[other] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of the script's own functions now have their arguments turned round to read in parameter order; look them over
+# noxcore/src/mapedit/script_doc.cpp:287
+#@ 46a01745: the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and has syntax errors: the code the parser skips after each one isn't read, so a call there of the script's own functions with two or more arguments is left as it was saved and now binds the other way round; check the code around each syntax error
+editor.script.migrated.unparsed = the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and has syntax errors: the code the parser skips after each one isn't read, so a call there of the script's own functions with two or more arguments is left as it was saved and now binds the other way round; check the code around each syntax error
 # noxsdl/src/editor/script_panel.cpp:174, noxsdl/src/editor/script_panel.cpp:174
 #@ f22a6288: Arena
 editor.script.mode.arena = Arena
@@ -9724,7 +9727,7 @@ editor.script.problems.warning = Warning
 # noxsdl/src/editor/script_panel.cpp:2633
 #@ 91dad0f8: Where
 editor.script.problems.where = Where
-# noxcore/src/mapedit/script_doc.cpp:437
+# noxcore/src/mapedit/script_doc.cpp:445
 #@ 4793750e: This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is kept as it is. Turn on "Allow NoX Core-only script features (object variables)" to edit and compile it.
 editor.script.read_only_object_vars = This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is kept as it is. Turn on "Allow NoX Core-only script features (object variables)" to edit and compile it.
 # noxsdl/src/editor/script_panel.cpp:1721
@@ -9881,7 +9884,7 @@ editor.script.status.tests_failed = Script tests didn't run: {error}
 # noxsdl/src/editor/script_panel.cpp:1310
 #@ 9c1a4225: Watching {path}
 editor.script.status.watching = Watching {path}
-# noxcore/src/mapedit/script_doc.cpp:393
+# noxcore/src/mapedit/script_doc.cpp:401
 #@ 91017d7d: the map's script can't be read: {error}
 editor.script.unreadable = the map's script can't be read: {error}
 # noxsdl/src/editor/script_panel.cpp:1810
@@ -9912,11 +9915,11 @@ editor.script.values.copy_help = Copy the picked value.
 # noxsdl/src/editor/script_panel.cpp:2512
 #@ eaf89cc2: \s{n} of {total}
 editor.script.values.count = \s{n} of {total}
-# noxcore/src/mapedit/script_doc.cpp:512
+# noxcore/src/mapedit/script_doc.cpp:520
 #@ 11c43051: {n} group | {n} groups
 editor.script.values.groups[one] = {n} group
 editor.script.values.groups[other] = {n} groups
-# noxcore/src/mapedit/script_doc.cpp:520, noxcore/src/mapedit/script_doc.cpp:521, noxcore/src/mapedit/script_doc.cpp:522
+# noxcore/src/mapedit/script_doc.cpp:528, noxcore/src/mapedit/script_doc.cpp:529, noxcore/src/mapedit/script_doc.cpp:530
 #@ 2f277676: {n} groups have this name
 editor.script.values.groups_share_name = {n} groups have this name
 # noxsdl/src/editor/script_panel.cpp:2486
@@ -9925,11 +9928,11 @@ editor.script.values.insert_help = Type the picked value into the Script panel a
 # noxsdl/src/editor/script_panel.cpp:2506
 #@ 61d21012: None on this map yet.
 editor.script.values.none_on_map = None on this map yet.
-# noxcore/src/mapedit/script_doc.cpp:513
+# noxcore/src/mapedit/script_doc.cpp:521
 #@ 44c3dd8d: {n} object | {n} objects
 editor.script.values.objects[one] = {n} object
 editor.script.values.objects[other] = {n} objects
-# noxcore/src/mapedit/script_doc.cpp:518
+# noxcore/src/mapedit/script_doc.cpp:526
 #@ 2b2fb014: {n} objects have this name
 editor.script.values.objects_share_name = {n} objects have this name
 # noxsdl/src/editor/script_panel.cpp:2478
@@ -9938,30 +9941,30 @@ editor.script.values.search_hint = Search values and notes
 # noxsdl/src/editor/script_panel.cpp:2387, noxsdl/src/editor/script_panel.cpp:2507
 #@ f1ea1eb2: Not available: the game's data isn't loaded.
 editor.script.values.unavailable = Not available: the game's data isn't loaded.
-# noxcore/src/mapedit/script_doc.cpp:510
+# noxcore/src/mapedit/script_doc.cpp:518
 #@ 45cbc723: {n} wall | {n} walls
 editor.script.values.walls[one] = {n} wall
 editor.script.values.walls[other] = {n} walls
-# noxcore/src/mapedit/script_doc.cpp:500
+# noxcore/src/mapedit/script_doc.cpp:508
 #@ 296b242b: waypoint {id} at {x}, {y}
 editor.script.values.waypoint_at = waypoint {id} at {x}, {y}
-# noxcore/src/mapedit/script_doc.cpp:511
+# noxcore/src/mapedit/script_doc.cpp:519
 #@ 62b037b9: {n} waypoint | {n} waypoints
 editor.script.values.waypoints[one] = {n} waypoint
 editor.script.values.waypoints[other] = {n} waypoints
-# noxcore/src/mapedit/script_doc.cpp:519
+# noxcore/src/mapedit/script_doc.cpp:527
 #@ 5caf63bc: {n} waypoints have this name
 editor.script.values.waypoints_share_name = {n} waypoints have this name
-# noxcore/src/mapedit/script_doc.cpp:321
+# noxcore/src/mapedit/script_doc.cpp:329
 #@ 449b4c02: {type} (extent {extent}): {field}
 editor.script.where.object = {type} (extent {extent}): {field}
-# noxcore/src/mapedit/script_doc.cpp:319
+# noxcore/src/mapedit/script_doc.cpp:327
 #@ ce866ea2: object: {field}
 editor.script.where.object_gone = object: {field}
-# noxcore/src/mapedit/script_doc.cpp:314
+# noxcore/src/mapedit/script_doc.cpp:322
 #@ f9e44c3f: polygon {n}: {field}
 editor.script.where.polygon = polygon {n}: {field}
-# noxcore/src/mapedit/script_doc.cpp:315
+# noxcore/src/mapedit/script_doc.cpp:323
 #@ b9e48739: polygon {n} ({name}): {field}
 editor.script.where.polygon_named = polygon {n} ({name}): {field}
 # noxsdl/src/editor/map_editor_ui.cpp:790

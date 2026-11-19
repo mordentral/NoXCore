@@ -3016,6 +3016,8 @@ CallOrderMigration migrateCallOrder(std::string_view oldSource)
     const auto items = Parser(Lexer(oldSource, diags).run(flags), diags).program();
     OwnCalls found(items);
     out.skipped = found.skipped;
+    // (A syntax error drops the code after it from the tree, its calls with it: said, not counted.)
+    out.unparsed = std::ranges::any_of(diags, [](const Diagnostic& d) { return d.severity == Diagnostic::Severity::Error; });
     if (found.calls.empty()) {
         return out;
     }

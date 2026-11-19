@@ -6388,6 +6388,8 @@ editor.script.migrated.skipped[other] = 구문 분석되지 않는 코드에 있
 editor.script.migrated.type_errors[other] = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었습니다: 스크립트 자체 함수 호출 {n}개의 인수를 맵이 실행하는 대로 읽히도록 뒤집었고, 일부는 컴파일되지 않습니다: 예전 순서가 값을 다른 타입의 매개변수에 넣었습니다. 수정하세요(오류 참고). 그때까지 맵의 스크립트는 그대로 유지됩니다
 #@ 7587fba6 mt: the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} call of the script's own functions now has its arguments turned round to read in parameter order; look it over | the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of the script's own functions now have their arguments turned round to read in parameter order; look them over
 editor.script.migrated.unchecked[other] = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었고 컴파일되지 않아 변경을 확인할 수 없습니다: 스크립트 자체 함수 호출 {n}개의 인수를 매개변수 순서대로 읽히도록 뒤집었습니다. 살펴보세요
+#@ 46a01745 mt: the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and has syntax errors: the code the parser skips after each one isn't read, so a call there of the script's own functions with two or more arguments is left as it was saved and now binds the other way round; check the code around each syntax error
+editor.script.migrated.unparsed = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었고 구문 오류가 있습니다: 파서가 각 오류 뒤에서 건너뛰는 코드는 읽히지 않으므로, 그곳에 있는 인수가 둘 이상인 스크립트 자체 함수 호출은 저장된 그대로 남아 이제 반대로 연결됩니다. 각 구문 오류 주변의 코드를 확인하세요
 #@ f22a6288 mt: Arena
 editor.script.mode.arena = 아레나
 #@ 01741f9c mt: Capture the Flag
