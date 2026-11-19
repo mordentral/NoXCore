@@ -119,21 +119,41 @@ private:
         }
     }
 
-    /// An object record's data, field by field (xfer version, header, typed xfer).
-    void writeRecordData(const ObjectRecord& rec)
+    /// The xfer a record is read with: a generator template's by its type name (`templateType`),
+    /// any other record's by its ObjectTOC id.
+    const xfer::TypeXfer& recordType(const ObjectRecord& rec, std::string_view templateType)
     {
+        if (!templateType.empty()) {
+            const std::string name(templateType);
+            auto it = templateTypes_.find(name);
+            if (it == templateTypes_.end()) {
+                const things::ThingDef* t = things_.findThing(name);
+                if (!t) {
+                    throw FormatError("map CRC: generator template type " + name + " is not in thing.bin");
+                }
+                it = templateTypes_.emplace(name, xfer::typeXferOf(*t)).first;
+            }
+            return it->second;
+        }
         const auto it = types_.find(rec.tocId);
         if (it == types_.end()) {
             throw FormatError("map CRC: object record with unknown type id " + std::to_string(rec.tocId));
         }
+        return it->second;
+    }
+
+    /// An object record's data, field by field (xfer version, header, typed xfer).
+    void writeRecordData(const ObjectRecord& rec, std::string_view templateType = {})
+    {
+        const xfer::TypeXfer& type = recordType(rec, templateType);
         const ObjectXfer obj = ObjectXfer::parse(rec.data);
         const std::size_t extraOffset = obj.extraOffset();
-        const auto data = xfer::decode(it->second.xfer, obj.xferVersion, obj.extra, it->second.info, extraOffset);
+        const auto data = xfer::decode(type.xfer, obj.xferVersion, obj.extra, type.info, extraOffset);
         w_.u16(obj.xferVersion);
         writeObjectHeader(w_, obj.header);
         // Generator templates are records inside a record: the callback re-encodes them the same way.
-        xfer::write(w_, data, obj.xferVersion, it->second.info, extraOffset,
-                    [this](ByteWriter&, const ObjectRecord& nested) { writeRecordData(nested); });
+        xfer::write(w_, data, obj.xferVersion, type.info, extraOffset,
+                    [this](ByteWriter&, const ObjectRecord& nested, std::string_view nestedType) { writeRecordData(nested, nestedType); });
     }
 
     void writeObjectData(const RawSection& sect)
@@ -156,7 +176,8 @@ private:
 
     const MapFile& map_;
     const things::ThingDb& things_;
-    std::map<std::uint16_t, xfer::TypeXfer> types_; // by ObjectTOC id
+    std::map<std::uint16_t, xfer::TypeXfer> types_;      // by ObjectTOC id
+    std::map<std::string, xfer::TypeXfer> templateTypes_; // generator templates', by type name
     ByteWriter w_;
     std::uint32_t crc_ = 0;
 };

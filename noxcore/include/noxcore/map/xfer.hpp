@@ -499,7 +499,10 @@ std::vector<std::uint8_t> encode(const Data& data, std::uint16_t xferVersion, co
 
 /// Writes an embedded object record's data (MonsterGenerator templates). When empty, the bytes
 /// are written as one call; the map CRC walk supplies one that re-encodes them field by field.
-using RecordDataWriter = std::function<void(ByteWriter&, const ObjectRecord&)>;
+/// `templateType` is the template's type name for a template's own record, which the game reads
+/// as that type whatever object TOC id the record stores; it is empty for the template's
+/// inventory records, which the game reads by their TOC ids.
+using RecordDataWriter = std::function<void(ByteWriter&, const ObjectRecord&, std::string_view templateType)>;
 
 /// Like encode, into an existing writer whose call boundaries follow the game's (see ByteWriter).
 void write(ByteWriter& w, const Data& data, std::uint16_t xferVersion, const TypeInfo& type,

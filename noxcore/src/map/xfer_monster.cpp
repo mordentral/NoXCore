@@ -748,9 +748,9 @@ void readRecordWithInventory(ByteReader& r, std::size_t base, std::vector<Object
 }
 
 /// `offset` is where the writer currently is within the 8-aligned record data. Padding and size
-/// go below the CRC; the data goes through `nested`.
+/// go below the CRC; the data goes through `nested` (with `templateType`, see RecordDataWriter).
 void writeEmbeddedRecord(ByteWriter& w, const ObjectRecord& rec, std::size_t offset,
-                         const RecordDataWriter& nested)
+                         const RecordDataWriter& nested, std::string_view templateType)
 {
     if (rec.size != rec.data.size()) {
         throw FormatError("MonsterGenerator: template size doesn't match its data");
@@ -767,7 +767,7 @@ void writeEmbeddedRecord(ByteWriter& w, const ObjectRecord& rec, std::size_t off
     w.uncountedU32(rec.size);
     w.uncountedU32(rec.sizeHi);
     if (nested) {
-        nested(w, rec);
+        nested(w, rec, templateType);
     } else {
         w.bytes(rec.data);
     }
@@ -855,10 +855,12 @@ void writeGenerator(ByteWriter& w, const MonsterGenerator& g, std::uint16_t v, s
         w.u8(static_cast<std::uint8_t>(group.size()));
         for (const auto& t : group) {
             writeString8(w, t.type);
-            writeEmbeddedRecord(w, t.record, offset(), nested);
+            // (The game makes a template by its type name and skips the TOC id stored before its
+            // record; its inventory records go by their TOC ids.)
+            writeEmbeddedRecord(w, t.record, offset(), nested, t.type);
             // Each record is aligned against the absolute offset at the point it is written.
             for (const auto& item : t.inventory) {
-                writeEmbeddedRecord(w, item, offset(), nested);
+                writeEmbeddedRecord(w, item, offset(), nested, {});
             }
         }
     }
