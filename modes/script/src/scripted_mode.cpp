@@ -1906,6 +1906,53 @@ int noxCallMapFunction(lua_State* L)
     return 1;
 }
 
+int noxCallMapHandler(lua_State* L)
+{
+    // nox.callMapHandler(fn, self, other): the map's function (its name, or its value as the
+    // script holds a function: its index) called as the engine calls an object's script handler,
+    // with self (the trigger) and other (the caller) the things given (ids; nil none): what it
+    // returns as a signed int, nil when it returns nothing (or the VM's budget stopped it).
+    Impl& impl = implOf(L);
+    toolbox::refuseInsideAsked(L, "callMapHandler");
+    server::ScriptHost* mapScript = impl.host ? impl.host->server().script() : nullptr;
+    if (!mapScript) {
+        luaL_error(L, "callMapHandler: no map script yet (the game's map is there from start on)");
+    }
+    std::uint32_t function = 0;
+    if (lua_type(L, 1) == LUA_TSTRING) {
+        const char* name = lua_tostring(L, 1);
+        const auto f = mapScript->function(name);
+        if (!f || *f < 2) {
+            luaL_error(L, "callMapHandler: the map's script has no function %s", name);
+        }
+        function = *f;
+    } else {
+        const double v = luaL_checknumber(L, 1);
+        luaL_argcheck(L, v >= 0 && v <= 4294967295.0 && v == std::floor(v), 1, "a map function's name or index");
+        function = static_cast<std::uint32_t>(v);
+    }
+    const auto thing = [&](int idx) -> std::uint32_t {
+        if (lua_isnoneornil(L, idx)) {
+            return 0;
+        }
+        const server::ServerObject& o = objectArg(L, idx);
+        luaL_argcheck(L, !impl.hidden(o), idx, "no such thing (gone?)");
+        return o.extent;
+    };
+    const std::uint32_t self = thing(2);
+    const std::uint32_t other = thing(3);
+    const server::ScriptHost::FunctionCall r = mapScript->callHandler(function, other, self);
+    if (!r.error.empty()) {
+        luaL_error(L, "callMapHandler: %s", r.error.c_str());
+    }
+    if (r.result) {
+        lua_pushnumber(L, static_cast<std::int32_t>(*r.result));
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
 int noxMapObject(lua_State* L)
 {
     // nox.mapObject(id): the map script's handle for a thing (its script id, what Object("name")
@@ -2507,6 +2554,20 @@ int noxGameNumber(lua_State* L)
         return 1;
     }
     lua_pushnumber(L, world.number(name, index));
+    return 1;
+}
+
+int noxSetGameNumber(lua_State* L)
+{
+    // nox.setGameNumber(name, value, index): this map's own value for a gamedata.bin number (the
+    // line the game reads, World::setNumber); whether there was such a number to set.
+    toolbox::refuseInsideAsked(L, "setGameNumber");
+    size_t len = 0;
+    const char* s = luaL_checklstring(L, 1, &len);
+    const double value = luaL_checknumber(L, 2);
+    luaL_argcheck(L, std::isfinite(value) && std::fabs(value) <= 3.0e38, 2, "a finite number");
+    const std::size_t index = lua_isnoneornil(L, 3) ? 0 : static_cast<std::size_t>(wholeArg(L, 3, 0, 254, "an index 0-254"));
+    lua_pushboolean(L, worldOf(L).setNumber(std::string_view(s, len), index, static_cast<float>(value)));
     return 1;
 }
 
@@ -4367,7 +4428,7 @@ void Impl::installToolbox()
         {"touch", noxTouch},   {"sightRange", noxSightRange}, {"textToAll", noxTextToAll},
         {"nearestFoes", noxNearestFoes}, {"applyForce", noxApplyForce}, {"attack", noxAttack}, {"direction", noxDirection},
         {"directionOf", noxDirectionOf}, {"directionVector", noxDirectionVector}, {"newMark", noxNewMark}, {"madeSince", noxMadeSince},
-        {"spellInfo", noxSpellInfo}, {"setCharmable", noxSetCharmable}, {"decal", noxDecal}, {"removeDecal", noxRemoveDecal}, {"clearDecals", noxClearDecals}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"traceRay", noxTraceRay},
+        {"spellInfo", noxSpellInfo}, {"setCharmable", noxSetCharmable}, {"decal", noxDecal}, {"removeDecal", noxRemoveDecal}, {"clearDecals", noxClearDecals}, {"enchantTime", noxEnchantTime}, {"gameNumber", noxGameNumber}, {"setGameNumber", noxSetGameNumber}, {"traceRay", noxTraceRay},
         {"setEnchantTime", noxSetEnchantTime}, {"poison", noxPoison}, {"setPoison", noxSetPoison},
         {"shoot", noxShoot},   {"summon", noxSummon},   {"abilitySound", noxAbilitySound}, {"setPosition", noxSetPosition},
         {"setVelocity", noxSetVelocity}, {"setOwner", noxSetOwner}, {"setTeam", noxSetTeam}, {"setNoCollide", noxSetNoCollide},
@@ -4399,7 +4460,7 @@ void Impl::installToolbox()
         {"inform", noxInform}, {"informString", noxInformString}, {"flagStatus", noxFlagStatus}, {"timer", noxTimer},
         {"endMatch", noxEndMatch}, {"gameOver", noxGameOver},
         // (the map's script)
-        {"onMapCall", noxOnMapCall}, {"callMapFunction", noxCallMapFunction}, {"mapObject", noxMapObject},
+        {"onMapCall", noxOnMapCall}, {"callMapFunction", noxCallMapFunction}, {"callMapHandler", noxCallMapHandler}, {"mapObject", noxMapObject},
     };
     // A stream's methods (nox.mt19937's): stream:next().
     if (luaL_newmetatable(L, kMtType)) {
@@ -4949,6 +5010,28 @@ public:
         bool go = true;
         impl_.guarded("onExit", [&] { go = impl_.parts.events.exitTouched(impl_.vm->thread(), exit, player); });
         return go;
+    }
+
+    // ---- In place of a watched item's own USE or pickup (nox.events.use, .pickup): at once, where
+    // the game would run it (Items::use asks only for an item with the use bit; every pickup is
+    // asked, so the bit is read here first).
+    bool mayUse(server::World&, server::ServerObject& user, server::ServerObject& item) override
+    {
+        if (!impl_.parts.events.has().onUse || impl_.hidden(user)) {
+            return true;
+        }
+        bool own = true;
+        impl_.guarded("onUse", [&] { own = impl_.parts.events.use(impl_.vm->thread(), user, item); });
+        return own;
+    }
+    bool mayPickUp(server::World&, server::ServerObject& taker, server::ServerObject& item) override
+    {
+        if (!(item.modeEvents & server::ModeEvent::Pickup) || !impl_.parts.events.has().onTryPickup || impl_.hidden(taker)) {
+            return true;
+        }
+        bool take = true;
+        impl_.guarded("onTryPickup", [&] { take = impl_.parts.events.tryPickup(impl_.vm->thread(), taker, item); });
+        return take;
     }
 
     // ---- The map script's LuauCall (nox.onMapCall's handlers): none of that name, nullopt (the

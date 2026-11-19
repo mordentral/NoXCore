@@ -52,7 +52,7 @@ void Events::look(lua_State* L)
     has_ = {.onObjectKilled = hasFn("onObjectKilled"), .onDestroyed = hasFn("onDestroyed"), .onDamage = hasFn("onDamage"),
             .onDamaged = hasFn("onDamaged"), .onPickup = hasFn("onPickup"), .onDrop = hasFn("onDrop"), .onEquip = hasFn("onEquip"),
             .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost"), .onReflect = hasFn("onReflect"),
-            .onAbility = hasFn("onAbility")};
+            .onAbility = hasFn("onAbility"), .onUse = hasFn("onUse"), .onTryPickup = hasFn("onTryPickup")};
 }
 
 void Events::ability(const server::ServerObject& unit, const server::AbilityNews& news)
@@ -256,6 +256,36 @@ bool Events::castCost(lua_State* L, const server::ServerObject& caster, std::uin
     }
     lua_pop(L, 2);
     return priced;
+}
+
+bool Events::use(lua_State* L, const server::ServerObject& user, const server::ServerObject& item)
+{
+    if (!has_.onUse || !toolbox::beginHook(L, "onUse")) {
+        return true;
+    }
+    lua_pushnumber(L, user.extent);
+    lua_pushnumber(L, item.extent);
+    if (!toolbox::callHook(L, "onUse", 2, 1)) {
+        return true; // (a failing hook: the game's own, as every hook's)
+    }
+    const bool own = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+    lua_pop(L, 1);
+    return own;
+}
+
+bool Events::tryPickup(lua_State* L, const server::ServerObject& taker, const server::ServerObject& item)
+{
+    if (!has_.onTryPickup || !toolbox::beginHook(L, "onTryPickup")) {
+        return true;
+    }
+    lua_pushnumber(L, taker.extent);
+    lua_pushnumber(L, item.extent);
+    if (!toolbox::callHook(L, "onTryPickup", 2, 1)) {
+        return true;
+    }
+    const bool take = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+    lua_pop(L, 1);
+    return take;
 }
 
 void Events::deliver(lua_State* L)

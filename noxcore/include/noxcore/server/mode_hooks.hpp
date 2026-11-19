@@ -87,6 +87,8 @@ inline constexpr std::uint8_t Damaged = 0x08;   ///< damaged told (the health it
 inline constexpr std::uint8_t Drop = 0x10;      ///< dropped told (an item put down)
 inline constexpr std::uint8_t Use = 0x20;       ///< mayUse asked (an item used)
 inline constexpr std::uint8_t Equip = 0x40;     ///< equipped told (an item put on or taken off)
+/// (No hook of its own: a mode's mayPickUp, asked for every pickup, reads it to pick its items.)
+inline constexpr std::uint8_t Pickup = 0x80;
 } // namespace ModeEvent
 
 /// A map script's call of its mod (NoX Core's LuauCall / LuauCallReturn builtins: ModeHooks::mapCall).

@@ -14,7 +14,7 @@ type NoxModifier = { name: string, section: string, position: string, color: { r
 -- damageCoefficient); damageType: a melee swing's; armor: an armour record's ARMOR_VALUE (the fraction it takes off);
 -- classes: who may use or wear it (a multiclass player: anything).
 type NoxItemStats = { type: string, name: string?, durability: number, charges: number, damageMin: number?, damageCoefficient: number?, requiredStrength: number?, range: number?, damageType: string?, armor: number?, classes: { warrior: boolean, wizard: boolean, conjurer: boolean } }
-type NoxEvents = { death: number, destroyed: number, damage: number, damaged: number, drop: number, equip: number }
+type NoxEvents = { death: number, destroyed: number, damage: number, damaged: number, drop: number, equip: number, use: number, pickup: number }
 type NoxWeather = { kind: string, strength: number?, wind: { angle: number?, speed: number? }?, fade: number? }
 type NoxGenerate ={ map: string, module: string?, fn: string?, params: any?, arena: { [string]: any }?, seed: number?, title: string?, ahead: boolean? }
 type NoxStore = {
@@ -94,7 +94,7 @@ declare nox: {
     units: () -> { number },
     --- What a thing carries, as { id, type, flag } tables.
     inventory: (id: number) -> { NoxItem },
-    --- Sends the thing's touches to mode.collide from now on, instead of its own collide.
+    --- Sends the thing's touches to mode.collide from now on, instead of its own collide (a missile's too: what it hits, a wall, its running out).
     watchCollide: (id: number) -> (),
     --- Puts a thing from the ground into a player's unit's inventory, as a pickup does.
     take: (unit: number, item: number) -> (),
@@ -181,6 +181,8 @@ declare nox: {
     setPoison: (unit: number, level: number, frames: number?) -> (),
     --- A gamedata.bin number as this game reads it (index from 0); nil for a name it hasn't.
     gameNumber: (name: string, index: number?) -> number?,
+    --- Sets a gamedata.bin number (the line this game reads; index from 0, within its table) for this map alone, read from then on wherever the game reads it (one read as a thing is made or at the map's load keeps what it was); each map loads with the install's numbers, and nothing is saved or sent (clients keep their own: a stock ability's cooldown shading, say). Whether there was such a number.
+    setGameNumber: (name: string, value: number, index: number?) -> boolean,
     --- Whether no wall stands between two points; blocked by a wall, also where it met it and its cell.
     traceRay: (x1: number, y1: number, x2: number, y2: number, flags: number) -> (boolean, number?, number?, number?, number?),
     --- Looses a missile of a type from the owner's edge in a direction; its id, nil when a wall is in the way.
@@ -418,7 +420,7 @@ declare nox: {
     --- Gives a player experience as a kill does (levels gained with it).
     giveExperience: (unit: number, amount: number) -> (),
     --- # Events and timers
-    --- The event bits for nox.watchEvents: death, destroyed, damage, damaged, drop, equip.
+    --- The event bits for nox.watchEvents: death, destroyed, damage, damaged, drop, equip, use (onUse), pickup (onTryPickup).
     events: NoxEvents,
     --- Sets which events a thing sends the mode's hooks (a sum of nox.events); its old bits.
     watchEvents: (id: number, mask: number) -> number,
@@ -441,6 +443,8 @@ declare nox: {
     onMapCall: (name: string, fn: ((call: NoxMapCall) -> any)?) -> (),
     --- Calls the map script's own function by name with whole numbers, the first for its first parameter (true and false: 1 and 0; those left out 0); what it returns as an int, nil when it returns nothing. While the map's script runs (inside a LuauCall's handler, or a hook the engine calls from inside one of its builtins: onKill for a kill its Damage made) it runs nested with that call's caller and trigger (8 LuauCalls deep at most); else as a timer's, with none. An error for a name the map hasn't, too many values, or inside an asked hook.
     callMapFunction: (name: string, ...(number | boolean)) -> number?,
+    --- Calls the map script's function (its name, or its value as the script holds a function: its index) as the engine calls an object's script handler: self (GetTrigger) and other (GetCaller) the things given (ids; nil: none), its parameters 0; what it returns as an int, nil when it returns nothing. Nested as callMapFunction's while the map's script runs (that call's own self and other back after it). An error for a function the map hasn't, a thing that's gone, or inside an asked hook.
+    callMapHandler: (fn: string | number, self: number?, other: number?) -> number?,
     --- A thing as the map script names it (its script id, what Object("name") gives there): for a LuauCallReturn's result or a map function's value; nil when it's gone.
     mapObject: (id: number) -> number?,
     --- # Generated maps
@@ -493,6 +497,8 @@ declare function require(name: string): any
 --- @hook onPickup(taker, item, x, y) | Something picked an item up from (x, y).
 --- @hook onDrop(holder, item) | A holder dropped a watched item.
 --- @hook onEquip(unit, item, worn) | A watched item was put on (true) or taken off.
+--- @hook onUse(user, item) | An item with nox.events.use used (a held item's use, a book read as it's picked up, food a creature eats), at once, in place of its own USE: return true to have that run as well, after.
+--- @hook onTryPickup(taker, item) | An item with nox.events.pickup about to be picked up (past the game's checks), at once, in place of its own pickup: return true to have it picked up as the game would; else it stays where it is.
 --- @hook onSpellCast(caster, spell, target, x, y, made) | A spell was cast (its name; target nil: none; made: what was made while it went off, its missiles or creature and anything its kills made at once, not what comes on later frames, oldest first, nil: none; normally heard before its missiles first fly, but after a host stall they may have flown a frame at their type's size).
 --- @hook onExit(exit, player) | A player touched an exit: return false to hold them; changes nothing in the world.
 --- @hook castCost(caster, spell, cost, how) | A player's spell's price before it's paid (cost: the game's mana; how "cast", or "trap": into a glyph's trap, at its check and as it's paid): return mana, health (health a plain loss, never to below 1; short of either: refused, as short of mana; given back where the game gives a cast's price back) or nil for the game's; changes nothing in the world.

@@ -543,6 +543,24 @@ float World::number(std::string_view name, std::size_t index) const
     return things::gameNumber(gameData, name, gameFlags, index);
 }
 
+bool World::setNumber(std::string_view name, std::size_t index, float value)
+{
+    const std::vector<float>* now = gameData ? gameData->find(name, gameFlags) : nullptr;
+    if (!now || index >= now->size()) {
+        return false;
+    }
+    if (!ownGameData_) {
+        // (Copied whole, its index and serial with it: every GameDataKey's place holds in the copy.)
+        ownGameData_ = std::make_unique<things::GameData>(*gameData);
+        gameData = ownGameData_.get();
+    }
+    // (The copy is this world's own: its line changed in place, read through the entries.)
+    auto* values = const_cast<std::vector<float>*>(ownGameData_->find(name, gameFlags));
+    (*values)[index] = value;
+    typeCache_.things = nullptr; // (the types' prototypes made again, under the new number)
+    return true;
+}
+
 /// What an item's xfer reads into it (WeaponXfer's charges and health, ArmorXfer
 /// XFerArmor's health, the item flags, AmmoXfer's ammunition, the books' entries:
 /// SpellRewardXfer, AbilityRewardXfer, FieldGuideXfer; ReadableXfer

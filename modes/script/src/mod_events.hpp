@@ -28,7 +28,7 @@ public:
     struct Has {
         bool onObjectKilled = false, onDestroyed = false, onDamage = false, onDamaged = false, onPickup = false,
              onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false, onReflect = false,
-             onAbility = false;
+             onAbility = false, onUse = false, onTryPickup = false;
     };
     /// Which of them the script's mode table (on top of L's stack) has (each load).
     void look(lua_State* L);
@@ -62,6 +62,16 @@ public:
     /// spell's price (`how` "cast", or "trap": into a glyph's trap). False: the game's (`mana`,
     /// `health` untouched).
     bool castCost(lua_State* L, const server::ServerObject& caster, std::uint32_t spell, int cost, bool trap, int& mana, int& health);
+
+    // ---- in place of the thing's own function: at once, and the hook may change the world (it
+    // runs where the game would run that function: never inside an asked hook's refusals)
+    /// onUse(user, item) for an item with nox.events.use, in place of its USE: true has the USE
+    /// run as well (after it); anything else: not run. A failing hook: run (the game's own).
+    bool use(lua_State* L, const server::ServerObject& user, const server::ServerObject& item);
+    /// onTryPickup(taker, item) for an item with nox.events.pickup about to be picked up (past the
+    /// game's checks), in place of its pickup: true has it picked up as the game would; anything
+    /// else: left where it is. A failing hook: picked up (the game's own).
+    bool tryPickup(lua_State* L, const server::ServerObject& taker, const server::ServerObject& item);
 
     /// The recorded events to the script's hooks, in order (each its own protected call).
     void deliver(lua_State* L);

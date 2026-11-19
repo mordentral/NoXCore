@@ -141,6 +141,15 @@ public:
     /// and trigger; made with none running, it's a call of its own with none (as a timer's), the
     /// stack emptied and its strings dropped after it as a handler's are (callBlock).
     FunctionCall callFunction(std::string_view name, std::span<const std::uint32_t> args);
+    /// A mod's call of the map's function `function` (its index: a function value as the script
+    /// holds one) as the engine calls an object's script handler: `trigger` its self, `caller`
+    /// its other (extents; 0 none), its parameters 0 (a handler takes none). Refused (`error`)
+    /// for an index the script hasn't (or 0, 1: the object variables and GLOBAL). Made while the
+    /// script runs (from a LuauCall's handler, or a hook a builtin set off) it's a nested call on
+    /// the running call's budgets, the running call's caller and trigger put back after it; made
+    /// with none running, a call of its own, the stack emptied and its strings dropped after it
+    /// as a handler's are (callBlock).
+    FunctionCall callHandler(std::uint32_t function, std::uint32_t caller, std::uint32_t trigger);
     /// The thing a script value names (-1 the caller, -2 the trigger, else a script id), as the
     /// builtins find it; null: none.
     ServerObject* scriptObject(std::int32_t value) { return object(value); }

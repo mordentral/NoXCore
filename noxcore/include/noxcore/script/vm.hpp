@@ -164,6 +164,13 @@ public:
 
     std::uint32_t caller() const noexcept { return caller_; }
     std::uint32_t trigger() const noexcept { return trigger_; }
+    /// The running call's caller and trigger put back after a nested call made with others
+    /// (ScriptHost::callHandler; call() sets them and leaves them so).
+    void restoreCallerTrigger(std::uint32_t caller, std::uint32_t trigger) noexcept
+    {
+        caller_ = caller;
+        trigger_ = trigger;
+    }
     const BuiltinContext& context() const noexcept { return context_; }
 
     /// The globals (function 1's locals), as a savegame keeps them.

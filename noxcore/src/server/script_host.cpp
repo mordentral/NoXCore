@@ -410,6 +410,38 @@ ScriptHost::FunctionCall ScriptHost::callFunction(std::string_view name, std::sp
     return out;
 }
 
+ScriptHost::FunctionCall ScriptHost::callHandler(std::uint32_t function, std::uint32_t caller, std::uint32_t trigger)
+{
+    FunctionCall out;
+    const auto& functions = vm_.file().functions;
+    if (function < 2 || function >= functions.size()) {
+        out.error = "the map's script has no function " + std::to_string(function);
+        return out;
+    }
+    const script::Function& fn = functions[function];
+    if (fn.args > script::Vm::kStackWords) {
+        out.error = fn.name + " takes more arguments than the script's stack holds";
+        return out;
+    }
+    const bool nested = vm_.running();
+    const std::uint32_t outerCaller = vm_.caller();
+    const std::uint32_t outerTrigger = vm_.trigger();
+    for (std::size_t i = fn.args; i-- > 0;) {
+        vm_.push(0u);
+    }
+    out.ran = run(function, caller, trigger);
+    if (out.ran && fn.returns != 0) {
+        out.result = vm_.pop();
+    }
+    if (nested) {
+        vm_.restoreCallerTrigger(outerCaller, outerTrigger);
+    } else {
+        vm_.resetStack();
+        vm_.freeRuntimeStrings();
+    }
+    return out;
+}
+
 std::optional<std::uint32_t> ScriptHost::callBlock(ServerObject::ScriptBlock& block, std::uint32_t caller, std::uint32_t trigger)
 {
     // scriptCallByEventBlock. Its result is one shared word, 0 from the start of every call.

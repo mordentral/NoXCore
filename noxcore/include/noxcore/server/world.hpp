@@ -2158,6 +2158,16 @@ public:
     float number(std::string_view name, std::size_t index = 0) const;
     /// The same by a key (game_data.hpp's GameDataKey: the name found once, for every frame's look-ups).
     float number(const things::GameDataKey& key, std::size_t index = 0) const { return things::gameNumber(gameData, key, gameFlags, index); }
+    /// noxcpp: a mode's own value for a gamedata number in this world alone (nox.setGameNumber):
+    /// the line this game reads for `name` (number()'s), its value `index` (within its table).
+    /// The first change copies the table this world reads (gameData then points at the copy,
+    /// owned here); the install's own is never changed, and the next map's world reads it again.
+    /// Read where the game reads the number: one read as a thing is made, or at the map's load,
+    /// keeps what it was then. False (nothing changed) for a name the game hasn't, an index past
+    /// its table, or no table.
+    bool setNumber(std::string_view name, std::size_t index, float value);
+    /// Whether this world reads its own copy of the numbers (setNumber was used).
+    bool ownNumbers() const noexcept { return ownGameData_ != nullptr; }
     bool solo() const noexcept { return (gameFlags & (GameFlag::Solo | GameFlag::SoloOther)) != 0; }
     bool quest() const noexcept { return (gameFlags & GameFlag::Quest) != 0; }
     bool network() const noexcept { return (gameFlags & GameFlag::Network) != 0; }
@@ -2605,6 +2615,8 @@ private:
         std::vector<std::unique_ptr<const ServerObject>> protos; ///< by type index (null: not made yet)
     };
     mutable TypeCache typeCache_;
+    /// setNumber's copy of the numbers (null: gameData is the install's).
+    std::unique_ptr<things::GameData> ownGameData_;
     MapGrid grid_;
     std::vector<std::uint32_t> fresh_; ///< the new list (noteNew), oldest first
     WallMap walls_;

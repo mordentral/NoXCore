@@ -932,6 +932,14 @@ void Missiles::collide(ServerObject& m, ServerObject* other, float nx, float ny)
                                                                 static_cast<int>(world.number("DeathBallCollideDamage")), 2);
         }
         break;
+    case NameId::ModeCollide:
+        // (noxcpp: a mode's own missile, its COLLIDE the mode's, as collideFunction runs a thing's:
+        // what it met, or nothing for a wall and its run out. Nothing of the game's.)
+        if (world.modeHooks) {
+            Fight fight{world, rng, frame, &things, modifiers};
+            world.modeHooks->collide(fight, m, other);
+        }
+        break;
     default:
         m.pendingDelete = true; // (the other missiles: not yet; gone on whatever they meet)
         break;
