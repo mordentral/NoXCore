@@ -431,7 +431,7 @@ declare nox: {
     --- # The map's script (NoX Core maps a mod ships)
     --- Runs fn(call) for the map script's LuauCall(name, ...) and LuauCallReturn(name, ...), at once inside the map's call (what fn returns, a number, true or false, or nox.mapObject's, is LuauCallReturn's result; else 0); nil takes it away. Register at the script's top level: a reload's code registers its own.
     onMapCall: (name: string, fn: ((call: NoxMapCall) -> any)?) -> (),
-    --- Calls the map script's own function by name with whole numbers, the first for its first parameter (true and false: 1 and 0; those left out 0); what it returns as an int, nil when it returns nothing. Inside a LuauCall's handler it runs nested with that call's caller and trigger (8 LuauCalls deep at most); else as a timer's, with none. An error for a name the map hasn't, too many values, or inside an asked hook.
+    --- Calls the map script's own function by name with whole numbers, the first for its first parameter (true and false: 1 and 0; those left out 0); what it returns as an int, nil when it returns nothing. While the map's script runs (inside a LuauCall's handler, or a hook the engine calls from inside one of its builtins: onKill for a kill its Damage made) it runs nested with that call's caller and trigger (8 LuauCalls deep at most); else as a timer's, with none. An error for a name the map hasn't, too many values, or inside an asked hook.
     callMapFunction: (name: string, ...(number | boolean)) -> number?,
     --- A thing as the map script names it (its script id, what Object("name") gives there): for a LuauCallReturn's result or a map function's value; nil when it's gone.
     mapObject: (id: number) -> number?,

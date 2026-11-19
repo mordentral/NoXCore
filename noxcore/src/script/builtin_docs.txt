@@ -5510,7 +5510,7 @@ Mods run in hosted games (Host Custom), not the solo campaign: there no mod host
 [returns]
 Nothing.
 [edge]
-- No mod hosting the game, no handler of that name, a handler that fails (a Luau error), or calls nested more than 8 deep: nothing happens, and the server logs it once per name on the map.
+- No mod hosting the game, no handler of that name, or calls nested more than 8 deep: nothing happens, and the server logs it once per name on the map. A handler that fails (a Luau error) stops there; its error is reported as the mod's other errors are.
 - The original game crashes on this call (its table of builtins ends at 210): only for maps played on NoX Core with their mod. The compiler warns once a script.
 [example]
 void VaultLeverPulled()
@@ -5537,7 +5537,7 @@ The values after the name may be of any type and may be left out (0 each), as Lu
 [returns]
 What the handler returns, or 0 when there's no mod, no handler of that name, the handler fails, or calls nest more than 8 deep.
 [edge]
-- Each failure is logged once per name on the map; the map script goes on with 0.
+- No mod, no handler and too deep are logged once per name on the map; a failing handler or a result that isn't one of those above is reported as the mod's error. The map script goes on with 0 either way.
 - The original game crashes on this call: only for maps played on NoX Core with their mod.
 [example]
 void ShrineTouched()
