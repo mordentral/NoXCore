@@ -12,6 +12,7 @@
 #include "noxcore/mapedit/sidecar.hpp"
 #include "noxcore/mapedit/validate.hpp"
 #include "noxcore/mapedit/writer.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -32,7 +33,11 @@ namespace noxsdl::editor {
 
 namespace {
 
-constexpr const char* kTitle = "Host a map editor session";
+/// The dialog's title (its popup's id too).
+const char* title()
+{
+    return NOX_TRI("editor.session.setup_title", "Host a map editor session");
+}
 
 using nox::util::lowered;
 
@@ -41,7 +46,8 @@ constexpr int kSizes[] = {0, 16, 32, 48, 64, 96, 128, 192, 254};
 
 std::string sizeLabel(int size)
 {
-    return size == 0 ? std::string("No floor") : std::to_string(size) + " x " + std::to_string(size) + " cells";
+    return size == 0 ? NOX_TR("editor.session.no_floor", "No floor")
+                     : nox::l10n::format(NOX_TR("editor.session.floor_cells", "{n} x {n} cells"), {{"n", size}});
 }
 
 /// The session map's name a choice suggests: a user map's own (whatever its characters: '!TakRP'),
@@ -95,12 +101,12 @@ bool SessionSetupDialog::draw(SessionSetup& out)
         return false;
     }
     if (justOpened_) {
-        ImGui::OpenPopup(kTitle);
+        ImGui::OpenPopup(title());
         justOpened_ = false;
     }
     const float u = ImGui::GetFontSize(); // (sizes in lines of text: the editor's scale follows its font)
     ImGui::SetNextWindowSize(ImVec2(36 * u, 0), ImGuiCond_Appearing);
-    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_NoSavedSettings)) {
+    if (!ImGui::BeginPopupModal(title(), nullptr, ImGuiWindowFlags_NoSavedSettings)) {
         // Closed from outside (another popup opened over the editor's frame): as Cancel.
         open_ = false;
         cancelled_ = true;
@@ -108,12 +114,12 @@ bool SessionSetupDialog::draw(SessionSetup& out)
     }
 
     // ---- the map to start from
-    ImGui::SeparatorText("Map");
+    ImGui::SeparatorText(NOX_TRC("editor.session.setup_map", "Map"));
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::IsWindowAppearing()) {
         ImGui::SetKeyboardFocusHere();
     }
-    ImGui::InputTextWithHint("##search", "Search maps", search_, sizeof search_);
+    ImGui::InputTextWithHint("##search", NOX_TRC("editor.session.search_maps", "Search maps"), search_, sizeof search_);
     ImGui::BeginChild("##maps", ImVec2(0, 12 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_Borders);
     // A choice changed: the session's name follows it unless it was typed over (it still reads
     // the old choice's suggestion).
@@ -125,7 +131,7 @@ bool SessionSetupDialog::draw(SessionSetup& out)
             copyText(name_, sizeof name_, suggestedName(maps_, selected_, s_.newMap));
         }
     };
-    if (ImGui::Selectable("New blank map", s_.newMap)) {
+    if (ImGui::Selectable(NOX_TRI("editor.session.new_blank_map", "New blank map"), s_.newMap)) {
         choose(-1, true);
     }
     const std::string q = lowered(search_);
@@ -136,17 +142,17 @@ bool SessionSetupDialog::draw(SessionSetup& out)
             continue;
         }
         ++shown;
-        const std::string label = m.name + (m.stock ? "   (stock: copied under a new name)" : "");
+        const std::string label = m.name + (m.stock ? NOX_TR("editor.session.stock_copied", "   (stock: copied under a new name)") : std::string());
         if (verbatimSelectable(i, label, !s_.newMap && selected_ == i)) {
             choose(i, false);
         }
     }
     if (shown == 0) {
-        ImGui::TextDisabled(maps_.empty() ? "No maps found." : "No map matches.");
+        ImGui::TextDisabled("%s", maps_.empty() ? NOX_TRC("editor.session.no_maps", "No maps found.") : NOX_TRC("editor.session.no_match", "No map matches."));
     }
     ImGui::EndChild();
     if (s_.newMap) {
-        if (ImGui::BeginCombo("Floored area", sizeLabel(s_.newOptions.size).c_str())) {
+        if (ImGui::BeginCombo(NOX_TRI("editor.session.floored_area", "Floored area"), sizeLabel(s_.newOptions.size).c_str())) {
             for (const int size : kSizes) {
                 if (ImGui::Selectable(sizeLabel(size).c_str(), size == s_.newOptions.size)) {
                     s_.newOptions.size = size;
@@ -154,19 +160,20 @@ bool SessionSetupDialog::draw(SessionSetup& out)
             }
             ImGui::EndCombo();
         }
-        help("A square of floor in the middle of the map (the whole map is 256 x 256 wall cells), with a player start.");
+        help(NOX_TRC("editor.session.floored_area_tip",
+                     "A square of floor in the middle of the map (the whole map is 256 x 256 wall cells), with a player start."));
     }
 
     // ---- the session's map name: what is published (never a stock map's)
-    ImGui::InputText("Session map name", name_, sizeof name_);
-    help("The map the session publishes, in your maps folder. A stock map is copied under this name.");
+    ImGui::InputText(NOX_TRI("editor.session.map_name", "Session map name"), name_, sizeof name_);
+    help(NOX_TRC("editor.session.map_name_tip", "The map the session publishes, in your maps folder. A stock map is copied under this name."));
     const bool chosen = s_.newMap || (selected_ >= 0 && selected_ < static_cast<int>(maps_.size()));
     if (!chosen) {
-        problem_ = "Choose a map to start from.";
+        problem_ = NOX_TR("editor.session.choose_map", "Choose a map to start from.");
     } else if (const auto p = me::mapNameProblem(name_)) {
         problem_ = *p;
     } else if (me::isStockMapName(name_)) {
-        problem_ = std::string(name_) + " is a map that ships with the game: choose a new name";
+        problem_ = nox::l10n::format(NOX_TR("editor.session.stock_name", "{name} is a map that ships with the game: choose a new name"), {{"name", name_}});
     } else {
         problem_.clear();
     }
@@ -181,11 +188,11 @@ bool SessionSetupDialog::draw(SessionSetup& out)
                             lowered(maps_[static_cast<std::size_t>(selected_)].name) == lname;
         const bool clash = std::ranges::any_of(maps_, [&](const SessionMapChoice& m) { return !m.stock && lowered(m.name) == lname; });
         if (itself) {
-            ImGui::TextDisabled("Edits %s itself: publishing writes over it.", name_);
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.session.edits_itself", "Edits {name} itself: publishing writes over it."), {{"name", name_}}).c_str());
         } else if (clash) {
-            ImGui::TextColored(themeColours().warning, "A map with this name is there: hosting replaces it.");
+            ImGui::TextColored(themeColours().warning, "%s", NOX_TRC("editor.session.name_clash", "A map with this name is there: hosting replaces it."));
         } else {
-            ImGui::TextDisabled("Writes %s\\%s.map", name_, name_);
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.session.writes", "Writes {name}\\{name}.map"), {{"name", name_}}).c_str());
         }
     }
     if (!s_.newMap && selected_ >= 0 && selected_ < static_cast<int>(maps_.size())) {
@@ -193,55 +200,59 @@ bool SessionSetupDialog::draw(SessionSetup& out)
         if (const auto p = m.stock ? std::nullopt : me::mapNameProblem(m.name)) {
             // (A map named before the limit: copied under a name that fits, as a stock map is.)
             ImGui::PushTextWrapPos(0);
-            ImGui::TextDisabled("%s can't be published under its own name (%s): the session copies it under a new one.",
-                                m.name.c_str(), p->c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.session.renamed_copy",
+                                                               "{name} can't be published under its own name ({why}): the session copies it under a new one."),
+                                                        {{"name", m.name}, {"why", *p}})
+                                          .c_str());
             ImGui::PopTextWrapPos();
         }
     }
 
     // ---- who may edit
-    ImGui::SeparatorText("Who may edit");
+    ImGui::SeparatorText(NOX_TRC("editor.session.who_may_edit", "Who may edit"));
     int mode = s_.editMode == me::session::EditMode::HostOnly ? 0 : 1;
-    if (ImGui::RadioButton("Only me", mode == 0)) {
+    if (ImGui::RadioButton(NOX_TRI("editor.session.only_me", "Only me"), mode == 0)) {
         mode = 0;
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Others when I approve", mode == 1)) {
+    if (ImGui::RadioButton(NOX_TRI("editor.session.others_approve", "Others when I approve"), mode == 1)) {
         mode = 1;
     }
-    help("NoX Core players ask to edit; you approve each one (once, or always for that player).");
+    help(NOX_TRC("editor.session.who_may_edit_tip", "NoX Core players ask to edit; you approve each one (once, or always for that player)."));
     s_.editMode = mode == 0 ? me::session::EditMode::HostOnly : me::session::EditMode::Approve;
 
     // ---- the running game
-    ImGui::SeparatorText("The game");
-    ImGui::Checkbox("Players can't die (sandbox)", &s_.playersCantDie);
-    help("While editing, everyone plays the map in a sandbox; a play-test round can let them die.");
-    ImGui::Checkbox("Show live players in the editor", &s_.liveView);
+    ImGui::SeparatorText(NOX_TRC("editor.session.the_game", "The game"));
+    ImGui::Checkbox(NOX_TRI("editor.session.cant_die_sandbox", "Players can't die (sandbox)"), &s_.playersCantDie);
+    help(NOX_TRC("editor.session.cant_die_tip", "While editing, everyone plays the map in a sandbox; a play-test round can let them die."));
+    ImGui::Checkbox(NOX_TRI("editor.session.show_live_players", "Show live players in the editor"), &s_.liveView);
     ImGui::Indent();
     ImGui::BeginDisabled(!s_.liveView);
-    ImGui::Checkbox("...and creatures", &s_.liveCreatures);
+    ImGui::Checkbox(NOX_TRI("editor.session.and_creatures", "...and creatures"), &s_.liveCreatures);
     ImGui::EndDisabled();
     ImGui::Unindent();
-    ImGui::Checkbox("Publish object changes automatically", &s_.autoPublish);
-    help("Object changes are written for players who join later; walls, floors and the script wait for a full publish.");
+    ImGui::Checkbox(NOX_TRI("editor.session.auto_publish_changes", "Publish object changes automatically"), &s_.autoPublish);
+    help(NOX_TRC("editor.session.auto_publish_tip",
+                 "Object changes are written for players who join later; walls, floors and the script wait for a full publish."));
     const auto current = std::ranges::find_if(kSessionModes, [&](const auto& m) { return m.bits == s_.playTestMode; });
-    if (ImGui::BeginCombo("Play-test mode", current != std::end(kSessionModes) ? current->name : "Arena")) {
+    if (ImGui::BeginCombo(NOX_TRI("editor.session.play_test_mode", "Play-test mode"),
+                          nox::l10n::trImGui(current != std::end(kSessionModes) ? current->name : kSessionModes[0].name))) {
         for (const auto& [bits, label] : kSessionModes) {
-            if (ImGui::Selectable(label, bits == s_.playTestMode)) {
+            if (ImGui::Selectable(nox::l10n::trImGui(label), bits == s_.playTestMode)) {
                 s_.playTestMode = bits;
             }
         }
         ImGui::EndCombo();
     }
-    help("The mode a play-test round runs (the map must allow it).");
-    ImGui::InputText("Game password", password_, 9); // (8 characters at most)
-    help("Asked of everyone joining (the game's own prompt for stock clients). Empty: none.");
-    ImGui::SliderInt("Player limit", &s_.maxPlayers, 2, 32);
+    help(NOX_TRC("editor.session.play_test_mode_tip", "The mode a play-test round runs (the map must allow it)."));
+    ImGui::InputText(NOX_TRI("editor.session.password", "Game password"), password_, 9); // (8 characters at most)
+    help(NOX_TRC("editor.session.password_tip", "Asked of everyone joining (the game's own prompt for stock clients). Empty: none."));
+    ImGui::SliderInt(NOX_TRI("editor.session.player_limit", "Player limit"), &s_.maxPlayers, 2, 32);
     s_.maxPlayers = std::clamp(s_.maxPlayers, 2, 32);
 
     // ---- where Host lists it (online only with an XWIS login: main.cpp's host_listing.hpp)
     if (!listing_.text.empty()) {
-        ImGui::SeparatorText("Game list");
+        ImGui::SeparatorText(NOX_TRC("editor.session.game_list", "Game list"));
         ImGui::PushTextWrapPos(0);
         if (listing_.warning) {
             ImGui::TextColored(themeColours().warning, "%s", listing_.text.c_str());
@@ -256,12 +267,12 @@ bool SessionSetupDialog::draw(SessionSetup& out)
     const ImVec2 button(8 * u, 0);
     bool host = false;
     ImGui::BeginDisabled(!problem_.empty());
-    if (ImGui::Button("Host", button)) {
+    if (ImGui::Button(NOX_TRI("editor.session.host", "Host"), button)) {
         host = true;
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Cancel", button) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button(NOX_TRI("editor.session.cancel", "Cancel"), button) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         open_ = false;
         cancelled_ = true;
         ImGui::CloseCurrentPopup();
@@ -287,10 +298,11 @@ std::string prepareSessionMap(const SessionSetup& s, const fs::path& mapsDir, co
 {
     try {
         if (const auto problem = me::mapNameProblem(s.name)) {
-            return "Can't host \"" + s.name + "\": " + *problem;
+            return nox::l10n::format(NOX_TR("editor.session.cant_host", "Can't host \"{name}\": {why}"), {{"name", s.name}, {"why", *problem}});
         }
         if (me::isStockMapName(s.name)) { // (mapNameProblem's too: never a stock map's name)
-            return "Can't host \"" + s.name + "\": it is a map that ships with the game";
+            return nox::l10n::format(NOX_TR("editor.session.cant_host_stock", "Can't host \"{name}\": it is a map that ships with the game"),
+                                     {{"name", s.name}});
         }
         if (s.newMap) {
             me::NewMapOptions options = s.newOptions;
@@ -304,7 +316,7 @@ std::string prepareSessionMap(const SessionSetup& s, const fs::path& mapsDir, co
             return {};
         }
         if (s.sourceMap.empty()) {
-            return "No map chosen to start from.";
+            return NOX_TR("editor.session.no_map_chosen", "No map chosen to start from.");
         }
         // The source: the maps folder's (the user's), else the game's.
         const auto find = [&](const fs::path& dir) -> std::optional<fs::path> {
@@ -321,7 +333,10 @@ std::string prepareSessionMap(const SessionSetup& s, const fs::path& mapsDir, co
             source = find(gameMapsDir);
         }
         if (!source) {
-            return "No map " + s.sourceMap + " in " + pathText(mapsDir) + (gameMapsDir.empty() ? "" : " or " + pathText(gameMapsDir));
+            return gameMapsDir.empty() ? nox::l10n::format(NOX_TR("editor.session.no_map_in", "No map {map} in {folder}"),
+                                                          {{"map", s.sourceMap}, {"folder", pathText(mapsDir)}})
+                                       : nox::l10n::format(NOX_TR("editor.session.no_map_in_either", "No map {map} in {folder} or {game_folder}"),
+                                                          {{"map", s.sourceMap}, {"folder", pathText(mapsDir)}, {"game_folder", pathText(gameMapsDir)}});
         }
         const bool sourceStock = me::isStockMapName(s.sourceMap);
         if (inMapsDir && !sourceStock && lowered(s.sourceMap) == lowered(s.name)) {
@@ -351,7 +366,8 @@ std::string prepareSessionMap(const SessionSetup& s, const fs::path& mapsDir, co
         me::saveDocument(doc, things, mapsDir, s.name, &side);
         return {};
     } catch (const std::exception& ex) {
-        return "Can't prepare the session's map " + s.name + ":\n" + ex.what();
+        return nox::l10n::format(NOX_TR("editor.session.cant_prepare", "Can't prepare the session's map {name}:\n{error}"),
+                                 {{"name", s.name}, {"error", ex.what()}});
     }
 }
 

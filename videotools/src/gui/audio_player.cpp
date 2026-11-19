@@ -1,6 +1,8 @@
 // Plays a preview sound (audio_player.hpp).
 #include "gui/audio_player.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 namespace videotools::gui {
 
 bool AudioPlayer::play(const nox::audio::Pcm& pcm, std::string label)
@@ -9,7 +11,7 @@ bool AudioPlayer::play(const nox::audio::Pcm& pcm, std::string label)
     label_ = std::move(label);
     error_.clear();
     if (pcm.channels == 0 || pcm.rate == 0 || pcm.samples.empty()) {
-        error_ = "nothing to play";
+        error_ = NOX_TR("content.audio.nothing_to_play", "nothing to play");
         return false;
     }
     if (!SDL_WasInit(SDL_INIT_AUDIO) && !SDL_InitSubSystem(SDL_INIT_AUDIO)) {

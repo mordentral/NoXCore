@@ -3,6 +3,8 @@
 
 #include "draw_box.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -34,7 +36,7 @@ CampfireWindow::Layout CampfireWindow::layout(Offer offer, int w, int h, float s
     const int columns = std::max(1, (n + kRowsPerColumn - 1) / kRowsPerColumn);
     const int rows = std::min(n, kRowsPerColumn);
     const float header = l.line * 2.6f;
-    const float pw = std::max(columns * kColumnW * s + 2 * kPad * s, font_->measure("Strengthen one spell, free: once at this fire", l.text) + 2 * kPad * s);
+    const float pw = std::max(columns * kColumnW * s + 2 * kPad * s, font_->measure(NOX_TR("modes.delve.campfire.subtitle", "Strengthen one spell, free: once at this fire"), l.text) + 2 * kPad * s);
     const float ph = header + static_cast<float>(rows) * kRowH * s + 2 * kPad * s;
     l.panel = {std::floor((static_cast<float>(w) - pw) / 2), std::floor((static_cast<float>(h) - ph) / 2 - 40 * s), pw, ph};
     for (int i = 0; i < n; ++i) {
@@ -62,8 +64,8 @@ void CampfireWindow::draw(SDL_Renderer* renderer, Offer offer, int w, int h, flo
     SDL_RenderFillRect(renderer, &l.panel);
     outline(renderer, l.panel, {150, 90, 40, 255});
     const float tx = l.panel.x + kPad * s;
-    font_->draw("The campfire's warmth", tx, l.panel.y + kPad * s, l.text, ember);
-    font_->draw("Strengthen one spell, free: once at this fire", tx, l.panel.y + kPad * s + l.line * 1.1f, l.text, grey);
+    font_->draw(NOX_TR("modes.delve.campfire.title", "The campfire's warmth"), tx, l.panel.y + kPad * s, l.text, ember);
+    font_->draw(NOX_TR("modes.delve.campfire.subtitle", "Strengthen one spell, free: once at this fire"), tx, l.panel.y + kPad * s + l.line * 1.1f, l.text, grey);
     for (std::size_t i = 0; i < offer.size() && i < l.rows.size(); ++i) {
         const SDL_FRect& r = l.rows[i];
         const bool hover = inside(r, mouse.x, mouse.y);
@@ -79,7 +81,7 @@ void CampfireWindow::draw(SDL_Renderer* renderer, Offer offer, int w, int h, flo
         }
         std::string name = name_ ? name_(offer[i].spell) : std::string();
         if (name.empty()) {
-            name = "Spell " + std::to_string(offer[i].spell);
+            name = nox::l10n::format(NOX_TR("modes.delve.campfire.spell_number", "Spell {n}"), {{"n", offer[i].spell}});
         }
         const std::string levels = std::to_string(offer[i].level) + " > " + std::to_string(offer[i].level + 1);
         const float lw = font_->measure(levels, l.text);

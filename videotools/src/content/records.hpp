@@ -91,7 +91,8 @@ public:
     /// with them, their records index it from `first` on (thing.bin's own count). Those of an
     /// earlier call are replaced.
     void setNewThings(const nox::things::ThingDb& things, std::size_t first);
-    static constexpr const char* kNewThingsGroup = "New types (this pack)";
+    /// That group's name (as shown, and as it's found again).
+    static const std::string& newThingsGroup();
 
 private:
     void buildLookups();

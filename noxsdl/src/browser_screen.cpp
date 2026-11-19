@@ -5,6 +5,8 @@
 #include "mode_column.hpp"
 #include "pencil_icon.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -66,6 +68,12 @@ std::string ipText(std::uint32_t a)
            "." + std::to_string(a & 0xFF);
 }
 
+// The status line's count of servers found.
+std::string serverCountText(std::size_t n)
+{
+    return nox::l10n::format(NOX_TR("menus.browser.server_count", "{n} server(s)"), {{"n", n}});
+}
+
 // Ping colours: grey unknown, green under 100 ms, yellow under 200, else red.
 SDL_Color pingColor(const std::optional<std::uint32_t>& ping)
 {
@@ -97,7 +105,8 @@ void BrowserScreen::reloadServerLists()
     servers.insert(servers.end(), savedServers_.begin(), savedServers_.end());
     browser_.setServers(std::move(servers));
     if (!errors.empty()) {
-        message_ = "Cannot read saved servers: " + errors.front();
+        message_ = nox::l10n::format(NOX_TR("menus.browser.cannot_read_saved", "Cannot read saved servers: {error}"),
+                                     {{"error", errors.front()}});
         for (const auto& error : errors) {
             SDL_Log("browser: %s", error.c_str());
         }
@@ -136,9 +145,9 @@ std::string BrowserScreen::rowKey(const nox::lobby::ServerEntry& entry)
 
 std::string BrowserScreen::statusText(const nox::lobby::ServerEntry& entry)
 {
-    if (entry.answered) return "Online";
-    if (entry.unresolved) return "Address not found";
-    return entry.checking ? "Checking..." : "No response";
+    if (entry.answered) return NOX_TR("menus.browser.status_online", "Online");
+    if (entry.unresolved) return NOX_TR("menus.browser.status_not_found", "Address not found");
+    return entry.checking ? NOX_TR("menus.browser.status_checking", "Checking...") : NOX_TR("menus.browser.status_no_response", "No response");
 }
 
 void BrowserScreen::selectAddress(const std::string& address)
@@ -245,7 +254,7 @@ std::optional<std::string> BrowserScreen::joinSelected()
     // only a name that didn't resolve has no address to join.
     const auto& entry = rows_[static_cast<std::size_t>(selected_)];
     if (entry.unresolved) {
-        message_ = statusText(entry) + ". Refresh to try again.";
+        message_ = nox::l10n::format(NOX_TR("menus.browser.refresh_to_retry", "{status}. Refresh to try again."), {{"status", statusText(entry)}});
         return std::nullopt;
     }
     return address(entry.game);
@@ -258,22 +267,22 @@ std::string BrowserScreen::searchingText() const
         places.emplace_back("XWIS");
     }
     if (browser_.listsLan()) {
-        places.emplace_back("the LAN");
+        places.emplace_back(NOX_TR("menus.browser.place_lan", "the LAN"));
     }
     if (browser_.hasServerList()) {
-        places.emplace_back("your server list");
+        places.emplace_back(NOX_TR("menus.browser.place_server_list", "your server list"));
     }
     if (places.empty()) {
-        return "Searching...";
+        return NOX_TR("menus.browser.searching", "Searching...");
     }
-    std::string text = "Searching ";
+    std::string text;
     for (std::size_t i = 0; i < places.size(); ++i) {
         if (i > 0) {
-            text += i + 1 == places.size() ? " and " : ", ";
+            text += i + 1 == places.size() ? NOX_TR("menus.browser.list_and", " and ") : NOX_TR("menus.browser.list_comma", ", ");
         }
         text += places[i];
     }
-    return text + "...";
+    return nox::l10n::format(NOX_TR("menus.browser.searching_places", "Searching {places}..."), {{"places", text}});
 }
 
 std::string BrowserScreen::address(const nox::lobby::GameListing& game)
@@ -381,9 +390,9 @@ void BrowserScreen::draw(SDL_Renderer* renderer, int width, int height)
     const SDL_Color grey{150, 150, 150, 255};
     const SDL_Color gold{240, 200, 110, 255};
 
-    font_.draw("Nox games", margin, l.rowHeight * 0.6f, static_cast<int>(l.size * 1.5), gold);
-    std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " server(s)";
-    status += "     Enter / double-click: join     R: refresh     Esc: quit";
+    font_.draw(NOX_TR("menus.browser.title", "Nox games"), margin, l.rowHeight * 0.6f, static_cast<int>(l.size * 1.5), gold);
+    std::string status = browser_.searching() ? searchingText() : serverCountText(rows_.size());
+    status += NOX_TR("menus.browser.keys_hint", "     Enter / double-click: join     R: refresh     Esc: quit");
     font_.draw(status, margin, l.rowHeight * 2.2f, l.size, grey);
     if (!message_.empty()) {
         font_.draw(message_, margin, l.rowHeight * 3.2f, l.size, {235, 160, 110, 255});
@@ -419,7 +428,7 @@ void BrowserScreen::drawFramed(SDL_Renderer* renderer, SDL_FRect area, int textS
 
     const SDL_Color grey{150, 150, 150, 255};
     float y = area.y + area.h - footer + l.rowHeight * 0.3f;
-    std::string status = browser_.searching() ? searchingText() : std::to_string(rows_.size()) + " server(s)";
+    std::string status = browser_.searching() ? searchingText() : serverCountText(rows_.size());
     if (!message_.empty()) {
         status = message_;
     }
@@ -445,7 +454,9 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
         cols[i] = x0 + w * mode_column::kColumnStarts[i];
     }
     const float gap = mode_column::columnGap(font_.lineHeight(l.size));
-    const char* headers[6] = {"Name", "Map", "Mode", "Players", "Ping", "From"};
+    const char* headers[6] = {NOX_TRC("menus.browser.col_name", "Name"),       NOX_TRC("menus.browser.col_map", "Map"),
+                              NOX_TRC("menus.browser.col_mode", "Mode"),       NOX_TRC("menus.browser.col_players", "Players"),
+                              NOX_TRC("menus.browser.col_ping", "Ping"),       NOX_TRC("menus.browser.col_from", "From")};
     const float headerY = l.top - l.rowHeight;
     // The headers a quarter larger in a plain face (Caudex); the Nox-style fonts keep the game's one
     // size. (The header's line ends where the rows' size would end it.)
@@ -515,12 +526,12 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
         std::string name = g.name.empty() ? ipText(g.address) : g.name;
         // (A password's game: the padlock at the row's far right, drawn below.)
         if (g.access == nox::lobby::GameAccess::Closed) {
-            name += " (closed)";
+            name += NOX_TR("menus.browser.closed_mark", " (closed)");
         }
         if (e.extended && (e.extended->features & nox::lobby::ServerFeature::NoxCoreOnly)) {
-            name += " (NoX Core only)"; // (a mod that turns GAME.EXE players away)
+            name += NOX_TR("menus.browser.noxcore_only_mark", " (NoX Core only)"); // (a mod that turns GAME.EXE players away)
         }
-        const std::string updateMark = client_level::updateNeeded(e) ? " (Update needed)" : "";
+        const std::string updateMark = client_level::updateNeeded(e) ? NOX_TR("menus.browser.update_needed_mark", " (Update needed)") : "";
         if (e.extended && (e.extended->features & nox::lobby::ServerFeature::EditSession)) {
             // A map editor session (the NXSV edit-session bit): a pencil before its name
             // ("[EDIT] <host>"), the name in the noxcpp colour.
@@ -554,7 +565,7 @@ void BrowserScreen::drawRows(SDL_Renderer* renderer, SDL_FRect area, const Layou
                                       [&](const std::string& s) { return font_.measure(s, l.size); }),
              ty, text);
         cell(3, std::to_string(g.players) + "/" + std::to_string(g.maxPlayers), ty, text);
-        cell(4, e.pingMs ? std::to_string(*e.pingMs) + " ms" : "-", ty, pingColor(e.pingMs));
+        cell(4, e.pingMs ? nox::l10n::format(NOX_TR("menus.browser.ping_ms", "{ms} ms"), {{"ms", *e.pingMs}}) : "-", ty, pingColor(e.pingMs));
         // Where it was found (mode_column.hpp's fromText: the first of XWIS, the LAN, the lists).
         cell(5, mode_column::fromText(e, isSaved(e)), ty, grey);
         if (g.access == nox::lobby::GameAccess::Password) {

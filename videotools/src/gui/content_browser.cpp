@@ -5,6 +5,8 @@
 
 #include "editor/theme_colours.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -57,7 +59,7 @@ void ContentBrowser::row(const Record& r, bool showSection)
         const ImVec2 c(b0.x + rowH_ * 0.5f, b0.y + rowH_ * 0.5f);
         dl->AddTriangleFilled(ImVec2(c.x - h * 0.8f, c.y - h), ImVec2(c.x - h * 0.8f, c.y + h), ImVec2(c.x + h, c.y),
                               ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled));
-        ImGui::SetItemTooltip("Play");
+        ImGui::SetItemTooltip("%s", NOX_TRC("content.browser.play", "Play"));
         ImGui::SameLine(0, 4);
     }
     const bool selected = ws_.selected && *ws_.selected == r.ref;
@@ -123,12 +125,12 @@ void ContentBrowser::sectionList(const Section& s, const std::vector<std::uint32
 void ContentBrowser::draw()
 {
     rowH_ = std::round(ImGui::GetTextLineHeight() * 1.45f);
-    const float boxW = ImGui::CalcTextSize("Changed only").x + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x * 2;
+    const float boxW = ImGui::CalcTextSize(NOX_TRC("content.browser.changed_only", "Changed only")).x + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x * 2;
     ImGui::SetNextItemWidth(-boxW);
-    ImGui::InputTextWithHint("##search", "Search every file's records", search_, sizeof search_);
+    ImGui::InputTextWithHint("##search", NOX_TRC("content.browser.search_hint", "Search every file's records"), search_, sizeof search_);
     ImGui::SameLine();
-    ImGui::Checkbox("Changed only", &changedOnly_);
-    ImGui::SetItemTooltip("Only the records the content pack changes (with the search, those that match it)");
+    ImGui::Checkbox(NOX_TRI("content.browser.changed_only", "Changed only"), &changedOnly_);
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.browser.changed_only_tip", "Only the records the content pack changes (with the search, those that match it)"));
     const std::string text = search_;
     if (text != searchUsed_) {
         searchUsed_ = text;
@@ -144,7 +146,10 @@ void ContentBrowser::draw()
     const std::vector<content::RecordRef>& shown = changedOnly_ ? changed : results_;
     ImGui::BeginChild("tree", ImVec2(0, 0), ImGuiChildFlags_None);
     if (!text.empty() || changedOnly_) {
-        ImGui::TextDisabled("%zu %s%s", shown.size(), changedOnly_ ? "changed" : "found", shown.size() >= 5000 ? " (the first 5000)" : "");
+        ImGui::TextDisabled("%s", (nox::l10n::format(changedOnly_ ? NOX_TR("content.browser.n_changed", "{n} changed") : NOX_TR("content.browser.n_found", "{n} found"),
+                                                  {{"n", shown.size()}}) +
+                                (shown.size() >= 5000 ? NOX_TR("content.browser.first_5000", " (the first 5000)") : std::string()))
+                                   .c_str());
         ImGuiListClipper clipper;
         clipper.Begin(int(shown.size()), rowH_ + ImGui::GetStyle().ItemSpacing.y);
         while (clipper.Step()) {
@@ -170,7 +175,7 @@ void ContentBrowser::draw()
         const bool open = ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
         ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("000000").x);
         if (!s.loaded) {
-            ImGui::TextColored(theme.error, "missing");
+            ImGui::TextColored(theme.error, "%s", NOX_TRC("content.browser.missing", "missing"));
             if (const auto* st = ws_.files.statusOf(s.kind); st && ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s: %s", st->path.string().c_str(), st->error.c_str());
             }

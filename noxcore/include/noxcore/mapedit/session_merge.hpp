@@ -85,7 +85,7 @@ std::size_t mergeConcurrent(const MapDocument& doc, Op& op, MergeRule rule, IdMo
 struct UndoSkip {
     ElementKey key;
     std::string why;
-    std::string what() const { return key.text(); } ///< "wall 30,40", "object 12"...
+    std::string what() const { return key.shownText(); } ///< "wall 30,40", "object 12"... (shown: in the player's language)
 };
 Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::vector<UndoSkip>* skipped = nullptr);
 

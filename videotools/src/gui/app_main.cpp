@@ -24,6 +24,7 @@
 
 #include "editor/imgui_host.hpp"
 #include "editor/theme.hpp"
+#include "language_pick.hpp"
 
 #include "noxcore/io/file.hpp"
 
@@ -182,6 +183,9 @@ int main(int argc, char** argv)
     } else if (!holdsBag(settings.gameDir)) {
         settings.gameDir = utf8(locateGameDir(exeDir()));
     }
+    // NoX Core's own text's language (the game client's choice: noxcore.cfg's Language, nox.csf's,
+    // the system's), before any panel is built.
+    noxsdl::pickLanguageFor(pathFromUtf8(settings.gameDir));
     // The HD pack: --pack, else the one used last, else video_hd.nxp beside this program or in the
     // game folder.
     fs::path pack;

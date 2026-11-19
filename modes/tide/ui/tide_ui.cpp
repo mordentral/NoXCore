@@ -7,6 +7,7 @@
 
 #include "noxcore/client/tide_client.hpp"
 #include "noxcore/server/tide.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <memory>
 #include <optional>
@@ -109,7 +110,8 @@ public:
         if (!tide_ || !tide_->run()) {
             return std::nullopt;
         }
-        return GameOverWords{"The Tide Takes You", "You're out of this run. OK: watch the others till it ends. Quit: leave the game.", false};
+        return GameOverWords{NOX_TR("modes.tide.game_over.title", "The Tide Takes You"),
+                             NOX_TR("modes.tide.game_over.question", "You're out of this run. OK: watch the others till it ends. Quit: leave the game."), false};
     }
 
     bool fakeScreen(App&, std::string_view flag) override

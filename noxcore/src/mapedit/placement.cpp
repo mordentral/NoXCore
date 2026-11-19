@@ -1,6 +1,7 @@
 // The map editor's object placement (placement.hpp): new objects as the game's save writes a
 // fresh thing, facing, snapping, the placement op and the scatter brush.
 #include "noxcore/mapedit/placement.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "doc_types.hpp"
 
@@ -9,6 +10,7 @@
 #include "noxcore/map/xfer.hpp"
 #include "noxcore/server/object_save.hpp"
 #include "noxcore/server/world.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
@@ -250,8 +252,9 @@ Op placeObjectsOp(const MapDocument& doc, std::vector<DocObject> objects, Select
     }
     if (!add.objects.empty()) op.parts.push_back(std::move(add));
     if (label.empty()) {
-        label = roots == 1 && !op.parts.empty() ? "Place " + std::get<AddObjects>(op.parts.front()).objects.front().object.type
-                                                : "Place " + std::to_string(roots) + " objects";
+        label = roots == 1 && !op.parts.empty()
+                    ? opLabel(oplabels::kPlaceOne, {{"type", std::get<AddObjects>(op.parts.front()).objects.front().object.type}})
+                    : opLabel(oplabels::kPlaceObjects, {{"n", roots}});
     }
     op.label = std::move(label);
     if (placed) *placed = std::move(sel);
@@ -392,7 +395,7 @@ std::vector<DocObject> ScatterStroke::dab(WorldPoint at)
 Op ScatterStroke::finish(Selection* placed) const
 {
     if (objects_.empty()) return {};
-    return placeObjectsOp(doc_, objects_, placed, "Scatter " + std::to_string(objects_.size()) + " objects");
+    return placeObjectsOp(doc_, objects_, placed, opLabel(oplabels::kScatter, {{"n", objects_.size()}}));
 }
 
 } // namespace nox::mapedit

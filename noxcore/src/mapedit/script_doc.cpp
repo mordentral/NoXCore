@@ -1,8 +1,10 @@
 // The map editor's script on the document's side (script_doc.hpp).
 #include "noxcore/mapedit/script_doc.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "noxcore/script/decompiler.hpp"
 #include "noxcore/script/opcodes.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
@@ -139,39 +141,39 @@ template <typename Obj, typename F>
 void eachHandler(Obj& o, F&& f)
 {
     if (o.header.details && o.header.details->onPickup) {
-        f("Pickup", *o.header.details->onPickup);
+        f(NOX_TRC("editor.script.handler.pickup", "Pickup"), *o.header.details->onPickup);
     }
     const auto monster = [&](auto& s) {
-        f("Enemy sighted", s.enemySighted);
-        f("Death", s.death);
-        f("Looking for enemy", s.lookingForEnemy);
-        f("Change focus", s.changeFocus);
-        f("Is hit", s.isHit);
-        f("Retreat", s.retreat);
-        f("Collision", s.collision);
-        f("Hear enemy", s.hearEnemy);
-        f("End of waypoint", s.endOfWaypoint);
-        f("Lost enemy", s.lostEnemy);
+        f(NOX_TRC("editor.script.handler.enemy_sighted", "Enemy sighted"), s.enemySighted);
+        f(NOX_TRC("editor.script.handler.death", "Death"), s.death);
+        f(NOX_TRC("editor.script.handler.looking_for_enemy", "Looking for enemy"), s.lookingForEnemy);
+        f(NOX_TRC("editor.script.handler.change_focus", "Change focus"), s.changeFocus);
+        f(NOX_TRC("editor.script.handler.is_hit", "Is hit"), s.isHit);
+        f(NOX_TRC("editor.script.handler.retreat", "Retreat"), s.retreat);
+        f(NOX_TRC("editor.script.handler.collision", "Collision"), s.collision);
+        f(NOX_TRC("editor.script.handler.hear_enemy", "Hear enemy"), s.hearEnemy);
+        f(NOX_TRC("editor.script.handler.end_of_waypoint", "End of waypoint"), s.endOfWaypoint);
+        f(NOX_TRC("editor.script.handler.lost_enemy", "Lost enemy"), s.lostEnemy);
     };
     std::visit(
         [&](auto& d) {
             using T = std::remove_cvref_t<decltype(d)>;
             if constexpr (std::is_same_v<T, map::xfer::Trigger>) {
-                f("Pressed", d.onPressed);
-                f("Released", d.onReleased);
+                f(NOX_TRC("editor.script.handler.pressed", "Pressed"), d.onPressed);
+                f(NOX_TRC("editor.script.handler.released", "Released"), d.onReleased);
                 if (o.xferVersion > 0x1E) {
-                    f("Collided", d.onCollided);
+                    f(NOX_TRC("editor.script.handler.collided", "Collided"), d.onCollided);
                 }
             } else if constexpr (std::is_same_v<T, map::xfer::Hole>) {
-                f("Stepped on", d.script);
+                f(NOX_TRC("editor.script.handler.stepped_on", "Stepped on"), d.script);
             } else if constexpr (std::is_same_v<T, map::xfer::Monster> || std::is_same_v<T, map::xfer::Npc>) {
                 monster(d.scripts);
             } else if constexpr (std::is_same_v<T, map::xfer::MonsterGenerator>) {
                 // (the server reads them as hurt, die, collide, spawn: World::load)
-                f("Hurt", d.scripts[0]);
-                f("Die", d.scripts[1]);
-                f("Collide", d.scripts[2]);
-                f("Spawn", d.scripts[3]);
+                f(NOX_TRC("editor.script.handler.hurt", "Hurt"), d.scripts[0]);
+                f(NOX_TRC("editor.script.handler.die", "Die"), d.scripts[1]);
+                f(NOX_TRC("editor.script.handler.collide", "Collide"), d.scripts[2]);
+                f(NOX_TRC("editor.script.handler.spawn", "Spawn"), d.scripts[3]);
             }
         },
         o.data);
@@ -217,13 +219,15 @@ std::string HandlerRef::where(const MapDocument& doc) const
 {
     if (owner == Owner::Polygon) {
         std::string name = polygon < doc.polygons.polygons.size() ? doc.polygons.polygons[polygon].name : std::string();
-        return "polygon " + std::to_string(polygon + 1) + (name.empty() ? "" : " (" + name + ")") + ": " + field;
+        return name.empty() ? l10n::format(NOX_TR("editor.script.where.polygon", "polygon {n}: {field}"), {{"n", polygon + 1}, {"field", field}})
+                            : l10n::format(NOX_TR("editor.script.where.polygon_named", "polygon {n} ({name}): {field}"), {{"n", polygon + 1}, {"name", name}, {"field", field}});
     }
     const auto it = doc.objects.find(object);
     if (it == doc.objects.end()) {
-        return "object: " + field;
+        return l10n::format(NOX_TR("editor.script.where.object_gone", "object: {field}"), {{"field", field}});
     }
-    return it->second.type + " (extent " + std::to_string(it->second.header.extent) + "): " + field;
+    return l10n::format(NOX_TR("editor.script.where.object", "{type} (extent {extent}): {field}"),
+                        {{"type", it->second.type}, {"extent", it->second.header.extent}, {"field", field}});
 }
 
 std::vector<std::pair<std::string, map::ScriptHandler*>> objectHandlers(DocObject& o)
@@ -249,8 +253,8 @@ std::vector<HandlerRef> handlerRefs(const MapDocument& doc)
     }
     for (std::size_t i = 0; i < doc.polygons.polygons.size(); ++i) {
         const auto& p = doc.polygons.polygons[i];
-        out.push_back({HandlerRef::Owner::Polygon, 0, i, "Enter", p.playerEnter.function});
-        out.push_back({HandlerRef::Owner::Polygon, 0, i, "Leave", p.monsterEnter.function});
+        out.push_back({HandlerRef::Owner::Polygon, 0, i, NOX_TR("editor.script.handler.enter", "Enter"), p.playerEnter.function});
+        out.push_back({HandlerRef::Owner::Polygon, 0, i, NOX_TR("editor.script.handler.leave", "Leave"), p.monsterEnter.function});
     }
     return out;
 }
@@ -294,7 +298,7 @@ DecompiledSource decompileDocumentScript(const MapDocument& doc, const script::D
         out.identical = d.identical;
         out.notes = std::move(d.notes);
     } catch (const std::exception& ex) {
-        out.notes.push_back(std::string("the map's script can't be read: ") + ex.what());
+        out.notes.push_back(l10n::format(NOX_TR("editor.script.unreadable", "the map's script can't be read: {error}"), {{"error", ex.what()}}));
     }
     return out;
 }
@@ -338,9 +342,10 @@ std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool all
     if (allowObjectVariables || !documentNeedsNoxCore(doc)) {
         return std::nullopt;
     }
-    return "This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map "
-           "needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is "
-           "kept as it is. Turn on \"Allow NoX Core-only script features (object variables)\" to edit and compile it.";
+    return NOX_TR("editor.script.read_only_object_vars",
+                  "This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map "
+                  "needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is "
+                  "kept as it is. Turn on \"Allow NoX Core-only script features (object variables)\" to edit and compile it.");
 }
 
 void addMapArgValues(script::ArgValueSets& sets, const MapDocument& doc, const things::ThingDb* things)
@@ -375,11 +380,11 @@ void addMapArgValues(script::ArgValueSets& sets, const MapDocument& doc, const t
             n.value.aliases.push_back(stored);
         }
     };
-    const auto take = [](Names& names, const char* several) {
+    const auto take = [](Names& names, const std::string& several) {
         std::vector<ArgValue> out;
         for (auto& [bare, n] : names) {
             if (n.count > 1) {
-                n.value.note += " (" + std::to_string(n.count) + several + ")";
+                n.value.note += " (" + l10n::format(several, {{"n", n.count}}) + ")";
             }
             if (!n.value.aliases.empty()) {
                 n.value.note += "; " + n.value.aliases.front() + (n.value.aliases.size() > 1 ? "..." : "");
@@ -397,9 +402,10 @@ void addMapArgValues(script::ArgValueSets& sets, const MapDocument& doc, const t
     Names waypoints;
     for (const auto& w : doc.waypoints.waypoints) {
         add(waypoints, stripNul(w.name), [&] {
-            char where[64];
-            std::snprintf(where, sizeof where, "waypoint %u at %.0f, %.0f", w.id, static_cast<double>(w.x), static_cast<double>(w.y));
-            return std::string(where);
+            char x[24], y[24];
+            std::snprintf(x, sizeof x, "%.0f", static_cast<double>(w.x));
+            std::snprintf(y, sizeof y, "%.0f", static_cast<double>(w.y));
+            return l10n::format(NOX_TR("editor.script.values.waypoint_at", "waypoint {id} at {x}, {y}"), {{"id", w.id}, {"x", x}, {"y", y}});
         }, -1);
     }
     Names groups[3];
@@ -409,18 +415,19 @@ void addMapArgValues(script::ArgValueSets& sets, const MapDocument& doc, const t
         const int k = g.kind == map::Group::Kind::Waypoints ? 1 : g.kind == map::Group::Kind::Walls ? 2 : 0;
         add(groups[k], stripNul(g.name), [&] {
             const std::size_t size = g.kind == map::Group::Kind::Walls ? g.walls.size() : g.members.size();
-            const char* what = g.kind == map::Group::Kind::Walls ? " wall" : g.kind == map::Group::Kind::Waypoints ? " waypoint"
-                               : g.kind == map::Group::Kind::Unknown3                                       ? " group"
-                                                                                                             : " object";
-            return std::to_string(size) + what + (size == 1 ? "" : "s");
+            const std::string& what = g.kind == map::Group::Kind::Walls       ? NOX_TRP("editor.script.values.walls", "{n} wall", "{n} walls", size)
+                                      : g.kind == map::Group::Kind::Waypoints ? NOX_TRP("editor.script.values.waypoints", "{n} waypoint", "{n} waypoints", size)
+                                      : g.kind == map::Group::Kind::Unknown3  ? NOX_TRP("editor.script.values.groups", "{n} group", "{n} groups", size)
+                                                                              : NOX_TRP("editor.script.values.objects", "{n} object", "{n} objects", size);
+            return l10n::format(what, {{"n", size}});
         }, -1);
     }
     using script::ValueMatch;
-    sets.set({ValueSetId::ObjectName, ValueMatch::MapScoped, take(objects, " objects have this name")});
-    sets.set({ValueSetId::WaypointName, ValueMatch::MapScoped, take(waypoints, " waypoints have this name")});
-    sets.set({ValueSetId::ObjectGroup, ValueMatch::MapScoped, take(groups[0], " groups have this name")});
-    sets.set({ValueSetId::WaypointGroup, ValueMatch::MapScoped, take(groups[1], " groups have this name")});
-    sets.set({ValueSetId::WallGroup, ValueMatch::MapScoped, take(groups[2], " groups have this name")});
+    sets.set({ValueSetId::ObjectName, ValueMatch::MapScoped, take(objects, NOX_TR("editor.script.values.objects_share_name", "{n} objects have this name"))});
+    sets.set({ValueSetId::WaypointName, ValueMatch::MapScoped, take(waypoints, NOX_TR("editor.script.values.waypoints_share_name", "{n} waypoints have this name"))});
+    sets.set({ValueSetId::ObjectGroup, ValueMatch::MapScoped, take(groups[0], NOX_TR("editor.script.values.groups_share_name", "{n} groups have this name"))});
+    sets.set({ValueSetId::WaypointGroup, ValueMatch::MapScoped, take(groups[1], NOX_TR("editor.script.values.groups_share_name", "{n} groups have this name"))});
+    sets.set({ValueSetId::WallGroup, ValueMatch::MapScoped, take(groups[2], NOX_TR("editor.script.values.groups_share_name", "{n} groups have this name"))});
 }
 
 script::CompileResult compileForDocument(const MapDocument& doc, std::string_view source, bool allowObjectVariables,
@@ -458,8 +465,11 @@ script::CompileResult compileForDocument(const MapDocument& doc, std::string_vie
         }
     }
     for (const auto& [name, m] : missing) {
-        warn({}, m.first + " names the function " + name + ", which the script doesn't define" +
-                     (m.second > 1 ? " (and " + std::to_string(m.second - 1) + " more handlers)" : ""));
+        warn({}, m.second > 1 ? l10n::format(NOX_TR("editor.script.handler_undefined_more",
+                                                    "{where} names the function {name}, which the script doesn't define (and {n} more handlers)"),
+                                             {{"where", m.first}, {"name", name}, {"n", m.second - 1}})
+                              : l10n::format(NOX_TR("editor.script.handler_undefined", "{where} names the function {name}, which the script doesn't define"),
+                                             {{"where", m.first}, {"name", name}}));
     }
     // (A lookup by a literal name nothing on the map has: the compiler's lint, CompileOptions::
     // argValues, at the literal.)
@@ -476,7 +486,7 @@ Op compiledScriptOp(const MapDocument& doc, const script::ScriptFile& file)
     if (so.code == doc.script.code && !std::ranges::none_of(doc.sections, [](const std::string& s) { return s == map::ScriptObject::kName; })) {
         return {};
     }
-    return Op{"Compile script", {SetScript{std::move(so)}}};
+    return Op{opLabel(oplabels::kCompileScript), {SetScript{std::move(so)}}};
 }
 
 } // namespace nox::mapedit

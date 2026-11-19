@@ -4,6 +4,8 @@
 
 #include "menu_rules.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 namespace noxsdl {
 
 namespace {
@@ -79,7 +81,7 @@ void QuitMenu::layout(bool solo)
             save->status |= nox::gui::status::Enabled;
         } else {
             save->status &= ~nox::gui::status::Enabled; // (the network game's save: not yet)
-            save->text += " - WIP";
+            save->text += NOX_TR("menus.common.wip_suffix", " - WIP");
         }
     }
     // Gameplay Controls: the host's Server Settings (server_options.hpp); off in a game we don't
@@ -97,10 +99,10 @@ void QuitMenu::layout(bool solo)
     // game's vote (a kick, MSG_VOTE) isn't done yet: off, and marked.
     if (gui::Window* vote = menu_->find(kVote)) {
         if (callbacks_.canVoteMap && callbacks_.canVoteMap()) {
-            vote->text = "Vote Map";
+            vote->text = NOX_TR("game.quit_menu.vote_map", "Vote Map");
             vote->status |= nox::gui::status::Enabled;
         } else {
-            vote->text = voteText_ + " - WIP";
+            vote->text = voteText_ + NOX_TR("menus.common.wip_suffix", " - WIP");
             vote->status &= ~nox::gui::status::Enabled;
         }
     }

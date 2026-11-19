@@ -1,5 +1,7 @@
 // The map editor's waypoints, polygons and groups (markers.hpp).
 #include "noxcore/mapedit/markers.hpp"
+#include "noxcore/mapedit/op_label.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
@@ -8,6 +10,8 @@
 #include <map>
 
 namespace nox::mapedit {
+
+using l10n::format;
 
 namespace {
 
@@ -20,11 +24,6 @@ float dist2(float ax, float ay, float bx, float by)
 float clampWorld(float v)
 {
     return std::clamp(v, 0.0f, kWorldSize - 1);
-}
-
-std::string waypointLabel(std::uint32_t id)
-{
-    return "waypoint " + std::to_string(id);
 }
 
 /// A point id no point in the pool has (above the others: the writer renumbers them anyway).
@@ -64,7 +63,7 @@ Op single(std::string label, OpPart part)
 std::string polygonName(const MapDocument& d, std::size_t i)
 {
     const auto& n = d.polygons.polygons[i].name;
-    return n.empty() ? "polygon " + std::to_string(i + 1) : "polygon " + n;
+    return n.empty() ? opLabel(oplabels::kPolygonNumbered, {{"n", i + 1}}) : opLabel(oplabels::kPolygonNamed, {{"name", n}});
 }
 
 /// The document's polygon keys, one per polygon (a list edited outside an op gets keys by position).
@@ -111,10 +110,12 @@ const std::vector<FlagBit>& waypointFlagBits()
     // "registered in the map grid" mark (the waypoint grid register sets it at load and skips a
     // waypoint that has it), so a file must never store it. No other bit is read.
     static const std::vector<FlagBit> bits = {
-        {kWaypointEnabled, "Enabled", "Creatures, movers and scripts' waypoint searches use it (scripts turn it on and off)."},
-        {kWaypointRegistered, "Registered (run time only)",
-         "The game's own mark for a waypoint put in its map grid at load. A map storing it keeps the waypoint out of the grid, "
-         "so the nearest-waypoint search never finds it: clear it."},
+        {kWaypointEnabled, NOX_TRC("editor.markers.waypoint_flag.enabled", "Enabled"),
+         NOX_TRC("editor.markers.waypoint_flag.enabled.help", "Creatures, movers and scripts' waypoint searches use it (scripts turn it on and off).")},
+        {kWaypointRegistered, NOX_TRC("editor.markers.waypoint_flag.registered", "Registered (run time only)"),
+         NOX_TRC("editor.markers.waypoint_flag.registered.help",
+                 "The game's own mark for a waypoint put in its map grid at load. A map storing it keeps the waypoint out of the grid, "
+                 "so the nearest-waypoint search never finds it: clear it.")},
     };
     return bits;
 }
@@ -126,14 +127,15 @@ const std::vector<FlagBit>& waypointLinkFlagBits()
     // != 0. Roaming monsters and Blink's random destination want 0x80; a monster's roam flags
     // (the script's SetRoamFlag) are the mask its Roam wants, so any bit can be a class.
     static const std::vector<FlagBit> bits = {
-        {0x01, "Route class 1", "A creature whose roam flags include class 1 may walk this link."},
-        {0x02, "Route class 2", "A creature whose roam flags include class 2 may walk this link."},
-        {0x04, "Route class 3", "A creature whose roam flags include class 3 may walk this link."},
-        {0x08, "Route class 4", "A creature whose roam flags include class 4 may walk this link."},
-        {0x10, "Route class 5", "A creature whose roam flags include class 5 may walk this link."},
-        {0x20, "Route class 6", "A creature whose roam flags include class 6 may walk this link."},
-        {0x40, "Route class 7", "A creature whose roam flags include class 7 may walk this link."},
-        {0x80, "Default (roaming, Blink)", "The default class: roaming monsters and Blink's random destination use it (every stock link has it)."},
+        {0x01, NOX_TRC("editor.markers.link_class.c1", "Route class 1"), NOX_TRC("editor.markers.link_class.c1.help", "A creature whose roam flags include class 1 may walk this link.")},
+        {0x02, NOX_TRC("editor.markers.link_class.c2", "Route class 2"), NOX_TRC("editor.markers.link_class.c2.help", "A creature whose roam flags include class 2 may walk this link.")},
+        {0x04, NOX_TRC("editor.markers.link_class.c3", "Route class 3"), NOX_TRC("editor.markers.link_class.c3.help", "A creature whose roam flags include class 3 may walk this link.")},
+        {0x08, NOX_TRC("editor.markers.link_class.c4", "Route class 4"), NOX_TRC("editor.markers.link_class.c4.help", "A creature whose roam flags include class 4 may walk this link.")},
+        {0x10, NOX_TRC("editor.markers.link_class.c5", "Route class 5"), NOX_TRC("editor.markers.link_class.c5.help", "A creature whose roam flags include class 5 may walk this link.")},
+        {0x20, NOX_TRC("editor.markers.link_class.c6", "Route class 6"), NOX_TRC("editor.markers.link_class.c6.help", "A creature whose roam flags include class 6 may walk this link.")},
+        {0x40, NOX_TRC("editor.markers.link_class.c7", "Route class 7"), NOX_TRC("editor.markers.link_class.c7.help", "A creature whose roam flags include class 7 may walk this link.")},
+        {0x80, NOX_TRC("editor.markers.link_class.default", "Default (roaming, Blink)"),
+         NOX_TRC("editor.markers.link_class.default.help", "The default class: roaming monsters and Blink's random destination use it (every stock link has it).")},
     };
     return bits;
 }
@@ -185,7 +187,7 @@ Op placeWaypointOp(const MapDocument& d, WorldPoint at, std::string name, std::u
     w.flags = kWaypointEnabled; // (new waypoints are on: the old editor's "always off" fixed)
     if (placed) *placed = w.id;
     const std::uint32_t id = w.id;
-    return single("Place " + waypointLabel(id), SetWaypoints{{{id, std::move(w), -1}}});
+    return single(opLabel(oplabels::kPlaceWaypoint, {{"id", id}}), SetWaypoints{{{id, std::move(w), -1}}});
 }
 
 Op placeLinkedWaypointOp(const MapDocument& d, WorldPoint at, std::uint32_t from, bool bothWays, std::uint8_t flags, std::uint32_t* placed)
@@ -204,7 +206,7 @@ Op placeLinkedWaypointOp(const MapDocument& d, WorldPoint at, std::uint32_t from
     if (placed) *placed = w.id;
     const std::uint32_t id = w.id;
     // (The new waypoint first: the link to it then names a waypoint that exists.)
-    return single("Place " + waypointLabel(id) + " linked from " + std::to_string(from), SetWaypoints{{{id, std::move(w), -1}, {from, std::move(na)}}});
+    return single(opLabel(oplabels::kPlaceWaypointLinked, {{"id", id}, {"from", from}}), SetWaypoints{{{id, std::move(w), -1}, {from, std::move(na)}}});
 }
 
 Op linkWaypointsOp(const MapDocument& d, std::uint32_t from, std::uint32_t to, bool bothWays, std::uint8_t flags)
@@ -235,7 +237,10 @@ Op linkWaypointsOp(const MapDocument& d, std::uint32_t from, std::uint32_t to, b
         if (!(nb == *b)) part.waypoints.push_back({to, std::move(nb)});
     }
     if (part.waypoints.empty()) return {};
-    return single((bothWays ? "Link both ways " : "Link ") + waypointLabel(from) + " to " + std::to_string(to), std::move(part));
+    return single(opLabel(bothWays ? oplabels::kLinkWaypointsBoth
+                                  : oplabels::kLinkWaypoints,
+                         {{"from", from}, {"to", to}}),
+                  std::move(part));
 }
 
 Op unlinkWaypointsOp(const MapDocument& d, std::uint32_t from, std::uint32_t to, bool bothWays)
@@ -251,7 +256,7 @@ Op unlinkWaypointsOp(const MapDocument& d, std::uint32_t from, std::uint32_t to,
     drop(from, to);
     if (bothWays) drop(to, from);
     if (part.waypoints.empty()) return {};
-    return single("Unlink " + waypointLabel(from) + " from " + std::to_string(to), std::move(part));
+    return single(opLabel(oplabels::kUnlinkWaypoints, {{"from", from}, {"to", to}}), std::move(part));
 }
 
 Op setLinkFlagsOp(const MapDocument& d, std::uint32_t from, std::uint32_t to, std::uint8_t flags)
@@ -265,7 +270,7 @@ Op setLinkFlagsOp(const MapDocument& d, std::uint32_t from, std::uint32_t to, st
     if (c == *w) return {};
     char b[8];
     std::snprintf(b, sizeof b, "0x%02X", flags);
-    return single("Set link flags " + std::to_string(from) + " to " + std::to_string(to) + " to " + b, SetWaypoints{{{from, std::move(c)}}});
+    return single(opLabel(oplabels::kSetLinkFlags, {{"from", from}, {"to", to}, {"flags", b}}), SetWaypoints{{{from, std::move(c)}}});
 }
 
 Op setWaypointsEnabledOp(const MapDocument& d, const std::set<std::uint32_t>& ids, bool on)
@@ -279,7 +284,10 @@ Op setWaypointsEnabledOp(const MapDocument& d, const std::set<std::uint32_t>& id
     }
     if (part.waypoints.empty()) return {};
     const std::size_t n = part.waypoints.size();
-    return single(std::string(on ? "Enable " : "Disable ") + std::to_string(n) + (n == 1 ? " waypoint" : " waypoints"), std::move(part));
+    return single(opLabel(on ? oplabels::kEnableWaypoints
+                            : oplabels::kDisableWaypoints,
+                         {{"n", n}}),
+                  std::move(part));
 }
 
 Op setWaypointOp(const MapDocument& d, const map::Waypoint& w, std::string label)
@@ -293,7 +301,7 @@ Op setWaypointOp(const MapDocument& d, const map::Waypoint& w, std::string label
     c.x = clampWorld(c.x);
     c.y = clampWorld(c.y);
     if (c.name.size() > kMarkerNameMax) throw FormatError("map editor: a waypoint name holds at most 255 bytes");
-    return single(label.empty() ? "Edit " + waypointLabel(w.id) : std::move(label), SetWaypoints{{{w.id, std::move(c)}}});
+    return single(label.empty() ? opLabel(oplabels::kEditWaypoint, {{"id", w.id}}) : std::move(label), SetWaypoints{{{w.id, std::move(c)}}});
 }
 
 Op setWaypointsOp(const MapDocument& d, const std::vector<map::Waypoint>& changed, std::string label)
@@ -326,7 +334,10 @@ Op setWaypointFlagOp(const MapDocument& d, const std::set<std::uint32_t>& ids, s
     char b[16];
     std::snprintf(b, sizeof b, "0x%X", bits);
     const std::size_t n = changed.size();
-    return setWaypointsOp(d, changed, std::string(on ? "Set" : "Clear") + " flag " + b + " on " + std::to_string(n) + (n == 1 ? " waypoint" : " waypoints"));
+    return setWaypointsOp(d, changed,
+                          opLabel(on ? oplabels::kSetWaypointFlag
+                                    : oplabels::kClearWaypointFlag,
+                                 {{"flag", b}, {"n", n}}));
 }
 
 // --- Polygons ----------------------------------------------------------------------------------------
@@ -337,7 +348,8 @@ const std::vector<FlagBit>& polygonFlagBits()
     // visit in quest mode clears it and counts a secret found). Other bits are written back as
     // read and never used.
     static const std::vector<FlagBit> bits = {
-        {0x1, "Secret area", "A quest's secret area: counted in the quest's secret total, and found the first time a player enters it."},
+        {0x1, NOX_TRC("editor.markers.polygon_flag.secret", "Secret area"),
+         NOX_TRC("editor.markers.polygon_flag.secret.help", "A quest's secret area: counted in the quest's secret total, and found the first time a player enters it.")},
     };
     return bits;
 }
@@ -463,7 +475,7 @@ Op addPolygonOp(const MapDocument& d, const std::vector<WorldPoint>& corners, co
     while (std::ranges::find(keys, next) != keys.end() || next == 0) ++next;
     keys.push_back(next);
     if (key) *key = next;
-    return single("Add polygon " + (props.name.empty() ? std::to_string(p.polygons.size()) : props.name), SetPolygons{std::move(p), std::move(keys)});
+    return single(opLabel(oplabels::kAddPolygon, {{"name", props.name.empty() ? std::to_string(p.polygons.size()) : props.name}}), SetPolygons{std::move(p), std::move(keys)});
 }
 
 Op setPolygonPropsOp(const MapDocument& d, std::uint32_t key, const map::Polygon& props, std::string label)
@@ -477,7 +489,7 @@ Op setPolygonPropsOp(const MapDocument& d, std::uint32_t key, const map::Polygon
     next.points = poly.points;
     if (next == poly) return {};
     poly = std::move(next);
-    return single(label.empty() ? "Edit " + polygonName(d, *i) : std::move(label), SetPolygons{std::move(p), keys});
+    return single(label.empty() ? opLabel(oplabels::kEditPolygon, {{"polygon", polygonName(d, *i)}}) : std::move(label), SetPolygons{std::move(p), keys});
 }
 
 Op movePolygonCornerOp(const MapDocument& d, std::uint32_t key, std::size_t corner, WorldPoint to)
@@ -496,7 +508,7 @@ Op movePolygonCornerOp(const MapDocument& d, std::uint32_t key, std::size_t corn
         }
     }
     if (!moved) return {};
-    return single("Move a corner of " + polygonName(d, *i), SetPolygons{std::move(p), keys});
+    return single(opLabel(oplabels::kMoveCorner, {{"polygon", polygonName(d, *i)}}), SetPolygons{std::move(p), keys});
 }
 
 Op insertPolygonCornerOp(const MapDocument& d, std::uint32_t key, std::size_t after, WorldPoint at)
@@ -510,7 +522,7 @@ Op insertPolygonCornerOp(const MapDocument& d, std::uint32_t key, std::size_t af
     const std::uint32_t id = freePointId(p);
     p.points.push_back({id, clampWorld(at.x), clampWorld(at.y)});
     pts.insert(pts.begin() + static_cast<std::ptrdiff_t>(std::min(after + 1, pts.size())), id);
-    return single("Add a corner to " + polygonName(d, *i), SetPolygons{std::move(p), keys});
+    return single(opLabel(oplabels::kAddCorner, {{"polygon", polygonName(d, *i)}}), SetPolygons{std::move(p), keys});
 }
 
 Op deletePolygonCornerOp(const MapDocument& d, std::uint32_t key, std::size_t corner)
@@ -523,7 +535,7 @@ Op deletePolygonCornerOp(const MapDocument& d, std::uint32_t key, std::size_t co
     if (corner >= pts.size() || pts.size() <= 3) return {};
     pts.erase(pts.begin() + static_cast<std::ptrdiff_t>(corner));
     dropUnusedPoints(p);
-    return single("Remove a corner of " + polygonName(d, *i), SetPolygons{std::move(p), keys});
+    return single(opLabel(oplabels::kRemoveCorner, {{"polygon", polygonName(d, *i)}}), SetPolygons{std::move(p), keys});
 }
 
 Op reorderPolygonOp(const MapDocument& d, std::uint32_t key, std::size_t to)
@@ -539,7 +551,7 @@ Op reorderPolygonOp(const MapDocument& d, std::uint32_t key, std::size_t to)
     keys.erase(keys.begin() + static_cast<std::ptrdiff_t>(*i));
     p.polygons.insert(p.polygons.begin() + static_cast<std::ptrdiff_t>(to), std::move(poly));
     keys.insert(keys.begin() + static_cast<std::ptrdiff_t>(to), key);
-    return single("Move " + polygonName(d, *i) + " to position " + std::to_string(to + 1), SetPolygons{std::move(p), std::move(keys)});
+    return single(opLabel(oplabels::kReorderPolygon, {{"polygon", polygonName(d, *i)}, {"n", to + 1}}), SetPolygons{std::move(p), std::move(keys)});
 }
 
 Op deletePolygonsOp(const MapDocument& d, const std::set<std::uint32_t>& gone)
@@ -556,7 +568,7 @@ Op deletePolygonsOp(const MapDocument& d, const std::set<std::uint32_t>& gone)
     }
     if (n == 0) return {};
     dropUnusedPoints(p);
-    return single("Delete " + std::to_string(n) + (n == 1 ? " polygon" : " polygons"), SetPolygons{std::move(p), std::move(keys)});
+    return single(opLabel(oplabels::kDeletePolygons, {{"n", n}}), SetPolygons{std::move(p), std::move(keys)});
 }
 
 Op movePolygonsOp(const MapDocument& d, const std::set<std::uint32_t>& moved, float dx, float dy)
@@ -575,7 +587,7 @@ Op movePolygonsOp(const MapDocument& d, const std::set<std::uint32_t>& moved, fl
         }
     }
     const std::size_t n = moved.size();
-    return single("Move " + std::to_string(n) + (n == 1 ? " polygon" : " polygons"), SetPolygons{std::move(p), keys});
+    return single(opLabel(oplabels::kMovePolygons, {{"n", n}}), SetPolygons{std::move(p), keys});
 }
 
 // --- Groups ------------------------------------------------------------------------------------------
@@ -583,12 +595,24 @@ Op movePolygonsOp(const MapDocument& d, const std::set<std::uint32_t>& moved, fl
 const char* groupKindName(map::Group::Kind kind)
 {
     switch (kind) {
-    case map::Group::Kind::Objects: return "Objects";
-    case map::Group::Kind::Waypoints: return "Waypoints";
-    case map::Group::Kind::Walls: return "Walls";
-    case map::Group::Kind::Unknown3: return "Groups";
+    case map::Group::Kind::Objects: return NOX_TRC("editor.group_kind.objects", "Objects");
+    case map::Group::Kind::Waypoints: return NOX_TRC("editor.group_kind.waypoints", "Waypoints");
+    case map::Group::Kind::Walls: return NOX_TRC("editor.group_kind.walls", "Walls");
+    case map::Group::Kind::Unknown3: return NOX_TRC("editor.group_kind.groups", "Groups");
     }
     return "?";
+}
+
+const nox::l10n::Key& groupKindKey(map::Group::Kind kind)
+{
+    static constexpr nox::l10n::Key kUnknown{"", "?"};
+    switch (kind) {
+    case map::Group::Kind::Objects: return oplabels::kGroupKindObjects;
+    case map::Group::Kind::Waypoints: return oplabels::kGroupKindWaypoints;
+    case map::Group::Kind::Walls: return oplabels::kGroupKindWalls;
+    case map::Group::Kind::Unknown3: return oplabels::kGroupKindGroups;
+    }
+    return kUnknown;
 }
 
 std::int32_t freeGroupId(const MapDocument& d)
@@ -635,7 +659,7 @@ Op addGroupOp(const MapDocument& d, std::string name, map::Group::Kind kind, std
     n.name = std::move(name);
     n.kind = kind;
     n.id = freeGroupId(d);
-    const std::string label = "Add group " + n.name;
+    const std::string label = opLabel(oplabels::kAddGroup, {{"name", n.name}});
     g.groups.push_back(std::move(n));
     std::uint32_t next = d.nextGroupKey;
     while (std::ranges::find(keys, next) != keys.end() || next == 0) ++next;
@@ -656,7 +680,7 @@ Op setGroupOp(const MapDocument& d, std::uint32_t key, const map::Group& grp, st
     } else {
         g.groups[*i].walls.clear();
     }
-    return single(label.empty() ? "Edit group " + d.groups.groups[*i].name : std::move(label), SetGroups{std::move(g), keys});
+    return single(label.empty() ? opLabel(oplabels::kEditGroup, {{"name", d.groups.groups[*i].name}}) : std::move(label), SetGroups{std::move(g), keys});
 }
 
 Op deleteGroupOp(const MapDocument& d, std::uint32_t key)
@@ -668,7 +692,7 @@ Op deleteGroupOp(const MapDocument& d, std::uint32_t key)
     const std::string name = g.groups[*i].name;
     g.groups.erase(g.groups.begin() + static_cast<std::ptrdiff_t>(*i));
     keys.erase(keys.begin() + static_cast<std::ptrdiff_t>(*i));
-    return single("Delete group " + name, SetGroups{std::move(g), std::move(keys)});
+    return single(opLabel(oplabels::kDeleteGroup, {{"name", name}}), SetGroups{std::move(g), std::move(keys)});
 }
 
 namespace {
@@ -708,7 +732,7 @@ Op addGroupMembersOp(const MapDocument& d, std::uint32_t key, const Selection& p
     for (const auto& w : walls) {
         if (std::ranges::find(g.walls, w) == g.walls.end()) g.walls.push_back(w);
     }
-    return setGroupOp(d, key, g, "Add members to group " + g.name);
+    return setGroupOp(d, key, g, opLabel(oplabels::kAddGroupMembers, {{"name", g.name}}));
 }
 
 Op removeGroupMembersOp(const MapDocument& d, std::uint32_t key, const Selection& picked)
@@ -721,7 +745,7 @@ Op removeGroupMembersOp(const MapDocument& d, std::uint32_t key, const Selection
     membersOf(d, g.kind, picked, ids, walls);
     std::erase_if(g.members, [&](std::int32_t m) { return std::ranges::find(ids, m) != ids.end(); });
     std::erase_if(g.walls, [&](const map::GridPoint& w) { return std::ranges::find(walls, w) != walls.end(); });
-    return setGroupOp(d, key, g, "Remove members from group " + g.name);
+    return setGroupOp(d, key, g, opLabel(oplabels::kRemoveGroupMembers, {{"name", g.name}}));
 }
 
 Op addGroupMemberIdsOp(const MapDocument& d, std::uint32_t key, const std::vector<std::int32_t>& ids)
@@ -734,7 +758,7 @@ Op addGroupMemberIdsOp(const MapDocument& d, std::uint32_t key, const std::vecto
         if (g.kind == map::Group::Kind::Unknown3 && groupCycle(d, g.id, id)) continue; // (a group never reaches itself)
         if (std::ranges::find(g.members, id) == g.members.end()) g.members.push_back(id);
     }
-    return setGroupOp(d, key, g, "Add members to group " + g.name);
+    return setGroupOp(d, key, g, opLabel(oplabels::kAddGroupMembers, {{"name", g.name}}));
 }
 
 Op removeGroupMemberIdsOp(const MapDocument& d, std::uint32_t key, const std::vector<std::int32_t>& ids)
@@ -743,7 +767,7 @@ Op removeGroupMemberIdsOp(const MapDocument& d, std::uint32_t key, const std::ve
     if (!i) return {};
     map::Group g = d.groups.groups[*i];
     std::erase_if(g.members, [&](std::int32_t m) { return std::ranges::find(ids, m) != ids.end(); });
-    return setGroupOp(d, key, g, "Remove members from group " + g.name);
+    return setGroupOp(d, key, g, opLabel(oplabels::kRemoveGroupMembers, {{"name", g.name}}));
 }
 
 Selection groupSelection(const MapDocument& d, const map::Group& g)
@@ -776,19 +800,19 @@ std::vector<std::string> groupProblems(const MapDocument& d, std::size_t index)
     std::vector<std::string> out;
     if (index >= d.groups.groups.size()) return out;
     const map::Group& g = d.groups.groups[index];
-    if (g.name.empty()) out.push_back("It has no name (scripts find groups by name).");
-    if (g.name.size() > kGroupNameMax) out.push_back("Its name is longer than the game's 75-byte buffer.");
-    if (!g.terminated) out.push_back("Its name was stored without its terminator (the game reads on into its buffer).");
+    if (g.name.empty()) out.push_back(NOX_TR("editor.group_problem.no_name", "It has no name (scripts find groups by name)."));
+    if (g.name.size() > kGroupNameMax) out.push_back(NOX_TR("editor.group_problem.name_too_long", "Its name is longer than the game's 75-byte buffer."));
+    if (!g.terminated) out.push_back(NOX_TR("editor.group_problem.unterminated", "Its name was stored without its terminator (the game reads on into its buffer)."));
     for (std::size_t j = 0; j < d.groups.groups.size(); ++j) {
         if (j != index && d.groups.groups[j].name == g.name && !g.name.empty()) {
-            out.push_back("Another group has the same name (a script finds only one of them).");
+            out.push_back(NOX_TR("editor.group_problem.same_name", "Another group has the same name (a script finds only one of them)."));
             break;
         }
     }
     for (std::size_t j = 0; j < d.groups.groups.size(); ++j) {
         if (j != index && d.groups.groups[j].id == g.id) {
             // (Scripts name groups by id; the game's lookup keeps the last group read with an id.)
-            out.push_back("Another group has the same id " + std::to_string(g.id) + " (scripts reach only the last of them).");
+            out.push_back(format(NOX_TR("editor.group_problem.same_id", "Another group has the same id {id} (scripts reach only the last of them)."), {{"id", g.id}}));
             break;
         }
     }
@@ -798,32 +822,32 @@ std::vector<std::string> groupProblems(const MapDocument& d, std::size_t index)
         for (const auto& [id, o] : d.objects) ++count[static_cast<std::int32_t>(o.header.extent)];
         for (const auto m : g.members) {
             const auto it = count.find(m);
-            if (it == count.end()) out.push_back("Member extent " + std::to_string(m) + ": no object has it.");
-            else if (it->second > 1) out.push_back("Member extent " + std::to_string(m) + ": " + std::to_string(it->second) + " objects share it.");
+            if (it == count.end()) out.push_back(format(NOX_TR("editor.group_problem.extent_missing", "Member extent {extent}: no object has it."), {{"extent", m}}));
+            else if (it->second > 1) out.push_back(format(NOX_TR("editor.group_problem.extent_shared", "Member extent {extent}: {n} objects share it."), {{"extent", m}, {"n", it->second}}));
         }
         break;
     }
     case map::Group::Kind::Waypoints:
         for (const auto m : g.members) {
-            if (!findWaypoint(d, static_cast<std::uint32_t>(m))) out.push_back("Member waypoint " + std::to_string(m) + " doesn't exist.");
+            if (!findWaypoint(d, static_cast<std::uint32_t>(m))) out.push_back(format(NOX_TR("editor.group_problem.waypoint_missing", "Member waypoint {id} doesn't exist."), {{"id", m}}));
         }
         break;
     case map::Group::Kind::Walls:
         for (const auto& w : g.walls) {
             const bool on = w.x >= 0 && w.x < 256 && w.y >= 0 && w.y < 256 &&
                             d.walls.contains(Cell{static_cast<std::uint8_t>(w.x), static_cast<std::uint8_t>(w.y)});
-            if (!on) out.push_back("Member wall " + std::to_string(w.x) + "," + std::to_string(w.y) + ": no wall there.");
+            if (!on) out.push_back(format(NOX_TR("editor.group_problem.wall_missing", "Member wall {x},{y}: no wall there."), {{"x", w.x}, {"y", w.y}}));
         }
         break;
     case map::Group::Kind::Unknown3:
         // A group of groups: the scripts' for-each walks its members' groups in turn. An empty one
         // crashes the walk (an original bug, OB-158).
-        if (g.members.empty()) out.push_back("A group of groups with no members: the game's for-each crashes on it (add a member or delete it).");
+        if (g.members.empty()) out.push_back(NOX_TR("editor.group_problem.empty_group_of_groups", "A group of groups with no members: the game's for-each crashes on it (add a member or delete it)."));
         for (const auto m : g.members) {
             if (!findGroupById(d, m)) {
-                out.push_back("Member group id " + std::to_string(m) + ": no group has it.");
+                out.push_back(format(NOX_TR("editor.group_problem.group_missing", "Member group id {id}: no group has it."), {{"id", m}}));
             } else if (m == g.id || groupCycle(d, g.id, m)) {
-                out.push_back("Member group id " + std::to_string(m) + " leads back to this group (the walk never ends).");
+                out.push_back(format(NOX_TR("editor.group_problem.group_cycle", "Member group id {id} leads back to this group (the walk never ends)."), {{"id", m}}));
             }
         }
         break;
@@ -948,14 +972,14 @@ const std::vector<FlagBit>& gameTypeBits()
     // MapInfo's game flags as the map list reads them (mapRWMapInfo; the game-type filter tests
     // each bit): a bitfield, a map may offer several.
     static const std::vector<FlagBit> bits = {
-        {0x1, "Solo / co-op", "A solo (or co-operative) game's map."},
-        {0x2, "Quest", "Quest mode."},
-        {0x4, "Arena", "Arena (deathmatch)."},
-        {0x8, "Capture the Flag", "Capture the Flag."},
-        {0x10, "King of the Realm", "King of the Realm."},
-        {0x20, "Elimination", "Elimination."},
-        {0x40, "Flag Ball", "Flag Ball."},
-        {0x80000000u, "Chat", "Social / chat."},
+        {0x1, NOX_TRC("editor.markers.game_type.solo", "Solo / co-op"), NOX_TRC("editor.markers.game_type.solo.help", "A solo (or co-operative) game's map.")},
+        {0x2, NOX_TRC("editor.markers.game_type.quest", "Quest"), NOX_TRC("editor.markers.game_type.quest.help", "Quest mode.")},
+        {0x4, NOX_TRC("editor.markers.game_type.arena", "Arena"), NOX_TRC("editor.markers.game_type.arena.help", "Arena (deathmatch).")},
+        {0x8, NOX_TRC("editor.markers.game_type.ctf", "Capture the Flag"), NOX_TRC("editor.markers.game_type.ctf.help", "Capture the Flag.")},
+        {0x10, NOX_TRC("editor.markers.game_type.kotr", "King of the Realm"), NOX_TRC("editor.markers.game_type.kotr.help", "King of the Realm.")},
+        {0x20, NOX_TRC("editor.markers.game_type.elimination", "Elimination"), NOX_TRC("editor.markers.game_type.elimination.help", "Elimination.")},
+        {0x40, NOX_TRC("editor.markers.game_type.flagball", "Flag Ball"), NOX_TRC("editor.markers.game_type.flagball.help", "Flag Ball.")},
+        {0x80000000u, NOX_TRC("editor.markers.game_type.chat", "Chat"), NOX_TRC("editor.markers.game_type.chat.help", "Social / chat.")},
     };
     return bits;
 }

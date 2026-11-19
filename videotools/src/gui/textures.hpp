@@ -9,6 +9,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -107,7 +108,12 @@ void drawFit(ImDrawList* dl, const Tex* t, ImVec2 p0, ImVec2 size, bool tint = f
 /// Fills a box with one of the backgrounds (0 checker, 1 black, 2 grey, 3 white, 4 magenta).
 void drawBackground(ImDrawList* dl, ImVec2 p0, ImVec2 p1, int background, float scale);
 
-inline constexpr const char* kBackgrounds[] = {"Checker", "Black", "Grey", "White", "Magenta"};
+inline constexpr int kBackgroundCount = 5;
+/// A background's name, as the background menu shows it.
+const char* backgroundName(int background);
+
+/// A text with a {n} (translated) as a slider's printf format: its own '%' doubled, {n} as %d.
+std::string sliderFormat(std::string_view text);
 
 /// A human name for a video.bag image type.
 const char* imageTypeName(int type);

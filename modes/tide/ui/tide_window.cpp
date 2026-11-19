@@ -3,6 +3,7 @@
 #include "tide_window.hpp"
 
 #include "draw_box.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -90,7 +91,7 @@ std::string_view pickName(const ts::TidePick& p)
     switch (p.kind) {
     case ts::TidePick::Kind::Weapon: return ts::tideWeaponName(static_cast<ts::TideWeapon>(p.which));
     case ts::TidePick::Kind::Passive: return ts::tidePassiveName(static_cast<ts::TidePassive>(p.which));
-    case ts::TidePick::Kind::Heal: return "Heal";
+    case ts::TidePick::Kind::Heal: return NOX_TR("modes.tide.pick.heal", "Heal");
     }
     return "";
 }
@@ -100,7 +101,7 @@ std::string_view pickText(const ts::TidePick& p)
     switch (p.kind) {
     case ts::TidePick::Kind::Weapon: return ts::tideWeaponText(static_cast<ts::TideWeapon>(p.which));
     case ts::TidePick::Kind::Passive: return ts::tidePassiveText(static_cast<ts::TidePassive>(p.which));
-    case ts::TidePick::Kind::Heal: return "All your health back.";
+    case ts::TidePick::Kind::Heal: return NOX_TR("modes.tide.pick.heal_text", "All your health back.");
     }
     return "";
 }
@@ -138,7 +139,10 @@ void TideWindow::drawIcon(SDL_Renderer* renderer, const Sprite* icon, std::strin
     fill(renderer, box, {40, 40, 70, 230});
     outline(renderer, box, {90, 90, 140, 255});
     if (!name.empty()) {
-        const std::string letter(1, name[0]);
+        // (Its first letter: a whole UTF-8 sequence.)
+        const auto lead = static_cast<unsigned char>(name[0]);
+        const std::size_t bytes = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+        const std::string letter(name.substr(0, bytes));
         font_->draw(letter, box.x + (box.w - font_->measure(letter, text)) / 2, box.y + (box.h - font_->lineHeight(text)) / 2, text, kWhite);
     }
 }
@@ -173,11 +177,11 @@ void TideWindow::drawStrip(SDL_Renderer* renderer, const Hud& hud, int w, float 
     const float tw = font_->measure(time, big);
     font_->draw(time, (fw - tw) / 2, y, big, kWhite);
     const float mid = y + (font_->lineHeight(big) - font_->lineHeight(text)) / 2;
-    const std::string level = "Level " + std::to_string(hud.level);
+    const std::string level = nox::l10n::format(NOX_TR("modes.tide.strip.level", "Level {n}"), {{"n", hud.level}});
     font_->draw(level, (fw - tw) / 2 - 18 * s - font_->measure(level, text), mid, text, kBlue);
-    font_->draw(std::to_string(hud.kills) + " slain", (fw + tw) / 2 + 18 * s, mid, text, kGrey);
+    font_->draw(nox::l10n::format(NOX_TR("modes.tide.strip.slain", "{n} slain"), {{"n", hud.kills}}), (fw + tw) / 2 + 18 * s, mid, text, kGrey);
     if (hud.stage > 1) { // (the land the party's carried on to, by its guardians slain)
-        const std::string stage = "Stage " + std::to_string(hud.stage);
+        const std::string stage = nox::l10n::format(NOX_TR("modes.tide.strip.stage", "Stage {n}"), {{"n", hud.stage}});
         font_->draw(stage, (fw - tw) / 2 - 18 * s - font_->measure(level, text) - 18 * s - font_->measure(stage, text), mid, text, kGold);
     }
     y += font_->lineHeight(big);
@@ -185,13 +189,17 @@ void TideWindow::drawStrip(SDL_Renderer* renderer, const Hud& hud, int w, float 
     SDL_Color underColour = kGrey;
     // Under it, the guardian and dawn (boss 0: not come yet, 1: walking, 2: slain).
     if (hud.boss == 0) {
-        under = hud.bossAt >= hud.dawn ? "The night's guardian comes at dawn, " + clock(hud.bossAt)
-                                       : "Guardian at " + clock(hud.bossAt) + "   Dawn at " + clock(hud.dawn);
+        under = hud.bossAt >= hud.dawn
+                    ? nox::l10n::format(NOX_TR("modes.tide.strip.guardian_at_dawn", "The night's guardian comes at dawn, {time}"), {{"time", clock(hud.bossAt)}})
+                    : nox::l10n::format(NOX_TR("modes.tide.strip.guardian_and_dawn", "Guardian at {time}   Dawn at {dawn}"),
+                                        {{"time", clock(hud.bossAt)}, {"dawn", clock(hud.dawn)}});
     } else if (hud.boss == 1) {
-        under = hud.bossAt >= hud.dawn ? std::string("The night's guardian walks! Slay it to go on.") : "The night's guardian walks!   Dawn at " + clock(hud.dawn);
+        under = hud.bossAt >= hud.dawn ? NOX_TR("modes.tide.strip.guardian_walks_slay", "The night's guardian walks! Slay it to go on.")
+                                       : nox::l10n::format(NOX_TR("modes.tide.strip.guardian_walks_dawn", "The night's guardian walks!   Dawn at {dawn}"),
+                                                           {{"dawn", clock(hud.dawn)}});
         underColour = kRed;
     } else {
-        under = "The guardian is slain: on to a new land";
+        under = NOX_TR("modes.tide.strip.guardian_slain", "The guardian is slain: on to a new land");
         underColour = kGold;
     }
     font_->draw(under, (fw - font_->measure(under, text)) / 2, y, text, underColour);
@@ -272,11 +280,12 @@ void TideWindow::drawCards(SDL_Renderer* renderer, const Offer& offer, int w, in
     const CardsLayout l = cardsLayout(offer, w, h, s);
     fill(renderer, l.area, {6, 8, 20, 215});
     outline(renderer, l.area, {70, 90, 150, 255});
-    const std::string title = "Level " + std::to_string(offer.level) + "!  Choose one";
+    const std::string title = nox::l10n::format(NOX_TR("modes.tide.cards.title", "Level {n}!  Choose one"), {{"n", offer.level}});
     font_->draw(title, l.area.x + (l.area.w - font_->measure(title, l.big)) / 2, l.area.y + kPad * s, l.big, kGold);
     const auto gone = static_cast<int>((nowMs - offerAt_) / 1000);
     const int left = std::max(0, static_cast<int>(offer.seconds) - gone);
-    const std::string hint = "Click one, or press 1-" + std::to_string(offer.picks.size()) + "   (" + std::to_string(left) + " s, then the first)";
+    const std::string hint = nox::l10n::format(NOX_TR("modes.tide.cards.hint", "Click one, or press 1-{n}   ({s} s, then the first)"),
+                                               {{"n", offer.picks.size()}, {"s", left}});
     font_->draw(hint, l.area.x + (l.area.w - font_->measure(hint, l.text)) / 2, l.area.y + kPad * s + font_->lineHeight(l.big), l.text, kGrey);
     for (std::size_t i = 0; i < offer.picks.size() && i < l.cards.size(); ++i) {
         const ts::TidePick& p = offer.picks[i];
@@ -301,13 +310,13 @@ void TideWindow::drawCards(SDL_Renderer* renderer, const Offer& offer, int w, in
         std::string what;
         SDL_Color whatColour = kBlue;
         if (p.kind == ts::TidePick::Kind::Heal) {
-            what = "Nothing left to learn";
+            what = NOX_TR("modes.tide.cards.nothing_left", "Nothing left to learn");
             whatColour = kGrey;
         } else if (p.level <= 1) {
-            what = p.kind == ts::TidePick::Kind::Weapon ? "New weapon!" : "New!";
+            what = p.kind == ts::TidePick::Kind::Weapon ? NOX_TR("modes.tide.cards.new_weapon", "New weapon!") : NOX_TR("modes.tide.cards.new", "New!");
             whatColour = kGold;
         } else {
-            what = "Level " + std::to_string(p.level - 1) + " > " + std::to_string(p.level);
+            what = nox::l10n::format(NOX_TR("modes.tide.cards.level_up", "Level {from} > {to}"), {{"from", p.level - 1}, {"to", p.level}});
         }
         font_->draw(what, c.x + (c.w - font_->measure(what, l.text)) / 2, y, l.text, whatColour);
         y += l.line + 3 * s;
@@ -343,18 +352,28 @@ void TideWindow::drawResults(SDL_Renderer* renderer, const Results& r, int w, in
     const ResultsLayout l = resultsLayout(r, w, h, s);
     fill(renderer, l.panel, {8, 6, 16, 235});
     outline(renderer, l.panel, r.won ? SDL_Color{170, 140, 60, 255} : SDL_Color{150, 50, 45, 255});
-    const std::string title = r.won && r.boss == 2 ? "The guardian falls!" : r.won ? "Dawn breaks!" : "The tide takes everyone";
+    const std::string& title = r.won && r.boss == 2 ? NOX_TR("modes.tide.results.guardian_falls", "The guardian falls!")
+                               : r.won              ? NOX_TR("modes.tide.results.dawn_breaks", "Dawn breaks!")
+                                                    : NOX_TR("modes.tide.results.tide_takes_all", "The tide takes everyone");
     float y = l.panel.y + kPad * s;
     font_->draw(title, l.panel.x + (l.panel.w - font_->measure(title, l.big)) / 2, y, l.big, r.won ? kGold : kRed);
     y += font_->lineHeight(l.big);
-    const std::string time = (r.stage > 1 ? "Stage " + std::to_string(r.stage) + "   " : std::string()) + (r.won ? "Survived " : "Fell at ") +
-                             clock(r.seconds) + "   " + std::to_string(r.elites) +
-                             (r.elites == 1 ? " elite slain" : " elites slain");
+    const std::string lasted = nox::l10n::format(r.won ? NOX_TR("modes.tide.results.survived", "Survived {time}") : NOX_TR("modes.tide.results.fell", "Fell at {time}"),
+                                                 {{"time", clock(r.seconds)}});
+    const std::string elites = nox::l10n::format(NOX_TRP("modes.tide.results.elites", "{n} elite slain", "{n} elites slain", r.elites), {{"n", r.elites}});
+    const std::string time = r.stage > 1 ? nox::l10n::format(NOX_TR("modes.tide.results.line_stage", "Stage {stage}   {lasted}   {elites}"),
+                                                             {{"stage", r.stage}, {"lasted", lasted}, {"elites", elites}})
+                                         : nox::l10n::format(NOX_TR("modes.tide.results.line", "{lasted}   {elites}"), {{"lasted", lasted}, {"elites", elites}});
     font_->draw(time, l.panel.x + (l.panel.w - font_->measure(time, l.text)) / 2, y, l.text, kWhite);
     y += l.line;
-    const std::string guardian = r.boss == 0   ? std::string("The night's guardian never came")
-                                 : r.boss == 2 ? "The night's guardian slain" + (r.bossName.empty() ? std::string() : " (" + r.bossName + ")")
-                                               : "The night's guardian still stands" + (r.bossName.empty() ? std::string() : " (" + r.bossName + ")");
+    const std::string guardian =
+        r.boss == 0   ? NOX_TR("modes.tide.results.guardian_never_came", "The night's guardian never came")
+        : r.boss == 2 ? (r.bossName.empty() ? NOX_TR("modes.tide.results.guardian_slain", "The night's guardian slain")
+                                            : nox::l10n::format(NOX_TR("modes.tide.results.guardian_slain_named", "The night's guardian slain ({name})"),
+                                                                {{"name", r.bossName}}))
+                      : (r.bossName.empty() ? NOX_TR("modes.tide.results.guardian_stands", "The night's guardian still stands")
+                                            : nox::l10n::format(NOX_TR("modes.tide.results.guardian_stands_named", "The night's guardian still stands ({name})"),
+                                                                {{"name", r.bossName}}));
     font_->draw(guardian, l.panel.x + (l.panel.w - font_->measure(guardian, l.text)) / 2, y, l.text, kGrey);
     y += l.line + 10 * s;
     // The players: name, level, slain, weapons.
@@ -364,10 +383,10 @@ void TideWindow::drawResults(SDL_Renderer* renderer, const Results& r, int w, in
     const float xKit = x0 + 250 * s;
     const float rh = kRowH * s;
     const float ty = (rh - l.line) / 2;
-    font_->draw("Player", x0, y + ty, l.text, kGrey);
-    font_->draw("Level", xLevel, y + ty, l.text, kGrey);
-    font_->draw("Slain", xSlain, y + ty, l.text, kGrey);
-    font_->draw("Weapons", xKit, y + ty, l.text, kGrey);
+    font_->draw(NOX_TR("modes.tide.results.player", "Player"), x0, y + ty, l.text, kGrey);
+    font_->draw(NOX_TR("modes.tide.results.level", "Level"), xLevel, y + ty, l.text, kGrey);
+    font_->draw(NOX_TR("modes.tide.results.slain", "Slain"), xSlain, y + ty, l.text, kGrey);
+    font_->draw(NOX_TR("modes.tide.results.weapons", "Weapons"), xKit, y + ty, l.text, kGrey);
     y += rh;
     for (const Results::Player& p : r.players) {
         fill(renderer, {x0 - 4 * s, y, l.panel.w - 2 * kPad * s + 8 * s, rh - 2 * s}, {22, 20, 36, 200});
@@ -397,7 +416,8 @@ void TideWindow::drawResults(SDL_Renderer* renderer, const Results& r, int w, in
     const bool hover = inside(l.ok, mouse.x, mouse.y);
     fill(renderer, l.ok, hover ? SDL_Color{60, 55, 30, 255} : SDL_Color{30, 28, 20, 255});
     outline(renderer, l.ok, hover ? kGold : SDL_Color{120, 110, 70, 255});
-    font_->draw("OK", l.ok.x + (l.ok.w - font_->measure("OK", l.text)) / 2, l.ok.y + (l.ok.h - l.line) / 2, l.text, hover ? kGold : kWhite);
+    const std::string& ok = NOX_TR("modes.tide.results.ok", "OK");
+    font_->draw(ok, l.ok.x + (l.ok.w - font_->measure(ok, l.text)) / 2, l.ok.y + (l.ok.h - l.line) / 2, l.text, hover ? kGold : kWhite);
 }
 
 void TideWindow::draw(SDL_Renderer* renderer, const std::optional<Hud>& hud, const Offer& offer, const std::optional<Results>& results, int w,
@@ -449,10 +469,10 @@ void TideWindow::drawAsk(SDL_Renderer* renderer, const std::optional<std::uint8_
     fill(renderer, l.panel, {8, 6, 16, 235});
     outline(renderer, l.panel, {120, 100, 160, 255});
     float y = l.panel.y + kPad * s;
-    const std::string title = "Begin the run at which difficulty?";
+    const std::string& title = NOX_TR("modes.tide.ask.title", "Begin the run at which difficulty?");
     font_->draw(title, l.panel.x + (l.panel.w - font_->measure(title, l.big)) / 2, y, l.big, kGold);
     y += font_->lineHeight(l.big);
-    const std::string hint = "Click one, or press 1-4 (Enter: the one marked). Everyone here comes along.";
+    const std::string& hint = NOX_TR("modes.tide.ask.hint", "Click one, or press 1-4 (Enter: the one marked). Everyone here comes along.");
     font_->draw(hint, l.panel.x + (l.panel.w - font_->measure(hint, l.text)) / 2, y, l.text, kGrey);
     static constexpr SDL_Color kTint[] = {{120, 200, 120, 255}, {230, 200, 90, 255}, {240, 130, 60, 255}, {230, 70, 70, 255}};
     for (std::size_t i = 0; i < l.rows.size(); ++i) {
@@ -462,7 +482,8 @@ void TideWindow::drawAsk(SDL_Renderer* renderer, const std::optional<std::uint8_
         const bool now = *ask == i;
         fill(renderer, r, hover ? SDL_Color{40, 34, 60, 240} : SDL_Color{20, 18, 34, 240});
         outline(renderer, r, hover || now ? kGold : SDL_Color{70, 64, 100, 255});
-        const std::string name = std::to_string(i + 1) + ".  " + std::string(ts::tideDifficultyName(d)) + (now ? "   (set now)" : "");
+        const std::string name = nox::l10n::format(now ? NOX_TR("modes.tide.ask.row_set", "{n}.  {difficulty}   (set now)") : NOX_TR("modes.tide.ask.row", "{n}.  {difficulty}"),
+                                                   {{"n", i + 1}, {"difficulty", ts::tideDifficultyName(d)}});
         font_->draw(name, r.x + 8 * s, r.y + 4 * s, l.text, kTint[i]);
         std::string about(ts::tideDifficultyAbout(d));
         while (about.size() > 1 && font_->measure(about, l.text) > r.w - 24 * s) {
@@ -473,7 +494,8 @@ void TideWindow::drawAsk(SDL_Renderer* renderer, const std::optional<std::uint8_
     const bool hover = inside(l.cancel, mouse.x, mouse.y);
     fill(renderer, l.cancel, hover ? SDL_Color{60, 55, 30, 255} : SDL_Color{30, 28, 20, 255});
     outline(renderer, l.cancel, hover ? kGold : SDL_Color{120, 110, 70, 255});
-    font_->draw("Cancel", l.cancel.x + (l.cancel.w - font_->measure("Cancel", l.text)) / 2, l.cancel.y + (l.cancel.h - l.line) / 2, l.text,
+    const std::string& cancel = NOX_TR("modes.tide.ask.cancel", "Cancel");
+    font_->draw(cancel, l.cancel.x + (l.cancel.w - font_->measure(cancel, l.text)) / 2, l.cancel.y + (l.cancel.h - l.line) / 2, l.text,
                 hover ? kGold : kWhite);
 }
 

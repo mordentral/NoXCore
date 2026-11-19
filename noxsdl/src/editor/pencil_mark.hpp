@@ -5,6 +5,7 @@
 #include "pencil_icon.hpp"
 
 #include "noxcore/mapedit/session_proto.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <imgui.h>
 
@@ -33,9 +34,15 @@ inline void pencilMark(ImDrawList* dl, ImVec2 c, float size, std::uint32_t peer,
     dl->AddQuadFilled(v(s.cap[0]), v(s.cap[1]), v(s.cap[2]), v(s.cap[3]), IM_COL32(242, 148, 158, a));
 }
 
-/// "editing", "idle", "playing".
+/// "editing", "idle", "playing", in the player's language (activityName's English is the log's).
 inline const char* activityText(nox::mapedit::session::Activity a)
 {
+    using A = nox::mapedit::session::Activity;
+    switch (a) {
+    case A::Editing: return NOX_TRC("editor.session.activity.editing", "editing");
+    case A::Idle: return NOX_TRC("editor.session.activity.idle", "idle");
+    case A::Playing: return NOX_TRC("editor.session.activity.playing", "playing");
+    }
     return nox::mapedit::session::activityName(a);
 }
 

@@ -3,6 +3,8 @@
 #include "editor/code_lexer.hpp"
 #include "editor/mod_defs.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4100 4324) // (Luau's headers' unused parameters and padded variants, not ours)
@@ -93,13 +95,15 @@ struct Checker {
             frontend->loadDefinitionFile(frontend->globals, frontend->globals.globalScope, defs, "@nox", false, false);
         Luau::freeze(frontend->globals.globalTypes);
         if (!r.success) {
-            loadError = "the toolbox's declarations didn't load";
+            loadError = NOX_TR("editor.mod.check.defs_failed", "the toolbox's declarations didn't load");
             for (const auto& e : r.parseResult.errors) {
-                loadError += "; line " + std::to_string(e.getLocation().begin.line + 1) + ": " + e.getMessage();
+                loadError += nox::l10n::format(NOX_TR("editor.mod.check.defs_error", "; line {line}: {error}"),
+                                               {{"line", e.getLocation().begin.line + 1}, {"error", e.getMessage()}});
             }
             if (r.module) {
                 for (const auto& e : r.module->errors) {
-                    loadError += "; line " + std::to_string(e.location.begin.line + 1) + ": " + Luau::toString(e);
+                    loadError += nox::l10n::format(NOX_TR("editor.mod.check.defs_error", "; line {line}: {error}"),
+                                                   {{"line", e.location.begin.line + 1}, {"error", Luau::toString(e)}});
                 }
             }
         }
@@ -125,7 +129,7 @@ struct Checker {
         try {
             r = frontend->check(name);
         } catch (const std::exception& e) {
-            out.push_back({name, 1, 1, true, std::string("the check failed: ") + e.what()});
+            out.push_back({name, 1, 1, true, nox::l10n::format(NOX_TR("editor.mod.check.failed", "the check failed: {error}"), {{"error", e.what()}})});
             files.files = nullptr;
             return;
         }
@@ -168,8 +172,11 @@ struct Checker {
                 if (runs[i].tok == Tok::Plain && word(i) == "nox" && word(i + 1) == "." && runs[i + 2].tok == Tok::Plain && !known.contains(word(i + 2)) &&
                     (i == 0 || word(i - 1) != ".")) {
                     out.push_back({name, lineNo, runs[i + 2].begin + 1, true,
-                                   "nox." + std::string(word(i + 2)) + " isn't in the " + (files.half == ModHalf::Ui ? "UI API" : "server toolbox") +
-                                       " (the Mod Reference lists what is)"});
+                                   nox::l10n::format(files.half == ModHalf::Ui
+                                                         ? NOX_TR("editor.mod.check.unknown_ui", "nox.{name} isn't in the UI API (the Mod Reference lists what is)")
+                                                         : NOX_TR("editor.mod.check.unknown_server",
+                                                                  "nox.{name} isn't in the server toolbox (the Mod Reference lists what is)"),
+                                                     {{"name", word(i + 2)}})});
                 }
             }
             at = end + 1;

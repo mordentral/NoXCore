@@ -9,6 +9,8 @@
 // The chat's own lists and title give FONT = default and stay as they are.
 #pragma once
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cstdint>
 #include <string_view>
@@ -30,10 +32,13 @@ constexpr int linesShown(int boxHeight, bool hasTitle, int fontLine, int lineHei
 
 /// (noxcpp) The login's how-to, drawn in the screen's empty right-hand panel (wolapi.wnd's window 0,
 /// 260 x 380), wrapped `kLoginHelpInset` in from its sides and top, in the default font.
-inline constexpr std::string_view kLoginHelp =
+inline constexpr nox::l10n::Key kLoginHelpText = NOX_TRK(
+    "lobby.login.help",
     "Log in with your XWIS account. A new name becomes your account with the password you type; for a "
     "name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a "
-    "game you host is listed under a generated one).";
+    "game you host is listed under a generated one).");
+/// Its English.
+inline constexpr std::string_view kLoginHelp = kLoginHelpText.en;
 inline constexpr std::int32_t kLoginHelpPanel = 0;
 inline constexpr int kLoginHelpInset = 12;
 

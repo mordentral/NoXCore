@@ -27,6 +27,7 @@ add_library(noxsdl_editor_host STATIC
     src/editor/panel_textures.cpp
     src/editor/texture_mirror.cpp
     src/editor/theme.cpp
+    src/language_pick.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_font.cpp
 )
 target_include_directories(noxsdl_editor_host PUBLIC src) # (its headers: "editor/imgui_host.hpp" ...)
@@ -204,12 +205,22 @@ add_custom_command(TARGET noxsdl POST_BUILD
             $<TARGET_FILE_DIR:noxsdl>/NotoSans-OFL.txt
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${caudex_license_SOURCE_DIR}/OFL.txt
             $<TARGET_FILE_DIR:noxsdl>/Caudex-OFL.txt
+    # (fonts/NotoSansKR-SemiBold-Hangul.ttf's: res/fonts holds Noto Sans KR's Hangul, subset)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/res/NotoSansKR-OFL.txt
+            $<TARGET_FILE_DIR:noxsdl>/NotoSansKR-OFL.txt
     VERBATIM
 )
 # The Nox-style fonts (res/fonts: NoxDefault, NoxLarge and their HD forms) into the fonts folder
 # beside the exe, where the program looks for them (text.hpp's GameFonts) and packages take them.
 add_custom_command(TARGET noxsdl POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res/fonts $<TARGET_FILE_DIR:noxsdl>/fonts
+    VERBATIM
+)
+# The language files (res/lang: NoX Core's own text in other languages, noxsdl/l10n/l10n.py) into
+# the lang folder beside the exe, where the program looks for them (language_pick.hpp) and packages
+# take them. (Copied over each build, so a removed language's file stays until the folder is cleared.)
+add_custom_command(TARGET noxsdl POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res/lang $<TARGET_FILE_DIR:noxsdl>/lang
     VERBATIM
 )
 # The mods in mods/ (script modes) into the mods folder beside the exe, where a host finds them.

@@ -2,6 +2,7 @@
 #include "noxcore/lobby/servserv.hpp"
 
 #include "noxcore/lobby/xwis.hpp" // (kXwisHost, kXwisPort)
+#include "noxcore/strings/l10n.hpp"
 
 #include "irc.hpp"
 
@@ -224,7 +225,7 @@ void XwisConnection::askNext(std::uint32_t nowMs)
             to = net::Endpoint::resolve(std::string_view(s.name).substr(0, colon), kServservPort);
         }
         if (!to) {
-            failures_.push_back("can't resolve " + s.name.substr(0, s.name.rfind(':')));
+            failures_.push_back(l10n::format(NOX_TR("lobby.xwis.cant_resolve", "can't resolve {name}"), {{"name", s.name.substr(0, s.name.rfind(':'))}}));
             continue;
         }
         // (Asking the same address again would get the same answer, or none.)
@@ -232,14 +233,14 @@ void XwisConnection::askNext(std::uint32_t nowMs)
             return e.address == to->address && e.port == to->port;
         });
         if (again) {
-            log_.push_back("XWIS: " + s.name + " skipped (the address just asked)");
+            log_.push_back(l10n::format(NOX_TR("lobby.xwis.skipped", "XWIS: {name} skipped (the address just asked)"), {{"name", s.name}}));
             continue;
         }
         tried_.push_back(*to);
         try {
             servserv_ = net::TcpSocket::connect(*to);
         } catch (const std::exception& ex) {
-            failures_.push_back("can't connect to " + s.name + ": " + ex.what());
+            failures_.push_back(l10n::format(NOX_TR("lobby.xwis.cant_connect_why", "can't connect to {name}: {error}"), {{"name", s.name}, {"error", ex.what()}}));
             continue;
         }
         servservName_ = s.name;
@@ -250,7 +251,7 @@ void XwisConnection::askNext(std::uint32_t nowMs)
             request_ += line + "\r\n";
         }
         if (!failures_.empty()) {
-            log_.push_back("XWIS: failed (" + failures() + "), asking servserv " + s.name);
+            log_.push_back(l10n::format(NOX_TR("lobby.xwis.failed_asking", "XWIS: failed ({why}), asking servserv {name}"), {{"why", failures()}, {"name", s.name}}));
         }
         return;
     }
@@ -260,8 +261,8 @@ void XwisConnection::askNext(std::uint32_t nowMs)
     }
     // Every way tried.
     failed_ = true;
-    error_ = "can't reach XWIS (" + failures() + ")";
-    log_.push_back("XWIS: failed (" + failures() + "), nothing left to try");
+    error_ = l10n::format(NOX_TR("lobby.xwis.cant_reach", "can't reach XWIS ({why})"), {{"why", failures()}});
+    log_.push_back(l10n::format(NOX_TR("lobby.xwis.failed_all", "XWIS: failed ({why}), nothing left to try"), {{"why", failures()}}));
 }
 
 bool XwisConnection::poll(std::uint32_t nowMs)
@@ -278,24 +279,24 @@ bool XwisConnection::poll(std::uint32_t nowMs)
             return false;
         }
         if (chat == net::TcpSocket::State::Failed) {
-            moveOn("can't connect to " + chatServer_, nowMs);
+            moveOn(l10n::format(NOX_TR("lobby.xwis.cant_connect", "can't connect to {name}"), {{"name", chatServer_}}), nowMs);
             return !asking();
         }
         if (chat == net::TcpSocket::State::Connecting && nowMs - chatStartedAt_ > kXwisChatTimeoutMs) {
-            moveOn(chatServer_ + ": not open in " + std::to_string(kXwisChatTimeoutMs / 1000) + " s", nowMs);
+            moveOn(l10n::format(NOX_TR("lobby.xwis.not_open", "{name}: not open in {n} s"), {{"name", chatServer_}, {"n", kXwisChatTimeoutMs / 1000}}), nowMs);
             return !asking();
         }
         return false;
     }
     const auto state = servserv_->state();
     if (state == net::TcpSocket::State::Failed) {
-        moveOn("can't connect to " + servservName_, nowMs);
+        moveOn(l10n::format(NOX_TR("lobby.xwis.cant_connect", "can't connect to {name}"), {{"name", servservName_}}), nowMs);
         return !asking();
     }
     if (nowMs - startedAt_ > route_.servservTimeoutMs) {
         const std::uint32_t ms = route_.servservTimeoutMs;
-        moveOn(servservName_ + ": no answer in " +
-                   (ms % 1000 == 0 ? std::to_string(ms / 1000) + " s" : std::to_string(ms) + " ms"),
+        moveOn(ms % 1000 == 0 ? l10n::format(NOX_TR("lobby.xwis.no_answer_s", "{name}: no answer in {n} s"), {{"name", servservName_}, {"n", ms / 1000}})
+                              : l10n::format(NOX_TR("lobby.xwis.no_answer_ms", "{name}: no answer in {n} ms"), {{"name", servservName_}, {"n", ms}}),
                nowMs);
         return !asking();
     }
@@ -314,14 +315,16 @@ bool XwisConnection::poll(std::uint32_t nowMs)
         if (const ChatServer* chat = session_.pick()) {
             useServserv(*chat, nowMs);
         } else {
-            moveOn(servservName_ + (session_.chatServers().empty() ? ": it listed no chat server"
-                                                                   : ": it listed no chat server for the game's language"),
+            moveOn(l10n::format(session_.chatServers().empty()
+                                    ? NOX_TR("lobby.xwis.no_chat_server", "{name}: it listed no chat server")
+                                    : NOX_TR("lobby.xwis.no_chat_server_language", "{name}: it listed no chat server for the game's language"),
+                                {{"name", servservName_}}),
                    nowMs);
         }
         return !asking();
     }
     if (servserv_->state() != net::TcpSocket::State::Connected) {
-        moveOn(servservName_ + ": it closed the connection before the end of its list", nowMs);
+        moveOn(l10n::format(NOX_TR("lobby.xwis.closed_before_list_end", "{name}: it closed the connection before the end of its list"), {{"name", servservName_}}), nowMs);
         return !asking();
     }
     return false;
@@ -332,10 +335,10 @@ void XwisConnection::useServserv(const ChatServer& server, std::uint32_t nowMs)
     const std::string name = hostAndPort(server.host, server.port);
     const auto to = net::Endpoint::resolve(server.host, server.port);
     if (!to) {
-        moveOn(servservName_ + ": it gave chat server " + name + ", which can't be resolved", nowMs);
+        moveOn(l10n::format(NOX_TR("lobby.xwis.chat_unresolved", "{name}: it gave chat server {chat}, which can't be resolved"), {{"name", servservName_}, {"chat", name}}), nowMs);
         return;
     }
-    log_.push_back("XWIS: " + servservName_ + " gave chat server " + name);
+    log_.push_back(l10n::format(NOX_TR("lobby.xwis.gave_chat_server", "XWIS: {name} gave chat server {chat}"), {{"name", servservName_}, {"chat", name}}));
     connectChat(*to, name, nowMs);
 }
 
@@ -344,14 +347,14 @@ void XwisConnection::useFallback(const std::string& why, std::uint32_t nowMs)
     fallbackTried_ = true;
     const std::string name = route_.fallback ? route_.fallback->toString() : hostAndPort(kXwisHost, kXwisPort);
     if (why.empty()) {
-        log_.push_back("XWIS: connecting straight to " + name);
+        log_.push_back(l10n::format(NOX_TR("lobby.xwis.connecting_straight", "XWIS: connecting straight to {name}"), {{"name", name}}));
     } else {
-        log_.push_back("XWIS: servserv failed (" + why + "), using " + name);
+        log_.push_back(l10n::format(NOX_TR("lobby.xwis.servserv_failed", "XWIS: servserv failed ({why}), using {name}"), {{"why", why}, {"name", name}}));
     }
     const auto to = route_.fallback ? route_.fallback : net::Endpoint::resolve(kXwisHost, kXwisPort);
     if (!to) {
         chatServer_ = name;
-        failures_.push_back("can't resolve " + std::string(kXwisHost));
+        failures_.push_back(l10n::format(NOX_TR("lobby.xwis.cant_resolve", "can't resolve {name}"), {{"name", kXwisHost}}));
         askNext(nowMs);
         if (failed_ && failures_.size() == 1) {
             error_ = failures_.back(); // (only it was tried: "can't resolve xwis.net")
@@ -371,7 +374,7 @@ void XwisConnection::connectChat(const net::Endpoint& to, const std::string& nam
     } catch (const std::exception& ex) {
         socket_.reset();
         if (moreToTry()) {
-            moveOn("can't connect to " + name + ": " + ex.what(), nowMs);
+            moveOn(l10n::format(NOX_TR("lobby.xwis.cant_connect_why", "can't connect to {name}: {error}"), {{"name", name}, {"error", ex.what()}}), nowMs);
             return;
         }
         failed_ = true;
@@ -423,7 +426,9 @@ std::string XwisConnection::error()
         return error_;
     }
     if (state() == net::TcpSocket::State::Failed) {
-        return (chatOpened_ ? "lost the connection to " : "can't connect to ") + chatServer_;
+        return l10n::format(chatOpened_ ? NOX_TR("lobby.xwis.lost_connection", "lost the connection to {name}")
+                                        : NOX_TR("lobby.xwis.cant_connect", "can't connect to {name}"),
+                            {{"name", chatServer_}});
     }
     return {};
 }

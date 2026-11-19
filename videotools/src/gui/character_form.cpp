@@ -5,6 +5,7 @@
 
 #include "editor/theme_colours.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <imgui.h>
@@ -32,6 +33,31 @@ PlrRgb fromFloats(const float* f)
 {
     const auto b = [](float v) { return static_cast<std::uint8_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
     return {b(f[0]), b(f[1]), b(f[2])};
+}
+
+/// A body part's and a garment's names as the form shows them (the English ones are their ids).
+const char* bodyPartLabel(BodyPart p)
+{
+    switch (p) {
+    case BodyPart::Skin: return NOX_TRI("content.character.skin", "Skin");
+    case BodyPart::Hair: return NOX_TRI("content.character.hair", "Hair");
+    case BodyPart::Mustache: return NOX_TRI("content.character.mustache", "Mustache");
+    case BodyPart::Goatee: return NOX_TRI("content.character.goatee", "Goatee");
+    case BodyPart::Beard: return NOX_TRI("content.character.beard", "Beard");
+    }
+    return "?";
+}
+
+const char* garmentLabel(Garment g)
+{
+    switch (g) {
+    case Garment::Shirt1: return NOX_TRC("content.character.shirt", "Shirt");
+    case Garment::Shirt2: return NOX_TRC("content.character.shirt_trim", "Shirt trim");
+    case Garment::Pants: return NOX_TRC("content.character.pants", "Pants");
+    case Garment::Shoes1: return NOX_TRC("content.character.shoes", "Shoes");
+    case Garment::Shoes2: return NOX_TRC("content.character.shoe_trim", "Shoe trim");
+    }
+    return "?";
 }
 
 /// 32 swatches, 8 a row; the one clicked, if any.
@@ -157,7 +183,7 @@ bool RecordPanel::characterForm(const content::Record& r)
         try {
             character_ = content::Character::load(*file);
         } catch (const std::exception& ex) {
-            characterError_ = std::format("Can't read it: {}", ex.what());
+            characterError_ = nox::l10n::format(NOX_TR("content.text_form.cant_read", "Can't read it: {error}"), {{"error", ex.what()}});
         }
         dollStale_ = true;
     }
@@ -172,19 +198,28 @@ bool RecordPanel::characterForm(const content::Record& r)
     const float scale = ws_.session.scale();
 
     // --- Who it is
-    static constexpr const char* kClasses[] = {"Warrior", "Wizard", "Conjurer"};
     const auto cls = std::size_t(c.info().characterClass);
-    ImGui::TextDisabled("%s, level %d, %s. %s", cls < 3 ? kClasses[cls] : "?", int(c.info().level), c.female() ? "woman" : "man",
-                        c.info().flags & 4 ? "Quest character." : c.info().flags & 1 ? "Solo character." : "Multiplayer character.");
+    const char* className = cls == 0   ? NOX_TRC("content.character.warrior", "Warrior")
+                            : cls == 1 ? NOX_TRC("content.character.wizard", "Wizard")
+                            : cls == 2 ? NOX_TRC("content.character.conjurer", "Conjurer")
+                                       : "?";
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.character.who", "{class}, level {level}, {sex}. {kind}"),
+                                                {{"class", className},
+                                                 {"level", int(c.info().level)},
+                                                 {"sex", c.female() ? NOX_TR("content.character.woman", "woman") : NOX_TR("content.character.man", "man")},
+                                                 {"kind", c.info().flags & 4   ? NOX_TR("content.character.quest", "Quest character.")
+                                                          : c.info().flags & 1 ? NOX_TR("content.character.solo", "Solo character.")
+                                                                               : NOX_TR("content.character.multiplayer", "Multiplayer character.")}})
+                                  .c_str());
     char name[64] = {};
     {
         const std::string now = nox::strings::toUtf8(c.name());
         std::snprintf(name, sizeof name, "%s", now.c_str());
     }
     ImGui::SetNextItemWidth(260 * scale);
-    if (ImGui::InputText("Name", name, sizeof name, ImGuiInputTextFlags_EnterReturnsTrue) || ImGui::IsItemDeactivatedAfterEdit()) {
+    if (ImGui::InputText(NOX_TRI("content.form.name", "Name"), name, sizeof name, ImGuiInputTextFlags_EnterReturnsTrue) || ImGui::IsItemDeactivatedAfterEdit()) {
         if (!c.setName(nox::strings::fromUtf8(name))) {
-            ws_.session.error("A name is 1 to 24 characters.");
+            ws_.session.error(NOX_TR("content.character.name_length", "A name is 1 to 24 characters."));
         }
     }
 
@@ -204,13 +239,13 @@ bool RecordPanel::characterForm(const content::Record& r)
             const ImVec2 at(p.x + (box - size.x) / 2, p.y + (box - size.y) / 2);
             dl->AddImage(texRef(doll_), at, ImVec2(at.x + size.x, at.y + size.y));
         } else {
-            dl->AddText(ImVec2(p.x + 8, p.y + 8), ImGui::GetColorU32(ImGuiCol_TextDisabled), "(the doll's pictures aren't in video.bag)");
+            dl->AddText(ImVec2(p.x + 8, p.y + 8), ImGui::GetColorU32(ImGuiCol_TextDisabled), NOX_TRC("content.character.no_doll", "(the doll's pictures aren't in video.bag)"));
         }
         ImGui::Dummy(ImVec2(box, box));
-        ImGui::TextDisabled("As the character creator draws it.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.character.doll_note", "As the character creator draws it."));
 
         ImGui::TableNextColumn();
-        ImGui::SeparatorText("Body (any colour)");
+        ImGui::SeparatorText(NOX_TRI("content.character.body", "Body (any colour)"));
         struct Part {
             BodyPart part;
             const char* label;
@@ -232,7 +267,7 @@ bool RecordPanel::characterForm(const content::Record& r)
                     c.setColour(part.part, on ? (part.part == BodyPart::Hair ? content::kCreatorHairColors[0] : hair) : c.colour(BodyPart::Skin));
                     dollStale_ = true;
                 }
-                ImGui::SetItemTooltip(part.part == BodyPart::Hair ? "Off: bald" : "Off: none");
+                ImGui::SetItemTooltip("%s", part.part == BodyPart::Hair ? NOX_TRC("content.character.off_bald", "Off: bald") : NOX_TRC("content.character.off_none", "Off: none"));
                 ImGui::SameLine();
             } else {
                 ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
@@ -242,7 +277,7 @@ bool RecordPanel::characterForm(const content::Record& r)
             const PlrRgb now = c.colour(part.part);
             float f[3] = {now[0] / 255.0f, now[1] / 255.0f, now[2] / 255.0f};
             ImGui::SetNextItemWidth(230 * scale);
-            if (ImGui::ColorEdit3(part.label, f, ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_Uint8)) {
+            if (ImGui::ColorEdit3(bodyPartLabel(part.part), f, ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_Uint8)) {
                 PlrRgb picked = fromFloats(f);
                 if (!skin && picked == c.colour(BodyPart::Skin)) {
                     picked[0] = picked[0] < 255 ? std::uint8_t(picked[0] + 1) : std::uint8_t(254); // (the skin's exact colour would read as "off")
@@ -251,10 +286,10 @@ bool RecordPanel::characterForm(const content::Record& r)
                 dollStale_ = true;
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Game's...")) {
+            if (ImGui::SmallButton(NOX_TRI("content.character.games_colours", "Game's..."))) {
                 ImGui::OpenPopup("swatches");
             }
-            ImGui::SetItemTooltip("The character creator's 32 colours for this");
+            ImGui::SetItemTooltip("%s", NOX_TRC("content.character.games_colours_tip", "The character creator's 32 colours for this"));
             if (ImGui::BeginPopup("swatches")) {
                 const auto at = std::ranges::find(*part.table, now);
                 const int current = at == part.table->end() ? -1 : int(at - part.table->begin());
@@ -269,7 +304,7 @@ bool RecordPanel::characterForm(const content::Record& r)
             ImGui::PopID();
         }
 
-        ImGui::SeparatorText("Clothes (modifier.bin's UserColor1-32)");
+        ImGui::SeparatorText(NOX_TRI("content.character.clothes", "Clothes (modifier.bin's UserColor1-32)"));
         std::array<PlrRgb, 32> clothes{};
         for (int i = 0; i < 32; ++i) {
             clothes[std::size_t(i)] = content::userColor(ws_.files.modifiers(), i);
@@ -291,14 +326,14 @@ bool RecordPanel::characterForm(const content::Record& r)
                 ImGui::OpenPopup("clothes");
             }
             ImGui::SameLine();
-            ImGui::Text("%s  (UserColor%d)", cloth.label, index + 1);
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("content.character.cloth_colour", "{garment}  (UserColor{n})"), {{"garment", garmentLabel(cloth.garment)}, {"n", index + 1}}).c_str());
             if (ImGui::BeginPopup("clothes")) {
                 if (const auto i = swatches(cloth.label, clothes, index, 22 * scale)) {
                     c.setClothing(cloth.garment, std::uint8_t(*i));
                     dollStale_ = true;
                     ImGui::CloseCurrentPopup();
                 }
-                ImGui::TextDisabled("A .plr names one of these 32; their colours are modifier.bin's\n(a content pack's modifier.patch can change them, for every player who has it).");
+                ImGui::TextDisabled("%s", NOX_TRC("content.character.clothes_note", "A .plr names one of these 32; their colours are modifier.bin's\n(a content pack's modifier.patch can change them, for every player who has it)."));
                 ImGui::EndPopup();
             }
             ImGui::PopID();
@@ -309,19 +344,19 @@ bool RecordPanel::characterForm(const content::Record& r)
     // --- Saving: always a new file, never in the game's folders
     ImGui::Separator();
     if (c.changed()) {
-        ImGui::TextColored(theme.highlightText, "Changed (not saved).");
+        ImGui::TextColored(theme.highlightText, "%s", NOX_TRC("content.text_form.changed", "Changed (not saved)."));
         ImGui::SameLine();
     }
-    if (ImGui::Button("Save as...")) {
-        static constexpr SDL_DialogFileFilter kPlr[] = {{"Nox character", "plr"}};
+    if (ImGui::Button(NOX_TRI("content.text_form.save_as", "Save as..."))) {
+        static const SDL_DialogFileFilter kPlr[] = {{NOX_TRC("content.character.plr_filter", "Nox character"), "plr"}};
         const std::string start = ws_.session.settings().saveDir.empty() ? std::string() : ws_.session.settings().saveDir + "/" + utf8(file->filename());
         ws_.session.dialogs().request(kDialogSaveCharacter, Dialogs::Save, ws_.session.window(), start, kPlr, 1);
     }
-    ImGui::SetItemTooltip("Writes a new .plr (never over this one, never into the game's folder). To play it, put it in\n"
-                          "the Save folder of a copy of the game.");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.character.save_tip", "Writes a new .plr (never over this one, never into the game's folder). To play it, put it in\n"
+                                                                       "the Save folder of a copy of the game."));
     if (c.changed()) {
         ImGui::SameLine();
-        if (ImGui::Button("Revert")) {
+        if (ImGui::Button(NOX_TRI("content.text_form.revert", "Revert"))) {
             characterFile_.clear(); // (read again next frame)
         }
     }
@@ -331,20 +366,21 @@ bool RecordPanel::characterForm(const content::Record& r)
             target += ".plr";
         }
         if (const std::string why = content::checkSaveOutsideGame(target, *file, ws_.session.gameDir()); !why.empty()) {
-            ws_.session.error("Not there: " + why);
+            ws_.session.error(nox::l10n::format(NOX_TR("content.common.not_there", "Not there: {why}"), {{"why", why}}));
         } else {
             const auto save = [this, target] {
                 try {
                     character_->save(target); // (the form goes on with what was saved; the record is still the file read)
                     ws_.session.settings().saveDir = utf8(target.parent_path());
-                    ws_.session.setStatus("Saved " + utf8(target), target.parent_path());
+                    ws_.session.setStatus(nox::l10n::format(NOX_TR("content.common.saved_file", "Saved {file}"), {{"file", utf8(target)}}), target.parent_path());
                 } catch (const std::exception& ex) {
-                    ws_.session.error(std::string("Couldn't save it: ") + ex.what());
+                    ws_.session.error(nox::l10n::format(NOX_TR("content.common.cant_save", "Couldn't save it: {error}"), {{"error", ex.what()}}));
                 }
             };
             std::error_code ec;
             if (fs::exists(target, ec)) {
-                ws_.session.confirm("Replace it?", utf8(target) + " is there already. Replace it?", save);
+                ws_.session.confirm(NOX_TR("content.common.replace_title", "Replace it?"),
+                                    nox::l10n::format(NOX_TR("content.common.replace_ask", "{file} is there already. Replace it?"), {{"file", utf8(target)}}), save);
             } else {
                 save();
             }

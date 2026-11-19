@@ -10,6 +10,7 @@
 
 #include "noxcore/mapedit/paint.hpp"
 #include "noxcore/mapedit/walls.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/text.hpp"
@@ -42,20 +43,51 @@ constexpr const char* kUser = "User Categories";
 using editor::help;
 using editor::texId;
 
-/// The class filter chips: a label and the CLASS bits it takes.
-struct Chip {
-    const char* label;
-    std::uint32_t classes;
+/// The class filter chips: the CLASS bits each takes (its label: chipLabel).
+constexpr std::uint32_t kChips[] = {
+    oc::Monster,
+    oc::Weapon | oc::Armor | oc::Food | oc::Wand | oc::Key | oc::InfoBook | oc::Treasure,
+    oc::Door | oc::Exit | oc::Transporter | oc::Elevator | oc::ElevatorShaft | oc::Hole,
+    oc::Trigger,
+    oc::Dangerous | oc::Fire,
+    oc::Light,
+    oc::Immobile,
 };
-constexpr Chip kChips[] = {
-    {"Creatures", oc::Monster},
-    {"Items", oc::Weapon | oc::Armor | oc::Food | oc::Wand | oc::Key | oc::InfoBook | oc::Treasure},
-    {"Doors & exits", oc::Door | oc::Exit | oc::Transporter | oc::Elevator | oc::ElevatorShaft | oc::Hole},
-    {"Triggers", oc::Trigger},
-    {"Hazards", oc::Dangerous | oc::Fire},
-    {"Lights", oc::Light},
-    {"Immobile", oc::Immobile},
-};
+
+const char* chipLabel(std::size_t i)
+{
+    switch (i) {
+    case 0: return NOX_TRI("editor.browser.chip.creatures", "Creatures");
+    case 1: return NOX_TRI("editor.browser.chip.items", "Items");
+    case 2: return NOX_TRI("editor.browser.chip.doors", "Doors & exits");
+    case 3: return NOX_TRI("editor.browser.chip.triggers", "Triggers");
+    case 4: return NOX_TRI("editor.browser.chip.hazards", "Hazards");
+    case 5: return NOX_TRI("editor.browser.chip.lights", "Lights");
+    default: return NOX_TRI("editor.browser.chip.immobile", "Immobile");
+    }
+}
+
+/// A folder's name over the grid: the browser's own folders (kept in English: their keys) in the
+/// language in use, the catalog's as they are.
+void folderHeading(const std::string& folder)
+{
+    const std::string_view f = folder;
+    const std::string_view user = kUser;
+    const char* own = f == kFolderFavourites ? NOX_TRC("editor.browser.folder.favourites", "Favourites")
+                      : f == kFolderRecent   ? NOX_TRC("editor.browser.folder.recent", "Recently Used")
+                      : f == kFolderPrefabs  ? NOX_TRC("editor.browser.folder.prefabs", "Prefabs")
+                      : f == kFloors         ? NOX_TRC("editor.browser.folder.floors", "Floors")
+                      : f == kWalls          ? NOX_TRC("editor.browser.folder.walls", "Walls")
+                      : f == kEdges          ? NOX_TRC("editor.browser.folder.edges", "Edges")
+                                             : nullptr;
+    if (own) {
+        ImGui::TextDisabled("%s", own);
+    } else if (f.starts_with(user) && (f.size() == user.size() || f[user.size()] == '/')) {
+        ImGui::TextDisabled("%s%s", NOX_TRC("editor.browser.folder.user", "User Categories"), folder.c_str() + user.size());
+    } else {
+        ImGui::TextDisabled("%s", me::folderText(folder).c_str());
+    }
+}
 
 /// One cell of a grid: a picture (fitted, centred) over its name. True when clicked.
 bool cell(const char* id, SDL_Texture* tex, ImVec2 uv0, ImVec2 uv1, float texW, float texH, const std::string& name, bool selected, float size,
@@ -145,13 +177,13 @@ void ObjectTools::browse(const std::string& folder)
     focusFolder_ = true;
     showBrowser = true;
     search_[0] = 0;
-    ImGui::SetWindowFocus("Content Browser");
+    ImGui::SetWindowFocus(NOX_TRI("editor.window.content_browser", "Content Browser"));
 }
 
 void ObjectTools::pickType(const std::string& type)
 {
     if (!catalog_.find(type)) {
-        ed_.status("No object type " + type);
+        ed_.status(nox::l10n::format(NOX_TR("editor.browser.status.no_type", "No object type {type}"), {{"type", type}}));
         return;
     }
     type_ = type;
@@ -175,17 +207,17 @@ void ObjectTools::pickPaint(const std::string& folder, int index)
     if (folder == kFloors) {
         ed_.brush_.floor = static_cast<std::uint8_t>(index);
         tool(MapEditor::Tool::Floor);
-        ed_.status("Floor brush: " + ed_.things_.floors[static_cast<std::size_t>(index)].name);
+        ed_.status(nox::l10n::format(NOX_TR("editor.browser.floor_brush", "Floor brush: {name}"), {{"name", ed_.things_.floors[static_cast<std::size_t>(index)].name}}));
     } else if (folder == kWalls) {
         ed_.wallMaterial_ = index;
         ed_.wallVariantMin_ = 0;
         ed_.wallVariantMax_ = std::max(0, me::wallRandomVariations(ed_.things_, index) - 1);
         tool(MapEditor::Tool::Wall);
-        ed_.status("Wall material: " + ed_.things_.walls[static_cast<std::size_t>(index)].name);
+        ed_.status(nox::l10n::format(NOX_TR("editor.browser.wall_material", "Wall material: {name}"), {{"name", ed_.things_.walls[static_cast<std::size_t>(index)].name}}));
     } else if (folder == kEdges) {
         ed_.edgeSet_ = index;
         tool(MapEditor::Tool::Edge);
-        ed_.status("Edge set: " + ed_.things_.edges[static_cast<std::size_t>(index)].name);
+        ed_.status(nox::l10n::format(NOX_TR("editor.browser.edge_set", "Edge set: {name}"), {{"name", ed_.things_.edges[static_cast<std::size_t>(index)].name}}));
     }
 }
 
@@ -239,7 +271,7 @@ void ObjectTools::panels()
         const int v = *static_cast<const int*>(p->Data);
         if (v >= 0 && static_cast<std::size_t>(v) < ed_.things_.things.size()) dragType_ = ed_.things_.things[static_cast<std::size_t>(v)].name;
         else if (v < 0) dragPrefab_ = -v - 1;
-        if (ed_.panelW_ > 0 && ImGui::Begin("Map")) {
+        if (ed_.panelW_ > 0 && ImGui::Begin(NOX_TRI("editor.window.map", "Map"))) {
             const ImRect r(ImVec2(ed_.panelX_, ed_.panelY_), ImVec2(ed_.panelX_ + ed_.panelW_, ed_.panelY_ + ed_.panelH_));
             if (ImGui::BeginDragDropTargetCustom(r, ImGui::GetID("##mapdrop"))) {
                 if (const ImGuiPayload* got = ImGui::AcceptDragDropPayload("NOX_THING")) {
@@ -277,9 +309,11 @@ void ObjectTools::folderTree()
             focusFolder_ = false;
         }
     };
-    leaf("* Favourites", kFolderFavourites, "The types you starred (right click a thumbnail).");
-    leaf("Recently Used", kFolderRecent, "The last 30 types placed.");
-    leaf("Prefabs", kFolderPrefabs, "Saved selections, placed again with their links (Edit > Save Selection as Prefab).");
+    leaf(NOX_TRI("editor.browser.tree.favourites", "* Favourites"), kFolderFavourites,
+         NOX_TRC("editor.browser.tree.favourites_help", "The types you starred (right click a thumbnail)."));
+    leaf(NOX_TRI("editor.browser.folder.recent", "Recently Used"), kFolderRecent, NOX_TRC("editor.browser.tree.recent_help", "The last 30 types placed."));
+    leaf(NOX_TRI("editor.browser.folder.prefabs", "Prefabs"), kFolderPrefabs,
+         NOX_TRC("editor.browser.tree.prefabs_help", "Saved selections, placed again with their links (Edit > Save Selection as Prefab)."));
     ImGui::Separator();
     // The catalog's folders, nested by their paths (parents come before children).
     const auto& folders = catalog_.folders;
@@ -289,7 +323,8 @@ void ObjectTools::folderTree()
             const std::string p = slash == std::string::npos ? std::string() : f.substr(0, slash);
             if (p != parent) continue;
             if (!showAll_ && f.starts_with("Hidden")) continue;
-            const std::string name = slash == std::string::npos ? f : f.substr(slash + 1);
+            const auto fi = static_cast<std::size_t>(&f - folders.data());
+            const std::string& name = catalog_.folderNames[fi]; // (as shown: the path stays its id)
             const bool hasChildren = std::ranges::any_of(folders, [&](const std::string& g) { return g.size() > f.size() && g.starts_with(f) && g[f.size()] == '/'; });
             ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
             if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
@@ -310,13 +345,16 @@ void ObjectTools::folderTree()
     };
     drawChildren(drawChildren, std::string());
     ImGui::Separator();
-    leaf("Floors", kFloors, "thing.bin's floors: a click picks the floor brush's.");
-    leaf("Walls", kWalls, "thing.bin's wall materials: a click picks the wall tool's.");
-    leaf("Edges", kEdges, "thing.bin's edge sets: a click picks the edge tool's.");
+    leaf(NOX_TRI("editor.browser.folder.floors", "Floors"), kFloors, NOX_TRC("editor.browser.tree.floors_help", "thing.bin's floors: a click picks the floor brush's."));
+    leaf(NOX_TRI("editor.browser.folder.walls", "Walls"), kWalls,
+         NOX_TRC("editor.browser.tree.walls_help", "thing.bin's wall materials: a click picks the wall tool's."));
+    leaf(NOX_TRI("editor.browser.folder.edges", "Edges"), kEdges, NOX_TRC("editor.browser.tree.edges_help", "thing.bin's edge sets: a click picks the edge tool's."));
     ImGui::Separator();
-    const bool userOpen = ImGui::TreeNodeEx(kUser, ImGuiTreeNodeFlags_SpanAvailWidth | (folder_ == kUser ? ImGuiTreeNodeFlags_Selected : 0));
+    const bool userOpen = ImGui::TreeNodeEx(NOX_TRI("editor.browser.folder.user", "User Categories"),
+                                            ImGuiTreeNodeFlags_SpanAvailWidth | (folder_ == kUser ? ImGuiTreeNodeFlags_Selected : 0));
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) folder_ = kUser;
-    help("Your own categories: the old editor's categories.xml rules (NAME_BEGIN, NAME_CONTAIN, OBJECT_CLASS, ANYTHING...).");
+    help(NOX_TRC("editor.browser.tree.user_help",
+                 "Your own categories: the old editor's categories.xml rules (NAME_BEGIN, NAME_CONTAIN, OBJECT_CLASS, ANYTHING...)."));
     if (userOpen) {
         for (const auto& c : userCats_) leaf(c.name.c_str(), std::string(kUser) + "/" + c.name);
         ImGui::TreePop();
@@ -385,11 +423,12 @@ void ObjectTools::itemGrid()
         return;
     }
     if (folder_ == kFolderPrefabs) {
-        if (ImGui::Button("Save Selection as Prefab...")) ed_.commands_.run("prefab.save");
+        if (ImGui::Button(NOX_TRI("editor.browser.prefab.save", "Save Selection as Prefab..."))) ed_.commands_.run("prefab.save");
         ImGui::SameLine();
-        if (ImGui::Button("Reload")) reloadPrefabs();
-        help("Prefabs live in the user folder's prefabs\\ (one .nxprefab file each).");
-        if (prefabs_.empty()) ImGui::TextDisabled("No prefabs yet: select things on the map, then Save Selection as Prefab.");
+        if (ImGui::Button(NOX_TRI("editor.browser.reload", "Reload"))) reloadPrefabs();
+        help(NOX_TRC("editor.browser.prefab.reload_help", "Prefabs live in the user folder's prefabs\\ (one .nxprefab file each)."));
+        if (prefabs_.empty())
+            ImGui::TextDisabled("%s", NOX_TRC("editor.browser.prefab.none", "No prefabs yet: select things on the map, then Save Selection as Prefab."));
         rows(static_cast<int>(prefabs_.size()), [&](int i) {
             const auto& p = prefabs_[static_cast<std::size_t>(i)];
             // Its picture: its first object's thumbnail.
@@ -414,37 +453,45 @@ void ObjectTools::itemGrid()
                 }
                 mode_ = Mode::Place;
             }
-            help(p.name + "\n" + std::to_string(p.objectCount()) + " objects, " + std::to_string(p.clip.walls.size()) + " walls, " +
-                 std::to_string(p.clip.tiles.size()) + " floor tiles, " + std::to_string(p.clip.waypoints.size()) + " waypoints" +
-                 (p.cellAligned() ? "\n(placed by whole cells: it holds walls or floor)" : ""));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                help(p.name + "\n" +
+                     nox::l10n::format(NOX_TR("editor.browser.prefab.counts", "{objects} objects, {walls} walls, {tiles} floor tiles, {waypoints} waypoints"),
+                                       {{"objects", p.objectCount()},
+                                        {"walls", p.clip.walls.size()},
+                                        {"tiles", p.clip.tiles.size()},
+                                        {"waypoints", p.clip.waypoints.size()}}) +
+                     (p.cellAligned() ? "\n" + NOX_TR("editor.browser.prefab.cell_aligned", "(placed by whole cells: it holds walls or floor)") : std::string()));
+            }
             if (ImGui::BeginDragDropSource()) {
                 const int v = -i - 1;
                 ImGui::SetDragDropPayload("NOX_THING", &v, sizeof v);
-                ImGui::Text("Prefab %s", p.name.c_str());
+                ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.browser.prefab.name", "Prefab {name}"), {{"name", p.name}}).c_str());
                 ImGui::EndDragDropSource();
             }
         });
         return;
     }
     if (folder_ == kUser) {
-        ImGui::TextWrapped("Your categories come from categories.xml in the user folder (the old community editor's format: "
-                           "<Category Name=\"..\"> with <Include Rule=\"NAME_BEGIN\">Tree</Include> and Exclude lines; rules OBJECT_CLASS, "
-                           "NAME_BEGIN, NAME_ENDING, NAME_CONTAIN, NAME_EQUAL, ANYTHING).");
+        ImGui::TextWrapped("%s", NOX_TRC("editor.browser.user.about",
+                                         "Your categories come from categories.xml in the user folder (the old community editor's format: "
+                                         "<Category Name=\"..\"> with <Include Rule=\"NAME_BEGIN\">Tree</Include> and Exclude lines; rules OBJECT_CLASS, "
+                                         "NAME_BEGIN, NAME_ENDING, NAME_CONTAIN, NAME_EQUAL, ANYTHING)."));
         static char path[260] = {};
         ImGui::SetNextItemWidth(-90 * ed_.imgui_->scale());
-        ImGui::InputTextWithHint("##catpath", "path to a categories.xml", path, sizeof path);
+        ImGui::InputTextWithHint("##catpath", NOX_TRC("editor.browser.user.path_hint", "path to a categories.xml"), path, sizeof path);
         ImGui::SameLine();
-        if (ImGui::Button("Import") && path[0]) runStep(std::string("categories:") + path);
-        if (ImGui::Button("Reload")) loadUserCategories();
+        if (ImGui::Button(NOX_TRI("editor.browser.user.import", "Import")) && path[0]) runStep(std::string("categories:") + path);
+        if (ImGui::Button(NOX_TRI("editor.browser.reload", "Reload"))) loadUserCategories();
         ImGui::SameLine();
-        ImGui::TextDisabled("%zu categories", userCats_.size());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.browser.user.count", "{n} categories"), {{"n", userCats_.size()}}).c_str());
         categoriesEditor();
         return;
     }
     const auto list = shown();
     if (list.empty()) {
-        ImGui::TextDisabled(search_[0] ? "Nothing matches." : folder_ == kFolderFavourites ? "No favourites: right click a thumbnail to star it."
-                                                                                       : "Nothing here.");
+        ImGui::TextDisabled("%s", search_[0]                         ? NOX_TRC("editor.browser.no_match", "Nothing matches.")
+                                  : folder_ == kFolderFavourites ? NOX_TRC("editor.browser.no_favourites", "No favourites: right click a thumbnail to star it.")
+                                                                 : NOX_TRC("editor.browser.empty", "Nothing here."));
         return;
     }
     rows(static_cast<int>(list.size()), [&](int i) {
@@ -458,8 +505,8 @@ void ObjectTools::itemGrid()
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             const std::string shownName = e->displayName.empty() ? std::string() : "\"" + e->displayName + "\"\n";
-            ImGui::SetTooltip("%s\n%s%s\n%s%s", e->name.c_str(), shownName.c_str(), e->folder.c_str(), e->xfer.c_str(),
-                              e->placeable ? "" : "\n(not placeable: the game's save drops it)");
+            ImGui::SetTooltip("%s\n%s%s\n%s%s%s", e->name.c_str(), shownName.c_str(), me::folderText(e->folder).c_str(), e->xfer.c_str(), e->placeable ? "" : "\n",
+                              e->placeable ? "" : NOX_TRC("editor.browser.not_placeable", "(not placeable: the game's save drops it)"));
         }
         if (ImGui::BeginDragDropSource()) {
             const int v = static_cast<int>(e->thing);
@@ -471,15 +518,15 @@ void ObjectTools::itemGrid()
         }
         if (ImGui::BeginPopupContextItem("##cellmenu")) {
             const bool fav = favourites_.contains(e->name);
-            if (ImGui::MenuItem(fav ? "Remove from Favourites" : "Add to Favourites")) {
+            if (ImGui::MenuItem(fav ? NOX_TRI("editor.browser.unfavourite", "Remove from Favourites") : NOX_TRI("editor.browser.favourite", "Add to Favourites"))) {
                 if (fav) favourites_.erase(e->name);
                 else favourites_.insert(e->name);
                 saveState();
             }
-            if (ImGui::MenuItem("Place at the View's Centre")) placeAt(placePoint(ed_.camera_.x, ed_.camera_.y), e->name);
-            if (ImGui::MenuItem("Select All of This Type on the Map")) ed_.setSelection(me::selectType(ed_.doc_, e->name));
-            if (ImGui::MenuItem("Show Its Folder")) browse(e->folder);
-            if (ImGui::BeginMenu("Add to Category")) {
+            if (ImGui::MenuItem(NOX_TRI("editor.browser.place_at_centre", "Place at the View's Centre"))) placeAt(placePoint(ed_.camera_.x, ed_.camera_.y), e->name);
+            if (ImGui::MenuItem(NOX_TRI("editor.browser.select_type", "Select All of This Type on the Map"))) ed_.setSelection(me::selectType(ed_.doc_, e->name));
+            if (ImGui::MenuItem(NOX_TRI("editor.browser.show_folder", "Show Its Folder"))) browse(e->folder);
+            if (ImGui::BeginMenu(NOX_TRI("editor.browser.add_to_category", "Add to Category"))) {
                 // (A NAME_EQUAL rule for it in one of the user's categories, or a new one.)
                 for (std::size_t k = 0; k < userCats_.size(); ++k) {
                     if (ImGui::MenuItem((userCats_[k].name + "##cat" + std::to_string(k)).c_str())) {
@@ -488,8 +535,8 @@ void ObjectTools::itemGrid()
                     }
                 }
                 if (!userCats_.empty()) ImGui::Separator();
-                if (ImGui::MenuItem("New Category")) {
-                    userCats_.push_back({uniqueCategoryName("New Category"), {{true, "NAME_EQUAL", e->name}}});
+                if (ImGui::MenuItem(NOX_TRI("editor.browser.new_category", "New Category"))) {
+                    userCats_.push_back({uniqueCategoryName(NOX_TR("editor.browser.new_category", "New Category")), {{true, "NAME_EQUAL", e->name}}});
                     saveUserCategories();
                 }
                 ImGui::EndMenu();
@@ -518,7 +565,8 @@ void ObjectTools::saveUserCategories()
     fs::create_directories(writeDir_, ec);
     std::ofstream out(writeDir_ / "categories.xml", std::ios::binary | std::ios::trunc);
     out << me::categoriesXml(userCats_);
-    ed_.status(out ? "Saved " + std::to_string(userCats_.size()) + " categories (categories.xml)" : "categories.xml couldn't be written");
+    ed_.status(out ? nox::l10n::format(NOX_TR("editor.browser.user.saved", "Saved {n} categories (categories.xml)"), {{"n", userCats_.size()}})
+                   : NOX_TR("editor.browser.user.save_failed", "categories.xml couldn't be written"));
 }
 
 void ObjectTools::categoriesEditor()
@@ -528,7 +576,7 @@ void ObjectTools::categoriesEditor()
     // pattern when its field is left).
     static constexpr const char* kRules[] = {"NAME_BEGIN", "NAME_ENDING", "NAME_CONTAIN", "NAME_EQUAL", "OBJECT_CLASS", "ANYTHING"};
     const float s = ed_.imgui_->scale();
-    ImGui::SeparatorText("Edit categories");
+    ImGui::SeparatorText(NOX_TRC("editor.browser.user.edit", "Edit categories"));
     bool changed = false;
     std::optional<std::size_t> removeCat;
     for (std::size_t k = 0; k < userCats_.size(); ++k) {
@@ -537,14 +585,14 @@ void ObjectTools::categoriesEditor()
         const bool open = ImGui::TreeNodeEx("##cat", ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap, "%s  (%zu)", c.name.c_str(),
                                             c.evaluate(catalog_).size());
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 120 * s + ImGui::GetCursorPosX());
-        if (ImGui::SmallButton("Show")) browse(std::string(kUser) + "/" + c.name);
+        if (ImGui::SmallButton(NOX_TRI("editor.browser.user.show", "Show"))) browse(std::string(kUser) + "/" + c.name);
         ImGui::SameLine();
-        if (ImGui::SmallButton("Delete")) removeCat = k;
+        if (ImGui::SmallButton(NOX_TRI("editor.common.delete", "Delete"))) removeCat = k;
         if (open) {
             char name[96];
             std::snprintf(name, sizeof name, "%s", c.name.c_str());
             ImGui::SetNextItemWidth(200 * s);
-            if (ImGui::InputText("Name", name, sizeof name) && name[0]) {
+            if (ImGui::InputText(NOX_TRI("editor.browser.user.name", "Name"), name, sizeof name) && name[0]) {
                 c.name = name;
             }
             changed = changed || ImGui::IsItemDeactivatedAfterEdit();
@@ -554,7 +602,8 @@ void ObjectTools::categoriesEditor()
                 ImGui::PushID(static_cast<int>(r));
                 ImGui::SetNextItemWidth(90 * s);
                 int inc = rule.include ? 0 : 1;
-                if (ImGui::Combo("##inc", &inc, "Include\0Exclude\0")) {
+                const char* incItems[] = {NOX_TRC("editor.browser.user.include", "Include"), NOX_TRC("editor.browser.user.exclude", "Exclude")};
+                if (ImGui::Combo("##inc", &inc, incItems, 2)) {
                     rule.include = inc == 0;
                     changed = true;
                 }
@@ -574,7 +623,8 @@ void ObjectTools::categoriesEditor()
                     char pattern[128];
                     std::snprintf(pattern, sizeof pattern, "%s", rule.pattern.c_str());
                     ImGui::SetNextItemWidth(160 * s);
-                    if (ImGui::InputTextWithHint("##pattern", rule.kind == "OBJECT_CLASS" ? "MONSTER | NPC" : "type name text", pattern, sizeof pattern)) {
+                    if (ImGui::InputTextWithHint("##pattern", rule.kind == "OBJECT_CLASS" ? "MONSTER | NPC" : NOX_TRC("editor.browser.user.pattern_hint", "type name text"),
+                                                 pattern, sizeof pattern)) {
                         rule.pattern = pattern;
                     }
                     changed = changed || ImGui::IsItemDeactivatedAfterEdit();
@@ -587,7 +637,7 @@ void ObjectTools::categoriesEditor()
                 c.rules.erase(c.rules.begin() + static_cast<std::ptrdiff_t>(*removeRule));
                 changed = true;
             }
-            if (ImGui::SmallButton("Add Rule")) {
+            if (ImGui::SmallButton(NOX_TRI("editor.browser.user.add_rule", "Add Rule"))) {
                 c.rules.push_back({true, "NAME_CONTAIN", ""});
                 changed = true;
             }
@@ -599,11 +649,11 @@ void ObjectTools::categoriesEditor()
         userCats_.erase(userCats_.begin() + static_cast<std::ptrdiff_t>(*removeCat));
         changed = true;
     }
-    if (ImGui::Button("New Category")) {
-        userCats_.push_back({uniqueCategoryName("New Category"), {{true, "NAME_CONTAIN", ""}}});
+    if (ImGui::Button(NOX_TRI("editor.browser.new_category", "New Category"))) {
+        userCats_.push_back({uniqueCategoryName(NOX_TR("editor.browser.new_category", "New Category")), {{true, "NAME_CONTAIN", ""}}});
         changed = true;
     }
-    help("A new category in the user folder's categories.xml (right click a thumbnail: Add to Category).");
+    help(NOX_TRC("editor.browser.user.new_help", "A new category in the user folder's categories.xml (right click a thumbnail: Add to Category)."));
     if (changed) {
         saveUserCategories();
     }
@@ -616,28 +666,41 @@ void ObjectTools::detailsCard(bool tall)
         const auto& t = ed_.things_;
         if (folder_ == kFloors && ed_.brush_.floor < t.floors.size()) {
             const auto& f = t.floors[ed_.brush_.floor];
-            ImGui::Text("Floor brush: %s", f.name.c_str());
-            ImGui::TextDisabled("%d x %d variants%s", f.cols, f.rows, f.frames > 1 ? ", animated" : "");
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.browser.floor_brush", "Floor brush: {name}"), {{"name", f.name}}).c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(f.frames > 1 ? NOX_TR("editor.browser.floor_variants_animated", "{cols} x {rows} variants, animated")
+                                                                     : NOX_TR("editor.browser.floor_variants", "{cols} x {rows} variants"),
+                                                        {{"cols", f.cols}, {"rows", f.rows}})
+                                          .c_str());
         } else if (folder_ == kWalls && ed_.wallMaterial_ >= 0 && static_cast<std::size_t>(ed_.wallMaterial_) < t.walls.size()) {
-            ImGui::Text("Wall material: %s", t.walls[static_cast<std::size_t>(ed_.wallMaterial_)].name.c_str());
-            ImGui::TextDisabled("%d random variations", me::wallRandomVariations(t, ed_.wallMaterial_));
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.browser.wall_material", "Wall material: {name}"),
+                                                     {{"name", t.walls[static_cast<std::size_t>(ed_.wallMaterial_)].name}})
+                                       .c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.browser.wall_variations", "{n} random variations"),
+                                                        {{"n", me::wallRandomVariations(t, ed_.wallMaterial_)}})
+                                          .c_str());
         } else if (folder_ == kEdges && ed_.edgeSet_ >= 0 && static_cast<std::size_t>(ed_.edgeSet_) < t.edges.size()) {
             const auto& e = t.edges[static_cast<std::size_t>(ed_.edgeSet_)];
-            ImGui::Text("Edge set: %s", e.name.c_str());
-            ImGui::TextDisabled("%d x %d (%d shapes)", e.cols, e.rows, 2 * (e.cols + e.rows));
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.browser.edge_set", "Edge set: {name}"), {{"name", e.name}}).c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.browser.edge_shapes", "{cols} x {rows} ({n} shapes)"),
+                                                        {{"cols", e.cols}, {"rows", e.rows}, {"n", 2 * (e.cols + e.rows)}})
+                                          .c_str());
         }
-        ImGui::TextWrapped("A click picks it for its tool and switches to that tool.");
+        ImGui::TextWrapped("%s", NOX_TRC("editor.browser.paint_click", "A click picks it for its tool and switches to that tool."));
         return;
     }
     const me::ContentEntry* e = prefab_ < 0 ? catalog_.find(type_) : nullptr;
     if (!e) {
         if (prefab_ >= 0 && prefab_ < static_cast<int>(prefabs_.size())) {
             const auto& p = prefabs_[static_cast<std::size_t>(prefab_)];
-            ImGui::Text("Prefab %s", p.name.c_str());
-            ImGui::TextDisabled("%zu objects, %zu walls, %zu tiles, %zu waypoints", p.objectCount(), p.clip.walls.size(), p.clip.tiles.size(),
-                                p.clip.waypoints.size());
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.browser.prefab.name", "Prefab {name}"), {{"name", p.name}}).c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.browser.prefab.card_counts", "{objects} objects, {walls} walls, {tiles} tiles, {waypoints} waypoints"),
+                                                        {{"objects", p.objectCount()},
+                                                         {"walls", p.clip.walls.size()},
+                                                         {"tiles", p.clip.tiles.size()},
+                                                         {"waypoints", p.clip.waypoints.size()}})
+                                          .c_str());
         } else {
-            ImGui::TextDisabled("Pick a type to see it here; click on the map to place it (Object tool).");
+            ImGui::TextDisabled("%s", NOX_TRC("editor.browser.card_empty", "Pick a type to see it here; click on the map to place it (Object tool)."));
         }
         return;
     }
@@ -647,20 +710,20 @@ void ObjectTools::detailsCard(bool tall)
     if (!tall) ImGui::SameLine();
     ImGui::BeginGroup();
     const bool fav = favourites_.contains(e->name);
-    if (ImGui::SmallButton(fav ? "Unstar##fav" : "Star##fav")) {
+    if (ImGui::SmallButton(fav ? NOX_TRI("editor.browser.unstar", "Unstar##fav") : NOX_TRI("editor.browser.star", "Star##fav"))) {
         if (fav) favourites_.erase(e->name);
         else favourites_.insert(e->name);
         saveState();
     }
-    help(fav ? "Remove from Favourites" : "Add to Favourites");
+    help(fav ? NOX_TRC("editor.browser.unfavourite", "Remove from Favourites") : NOX_TRC("editor.browser.favourite", "Add to Favourites"));
     ImGui::SameLine();
     ImGui::TextUnformatted(e->name.c_str());
     if (!e->displayName.empty()) {
         ImGui::Text("\"%s\"", e->displayName.c_str());
-        help("The name the game shows for it.");
+        help(NOX_TRC("editor.browser.game_name_help", "The name the game shows for it."));
     }
-    ImGui::TextDisabled("%s", e->folder.c_str());
-    ImGui::Text("%s%s", e->xfer.c_str(), e->placeable ? "" : "  (not placeable: the game's object save drops it)");
+    ImGui::TextDisabled("%s", me::folderText(e->folder).c_str());
+    ImGui::Text("%s%s", e->xfer.c_str(), e->placeable ? "" : NOX_TRC("editor.browser.card_not_placeable", "  (not placeable: the game's object save drops it)"));
     ImGui::TextWrapped("CLASS %s", std::string(def.attribute("CLASS").value_or("-")).c_str());
     if (!e->subclasses.empty()) {
         std::string s;
@@ -674,7 +737,9 @@ void ObjectTools::detailsCard(bool tall)
     if (!stats.empty()) ImGui::TextWrapped("%s", stats.c_str());
     if (monsters_) {
         if (const auto* m = monsters_->find(e->name)) {
-            ImGui::Text("monster.bin (solo): health %d, speed %d", m->health, m->speed);
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.browser.monster_stats", "monster.bin (solo): health {health}, speed {speed}"),
+                                                     {{"health", m->health}, {"speed", m->speed}})
+                                       .c_str());
         }
     }
     ImGui::EndGroup();
@@ -682,38 +747,40 @@ void ObjectTools::detailsCard(bool tall)
 
 void ObjectTools::browserPanel()
 {
-    if (!ImGui::Begin("Content Browser", &showBrowser)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.content_browser", "Content Browser"), &showBrowser)) {
         ImGui::End();
         return;
     }
     const float scale = ed_.imgui_->scale();
     // The search and filters.
     ImGui::SetNextItemWidth(220 * scale);
-    ImGui::InputTextWithHint("##search", "search (name, game name, folder, xfer, class)", search_, sizeof search_);
-    help("Every word must match: the type name, the name the game shows (\"Potion of Restore Health\"), the folder, the XFER or a CLASS / SUBCLASS "
-         "name. A search looks through every folder.");
+    ImGui::InputTextWithHint("##search", NOX_TRC("editor.browser.search_hint", "search (name, game name, folder, xfer, class)"), search_, sizeof search_);
+    help(NOX_TRC("editor.browser.search_help",
+                 "Every word must match: the type name, the name the game shows (\"Potion of Restore Health\"), the folder, the XFER or a CLASS / SUBCLASS "
+                 "name. A search looks through every folder."));
     ImGui::SameLine();
-    ImGui::Checkbox("Show all", &showAll_);
-    help("Also the types the game's object save drops (no menu icon: effects, missiles, generators' markers).");
+    ImGui::Checkbox(NOX_TRI("editor.browser.show_all", "Show all"), &showAll_);
+    help(NOX_TRC("editor.browser.show_all_help", "Also the types the game's object save drops (no menu icon: effects, missiles, generators' markers)."));
     ImGui::SameLine();
-    ImGui::Checkbox("Sub-folders", &recursive_);
-    help("A folder shows what its sub-folders hold too.");
+    ImGui::Checkbox(NOX_TRI("editor.browser.subfolders", "Sub-folders"), &recursive_);
+    help(NOX_TRC("editor.browser.subfolders_help", "A folder shows what its sub-folders hold too."));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(90 * scale);
     if (ImGui::SliderFloat("##cell", &cell_, 40, 160, "%.0f px")) saveState();
-    help("Thumbnail size.");
-    for (const auto& chip : kChips) {
+    help(NOX_TRC("editor.browser.cell_help", "Thumbnail size."));
+    for (std::size_t i = 0; i < std::size(kChips); ++i) {
+        const std::uint32_t classes = kChips[i];
         ImGui::SameLine();
-        const bool on = (classMask_ & chip.classes) == chip.classes && classMask_ != 0;
+        const bool on = (classMask_ & classes) == classes && classMask_ != 0;
         if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
-        if (ImGui::SmallButton(chip.label)) classMask_ = on ? (classMask_ & ~chip.classes) : (classMask_ | chip.classes);
+        if (ImGui::SmallButton(chipLabel(i))) classMask_ = on ? (classMask_ & ~classes) : (classMask_ | classes);
         if (on) ImGui::PopStyleColor();
-        help("Only types of these classes (click again to drop the filter).");
+        help(NOX_TRC("editor.browser.chip_help", "Only types of these classes (click again to drop the filter)."));
     }
     if (thumbs_) {
         if (const auto n = thumbs_->pending()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("thumbnails: %zu to draw", n);
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.browser.thumbs_pending", "thumbnails: {n} to draw"), {{"n", n}}).c_str());
         }
     }
     // The tree | the grid | the details card.
@@ -731,9 +798,9 @@ void ObjectTools::browserPanel()
     ImGui::BeginGroup();
     ImGui::BeginChild("##grid", ImVec2(gridW, beside ? avail : std::max(80.0f, avail - cardH - ImGui::GetStyle().ItemSpacing.y)), ImGuiChildFlags_Borders);
     if (search_[0] && folder_ != kFloors && folder_ != kWalls && folder_ != kEdges) {
-        ImGui::TextDisabled("Search results");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.browser.search_results", "Search results"));
     } else {
-        ImGui::TextDisabled("%s", folder_.c_str());
+        folderHeading(folder_);
     }
     itemGrid();
     ImGui::EndChild();
@@ -749,17 +816,18 @@ void ObjectTools::browserPanel()
 
 void ObjectTools::scatterPanel()
 {
-    ImGui::SliderFloat("Radius", &scatter_.radius, 23, 460, "%.0f");
-    ImGui::SliderFloat("Density", &scatter_.density, 0.05f, 3, "%.2f a tile");
-    help("Objects a dab tries to place per floor tile (46 x 46 diamond) inside the radius.");
-    ImGui::SliderFloat("Spacing", &scatter_.spacing, 4, 200, "%.0f");
-    help("The least distance between scattered objects, and from objects already on the map (Poisson disc).");
-    ImGui::Checkbox("Random facing", &scatter_.randomFacing);
+    ImGui::SliderFloat(NOX_TRI("editor.object.scatter.radius", "Radius"), &scatter_.radius, 23, 460, "%.0f");
+    ImGui::SliderFloat(NOX_TRI("editor.object.scatter.density", "Density"), &scatter_.density, 0.05f, 3,
+                       NOX_TRC("editor.object.scatter.density_format", "%.2f a tile"));
+    help(NOX_TRC("editor.object.scatter.density_help", "Objects a dab tries to place per floor tile (46 x 46 diamond) inside the radius."));
+    ImGui::SliderFloat(NOX_TRI("editor.object.scatter.spacing", "Spacing"), &scatter_.spacing, 4, 200, "%.0f");
+    help(NOX_TRC("editor.object.scatter.spacing_help", "The least distance between scattered objects, and from objects already on the map (Poisson disc)."));
+    ImGui::Checkbox(NOX_TRI("editor.object.scatter.random_facing", "Random facing"), &scatter_.randomFacing);
     ImGui::SameLine();
-    ImGui::Checkbox("Avoid walls", &scatter_.avoidWalls);
+    ImGui::Checkbox(NOX_TRI("editor.object.scatter.avoid_walls", "Avoid walls"), &scatter_.avoidWalls);
     ImGui::SameLine();
-    ImGui::Checkbox("Only on floor", &scatter_.avoidHoles);
-    ImGui::TextDisabled("The list (a weighted pick each time):");
+    ImGui::Checkbox(NOX_TRI("editor.object.scatter.only_floor", "Only on floor"), &scatter_.avoidHoles);
+    ImGui::TextDisabled("%s", NOX_TRC("editor.object.scatter.list", "The list (a weighted pick each time):"));
     int remove = -1;
     for (std::size_t i = 0; i < scatter_.types.size(); ++i) {
         auto& t = scatter_.types[i];
@@ -778,62 +846,68 @@ void ObjectTools::scatterPanel()
     }
     if (remove >= 0) scatter_.types.erase(scatter_.types.begin() + remove);
     ImGui::BeginDisabled(type_.empty());
-    if (ImGui::Button("Add the Browser's Type")) {
+    if (ImGui::Button(NOX_TRI("editor.object.scatter.add_type", "Add the Browser's Type"))) {
         if (std::ranges::none_of(scatter_.types, [&](const auto& t) { return t.type == type_; })) scatter_.types.push_back({type_, 1});
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Add the Folder")) {
+    if (ImGui::Button(NOX_TRI("editor.object.scatter.add_folder", "Add the Folder"))) {
         for (const auto* e : catalog_.inFolder(folder_, recursive_)) {
             if (e->placeable && std::ranges::none_of(scatter_.types, [&](const auto& t) { return t.type == e->name; })) scatter_.types.push_back({e->name, 1});
         }
     }
-    help("Every placeable type of the browser's folder, weight 1 each (trees, rocks, flowers...).");
+    help(NOX_TRC("editor.object.scatter.add_folder_help", "Every placeable type of the browser's folder, weight 1 each (trees, rocks, flowers...)."));
     ImGui::SameLine();
-    if (ImGui::Button("Clear")) scatter_.types.clear();
-    if (scatter_.types.empty()) ImGui::TextDisabled("(empty: the browser's type)");
-    ImGui::TextWrapped("Drag on the map: one stroke is one change (undo takes it all back). The same stroke places the same objects every time "
-                       "(seeded by the stroke count, never the clock).");
+    if (ImGui::Button(NOX_TRI("editor.common.clear", "Clear"))) scatter_.types.clear();
+    if (scatter_.types.empty()) ImGui::TextDisabled("%s", NOX_TRC("editor.object.scatter.empty", "(empty: the browser's type)"));
+    ImGui::TextWrapped("%s", NOX_TRC("editor.object.scatter.about",
+                                     "Drag on the map: one stroke is one change (undo takes it all back). The same stroke places the same objects every time "
+                                     "(seeded by the stroke count, never the clock)."));
 }
 
 void ObjectTools::toolPanel()
 {
-    ImGui::SeparatorText("Object");
+    ImGui::SeparatorText(NOX_TRC("editor.object.heading", "Object"));
     int mode = static_cast<int>(mode_);
-    ImGui::RadioButton("Place", &mode, 0);
+    ImGui::RadioButton(NOX_TRI("editor.object.place", "Place"), &mode, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Scatter brush", &mode, 1);
+    ImGui::RadioButton(NOX_TRI("editor.object.scatter_brush", "Scatter brush"), &mode, 1);
     mode_ = static_cast<Mode>(mode);
     if (mode_ == Mode::Place) {
         if (prefab_ >= 0 && prefab_ < static_cast<int>(prefabs_.size())) {
-            ImGui::Text("Placing prefab %s", prefabs_[static_cast<std::size_t>(prefab_)].name.c_str());
-            if (ImGui::SmallButton("Back to the browser's type")) prefab_ = -1;
+            ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.object.placing_prefab", "Placing prefab {name}"),
+                                                     {{"name", prefabs_[static_cast<std::size_t>(prefab_)].name}})
+                                       .c_str());
+            if (ImGui::SmallButton(NOX_TRI("editor.object.back_to_type", "Back to the browser's type"))) prefab_ = -1;
         } else if (const auto* e = catalog_.find(type_)) {
             thumbnail(e->thing, 40 * ed_.imgui_->scale());
             ImGui::SameLine();
             ImGui::BeginGroup();
             ImGui::TextUnformatted(e->name.c_str());
-            ImGui::TextDisabled("%s", e->folder.c_str());
+            ImGui::TextDisabled("%s", me::folderText(e->folder).c_str());
             ImGui::EndGroup();
         } else {
-            ImGui::TextDisabled("Pick a type in the Content Browser (or drag one onto the map).");
+            ImGui::TextDisabled("%s", NOX_TRC("editor.object.pick_type", "Pick a type in the Content Browser (or drag one onto the map)."));
         }
-        ImGui::SliderFloat("Facing", &facing_, 0, 359, "%.0f deg");
-        help("New doors, creatures, NPCs and sentries face this way (0 east, 90 south). Q and E turn it a step: a door a quarter, a creature "
-             "an eighth, a sentry 5 degrees. With the Select tool, Q and E turn the selection.");
-        ImGui::Checkbox("Random from the folder", &randomFromFolder_);
-        help("Each click places a random type from the browser's folder (the old editor's Randomize).");
-        ImGui::Checkbox("Right click deletes", &rightDeletes_);
-        help("A right click deletes the object under the mouse (the old editor's place-mode binding).");
-        ImGui::TextWrapped("Click to place (again and again: multi-place); Alt+click takes the type under the mouse. Objects snap as the "
-                           "toolbar's Snap says; doors always snap to the grid, as the old editor placed them. Each placement is one change.");
+        ImGui::SliderFloat(NOX_TRI("editor.object.facing", "Facing"), &facing_, 0, 359, NOX_TRC("editor.object.facing_format", "%.0f deg"));
+        help(NOX_TRC("editor.object.facing_help",
+                     "New doors, creatures, NPCs and sentries face this way (0 east, 90 south). Q and E turn it a step: a door a quarter, a creature "
+                     "an eighth, a sentry 5 degrees. With the Select tool, Q and E turn the selection."));
+        ImGui::Checkbox(NOX_TRI("editor.object.random_from_folder", "Random from the folder"), &randomFromFolder_);
+        help(NOX_TRC("editor.object.random_from_folder_help", "Each click places a random type from the browser's folder (the old editor's Randomize)."));
+        ImGui::Checkbox(NOX_TRI("editor.object.right_deletes", "Right click deletes"), &rightDeletes_);
+        help(NOX_TRC("editor.object.right_deletes_help", "A right click deletes the object under the mouse (the old editor's place-mode binding)."));
+        ImGui::TextWrapped("%s", NOX_TRC("editor.object.place_about",
+                                         "Click to place (again and again: multi-place); Alt+click takes the type under the mouse. Objects snap as the "
+                                         "toolbar's Snap says; doors always snap to the grid, as the old editor placed them. Each placement is one change."));
     } else {
         scatterPanel();
     }
-    ImGui::SeparatorText("New objects");
-    ImGui::TextWrapped("Each is the record the game's own save writes for a thing just made: the type's fresh state (MonsterCreate's numbers "
-                       "with monster.bin's solo table, a weapon's durability, a plate's colours...), its next free extent, no script id "
-                       "(the load gives one).");
+    ImGui::SeparatorText(NOX_TRC("editor.object.new_objects", "New objects"));
+    ImGui::TextWrapped("%s", NOX_TRC("editor.object.new_objects_about",
+                                     "Each is the record the game's own save writes for a thing just made: the type's fresh state (MonsterCreate's numbers "
+                                     "with monster.bin's solo table, a weapon's durability, a plate's colours...), its next free extent, no script id "
+                                     "(the load gives one)."));
 }
 
 } // namespace noxsdl

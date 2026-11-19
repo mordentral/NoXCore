@@ -2,6 +2,7 @@
 #include "content/records.hpp"
 
 #include "noxcore/audio/sound_names.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -50,16 +51,31 @@ std::string thingGroup(const nox::things::ThingDef& t)
 {
     using namespace nox::things::ObjectClass;
     const std::uint32_t c = nox::things::thingClasses(t);
-    static constexpr std::pair<std::uint32_t, const char*> kOrder[] = {
-        {Player, "Players"},       {Monster, "Monsters"},  {Weapon, "Weapons"},   {Armor, "Armour"},
-        {Wand, "Wands"},           {Food, "Food & potions"}, {Missile, "Missiles"}, {Door, "Doors"},
-        {Key, "Keys"},             {InfoBook, "Books"},    {MonsterGenerator, "Generators"}, {Exit, "Exits"},
-        {Transporter, "Teleporters"}, {Elevator, "Elevators"}, {Trigger, "Triggers"}, {Treasure, "Treasure"},
-        {Light, "Lights"},         {Fire, "Fire"},         {Obstacle, "Obstacles"}, {Immobile, "Scenery"},
+    static constexpr std::pair<std::uint32_t, nox::l10n::Key> kOrder[] = {
+        {Player, NOX_TRK("content.group.players", "Players")},
+        {Monster, NOX_TRK("content.group.monsters", "Monsters")},
+        {Weapon, NOX_TRK("content.group.weapons", "Weapons")},
+        {Armor, NOX_TRK("content.group.armour", "Armour")},
+        {Wand, NOX_TRK("content.group.wands", "Wands")},
+        {Food, NOX_TRK("content.group.food", "Food & potions")},
+        {Missile, NOX_TRK("content.group.missiles", "Missiles")},
+        {Door, NOX_TRK("content.group.doors", "Doors")},
+        {Key, NOX_TRK("content.group.keys", "Keys")},
+        {InfoBook, NOX_TRK("content.group.books", "Books")},
+        {MonsterGenerator, NOX_TRK("content.group.generators", "Generators")},
+        {Exit, NOX_TRK("content.group.exits", "Exits")},
+        {Transporter, NOX_TRK("content.group.teleporters", "Teleporters")},
+        {Elevator, NOX_TRK("content.group.elevators", "Elevators")},
+        {Trigger, NOX_TRK("content.group.triggers", "Triggers")},
+        {Treasure, NOX_TRK("content.group.treasure", "Treasure")},
+        {Light, NOX_TRK("content.group.lights", "Lights")},
+        {Fire, NOX_TRK("content.group.fire", "Fire")},
+        {Obstacle, NOX_TRK("content.group.obstacles", "Obstacles")},
+        {Immobile, NOX_TRK("content.group.scenery", "Scenery")},
     };
     for (const auto& [bit, name] : kOrder) {
         if (c & bit) {
-            return name;
+            return nox::l10n::tr(name);
         }
     }
     for (int b = 0; b < 32; ++b) {
@@ -67,7 +83,7 @@ std::string thingGroup(const nox::things::ThingDef& t)
             return std::string(nox::things::kClassNames[b]);
         }
     }
-    return "No class";
+    return NOX_TR("content.group.no_class", "No class");
 }
 
 std::string str(const nox::strings::StringTable* strings, std::string_view label)
@@ -88,7 +104,7 @@ std::string rgb(const nox::things::Rgb& c)
 
 std::string imageText(const nox::things::ImageRef& r)
 {
-    return r.index >= 0 ? std::format("#{}", r.index) : r.name.empty() ? std::string("none") : r.name;
+    return r.index >= 0 ? std::format("#{}", r.index) : r.name.empty() ? NOX_TR("content.record.none", "none") : r.name;
 }
 
 std::string joined(const std::vector<std::string>& v, std::string_view sep = ", ")
@@ -114,7 +130,7 @@ const char* gameDataSection(nox::things::GameData::Section s)
     switch (s) {
     case nox::things::GameData::Section::Solo: return "SOLO";
     case nox::things::GameData::Section::Arena: return "ARENA";
-    default: return "both";
+    default: return NOX_TRC("content.record.game_both", "both");
     }
 }
 
@@ -131,7 +147,7 @@ void monsterFields(std::vector<Field>& out, const nox::things::MonsterDef* solo,
         const std::string a = arena ? get(*arena) : std::string("-");
         Field& f = out.emplace_back();
         f.label = label;
-        f.value = s == a ? s : std::format("solo {}   arena {}", s, a);
+        f.value = s == a ? s : nox::l10n::format(NOX_TR("content.record.solo_arena", "solo {solo}   arena {arena}"), {{"solo", s}, {"arena", a}});
     };
     const auto num = [](auto member) { return [member](const nox::things::MonsterDef& m) { return std::format("{}", m.*member); }; };
     using M = nox::things::MonsterDef;
@@ -186,7 +202,7 @@ std::string fileName(const fs::path& p)
 std::string soundLabel(std::uint32_t id)
 {
     if (id == 0) {
-        return "none";
+        return NOX_TR("content.record.none", "none");
     }
     const std::string_view n = nox::audio::soundName(id);
     return n.empty() ? std::format("#{}", id) : std::string(n);
@@ -213,49 +229,52 @@ ContentIndex ContentIndex::build(const GameFiles& files)
 
     // thing.bin: its object types by class, then its other lists.
     {
-        Section& s = section(FileKind::Things, "Things");
+        Section& s = section(FileKind::Things, fileKindLabel(FileKind::Things));
         std::vector<std::string> groups;
         if (const auto* db = files.things()) {
+            const std::string& typeN = NOX_TR("content.record.type_n", "type {n}");
             for (std::size_t i = 0; i < db->things.size(); ++i) {
                 const auto& t = db->things[i];
                 const std::int32_t icon = t.menuIcon && t.menuIcon->index >= 0 ? t.menuIcon->index : -1;
-                s.records.push_back(make(FileKind::Things, RecordList::Thing, i, t.name, std::format("type {}", i + 1), icon));
+                s.records.push_back(make(FileKind::Things, RecordList::Thing, i, t.name, nox::l10n::format(typeN, {{"n", i + 1}}), icon));
                 groups.push_back(thingGroup(t));
             }
         }
         groupBy(s, groups, true);
     }
     if (const auto* db = files.things()) {
-        Section& sp = section(FileKind::Things, "Spells");
+        Section& sp = section(FileKind::Things, NOX_TR("content.section.spells", "Spells"));
         for (std::size_t i = 0; i < db->spells.size(); ++i) {
             const auto& d = db->spells[i];
-            sp.records.push_back(make(FileKind::Things, RecordList::Spell, i, d.id, std::format("{} mana", d.manaCost), d.icon.index));
+            sp.records.push_back(make(FileKind::Things, RecordList::Spell, i, d.id, nox::l10n::format(NOX_TR("content.record.mana_n", "{n} mana"), {{"n", d.manaCost}}),
+                                      d.icon.index));
         }
-        Section& ab = section(FileKind::Things, "Abilities");
+        Section& ab = section(FileKind::Things, NOX_TR("content.section.abilities", "Abilities"));
         for (std::size_t i = 0; i < db->abilities.size(); ++i) {
             ab.records.push_back(make(FileKind::Things, RecordList::Ability, i, db->abilities[i].name, {}, db->abilities[i].icons[0].index));
         }
-        Section& snd = section(FileKind::Things, "Sound events");
+        Section& snd = section(FileKind::Things, NOX_TR("content.section.sound_events", "Sound events"));
         for (std::size_t i = 0; i < db->audio.size(); ++i) {
             const auto& a = db->audio[i];
-            snd.records.push_back(make(FileKind::Things, RecordList::SoundEvent, i, a.name, std::format("{} files", a.files.size())));
+            snd.records.push_back(make(FileKind::Things, RecordList::SoundEvent, i, a.name,
+                                       nox::l10n::format(NOX_TR("content.record.files_n", "{n} files"), {{"n", a.files.size()}})));
         }
         for (std::size_t i = 0; i < db->avnts.size(); ++i) {
             snd.records.push_back(make(FileKind::Things, RecordList::SoundEventAvnt, i, db->avnts[i].name, "AVNT"));
         }
-        Section& fl = section(FileKind::Things, "Floors");
+        Section& fl = section(FileKind::Things, NOX_TR("content.section.floors", "Floors"));
         for (std::size_t i = 0; i < db->floors.size(); ++i) {
             const auto& f = db->floors[i];
-            fl.records.push_back(make(FileKind::Things, RecordList::Floor, i, f.name, std::format("floor {}", i),
+            fl.records.push_back(make(FileKind::Things, RecordList::Floor, i, f.name, nox::l10n::format(NOX_TR("content.record.floor_n", "floor {n}"), {{"n", i}}),
                                       f.images.empty() ? -1 : f.images.front().index));
         }
-        Section& ed = section(FileKind::Things, "Edges");
+        Section& ed = section(FileKind::Things, NOX_TR("content.section.edges", "Edges"));
         for (std::size_t i = 0; i < db->edges.size(); ++i) {
             const auto& e = db->edges[i];
-            ed.records.push_back(make(FileKind::Things, RecordList::Edge, i, e.name, std::format("edge {}", i),
+            ed.records.push_back(make(FileKind::Things, RecordList::Edge, i, e.name, nox::l10n::format(NOX_TR("content.record.edge_n", "edge {n}"), {{"n", i}}),
                                       e.images.empty() ? -1 : e.images.front().index));
         }
-        Section& wa = section(FileKind::Things, "Walls");
+        Section& wa = section(FileKind::Things, NOX_TR("content.section.walls", "Walls"));
         for (std::size_t i = 0; i < db->walls.size(); ++i) {
             const auto& w = db->walls[i];
             std::int32_t icon = -1;
@@ -264,41 +283,44 @@ ContentIndex ContentIndex::build(const GameFiles& files)
                     icon = dir.front()[0].image.index;
                 }
             }
-            wa.records.push_back(make(FileKind::Things, RecordList::Wall, i, w.name, std::format("wall {}", i), icon));
+            wa.records.push_back(make(FileKind::Things, RecordList::Wall, i, w.name, nox::l10n::format(NOX_TR("content.record.wall_n", "wall {n}"), {{"n", i}}), icon));
         }
-        Section& im = section(FileKind::Things, "Named images");
+        Section& im = section(FileKind::Things, NOX_TR("content.section.named_images", "Named images"));
         for (std::size_t i = 0; i < db->images.size(); ++i) {
             const auto& d = db->images[i];
             std::int32_t icon = d.image ? d.image->index : d.animation && !d.animation->frames.empty() ? d.animation->frames.front().index : -1;
-            im.records.push_back(make(FileKind::Things, RecordList::NamedImage, i, d.name, d.animation ? "animation" : "image", icon));
+            im.records.push_back(make(FileKind::Things, RecordList::NamedImage, i, d.name,
+                                      d.animation ? NOX_TR("content.record.animation", "animation") : NOX_TR("content.record.image", "image"), icon));
         }
     }
 
     // modifier.bin
     {
-        Section& s = section(FileKind::Modifiers, "Weapons & armour");
+        Section& s = section(FileKind::Modifiers, fileKindLabel(FileKind::Modifiers));
         std::vector<std::string> groups;
         if (const auto* db = files.modifiers()) {
             for (std::size_t i = 0; i < db->weapons.size(); ++i) {
-                s.records.push_back(make(FileKind::Modifiers, RecordList::Weapon, i, db->weapons[i].name, "weapon"));
-                groups.push_back("Weapons");
+                s.records.push_back(make(FileKind::Modifiers, RecordList::Weapon, i, db->weapons[i].name, NOX_TR("content.record.weapon", "weapon")));
+                groups.push_back(NOX_TR("content.group.weapons", "Weapons"));
             }
             for (std::size_t i = 0; i < db->armor.size(); ++i) {
-                s.records.push_back(make(FileKind::Modifiers, RecordList::Armor, i, db->armor[i].name, "armour"));
-                groups.push_back("Armour");
+                s.records.push_back(make(FileKind::Modifiers, RecordList::Armor, i, db->armor[i].name, NOX_TR("content.record.armour", "armour")));
+                groups.push_back(NOX_TR("content.group.armour", "Armour"));
             }
             for (std::size_t i = 0; i < db->modifiers.size(); ++i) {
                 const auto& m = db->modifiers[i];
-                s.records.push_back(make(FileKind::Modifiers, RecordList::Modifier, i, m.name, std::format("id {}", m.id)));
+                s.records.push_back(make(FileKind::Modifiers, RecordList::Modifier, i, m.name, nox::l10n::format(NOX_TR("content.record.id_n", "id {n}"), {{"n", m.id}})));
                 const std::string_view sec = modifierSection(m);
-                groups.push_back(sec == "EFFECTIVENESS" ? "Effectiveness" : sec == "MATERIAL" ? "Materials" : "Enchantments");
+                groups.push_back(sec == "EFFECTIVENESS" ? NOX_TR("content.group.effectiveness", "Effectiveness")
+                                 : sec == "MATERIAL"    ? NOX_TR("content.group.materials", "Materials")
+                                                        : NOX_TR("content.group.enchantments", "Enchantments"));
             }
         }
         groupBy(s, groups, false);
     }
     // gamedata.bin, by the first word of each name (Fireball..., Trap...).
     {
-        Section& s = section(FileKind::GameData, "Tuning");
+        Section& s = section(FileKind::GameData, fileKindLabel(FileKind::GameData));
         if (const auto* gd = files.gameData()) {
             // One record a name (its SOLO, ARENA and unprefixed lines together), at its first line.
             std::set<std::string> seen;
@@ -312,16 +334,17 @@ ContentIndex ContentIndex::build(const GameFiles& files)
         }
     }
     {
-        Section& s = section(FileKind::Monsters, "Monsters");
+        Section& s = section(FileKind::Monsters, fileKindLabel(FileKind::Monsters));
         if (const auto* db = files.monstersSolo()) {
+            const std::string& healthN = NOX_TR("content.record.health_n", "{n} health");
             for (std::size_t i = 0; i < db->monsters.size(); ++i) {
                 const auto& m = db->monsters[i];
-                s.records.push_back(make(FileKind::Monsters, RecordList::Monster, i, m.name, std::format("{} health", m.health)));
+                s.records.push_back(make(FileKind::Monsters, RecordList::Monster, i, m.name, nox::l10n::format(healthN, {{"n", std::format("{}", m.health)}})));
             }
         }
     }
     {
-        Section& s = section(FileKind::SoundSets, "Sound sets");
+        Section& s = section(FileKind::SoundSets, fileKindLabel(FileKind::SoundSets));
         if (const auto* ss = files.soundSets()) {
             for (std::size_t i = 0; i < ss->sets.size(); ++i) {
                 s.records.push_back(make(FileKind::SoundSets, RecordList::SoundSet, i, ss->sets[i].name));
@@ -330,7 +353,7 @@ ContentIndex ContentIndex::build(const GameFiles& files)
     }
     // nox.csf, by the label's file ("QuitMenu.wnd:Quit" under QuitMenu.wnd).
     {
-        Section& s = section(FileKind::Strings, "Strings");
+        Section& s = section(FileKind::Strings, fileKindLabel(FileKind::Strings));
         std::vector<std::string> groups;
         if (const auto* st = files.strings()) {
             const auto& es = st->entries();
@@ -342,25 +365,30 @@ ContentIndex ContentIndex::build(const GameFiles& files)
                 }
                 s.records.push_back(make(FileKind::Strings, RecordList::String, i, e.label, first));
                 const auto colon = e.label.find(':');
-                groups.push_back(colon == std::string::npos ? std::string("(no file)") : e.label.substr(0, colon));
+                groups.push_back(colon == std::string::npos ? NOX_TR("content.group.no_file", "(no file)") : e.label.substr(0, colon));
             }
         }
         groupBy(s, groups, true);
     }
     // The images: panels, not records.
     {
-        Section& s = section(FileKind::Images, "Images / HD");
-        s.records.push_back(make(FileKind::Images, RecordList::View, 0, "Images (video.bag and HD pack)", "every image by index"));
-        s.records.push_back(make(FileKind::Images, RecordList::View, 1, "Sprites (by thing)", "animations, as thing.bin draws them"));
+        Section& s = section(FileKind::Images, fileKindLabel(FileKind::Images));
+        s.records.push_back(make(FileKind::Images, RecordList::View, 0, NOX_TR("content.record.images_view", "Images (video.bag and HD pack)"),
+                                 NOX_TR("content.record.images_view_detail", "every image by index")));
+        s.records.push_back(make(FileKind::Images, RecordList::View, 1, NOX_TR("content.record.sprites_view", "Sprites (by thing)"),
+                                 NOX_TR("content.record.sprites_view_detail", "animations, as thing.bin draws them")));
     }
     {
-        Section& s = section(FileKind::Audio, "Audio");
+        Section& s = section(FileKind::Audio, fileKindLabel(FileKind::Audio));
         if (auto* bag = files.audio()) {
             const auto& samples = bag->samples();
+            const std::string& hz = NOX_TR("content.record.sample_detail", "{rate} Hz{stereo}{adpcm}");
+            const std::string& stereo = NOX_TR("content.record.stereo", " stereo");
             for (std::size_t i = 0; i < samples.size(); ++i) {
                 const auto& b = samples[i];
                 s.records.push_back(make(FileKind::Audio, RecordList::Sample, i, b.name,
-                                         std::format("{} Hz{}{}", b.rate, b.channels() == 2 ? " stereo" : "", b.flags & b.kAdpcm ? " ADPCM" : "")));
+                                         nox::l10n::format(hz, {{"rate", b.rate}, {"stereo", b.channels() == 2 ? stereo : std::string()},
+                                                                {"adpcm", b.flags & b.kAdpcm ? " ADPCM" : ""}})));
             }
         }
     }
@@ -380,7 +408,7 @@ ContentIndex ContentIndex::build(const GameFiles& files)
     loose(FileKind::Characters, files.characters(), none);
     loose(FileKind::Mods, files.mods(), [](const fs::path& p) {
         std::error_code ec;
-        return fs::exists(p / "content", ec) ? std::string("content pack") : std::string("mod");
+        return fs::exists(p / "content", ec) ? NOX_TR("content.record.content_pack", "content pack") : NOX_TR("content.record.mod", "mod");
     });
     loose(FileKind::Text, files.texts(), none);
     loose(FileKind::Fonts, files.fonts(), none);
@@ -420,22 +448,28 @@ void ContentIndex::buildLookups()
     }
 }
 
+const std::string& ContentIndex::newThingsGroup()
+{
+    return NOX_TR("content.group.new_types", "New types (this pack)");
+}
+
 void ContentIndex::setNewThings(const nox::things::ThingDb& things, std::size_t first)
 {
-    const auto s = std::ranges::find_if(sections_, [](const Section& x) { return x.kind == FileKind::Things && x.name == "Things"; });
+    const auto s = std::ranges::find_if(sections_, [](const Section& x) { return x.kind == FileKind::Things && x.name == fileKindLabel(FileKind::Things); });
     if (s == sections_.end()) {
         return;
     }
     // The earlier call's taken out: they're the records past `first` (always last, in one group).
     const std::size_t keep = std::min(first, s->records.size());
     s->records.resize(keep);
-    std::erase_if(s->groups, [](const RecordGroup& g) { return g.name == kNewThingsGroup; });
-    RecordGroup group{kNewThingsGroup, {}};
+    std::erase_if(s->groups, [](const RecordGroup& g) { return g.name == newThingsGroup(); });
+    RecordGroup group{newThingsGroup(), {}};
     for (std::size_t i = first; i < things.things.size(); ++i) {
         const auto& t = things.things[i];
         const std::int32_t icon = t.menuIcon && t.menuIcon->index >= 0 ? t.menuIcon->index : -1;
         group.records.push_back(static_cast<std::uint32_t>(s->records.size()));
-        s->records.push_back(make(FileKind::Things, RecordList::Thing, i, t.name, std::format("type {}, new", i + 1), icon));
+        s->records.push_back(make(FileKind::Things, RecordList::Thing, i, t.name,
+                                  nox::l10n::format(NOX_TR("content.record.type_n_new", "type {n}, new"), {{"n", i + 1}}), icon));
     }
     if (!group.records.empty()) {
         s->groups.insert(s->groups.begin(), std::move(group));
@@ -500,7 +534,7 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
         f.back().plays = Field::Plays::SoundEvent;
     };
     const auto addFiles = [&](const std::vector<std::string>& files) {
-        add("Files", joined(files));
+        add(NOX_TR("content.label.files", "Files"), joined(files));
         f.back().plays = Field::Plays::Samples;
         for (const auto& file : files) {
             f.back().samples.push_back(fs::path(file).stem().string());
@@ -514,17 +548,17 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
     switch (ref.list) {
     case RecordList::Thing:
         if (const auto* t = db ? at(db->things) : nullptr) {
-            add("Type id", std::to_string(ref.index + 1), "The number maps and the network use for this type: its place in thing.bin.");
+            add(NOX_TR("content.label.type_id", "Type id"), std::to_string(ref.index + 1), NOX_TR("content.note.type_id", "The number maps and the network use for this type: its place in thing.bin."));
             for (const auto& a : t->attributes) {
                 const auto eq = a.find('=');
                 if (eq == std::string::npos) {
-                    add(a, "(set)");
+                    add(a, NOX_TR("content.record.set", "(set)"));
                 } else {
                     add(std::string(nox::util::trim(std::string_view(a).substr(0, eq))), std::string(nox::util::trim(std::string_view(a).substr(eq + 1))));
                 }
             }
             if (t->draw) {
-                add("DRAW", std::format("{} ({} bytes)", t->draw->type, t->draw->data.size()));
+                add("DRAW", nox::l10n::format(NOX_TR("content.record.draw_bytes", "{type} ({n} bytes)"), {{"type", t->draw->type}, {"n", t->draw->data.size()}}));
             }
             if (t->menuIcon) {
                 add("MENUICON", imageText(*t->menuIcon));
@@ -536,119 +570,119 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
         break;
     case RecordList::Spell:
         if (const auto* s = db ? at(db->spells) : nullptr) {
-            add("Id", s->id);
-            add("Mana cost", std::to_string(s->manaCost));
-            add("Price", std::to_string(s->price));
+            add(NOX_TR("content.label.id", "Id"), s->id);
+            add(NOX_TR("content.label.mana_cost", "Mana cost"), std::to_string(s->manaCost));
+            add(NOX_TR("content.label.price", "Price"), std::to_string(s->price));
             std::string ph;
             for (auto p : s->phonemes) {
                 ph += (ph.empty() ? "" : " ") + std::to_string(p);
             }
-            add("Phonemes", ph.empty() ? "none" : ph);
-            add("Flags", std::format("0x{:X}", s->flags));
-            add("Title", s->title, str(strings, s->title));
-            add("Description", s->description, str(strings, s->description));
-            add("Icon", imageText(s->icon));
-            add("Icon (enabled)", imageText(s->iconEnabled));
-            addEvent("Cast sound", s->castSound);
-            addEvent("On sound", s->onSound);
-            addEvent("Off sound", s->offSound);
+            add(NOX_TR("content.label.phonemes", "Phonemes"), ph.empty() ? NOX_TR("content.record.none", "none") : ph);
+            add(NOX_TR("content.label.flags", "Flags"), std::format("0x{:X}", s->flags));
+            add(NOX_TR("content.label.title", "Title"), s->title, str(strings, s->title));
+            add(NOX_TR("content.label.description", "Description"), s->description, str(strings, s->description));
+            add(NOX_TR("content.label.icon", "Icon"), imageText(s->icon));
+            add(NOX_TR("content.label.icon_enabled", "Icon (enabled)"), imageText(s->iconEnabled));
+            addEvent(NOX_TR("content.label.cast_sound", "Cast sound"), s->castSound);
+            addEvent(NOX_TR("content.label.on_sound", "On sound"), s->onSound);
+            addEvent(NOX_TR("content.label.off_sound", "Off sound"), s->offSound);
         }
         break;
     case RecordList::Ability:
         if (const auto* a = db ? at(db->abilities) : nullptr) {
-            add("Name", a->name);
-            add("Title", a->title, str(strings, a->title));
-            add("Description", a->description, str(strings, a->description));
+            add(NOX_TR("content.label.name", "Name"), a->name);
+            add(NOX_TR("content.label.title", "Title"), a->title, str(strings, a->title));
+            add(NOX_TR("content.label.description", "Description"), a->description, str(strings, a->description));
             for (int i = 0; i < 3; ++i) {
-                add(std::format("Icon {}", i + 1), imageText(a->icons[std::size_t(i)]));
-                addEvent(std::format("Sound {}", i + 1), a->sounds[std::size_t(i)]);
+                add(nox::l10n::format(NOX_TR("content.label.icon_n", "Icon {n}"), {{"n", i + 1}}), imageText(a->icons[std::size_t(i)]));
+                addEvent(nox::l10n::format(NOX_TR("content.label.sound_n", "Sound {n}"), {{"n", i + 1}}), a->sounds[std::size_t(i)]);
             }
         }
         break;
     case RecordList::SoundEvent:
         if (const auto* a = db ? at(db->audio) : nullptr) {
-            add("Volume", std::format("{}%", a->volume));
-            add("Range", std::to_string(a->range), "In 15-unit steps; 0 or less keeps the default 600 units.");
-            add("Hearing", std::to_string(a->hearing));
-            add("Max instances", std::to_string(a->maxInstances), "Voices at once, 0 = no limit.");
-            add("Pitch", std::format("{} .. {}", a->pitchMin, a->pitchMax), "Playback-rate percent added to 100, picked per play.");
-            add("Priority", std::to_string(a->priority));
+            add(NOX_TR("content.label.volume", "Volume"), std::format("{}%", a->volume));
+            add(NOX_TR("content.label.range", "Range"), std::to_string(a->range), NOX_TR("content.note.range", "In 15-unit steps; 0 or less keeps the default 600 units."));
+            add(NOX_TR("content.label.hearing", "Hearing"), std::to_string(a->hearing));
+            add(NOX_TR("content.label.max_instances", "Max instances"), std::to_string(a->maxInstances), NOX_TR("content.note.max_instances", "Voices at once, 0 = no limit."));
+            add(NOX_TR("content.label.pitch", "Pitch"), std::format("{} .. {}", a->pitchMin, a->pitchMax), NOX_TR("content.note.pitch", "Playback-rate percent added to 100, picked per play."));
+            add(NOX_TR("content.label.priority", "Priority"), std::to_string(a->priority));
             addFiles(a->files);
         }
         break;
     case RecordList::SoundEventAvnt:
         if (const auto* a = db ? at(db->avnts) : nullptr) {
-            const auto opt = [&](const char* label, const auto& v) {
+            const auto opt = [&](const std::string& label, const auto& v) {
                 if (v) {
                     add(label, std::format("{}", *v));
                 }
             };
-            opt("Priority", a->priority);
-            opt("Flags", a->flags);
-            opt("Volume", a->volume);
-            opt("Max instances", a->maxInstances);
-            opt("Loops", a->loops);
+            opt(NOX_TR("content.label.priority", "Priority"), a->priority);
+            opt(NOX_TR("content.label.flags", "Flags"), a->flags);
+            opt(NOX_TR("content.label.volume", "Volume"), a->volume);
+            opt(NOX_TR("content.label.max_instances", "Max instances"), a->maxInstances);
+            opt(NOX_TR("content.label.loops", "Loops"), a->loops);
             if (a->pitch) {
-                add("Pitch", std::format("{} .. {}", a->pitch->first, a->pitch->second));
+                add(NOX_TR("content.label.pitch", "Pitch"), std::format("{} .. {}", a->pitch->first, a->pitch->second));
             }
             if (a->files) {
                 addFiles(*a->files);
             }
             if (a->delay) {
-                add("Delay", std::format("{} .. {} ms", a->delay->first, a->delay->second));
+                add(NOX_TR("content.label.delay", "Delay"), nox::l10n::format(NOX_TR("content.record.delay_ms", "{min} .. {max} ms"), {{"min", std::format("{}", a->delay->first)}, {"max", std::format("{}", a->delay->second)}}));
             }
-            opt("Range", a->range);
-            opt("Hearing", a->hearing);
+            opt(NOX_TR("content.label.range", "Range"), a->range);
+            opt(NOX_TR("content.label.hearing", "Hearing"), a->hearing);
         }
         break;
     case RecordList::Floor:
         if (const auto* fl = db ? at(db->floors) : nullptr) {
-            add("Index", std::to_string(ref.index), "Maps' floor tiles name the floor by this number.");
-            add("Minimap colour", std::format("{} {} {}", fl->minimapColor[0], fl->minimapColor[1], fl->minimapColor[2]));
-            add("Material", std::format("0x{:X}", fl->material));
-            add("Flags", std::format("0x{:X}", fl->flags));
-            add("Columns x rows", std::format("{} x {}", fl->cols, fl->rows));
-            add("Frames", std::to_string(fl->frames));
-            add("Images", std::to_string(fl->images.size()));
+            add(NOX_TR("content.label.index", "Index"), std::to_string(ref.index), NOX_TR("content.note.floor_index", "Maps' floor tiles name the floor by this number."));
+            add(NOX_TR("content.label.minimap_colour", "Minimap colour"), std::format("{} {} {}", fl->minimapColor[0], fl->minimapColor[1], fl->minimapColor[2]));
+            add(NOX_TR("content.label.material", "Material"), std::format("0x{:X}", fl->material));
+            add(NOX_TR("content.label.flags", "Flags"), std::format("0x{:X}", fl->flags));
+            add(NOX_TR("content.label.columns_x_rows", "Columns x rows"), std::format("{} x {}", fl->cols, fl->rows));
+            add(NOX_TR("content.label.frames", "Frames"), std::to_string(fl->frames));
+            add(NOX_TR("content.label.images", "Images"), std::to_string(fl->images.size()));
         }
         break;
     case RecordList::Edge:
         if (const auto* e = db ? at(db->edges) : nullptr) {
-            add("Index", std::to_string(ref.index));
-            add("Material", std::format("0x{:X}", e->material));
-            add("Flags", std::format("0x{:X}", e->flags));
-            add("Columns x rows", std::format("{} x {}", e->cols, e->rows));
-            add("Frames", std::to_string(e->frames));
-            add("Images", std::to_string(e->images.size()));
+            add(NOX_TR("content.label.index", "Index"), std::to_string(ref.index));
+            add(NOX_TR("content.label.material", "Material"), std::format("0x{:X}", e->material));
+            add(NOX_TR("content.label.flags", "Flags"), std::format("0x{:X}", e->flags));
+            add(NOX_TR("content.label.columns_x_rows", "Columns x rows"), std::format("{} x {}", e->cols, e->rows));
+            add(NOX_TR("content.label.frames", "Frames"), std::to_string(e->frames));
+            add(NOX_TR("content.label.images", "Images"), std::to_string(e->images.size()));
         }
         break;
     case RecordList::Wall:
         if (const auto* w = db ? at(db->walls) : nullptr) {
-            add("Index", std::to_string(ref.index), "Maps' walls name the material by this number.");
-            add("Flags", std::format("0x{:X}", w->flags), "1 blocks sight, 2 ignored by the line trace, 4 see-through and sprite-sorted.");
-            add("Material", std::format("0x{:X}", static_cast<std::uint32_t>(w->material)));
-            add("Health", std::to_string(w->health));
-            add("Debris", joined(w->debris));
-            addEvent("Open sound", w->openSound);
-            addEvent("Close sound", w->closeSound);
-            addEvent("Break sound", w->breakSound);
-            add("Random variations", std::to_string(w->randomVariations));
+            add(NOX_TR("content.label.index", "Index"), std::to_string(ref.index), NOX_TR("content.note.wall_index", "Maps' walls name the material by this number."));
+            add(NOX_TR("content.label.flags", "Flags"), std::format("0x{:X}", w->flags), NOX_TR("content.note.wall_flags", "1 blocks sight, 2 ignored by the line trace, 4 see-through and sprite-sorted."));
+            add(NOX_TR("content.label.material", "Material"), std::format("0x{:X}", static_cast<std::uint32_t>(w->material)));
+            add(NOX_TR("content.label.health", "Health"), std::to_string(w->health));
+            add(NOX_TR("content.label.debris", "Debris"), joined(w->debris));
+            addEvent(NOX_TR("content.label.open_sound", "Open sound"), w->openSound);
+            addEvent(NOX_TR("content.label.close_sound", "Close sound"), w->closeSound);
+            addEvent(NOX_TR("content.label.break_sound", "Break sound"), w->breakSound);
+            add(NOX_TR("content.label.random_variations", "Random variations"), std::to_string(w->randomVariations));
             std::size_t variants = 0;
             for (const auto& d : w->directions) {
                 variants += d.size();
             }
-            add("Variants", std::to_string(variants));
+            add(NOX_TR("content.label.variants", "Variants"), std::to_string(variants));
         }
         break;
     case RecordList::NamedImage:
         if (const auto* im = db ? at(db->images) : nullptr) {
             if (im->image) {
-                add("Image", imageText(*im->image));
+                add(NOX_TR("content.label.image", "Image"), imageText(*im->image));
             }
             if (im->animation) {
-                add("Kind", im->animation->kind);
-                add("Frame delay", std::to_string(im->animation->frameDelay));
-                add("Frames", std::to_string(im->animation->frames.size()));
+                add(NOX_TR("content.label.kind", "Kind"), im->animation->kind);
+                add(NOX_TR("content.label.frame_delay", "Frame delay"), std::to_string(im->animation->frameDelay));
+                add(NOX_TR("content.label.frames", "Frames"), std::to_string(im->animation->frames.size()));
             }
         }
         break;
@@ -662,9 +696,9 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
                 }
                 static constexpr const char* kSlot[] = {"EFFECTIVENESS", "MATERIAL", "PRIMARYENCHANTMENT", "SECONDARYENCHANTMENT"};
                 for (int i = 0; i < 4; ++i) {
-                    add(kSlot[i], e->modifierSlots[std::size_t(i)] ? std::format("COLOR{}", e->modifierSlots[std::size_t(i)]) : std::string("none"));
+                    add(kSlot[i], e->modifierSlots[std::size_t(i)] ? std::format("COLOR{}", e->modifierSlots[std::size_t(i)]) : NOX_TR("content.record.none", "none"));
                 }
-                add("CLASSUSE", e->classUse ? std::format("{}", *e->classUse) : std::string("anyone"));
+                add("CLASSUSE", e->classUse ? std::format("{}", *e->classUse) : NOX_TR("content.record.anyone", "anyone"));
                 add("DESC", e->desc, str(strings, e->desc));
                 if (ref.list == RecordList::Armor) {
                     add("ARMOR_VALUE", std::format("{}", e->armorValue));
@@ -681,8 +715,8 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
     case RecordList::Modifier:
         if (const auto* md = files.modifiers()) {
             if (const auto* m = at(md->modifiers)) {
-                add("Section", m->section);
-                add("Id", std::to_string(m->id), "The number items carry for it (network and saves): its place among all modifiers.");
+                add(NOX_TR("content.label.section", "Section"), m->section);
+                add(NOX_TR("content.label.id", "Id"), std::to_string(m->id), NOX_TR("content.note.modifier_id", "The number items carry for it (network and saves): its place among all modifiers."));
                 add("COLOR", rgb(m->color));
                 add("DESC", m->desc, str(strings, m->desc));
                 if (!m->secondaryDesc.empty()) {
@@ -692,7 +726,7 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
                     add("IDENTIFYDESC", m->identifyDesc, str(strings, m->identifyDesc));
                 }
                 for (const auto& [name, value] : m->effects) {
-                    add("Effect", std::format("{} {}", name, value));
+                    add(NOX_TR("content.label.effect", "Effect"), std::format("{} {}", name, value));
                 }
                 add("ALLOWED_WEAPONS", std::format("0x{:X}", m->allowedWeapons));
                 add("ALLOWED_ARMOR", std::format("0x{:X}", m->allowedArmor));
@@ -704,10 +738,10 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
     case RecordList::Tuning:
         if (const auto* gd = files.gameData()) {
             if (const auto* e = at(gd->entries)) {
-                add("Name", e->name);
-                add("Game", gameDataSection(e->section), "SOLO lines are for the solo game, ARENA lines for network games, unprefixed lines for both.");
+                add(NOX_TR("content.label.name", "Name"), e->name);
+                add(NOX_TR("content.label.game", "Game"), gameDataSection(e->section), NOX_TR("content.note.game", "SOLO lines are for the solo game, ARENA lines for network games, unprefixed lines for both."));
                 for (std::size_t i = 0; i < e->values.size(); ++i) {
-                    add(e->values.size() == 1 ? std::string("Value") : std::format("Value {}", i + 1), std::format("{}", e->values[i]));
+                    add(e->values.size() == 1 ? NOX_TR("content.label.value", "Value") : nox::l10n::format(NOX_TR("content.label.value_n", "Value {n}"), {{"n", i + 1}}), std::format("{}", e->values[i]));
                 }
             }
         }
@@ -732,12 +766,12 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
     case RecordList::String:
         if (strings) {
             if (const auto* e = at(strings->entries())) {
-                add("Label", e->label);
+                add(NOX_TR("content.label.label", "Label"), e->label);
                 for (std::size_t i = 0; i < e->variants.size(); ++i) {
                     const auto& v = e->variants[i];
-                    add(e->variants.size() == 1 ? std::string("Text") : std::format("Variant {}", i + 1), nox::strings::toUtf8(v.text));
+                    add(e->variants.size() == 1 ? NOX_TR("content.label.text", "Text") : nox::l10n::format(NOX_TR("content.label.variant_n", "Variant {n}"), {{"n", i + 1}}), nox::strings::toUtf8(v.text));
                     if (!v.extra.empty()) {
-                        add("Speech file", v.extra);
+                        add(NOX_TR("content.label.speech_file", "Speech file"), v.extra);
                     }
                 }
             }
@@ -746,11 +780,11 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
     case RecordList::Sample:
         if (auto* bag = files.audio()) {
             if (const auto* b = at(bag->samples())) {
-                add("Name", b->name);
-                add("Rate", std::format("{} Hz", b->rate));
-                add("Channels", std::to_string(b->channels()));
-                add("Format", b->flags & b->kAdpcm ? std::format("IMA ADPCM, {}-byte blocks", b->blockAlign) : b->flags & b->k16Bit ? "16-bit PCM" : "8-bit PCM");
-                add("Size", std::format("{} bytes", b->size));
+                add(NOX_TR("content.label.name", "Name"), b->name);
+                add(NOX_TR("content.label.rate", "Rate"), nox::l10n::format(NOX_TR("content.record.hz", "{n} Hz"), {{"n", b->rate}}));
+                add(NOX_TR("content.label.channels", "Channels"), std::to_string(b->channels()));
+                add(NOX_TR("content.label.format", "Format"), b->flags & b->kAdpcm ? nox::l10n::format(NOX_TR("content.record.adpcm_blocks", "IMA ADPCM, {n}-byte blocks"), {{"n", b->blockAlign}}) : b->flags & b->k16Bit ? NOX_TR("content.record.pcm16", "16-bit PCM") : NOX_TR("content.record.pcm8", "8-bit PCM"));
+                add(NOX_TR("content.label.size", "Size"), nox::l10n::format(NOX_TR("content.record.bytes", "{n} bytes"), {{"n", b->size}}));
                 // How long and how loud, decoded as the game plays it.
                 try {
                     const auto pcm = bag->decode(std::size_t(ref.index));
@@ -762,10 +796,10 @@ std::vector<Field> describe(const GameFiles& files, const RecordRef& ref)
                     }
                     const double rms = pcm.samples.empty() ? 0 : std::sqrt(sum / double(pcm.samples.size()));
                     const auto decibels = [](double v) { return v > 0 ? 20 * std::log10(v) : -120.0; };
-                    add("Length", std::format("{:.2f} s", double(pcm.frames()) / std::max(1u, pcm.rate)));
-                    add("Loudness", std::format("peak {:.1f} dB, RMS {:.1f} dB", decibels(peak), decibels(rms)), "Full scale is 0 dB.");
+                    add(NOX_TR("content.label.length", "Length"), nox::l10n::format(NOX_TR("content.record.seconds", "{n} s"), {{"n", std::format("{:.2f}", double(pcm.frames()) / std::max(1u, pcm.rate))}}));
+                    add(NOX_TR("content.label.loudness", "Loudness"), nox::l10n::format(NOX_TR("content.record.loudness", "peak {peak} dB, RMS {rms} dB"), {{"peak", std::format("{:.1f}", decibels(peak))}, {"rms", std::format("{:.1f}", decibels(rms))}}), NOX_TR("content.note.loudness", "Full scale is 0 dB."));
                 } catch (const std::exception& ex) {
-                    add("Loudness", std::string("can't decode: ") + ex.what());
+                    add(NOX_TR("content.label.loudness", "Loudness"), nox::l10n::format(NOX_TR("content.record.cant_decode", "can't decode: {error}"), {{"error", ex.what()}}));
                 }
             }
         }
@@ -810,18 +844,18 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
     switch (ref.list) {
     case RecordList::Thing:
         if (const auto* m = files.monstersSolo() ? files.monstersSolo()->find(name) : nullptr) {
-            link("monster.bin: " + m->name, RecordList::Monster, m->name);
+            link(nox::l10n::format(NOX_TR("content.ref.monster_bin", "monster.bin: {name}"), {{"name", m->name}}), RecordList::Monster, m->name);
         }
         if (files.soundSets() && files.soundSets()->find(name)) {
-            link("sound set: " + name, RecordList::SoundSet, name);
+            link(nox::l10n::format(NOX_TR("content.ref.sound_set", "sound set: {name}"), {{"name", name}}), RecordList::SoundSet, name);
         }
         if (const auto* md = files.modifiers()) {
             // (By the entry's own name: a pack's type without one of its own has its stock type's.)
             if (const auto* weapon = md->findWeapon(name)) {
-                link("modifier.bin weapon: " + weapon->name, RecordList::Weapon, weapon->name);
+                link(nox::l10n::format(NOX_TR("content.ref.weapon", "modifier.bin weapon: {name}"), {{"name", weapon->name}}), RecordList::Weapon, weapon->name);
             }
             if (const auto* armour = md->findArmor(name)) {
-                link("modifier.bin armour: " + armour->name, RecordList::Armor, armour->name);
+                link(nox::l10n::format(NOX_TR("content.ref.armour", "modifier.bin armour: {name}"), {{"name", armour->name}}), RecordList::Armor, armour->name);
             }
         }
         if (const auto* db = files.things(); db && std::size_t(ref.index) < db->things.size()) { // (not a pack's new type)
@@ -829,27 +863,27 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
             // Its texts (PRETTYNAME and DESCRIPTION name string ids) and sounds.
             for (const char* key : {"PRETTYNAME", "DESCRIPTION"}) {
                 if (const auto v = t.attribute(key)) {
-                    link(std::string("string (") + key + "): " + std::string(*v), RecordList::String, *v);
+                    link(nox::l10n::format(NOX_TR("content.ref.string_key", "string ({key}): {name}"), {{"key", key}, {"name", *v}}), RecordList::String, *v);
                 }
             }
             if (const auto v = t.attribute("AUDIOLOOP")) {
-                link("sound event (AUDIOLOOP): " + std::string(*v), RecordList::SoundEvent, *v);
+                link(nox::l10n::format(NOX_TR("content.ref.audioloop", "sound event (AUDIOLOOP): {name}"), {{"name", *v}}), RecordList::SoundEvent, *v);
             }
         }
         break;
     case RecordList::Monster:
-        link("thing: " + name, RecordList::Thing, name);
+        link(nox::l10n::format(NOX_TR("content.ref.thing", "thing: {name}"), {{"name", name}}), RecordList::Thing, name);
         if (files.soundSets() && files.soundSets()->find(name)) {
-            link("sound set: " + name, RecordList::SoundSet, name);
+            link(nox::l10n::format(NOX_TR("content.ref.sound_set", "sound set: {name}"), {{"name", name}}), RecordList::SoundSet, name);
         }
         if (const auto* m = files.monstersSolo() ? files.monstersSolo()->find(name) : nullptr; m && !m->missile.empty()) {
-            link("missile: " + m->missile, RecordList::Thing, m->missile);
+            link(nox::l10n::format(NOX_TR("content.ref.missile", "missile: {name}"), {{"name", m->missile}}), RecordList::Thing, m->missile);
         }
         break;
     case RecordList::SoundSet: {
-        link("thing: " + name, RecordList::Thing, name);
+        link(nox::l10n::format(NOX_TR("content.ref.thing", "thing: {name}"), {{"name", name}}), RecordList::Thing, name);
         if (files.monstersSolo() && files.monstersSolo()->find(name)) {
-            link("monster.bin: " + name, RecordList::Monster, name);
+            link(nox::l10n::format(NOX_TR("content.ref.monster_bin", "monster.bin: {name}"), {{"name", name}}), RecordList::Monster, name);
         }
         if (const auto* s = files.soundSets() ? &files.soundSets()->sets[std::size_t(ref.index)] : nullptr) {
             std::set<std::string> seen;
@@ -857,7 +891,7 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
                 const std::uint32_t id = s->sounds[std::size_t(slot)];
                 const std::string n = id ? std::string(nox::audio::soundName(id)) : std::string();
                 if (!n.empty() && seen.insert(n).second) {
-                    link("sound event: " + n, RecordList::SoundEvent, n);
+                    link(nox::l10n::format(NOX_TR("content.ref.sound_event", "sound event: {name}"), {{"name", n}}), RecordList::SoundEvent, n);
                 }
             }
         }
@@ -865,24 +899,24 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
     }
     case RecordList::Weapon:
     case RecordList::Armor:
-        link("thing: " + name, RecordList::Thing, name);
+        link(nox::l10n::format(NOX_TR("content.ref.thing", "thing: {name}"), {{"name", name}}), RecordList::Thing, name);
         break;
     case RecordList::SoundEvent:
         if (const auto* db = files.things()) {
             for (const auto& f : db->audio[std::size_t(ref.index)].files) {
                 const std::string base = fs::path(f).stem().string();
-                link("Audio.bag: " + base, RecordList::Sample, base);
+                link(nox::l10n::format(NOX_TR("content.ref.audio_bag", "Audio.bag: {name}"), {{"name", base}}), RecordList::Sample, base);
             }
         }
         break;
     case RecordList::Spell:
         if (const auto* db = files.things()) {
             const auto& s = db->spells[std::size_t(ref.index)];
-            link("string: " + s.title, RecordList::String, s.title);
-            link("string: " + s.description, RecordList::String, s.description);
+            link(nox::l10n::format(NOX_TR("content.ref.string", "string: {name}"), {{"name", s.title}}), RecordList::String, s.title);
+            link(nox::l10n::format(NOX_TR("content.ref.string", "string: {name}"), {{"name", s.description}}), RecordList::String, s.description);
             for (const auto* snd : {&s.castSound, &s.onSound, &s.offSound}) {
                 if (*snd != "NULL") {
-                    link("sound event: " + *snd, RecordList::SoundEvent, *snd);
+                    link(nox::l10n::format(NOX_TR("content.ref.sound_event", "sound event: {name}"), {{"name", *snd}}), RecordList::SoundEvent, *snd);
                 }
             }
         }
@@ -890,8 +924,8 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
     case RecordList::Modifier:
         if (const auto* md = files.modifiers()) {
             const auto& m = md->modifiers[std::size_t(ref.index)];
-            link("string: " + m.desc, RecordList::String, m.desc);
-            link("string: " + m.identifyDesc, RecordList::String, m.identifyDesc);
+            link(nox::l10n::format(NOX_TR("content.ref.string", "string: {name}"), {{"name", m.desc}}), RecordList::String, m.desc);
+            link(nox::l10n::format(NOX_TR("content.ref.string", "string: {name}"), {{"name", m.identifyDesc}}), RecordList::String, m.identifyDesc);
         }
         break;
     case RecordList::String:
@@ -900,17 +934,17 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
             // Its spoken line (a W variant's speech file), the window it belongs to, the types naming it.
             for (const auto& v : e.variants) {
                 if (!v.extra.empty()) {
-                    link("dialog: " + v.extra + ".wav", RecordList::File, fs::path(v.extra).stem().string() + ".wav");
+                    link(nox::l10n::format(NOX_TR("content.ref.dialog", "dialog: {name}"), {{"name", v.extra + ".wav"}}), RecordList::File, fs::path(v.extra).stem().string() + ".wav");
                 }
             }
             if (const auto colon = e.label.find(':'); colon != std::string::npos && lowered(e.label.substr(0, colon)).ends_with(".wnd")) {
-                link("window: " + e.label.substr(0, colon), RecordList::File, e.label.substr(0, colon));
+                link(nox::l10n::format(NOX_TR("content.ref.window", "window: {name}"), {{"name", e.label.substr(0, colon)}}), RecordList::File, e.label.substr(0, colon));
             }
             if (const auto* db = files.things()) {
                 for (const auto& t : db->things) {
                     for (const char* key : {"PRETTYNAME", "DESCRIPTION"}) {
                         if (const auto v = t.attribute(key); v && nox::util::equalsNoCase(*v, e.label)) {
-                            link(std::string("thing (") + key + "): " + t.name, RecordList::Thing, t.name);
+                            link(nox::l10n::format(NOX_TR("content.ref.thing_key", "thing ({key}): {name}"), {{"key", key}, {"name", t.name}}), RecordList::Thing, t.name);
                         }
                     }
                 }
@@ -925,7 +959,7 @@ std::vector<Reference> references(const GameFiles& files, const ContentIndex& in
                 for (const auto& e : st->entries()) {
                     for (const auto& v : e.variants) {
                         if (!v.extra.empty() && nox::util::equalsNoCase(fs::path(v.extra).stem().string(), stem)) {
-                            link("string: " + e.label, RecordList::String, e.label);
+                            link(nox::l10n::format(NOX_TR("content.ref.string", "string: {name}"), {{"name", e.label}}), RecordList::String, e.label);
                             break;
                         }
                     }

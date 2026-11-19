@@ -74,6 +74,7 @@
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/modes/script/script_ui.hpp"
 #include "noxcore/server/solo.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/version.hpp"
 
@@ -643,9 +644,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("game folder: none found");
         SDL_Log("loading failed: no folder with the game's data (thing.bin, gamedata.bin...) found");
         if (app->screenshot.empty() && opts.mapPicture.empty()) {
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "NoX Core: loading failed",
-                                     "Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one "
-                                     "with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.",
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, NOX_TRC("game.load_failed.title", "NoX Core: loading failed"),
+                                     NOX_TRC("game.load_failed.no_game",
+                                             "Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one "
+                                             "with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder."),
                                      nullptr);
         }
         return SDL_APP_FAILURE;
@@ -932,6 +934,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                                                 : "");
         }
         applyTextCodepage(*app); // (CsfText = cp1251 holds without a nox.csf too)
+        applyLanguage(*app);     // (NoX Core's own text: before the windows below are built)
         app->hud->setStrings(app->strings.get()); // tooltips
         app->itemNames = std::make_unique<ItemNames>(app->things, *app->art, app->modifiers, app->strings.get());
         const gui::Resources res = guiResources(*app);
@@ -1126,15 +1129,19 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("loading failed: %s", ex.what());
         if (app->screenshot.empty()) {
             // A windowed run would otherwise just vanish (the log goes to stderr).
-            const std::string text = std::string(ex.what()) + "\n\nGame folder: " + nox::pathUtf8(app->gameDir) +
+            const std::string text = nox::l10n::format(
 #ifdef _WIN32
-                                     "\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE "
-                                     "and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.";
+                NOX_TR("game.load_failed.error_windows",
+                       "{error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE "
+                       "and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder."),
 #else
-                                     "\nNox wasn't found where it's usually installed. Pass --game-dir (or set "
-                                     "NOX_DATA) to the folder with GAME.EXE and thing.bin.";
+                NOX_TR("game.load_failed.error_other",
+                       "{error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set "
+                       "NOX_DATA) to the folder with GAME.EXE and thing.bin."),
 #endif
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "NoX Core: loading failed", text.c_str(), app->window);
+                {{"error", ex.what()}, {"folder", nox::pathUtf8(app->gameDir)}});
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, NOX_TRC("game.load_failed.title", "NoX Core: loading failed"), text.c_str(),
+                                     app->window);
         }
         return SDL_APP_FAILURE;
     }
@@ -1979,33 +1986,44 @@ SDL_AppResult gameLeft(App& app, JoinWaitEnd joinEnd = JoinWaitEnd::None)
     const bool askPassword = failed && !ownGame && endReason == EndReason::None && (app.live->client().passwordAsked() || wrongPassword);
     if (app.menus && !app.shotTaken) { // (a screenshot run ends once it has left)
         // Back to the game list.
-        std::string couldNot = "Couldn't join " + app.liveHost + " (see noxcore-log.txt)";
+        std::string couldNot =
+            nox::l10n::format(NOX_TR("game.join.couldnt_join_log", "Couldn't join {host} (see noxcore-log.txt)"), {{"host", app.liveHost}});
         for (const auto& [id, ui] : app.modeUis) {
             // (a class refused: a campaign mode's says which)
             if (const auto why = ui->joinRefused(static_cast<std::uint8_t>(app.live->client().joinError()), app.browser->selectedEntry())) {
-                couldNot = "Couldn't join " + app.liveHost + ": " + *why;
+                couldNot = nox::l10n::format(NOX_TR("game.join.couldnt_join_why", "Couldn't join {host}: {why}"),
+                                             {{"host", app.liveHost}, {"why", *why}});
                 break;
             }
         }
         // (a host whose content packs add object types lets in only a game with the same ones: refused
         // at the join, or its connect turned away as when full)
         if (const auto& ext = app.live->extended(); ext && ext->typesHash != 0 && ext->typesHash != nox::content::newThingTypes().hash) {
-            couldNot = "Couldn't join " + app.liveHost + ": its content packs (" + ext->typesPacks + ") add object types" +
-                       (nox::content::newThingTypes().hash != 0 ? ", and yours add other ones" : "") +
-                       ". Install the same packs in the mods folder to join.";
+            couldNot = nox::l10n::format(
+                nox::content::newThingTypes().hash != 0
+                    ? NOX_TR("game.join.packs_differ",
+                             "Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install "
+                             "the same packs in the mods folder to join.")
+                    : NOX_TR("game.join.packs_missing",
+                             "Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the "
+                             "mods folder to join."),
+                {{"host", app.liveHost}, {"packs", ext->typesPacks}});
         }
         // (a host with a lowest client level above ours refuses us at the join, or the session saw
         // its level before joining: LiveSession::tooOld; the notice in a message box over the game
         // list, as choosing a game marked "Update needed" shows it: client_level_gate.hpp)
         const bool tooOldNotice = noxsdl::client_level::noticeAfterJoin(failed, endReason != EndReason::None, app.live->extended());
         if (tooOldNotice) {
-            couldNot = "Couldn't join " + app.liveHost;
+            couldNot = nox::l10n::format(NOX_TR("game.join.couldnt_join", "Couldn't join {host}"), {{"host", app.liveHost}});
         } else if (askPassword) {
-            couldNot = "Couldn't join " + app.liveHost + (wrongPassword ? ": the password was wrong" : ": it asks for a password");
+            couldNot = nox::l10n::format(wrongPassword ? NOX_TR("game.join.wrong_password", "Couldn't join {host}: the password was wrong")
+                                                       : NOX_TR("game.join.needs_password", "Couldn't join {host}: it asks for a password"),
+                                         {{"host", app.liveHost}});
         }
         app.browser->setMessage(joinEnd == JoinWaitEnd::Cancelled                ? std::string()
                                 : failed && endReason == EndReason::None ? couldNot
-                                                                         : "Left " + app.liveHost);
+                                                                         : nox::l10n::format(NOX_TR("game.join.left", "Left {host}"),
+                                                                                             {{"host", app.liveHost}}));
         saveBars(app);
         app.book.reset();
         app.cinematics.reset();

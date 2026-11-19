@@ -1,0 +1,65 @@
+# The map editor's main window, menus, markers, objects, settings: English no player reads (see
+# lint_allow.txt for the format).
+
+# The editor's settings file (settings.txt): its keys and values
+file noxsdl/src/editor/editor_settings.cpp   # settings.txt's keys and values
+# afterCloseName: the log's words for where the editor went after closing
+file noxsdl/src/editor/close_plan.hpp        # the log's names of where closing goes
+
+# Command categories: the English is the logic key (the Script and Mod panels compare it to pick the
+# commands they pass on); map_editor_ui.cpp's categoryText shows them translated
+noxsdl/src/editor/map_editor.cpp: "File"
+noxsdl/src/editor/map_editor.cpp: "Edit"
+noxsdl/src/editor/map_editor.cpp: "Select"
+noxsdl/src/editor/map_editor.cpp: "View"
+noxsdl/src/editor/map_editor.cpp: "Help"
+noxsdl/src/editor/map_editor.cpp: "Tools"
+noxsdl/src/editor/map_editor.cpp: "Window"
+noxsdl/src/editor/marker_tools.cpp: "Window"
+noxsdl/src/editor/marker_tools.cpp: "Tools"
+noxsdl/src/editor/marker_tools.cpp: "View"
+noxsdl/src/editor/object_tools.cpp: "Window"
+noxsdl/src/editor/object_tools.cpp: "Tools"
+noxsdl/src/editor/object_tools.cpp: "Edit"
+noxsdl/src/editor/object_tools.cpp: "View"
+
+# Default shortcuts: SDL's key names, parsed into the bindings
+noxsdl/src/editor/map_editor.cpp: "Delete"
+noxsdl/src/editor/map_editor.cpp: "Left"
+noxsdl/src/editor/map_editor.cpp: "Right"
+noxsdl/src/editor/map_editor.cpp: "Up"
+noxsdl/src/editor/map_editor.cpp: "Down"
+noxsdl/src/editor/map_editor.cpp: "Escape"
+
+# A new map's default title, written into the map file (MapInfo's title)
+noxsdl/src/editor/map_editor.cpp: "Untitled"
+noxsdl/src/editor/map_editor_ui.cpp: "Untitled"
+# The program's own name, as the window's title once the editor closes
+noxsdl/src/editor/map_editor.cpp: "NoX Core"
+# The validator's location text, parsed to find what a problem names
+noxsdl/src/editor/map_editor.cpp: "WayPoints #"
+
+# Test steps' replies (--editor-run automation, not a menu or panel)
+noxsdl/src/editor/map_editor.cpp: "theme: dark, medium or light"
+noxsdl/src/editor/map_editor.cpp: "float: needs WINDOW,dx,dy,w,h"
+noxsdl/src/editor/map_editor.cpp: "Layout read from "
+noxsdl/src/editor/map_editor.cpp: "Layout "
+noxsdl/src/editor/map_editor.cpp: " can't be read"
+noxsdl/src/editor/map_editor.cpp: "Layout written to "
+noxsdl/src/editor/map_editor.cpp: "No command "
+noxsdl/src/editor/map_editor.cpp: " (or it's disabled now)"
+noxsdl/src/editor/map_editor.cpp: "float: no undocked window "
+noxsdl/src/editor/object_tools.cpp: "No prefab "
+noxsdl/src/editor/object_tools.cpp: "Read "
+
+# The function picker's id, also the seed of a new handler's name ("Player enters" -> OnPlayerEnters)
+noxsdl/src/editor/marker_tools.cpp: "Player enters"
+noxsdl/src/editor/marker_tools.cpp: "Monster enters"
+# Width measures for flow() (where a button still fits on the line), never drawn
+noxsdl/src/editor/marker_tools.cpp: "Waypoints  WW"
+noxsdl/src/editor/marker_tools.cpp: "WW Polygons"
+noxsdl/src/editor/marker_tools.cpp: "WW Objects"
+noxsdl/src/editor/marker_tools.cpp: "WW Waypoints"
+
+# The Content Browser's starting folder: a catalog path compared with the folders' own
+noxsdl/src/editor/object_tools.hpp: "Monsters"

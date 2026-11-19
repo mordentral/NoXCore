@@ -5,6 +5,8 @@
 #include "editor/theme_colours.hpp"
 #include "editor/ui_helpers.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -78,19 +80,22 @@ void PlayView::registerCommands()
                          std::function<bool()> enabled = {}, std::function<bool()> checked = {}) {
         ed_.commands_.add(Command{id, label, "Play", key(shortcut), helpText, std::move(run), std::move(enabled), std::move(checked)});
     };
-    add("play.pause", "Pause Play-Test", "Pause", "Stop the play-test's world where it is, or let it go on.",
+    add("play.pause", NOX_TRC("editor.cmd.play.pause.label", "Pause Play-Test"), "Pause",
+        NOX_TRC("editor.cmd.play.pause.help", "Stop the play-test's world where it is, or let it go on."),
         [this] {
             if (ed_.ctx_.playTest.pause) ed_.ctx_.playTest.pause(!state().paused);
         },
         [this] { return running() && !state().session && static_cast<bool>(ed_.ctx_.playTest.pause); }, [this] { return state().paused; });
-    add("play.release", "Release Mouse", "Shift+F1",
-        "Give the keyboard and mouse back to the editor; the game goes on (click it to play again). Full window: back to the editor.",
+    add("play.release", NOX_TRC("editor.cmd.play.release.label", "Release Mouse"), "Shift+F1",
+        NOX_TRC("editor.cmd.play.release.help",
+                "Give the keyboard and mouse back to the editor; the game goes on (click it to play again). Full window: back to the editor."),
         [this] {
             if (ed_.ctx_.playTest.capture) ed_.ctx_.playTest.capture(false);
         },
         [this] { return running() && state().captured; });
-    add("play.fullWindow", "Play in Full Window", "",
-        "Play-test over the whole window (F2 in the game comes back), instead of in the Map panel with the editor round it.",
+    add("play.fullWindow", NOX_TRC("editor.cmd.play.full_window.label", "Play in Full Window"), "",
+        NOX_TRC("editor.cmd.play.full_window.help",
+                "Play-test over the whole window (F2 in the game comes back), instead of in the Map panel with the editor round it."),
         [this] {
             ed_.settings_.playFullWindow = !ed_.settings_.playFullWindow;
             ed_.saveSettings();
@@ -172,21 +177,25 @@ void PlayView::panel(const ImVec2& origin, const ImVec2& size)
     if (v.session) {
         // The session's game (the session bar's Play): F2 back to editing, the mouse freed as a play-test's.
         if (!v.captured) {
-            hint = "Click the game to play,  F2 edits";
+            hint = NOX_TR("editor.play.hint_session_click", "Click the game to play,  F2 edits");
         } else if (SDL_GetTicks() - capturedMs_ < 6000) {
             const std::string release = ed_.commands_.shortcut("play.release").text();
-            hint = "F2 edits,  " + (release.empty() ? std::string("Shift+F1") : release) + " frees the mouse";
+            hint = nox::l10n::format(NOX_TR("editor.play.hint_session_release", "F2 edits,  {key} frees the mouse"),
+                                     {{"key", release.empty() ? std::string("Shift+F1") : release}});
         }
     } else if (v.captured) {
         if (SDL_GetTicks() - capturedMs_ < 6000) {
             const std::string release = ed_.commands_.shortcut("play.release").text();
             const std::string stop = ed_.commands_.shortcut("play.stop").text();
-            hint = (release.empty() ? std::string("F2") : release) + " frees the mouse" + (stop.empty() ? "" : ",  " + stop + " stops");
+            const std::string releaseKey = release.empty() ? std::string("F2") : release;
+            hint = stop.empty() ? nox::l10n::format(NOX_TR("editor.play.hint_release", "{key} frees the mouse"), {{"key", releaseKey}})
+                                : nox::l10n::format(NOX_TR("editor.play.hint_release_stop", "{key} frees the mouse,  {stop} stops"),
+                                                    {{"key", releaseKey}, {"stop", stop}});
         }
     } else {
-        hint = "Click the game to play";
         const std::string stop = ed_.commands_.shortcut("play.stop").text();
-        if (!stop.empty()) hint += ",  " + stop + " stops";
+        hint = stop.empty() ? NOX_TR("editor.play.hint_click", "Click the game to play")
+                            : nox::l10n::format(NOX_TR("editor.play.hint_click_stop", "Click the game to play,  {stop} stops"), {{"stop", stop}});
     }
     if (!hint.empty()) {
         const ImVec2 ts = ImGui::CalcTextSize(hint.c_str());
@@ -195,7 +204,7 @@ void PlayView::panel(const ImVec2& origin, const ImVec2& size)
         dl->AddText(p, IM_COL32(236, 226, 200, 255), hint.c_str());
     }
     if (v.paused) {
-        const char* text = "PAUSED";
+        const char* text = NOX_TRC("editor.play.paused_banner", "PAUSED");
         ImFont* font = ImGui::GetFont();
         const float fs = ImGui::GetFontSize() * 2.0f;
         const ImVec2 ts = font->CalcTextSizeA(fs, 1e9f, 0, text);
@@ -219,15 +228,26 @@ void PlayView::toolbarButtons()
         if (ed_.inSession()) {
             // (The session's game is Play (F2) on the session bar; this tests our working copy in a
             // game of our own, the others undisturbed.)
-            if (iconButton("##play", Icon::Play, "Private Test", kGreen, ed_.commands_.enabled("play.start"))) ed_.commands_.run("play.start");
-            help("Test the working copy in a game of your own, in its own window: its real mode, nobody else in it, the session undisturbed" +
+            if (iconButton("##play", Icon::Play, NOX_TRC("editor.play.private_test", "Private Test"), kGreen, ed_.commands_.enabled("play.start"))) {
+                ed_.commands_.run("play.start");
+            }
+            help(NOX_TR("editor.play.private_test_tip",
+                        "Test the working copy in a game of your own, in its own window: its real mode, nobody else in it, the session undisturbed") +
                  key("play.start"));
             ImGui::SameLine();
             return;
         }
-        if (iconButton("##play", Icon::Play, "Play", kGreen, ed_.commands_.enabled("play.start"))) ed_.commands_.run("play.start");
-        help("Play-test the map " + std::string(ed_.settings_.playFullWindow ? "over the whole window (F2 in the game comes back)" : "in the Map panel") +
-             key("play.start") + "\nIts game mode, players dying and Play in Full Window are in the Play menu.");
+        if (iconButton("##play", Icon::Play, NOX_TRC("editor.play.play", "Play"), kGreen, ed_.commands_.enabled("play.start"))) {
+            ed_.commands_.run("play.start");
+        }
+        help(nox::l10n::format(ed_.settings_.playFullWindow
+                                   ? NOX_TR("editor.play.play_tip_full",
+                                            "Play-test the map over the whole window (F2 in the game comes back){key}\nIts game mode, players "
+                                            "dying and Play in Full Window are in the Play menu.")
+                                   : NOX_TR("editor.play.play_tip_panel",
+                                            "Play-test the map in the Map panel{key}\nIts game mode, players dying and Play in Full Window "
+                                            "are in the Play menu."),
+                               {{"key", key("play.start")}}));
         ImGui::SameLine();
         return;
     }
@@ -235,61 +255,69 @@ void PlayView::toolbarButtons()
     if (v.session) {
         // The session's game in the Map panel (the session bar's Play): back to editing; it can't
         // be paused or stopped from here (everyone plays in it).
-        if (iconButton("##edit", Icon::Stop, "Edit (F2)", kAmber, static_cast<bool>(hooks.stop))) hooks.stop();
-        help("Back to editing: your character stands aside as an observer till you play again.");
+        if (iconButton("##edit", Icon::Stop, NOX_TRC("editor.play.edit_f2", "Edit (F2)"), kAmber, static_cast<bool>(hooks.stop))) hooks.stop();
+        help(NOX_TR("editor.play.edit_f2_tip", "Back to editing: your character stands aside as an observer till you play again."));
         ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(kGreen)), "Playing in the session");
+        ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(kGreen)), "%s", NOX_TRC("editor.play.playing_in_session", "Playing in the session"));
         ImGui::SameLine(0, 4);
         if (v.captured) {
-            ImGui::TextDisabled("(%s frees the mouse)", ed_.commands_.shortcut("play.release").text().c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.play.frees_mouse", "({key} frees the mouse)"),
+                                                     {{"key", ed_.commands_.shortcut("play.release").text()}})
+                                       .c_str());
         } else {
-            ImGui::TextDisabled("(click the game to play)");
+            ImGui::TextDisabled("%s", NOX_TRC("editor.play.click_to_play", "(click the game to play)"));
         }
         ImGui::SameLine();
         return;
     }
     if (v.fullWindow) {
         // The test runs behind the editor (F2): back into it.
-        if (iconButton("##resume", Icon::Play, "Back to Game", kGreen, true)) ed_.commands_.run("play.start");
-        help("Back into the play-test's game" + key("play.start"));
+        if (iconButton("##resume", Icon::Play, NOX_TRC("editor.play.back_to_game", "Back to Game"), kGreen, true)) ed_.commands_.run("play.start");
+        help(NOX_TR("editor.play.back_to_game_tip", "Back into the play-test's game") + key("play.start"));
         ImGui::SameLine();
     }
     if (v.paused) {
-        if (iconButton("##pause", Icon::Play, "Resume", kGreen, ed_.commands_.enabled("play.pause"))) ed_.commands_.run("play.pause");
-        help("Let the play-test's world go on" + key("play.pause"));
+        if (iconButton("##pause", Icon::Play, NOX_TRC("editor.play.resume", "Resume"), kGreen, ed_.commands_.enabled("play.pause"))) {
+            ed_.commands_.run("play.pause");
+        }
+        help(NOX_TR("editor.play.resume_tip", "Let the play-test's world go on") + key("play.pause"));
     } else {
-        if (iconButton("##pause", Icon::Pause, "Pause", kAmber, ed_.commands_.enabled("play.pause"))) ed_.commands_.run("play.pause");
-        help("Stop the play-test's world where it is" + key("play.pause"));
+        if (iconButton("##pause", Icon::Pause, NOX_TRC("editor.play.pause", "Pause"), kAmber, ed_.commands_.enabled("play.pause"))) {
+            ed_.commands_.run("play.pause");
+        }
+        help(NOX_TR("editor.play.pause_tip", "Stop the play-test's world where it is") + key("play.pause"));
     }
     ImGui::SameLine();
-    if (iconButton("##stop", Icon::Stop, "Stop", kRed, true)) ed_.commands_.run("play.stop");
-    help("End the play-test" + key("play.stop"));
+    if (iconButton("##stop", Icon::Stop, NOX_TRC("editor.play.stop", "Stop"), kRed, true)) ed_.commands_.run("play.stop");
+    help(NOX_TR("editor.play.stop_tip", "End the play-test") + key("play.stop"));
     ImGui::SameLine();
-    if (ImGui::Button("Reload")) ed_.commands_.run("script.reload");
-    help("Hot-reload the script into the play-test" + key("script.reload"));
+    if (ImGui::Button(NOX_TRI("editor.play.reload", "Reload"))) ed_.commands_.run("script.reload");
+    help(NOX_TR("editor.play.reload_tip", "Hot-reload the script into the play-test") + key("script.reload"));
     ImGui::SameLine();
     // The play state.
     ImGui::AlignTextToFramePadding();
     if (v.paused) {
-        ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(kAmber)), "Paused");
+        ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(kAmber)), "%s", NOX_TRC("editor.play.state_paused", "Paused"));
     } else {
-        ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(kGreen)), "Playing");
+        ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(kGreen)), "%s", NOX_TRC("editor.play.state_playing", "Playing"));
     }
     ImGui::SameLine(0, 4);
     if (v.fullWindow) {
-        ImGui::TextDisabled("(full window, behind the editor)");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.play.behind_editor", "(full window, behind the editor)"));
     } else if (v.captured) {
-        ImGui::TextDisabled("(%s frees the mouse)", ed_.commands_.shortcut("play.release").text().c_str());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.play.frees_mouse", "({key} frees the mouse)"),
+                                                     {{"key", ed_.commands_.shortcut("play.release").text()}})
+                                       .c_str());
     } else {
-        ImGui::TextDisabled("(click the game to play)");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.play.click_to_play", "(click the game to play)"));
     }
     ImGui::SameLine();
 }
 
 void PlayView::menus()
 {
-    if (!ImGui::BeginMenu("Play")) {
+    if (!ImGui::BeginMenu(NOX_TRI("editor.menu.play", "Play"))) {
         return;
     }
     ImGui::Separator();

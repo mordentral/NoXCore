@@ -2,6 +2,7 @@
 #include "editor/chat_log.hpp"
 
 #include "noxcore/client/headless_client.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 
@@ -52,16 +53,18 @@ std::optional<ChatLine> chatLineFrom(const nox::client::ClientEvent& e)
     case K::PlayerJoined:
         l.kind = ChatLine::Kind::System;
         l.speaker = e.name;
-        l.text = e.name + " joined the game";
+        l.text = nox::l10n::format(NOX_TR("editor.chat.joined", "{name} joined the game"), {{"name", e.name}});
         return l;
     case K::PlayerLeft:
         l.kind = ChatLine::Kind::System;
         l.speaker = e.name;
-        l.text = e.name.empty() ? std::string("Someone left the game") : e.name + " left the game";
+        l.text = e.name.empty() ? NOX_TR("editor.chat.someone_left", "Someone left the game")
+                                : nox::l10n::format(NOX_TR("editor.chat.left", "{name} left the game"), {{"name", e.name}});
         return l;
     case K::Disconnected:
         l.kind = ChatLine::Kind::System;
-        l.text = e.text.empty() ? std::string("Disconnected") : "Disconnected: " + e.text;
+        l.text = e.text.empty() ? NOX_TR("editor.chat.disconnected", "Disconnected")
+                                : nox::l10n::format(NOX_TR("editor.chat.disconnected_why", "Disconnected: {why}"), {{"why", e.text}});
         return l;
     default:
         return std::nullopt;

@@ -4,6 +4,7 @@
 #include "editor/theme_colours.hpp"
 
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <imgui.h>
@@ -85,7 +86,7 @@ bool RecordPanel::fontForm(const content::Record& r)
                 palette_ = content::Palette::parse(bytes);
             }
         } catch (const std::exception& ex) {
-            viewerError_ = std::string("Can't read it: ") + ex.what();
+            viewerError_ = nox::l10n::format(NOX_TR("content.text_form.cant_read", "Can't read it: {error}"), {{"error", ex.what()}});
         }
     }
     ImGui::TextDisabled("%s", utf8(*file).c_str());
@@ -95,14 +96,17 @@ bool RecordPanel::fontForm(const content::Record& r)
     }
     if (font_) {
         const content::BitmapFont& f = *font_;
-        ImGui::TextWrapped("The original game's bitmap font: %zu glyphs, %u pixels high (lines %u apart), %s layout. NoX Core draws its own "
-                           "text with a TrueType font; these are what GAME.EXE shows.",
-                           f.glyphCount(), f.rows, f.height, f.tagged ? "the \"tNoF\"" : "the older");
+        ImGui::TextWrapped("%s", nox::l10n::format(f.tagged ? NOX_TR("content.font.about_tagged", "The original game's bitmap font: {glyphs} glyphs, {rows} pixels high (lines {height} apart), the \"tNoF\" layout. NoX Core draws its own "
+                                                                                        "text with a TrueType font; these are what GAME.EXE shows.")
+                                                            : NOX_TR("content.font.about_old", "The original game's bitmap font: {glyphs} glyphs, {rows} pixels high (lines {height} apart), the older layout. NoX Core draws its own "
+                                                                                     "text with a TrueType font; these are what GAME.EXE shows."),
+                                                   {{"glyphs", f.glyphCount()}, {"rows", f.rows}, {"height", f.height}})
+                                     .c_str());
         std::string ranges;
         for (const auto& g : f.ranges) {
             ranges += std::format("{}{:#06x}-{:#06x}", ranges.empty() ? "" : ", ", g.first, g.last);
         }
-        ImGui::TextDisabled("Characters: %s", ranges.c_str());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.font.characters", "Characters: {ranges}"), {{"ranges", ranges}}).c_str());
         // Every glyph, 16 a row, each in a cell of the widest glyph's width.
         if (!fontSheet_) {
             int cellW = 1;
@@ -132,7 +136,7 @@ bool RecordPanel::fontForm(const content::Record& r)
             fontSheetH_ = h;
         }
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::InputTextWithHint("##sample", "Type to see it in this font", sampleText_, sizeof sampleText_);
+        ImGui::InputTextWithHint("##sample", NOX_TRC("content.font.sample_hint", "Type to see it in this font"), sampleText_, sizeof sampleText_);
         if (sampleShown_ != sampleText_) {
             sampleShown_ = sampleText_;
             destroyTexture(fontSample_);
@@ -157,13 +161,14 @@ bool RecordPanel::fontForm(const content::Record& r)
         return true;
     }
     const content::Palette& p = *palette_;
-    ImGui::TextWrapped("The original game's 256 colours and its tables for them (%s). GAME.EXE reads them only in its 8-bit mode; "
-                       "NoX Core and the 16-bit game don't use them.",
-                       [&] {
-                           std::string s;
-                           for (const auto& t : p.sections) s += (s.empty() ? "" : ", ") + t;
-                           return s;
-                       }().c_str());
+    ImGui::TextWrapped("%s", nox::l10n::format(NOX_TR("content.font.palette_about", "The original game's 256 colours and its tables for them ({sections}). GAME.EXE reads them only in its 8-bit mode; "
+                                                                                 "NoX Core and the 16-bit game don't use them."),
+                                               {{"sections", [&] {
+                                                     std::string s;
+                                                     for (const auto& t : p.sections) s += (s.empty() ? "" : ", ") + t;
+                                                     return s;
+                                                 }()}})
+                                 .c_str());
     // The colours, 16 a row; hover for the numbers.
     const float cell = 20 * scale;
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -205,7 +210,7 @@ bool RecordPanel::fontForm(const content::Record& r)
         SDL_SetTextureScaleMode(blendTex_, SDL_SCALEMODE_NEAREST);
     }
     if (shadeTex_ || blendTex_) {
-        ImGui::SeparatorText("Shade map (32 light levels a colour) and blend table (each pair's mix)");
+        ImGui::SeparatorText(NOX_TRI("content.font.shade_blend", "Shade map (32 light levels a colour) and blend table (each pair's mix)"));
         if (shadeTex_) {
             ImGui::Image(texRef(shadeTex_), ImVec2(64 * scale, 256 * scale));
             ImGui::SameLine();

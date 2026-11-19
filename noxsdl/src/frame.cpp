@@ -10,6 +10,7 @@
 
 #include "noxcore/io/file.hpp"
 #include "noxcore/io/png.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -125,7 +126,9 @@ void saveF12Screenshot(App& app)
     const bool saved = SDL_SaveBMP(shot, path.string().c_str());
     SDL_DestroySurface(shot);
     if (app.console) {
-        app.console->print(saved ? "screenshot: " + nox::pathUtf8(path) : "screenshot: couldn't write " + nox::pathUtf8(path),
+        app.console->print(nox::l10n::format(saved ? NOX_TR("game.screenshot.saved", "screenshot: {path}")
+                                                   : NOX_TR("game.screenshot.failed", "screenshot: couldn't write {path}"),
+                                             {{"path", nox::pathUtf8(path)}}),
                            saved ? Yellow : Red);
     }
 }

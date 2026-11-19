@@ -16,6 +16,7 @@
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/server/rules.hpp"
 #include "noxcore/server/solo_save.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/random.hpp"
 
 #include <algorithm>
@@ -164,7 +165,7 @@ void Menus::wip(gui::Window* top, std::int32_t id)
     // Not hooked up yet: off, and marked.
     if (gui::Window* w = top ? top->find(id) : nullptr) {
         enable(top, id, false);
-        w->text += " - WIP";
+        w->text += NOX_TR("menus.common.wip_suffix", " - WIP");
     }
 }
 
@@ -368,7 +369,8 @@ void Menus::askJoinPassword(const std::string& host, const nox::client::PlayerPr
 
 void Menus::tooOldNotice()
 {
-    dialog(gui_.text("Noxworld.c:Notification"), std::string(nox::lobby::kClientTooOldNotice), 0x21, {});
+    // (kClientTooOldNotice stays English: the server sends it to stock clients too.)
+    dialog(gui_.text("Noxworld.c:Notification"), NOX_TR("menus.dialog.client_too_old", "Your NoX Core is too out of date for this game."), 0x21, {});
 }
 
 void Menus::enable(gui::Window* top, std::int32_t id, bool on)
@@ -419,7 +421,7 @@ void Menus::enter(State s)
         if (gui::Window* modes = screen_->find(kSoloQuest)) {
             // (noxcpp: Solo Quest's button opens Game Modes, soloModes; the .wnd's own font,
             // only its GeneralPrint:SoloQuest text replaced. No main-menu button has a tooltip.)
-            modes->text = "Game Modes";
+            modes->text = NOX_TR("menus.main.game_modes", "Game Modes");
         }
         optsBack_->show(true);
         break;
@@ -573,9 +575,9 @@ void Menus::enter(State s)
         }
         wip(screen_, kFilters);
         if (auto* button = screen_->find(kFind)) {
-            button->text = "Add/Remove";
+            button->text = NOX_TR("menus.servers.add_remove", "Add/Remove");
             button->show(true);
-            button->tooltip = "Add or remove saved server addresses";
+            button->tooltip = NOX_TR("menus.servers.add_remove_tip", "Add or remove saved server addresses");
             gui::setEnabled(button, true);
         }
         if (gui::Window* list = screen_->find(kList)) {
@@ -585,7 +587,7 @@ void Menus::enter(State s)
             status->text = gui_.text("Noxworld.c:JoinServer"); // game_showGameSel, the network (LAN) version's prompt
         }
         if (gui::Window* hostQuest = screen_->find(kHostQuest)) {
-            hostQuest->text = "Host Custom"; // (noxcpp: a quest or a NoX Core mode, chosen on its click)
+            hostQuest->text = NOX_TR("menus.servers.host_custom", "Host Custom"); // (noxcpp: a quest or a NoX Core mode, chosen on its click)
         }
         // The screen draws its background, then our game list in the map's frame.
         screen_->draw = [this](gui::Window& w, gui::Painter& p) {
@@ -1000,20 +1002,22 @@ void Menus::setupLogin()
     scrollLogins(std::max(pick - loginLinesShown() / 2, 0));
     // Register: XWIS makes an account on its first login, so it's our way to go on without one.
     if (gui::Window* skip = screen_->find(kLoginSkip)) {
-        skip->text = "Skip Login";
-        skip->tooltip = "Go to the game list with no login name (a game you host is listed on XWIS under a generated one)";
+        skip->text = NOX_TR("lobby.login.skip", "Skip Login");
+        skip->tooltip = NOX_TR("lobby.login.skip_tip",
+                               "Go to the game list with no login name (a game you host is listed on XWIS under a generated one)");
     }
     if (gui::Window* go = screen_->find(kLoginGo)) {
-        go->tooltip = "Log in to XWIS (a new name makes a new account with this password)";
+        go->tooltip = NOX_TR("lobby.login.go_tip", "Log in to XWIS (a new name makes a new account with this password)");
     }
     // Ours: how to log in to XWIS, in the default face at the top of the screen's empty panel on the
     // right (its black box; its border is drawn over it after).
     if (gui::Window* panel = screen_->find(wol_screens::kLoginHelpPanel)) {
-        panel->draw = [textColor = screen_->textColor](gui::Window& w, gui::Painter& p) {
+        panel->draw = [textColor = screen_->textColor, help = nox::l10n::tr(wol_screens::kLoginHelpText)](gui::Window& w,
+                                                                                                         gui::Painter& p) {
             const SDL_Point pos = w.screenPos();
             p.fill(pos.x, pos.y, w.rect.w, w.rect.h, w.backgroundColor);
             constexpr int in = wol_screens::kLoginHelpInset;
-            p.text(std::string(wol_screens::kLoginHelp), pos.x + in, pos.y + in, false, textColor, w.rect.w - 2 * in);
+            p.text(help, pos.x + in, pos.y + in, false, textColor, w.rect.w - 2 * in);
         };
     }
 }
@@ -1259,7 +1263,8 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
     const auto title = [&](const char* id) { add(gui_.text(std::string("Noxworld.c:") + id), 0xE); };
     const auto gap = [&] { add(" "); }; // (L"\n")
     if (saved || !entry.answered) {
-        add(saved ? "Saved server" : "Server", 0xE);
+        add(saved ? NOX_TR("menus.servers.info_saved_server", "Saved server") : NOX_TR("menus.servers.info_server", "Server"),
+            0xE);
         for (const auto& address : entry.listedAddresses) add(address);
         add(BrowserScreen::statusText(entry));
         gap();
@@ -1821,7 +1826,7 @@ void Menus::chooseCharacter(const std::string& host)
     // (only a listed name that didn't resolve can't be joined; an unanswered server may)
     if (!host.starts_with('@')) {
         if (const auto* entry = browser_.entryFor(host); entry && entry->unresolved) {
-            browser_.setMessage("Address not found. Refresh to try again.");
+            browser_.setMessage(NOX_TR("menus.servers.address_not_found_refresh", "Address not found. Refresh to try again."));
             return;
         }
     }
@@ -2241,8 +2246,10 @@ void Menus::characterSaveFailed(const std::filesystem::path& path, const std::st
     SDL_Log("character save failed: %s: %s", nox::pathUtf8(path).c_str(), reason.c_str());
     // Defer creation until the current button callback has returned.
     deferred_.push_back([this] {
-        dialog("Save failed",
-               "Check that your save folder is writable and has free space. See the log for details.", 0x21, {});
+        dialog(NOX_TR("menus.save_failed.title", "Save failed"),
+               NOX_TR("menus.save_failed.body",
+                      "Check that your save folder is writable and has free space. See the log for details."),
+               0x21, {});
         if (gui::Window* ok = dialog_->find(kDlgOk)) {
             ok->rect.x = (dialog_->rect.w - ok->rect.w) / 2;
         }

@@ -12,6 +12,8 @@
 #include "sprite_cache.hpp"
 
 #include "noxcore/mapedit/writer.hpp"
+#include "noxcore/mapedit/op_label.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <imgui.h>
@@ -23,6 +25,7 @@
 #include <map>
 
 namespace me = nox::mapedit;
+namespace ol = nox::mapedit::oplabels;
 
 namespace noxsdl {
 
@@ -73,11 +76,44 @@ std::vector<me::Cell> diagonalPath(me::Cell a, me::Cell b)
     return out;
 }
 
-constexpr const char* kFacingNames[13] = {"0  SW-NE",      "1  NW-SE",      "2  cross",      "3  T (NW NE SW)", "4  T (NW NE SE)",
-                                          "5  T (NE SE SW)", "6  T (NW SW SE)", "7  corner NW NE", "8  corner NE SE", "9  corner SE SW",
-                                          "10 corner NW SW", "11 window SW-NE", "12 window NW-SE"};
-constexpr const char* kShapeNames[12] = {"S point", "SW side", "W point", "SE side", "NW side", "E point",
-                                         "NE side", "N point", "SE+SW",   "SW+NW",   "NE+NW",   "NE+SE"};
+/// A wall facing's name (0-12): as text, or (`label`) as a list row's label.
+const char* facingName(int f, bool label = false)
+{
+    switch (f) {
+    case 0: return label ? NOX_TRI("editor.tools.facing.0", "0  SW-NE") : NOX_TRC("editor.tools.facing.0", "0  SW-NE");
+    case 1: return label ? NOX_TRI("editor.tools.facing.1", "1  NW-SE") : NOX_TRC("editor.tools.facing.1", "1  NW-SE");
+    case 2: return label ? NOX_TRI("editor.tools.facing.2", "2  cross") : NOX_TRC("editor.tools.facing.2", "2  cross");
+    case 3: return label ? NOX_TRI("editor.tools.facing.3", "3  T (NW NE SW)") : NOX_TRC("editor.tools.facing.3", "3  T (NW NE SW)");
+    case 4: return label ? NOX_TRI("editor.tools.facing.4", "4  T (NW NE SE)") : NOX_TRC("editor.tools.facing.4", "4  T (NW NE SE)");
+    case 5: return label ? NOX_TRI("editor.tools.facing.5", "5  T (NE SE SW)") : NOX_TRC("editor.tools.facing.5", "5  T (NE SE SW)");
+    case 6: return label ? NOX_TRI("editor.tools.facing.6", "6  T (NW SW SE)") : NOX_TRC("editor.tools.facing.6", "6  T (NW SW SE)");
+    case 7: return label ? NOX_TRI("editor.tools.facing.7", "7  corner NW NE") : NOX_TRC("editor.tools.facing.7", "7  corner NW NE");
+    case 8: return label ? NOX_TRI("editor.tools.facing.8", "8  corner NE SE") : NOX_TRC("editor.tools.facing.8", "8  corner NE SE");
+    case 9: return label ? NOX_TRI("editor.tools.facing.9", "9  corner SE SW") : NOX_TRC("editor.tools.facing.9", "9  corner SE SW");
+    case 10: return label ? NOX_TRI("editor.tools.facing.10", "10 corner NW SW") : NOX_TRC("editor.tools.facing.10", "10 corner NW SW");
+    case 11: return label ? NOX_TRI("editor.tools.facing.11", "11 window SW-NE") : NOX_TRC("editor.tools.facing.11", "11 window SW-NE");
+    default: return label ? NOX_TRI("editor.tools.facing.12", "12 window NW-SE") : NOX_TRC("editor.tools.facing.12", "12 window NW-SE");
+    }
+}
+
+/// An edge shape's name (0-11).
+const char* shapeName(int s)
+{
+    switch (s) {
+    case 0: return NOX_TRC("editor.tools.shape.s_point", "S point");
+    case 1: return NOX_TRC("editor.tools.shape.sw_side", "SW side");
+    case 2: return NOX_TRC("editor.tools.shape.w_point", "W point");
+    case 3: return NOX_TRC("editor.tools.shape.se_side", "SE side");
+    case 4: return NOX_TRC("editor.tools.shape.nw_side", "NW side");
+    case 5: return NOX_TRC("editor.tools.shape.e_point", "E point");
+    case 6: return NOX_TRC("editor.tools.shape.ne_side", "NE side");
+    case 7: return NOX_TRC("editor.tools.shape.n_point", "N point");
+    case 8: return NOX_TRC("editor.tools.shape.se_sw", "SE+SW");
+    case 9: return NOX_TRC("editor.tools.shape.sw_nw", "SW+NW");
+    case 10: return NOX_TRC("editor.tools.shape.ne_nw", "NE+NW");
+    default: return NOX_TRC("editor.tools.shape.ne_se", "NE+SE");
+    }
+}
 
 } // namespace
 
@@ -250,7 +286,7 @@ void MapEditor::viewObjects()
     try {
         view_->setObjects(me::toMapFile(objectsOnly, things_));
     } catch (const std::exception& ex) {
-        status(std::string("The objects can't be drawn: ") + ex.what());
+        status(nox::l10n::format(NOX_TR("editor.tools.status.objects_not_drawn", "The objects can't be drawn: {error}"), {{"error", ex.what()}}));
     }
 }
 
@@ -280,7 +316,8 @@ bool MapEditor::toolInput(const me::WorldPoint& w, bool hovered)
                         (tool_ == Tool::Object && L.lockObjects) || (tool_ == Tool::Waypoint && L.lockWaypoints) ||
                         (tool_ == Tool::Polygon && L.lockPolygons);
     if (locked) {
-        if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || toolRightClick_)) status("That layer is locked (Layers panel)");
+        if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || toolRightClick_))
+            status(NOX_TR("editor.tools.status.layer_locked", "That layer is locked (Layers panel)"));
         toolRightClick_ = false;
         return true;
     }
@@ -300,7 +337,7 @@ bool MapEditor::toolInput(const me::WorldPoint& w, bool hovered)
     default: break;
     }
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        status("This tool comes in P2d (Select is 1)");
+        status(NOX_TR("editor.tools.status.not_yet", "This tool comes in P2d (Select is 1)"));
     }
     toolRightClick_ = false;
     return false;
@@ -313,7 +350,7 @@ void MapEditor::eyedropper(const me::WorldPoint& w, bool full)
         const auto c = me::wallCellAt(w.x, w.y);
         const auto st = c ? me::wallState(doc_, *c) : std::nullopt;
         if (!st) {
-            status("Eyedropper: no wall there");
+            status(NOX_TR("editor.tools.eyedropper.no_wall", "Eyedropper: no wall there"));
             return;
         }
         wallMaterial_ = st->wall.material;
@@ -328,14 +365,16 @@ void MapEditor::eyedropper(const me::WorldPoint& w, bool full)
             wallSecret_ = st->secret.has_value();
             if (st->secret) wallSecretProps_ = *st->secret;
         }
-        status("Eyedropper: " + things_.walls[wallMaterial_].name + (full ? " (facing, variant and kind too)" : ""));
+        status(full ? nox::l10n::format(NOX_TR("editor.tools.eyedropper.wall_full", "Eyedropper: {name} (facing, variant and kind too)"),
+                                        {{"name", things_.walls[wallMaterial_].name}})
+                    : nox::l10n::format(NOX_TR("editor.tools.eyedropper.picked", "Eyedropper: {name}"), {{"name", things_.walls[wallMaterial_].name}}));
         break;
     }
     case Tool::Floor: {
         const auto t = me::tileAt(w.x, w.y);
         const auto* tile = t ? doc_.floor.tile(t->gx, t->gy) : nullptr;
         if (!tile) {
-            status("Eyedropper: no floor there");
+            status(NOX_TR("editor.tools.eyedropper.no_floor", "Eyedropper: no floor there"));
             return;
         }
         brush_.floor = tile->image;
@@ -343,24 +382,27 @@ void MapEditor::eyedropper(const me::WorldPoint& w, bool full)
             brush_.variants = me::FloorBrush::Variants::Fixed;
             brush_.fixedVariant = tile->variant;
         }
-        status("Eyedropper: " + things_.floors[tile->image].name + (full ? " variant " + std::to_string(tile->variant) : ""));
+        status(full ? nox::l10n::format(NOX_TR("editor.tools.eyedropper.floor_variant", "Eyedropper: {name} variant {variant}"),
+                                        {{"name", things_.floors[tile->image].name}, {"variant", tile->variant}})
+                    : nox::l10n::format(NOX_TR("editor.tools.eyedropper.picked", "Eyedropper: {name}"), {{"name", things_.floors[tile->image].name}}));
         break;
     }
     case Tool::Edge: {
         const auto t = me::tileAt(w.x, w.y);
         const auto* tile = t ? doc_.floor.tile(t->gx, t->gy) : nullptr;
         if (!tile || tile->edges.empty()) {
-            status("Eyedropper: no edge there");
+            status(NOX_TR("editor.tools.eyedropper.no_edge", "Eyedropper: no edge there"));
             return;
         }
         const auto& e = tile->edges.back();
         edgeSet_ = e.edge;
         edgeDirection_ = e.direction;
         edgeFloor_ = e.floor;
-        status("Eyedropper: " + things_.edges[e.edge].name + " direction " + std::to_string(e.direction));
+        status(nox::l10n::format(NOX_TR("editor.tools.eyedropper.edge", "Eyedropper: {name} direction {direction}"),
+                                 {{"name", things_.edges[e.edge].name}, {"direction", e.direction}}));
         break;
     }
-    default: status("The eyedropper works with the wall, floor and edge tools"); break;
+    default: status(NOX_TR("editor.tools.eyedropper.wrong_tool", "The eyedropper works with the wall, floor and edge tools")); break;
     }
 }
 
@@ -375,7 +417,7 @@ void MapEditor::wallPreview(const std::vector<me::Cell>& cells, bool erase)
         try {
             wallPreviewUndo_ = me::applyOp(doc_, op);
         } catch (const std::exception& ex) {
-            status(std::string("Walls: ") + ex.what());
+            status(nox::l10n::format(NOX_TR("editor.tools.status.walls_error", "Walls: {error}"), {{"error", ex.what()}}));
         }
     }
     viewWalls();
@@ -431,11 +473,11 @@ void MapEditor::wallInput(const me::WorldPoint& w, bool hovered)
             const auto t = me::tileAt(w.x, w.y);
             const auto ring = t ? me::wallOutline(doc_, *t) : std::map<me::Cell, std::uint8_t>{};
             if (ring.empty()) {
-                status("Outline: click inside a floor area bounded by holes or walls (an open map has no outline)");
+                status(NOX_TR("editor.tools.status.outline_open", "Outline: click inside a floor area bounded by holes or walls (an open map has no outline)"));
                 return;
             }
             me::Op op = withWallEdges(me::placeWallsOp(doc_, things_, me::cellsOf(ring), wallBrush(), &ring));
-            op.label = "Wall outline (" + std::to_string(ring.size()) + " walls)";
+            op.label = me::opLabel(ol::kWallOutline, {{"n", ring.size()}});
             perform(op);
             ++strokeSeed_;
             return;
@@ -558,7 +600,9 @@ void MapEditor::edgeInput(const me::WorldPoint& w, bool hovered)
         }
         if (next.edges == tile->edges) return;
         if (edgeMarkCustom_) paint_.customEdges.insert(at);
-        perform(me::Op{allOfSet ? "Remove " + things_.edges[edgeSet_].name + " edges" : "Remove an edge", {me::SetTiles{{{at.gx, at.gy, next}}}}});
+        perform(me::Op{allOfSet ? me::opLabel(ol::kRemoveEdges, {{"name", things_.edges[edgeSet_].name}})
+                                : me::opLabel(ol::kRemoveEdge),
+                       {me::SetTiles{{{at.gx, at.gy, next}}}}});
     };
     if (toolRightClick_) {
         toolRightClick_ = false;
@@ -578,12 +622,12 @@ void MapEditor::edgeInput(const me::WorldPoint& w, bool hovered)
         if (edgeMode_ == EdgeMode::Add) {
             const auto* tile = doc_.floor.tile(t->gx, t->gy);
             if (!tile) {
-                status("No tile there to put an edge on");
+                status(NOX_TR("editor.tools.status.no_tile", "No tile there to put an edge on"));
                 return;
             }
             const auto& set = things_.edges.at(static_cast<std::size_t>(edgeSet_));
             if (edgeDirection_ >= 2 * (set.rows + set.cols)) {
-                status(set.name + " has no direction " + std::to_string(edgeDirection_));
+                status(nox::l10n::format(NOX_TR("editor.tools.status.no_direction", "{name} has no direction {n}"), {{"name", set.name}, {"n", edgeDirection_}}));
                 return;
             }
             nox::map::FloorTile next = *tile;
@@ -593,12 +637,12 @@ void MapEditor::edgeInput(const me::WorldPoint& w, bool hovered)
             e.edge = static_cast<std::uint8_t>(edgeSet_);
             e.direction = static_cast<std::uint8_t>(edgeDirection_);
             if (std::ranges::find(next.edges, e) != next.edges.end()) {
-                status("That edge is on the tile already");
+                status(NOX_TR("editor.tools.status.edge_there", "That edge is on the tile already"));
                 return;
             }
             next.edges.push_back(e);
             if (edgeMarkCustom_) paint_.customEdges.insert(*t);
-            perform(me::Op{"Add a " + set.name + " edge", {me::SetTiles{{{t->gx, t->gy, next}}}}});
+            perform(me::Op{me::opLabel(ol::kAddEdge, {{"name", set.name}}), {me::SetTiles{{{t->gx, t->gy, next}}}}});
             return;
         }
         edgeStroke_ = {*t};
@@ -742,7 +786,8 @@ bool MapEditor::floorPicker(const char* id, int& floor, bool allowNone)
             ImGui::SameLine();
         }
     }
-    const std::string label = floor >= 0 && static_cast<std::size_t>(floor) < things_.floors.size() ? things_.floors[static_cast<std::size_t>(floor)].name : "(none)";
+    const std::string label = floor >= 0 && static_cast<std::size_t>(floor) < things_.floors.size() ? things_.floors[static_cast<std::size_t>(floor)].name
+                                                                                                   : NOX_TR("editor.tools.none", "(none)");
     const float browseW = ImGui::GetFrameHeight() * 1.6f; // (the content browser's folder: its button)
     ImGui::SetNextItemWidth(-browseW - ImGui::GetStyle().ItemSpacing.x);
     if (ImGui::BeginCombo("##pick", label.c_str(), ImGuiComboFlags_HeightLargest)) {
@@ -751,8 +796,8 @@ bool MapEditor::floorPicker(const char* id, int& floor, bool allowNone)
             ImGui::SetKeyboardFocusHere();
         }
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::InputTextWithHint("##filter", "filter", pickerFilter_, sizeof pickerFilter_);
-        if (allowNone && ImGui::Selectable("(none)", floor < 0)) {
+        ImGui::InputTextWithHint("##filter", NOX_TRC("editor.tools.filter_hint", "filter"), pickerFilter_, sizeof pickerFilter_);
+        if (allowNone && ImGui::Selectable(NOX_TRI("editor.tools.none", "(none)"), floor < 0)) {
             floor = -1;
             changed = true;
         }
@@ -763,7 +808,9 @@ bool MapEditor::floorPicker(const char* id, int& floor, bool allowNone)
             if (SDL_Texture* t = floorThumb(static_cast<int>(i), 0)) ImGui::Image(texId(t), ImVec2(s, s));
             else ImGui::Dummy(ImVec2(s, s));
             ImGui::SameLine();
-            const std::string text = f.name + "  (" + std::to_string(f.cols) + "x" + std::to_string(f.rows) + (f.frames > 1 ? ", animated" : "") + ")";
+            const std::string text =
+                f.frames > 1 ? nox::l10n::format(NOX_TR("editor.tools.floor_item_animated", "{name}  ({cols}x{rows}, animated)"), {{"name", f.name}, {"cols", f.cols}, {"rows", f.rows}})
+                             : nox::l10n::format(NOX_TR("editor.tools.floor_item", "{name}  ({cols}x{rows})"), {{"name", f.name}, {"cols", f.cols}, {"rows", f.rows}});
             if (ImGui::Selectable(text.c_str(), static_cast<int>(i) == floor, 0, ImVec2(0, s))) {
                 floor = static_cast<int>(i);
                 changed = true;
@@ -774,7 +821,7 @@ bool MapEditor::floorPicker(const char* id, int& floor, bool allowNone)
     }
     ImGui::SameLine();
     if (ImGui::Button("...##browse", ImVec2(browseW, 0))) objects_->browse("Floors");
-    help("Pick from the Content Browser's Floors folder, with thumbnails.");
+    help(NOX_TRC("editor.tools.browse_floors_help", "Pick from the Content Browser's Floors folder, with thumbnails."));
     ImGui::PopID();
     return changed;
 }
@@ -795,7 +842,8 @@ bool MapEditor::edgePicker(const char* id, int& edge)
             ImGui::SameLine();
         }
     }
-    const std::string label = edge >= 0 && static_cast<std::size_t>(edge) < things_.edges.size() ? things_.edges[static_cast<std::size_t>(edge)].name : "(none)";
+    const std::string label = edge >= 0 && static_cast<std::size_t>(edge) < things_.edges.size() ? things_.edges[static_cast<std::size_t>(edge)].name
+                                                                                                  : NOX_TR("editor.tools.none", "(none)");
     const float browseW = ImGui::GetFrameHeight() * 1.6f; // (the content browser's folder: its button)
     ImGui::SetNextItemWidth(-browseW - ImGui::GetStyle().ItemSpacing.x);
     if (ImGui::BeginCombo("##pick", label.c_str(), ImGuiComboFlags_HeightLargest)) {
@@ -804,7 +852,7 @@ bool MapEditor::edgePicker(const char* id, int& edge)
             ImGui::SetKeyboardFocusHere();
         }
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::InputTextWithHint("##filter", "filter", pickerFilter_, sizeof pickerFilter_);
+        ImGui::InputTextWithHint("##filter", NOX_TRC("editor.tools.filter_hint", "filter"), pickerFilter_, sizeof pickerFilter_);
         for (std::size_t i = 0; i < things_.edges.size(); ++i) {
             const auto& e = things_.edges[i];
             if (!containsNoCase(e.name, pickerFilter_)) continue;
@@ -812,7 +860,7 @@ bool MapEditor::edgePicker(const char* id, int& edge)
             if (SDL_Texture* t = sample(static_cast<int>(i))) ImGui::Image(texId(t), ImVec2(s, s));
             else ImGui::Dummy(ImVec2(s, s));
             ImGui::SameLine();
-            const std::string text = e.name + "  (" + std::to_string(2 * (e.rows + e.cols)) + " shapes)";
+            const std::string text = nox::l10n::format(NOX_TR("editor.tools.edge_item", "{name}  ({n} shapes)"), {{"name", e.name}, {"n", 2 * (e.rows + e.cols)}});
             if (ImGui::Selectable(text.c_str(), static_cast<int>(i) == edge, 0, ImVec2(0, s))) {
                 edge = static_cast<int>(i);
                 changed = true;
@@ -823,7 +871,7 @@ bool MapEditor::edgePicker(const char* id, int& edge)
     }
     ImGui::SameLine();
     if (ImGui::Button("...##browse", ImVec2(browseW, 0))) objects_->browse("Edges");
-    help("Pick from the Content Browser's Edges folder, with thumbnails.");
+    help(NOX_TRC("editor.tools.browse_edges_help", "Pick from the Content Browser's Edges folder, with thumbnails."));
     ImGui::PopID();
     return changed;
 }
@@ -855,7 +903,7 @@ bool MapEditor::wallPicker(const char* id, int& material)
             ImGui::SetKeyboardFocusHere();
         }
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::InputTextWithHint("##filter", "filter", pickerFilter_, sizeof pickerFilter_);
+        ImGui::InputTextWithHint("##filter", NOX_TRC("editor.tools.filter_hint", "filter"), pickerFilter_, sizeof pickerFilter_);
         for (std::size_t i = 0; i < things_.walls.size(); ++i) {
             const auto& w = things_.walls[i];
             if (!containsNoCase(w.name, pickerFilter_)) continue;
@@ -873,7 +921,7 @@ bool MapEditor::wallPicker(const char* id, int& material)
     }
     ImGui::SameLine();
     if (ImGui::Button("...##browse", ImVec2(browseW, 0))) objects_->browse("Walls");
-    help("Pick from the Content Browser's Walls folder, with thumbnails.");
+    help(NOX_TRC("editor.tools.browse_walls_help", "Pick from the Content Browser's Walls folder, with thumbnails."));
     ImGui::PopID();
     return changed;
 }
@@ -882,37 +930,44 @@ bool MapEditor::wallPicker(const char* id, int& material)
 
 void MapEditor::wallToolPanel()
 {
-    ImGui::SeparatorText("Wall");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.wall.heading", "Wall"));
     const struct {
         WallMode mode;
         const char* label;
         const char* tip;
     } modes[] = {
-        {WallMode::Draw, "Draw", "Drag to draw walls; each takes its facing from its neighbours (auto-facing). Shift: Smart Draw."},
-        {WallMode::Place, "Place", "Click to place one wall with the exact facing chosen below; its neighbours are left alone."},
-        {WallMode::Line, "Line", "Drag a straight wall line (along a diagonal)."},
-        {WallMode::Rect, "45\xC2\xB0 Rectangle", "Drag a rectangle with its sides along the diagonals."},
-        {WallMode::Outline, "Outline", "Click inside a floor area: walls all round its edge (the bucket)."},
-        {WallMode::Erase, "Erase", "Drag to remove walls; their neighbours are re-faced."},
-        {WallMode::Pick, "Properties", "Click walls to edit them in Properties (Shift adds). Alt+click is the eyedropper in every mode."},
+        {WallMode::Draw, NOX_TRI("editor.tools.wall.draw", "Draw"),
+         NOX_TRC("editor.tools.wall.draw_help", "Drag to draw walls; each takes its facing from its neighbours (auto-facing). Shift: Smart Draw.")},
+        {WallMode::Place, NOX_TRI("editor.tools.wall.place", "Place"),
+         NOX_TRC("editor.tools.wall.place_help", "Click to place one wall with the exact facing chosen below; its neighbours are left alone.")},
+        {WallMode::Line, NOX_TRI("editor.tools.wall.line", "Line"), NOX_TRC("editor.tools.wall.line_help", "Drag a straight wall line (along a diagonal).")},
+        {WallMode::Rect, NOX_TRI("editor.tools.wall.rect", "45\xC2\xB0 Rectangle"),
+         NOX_TRC("editor.tools.wall.rect_help", "Drag a rectangle with its sides along the diagonals.")},
+        {WallMode::Outline, NOX_TRI("editor.tools.wall.outline", "Outline"),
+         NOX_TRC("editor.tools.wall.outline_help", "Click inside a floor area: walls all round its edge (the bucket).")},
+        {WallMode::Erase, NOX_TRI("editor.tools.wall.erase", "Erase"), NOX_TRC("editor.tools.wall.erase_help", "Drag to remove walls; their neighbours are re-faced.")},
+        {WallMode::Pick, NOX_TRI("editor.tools.wall.properties", "Properties"),
+         NOX_TRC("editor.tools.wall.properties_help", "Click walls to edit them in Properties (Shift adds). Alt+click is the eyedropper in every mode.")},
     };
     for (std::size_t i = 0; i < std::size(modes); ++i) {
         if (i % 4 != 0) ImGui::SameLine();
         if (ImGui::RadioButton(modes[i].label, wallMode_ == modes[i].mode)) wallMode_ = modes[i].mode;
         help(modes[i].tip);
     }
-    ImGui::TextDisabled("Right click removes a wall; Alt+click picks (Shift: all its properties).");
-    ImGui::SeparatorText("Material");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.wall.mouse_hint", "Right click removes a wall; Alt+click picks (Shift: all its properties)."));
+    ImGui::SeparatorText(NOX_TRC("editor.tools.wall.material", "Material"));
     if (wallPicker("wallmat", wallMaterial_)) {
         wallVariantMin_ = 0;
         wallVariantMax_ = std::max(0, me::wallRandomVariations(things_, wallMaterial_) - 1);
     }
-    ImGui::SeparatorText("Facing");
-    ImGui::Checkbox("Auto-facing", &wallAutoFacing_);
-    help("Draw, line, rectangle and outline walls take the shape their neighbours give them, and neighbours are re-faced to join them.");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.wall.facing", "Facing"));
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.auto_facing", "Auto-facing"), &wallAutoFacing_);
+    help(NOX_TRC("editor.tools.wall.auto_facing_help",
+                 "Draw, line, rectangle and outline walls take the shape their neighbours give them, and neighbours are re-faced to join them."));
     ImGui::SameLine();
-    ImGui::Checkbox("Smart Draw", &wallSmart_);
-    help("Only this stroke's walls count as neighbours: walls already there neither shape it nor change (also: hold Shift).");
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.smart_draw", "Smart Draw"), &wallSmart_);
+    help(NOX_TRC("editor.tools.wall.smart_draw_help",
+                 "Only this stroke's walls count as neighbours: walls already there neither shape it nor change (also: hold Shift)."));
     // The facings' pictures (greyed where the material has none).
     const float s = ImGui::GetFrameHeight() * 2.0f;
     for (int f = 0; f < 13; ++f) {
@@ -931,48 +986,56 @@ void MapEditor::wallToolPanel()
         }
         if (active) ImGui::PopStyleColor();
         if (clicked) wallFacing_ = f;
-        help(kFacingNames[f]);
+        help(facingName(f));
         ImGui::PopID();
     }
-    ImGui::TextDisabled("Facing %s%s", kFacingNames[wallFacing_], wallMode_ == WallMode::Place ? "" : " (for lone walls)");
-    ImGui::SeparatorText("Variation");
+    ImGui::TextDisabled("%s", nox::l10n::format(wallMode_ == WallMode::Place ? NOX_TR("editor.tools.wall.facing_now", "Facing {facing}")
+                                                                             : NOX_TR("editor.tools.wall.facing_now_lone", "Facing {facing} (for lone walls)"),
+                                                {{"facing", facingName(wallFacing_)}})
+                                  .c_str());
+    ImGui::SeparatorText(NOX_TRC("editor.tools.wall.variation", "Variation"));
     const int count = me::wallVariantCount(things_, wallMaterial_, wallFacing_ > 10 ? wallFacing_ - 11 : wallFacing_);
-    ImGui::Checkbox("Auto variation", &wallAutoVariation_);
-    help("Straight pieces get a variant picked in the range (seeded per stroke); corners and junctions take 0.");
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.auto_variation", "Auto variation"), &wallAutoVariation_);
+    help(NOX_TRC("editor.tools.wall.auto_variation_help", "Straight pieces get a variant picked in the range (seeded per stroke); corners and junctions take 0."));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::SliderInt("##vmin", &wallVariantMin_, 0, std::max(0, count - 1), "from %d");
+    ImGui::SliderInt("##vmin", &wallVariantMin_, 0, std::max(0, count - 1), NOX_TRC("editor.tools.wall.variant_from", "from %d"));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::SliderInt("##vmax", &wallVariantMax_, 0, std::max(0, count - 1), "to %d");
+    ImGui::SliderInt("##vmax", &wallVariantMax_, 0, std::max(0, count - 1), NOX_TRC("editor.tools.wall.variant_to", "to %d"));
     wallVariantMin_ = std::clamp(wallVariantMin_, 0, std::max(0, count - 1));
     wallVariantMax_ = std::clamp(wallVariantMax_, wallVariantMin_, std::max(0, count - 1));
     const int game = me::wallRandomVariations(things_, wallMaterial_);
-    ImGui::TextDisabled("%d variants for this facing; the game's own range %d", count, game);
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.tools.wall.variants", "{n} variants for this facing; the game's own range {game}"),
+                                                {{"n", count}, {"game", game}})
+                                  .c_str());
     if (game > 0) {
         ImGui::SameLine();
-        if (ImGui::SmallButton("Use it")) {
+        if (ImGui::SmallButton(NOX_TRI("editor.tools.wall.use_it", "Use it"))) {
             wallVariantMin_ = 0;
             wallVariantMax_ = std::min(count, game) - 1;
         }
-        help("The material's thing.bin variation count: the Wall spell's straight pieces take x mod it.");
+        help(NOX_TRC("editor.tools.wall.use_it_help", "The material's thing.bin variation count: the Wall spell's straight pieces take x mod it."));
     }
-    ImGui::SeparatorText("Kind");
-    ImGui::Checkbox("Window", &wallWindow_);
-    help("Sight passes it. Straight pieces (facing 0 or 1) draw the window picture; others look plain.");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.wall.kind", "Kind"));
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.window", "Window"), &wallWindow_);
+    help(NOX_TRC("editor.tools.wall.window_help", "Sight passes it. Straight pieces (facing 0 or 1) draw the window picture; others look plain."));
     ImGui::SameLine();
-    ImGui::Checkbox("Breakable", &wallBreakable_);
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.breakable", "Breakable"), &wallBreakable_);
     ImGui::SameLine();
-    ImGui::Checkbox("Secret", &wallSecret_);
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.secret", "Secret"), &wallSecret_);
     if (wallSecret_) {
         bool open = wallSecretProps_.state == 3;
-        if (ImGui::Checkbox("Starts open", &open)) me::setSecretStartOpen(wallSecretProps_, open);
+        if (ImGui::Checkbox(NOX_TRI("editor.tools.wall.starts_open", "Starts open"), &open)) me::setSecretStartOpen(wallSecretProps_, open);
         const struct {
             int bit;
             const char* label;
             const char* tip;
-        } flags[] = {{2, "Opens when touched", "A player or monster walking into it opens it (and paths go through it)."},
-                     {4, "Moves on its own", "After its wait it closes again (or, with the next flag, opens again)."},
-                     {8, "Timer opens it", "With 'moves on its own': the timer opens it when shut, instead of closing it when open."},
-                     {1, "Scripted", "Marked for scripts (no engine effect)."}};
+        } flags[] = {{2, NOX_TRI("editor.tools.secret.touched", "Opens when touched"),
+                      NOX_TRC("editor.tools.secret.touched_help", "A player or monster walking into it opens it (and paths go through it).")},
+                     {4, NOX_TRI("editor.tools.secret.moves", "Moves on its own"),
+                      NOX_TRC("editor.tools.secret.moves_help", "After its wait it closes again (or, with the next flag, opens again).")},
+                     {8, NOX_TRI("editor.tools.secret.timer", "Timer opens it"),
+                      NOX_TRC("editor.tools.secret.timer_tool_help", "With 'moves on its own': the timer opens it when shut, instead of closing it when open.")},
+                     {1, NOX_TRI("editor.tools.secret.scripted", "Scripted"), NOX_TRC("editor.tools.secret.scripted_help", "Marked for scripts (no engine effect).")}};
         for (const auto& f : flags) {
             bool on = (wallSecretProps_.flags & f.bit) != 0;
             if (ImGui::Checkbox(f.label, &on)) wallSecretProps_.flags = static_cast<std::uint8_t>(on ? (wallSecretProps_.flags | f.bit) : (wallSecretProps_.flags & ~f.bit));
@@ -980,48 +1043,52 @@ void MapEditor::wallToolPanel()
         }
         int wait = static_cast<int>(wallSecretProps_.openWait);
         ImGui::SetNextItemWidth(120 * imgui_->scale());
-        if (ImGui::InputInt("Wait (seconds)", &wait)) wallSecretProps_.openWait = static_cast<std::uint32_t>(std::clamp(wait, 0, 100000));
+        if (ImGui::InputInt(NOX_TRI("editor.tools.secret.wait", "Wait (seconds)"), &wait)) wallSecretProps_.openWait = static_cast<std::uint32_t>(std::clamp(wait, 0, 100000));
     }
-    ImGui::SeparatorText("Placing");
-    ImGui::Checkbox("Minimap group from polygons", &wallGroupAuto_);
-    help("The polygon round the wall gives its minimap group (as the game's save does), else 100.");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.wall.placing", "Placing"));
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.group_auto", "Minimap group from polygons"), &wallGroupAuto_);
+    help(NOX_TRC("editor.tools.wall.group_auto_help", "The polygon round the wall gives its minimap group (as the game's save does), else 100."));
     if (!wallGroupAuto_) {
         ImGui::SetNextItemWidth(120 * imgui_->scale());
-        ImGui::InputInt("Minimap group", &wallGroup_);
+        ImGui::InputInt(NOX_TRI("editor.tools.wall.group", "Minimap group"), &wallGroup_);
         wallGroup_ = std::clamp(wallGroup_, 0, 255);
     }
-    ImGui::Checkbox("Replace existing walls", &wallReplace_);
-    ImGui::Checkbox("Recompute floor edges at walls", &wallEdges_);
-    help("Placing or removing walls recomputes the auto-edges of the floor tiles the walls touch (wall block: no edge laps across a wall). Hand-edited tiles are kept.");
-    ImGui::Checkbox("Re-face neighbours on erase", &wallReface_);
-    help("A removed wall's neighbours take the shape of what they still join (the old editor left them as they were).");
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.replace", "Replace existing walls"), &wallReplace_);
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.edges", "Recompute floor edges at walls"), &wallEdges_);
+    help(NOX_TRC("editor.tools.wall.edges_help",
+                 "Placing or removing walls recomputes the auto-edges of the floor tiles the walls touch (wall block: no edge laps across a wall). Hand-edited tiles are kept."));
+    ImGui::Checkbox(NOX_TRI("editor.tools.wall.reface", "Re-face neighbours on erase"), &wallReface_);
+    help(NOX_TRC("editor.tools.wall.reface_help", "A removed wall's neighbours take the shape of what they still join (the old editor left them as they were)."));
 }
 
 void MapEditor::floorToolPanel()
 {
     using Mode = me::FloorBrush::Mode;
-    ImGui::SeparatorText("Floor brush");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.floor.heading", "Floor brush"));
     const struct {
         Mode mode;
         const char* label;
         const char* tip;
-    } modes[] = {{Mode::Paint, "Paint", "Paint the floor; the edges round it follow (auto-edge)."},
-                 {Mode::Erase, "Erase", "Remove tiles (black holes, as the stock maps' void)."},
-                 {Mode::Replace, "Replace", "Paint only over tiles of the chosen floor."},
-                 {Mode::Fill, "Fill", "Flood the clicked tile's floor (or hole) region, bounded by walls."},
-                 {Mode::Smooth, "Smooth", "Each tile takes the floor most of its 3 x 3 window has: specks go."},
-                 {Mode::EdgesOnly, "Edges only", "Recompute edges under the brush, floors unchanged."}};
+    } modes[] = {{Mode::Paint, NOX_TRI("editor.tools.floor.paint", "Paint"), NOX_TRC("editor.tools.floor.paint_help", "Paint the floor; the edges round it follow (auto-edge).")},
+                 {Mode::Erase, NOX_TRI("editor.tools.floor.erase", "Erase"), NOX_TRC("editor.tools.floor.erase_help", "Remove tiles (black holes, as the stock maps' void).")},
+                 {Mode::Replace, NOX_TRI("editor.tools.floor.replace", "Replace"), NOX_TRC("editor.tools.floor.replace_help", "Paint only over tiles of the chosen floor.")},
+                 {Mode::Fill, NOX_TRI("editor.tools.floor.fill", "Fill"),
+                  NOX_TRC("editor.tools.floor.fill_help", "Flood the clicked tile's floor (or hole) region, bounded by walls.")},
+                 {Mode::Smooth, NOX_TRI("editor.tools.floor.smooth", "Smooth"),
+                  NOX_TRC("editor.tools.floor.smooth_help", "Each tile takes the floor most of its 3 x 3 window has: specks go.")},
+                 {Mode::EdgesOnly, NOX_TRI("editor.tools.floor.edges_only", "Edges only"),
+                  NOX_TRC("editor.tools.floor.edges_only_help", "Recompute edges under the brush, floors unchanged.")}};
     for (std::size_t i = 0; i < std::size(modes); ++i) {
         if (i % 3 != 0) ImGui::SameLine();
         if (ImGui::RadioButton(modes[i].label, brush_.mode == modes[i].mode)) brush_.mode = modes[i].mode;
         help(modes[i].tip);
     }
-    ImGui::TextDisabled("Right click removes a tile; Alt+click picks the floor (Shift: its variant). [ and ] size the brush.");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.floor.mouse_hint", "Right click removes a tile; Alt+click picks the floor (Shift: its variant). [ and ] size the brush."));
     int floor = brush_.floor;
     if (floorPicker("brushfloor", floor)) brush_.floor = static_cast<std::uint8_t>(floor);
     if (brush_.mode == Mode::Replace) {
         int rep = brush_.replaceFloor;
-        ImGui::TextDisabled("Replacing:");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.tools.floor.replacing", "Replacing:"));
         if (floorPicker("replacefloor", rep)) brush_.replaceFloor = static_cast<std::uint8_t>(rep);
     }
     // Which way the brush's floor and the one under the mouse lap (the priority preview).
@@ -1032,37 +1099,42 @@ void MapEditor::floorToolPanel()
                 const auto over = rules_.lap(brush_.floor, under);
                 const auto back = rules_.lap(under, brush_.floor);
                 const std::string a = things_.floors[brush_.floor].name, b = things_.floors[static_cast<std::size_t>(under)].name;
-                if (floorOnTop_ || over) ImGui::TextColored(editor::themeColours().ok, "%s laps over %s", a.c_str(), b.c_str());
-                else if (back) ImGui::TextColored(editor::themeColours().warning, "%s will lap over what you paint", b.c_str());
-                else ImGui::TextDisabled("%s and %s don't lap", a.c_str(), b.c_str());
+                if (floorOnTop_ || over)
+                    ImGui::TextColored(editor::themeColours().ok, "%s",
+                                       nox::l10n::format(NOX_TR("editor.tools.floor.laps_over", "{a} laps over {b}"), {{"a", a}, {"b", b}}).c_str());
+                else if (back)
+                    ImGui::TextColored(editor::themeColours().warning, "%s",
+                                       nox::l10n::format(NOX_TR("editor.tools.floor.laps_back", "{b} will lap over what you paint"), {{"b", b}}).c_str());
+                else ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.tools.floor.no_lap", "{a} and {b} don't lap"), {{"a", a}, {"b", b}}).c_str());
             }
         }
     }
-    ImGui::SeparatorText("Shape");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.floor.shape", "Shape"));
     int shape = static_cast<int>(brush_.shape);
-    ImGui::RadioButton("Round", &shape, 0);
+    ImGui::RadioButton(NOX_TRI("editor.tools.floor.round", "Round"), &shape, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Square", &shape, 1);
+    ImGui::RadioButton(NOX_TRI("editor.tools.floor.square", "Square"), &shape, 1);
     ImGui::SameLine();
-    ImGui::RadioButton("Diamond", &shape, 2);
-    help("Diamond: N x N tiles along the floor's diagonals (the old editor's brush).");
+    ImGui::RadioButton(NOX_TRI("editor.tools.floor.diamond", "Diamond"), &shape, 2);
+    help(NOX_TRC("editor.tools.floor.diamond_help", "Diamond: N x N tiles along the floor's diagonals (the old editor's brush)."));
     brush_.shape = static_cast<me::FloorBrush::Shape>(shape);
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::SliderInt("##size", &brush_.size, 1, 16, "size %d tiles");
+    ImGui::SliderInt("##size", &brush_.size, 1, 16, NOX_TRC("editor.tools.floor.size_format", "size %d tiles"));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::SliderFloat("##hard", &brush_.hardness, 0.0f, 1.0f, "hardness %.2f");
-    help("1: a crisp shape. Lower: a soft rim, which the noise makes ragged.");
+    ImGui::SliderFloat("##hard", &brush_.hardness, 0.0f, 1.0f, NOX_TRC("editor.tools.floor.hardness_format", "hardness %.2f"));
+    help(NOX_TRC("editor.tools.floor.hardness_help", "1: a crisp shape. Lower: a soft rim, which the noise makes ragged."));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::SliderFloat("##noise", &brush_.noise, 0.0f, 1.0f, "noise %.2f");
-    help("How ragged a soft rim is (seeded per stroke: the same stroke paints the same).");
-    ImGui::SeparatorText("Variants");
+    ImGui::SliderFloat("##noise", &brush_.noise, 0.0f, 1.0f, NOX_TRC("editor.tools.floor.noise_format", "noise %.2f"));
+    help(NOX_TRC("editor.tools.floor.noise_help", "How ragged a soft rim is (seeded per stroke: the same stroke paints the same)."));
+    ImGui::SeparatorText(NOX_TRC("editor.tools.floor.variants", "Variants"));
     int variants = static_cast<int>(brush_.variants);
-    ImGui::RadioButton("Aligned", &variants, 0);
-    help("The texture block tiled along the diagonals, lined up with the map's own tiles of the floor (as the stock maps).");
+    ImGui::RadioButton(NOX_TRI("editor.tools.floor.aligned", "Aligned"), &variants, 0);
+    help(NOX_TRC("editor.tools.floor.aligned_help",
+                 "The texture block tiled along the diagonals, lined up with the map's own tiles of the floor (as the stock maps)."));
     ImGui::SameLine();
-    ImGui::RadioButton("Random", &variants, 1);
+    ImGui::RadioButton(NOX_TRI("editor.tools.floor.random", "Random"), &variants, 1);
     ImGui::SameLine();
-    ImGui::RadioButton("Fixed", &variants, 2);
+    ImGui::RadioButton(NOX_TRI("editor.tools.floor.fixed", "Fixed"), &variants, 2);
     brush_.variants = static_cast<me::FloorBrush::Variants>(variants);
     if (brush_.variants == me::FloorBrush::Variants::Fixed && brush_.floor < things_.floors.size()) {
         const auto& def = things_.floors[brush_.floor];
@@ -1082,53 +1154,55 @@ void MapEditor::floorToolPanel()
         }
         ImGui::EndChild();
     }
-    ImGui::SeparatorText("Edges");
-    ImGui::Checkbox("Auto-edge", &brush_.autoEdge);
-    help("Off: tiles placed and removed with no edges touched (the old editor's Place/Remove).");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.edges.heading", "Edges"));
+    ImGui::Checkbox(NOX_TRI("editor.tools.floor.auto_edge", "Auto-edge"), &brush_.autoEdge);
+    help(NOX_TRC("editor.tools.floor.auto_edge_help", "Off: tiles placed and removed with no edges touched (the old editor's Place/Remove)."));
     ImGui::SameLine();
-    ImGui::Checkbox("Wall block", &floorWallBlock_);
-    help("No lap across a border a wall stands on.");
-    ImGui::Checkbox("Painted floor on top", &floorOnTop_);
-    help("This stroke's floor laps over its neighbours whatever the priorities say (the old brush's rule).");
-    ImGui::TextDisabled("Exclude floor (its tiles keep their edges):");
+    ImGui::Checkbox(NOX_TRI("editor.tools.floor.wall_block", "Wall block"), &floorWallBlock_);
+    help(NOX_TRC("editor.tools.floor.wall_block_help", "No lap across a border a wall stands on."));
+    ImGui::Checkbox(NOX_TRI("editor.tools.floor.on_top", "Painted floor on top"), &floorOnTop_);
+    help(NOX_TRC("editor.tools.floor.on_top_help", "This stroke's floor laps over its neighbours whatever the priorities say (the old brush's rule)."));
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.floor.exclude", "Exclude floor (its tiles keep their edges):"));
     floorPicker("exclude", floorExclude_, true);
-    ImGui::TextDisabled("Only lap floor (other edges stay):");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.floor.only", "Only lap floor (other edges stay):"));
     floorPicker("only", floorOnly_, true);
-    ImGui::TextDisabled("Cover with floor (laps show it):");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.floor.cover", "Cover with floor (laps show it):"));
     floorPicker("cover", floorCover_, true);
-    ImGui::TextDisabled("Trim next to holes:");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.floor.hole_trim", "Trim next to holes:"));
     if (floorHoleTrim_ < 0) {
-        if (ImGui::SmallButton("Add a hole trim")) floorHoleTrim_ = 23 < static_cast<int>(things_.edges.size()) ? 23 : 0;
+        if (ImGui::SmallButton(NOX_TRI("editor.tools.floor.add_hole_trim", "Add a hole trim"))) floorHoleTrim_ = 23 < static_cast<int>(things_.edges.size()) ? 23 : 0;
     } else {
         edgePicker("holetrim", floorHoleTrim_);
-        if (ImGui::SmallButton("No hole trim")) floorHoleTrim_ = -1;
+        if (ImGui::SmallButton(NOX_TRI("editor.tools.floor.no_hole_trim", "No hole trim"))) floorHoleTrim_ = -1;
     }
-    if (ImGui::Button("Edge Rules...")) showEdgeRules_ = true;
-    help("Which floor laps over which, and with which edge (the defaults come from the stock maps).");
+    if (ImGui::Button(NOX_TRI("editor.tools.edge_rules_button", "Edge Rules..."))) showEdgeRules_ = true;
+    help(NOX_TRC("editor.tools.edge_rules_help", "Which floor laps over which, and with which edge (the defaults come from the stock maps)."));
 }
 
 void MapEditor::edgeToolPanel()
 {
-    ImGui::SeparatorText("Edges");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.edges.heading", "Edges"));
     int mode = static_cast<int>(edgeMode_);
-    ImGui::RadioButton("Auto", &mode, 0);
-    help("Click or drag: the tiles get their auto-edges again (with the floor tool's edge options).");
+    ImGui::RadioButton(NOX_TRI("editor.tools.edges.auto", "Auto"), &mode, 0);
+    help(NOX_TRC("editor.tools.edges.auto_help", "Click or drag: the tiles get their auto-edges again (with the floor tool's edge options)."));
     ImGui::SameLine();
-    ImGui::RadioButton("Add", &mode, 1);
-    help("Click a tile: the edge below goes on top of its edges.");
+    ImGui::RadioButton(NOX_TRI("editor.tools.edges.add", "Add"), &mode, 1);
+    help(NOX_TRC("editor.tools.edges.add_help", "Click a tile: the edge below goes on top of its edges."));
     ImGui::SameLine();
-    ImGui::RadioButton("Remove", &mode, 2);
-    help("Click a tile: its last edge goes (Shift: every edge of the set below).");
+    ImGui::RadioButton(NOX_TRI("editor.tools.edges.remove", "Remove"), &mode, 2);
+    help(NOX_TRC("editor.tools.edges.remove_help", "Click a tile: its last edge goes (Shift: every edge of the set below)."));
     edgeMode_ = static_cast<EdgeMode>(mode);
-    ImGui::TextDisabled("Right click removes the last edge (Shift: all of the set); Alt+click picks one.");
-    ImGui::TextDisabled("Edge set:");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.edges.mouse_hint", "Right click removes the last edge (Shift: all of the set); Alt+click picks one."));
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.edges.set", "Edge set:"));
     edgePicker("edgeset", edgeSet_);
-    ImGui::TextDisabled("Floor blended in:");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.edges.floor", "Floor blended in:"));
     floorPicker("edgefloor", edgeFloor_);
     if (edgeSet_ >= 0 && static_cast<std::size_t>(edgeSet_) < things_.edges.size()) {
         const auto& set = things_.edges[static_cast<std::size_t>(edgeSet_)];
         const int n = 2 * (set.rows + set.cols);
-        ImGui::TextDisabled("Direction (%d shapes, %dx%d):", n, set.rows, set.cols);
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.tools.edges.direction", "Direction ({n} shapes, {rows}x{cols}):"),
+                                                    {{"n", n}, {"rows", set.rows}, {"cols", set.cols}})
+                                      .c_str());
         const float s = ImGui::GetFrameHeight() * 1.6f;
         // The base shown under the masks: the tile under the mouse's floor, else the brush's.
         int base = brush_.floor;
@@ -1141,21 +1215,25 @@ void MapEditor::edgeToolPanel()
             if (t ? ImGui::ImageButton("##d", texId(t), ImVec2(s, s)) : ImGui::Button("?", ImVec2(s, s))) edgeDirection_ = d;
             if (active) ImGui::PopStyleColor();
             const int shape = me::edgeShapeOf(set.rows, set.cols, d);
-            const std::string tip = std::to_string(d) + ": " + (shape >= 0 ? kShapeNames[shape] : "?") +
-                                    (me::edgeDirectionUsable(things_, edgeSet_, d) ? "" : " (a whole-tile image: auto-edge never uses it)");
-            help(tip.c_str());
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                const std::string tip = std::to_string(d) + ": " + (shape >= 0 ? shapeName(shape) : "?") +
+                                        (me::edgeDirectionUsable(things_, edgeSet_, d)
+                                             ? std::string()
+                                             : NOX_TR("editor.tools.edges.whole_tile", " (a whole-tile image: auto-edge never uses it)"));
+                help(tip.c_str());
+            }
             ImGui::PopID();
         }
         edgeDirection_ = std::clamp(edgeDirection_, 0, n - 1);
     }
-    ImGui::Checkbox("Mark hand-edited tiles", &edgeMarkCustom_);
-    help("Tiles whose edges you change by hand are left alone by the brush's auto-edge (kept in the map's .nxe).");
-    ImGui::TextDisabled("%zu hand-edited tiles", paint_.customEdges.size());
+    ImGui::Checkbox(NOX_TRI("editor.tools.edges.mark_custom", "Mark hand-edited tiles"), &edgeMarkCustom_);
+    help(NOX_TRC("editor.tools.edges.mark_custom_help", "Tiles whose edges you change by hand are left alone by the brush's auto-edge (kept in the map's .nxe)."));
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.tools.edges.custom_count", "{n} hand-edited tiles"), {{"n", paint_.customEdges.size()}}).c_str());
     if (!paint_.customEdges.empty()) {
         ImGui::SameLine();
-        if (ImGui::SmallButton("Forget them")) paint_.customEdges.clear();
+        if (ImGui::SmallButton(NOX_TRI("editor.tools.edges.forget", "Forget them"))) paint_.customEdges.clear();
     }
-    if (ImGui::Button("Edge Rules...")) showEdgeRules_ = true;
+    if (ImGui::Button(NOX_TRI("editor.tools.edge_rules_button", "Edge Rules..."))) showEdgeRules_ = true;
 }
 
 std::optional<int> MapEditor::heldInputInt(const char* id, int current, int lo, int hi)
@@ -1186,23 +1264,25 @@ void MapEditor::wallProperties(const std::set<me::Cell>& cells)
         perform(me::setWallsOp(doc_, things_, states, label));
     };
     const bool many = cells.size() > 1;
-    ImGui::SeparatorText(many ? (std::to_string(cells.size()) + " walls").c_str()
-                              : (first->wall.material < things_.walls.size() ? things_.walls[first->wall.material].name.c_str() : "Wall"));
+    ImGui::SeparatorText(many ? nox::l10n::format(NOX_TR("editor.tools.props.n_walls", "{n} walls"), {{"n", cells.size()}}).c_str()
+                              : (first->wall.material < things_.walls.size() ? things_.walls[first->wall.material].name.c_str()
+                                                                             : NOX_TRC("editor.tools.props.wall", "Wall")));
     if (!many) {
-        row("Cell");
+        row(NOX_TRC("editor.tools.props.cell", "Cell"));
         ImGui::Text("%d, %d", cells.begin()->x, cells.begin()->y);
     }
     int material = first->wall.material;
-    row("Material");
+    row(NOX_TRC("editor.tools.wall.material", "Material"));
     if (wallPicker("propmat", material)) {
-        apply("Wall material " + things_.walls[static_cast<std::size_t>(material)].name, [&](me::WallState& s) { s.wall.material = static_cast<std::uint8_t>(material); });
+        apply(me::opLabel(ol::kWallMaterial, {{"name", things_.walls[static_cast<std::size_t>(material)].name}}),
+              [&](me::WallState& s) { s.wall.material = static_cast<std::uint8_t>(material); });
     }
     int facing = first->wall.direction & 0x7F;
-    row("Facing");
-    if (ImGui::BeginCombo("##facing", facing < 13 ? kFacingNames[facing] : std::to_string(facing).c_str())) {
+    row(NOX_TRC("editor.tools.wall.facing", "Facing"));
+    if (ImGui::BeginCombo("##facing", facing < 13 ? facingName(facing) : std::to_string(facing).c_str())) {
         for (int f = 0; f <= 10; ++f) {
-            if (ImGui::Selectable(kFacingNames[f], f == facing)) {
-                apply("Wall facing", [&](me::WallState& s) { s.wall.direction = static_cast<std::uint8_t>((s.wall.direction & 0x80) | f); });
+            if (ImGui::Selectable(facingName(f, true), f == facing)) {
+                apply(me::opLabel(ol::kWallFacing), [&](me::WallState& s) { s.wall.direction = static_cast<std::uint8_t>((s.wall.direction & 0x80) | f); });
             }
         }
         ImGui::EndCombo();
@@ -1219,10 +1299,10 @@ void MapEditor::wallProperties(const std::set<me::Cell>& cells)
                 states[c] = *st;
             }
         }
-        return me::setWallsOp(doc_, things_, states, "Wall variant");
+        return me::setWallsOp(doc_, things_, states, me::opLabel(ol::kWallVariant));
     };
     int variant = variantDrag_.shown(first->wall.variant);
-    row("Variant");
+    row(NOX_TRC("editor.tools.props.variant", "Variant"));
     ImGui::SliderInt("##variant", &variant, 0, std::max(0, count - 1));
     const bool sliding = ImGui::IsItemActive();
     const bool let = ImGui::IsItemDeactivated();
@@ -1235,7 +1315,7 @@ void MapEditor::wallProperties(const std::set<me::Cell>& cells)
     }
     case editor::LiveDrag::Step::Cancel:
         endPreview();
-        status("Wall variant cancelled");
+        status(NOX_TR("editor.tools.status.variant_cancelled", "Wall variant cancelled"));
         break;
     case editor::LiveDrag::Step::Commit:
         endPreview(); // (the document as it was, then the one op)
@@ -1243,76 +1323,89 @@ void MapEditor::wallProperties(const std::set<me::Cell>& cells)
         break;
     case editor::LiveDrag::Step::None: break;
     }
-    row("Minimap group");
+    row(NOX_TRC("editor.tools.wall.group", "Minimap group"));
     if (const auto group = heldInputInt("##group", first->wall.minimapGroup, 0, 255)) {
-        apply("Wall minimap group", [&](me::WallState& s) { s.wall.minimapGroup = static_cast<std::uint8_t>(*group); });
+        apply(me::opLabel(ol::kWallGroup), [&](me::WallState& s) { s.wall.minimapGroup = static_cast<std::uint8_t>(*group); });
     }
-    if (ImGui::SmallButton("From polygons")) {
-        apply("Wall minimap group from polygons", [&](me::WallState& s) { s.wall.minimapGroup = me::minimapGroupAt(doc_, {s.wall.x, s.wall.y}); });
+    if (ImGui::SmallButton(NOX_TRI("editor.tools.props.from_polygons", "From polygons"))) {
+        apply(me::opLabel(ol::kWallGroupPolygons),
+              [&](me::WallState& s) { s.wall.minimapGroup = me::minimapGroupAt(doc_, {s.wall.x, s.wall.y}); });
     }
-    help("The polygon round each wall gives its group (as the game's save does), else 100.");
+    help(NOX_TRC("editor.tools.props.from_polygons_help", "The polygon round each wall gives its group (as the game's save does), else 100."));
     bool window = first->window;
-    if (ImGui::Checkbox("Window", &window)) apply(window ? "Make a window" : "No window", [&](me::WallState& s) { s.window = window; });
-    help("Sight passes it. Straight pieces (facing 0 or 1) draw the window picture; others look plain.");
+    if (ImGui::Checkbox(NOX_TRI("editor.tools.wall.window", "Window"), &window))
+        apply(window ? me::opLabel(ol::kMakeWindow) : me::opLabel(ol::kNoWindow),
+              [&](me::WallState& s) { s.window = window; });
+    help(NOX_TRC("editor.tools.wall.window_help", "Sight passes it. Straight pieces (facing 0 or 1) draw the window picture; others look plain."));
     ImGui::SameLine();
     bool breakable = first->destructible;
-    if (ImGui::Checkbox("Breakable", &breakable)) apply(breakable ? "Make breakable" : "Not breakable", [&](me::WallState& s) { s.destructible = breakable; });
+    if (ImGui::Checkbox(NOX_TRI("editor.tools.wall.breakable", "Breakable"), &breakable))
+        apply(breakable ? me::opLabel(ol::kMakeBreakable) : me::opLabel(ol::kNotBreakable),
+              [&](me::WallState& s) { s.destructible = breakable; });
     ImGui::SameLine();
     bool secret = first->secret.has_value();
-    if (ImGui::Checkbox("Secret", &secret)) {
-        apply(secret ? "Make secret" : "Not secret", [&](me::WallState& s) {
+    if (ImGui::Checkbox(NOX_TRI("editor.tools.wall.secret", "Secret"), &secret)) {
+        apply(secret ? me::opLabel(ol::kMakeSecret) : me::opLabel(ol::kNotSecret), [&](me::WallState& s) {
             if (secret) s.secret = me::defaultSecretWall({s.wall.x, s.wall.y});
             else s.secret.reset();
         });
     }
     if (first->secret) {
         const nox::map::SecretWall sw = *first->secret;
-        ImGui::SeparatorText("Secret wall");
+        ImGui::SeparatorText(NOX_TRC("editor.tools.secret.heading", "Secret wall"));
         const struct {
             int bit;
             const char* label;
             const char* tip;
-        } flags[] = {{2, "Opens when touched", "A player or monster walking into it opens it (and paths go through it)."},
-                     {4, "Moves on its own", "After its wait it closes again (or, with the next flag, opens again)."},
-                     {8, "Timer opens it", "With 'moves on its own': the timer opens it when shut. Also: an old map's wall with no state starts open."},
-                     {1, "Scripted", "Marked for scripts (no engine effect)."}};
+        } flags[] = {{2, NOX_TRI("editor.tools.secret.touched", "Opens when touched"),
+                      NOX_TRC("editor.tools.secret.touched_help", "A player or monster walking into it opens it (and paths go through it).")},
+                     {4, NOX_TRI("editor.tools.secret.moves", "Moves on its own"),
+                      NOX_TRC("editor.tools.secret.moves_help", "After its wait it closes again (or, with the next flag, opens again).")},
+                     {8, NOX_TRI("editor.tools.secret.timer", "Timer opens it"),
+                      NOX_TRC("editor.tools.secret.timer_help",
+                              "With 'moves on its own': the timer opens it when shut. Also: an old map's wall with no state starts open.")},
+                     {1, NOX_TRI("editor.tools.secret.scripted", "Scripted"), NOX_TRC("editor.tools.secret.scripted_help", "Marked for scripts (no engine effect).")}};
         for (const auto& f : flags) {
             bool on = (sw.flags & f.bit) != 0;
             if (ImGui::Checkbox(f.label, &on)) {
-                apply("Secret wall flags", [&](me::WallState& s) {
+                apply(me::opLabel(ol::kSecretFlags), [&](me::WallState& s) {
                     if (s.secret) s.secret->flags = static_cast<std::uint8_t>(on ? (s.secret->flags | f.bit) : (s.secret->flags & ~f.bit));
                 });
             }
             help(f.tip);
         }
-        row("Wait (seconds)");
+        row(NOX_TRC("editor.tools.secret.wait", "Wait (seconds)"));
         if (const auto wait = heldInputInt("##wait", static_cast<int>(std::min<std::uint32_t>(sw.openWait, std::numeric_limits<int>::max())), 0, 100000)) {
-            apply("Secret wall wait", [&](me::WallState& s) { if (s.secret) s.secret->openWait = static_cast<std::uint32_t>(*wait); });
+            apply(me::opLabel(ol::kSecretWait), [&](me::WallState& s) { if (s.secret) s.secret->openWait = static_cast<std::uint32_t>(*wait); });
         }
-        const char* states[] = {"0 (old map: by flag 8)", "1 shut", "2 closing", "3 open", "4 opening"};
+        const char* states[] = {NOX_TRC("editor.tools.secret.state0", "0 (old map: by flag 8)"), NOX_TRC("editor.tools.secret.state1", "1 shut"),
+                                NOX_TRC("editor.tools.secret.state2", "2 closing"), NOX_TRC("editor.tools.secret.state3", "3 open"),
+                                NOX_TRC("editor.tools.secret.state4", "4 opening")};
         int state = std::clamp<int>(sw.state, 0, 4);
-        row("State");
+        row(NOX_TRC("editor.tools.secret.state", "State"));
         if (ImGui::Combo("##state", &state, states, 5) && state != sw.state) {
-            apply("Secret wall state", [&](me::WallState& s) {
+            apply(me::opLabel(ol::kSecretState), [&](me::WallState& s) {
                 if (!s.secret) return;
                 me::setSecretStartOpen(*s.secret, state == 3);
                 s.secret->state = static_cast<std::uint8_t>(state);
             });
         }
-        help("How it starts: shut, or open (fully open, seen by everyone, as the stock maps store an open one).");
-        if (ImGui::TreeNode("Advanced")) {
-            row("How far open");
+        help(NOX_TRC("editor.tools.secret.state_help", "How it starts: shut, or open (fully open, seen by everyone, as the stock maps store an open one)."));
+        if (ImGui::TreeNode(NOX_TRI("editor.tools.secret.advanced", "Advanced"))) {
+            row(NOX_TRC("editor.tools.secret.how_far", "How far open"));
             if (const auto openBy = heldInputInt("##openby", sw.openDelay, 0, 23)) {
-                apply("Secret wall opening", [&](me::WallState& s) { if (s.secret) s.secret->openDelay = static_cast<std::uint8_t>(*openBy); });
+                apply(me::opLabel(ol::kSecretOpening),
+                      [&](me::WallState& s) { if (s.secret) s.secret->openDelay = static_cast<std::uint8_t>(*openBy); });
             }
-            row("Timer (frames)");
+            row(NOX_TRC("editor.tools.secret.timer_frames", "Timer (frames)"));
             constexpr int kTimerMost = std::numeric_limits<int>::max();
             if (const auto timer = heldInputInt("##timer", static_cast<int>(std::min<std::uint32_t>(sw.lastOpen, kTimerMost)), 0, kTimerMost)) {
-                apply("Secret wall timer", [&](me::WallState& s) { if (s.secret) s.secret->lastOpen = static_cast<std::uint32_t>(*timer); });
+                apply(me::opLabel(ol::kSecretTimer),
+                      [&](me::WallState& s) { if (s.secret) s.secret->lastOpen = static_cast<std::uint32_t>(*timer); });
             }
-            row("Seen by");
+            row(NOX_TRC("editor.tools.secret.seen_by", "Seen by"));
             ImGui::Text("0x%08X", sw.unknown);
-            help("Which players have seen it open (bit per player); 0xFFFFFFFF for one that starts open.");
+            help(NOX_TRC("editor.tools.secret.seen_by_help", "Which players have seen it open (bit per player); 0xFFFFFFFF for one that starts open."));
             ImGui::TreePop();
         }
     }
@@ -1321,21 +1414,22 @@ void MapEditor::wallProperties(const std::set<me::Cell>& cells)
 void MapEditor::edgeRulesWindow()
 {
     ImGui::SetNextWindowSize(ImVec2(420 * imgui_->scale(), 560 * imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Edge Rules", &showEdgeRules_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.edge_rules", "Edge Rules"), &showEdgeRules_)) {
         ImGui::End();
         return;
     }
-    ImGui::TextWrapped("A floor higher in this list laps over the floors below it. The defaults come from the stock maps "
-                       "(which floor laps over which, the edge used most for each pair); changes are saved in the map's .nxe.");
-    if (ImGui::Button("Reset to the stock rules")) {
+    ImGui::TextWrapped("%s", NOX_TRC("editor.tools.rules.about",
+                                     "A floor higher in this list laps over the floors below it. The defaults come from the stock maps "
+                                     "(which floor laps over which, the edge used most for each pair); changes are saved in the map's .nxe."));
+    if (ImGui::Button(NOX_TRI("editor.tools.rules.reset", "Reset to the stock rules"))) {
         rules_ = me::EdgeRules::defaults(things_);
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100 * imgui_->scale());
     int seed = static_cast<int>(paint_.edgeSeed);
-    if (ImGui::InputInt("Side seed", &seed)) paint_.edgeSeed = static_cast<std::uint32_t>(std::max(seed, 0));
-    help("The seed side variants are picked with (the same seed: the same edges).");
-    ImGui::SeparatorText("Priority (highest first)");
+    if (ImGui::InputInt(NOX_TRI("editor.tools.rules.seed", "Side seed"), &seed)) paint_.edgeSeed = static_cast<std::uint32_t>(std::max(seed, 0));
+    help(NOX_TRC("editor.tools.rules.seed_help", "The seed side variants are picked with (the same seed: the same edges)."));
+    ImGui::SeparatorText(NOX_TRC("editor.tools.rules.priority", "Priority (highest first)"));
     int& selected = edgeRulesPanel_.selected;
     std::vector<int> order = rules_.order();
     ImGui::BeginChild("##order", ImVec2(0, 260 * imgui_->scale()), ImGuiChildFlags_Borders);
@@ -1352,17 +1446,17 @@ void MapEditor::edgeRulesWindow()
     ImGui::EndChild();
     const auto at = std::ranges::find(order, selected);
     ImGui::BeginDisabled(at == order.end());
-    if (ImGui::Button("Up") && at != order.end() && at + 1 != order.end()) {
+    if (ImGui::Button(NOX_TRI("editor.tools.rules.up", "Up")) && at != order.end() && at + 1 != order.end()) {
         std::iter_swap(at, at + 1);
         rules_.setOrder(order);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Down") && at != order.end() && at != order.begin()) {
+    if (ImGui::Button(NOX_TRI("editor.tools.rules.down", "Down")) && at != order.end() && at != order.begin()) {
         std::iter_swap(at, at - 1);
         rules_.setOrder(order);
     }
     ImGui::SameLine();
-    if (ImGui::Button("To the top") && at != order.end()) {
+    if (ImGui::Button(NOX_TRI("editor.tools.rules.top", "To the top")) && at != order.end()) {
         const int f = *at;
         order.erase(at);
         order.push_back(f);
@@ -1370,30 +1464,35 @@ void MapEditor::edgeRulesWindow()
     }
     ImGui::EndDisabled();
     int& add = edgeRulesPanel_.add;
-    ImGui::TextDisabled("Add a floor the list lacks (at the bottom):");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.rules.add_floor", "Add a floor the list lacks (at the bottom):"));
     if (floorPicker("addfloor", add, true) && add >= 0 && std::ranges::find(order, add) == order.end()) {
         order.insert(order.begin(), add);
         rules_.setOrder(order);
     }
-    ImGui::SeparatorText("Pair overrides");
+    ImGui::SeparatorText(NOX_TRC("editor.tools.rules.overrides", "Pair overrides"));
     int& over = edgeRulesPanel_.over;
     int& base = edgeRulesPanel_.base;
     int& kind = edgeRulesPanel_.kind;
     int& edge = edgeRulesPanel_.edge;
     if (edge < 0) edge = edgeSet_;
-    ImGui::TextDisabled("Floor lapping:");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.rules.floor_lapping", "Floor lapping:"));
     floorPicker("ovover", over);
-    ImGui::TextDisabled("over floor:");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.tools.rules.over_floor", "over floor:"));
     floorPicker("ovbase", base);
-    const char* kinds[] = {"Blend with edge", "Trim with edge", "Never laps"};
+    const char* kinds[] = {NOX_TRC("editor.tools.rules.blend", "Blend with edge"), NOX_TRC("editor.tools.rules.trim", "Trim with edge"),
+                           NOX_TRC("editor.tools.rules.never", "Never laps")};
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::Combo("##kind", &kind, kinds, 3);
     if (kind < 2) edgePicker("ovedge", edge);
     if (over >= 0 && base >= 0 && over != base) {
         const me::EdgeStyle now = rules_.style(over, base);
-        ImGui::TextDisabled("Now: %s, %s", rules_.lap(over, base) ? "laps" : "doesn't lap",
-                            now.edge >= 0 && static_cast<std::size_t>(now.edge) < things_.edges.size() ? things_.edges[static_cast<std::size_t>(now.edge)].name.c_str() : "-");
-        if (ImGui::Button("Set override")) {
+        ImGui::TextDisabled("%s", nox::l10n::format(rules_.lap(over, base) ? NOX_TR("editor.tools.rules.now_laps", "Now: laps, {edge}")
+                                                                           : NOX_TR("editor.tools.rules.now_no_lap", "Now: doesn't lap, {edge}"),
+                                                    {{"edge", now.edge >= 0 && static_cast<std::size_t>(now.edge) < things_.edges.size()
+                                                                  ? things_.edges[static_cast<std::size_t>(now.edge)].name.c_str()
+                                                                  : "-"}})
+                                      .c_str());
+        if (ImGui::Button(NOX_TRI("editor.tools.rules.set_override", "Set override"))) {
             rules_.setOverride(over, base, me::EdgeStyle{static_cast<me::EdgeStyle::Kind>(kind), kind < 2 ? edge : -1});
         }
     }
@@ -1406,7 +1505,9 @@ void MapEditor::edgeRulesWindow()
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(things_.floors[static_cast<std::size_t>(k.second)].name.c_str());
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(s.kind == me::EdgeStyle::Kind::None ? "never" : s.edge >= 0 ? things_.edges[static_cast<std::size_t>(s.edge)].name.c_str() : "-");
+            ImGui::TextUnformatted(s.kind == me::EdgeStyle::Kind::None ? NOX_TRC("editor.tools.rules.never_short", "never")
+                                   : s.edge >= 0                       ? things_.edges[static_cast<std::size_t>(s.edge)].name.c_str()
+                                                                       : "-");
             ImGui::TableNextColumn();
             ImGui::PushID(k.first * 1000 + k.second);
             if (ImGui::SmallButton("x")) drop = k;

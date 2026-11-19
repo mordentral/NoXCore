@@ -3,6 +3,8 @@
 
 #include "draw_box.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -59,7 +61,7 @@ BlessingWindow::Layout BlessingWindow::layout(Offer offer, int w, int h, float s
     const auto n = static_cast<float>(offer.size());
     const float header = l.line * 2.6f;
     const float pw = std::max(n * kCardW * s + (n - 1) * kGap * s + 2 * kPad * s,
-                              font_->measure("Take one blessing for the rest of the delve", l.text) + 2 * kPad * s);
+                              font_->measure(NOX_TR("modes.delve.blessing.subtitle", "Take one blessing for the rest of the delve"), l.text) + 2 * kPad * s);
     const float ph = header + kCardH * s + 2 * kPad * s;
     l.panel = {std::floor((static_cast<float>(w) - pw) / 2), std::floor((static_cast<float>(h) - ph) / 2 - 40 * s), pw, ph};
     const float cardsW = n * kCardW * s + (n - 1) * kGap * s;
@@ -87,8 +89,8 @@ void BlessingWindow::draw(SDL_Renderer* renderer, Offer offer, int w, int h, flo
     SDL_RenderFillRect(renderer, &l.panel);
     outline(renderer, l.panel, {170, 150, 90, 255});
     const float tx = l.panel.x + kPad * s;
-    font_->draw("The altar's blessing", tx, l.panel.y + kPad * s, l.text, pale);
-    font_->draw("Take one blessing for the rest of the delve", tx, l.panel.y + kPad * s + l.line * 1.1f, l.text, grey);
+    font_->draw(NOX_TR("modes.delve.blessing.title", "The altar's blessing"), tx, l.panel.y + kPad * s, l.text, pale);
+    font_->draw(NOX_TR("modes.delve.blessing.subtitle", "Take one blessing for the rest of the delve"), tx, l.panel.y + kPad * s + l.line * 1.1f, l.text, grey);
     for (std::size_t i = 0; i < offer.size() && i < l.cards.size(); ++i) {
         const SDL_FRect& r = l.cards[i];
         const bool hover = inside(r, mouse.x, mouse.y);
@@ -105,7 +107,7 @@ void BlessingWindow::draw(SDL_Renderer* renderer, Offer offer, int w, int h, flo
             y += l.line;
         }
         if (offer[i].held != 0) {
-            const std::string held = "You have it: " + std::to_string(offer[i].held);
+            const std::string held = nox::l10n::format(NOX_TR("modes.delve.blessing.held", "You have it: {n}"), {{"n", offer[i].held}});
             font_->draw(held, r.x + (r.w - font_->measure(held, l.text)) / 2, r.y + r.h - l.line - 6 * s, l.text, grey);
         }
     }

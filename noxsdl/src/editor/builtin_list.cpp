@@ -1,6 +1,8 @@
 // The Builtins list's priorities, orders and filter (builtin_list.hpp).
 #include "editor/builtin_list.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cctype>
 
@@ -20,24 +22,24 @@ bool nameLess(const std::string& a, const std::string& b)
 const char* builtinPriorityName(BuiltinPriority p)
 {
     switch (p) {
-    case BuiltinPriority::Favourite: return "Favourite";
-    case BuiltinPriority::High: return "High";
-    case BuiltinPriority::Normal: return "Normal";
-    case BuiltinPriority::Low: return "Low";
+    case BuiltinPriority::Favourite: return NOX_TRC("editor.builtins.priority_favourite", "Favourite");
+    case BuiltinPriority::High: return NOX_TRC("editor.builtins.priority_high", "High");
+    case BuiltinPriority::Normal: return NOX_TRC("editor.builtins.priority_normal", "Normal");
+    case BuiltinPriority::Low: return NOX_TRC("editor.builtins.priority_low", "Low");
     }
-    return "Normal";
+    return NOX_TRC("editor.builtins.priority_normal", "Normal");
 }
 
 const char* builtinSortName(BuiltinSort s)
 {
     switch (s) {
-    case BuiltinSort::Priority: return "Priority";
-    case BuiltinSort::Name: return "Name";
-    case BuiltinSort::Category: return "Category";
-    case BuiltinSort::Usage: return "Use in stock maps";
-    case BuiltinSort::Table: return "Builtin number";
+    case BuiltinSort::Priority: return NOX_TRC("editor.builtins.sort_priority", "Priority");
+    case BuiltinSort::Name: return NOX_TRC("editor.builtins.sort_name", "Name");
+    case BuiltinSort::Category: return NOX_TRC("editor.builtins.sort_category", "Category");
+    case BuiltinSort::Usage: return NOX_TRC("editor.builtins.sort_usage", "Use in stock maps");
+    case BuiltinSort::Table: return NOX_TRC("editor.builtins.sort_number", "Builtin number");
     }
-    return "Priority";
+    return NOX_TRC("editor.builtins.sort_priority", "Priority");
 }
 
 BuiltinPriority priorityOf(const BuiltinPriorities& priorities, std::string_view name)

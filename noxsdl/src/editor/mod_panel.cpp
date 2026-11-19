@@ -18,6 +18,7 @@
 #include "noxcore/mapedit/mod_files.hpp"
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/manifest.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <imgui.h>
@@ -99,7 +100,7 @@ std::string unescaped(std::string_view s)
 ModPanel::ModPanel(MapEditor& editor)
     : ed_(editor)
 {
-    std::snprintf(newName_, sizeof newName_, "My Mode");
+    std::snprintf(newName_, sizeof newName_, "%s", NOX_TRC("editor.mod.new.default_name", "My Mode"));
     std::snprintf(newId_, sizeof newId_, "my_mode");
 }
 
@@ -189,60 +190,83 @@ void ModPanel::registerCommands()
     using editor::Command;
     using editor::Shortcut;
     const auto add = [&](const char* id, const char* label, const char* helpText, std::function<void()> run, std::function<bool()> enabled = {},
-                         std::function<bool()> checked = {}, const char* category = "Mod") {
-        ed_.commands_.add(Command{id, label, category, Shortcut{}, helpText, std::move(run), std::move(enabled), std::move(checked)});
+                         std::function<bool()> checked = {}, const char* category = nullptr) {
+        ed_.commands_.add(Command{id, label, category ? category : NOX_TRC("editor.category.mod", "Mod"), Shortcut{}, helpText, std::move(run),
+                                  std::move(enabled), std::move(checked)});
     };
     const auto available = [this] { return !ed_.ctx_.modsDir.empty(); };
     const auto open = [this] { return project_.has_value(); };
-    add("mod.new", "New Mod...", "A new mod from the template (mode.json, a server script, a UI script and its preview) in mods\\ beside noxcore.exe: playable as soon as it's saved.",
+    add("mod.new", NOX_TRC("editor.cmd.mod.new.label", "New Mod..."),
+        NOX_TRC("editor.cmd.mod.new.help",
+                "A new mod from the template (mode.json, a server script, a UI script and its preview) in mods\\ beside noxcore.exe: playable as soon as it's saved."),
         [this] { newOpen_ = true; }, available);
-    add("mod.open", "Open Mod...", "A mod in mods\\ (a reference mod opens as a copy of its own).", [this] {
+    add("mod.open", NOX_TRC("editor.cmd.mod.open.label", "Open Mod..."),
+        NOX_TRC("editor.cmd.mod.open.help", "A mod in mods\\ (a reference mod opens as a copy of its own)."), [this] {
         listing_ = editor::listMods(modsDir());
         openOpen_ = true;
     }, available);
-    add("mod.save", "Save Mod", "Save the mod's open files and its form (mode.json). A running test of the mod reloads its server scripts, keeping their state.",
+    add("mod.save", NOX_TRC("editor.cmd.mod.save.label", "Save Mod"),
+        NOX_TRC("editor.cmd.mod.save.help",
+                "Save the mod's open files and its form (mode.json). A running test of the mod reloads its server scripts, keeping their state."),
         [this] { saveAll(); }, open);
-    add("mod.play", "Play Mod", "Host the mod here and play it (on its own map, or the open one: the Play Map setting below), as the map's play-test does.",
+    add("mod.play", NOX_TRC("editor.cmd.mod.play.label", "Play Mod"),
+        NOX_TRC("editor.cmd.mod.play.help",
+                "Host the mod here and play it (on its own map, or the open one: the Play Map setting below), as the map's play-test does."),
         [this] { playMod(playMap_); },
         [this, open] { return open() && ed_.ctx_.playTest.available() && (!ed_.inSession() || (sessionMod_ && ed_.ctx_.playTest.startPrivate)); });
-    add("mod.publish", "Publish Mod", "(The session's host) Write the session's mod files as they stand now into your mods\\ folder: the pending changes become the mod.",
+    add("mod.publish", NOX_TRC("editor.cmd.mod.publish.label", "Publish Mod"),
+        NOX_TRC("editor.cmd.mod.publish.help",
+                "(The session's host) Write the session's mod files as they stand now into your mods\\ folder: the pending changes become the mod."),
         [this] {
             if (auto* s = session()) s->modPublish();
         },
         [this] { return sessionMod_ && session() && session()->isOwner(); });
-    add("mod.sessionOpen", "Open the Session's Mod", "The mod the session carries in the Mod windows again (after Close Mod).", [this] {
+    add("mod.sessionOpen", NOX_TRC("editor.cmd.mod.session_open.label", "Open the Session's Mod"),
+        NOX_TRC("editor.cmd.mod.session_open.help", "The mod the session carries in the Mod windows again (after Close Mod)."), [this] {
         sessionDismissed_ = false;
         sessionModId_.clear(); // (opened afresh at the next frame)
     }, [this] { return session() && session()->mod() && !sessionMod_; });
-    add("mod.export", "Export Mod...", "Write the mod's folder as a zip for someone to unzip into their own mods\\ (nothing is uploaded).", [this] {
-        static const SDL_DialogFileFilter filters[] = {{"Zip archive", "zip"}};
+    add("mod.export", NOX_TRC("editor.cmd.mod.export.label", "Export Mod..."),
+        NOX_TRC("editor.cmd.mod.export.help", "Write the mod's folder as a zip for someone to unzip into their own mods\\ (nothing is uploaded)."), [this] {
+        static const SDL_DialogFileFilter filters[] = {{NOX_TRC("editor.mod.zip_filter", "Zip archive"), "zip"}};
         static std::string start;
         start = pathText(modsDir().parent_path() / (project_->folderName() + ".zip"));
         editor::saveFileDialog(filePick_, ed_.ctx_.window, filters, 1, start.c_str());
     }, open);
-    add("mod.close", "Close Mod", "Close the mod's windows (unsaved changes are asked about).", [this] {
+    add("mod.close", NOX_TRC("editor.cmd.mod.close.label", "Close Mod"),
+        NOX_TRC("editor.cmd.mod.close.help", "Close the mod's windows (unsaved changes are asked about)."), [this] {
         askThen([this] {
             sessionDismissed_ = sessionMod_; // (the session's: not opened again till asked)
             closeProject();
         });
     }, open);
-    add("mod.preview", "Preview UI", "Run the mod's UI here with no server, fed by ui/preview.luau's test messages.", [this] {
+    add("mod.preview", NOX_TRC("editor.cmd.mod.preview.label", "Preview UI"),
+        NOX_TRC("editor.cmd.mod.preview.help", "Run the mod's UI here with no server, fed by ui/preview.luau's test messages."), [this] {
         showPreview_ = true;
         focusPreview_ = 2;
         reloadPreview();
     }, [this, open] { return open() && !form_.uiScript.empty(); });
-    add("window.modForm", "Mod", "Shows or hides the mod's form (mode.json).", [this] { showForm_ = !showForm_; }, open, [this] { return showForm_; }, "Window");
-    add("window.modFiles", "Mod Files", "Shows or hides the mod's files.", [this] { showFiles_ = !showFiles_; }, open, [this] { return showFiles_; }, "Window");
-    add("window.modCode", "Mod Code", "Shows or hides the mod's open files.", [this] { showCode_ = !showCode_; }, open, [this] { return showCode_; }, "Window");
-    add("window.modReference", "Mod Reference", "Shows or hides the server toolbox and the UI API.", [this] { showReference_ = !showReference_; }, {},
-        [this] { return showReference_ && project_.has_value(); }, "Window");
-    add("window.modPreview", "Mod Preview", "Shows or hides the UI preview.", [this] { showPreview_ = !showPreview_; }, open,
-        [this] { return showPreview_; }, "Window");
+    const char* window = NOX_TRC("editor.category.window", "Window");
+    add("window.modForm", NOX_TRC("editor.cmd.window.mod_form.label", "Mod"),
+        NOX_TRC("editor.cmd.window.mod_form.help", "Shows or hides the mod's form (mode.json)."), [this] { showForm_ = !showForm_; }, open,
+        [this] { return showForm_; }, window);
+    add("window.modFiles", NOX_TRC("editor.cmd.window.mod_files.label", "Mod Files"),
+        NOX_TRC("editor.cmd.window.mod_files.help", "Shows or hides the mod's files."), [this] { showFiles_ = !showFiles_; }, open,
+        [this] { return showFiles_; }, window);
+    add("window.modCode", NOX_TRC("editor.cmd.window.mod_code.label", "Mod Code"),
+        NOX_TRC("editor.cmd.window.mod_code.help", "Shows or hides the mod's open files."), [this] { showCode_ = !showCode_; }, open,
+        [this] { return showCode_; }, window);
+    add("window.modReference", NOX_TRC("editor.cmd.window.mod_reference.label", "Mod Reference"),
+        NOX_TRC("editor.cmd.window.mod_reference.help", "Shows or hides the server toolbox and the UI API."), [this] { showReference_ = !showReference_; }, {},
+        [this] { return showReference_ && project_.has_value(); }, window);
+    add("window.modPreview", NOX_TRC("editor.cmd.window.mod_preview.label", "Mod Preview"),
+        NOX_TRC("editor.cmd.window.mod_preview.help", "Shows or hides the UI preview."), [this] { showPreview_ = !showPreview_; }, open,
+        [this] { return showPreview_; }, window);
 }
 
 void ModPanel::menu()
 {
-    if (ed_.ctx_.modsDir.empty() || !ImGui::BeginMenu("Mod")) {
+    if (ed_.ctx_.modsDir.empty() || !ImGui::BeginMenu(NOX_TRI("editor.menu.mod", "Mod"))) {
         return;
     }
     for (const char* id : {"mod.new", "mod.open", "mod.save"}) ed_.menuItem(id);
@@ -251,11 +275,11 @@ void ModPanel::menu()
     }
     ImGui::Separator();
     ed_.menuItem("mod.play");
-    if (ImGui::BeginMenu("Play Map", project_.has_value())) {
-        if (ImGui::MenuItem("The mode's own", nullptr, playMap_.empty())) playMap_.clear();
-        help("The map the mode's configure names (Estate when it names none).");
-        if (ImGui::MenuItem("The open map", nullptr, playMap_ == "open")) playMap_ = "open";
-        help("The map open in the editor, written as Play writes it, whatever map the mode names.");
+    if (ImGui::BeginMenu(NOX_TRI("editor.mod.play_map", "Play Map"), project_.has_value())) {
+        if (ImGui::MenuItem(NOX_TRI("editor.mod.play_map.own", "The mode's own"), nullptr, playMap_.empty())) playMap_.clear();
+        help(NOX_TRC("editor.mod.play_map.own_help", "The map the mode's configure names (Estate when it names none)."));
+        if (ImGui::MenuItem(NOX_TRI("editor.mod.play_map.open", "The open map"), nullptr, playMap_ == "open")) playMap_ = "open";
+        help(NOX_TRC("editor.mod.play_map.open_help", "The map open in the editor, written as Play writes it, whatever map the mode names."));
         ImGui::EndMenu();
     }
     ed_.menuItem("mod.preview");
@@ -278,7 +302,7 @@ bool ModPanel::openProject(const fs::path& folder)
     std::string error;
     auto p = editor::ModProject::open(folder, error);
     if (!p) {
-        ed_.errorText_ = "The mod can't be opened:\n" + error;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.open", "The mod can't be opened:\n{error}"), {{"error", error}});
         return false;
     }
     closeProject();
@@ -303,7 +327,7 @@ bool ModPanel::openProject(const fs::path& folder)
     if (showPreview_) {
         reloadPreview();
     }
-    ed_.status("Mod " + project_->folderName() + " (" + pathText(folder) + ")");
+    ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.opened", "Mod {name} ({path})"), {{"name", project_->folderName()}, {"path", pathText(folder)}}));
     return true;
 }
 
@@ -326,7 +350,7 @@ void ModPanel::newMod(const std::string& id, const std::string& name)
 {
     std::string error;
     if (!editor::ModProject::create(modsDir(), id, name, error)) {
-        ed_.errorText_ = "The mod can't be made:\n" + error;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.create", "The mod can't be made:\n{error}"), {{"error", error}});
         return;
     }
     openProject(modsDir() / id);
@@ -347,11 +371,12 @@ void ModPanel::openMod(const editor::ModListing& listing)
     name = (name + " (copy)").substr(0, 32);
     std::string error;
     if (!editor::ModProject::copyOf(listing.folder, modsDir(), id, name, error)) {
-        ed_.errorText_ = "The reference mod can't be copied:\n" + error;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.copy_reference", "The reference mod can't be copied:\n{error}"), {{"error", error}});
         return;
     }
     if (openProject(modsDir() / id)) {
-        ed_.status(listing.id + " is a reference mod: opened as a copy, mods\\" + id);
+        ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.reference_copy", "{mod} is a reference mod: opened as a copy, mods\\{copy}"),
+                                     {{"mod", listing.id}, {"copy", id}}));
     }
 }
 
@@ -393,12 +418,12 @@ void ModPanel::openFile(const std::string& path)
     }
     if (path == "mode.json") {
         showForm_ = true; // (mode.json is the form's: edited there, its other fields kept)
-        ImGui::SetWindowFocus("Mod");
+        ImGui::SetWindowFocus(NOX_TRI("editor.window.mod", "Mod"));
         return;
     }
     const auto text = project_ ? project_->read(path) : std::nullopt;
     if (!text) {
-        ed_.status(path + " can't be read (over 1 MB, or not a file)");
+        ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.cant_read", "{path} can't be read (over 1 MB, or not a file)"), {{"path", path}}));
         return;
     }
     auto tab = std::make_unique<Tab>();
@@ -417,7 +442,7 @@ bool ModPanel::saveTab(Tab& tab)
     std::string error;
     const std::string text = tab.code.text();
     if (!project_->write(tab.path, text, error)) {
-        ed_.errorText_ = "The mod's " + tab.path + " can't be saved:\n" + error;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.save_file", "The mod's {path} can't be saved:\n{error}"), {{"path", tab.path}, {"error", error}});
         return false;
     }
     tab.saved = text;
@@ -442,13 +467,14 @@ const std::string& ModPanel::prefixProblem()
 bool ModPanel::saveForm()
 {
     if (const std::string& why = prefixProblem(); !why.empty()) {
-        ed_.errorText_ = "The mod's mode.json isn't saved: its map prefix " + form_.mapPrefix + ": " + why + ".";
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.prefix_not_saved", "The mod's mode.json isn't saved: its map prefix {prefix}: {why}."),
+                                           {{"prefix", form_.mapPrefix}, {"why", why}});
         return false;
     }
     project_->setForm(form_);
     std::string error;
     if (!project_->saveManifest(error)) {
-        ed_.errorText_ = "The mod's mode.json can't be saved:\n" + error;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.save_manifest", "The mod's mode.json can't be saved:\n{error}"), {{"error", error}});
         return false;
     }
     formSaved_ = form_;
@@ -479,7 +505,10 @@ bool ModPanel::saveAll()
     refreshFiles();
     afterSave(server, ui);
     if (ok) {
-        ed_.status("Mod " + project_->folderName() + " saved" + (lastReload_.empty() ? "" : "; " + lastReload_));
+        ed_.status(lastReload_.empty()
+                       ? nox::l10n::format(NOX_TR("editor.mod.status.saved", "Mod {name} saved"), {{"name", project_->folderName()}})
+                       : nox::l10n::format(NOX_TR("editor.mod.status.saved_reload", "Mod {name} saved; {reload}"),
+                                           {{"name", project_->folderName()}, {"reload", lastReload_}}));
     }
     return ok;
 }
@@ -493,9 +522,9 @@ void ModPanel::afterSave(bool server, bool ui)
     if (running && (server || ui) && hooks.modeCommand) {
         // The running mode's scripts read again, its state kept (save() to restore()); the reload
         // sends its UI again when that changed (ScriptedMode's load).
-        lastReload_ = "reloading the running mode...";
+        lastReload_ = NOX_TR("editor.mod.reloading", "reloading the running mode...");
         hooks.modeCommand("mode reload keep", [this](std::vector<std::string> lines) {
-            lastReload_ = lines.empty() ? "the running mode didn't answer the reload" : lines.front();
+            lastReload_ = lines.empty() ? NOX_TR("editor.mod.reload_no_answer", "the running mode didn't answer the reload") : lines.front();
             ed_.status(lastReload_);
             if (ed_.ctx_.playTest.notify) {
                 ed_.ctx_.playTest.notify(lastReload_);
@@ -564,10 +593,12 @@ void ModPanel::reloadPreview()
     previewLoaded_ = true;
     previewLog_.clear();
     if (!assets.assets) {
-        previewLog_.push_back("assets: " + assets.error);
+        previewLog_.push_back(nox::l10n::format(NOX_TR("editor.mod.preview.assets_error", "assets: {error}"), {{"error", assets.error}}));
     }
     if (!ui) {
-        previewLog_.push_back(form_.uiScript.empty() ? "The mod has no UI script (mode.json's \"ui\")." : form_.uiScript + " can't be read.");
+        previewLog_.push_back(form_.uiScript.empty()
+                                  ? NOX_TR("editor.mod.preview.no_ui", "The mod has no UI script (mode.json's \"ui\").")
+                                  : nox::l10n::format(NOX_TR("editor.mod.preview.ui_unreadable", "{path} can't be read."), {{"path", form_.uiScript}}));
     }
 }
 
@@ -578,21 +609,21 @@ void ModPanel::playMod(const std::string& map)
     }
     auto& hooks = ed_.ctx_.playTest;
     if (!hooks.available()) {
-        ed_.status("Play-test isn't available here");
+        ed_.status(NOX_TR("editor.mod.status.no_playtest", "Play-test isn't available here"));
         return;
     }
     if (ed_.inSession()) {
         // In a session: a private test of the session's mod as our copy has it (our unsaved
         // changes saved first), in a process of its own; the session's game untouched.
         if (!sessionMod_ || !hooks.startPrivate) {
-            ed_.status("In a session, Play Mod plays the session's mod (it carries none here)");
+            ed_.status(NOX_TR("editor.mod.status.session_no_mod", "In a session, Play Mod plays the session's mod (it carries none here)"));
             return;
         }
         if (!saveAll()) {
             return;
         }
         if (const std::string problem = project_->manifestProblem(); !problem.empty()) {
-            ed_.errorText_ = "The mod doesn't load:\n" + problem;
+            ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.doesnt_load", "The mod doesn't load:\n{problem}"), {{"problem", problem}});
             return;
         }
         if (map == "open") {
@@ -608,10 +639,11 @@ void ModPanel::playMod(const std::string& map)
         req.modsDir = sessionRoot();
         req.playersCanDie = true;
         if (const std::string error = hooks.startPrivate(req); !error.empty()) {
-            ed_.errorText_ = "The mod's private test didn't start:\n" + error;
+            ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.private_test", "The mod's private test didn't start:\n{error}"), {{"error", error}});
             return;
         }
-        ed_.status("A private test of the session's mod " + form_.id + " in its own window (the session goes on here)");
+        ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.private_test", "A private test of the session's mod {id} in its own window (the session goes on here)"),
+                                     {{"id", form_.id}}));
         return;
     }
     if (hooks.running && hooks.running()) {
@@ -619,14 +651,14 @@ void ModPanel::playMod(const std::string& map)
             if (hooks.resume) hooks.resume();
             return;
         }
-        ed_.status("A play-test is running: stop it first");
+        ed_.status(NOX_TR("editor.mod.status.playtest_running", "A play-test is running: stop it first"));
         return;
     }
     if (!saveAll()) {
         return;
     }
     if (const std::string problem = project_->manifestProblem(); !problem.empty()) {
-        ed_.errorText_ = "The mod doesn't load:\n" + problem;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.doesnt_load", "The mod doesn't load:\n{problem}"), {{"problem", problem}});
         return;
     }
     const std::string id = form_.id;
@@ -643,7 +675,7 @@ void ModPanel::playMod(const std::string& map)
         req.playersCanDie = true; // (the mod's own rules: no sandbox)
         req.fullWindow = ed_.settings_.playFullWindow;
         if (const std::string error = hooks.start(req); !error.empty()) {
-            ed_.errorText_ = "The mod's play-test didn't start:\n" + error;
+            ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.playtest", "The mod's play-test didn't start:\n{error}"), {{"error", error}});
             return;
         }
     }
@@ -651,8 +683,12 @@ void ModPanel::playMod(const std::string& map)
     lastReload_.clear();
     if (playing_) {
         focusMap_ = 2; // (the game is drawn in the Map panel: in front of a tab sharing its dock, the preview's)
-        ed_.status("Playing mod " + id + (map == "open" ? " on the open map" : map.empty() ? "" : " on " + map) +
-                   ": saving a server script reloads it, its state kept");
+        ed_.status(map == "open"   ? nox::l10n::format(NOX_TR("editor.mod.status.playing_open", "Playing mod {id} on the open map: saving a server script reloads it, its state kept"),
+                                                       {{"id", id}})
+                   : map.empty() ? nox::l10n::format(NOX_TR("editor.mod.status.playing", "Playing mod {id}: saving a server script reloads it, its state kept"),
+                                                     {{"id", id}})
+                                 : nox::l10n::format(NOX_TR("editor.mod.status.playing_on", "Playing mod {id} on {map}: saving a server script reloads it, its state kept"),
+                                                     {{"id", id}, {"map", map}}));
     }
 }
 
@@ -673,7 +709,7 @@ void ModPanel::exportTo(const fs::path& zipPath)
             }
             total += e.size;
             if (total > kExportCap) {
-                ed_.errorText_ = "The mod is over 64 MB: not exported.";
+                ed_.errorText_ = NOX_TR("editor.mod.err.export_too_big", "The mod is over 64 MB: not exported.");
                 return;
             }
             const auto at = project_->pathOf(e.path);
@@ -684,14 +720,14 @@ void ModPanel::exportTo(const fs::path& zipPath)
         std::ofstream f(zipPath, std::ios::binary | std::ios::trunc);
         f.write(reinterpret_cast<const char*>(out.data()), static_cast<std::streamsize>(out.size()));
         if (!f) {
-            throw std::runtime_error("can't write " + pathText(zipPath));
+            throw std::runtime_error(nox::l10n::format(NOX_TR("editor.mod.err.cant_write", "can't write {path}"), {{"path", pathText(zipPath)}}));
         }
     } catch (const std::exception& ex) {
-        ed_.errorText_ = std::string("The mod can't be exported:\n") + ex.what();
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.mod.err.export", "The mod can't be exported:\n{error}"), {{"error", ex.what()}});
         return;
     }
-    ed_.status("Exported " + project_->folderName() + " (" + std::to_string(zip.entries()) + " entries) to " + pathText(zipPath) +
-               ": unzip it into a mods\\ folder beside noxcore.exe");
+    ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.exported", "Exported {name} ({n} entries) to {path}: unzip it into a mods\\ folder beside noxcore.exe"),
+                                 {{"name", project_->folderName()}, {"n", zip.entries()}, {"path", pathText(zipPath)}}));
 }
 
 bool ModPanel::dirty() const
@@ -746,7 +782,11 @@ bool ModPanel::onShortcut(int chord)
     s.key = ImGui::GetKeyName(static_cast<ImGuiKey>(key));
     if (const editor::Command* c = ed_.commands_.match(s)) {
         const std::string& cat = c->category;
-        if (cat == "File" || cat == "Window" || cat == "Help" || cat == "Play" || cat == "Mod" || c->id == "view.palette") {
+        // (A category as the registry holds it: in English, or in the language in use.)
+        const auto is = [&](std::string_view en, const std::string& shown) { return cat == en || cat == shown; };
+        if (is("File", NOX_TR("editor.category.file", "File")) || is("Window", NOX_TR("editor.category.window", "Window")) ||
+            is("Help", NOX_TR("editor.category.help", "Help")) || is("Play", NOX_TR("editor.category.play", "Play")) ||
+            is("Mod", NOX_TR("editor.category.mod", "Mod")) || c->id == "view.palette") {
             ed_.commands_.run(c->id);
             return true;
         }
@@ -814,11 +854,13 @@ void ModPanel::sessionTick()
         for (const auto& tab : tabs_) {
             if (tab->dirty) dropped += (dropped.empty() ? "" : ", ") + tab->path;
         }
-        if (!(form_ == formSaved_)) dropped += std::string(dropped.empty() ? "" : ", ") + "the Mod form";
+        if (!(form_ == formSaved_)) dropped += std::string(dropped.empty() ? "" : ", ") + NOX_TR("editor.mod.the_form", "the Mod form");
         closeProject();
         sessionModId_.clear();
-        ed_.status(dropped.empty() ? "The session's mod is closed"
-                                   : "The session's mod is closed; not saved, so dropped: " + dropped + " (what was saved is in its copy)");
+        ed_.status(dropped.empty() ? NOX_TR("editor.mod.status.session_closed", "The session's mod is closed")
+                                   : nox::l10n::format(NOX_TR("editor.mod.status.session_closed_dropped",
+                                                              "The session's mod is closed; not saved, so dropped: {files} (what was saved is in its copy)"),
+                                                       {{"files", dropped}}));
         return;
     }
     if (!s || !s->mod() || !s->modReady()) {
@@ -859,7 +901,7 @@ void ModPanel::attachSessionMod()
     sessionModId_ = id;
     sessionDismissed_ = false;
     if (!nox::modes::script::validModeId(id)) {
-        ed_.status("The session's mod has a bad id: not opened");
+        ed_.status(NOX_TR("editor.mod.status.session_bad_id", "The session's mod has a bad id: not opened"));
         return;
     }
     closeProject(); // (asked about first when it had unsaved changes: sessionTick)
@@ -876,7 +918,7 @@ void ModPanel::attachSessionMod()
         }
     }
     if (!fs::exists(dir / "mode.json", ec) || !openProject(dir)) {
-        ed_.status("The session's mod " + id + " has no mode.json to open");
+        ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.session_no_manifest", "The session's mod {id} has no mode.json to open"), {{"id", id}}));
         return;
     }
     // (openProject's closeProject cleared what was written: noted again.)
@@ -885,7 +927,8 @@ void ModPanel::attachSessionMod()
     }
     sessionMod_ = true;
     sessionModRev_ = s->modRevision();
-    ed_.status("The session's mod " + id + ": saves go to the session, pending till its host publishes them");
+    ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.session_opened", "The session's mod {id}: saves go to the session, pending till its host publishes them"),
+                                 {{"id", id}}));
 }
 
 void ModPanel::syncSessionMod()
@@ -975,11 +1018,13 @@ void ModPanel::syncSessionMod()
     if (!notTaken.empty()) {
         std::string list;
         for (const auto& c : notTaken) list += (list.empty() ? "" : ", ") + c;
-        ed_.status(list + ": not saved in the session (see the session log); your text is kept, unsaved");
+        ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.not_taken", "{files}: not saved in the session (see the session log); your text is kept, unsaved"),
+                                     {{"files", list}}));
     } else if (!changedBy.empty()) {
         std::string list;
         for (const auto& c : changedBy) list += (list.empty() ? "" : ", ") + c;
-        ed_.status("Changed in the session meanwhile: " + list + ": your edits are kept (saving them replaces theirs)");
+        ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.changed_by", "Changed in the session meanwhile: {files}: your edits are kept (saving them replaces theirs)"),
+                                     {{"files", list}}));
     }
     refreshFiles();
     requestAnalysis();
@@ -1060,17 +1105,18 @@ void ModPanel::problems()
     if (manifest.manifest && diagnostics_.empty() && prefixProblem().empty()) {
         return;
     }
-    ImGui::SeparatorText(("Mod " + project_->folderName()).c_str());
+    ImGui::SeparatorText(nox::l10n::format(NOX_TR("editor.mod.problems.heading", "Mod {name}"), {{"name", project_->folderName()}}).c_str());
     if (ImGui::BeginTable("##modissues", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable)) {
         const float s = ed_.imgui_->scale();
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60 * s);
-        ImGui::TableSetupColumn("Where", ImGuiTableColumnFlags_WidthFixed, 200 * s);
-        ImGui::TableSetupColumn("Problem", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("editor.mod.problems.where", "Where"), ImGuiTableColumnFlags_WidthFixed, 200 * s);
+        ImGui::TableSetupColumn(NOX_TRI("editor.mod.problems.problem", "Problem"), ImGuiTableColumnFlags_WidthStretch);
         int row = 0;
         const auto line = [&](bool error, const std::string& where, const std::string& message, const std::string& file, int goLine, int goCol) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextColored(error ? editor::themeColours().error : editor::themeColours().warning, "%s", error ? "Error" : "Warning");
+            ImGui::TextColored(error ? editor::themeColours().error : editor::themeColours().warning, "%s",
+                               error ? NOX_TRC("editor.mod.problems.error", "Error") : NOX_TRC("editor.mod.problems.warning", "Warning"));
             ImGui::TableNextColumn();
             if (ImGui::Selectable((where + "##m" + std::to_string(row++)).c_str(), false, ImGuiSelectableFlags_SpanAllColumns) && !file.empty()) {
                 openFile(file);
@@ -1087,7 +1133,9 @@ void ModPanel::problems()
             line(true, "mode.json", manifest.error, "mode.json", 0, 0);
         }
         if (!prefixProblem().empty()) {
-            line(true, "mode.json", "mapPrefix \"" + form_.mapPrefix + "\": " + prefixProblem(), "mode.json", 0, 0);
+            line(true, "mode.json",
+                 nox::l10n::format(NOX_TR("editor.mod.problems.map_prefix", "mapPrefix \"{prefix}\": {why}"), {{"prefix", form_.mapPrefix}, {"why", prefixProblem()}}),
+                 "mode.json", 0, 0);
         }
         for (const editor::ModDiagnostic& d : diagnostics_) {
             line(d.error, d.file + " " + std::to_string(d.line) + ":" + std::to_string(d.col), d.message, d.file, d.line, d.col);
@@ -1105,13 +1153,14 @@ void ModPanel::draw()
         return;
     }
     if (focusMap_ > 0 && --focusMap_ == 0) {
-        ImGui::SetWindowFocus("Map");
+        ImGui::SetWindowFocus(NOX_TRI("editor.window.map", "Map"));
     }
     if (focusOpened_ > 0) {
         // (The first frame makes the windows; then the form, the files, the code.)
-        static constexpr const char* kOrder[] = {"Mod Code", "Mod Files", "Mod"};
         if (--focusOpened_ < 3) {
-            ImGui::SetWindowFocus(kOrder[focusOpened_]);
+            ImGui::SetWindowFocus(focusOpened_ == 0   ? NOX_TRI("editor.window.mod_code", "Mod Code")
+                                  : focusOpened_ == 1 ? NOX_TRI("editor.window.mod_files", "Mod Files")
+                                                      : NOX_TRI("editor.window.mod", "Mod"));
         }
     }
     if (showForm_) formWindow();
@@ -1124,7 +1173,7 @@ void ModPanel::draw()
 void ModPanel::formWindow()
 {
     ImGui::SetNextWindowSize(ImVec2(360, 520), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Mod", &showForm_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.mod", "Mod"), &showForm_)) {
         ImGui::End();
         return;
     }
@@ -1134,12 +1183,13 @@ void ModPanel::formWindow()
     ImGui::SameLine();
     const bool changed = !(form_ == formSaved_);
     ImGui::BeginDisabled(!changed && !dirty());
-    if (ImGui::SmallButton("Save")) saveAll();
+    if (ImGui::SmallButton(NOX_TRI("editor.common.save", "Save"))) saveAll();
     ImGui::EndDisabled();
-    help("Save mode.json and the open files (Ctrl+S in a file).");
+    help(NOX_TRC("editor.mod.form.save_help", "Save mode.json and the open files (Ctrl+S in a file)."));
     ImGui::SameLine();
     ImGui::BeginDisabled(!ed_.commands_.enabled("mod.play"));
-    if (ImGui::SmallButton(playing_ ? "Back to Game" : "Play Mod")) ed_.commands_.run("mod.play");
+    if (ImGui::SmallButton(playing_ ? NOX_TRI("editor.mod.form.back_to_game", "Back to Game") : NOX_TRI("editor.cmd.mod.play.label", "Play Mod")))
+        ed_.commands_.run("mod.play");
     ImGui::EndDisabled();
     help(ed_.commands_.find("mod.play") ? ed_.commands_.find("mod.play")->help : std::string());
     if (playing_ && !lastReload_.empty()) {
@@ -1148,80 +1198,101 @@ void ModPanel::formWindow()
     if (sessionMod_ && session()) {
         // The session's mod: saves go to its host, pending till the host publishes them.
         const auto pending = std::ranges::count_if(session()->mod()->files, [](const auto& f) { return f.second.pending(); });
-        ImGui::TextColored(editor::themeColours().info, "The session's mod: saves go to the session (%td pending)", pending);
+        ImGui::TextColored(editor::themeColours().info, "%s",
+                           nox::l10n::format(NOX_TR("editor.mod.form.session_pending", "The session's mod: saves go to the session ({n} pending)"),
+                                             {{"n", pending}})
+                               .c_str());
         if (session()->isOwner()) {
             ImGui::SameLine();
             ImGui::BeginDisabled(pending == 0);
-            if (ImGui::SmallButton("Publish Mod")) ed_.commands_.run("mod.publish");
+            if (ImGui::SmallButton(NOX_TRI("editor.cmd.mod.publish.label", "Publish Mod"))) ed_.commands_.run("mod.publish");
             ImGui::EndDisabled();
             help(ed_.commands_.find("mod.publish") ? ed_.commands_.find("mod.publish")->help : std::string());
         }
     }
     ImGui::Separator();
 
-    editor::labelRow("Id", fieldX, "The mode's key (a-z, 0-9 and _, at most 24): the game registers it under this. Its folder's name should match.");
+    editor::labelRow(NOX_TRC("editor.mod.form.id", "Id"), fieldX,
+                     NOX_TRC("editor.mod.form.id_help", "The mode's key (a-z, 0-9 and _, at most 24): the game registers it under this. Its folder's name should match."));
     inputText("##id", form_.id, 24, ImGuiInputTextFlags_CharsNoBlank);
     if (form_.id != project_->folderName()) {
-        ImGui::TextColored(editor::themeColours().warning, "The folder is mods\\%s: the game lists the mode as \"%s\".", project_->folderName().c_str(),
-                           form_.id.c_str());
+        ImGui::TextColored(editor::themeColours().warning, "%s",
+                           nox::l10n::format(NOX_TR("editor.mod.form.folder_mismatch", "The folder is mods\\{folder}: the game lists the mode as \"{id}\"."),
+                                             {{"folder", project_->folderName()}, {"id", form_.id}})
+                               .c_str());
     }
-    editor::labelRow("Name", fieldX, "As the mode lists show it (at most 32).");
+    editor::labelRow(NOX_TRC("editor.mod.form.name", "Name"), fieldX, NOX_TRC("editor.mod.form.name_help", "As the mode lists show it (at most 32)."));
     inputText("##name", form_.name, 32);
-    editor::labelRow("Description", fieldX, "One line for the list (at most 120).");
+    editor::labelRow(NOX_TRC("editor.mod.form.description", "Description"), fieldX,
+                     NOX_TRC("editor.mod.form.description_help", "One line for the list (at most 120)."));
     inputText("##desc", form_.description, 120);
-    editor::labelRow("Players", fieldX, "The fewest and the most players (1-32).");
+    editor::labelRow(NOX_TRC("editor.mod.form.players", "Players"), fieldX, NOX_TRC("editor.mod.form.players_help", "The fewest and the most players (1-32)."));
     int players[2] = {form_.minPlayers, form_.maxPlayers};
     if (ImGui::InputInt2("##players", players)) {
         form_.minPlayers = std::clamp(players[0], 1, 32);
         form_.maxPlayers = std::clamp(players[1], form_.minPlayers, 32);
     }
-    editor::labelRow("Stock clients", fieldX, "Whether GAME.EXE players can join (off: NoX Core players only; stock ones are told why and turned away).");
+    editor::labelRow(NOX_TRC("editor.mod.form.stock_clients", "Stock clients"), fieldX,
+                     NOX_TRC("editor.mod.form.stock_clients_help",
+                             "Whether GAME.EXE players can join (off: NoX Core players only; stock ones are told why and turned away)."));
     ImGui::Checkbox("##stock", &form_.stockClients);
-    editor::labelRow("Levels", fieldX, "Map files (the host's maps), or levels the mode generates itself.");
+    editor::labelRow(NOX_TRC("editor.mod.form.levels", "Levels"), fieldX,
+                     NOX_TRC("editor.mod.form.levels_help", "Map files (the host's maps), or levels the mode generates itself."));
     int levels = form_.generatedLevels ? 1 : 0;
-    if (ImGui::Combo("##levels", &levels, "Map files\0Generated\0")) form_.generatedLevels = levels == 1;
-    editor::labelRow("Map prefix", fieldX,
-                     "2-3 capital letters its generated maps' names start with (\"DSC\": DSC_...), none another mode or mod has. Empty: none.");
+    const char* levelItems[] = {NOX_TRC("editor.mod.form.levels.map_files", "Map files"), NOX_TRC("editor.mod.form.levels.generated", "Generated")};
+    if (ImGui::Combo("##levels", &levels, levelItems, 2)) form_.generatedLevels = levels == 1;
+    editor::labelRow(NOX_TRC("editor.mod.form.map_prefix", "Map prefix"), fieldX,
+                     NOX_TRC("editor.mod.form.map_prefix_help",
+                             "2-3 capital letters its generated maps' names start with (\"DSC\": DSC_...), none another mode or mod has. Empty: none."));
     if (inputText("##prefix", form_.mapPrefix, 3, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank)) {
         prefixFor_.reset();
     }
     if (const std::string& why = prefixProblem(); !why.empty()) {
-        ImGui::TextColored(editor::themeColours().error, "Map prefix: %s.", why.c_str());
+        ImGui::TextColored(editor::themeColours().error, "%s",
+                           nox::l10n::format(NOX_TR("editor.mod.form.map_prefix_problem", "Map prefix: {why}."), {{"why", why}}).c_str());
     }
-    editor::labelRow("Plays as", fieldX, "A stock mode it looks like to the game and the clients (its own rules the script's).");
+    editor::labelRow(NOX_TRC("editor.mod.form.plays_as", "Plays as"), fieldX,
+                     NOX_TRC("editor.mod.form.plays_as_help", "A stock mode it looks like to the game and the clients (its own rules the script's)."));
     int looks = form_.looksLike == "arena" ? 1 : form_.looksLike == "ctf" ? 2 : 0;
-    if (ImGui::Combo("##looks", &looks, "Its own\0Arena\0Capture the Flag\0")) form_.looksLike = looks == 1 ? "arena" : looks == 2 ? "ctf" : "";
-    editor::labelRow("Server script", fieldX, "The script the host runs ('/' separated, inside the folder).");
+    const char* looksItems[] = {NOX_TRC("editor.mod.form.plays_as.own", "Its own"), NOX_TRC("editor.mod.form.plays_as.arena", "Arena"),
+                                NOX_TRC("editor.mod.form.plays_as.ctf", "Capture the Flag")};
+    if (ImGui::Combo("##looks", &looks, looksItems, 3)) form_.looksLike = looks == 1 ? "arena" : looks == 2 ? "ctf" : "";
+    editor::labelRow(NOX_TRC("editor.mod.form.server_script", "Server script"), fieldX,
+                     NOX_TRC("editor.mod.form.server_script_help", "The script the host runs ('/' separated, inside the folder)."));
     inputText("##server", form_.serverScript, 128);
-    editor::labelRow("UI script", fieldX, "The UI sent to NoX Core players (empty: none; everyone gets the views as text).");
+    editor::labelRow(NOX_TRC("editor.mod.form.ui_script", "UI script"), fieldX,
+                     NOX_TRC("editor.mod.form.ui_script_help", "The UI sent to NoX Core players (empty: none; everyone gets the views as text)."));
     inputText("##ui", form_.uiScript, 128);
-    editor::labelRow("UI API", fieldX,
-                     "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more. 3: lines, tooltips, labels over things, HUD strips, "
-                     "drags and the wheel. 4: the game's spell icons, hit areas, a tick, kept labels. 5: the game's top-left icons kept "
-                     "out of a box. 6: the game's own pictures and window look, clipping, the whole view, covering the HUD (each sent "
-                     "only to clients that run it; the rest get text).");
+    editor::labelRow(NOX_TRC("editor.mod.form.ui_api", "UI API"), fieldX,
+                     NOX_TRC("editor.mod.form.ui_api_help",
+                             "1: boxes, outlines, text, clicks. 2: images, sounds, keys and more. 3: lines, tooltips, labels over things, HUD strips, "
+                             "drags and the wheel. 4: the game's spell icons, hit areas, a tick, kept labels. 5: the game's top-left icons kept "
+                             "out of a box. 6: the game's own pictures and window look, clipping, the whole view, covering the HUD (each sent "
+                             "only to clients that run it; the rest get text)."));
     int api = std::clamp(form_.uiApi, 1, 6) - 1;
     if (ImGui::Combo("##uiapi", &api, "1\0" "2\0" "3\0" "4\0" "5\0" "6\0")) form_.uiApi = api + 1;
 
-    ImGui::SeparatorText("Options");
-    help("Settings shown under the mode's row in Host Custom; a script reads them with nox.option(key).");
+    ImGui::SeparatorText(NOX_TRC("editor.mod.form.options", "Options"));
+    help(NOX_TRC("editor.mod.form.options_help", "Settings shown under the mode's row in Host Custom; a script reads them with nox.option(key)."));
     int remove = -1;
     for (std::size_t i = 0; i < form_.options.size(); ++i) {
         editor::ModOption& o = form_.options[i];
         ImGui::PushID(static_cast<int>(i));
         const std::string head = (o.label.empty() ? o.key : o.label) + "##opt";
         if (ImGui::TreeNodeEx(head.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth)) {
-            editor::labelRow("Key", fieldX, "a-z, 0-9 and _ (nox.option's key).");
+            editor::labelRow(NOX_TRC("editor.mod.option.key", "Key"), fieldX, NOX_TRC("editor.mod.option.key_help", "a-z, 0-9 and _ (nox.option's key)."));
             inputText("##key", o.key, 32, ImGuiInputTextFlags_CharsNoBlank);
-            editor::labelRow("Label", fieldX);
+            editor::labelRow(NOX_TRC("editor.mod.option.label", "Label"), fieldX);
             inputText("##label", o.label, 48);
-            editor::labelRow("Kind", fieldX);
+            editor::labelRow(NOX_TRC("editor.mod.option.kind", "Kind"), fieldX);
             int kind = static_cast<int>(o.kind);
-            if (ImGui::Combo("##kind", &kind, "Toggle\0Choice\0Number\0Text\0")) o.kind = static_cast<editor::ModOption::Kind>(kind);
+            const char* kindItems[] = {NOX_TRC("editor.mod.option.kind.toggle", "Toggle"), NOX_TRC("editor.mod.option.kind.choice", "Choice"),
+                                       NOX_TRC("editor.mod.option.kind.number", "Number"), NOX_TRC("editor.mod.option.kind.text", "Text")};
+            if (ImGui::Combo("##kind", &kind, kindItems, 4)) o.kind = static_cast<editor::ModOption::Kind>(kind);
             if (o.kind == editor::ModOption::Kind::Choice) {
                 std::string list;
                 for (const auto& c : o.choices) list += (list.empty() ? "" : ", ") + c;
-                editor::labelRow("Choices", fieldX, "Comma-separated, 1-16 of them.");
+                editor::labelRow(NOX_TRC("editor.mod.option.choices", "Choices"), fieldX, NOX_TRC("editor.mod.option.choices_help", "Comma-separated, 1-16 of them."));
                 if (inputText("##choices", list, 400)) {
                     o.choices.clear();
                     for (std::size_t at = 0; at <= list.size();) {
@@ -1235,7 +1306,7 @@ void ModPanel::formWindow()
                 }
             }
             if (o.kind == editor::ModOption::Kind::Number) {
-                editor::labelRow("Min, max", fieldX);
+                editor::labelRow(NOX_TRC("editor.mod.option.min_max", "Min, max"), fieldX);
                 int range[2] = {o.min, o.max};
                 if (ImGui::InputInt2("##range", range)) {
                     o.min = range[0];
@@ -1243,10 +1314,10 @@ void ModPanel::formWindow()
                 }
             }
             if (o.kind != editor::ModOption::Kind::Text) {
-                editor::labelRow("Default", fieldX);
+                editor::labelRow(NOX_TRC("editor.mod.option.default", "Default"), fieldX);
                 ImGui::InputInt("##default", &o.defaultValue);
             }
-            if (ImGui::SmallButton("Remove")) remove = static_cast<int>(i);
+            if (ImGui::SmallButton(NOX_TRI("editor.common.remove", "Remove"))) remove = static_cast<int>(i);
             ImGui::TreePop();
         }
         ImGui::PopID();
@@ -1254,10 +1325,10 @@ void ModPanel::formWindow()
     if (remove >= 0) {
         form_.options.erase(form_.options.begin() + remove);
     }
-    if (ImGui::SmallButton("Add Option") && form_.options.size() < 32) {
+    if (ImGui::SmallButton(NOX_TRI("editor.mod.option.add", "Add Option")) && form_.options.size() < 32) {
         editor::ModOption o;
         o.key = "option" + std::to_string(form_.options.size() + 1);
-        o.label = "Option " + std::to_string(form_.options.size() + 1);
+        o.label = nox::l10n::format(NOX_TR("editor.mod.option.new_label", "Option {n}"), {{"n", form_.options.size() + 1}});
         form_.options.push_back(std::move(o));
     }
     ImGui::Separator();
@@ -1266,7 +1337,8 @@ void ModPanel::formWindow()
     if (const auto m = nox::modes::script::readManifest(editor::json::write(doc)); !m.manifest) {
         ImGui::TextColored(editor::themeColours().error, "%s", m.error.c_str());
     } else if (changed) {
-        ImGui::TextColored(editor::themeColours().info, "Changed: Save writes mode.json (a running test takes it at its next start).");
+        ImGui::TextColored(editor::themeColours().info, "%s",
+                           NOX_TRC("editor.mod.form.changed", "Changed: Save writes mode.json (a running test takes it at its next start)."));
     }
     ImGui::End();
 }
@@ -1274,7 +1346,7 @@ void ModPanel::formWindow()
 void ModPanel::filesWindow()
 {
     ImGui::SetNextWindowSize(ImVec2(260, 400), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Mod Files", &showFiles_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.mod_files", "Mod Files"), &showFiles_)) {
         ImGui::End();
         return;
     }
@@ -1288,17 +1360,17 @@ void ModPanel::filesWindow()
         else start = folder + "folder";
         std::snprintf(fileName_, sizeof fileName_, "%s", start.c_str());
     };
-    if (ImGui::SmallButton("New File")) action("new");
+    if (ImGui::SmallButton(NOX_TRI("editor.mod.files.new_file", "New File"))) action("new");
     ImGui::SameLine();
-    if (ImGui::SmallButton("New Folder")) action("folder");
+    if (ImGui::SmallButton(NOX_TRI("editor.mod.files.new_folder", "New Folder"))) action("folder");
     ImGui::SameLine();
     ImGui::BeginDisabled(selectedFile_.empty() || selectedFile_ == "mode.json");
-    if (ImGui::SmallButton("Rename")) action("rename");
+    if (ImGui::SmallButton(NOX_TRI("editor.common.rename", "Rename"))) action("rename");
     ImGui::SameLine();
-    if (ImGui::SmallButton("Delete")) confirmDelete_ = selectedFile_;
+    if (ImGui::SmallButton(NOX_TRI("editor.common.delete", "Delete"))) confirmDelete_ = selectedFile_;
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::SmallButton("Refresh")) refreshFiles();
+    if (ImGui::SmallButton(NOX_TRI("editor.common.refresh", "Refresh"))) refreshFiles();
     ImGui::Separator();
     // The tree: each entry under its folder (the list is in a tree's order).
     std::vector<std::string> open; // (the folders whose nodes are open, innermost last)
@@ -1330,7 +1402,8 @@ void ModPanel::filesWindow()
             const std::string holder = heldByOther(e.path);
             if (pending) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             ImGui::TreeNodeEx(e.path.c_str(), flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen, "%s%s%s%s", leaf.c_str(), dirtyTab ? " *" : "",
-                              pending ? (sf->info.published == 0 ? " (new, pending)" : " (pending)") : "", holder.empty() ? "" : (" [" + holder + "]").c_str());
+                              pending ? (sf->info.published == 0 ? NOX_TRC("editor.mod.files.new_pending", " (new, pending)") : NOX_TRC("editor.mod.files.pending", " (pending)")) : "",
+                              holder.empty() ? "" : (" [" + holder + "]").c_str());
             if (pending) ImGui::PopStyleColor();
             if (ImGui::IsItemClicked()) selectedFile_ = e.path;
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) openFile(e.path);
@@ -1349,7 +1422,7 @@ void ModPanel::filesWindow()
     if (sessionMod_ && session() && session()->mod()) {
         for (const auto& [path, f] : session()->mod()->files) {
             if (f.info.working == 0 && f.info.published != 0) {
-                ImGui::TextDisabled("%s (deleted, pending)", path.c_str());
+                ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.mod.files.deleted_pending", "{path} (deleted, pending)"), {{"path", path}}).c_str());
             }
         }
     }
@@ -1363,7 +1436,7 @@ void ModPanel::codeWindow()
         --focusCode_;
         ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin("Mod Code", &showCode_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.mod_code", "Mod Code"), &showCode_)) {
         ImGui::End();
         return;
     }
@@ -1371,20 +1444,28 @@ void ModPanel::codeWindow()
     const auto errors = std::ranges::count_if(diagnostics_, [](const auto& d) { return d.error; });
     const auto warnings = static_cast<std::ptrdiff_t>(diagnostics_.size()) - errors;
     if (analysis_.busy()) {
-        ImGui::TextDisabled("checking...");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.mod.code.checking", "checking..."));
     } else if (!analysed_) {
-        ImGui::TextDisabled("not checked yet");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.mod.code.not_checked", "not checked yet"));
     } else if (errors > 0) {
-        ImGui::TextColored(editor::themeColours().error, "%td %s, %td warnings (Problems)", errors, errors == 1 ? "error" : "errors", warnings);
+        ImGui::TextColored(editor::themeColours().error, "%s",
+                           nox::l10n::format(NOX_TRP("editor.mod.code.errors", "{n} error, {warnings} warnings (Problems)",
+                                                     "{n} errors, {warnings} warnings (Problems)", errors),
+                                             {{"n", errors}, {"warnings", warnings}})
+                               .c_str());
     } else {
-        ImGui::TextColored(editor::themeColours().ok, warnings ? "no errors (%td warnings)" : "no errors", warnings);
+        ImGui::TextColored(editor::themeColours().ok, "%s",
+                           warnings ? nox::l10n::format(NOX_TR("editor.mod.code.no_errors_warnings", "no errors ({warnings} warnings)"), {{"warnings", warnings}}).c_str()
+                                    : NOX_TRC("editor.mod.code.no_errors", "no errors"));
     }
     if (analysed_) {
         ImGui::SameLine();
-        ImGui::TextDisabled("Luau analysis, %.0f ms", analysisMs_);
+        char ms[32];
+        std::snprintf(ms, sizeof ms, "%.0f", analysisMs_);
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.mod.code.analysis_ms", "Luau analysis, {ms} ms"), {{"ms", ms}}).c_str());
     }
     if (tabs_.empty()) {
-        ImGui::TextDisabled("Double-click a file in Mod Files to open it.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.mod.code.empty", "Double-click a file in Mod Files to open it."));
     }
     int close = -1;
     if (ImGui::BeginTabBar("##modtabs", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_FittingPolicyScroll)) {
@@ -1399,18 +1480,23 @@ void ModPanel::codeWindow()
             const auto* sf = sessionFile(tab.path);
             const bool pending = sf && sf->pending();
             if (pending) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            const bool shown = ImGui::BeginTabItem((tab.path + (pending ? " (pending)" : "") + "###" + tab.path).c_str(), &keep, flags);
+            const bool shown =
+                ImGui::BeginTabItem((tab.path + (pending ? NOX_TR("editor.mod.files.pending", " (pending)") : std::string()) + "###" + tab.path).c_str(), &keep, flags);
             if (pending) ImGui::PopStyleColor();
-            if (pending) help("Changed in the session since its host last published the mod (the host's Publish Mod writes it).");
+            if (pending) help(NOX_TRC("editor.mod.code.pending_help", "Changed in the session since its host last published the mod (the host's Publish Mod writes it)."));
             if (shown) {
                 currentTab_ = static_cast<int>(i);
                 const std::string holder = heldByOther(tab.path);
                 // (A session's viewer edits nothing: its tabs are read-only, and it holds nothing.)
                 const bool viewer = sessionMod_ && session() && !session()->canEditMod();
                 if (viewer) {
-                    ImGui::TextColored(editor::themeColours().info, "You view the session's mod: ask the host to edit (Session panel).");
+                    ImGui::TextColored(editor::themeColours().info, "%s",
+                                       NOX_TRC("editor.mod.code.viewer", "You view the session's mod: ask the host to edit (Session panel)."));
                 } else if (!holder.empty()) {
-                    ImGui::TextColored(editor::themeColours().caution, "%s is editing this file: read-only till they let it go.", holder.c_str());
+                    ImGui::TextColored(editor::themeColours().caution, "%s",
+                                       nox::l10n::format(NOX_TR("editor.mod.code.held", "{name} is editing this file: read-only till they let it go."),
+                                                         {{"name", holder}})
+                                           .c_str());
                 }
                 tab.code.setReadOnly(viewer || !holder.empty());
                 ImGui::PushFont(ed_.imgui_->monoFont(), ImGui::GetStyle().FontSizeBase * ed_.settings_.scriptFontScale);
@@ -1435,7 +1521,8 @@ void ModPanel::codeWindow()
     }
     if (close >= 0) {
         if (tabs_[static_cast<std::size_t>(close)]->dirty) {
-            ed_.status(tabs_[static_cast<std::size_t>(close)]->path + " has unsaved changes: save it (Ctrl+S) first");
+            ed_.status(nox::l10n::format(NOX_TR("editor.mod.status.tab_unsaved", "{path} has unsaved changes: save it (Ctrl+S) first"),
+                                         {{"path", tabs_[static_cast<std::size_t>(close)]->path}}));
         } else {
             if (sessionFile(tabs_[static_cast<std::size_t>(close)]->path)) {
                 session()->modLock(tabs_[static_cast<std::size_t>(close)]->path, false); // (let go with its tab)
@@ -1450,17 +1537,17 @@ void ModPanel::codeWindow()
 void ModPanel::referenceWindow()
 {
     ImGui::SetNextWindowSize(ImVec2(360, 420), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Mod Reference", &showReference_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.mod_reference", "Mod Reference"), &showReference_)) {
         ImGui::End();
         return;
     }
-    ImGui::RadioButton("Server toolbox", &refHalf_, 0);
-    help("What a server script (server/...) has: the global nox, require, and the hooks its table may have.");
+    ImGui::RadioButton(NOX_TRI("editor.mod.ref.server", "Server toolbox"), &refHalf_, 0);
+    help(NOX_TRC("editor.mod.ref.server_help", "What a server script (server/...) has: the global nox, require, and the hooks its table may have."));
     ImGui::SameLine();
-    ImGui::RadioButton("UI API", &refHalf_, 1);
-    help("What a UI script (ui/...) has on a NoX Core client.");
+    ImGui::RadioButton(NOX_TRI("editor.mod.ref.ui", "UI API"), &refHalf_, 1);
+    help(NOX_TRC("editor.mod.ref.ui_help", "What a UI script (ui/...) has on a NoX Core client."));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##modrefsearch", "Search", refSearch_, sizeof refSearch_);
+    ImGui::InputTextWithHint("##modrefsearch", NOX_TRC("editor.common.search", "Search"), refSearch_, sizeof refSearch_);
     const std::string query = lowered(refSearch_);
     ImGui::BeginChild("##modref");
     std::string section;
@@ -1471,15 +1558,18 @@ void ModPanel::referenceWindow()
         }
         if (d.section != section) {
             section = d.section;
-            ImGui::SeparatorText(section.c_str());
+            // (Hooks and Globals are named by the reader, the rest by the declarations' own headings.)
+            ImGui::SeparatorText(section == "Hooks"     ? NOX_TRC("editor.mod.ref.hooks", "Hooks")
+                                 : section == "Globals" ? NOX_TRC("editor.mod.ref.globals", "Globals")
+                                                        : section.c_str());
         }
         const std::string call = d.kind == editor::ModDef::Kind::Member ? "nox." + d.name : d.kind == editor::ModDef::Kind::Hook ? "function mode." + d.signature : d.name;
         ImGui::PushFont(mono, 0.0f);
         const bool clicked = ImGui::Selectable((call + "##" + d.name + std::to_string(static_cast<int>(d.kind))).c_str());
         ImGui::PopFont();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-            ImGui::SetTooltip("%s%s\n\n%s\n\n(click: insert it in the open file)", call.c_str(),
-                              d.kind == editor::ModDef::Kind::Hook ? "" : (": " + d.signature).c_str(), d.doc.c_str());
+            ImGui::SetTooltip("%s%s\n\n%s\n\n%s", call.c_str(), d.kind == editor::ModDef::Kind::Hook ? "" : (": " + d.signature).c_str(), d.doc.c_str(),
+                              NOX_TRC("editor.mod.ref.click_inserts", "(click: insert it in the open file)"));
         }
         if (clicked) {
             if (Tab* t = current()) {
@@ -1505,7 +1595,7 @@ void ModPanel::previewWindow()
         --focusPreview_;
         ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin("Mod Preview", &showPreview_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.mod_preview", "Mod Preview"), &showPreview_)) {
         ImGui::End();
         return;
     }
@@ -1515,32 +1605,33 @@ void ModPanel::previewWindow()
     const float s = ed_.imgui_->scale();
     // The left column: reload, the test messages, what the UI sent.
     ImGui::BeginChild("##previewside", ImVec2(200 * s, 0), ImGuiChildFlags_ResizeX);
-    if (ImGui::Button("Reload")) reloadPreview();
-    help("Run the UI afresh (it reloads by itself when a UI file is saved).");
+    if (ImGui::Button(NOX_TRI("editor.mod.preview.reload", "Reload"))) reloadPreview();
+    help(NOX_TRC("editor.mod.preview.reload_help", "Run the UI afresh (it reloads by itself when a UI file is saved)."));
     if (!preview_.error().empty()) {
-        ImGui::TextColored(editor::themeColours().error, "The UI stopped:");
+        ImGui::TextColored(editor::themeColours().error, "%s", NOX_TRC("editor.mod.preview.stopped", "The UI stopped:"));
         ImGui::TextWrapped("%s", preview_.error().c_str());
     } else if (preview_.running()) {
-        ImGui::TextColored(editor::themeColours().ok, "Running");
+        ImGui::TextColored(editor::themeColours().ok, "%s", NOX_TRC("editor.mod.preview.running", "Running"));
     }
-    ImGui::SeparatorText("Test messages");
-    help("ui/preview.luau's: each sent to the UI as the server would send it.");
+    ImGui::SeparatorText(NOX_TRC("editor.mod.preview.test_messages", "Test messages"));
+    help(NOX_TRC("editor.mod.preview.test_messages_help", "ui/preview.luau's: each sent to the UI as the server would send it."));
     if (!preview_.previewError().empty()) {
         ImGui::TextColored(editor::themeColours().error, "%s", preview_.previewError().c_str());
     } else if (preview_.samples().empty()) {
-        ImGui::TextDisabled("None: ui/preview.luau returns { { name = ..., message = ... } }");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.mod.preview.no_samples", "None: ui/preview.luau returns { { name = ..., message = ... } }"));
     }
     for (std::size_t i = 0; i < preview_.samples().size(); ++i) {
         const auto& sample = preview_.samples()[i];
         ImGui::BeginDisabled(sample.value.empty());
-        if (ImGui::Button((sample.name + (sample.view ? " (view)" : "") + "##sample" + std::to_string(i)).c_str(), ImVec2(-FLT_MIN, 0))) {
+        if (ImGui::Button((sample.name + (sample.view ? NOX_TR("editor.mod.preview.view_suffix", " (view)") : std::string()) + "##sample" + std::to_string(i)).c_str(),
+                          ImVec2(-FLT_MIN, 0))) {
             preview_.send(i);
-            previewLog_.push_back("sent " + sample.name);
+            previewLog_.push_back(nox::l10n::format(NOX_TR("editor.mod.preview.sent", "sent {name}"), {{"name", sample.name}}));
         }
         ImGui::EndDisabled();
         if (!sample.problem.empty()) help(sample.problem, ImGuiHoveredFlags_AllowWhenDisabled);
     }
-    ImGui::SeparatorText("The UI sent");
+    ImGui::SeparatorText(NOX_TRC("editor.mod.preview.ui_sent", "The UI sent"));
     for (std::string& line : preview_.takeSent()) {
         previewLog_.push_back(std::move(line));
     }
@@ -1822,74 +1913,82 @@ void ModPanel::dialogs()
 {
     const float s = ed_.imgui_->scale();
     if (newOpen_) {
-        ImGui::OpenPopup("New Mod");
+        ImGui::OpenPopup(NOX_TRI("editor.mod.new.title", "New Mod"));
         newOpen_ = false;
     }
-    if (ImGui::BeginPopupModal("New Mod", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("A new mod in %s, from the template: mode.json, server/main.luau, ui/main.luau and ui/preview.luau.",
-                           pathText(modsDir()).c_str());
+    if (ImGui::BeginPopupModal(NOX_TRI("editor.mod.new.title", "New Mod"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("%s", nox::l10n::format(NOX_TR("editor.mod.new.text",
+                                                          "A new mod in {path}, from the template: mode.json, server/main.luau, ui/main.luau and ui/preview.luau."),
+                                                   {{"path", pathText(modsDir())}})
+                                     .c_str());
         ImGui::SetNextItemWidth(260 * s);
-        ImGui::InputText("Name", newName_, sizeof newName_);
+        ImGui::InputText(NOX_TRI("editor.mod.new.name", "Name"), newName_, sizeof newName_);
         ImGui::SetNextItemWidth(260 * s);
-        ImGui::InputText("Id", newId_, sizeof newId_, ImGuiInputTextFlags_CharsNoBlank);
-        help("Its folder and the mode's key: a-z, 0-9 and _, at most 24.");
+        ImGui::InputText(NOX_TRI("editor.mod.new.id", "Id"), newId_, sizeof newId_, ImGuiInputTextFlags_CharsNoBlank);
+        help(NOX_TRC("editor.mod.new.id_help", "Its folder and the mode's key: a-z, 0-9 and _, at most 24."));
         const bool good = nox::modes::script::validModeId(newId_) && std::string_view(newId_).size() <= 24;
         std::error_code ec;
         const bool taken = good && fs::exists(modsDir() / newId_, ec);
-        if (!good) ImGui::TextColored(editor::themeColours().warning, "An id is 1-24 of a-z, 0-9 and _.");
-        if (taken) ImGui::TextColored(editor::themeColours().warning, "mods\\%s is there already.", newId_);
+        if (!good) ImGui::TextColored(editor::themeColours().warning, "%s", NOX_TRC("editor.mod.new.bad_id", "An id is 1-24 of a-z, 0-9 and _."));
+        if (taken)
+            ImGui::TextColored(editor::themeColours().warning, "%s",
+                               nox::l10n::format(NOX_TR("editor.mod.new.taken", "mods\\{id} is there already."), {{"id", newId_}}).c_str());
         ImGui::BeginDisabled(!good || taken);
-        if (ImGui::Button("Create", ImVec2(120 * s, 0))) {
+        if (ImGui::Button(NOX_TRI("editor.mod.new.create", "Create"), ImVec2(120 * s, 0))) {
             newMod(newId_, newName_);
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120 * s, 0))) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel"), ImVec2(120 * s, 0))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
     if (openOpen_) {
-        ImGui::OpenPopup("Open Mod");
+        ImGui::OpenPopup(NOX_TRI("editor.mod.open.title", "Open Mod"));
         openOpen_ = false;
     }
     ImGui::SetNextWindowSize(ImVec2(480 * s, 360 * s), ImGuiCond_Appearing);
-    if (ImGui::BeginPopupModal("Open Mod")) {
+    if (ImGui::BeginPopupModal(NOX_TRI("editor.mod.open.title", "Open Mod"))) {
         ImGui::TextDisabled("%s", pathText(modsDir()).c_str());
         ImGui::BeginChild("##mods", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()));
-        if (listing_.empty()) ImGui::TextDisabled("No mods yet: New Mod makes one.");
+        if (listing_.empty()) ImGui::TextDisabled("%s", NOX_TRC("editor.mod.open.none", "No mods yet: New Mod makes one."));
         for (const auto& l : listing_) {
-            const std::string label = l.name + "  (" + l.folder.filename().string() + ")" + (l.reference ? "  reference: opens as a copy" : "");
+            const std::string label = l.name + "  (" + l.folder.filename().string() + ")" +
+                                      (l.reference ? NOX_TR("editor.mod.open.reference", "  reference: opens as a copy") : std::string());
             if (ImGui::Selectable(label.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                 openMod(l);
                 ImGui::CloseCurrentPopup();
             }
             if (!l.problem.empty()) {
                 ImGui::SameLine();
-                ImGui::TextColored(editor::themeColours().warning, "(doesn't load)");
+                ImGui::TextColored(editor::themeColours().warning, "%s", NOX_TRC("editor.mod.open.doesnt_load", "(doesn't load)"));
                 help(l.problem);
             }
         }
         ImGui::EndChild();
-        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel"))) ImGui::CloseCurrentPopup();
         ImGui::SameLine();
-        ImGui::TextDisabled("Double-click a mod to open it.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.mod.open.hint", "Double-click a mod to open it."));
         ImGui::EndPopup();
     }
     if (fileDialog_) {
-        ImGui::OpenPopup("Mod File");
+        ImGui::OpenPopup(NOX_TRI("editor.mod.file.title", "Mod File"));
         fileDialog_ = false;
     }
-    if (ImGui::BeginPopupModal("Mod File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted(fileAction_ == "rename" ? ("Rename " + selectedFile_ + " to:").c_str()
-                               : fileAction_ == "new"  ? "A new file ('/' separated, inside the mod):"
-                                                       : "A new folder:");
+    if (ImGui::BeginPopupModal(NOX_TRI("editor.mod.file.title", "Mod File"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(fileAction_ == "rename"
+                                   ? nox::l10n::format(NOX_TR("editor.mod.file.rename", "Rename {path} to:"), {{"path", selectedFile_}}).c_str()
+                               : fileAction_ == "new" ? NOX_TRC("editor.mod.file.new_file", "A new file ('/' separated, inside the mod):")
+                                                      : NOX_TRC("editor.mod.file.new_folder", "A new folder:"));
         ImGui::SetNextItemWidth(320 * s);
         if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
         const bool enter = ImGui::InputText("##filename", fileName_, sizeof fileName_, ImGuiInputTextFlags_EnterReturnsTrue);
         const bool good = editor::ModProject::validPath(fileName_);
-        if (!good) ImGui::TextColored(editor::themeColours().warning, "Parts '/' separated, none empty, \"..\" or with < > : \" \\ | ? *");
+        if (!good)
+            ImGui::TextColored(editor::themeColours().warning, "%s",
+                               NOX_TRC("editor.mod.file.bad_path", "Parts '/' separated, none empty, \"..\" or with < > : \" \\ | ? *"));
         ImGui::BeginDisabled(!good);
-        if (ImGui::Button("OK", ImVec2(120 * s, 0)) || (enter && good)) {
+        if (ImGui::Button(NOX_TRI("editor.common.ok", "OK"), ImVec2(120 * s, 0)) || (enter && good)) {
             std::string error;
             bool ok = false;
             if (fileAction_ == "new") {
@@ -1935,16 +2034,19 @@ void ModPanel::dialogs()
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120 * s, 0))) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel"), ImVec2(120 * s, 0))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
     if (!confirmDelete_.empty()) {
-        ImGui::OpenPopup("Delete?##mod");
+        ImGui::OpenPopup(NOX_TRI("editor.mod.delete.title", "Delete?##mod"));
     }
-    if (ImGui::BeginPopupModal("Delete?##mod", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Delete %s%s? This can't be undone.", confirmDelete_.c_str(),
-                    std::ranges::any_of(files_, [&](const auto& e) { return e.path == confirmDelete_ && e.folder; }) ? " and everything in it" : "");
-        if (ImGui::Button("Delete", ImVec2(120 * s, 0))) {
+    if (ImGui::BeginPopupModal(NOX_TRI("editor.mod.delete.title", "Delete?##mod"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const bool folder = std::ranges::any_of(files_, [&](const auto& e) { return e.path == confirmDelete_ && e.folder; });
+        ImGui::TextUnformatted(
+            (folder ? nox::l10n::format(NOX_TR("editor.mod.delete.folder", "Delete {path} and everything in it? This can't be undone."), {{"path", confirmDelete_}})
+                    : nox::l10n::format(NOX_TR("editor.mod.delete.file", "Delete {path}? This can't be undone."), {{"path", confirmDelete_}}))
+                .c_str());
+        if (ImGui::Button(NOX_TRI("editor.common.delete", "Delete"), ImVec2(120 * s, 0))) {
             std::string error;
             std::vector<std::string> gone; // (a session's files it takes: deleted there too)
             for (const auto& e : files_) {
@@ -1967,19 +2069,19 @@ void ModPanel::dialogs()
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120 * s, 0))) {
+        if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel"), ImVec2(120 * s, 0))) {
             confirmDelete_.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }
     if (closeAsk_) {
-        ImGui::OpenPopup("Close Mod?");
+        ImGui::OpenPopup(NOX_TRI("editor.mod.close.title", "Close Mod?"));
         closeAsk_ = false;
     }
-    if (ImGui::BeginPopupModal("Close Mod?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("The mod has unsaved changes.");
-        if (ImGui::Button("Save", ImVec2(100 * s, 0))) {
+    if (ImGui::BeginPopupModal(NOX_TRI("editor.mod.close.title", "Close Mod?"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(NOX_TRC("editor.mod.close.text", "The mod has unsaved changes."));
+        if (ImGui::Button(NOX_TRI("editor.common.save", "Save"), ImVec2(100 * s, 0))) {
             if (saveAll()) {
                 askCancelled_ = {};
                 if (auto then = std::exchange(askThen_, {})) then(); // (what asked: Close Mod, the editor's Close or quit)
@@ -1990,7 +2092,7 @@ void ModPanel::dialogs()
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Don't Save", ImVec2(100 * s, 0))) {
+        if (ImGui::Button(NOX_TRI("editor.common.dont_save", "Don't Save"), ImVec2(100 * s, 0))) {
             const bool session = sessionMod_;
             closeProject(); // (the changes dropped with it)
             sessionDismissed_ = session;
@@ -1999,7 +2101,7 @@ void ModPanel::dialogs()
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(100 * s, 0))) {
+        if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel"), ImVec2(100 * s, 0))) {
             askThen_ = {};
             if (auto cancelled = std::exchange(askCancelled_, {})) cancelled();
             ImGui::CloseCurrentPopup();
@@ -2059,7 +2161,7 @@ bool ModPanel::runStep(const std::string& step)
     } else if (step.starts_with("mod-preview-send:")) {
         if (const auto i = sampleIndex(preview_, step.substr(17))) {
             preview_.send(*i);
-            previewLog_.push_back("sent " + preview_.samples()[*i].name);
+            previewLog_.push_back(nox::l10n::format(NOX_TR("editor.mod.preview.sent", "sent {name}"), {{"name", preview_.samples()[*i].name}}));
         } else {
             ed_.status("No test message " + step.substr(17));
         }

@@ -12,10 +12,12 @@
 #include "editor/ui_helpers.hpp"
 
 #include "noxcore/mapedit/content.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 #include "noxcore/mapedit/markers.hpp"
 #include "noxcore/mapedit/object_edit.hpp"
 #include "noxcore/mapedit/placement.hpp"
 #include "noxcore/server/enchant.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/sound_sets.hpp"
@@ -34,6 +36,7 @@
 #include <unordered_map>
 
 namespace me = nox::mapedit;
+namespace ol = nox::mapedit::oplabels;
 namespace xf = nox::map::xfer;
 
 namespace noxsdl {
@@ -91,7 +94,7 @@ void pickButton(MapEditor& ed, MapEditor::PickRequest::Kind kind, std::string pr
                 std::function<void(const MapEditor::PickResult&)> done)
 {
     ImGui::SameLine();
-    if (ImGui::SmallButton("Pick")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.props.pick", "Pick"))) {
         MapEditor::PickRequest r;
         r.kind = kind;
         r.prompt = std::move(prompt);
@@ -101,7 +104,22 @@ void pickButton(MapEditor& ed, MapEditor::PickRequest::Kind kind, std::string pr
         r.owner = owner;
         ed.beginPick(std::move(r));
     }
-    help("Pick it on the map (right click or Escape cancels).");
+    help(NOX_TRC("editor.props.pick_help", "Pick it on the map (right click or Escape cancels)."));
+}
+
+/// A direction button's label (0 east, clockwise on screen).
+const char* compassLabel(int i)
+{
+    switch (i) {
+    case 0: return NOX_TRI("editor.props.dir.e", "E");
+    case 1: return NOX_TRI("editor.props.dir.se", "SE");
+    case 2: return NOX_TRI("editor.props.dir.s", "S");
+    case 3: return NOX_TRI("editor.props.dir.sw", "SW");
+    case 4: return NOX_TRI("editor.props.dir.w", "W");
+    case 5: return NOX_TRI("editor.props.dir.nw", "NW");
+    case 6: return NOX_TRI("editor.props.dir.n", "N");
+    default: return NOX_TRI("editor.props.dir.ne", "NE");
+    }
 }
 
 /// `f` on an object's data when it's a monster or an NPC (their spells and enchantments are alike).
@@ -215,28 +233,31 @@ PropertyPanel::~PropertyPanel() = default;
 void PropertyPanel::registerCommands()
 {
     auto& c = ed_.commands_;
-    c.add(editor::Command{"object.resetData", "Reset Type Data", "Tools", {},
-          "The selected objects' type data back to what the game gives a new one (monster.bin's numbers...): the old editor's "
-          "Load Defaults.",
+    const char* tools = NOX_TRC("editor.category.tools", "Tools");
+    c.add(editor::Command{"object.resetData", NOX_TR("editor.cmd.object.reset_data.label", "Reset Type Data"), tools, {},
+          NOX_TR("editor.cmd.object.reset_data.help",
+                 "The selected objects' type data back to what the game gives a new one (monster.bin's numbers...): the old editor's "
+                 "Load Defaults."),
           [this] {
               if (!ed_.selection_.objects.empty()) ed_.perform(me::resetTypeDataOp(ed_.doc_, ed_.objects_->factory(), ed_.selection_.objects));
           },
           [this] { return !ed_.selection_.objects.empty(); }, {}});
-    c.add(editor::Command{"object.changeType", "Change Type to the Browser's", "Tools", {},
-          "Changes the selected objects to the Content Browser's type, with the new type's fresh data.",
+    c.add(editor::Command{"object.changeType", NOX_TR("editor.cmd.object.change_type.label", "Change Type to the Browser's"), tools, {},
+          NOX_TR("editor.cmd.object.change_type.help", "Changes the selected objects to the Content Browser's type, with the new type's fresh data."),
           [this] {
               const std::string t = ed_.objects_->browserType();
               if (t.empty() || ed_.selection_.objects.empty()) return;
               try {
                   ed_.perform(me::changeTypeOp(ed_.doc_, ed_.objects_->factory(), ed_.selection_.objects, t));
               } catch (const std::exception& ex) {
-                  ed_.status(std::string("Change type: ") + ex.what());
+                  ed_.status(nox::l10n::format(NOX_TR("editor.props.status.change_type_failed", "Change type: {error}"), {{"error", ex.what()}}));
               }
           },
           [this] { return !ed_.selection_.objects.empty() && !ed_.objects_->browserType().empty(); }, {}});
-    c.add(editor::Command{"extents.reorder", "Reorder Extents", "Tools", {},
-          "Renumbers every object 1, 2, 3... in record order, rewriting every link (teleporters, elevators, movers) and object "
-          "group member to match (the old command broke groups).",
+    c.add(editor::Command{"extents.reorder", NOX_TR("editor.cmd.extents.reorder.label", "Reorder Extents"), tools, {},
+          NOX_TR("editor.cmd.extents.reorder.help",
+                 "Renumbers every object 1, 2, 3... in record order, rewriting every link (teleporters, elevators, movers) and object "
+                 "group member to match (the old command broke groups)."),
           [this] { ed_.perform(me::reorderExtentsOp(ed_.doc_, 1)); }, {}, {}});
 }
 
@@ -264,18 +285,20 @@ std::string PropertyPanel::linkSource(const me::Link& l) const
     if (l.source == me::Link::Source::Group) {
         const auto gi = ed_.doc_.groupIndex(l.from);
         if (!gi) return "?";
-        s = "Group \"" + me::fromMapText(ed_.doc_.groups.groups[*gi].name) + "\"";
+        s = nox::l10n::format(NOX_TR("editor.props.link.group", "Group \"{name}\""), {{"name", me::fromMapText(ed_.doc_.groups.groups[*gi].name)}});
     } else if (l.source == me::Link::Source::Waypoint) {
         const auto* w = me::findWaypoint(ed_.doc_, l.from);
-        s = "Waypoint " + std::to_string(l.from);
-        if (w && !w->name.empty()) s += " \"" + me::fromMapText(w->name) + "\"";
+        s = w && !w->name.empty() ? nox::l10n::format(NOX_TR("editor.props.link.waypoint_named", "Waypoint {n} \"{name}\""),
+                                                      {{"n", l.from}, {"name", me::fromMapText(w->name)}})
+                                  : nox::l10n::format(NOX_TR("editor.props.link.waypoint", "Waypoint {n}"), {{"n", l.from}});
     } else {
         const auto it = ed_.doc_.objects.find(l.from);
         if (it == ed_.doc_.objects.end()) return "?";
         s = label(it->second);
-        if (const auto owner = ed_.doc_.objects.find(it->second.parent); owner != ed_.doc_.objects.end()) s += " in " + label(owner->second);
+        if (const auto owner = ed_.doc_.objects.find(it->second.parent); owner != ed_.doc_.objects.end())
+            s = nox::l10n::format(NOX_TR("editor.props.link.in_owner", "{item} in {owner}"), {{"item", s}, {"owner", label(owner->second)}});
     }
-    return s + " (" + l.label + ")";
+    return s + " (" + me::shownText(l.label) + ")";
 }
 
 void PropertyPanel::goToSource(const me::Link& l, bool add)
@@ -313,7 +336,7 @@ void PropertyPanel::goToSource(const me::Link& l, bool add)
 void PropertyPanel::linkedFrom(const std::vector<me::Link>& in, const char* id)
 {
     if (in.empty()) return;
-    if (!section("Linked from (" + std::to_string(in.size()) + ")", id, ImGuiTreeNodeFlags_DefaultOpen)) return;
+    if (!section(nox::l10n::format(NOX_TR("editor.props.linked_from", "Linked from ({n})"), {{"n", in.size()}}), id, ImGuiTreeNodeFlags_DefaultOpen)) return;
     if (!ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) return;
     ImGui::TableSetupColumn("from", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableSetupColumn("go", ImGuiTableColumnFlags_WidthFixed);
@@ -325,11 +348,15 @@ void PropertyPanel::linkedFrom(const std::vector<me::Link>& in, const char* id)
         ImGui::AlignTextToFramePadding();
         ImGui::TextWrapped("%s", linkSource(l).c_str());
         const bool group = l.source == me::Link::Source::Group;
-        help(group ? std::string("This one is a member of the group.") : std::string("Its \"") + l.label + "\" names this one (" + l.field + ").");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled)) {
+            help(group ? NOX_TR("editor.props.link.member_help", "This one is a member of the group.")
+                       : nox::l10n::format(NOX_TR("editor.props.link.names_help", "Its \"{label}\" names this one ({field})."),
+                                           {{"label", me::shownText(l.label)}, {"field", me::linkFieldText(l.field)}}));
+        }
         ImGui::TableNextColumn();
-        if (ImGui::SmallButton("Go to")) goToSource(l, ImGui::GetIO().KeyShift);
-        help(group ? "Open the group in the Groups panel (its members highlighted on the map)."
-                   : "Select it and centre the view on it (Shift: add it to the selection).");
+        if (ImGui::SmallButton(NOX_TRI("editor.props.link.go_to", "Go to"))) goToSource(l, ImGui::GetIO().KeyShift);
+        help(group ? NOX_TRC("editor.props.link.go_group_help", "Open the group in the Groups panel (its members highlighted on the map).")
+                   : NOX_TRC("editor.props.link.go_help", "Select it and centre the view on it (Shift: add it to the selection)."));
         ImGui::PopID();
     }
     ImGui::EndTable();
@@ -372,7 +399,7 @@ const std::string& PropertyPanel::displayLower(const std::string& type) const
 bool PropertyPanel::nameCombo(const char* id, std::string& value, const std::vector<std::string>& names, bool allowNone, bool thumbs)
 {
     bool changed = false;
-    const std::string preview = value.empty() ? std::string("(none)") : value;
+    const std::string preview = value.empty() ? NOX_TR("editor.props.none", "(none)") : value;
     bool opened = false;
     if (!openCombo_.empty() && openCombo_ == id) {
         // (A test's props-combo: step: the picker opened as a click opens it, BeginCombo's popup.)
@@ -390,9 +417,9 @@ bool PropertyPanel::nameCombo(const char* id, std::string& value, const std::vec
             ImGui::SetKeyboardFocusHere();
         }
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::InputTextWithHint("##filter", "filter", filter_, sizeof filter_);
+        ImGui::InputTextWithHint("##filter", NOX_TRC("editor.props.filter_hint", "filter"), filter_, sizeof filter_);
         const std::string f = lowered(filter_);
-        if (allowNone && ImGui::Selectable("(none)", value.empty())) {
+        if (allowNone && ImGui::Selectable(NOX_TRI("editor.props.none", "(none)"), value.empty())) {
             value.clear();
             changed = true;
         }
@@ -409,7 +436,8 @@ bool PropertyPanel::nameCombo(const char* id, std::string& value, const std::vec
             }
             shown.push_back(i);
         }
-        if (shown.empty() && !names.empty()) ImGui::TextDisabled("Nothing matches \"%s\"", filter_);
+        if (shown.empty() && !names.empty())
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.props.no_match", "Nothing matches \"{filter}\""), {{"filter", filter_}}).c_str());
         const float icon = 20 * ed_.imgui_->scale();
         ImGuiListClipper clip;
         clip.Begin(static_cast<int>(shown.size()), thumbs ? std::max(icon, ImGui::GetTextLineHeight()) + ImGui::GetStyle().ItemSpacing.y : -1.0f);
@@ -473,14 +501,14 @@ std::optional<std::string> PropertyPanel::droppedThing(const char* label)
 void PropertyPanel::addItemRow(const std::function<void(const std::string&)>& add)
 {
     const std::string browser = ed_.objects_->browserType();
-    if (!browser.empty() && ImGui::Button(("Add " + browser).c_str())) add(browser);
-    help("Adds the Content Browser's selected type (or drag a thumbnail onto the list).");
+    if (!browser.empty() && ImGui::Button(nox::l10n::format(NOX_TR("editor.props.add_type", "Add {type}"), {{"type", browser}}).c_str())) add(browser);
+    help(NOX_TRC("editor.props.add_type_help", "Adds the Content Browser's selected type (or drag a thumbnail onto the list)."));
     if (!browser.empty()) ImGui::SameLine();
     std::string pick;
     ImGui::SetNextItemWidth(200 * ed_.imgui_->scale());
     if (nameCombo("##additem", pick, carriedTypes(), false, true) && !pick.empty()) add(pick);
-    help("Add an item by name.");
-    if (const auto dropped = droppedThing("drop an item here")) add(*dropped);
+    help(NOX_TRC("editor.props.add_item_help", "Add an item by name."));
+    if (const auto dropped = droppedThing(NOX_TRI("editor.props.drop_item", "drop an item here"))) add(*dropped);
 }
 
 bool PropertyPanel::section(const std::string& title, const char* id, int flags)
@@ -508,7 +536,7 @@ bool PropertyPanel::edit(ObjId id, const std::string& label, const std::function
     try {
         return ed_.perform(me::editObjectsOp(ed_.doc_, {{id, std::move(c)}}, label));
     } catch (const std::exception& ex) {
-        ed_.status(label + ": " + ex.what());
+        ed_.status(me::shownOpLabel(label) + ": " + ex.what());
         return false;
     }
 }
@@ -526,7 +554,7 @@ PropertyPanel::Apply PropertyPanel::selectionApply(const std::vector<ObjId>& ids
                 return;
             case me::FieldDesc::Special::Details: {
                 me::Op op;
-                op.label = v.i ? "Add header details" : "Remove header details";
+                op.label = v.i ? me::opLabel(ol::kAddDetails) : me::opLabel(ol::kRemoveDetails);
                 for (const ObjId id : ids) {
                     const me::Op one = me::setDetailsOp(ed_.doc_, id, v.i != 0, &ed_.objects_->factory());
                     for (const auto& p : one.parts) op.parts.push_back(p);
@@ -538,7 +566,7 @@ PropertyPanel::Apply PropertyPanel::selectionApply(const std::vector<ObjId>& ids
             }
             ed_.perform(me::setFieldOp(ed_.doc_, ids, f.id, v, ctx_, mask));
         } catch (const std::exception& ex) {
-            ed_.status(f.label + ": " + ex.what());
+            ed_.status(std::string(me::shownText(f.label)) + ": " + ex.what());
         }
     };
 }
@@ -556,9 +584,11 @@ void PropertyPanel::objects(const std::set<ObjId>& set)
     const me::DocObject& first = ed_.doc_.objects.at(ids.front());
     const bool multi = ids.size() > 1;
     if (std::holds_alternative<xf::Raw>(first.data)) {
-        ImGui::TextWrapped("This record is older than the game's typed layouts (xfer version 0x%X): its type data is kept as stored "
-                           "bytes and can't be edited.",
-                           first.xferVersion);
+        ImGui::TextWrapped("%s", nox::l10n::format(NOX_TR("editor.props.raw_record",
+                                                          "This record is older than the game's typed layouts (xfer version {version}): its type data is kept as stored "
+                                                          "bytes and can't be edited."),
+                                                   {{"version", hexText(first.xferVersion)}})
+                                     .c_str());
     }
     const auto shared = me::sharedFields(ed_.doc_, ids, ctx_);
     fieldList(shared, selectionApply(ids), first.type, multi ? std::nullopt : std::optional(me::WorldPoint{first.header.x, first.header.y}), multi,
@@ -569,7 +599,7 @@ void PropertyPanel::objects(const std::set<ObjId>& set)
         inventory(ids.front());
     } else {
         ImGui::Spacing();
-        ImGui::TextDisabled("Lists (inventory, spells, shop, templates...) edit one object at a time.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.props.lists_single", "Lists (inventory, spells, shop, templates...) edit one object at a time."));
     }
 }
 
@@ -582,19 +612,25 @@ void PropertyPanel::header(const std::vector<ObjId>& ids)
         ImGui::BeginGroup();
         ImGui::TextUnformatted(label(o).c_str());
         const auto* e = ed_.objects_->catalog().find(o.type);
-        ImGui::TextDisabled("%s  |  %s v0x%X  |  header v0x%X", e ? e->folder.c_str() : "?", e ? e->xfer.c_str() : "?", o.xferVersion, o.header.version);
+        char xv[16], hv[16];
+        std::snprintf(xv, sizeof xv, "0x%X", static_cast<unsigned>(o.xferVersion));
+        std::snprintf(hv, sizeof hv, "0x%X", static_cast<unsigned>(o.header.version));
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.props.header_versions", "{folder}  |  {xfer} v{xfer_version}  |  header v{header_version}"),
+                                                    {{"folder", e ? me::folderText(e->folder) : std::string("?")}, {"xfer", e ? e->xfer.c_str() : "?"}, {"xfer_version", xv},
+                                                     {"header_version", hv}})
+                                      .c_str());
         ImGui::EndGroup();
     } else {
         std::map<std::string, int> types;
         for (const ObjId id : ids) ++types[ed_.doc_.objects.at(id).type];
         std::string s;
         for (const auto& [t, n] : types) s += (s.empty() ? "" : ", ") + std::to_string(n) + " " + t;
-        ImGui::Text("%zu objects", ids.size());
+        ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.props.n_objects", "{n} objects"), {{"n", ids.size()}}).c_str());
         ImGui::TextWrapped("%s", s.c_str());
         if (types.size() > 1) {
             // Keep one type of them (their own fields show when they're all one kind).
             for (const auto& [t, n] : types) {
-                if (ImGui::SmallButton(("Only " + t).c_str())) {
+                if (ImGui::SmallButton(nox::l10n::format(NOX_TR("editor.props.only_type", "Only {type}"), {{"type", t}}).c_str())) {
                     me::Selection only;
                     for (const ObjId id : ids) {
                         if (ed_.doc_.objects.at(id).type == t) only.objects.insert(id);
@@ -606,7 +642,7 @@ void PropertyPanel::header(const std::vector<ObjId>& ids)
             }
             ImGui::NewLine();
         }
-        ImGui::TextDisabled("Fields they share; a mixed value shows \"-\". An edit applies to all as one op.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.props.shared_fields", "Fields they share; a mixed value shows \"-\". An edit applies to all as one op."));
     }
     // Records older than the current versions: the fields the newer ones add aren't stored.
     bool old = false;
@@ -616,7 +652,7 @@ void PropertyPanel::header(const std::vector<ObjId>& ids)
         if (!std::holds_alternative<xf::Raw>(x.data) && e && (x.xferVersion < me::currentXferVersion(e->xfer) || x.header.version < 0x40)) old = true;
     }
     if (old) {
-        if (ImGui::SmallButton("Bring up to date")) {
+        if (ImGui::SmallButton(NOX_TRI("editor.props.upgrade", "Bring up to date"))) {
             std::vector<std::pair<ObjId, me::DocObject>> up;
             for (const ObjId id : ids) {
                 const auto& x = ed_.doc_.objects.at(id);
@@ -626,10 +662,11 @@ void PropertyPanel::header(const std::vector<ObjId>& ids)
                 } catch (const std::exception&) {
                 }
             }
-            ed_.perform(me::editObjectsOp(ed_.doc_, up, "Bring records up to date"));
+            ed_.perform(me::editObjectsOp(ed_.doc_, up, me::opLabel(ol::kUpgrade)));
         }
-        help("The record is an older version: the fields newer versions add (shown only when stored) aren't in it. This writes it at "
-             "the versions the game writes now, the new fields at their fresh values.");
+        help(NOX_TRC("editor.props.upgrade_help",
+                     "The record is an older version: the fields newer versions add (shown only when stored) aren't in it. This writes it at "
+                     "the versions the game writes now, the new fields at their fresh values."));
     }
 }
 
@@ -638,16 +675,18 @@ void PropertyPanel::fieldList(const std::vector<me::SharedField>& fields, const 
 {
     ImGui::PushID(scope.c_str());
     // Sections in their first field's order; advanced fields under each section's "Advanced".
-    std::vector<std::string> groups;
+    // (A section is known by its English, its ids' too; its title is in the language in use.)
+    std::vector<nox::l10n::Key> groups;
     for (const auto& f : fields) {
-        if (std::ranges::find(groups, f.desc.group) == groups.end()) groups.push_back(f.desc.group);
+        if (std::ranges::none_of(groups, [&](const nox::l10n::Key& k) { return std::string_view(k.en) == f.desc.group.en; })) groups.push_back(f.desc.group);
     }
-    for (const auto& g : groups) {
-        const bool open = section(g, (g + scope).c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+    for (const auto& gk : groups) {
+        const std::string g = gk.en;
+        const bool open = section(me::shownText(gk), (g + scope).c_str(), ImGuiTreeNodeFlags_DefaultOpen);
         if (!open) continue;
         std::vector<const me::SharedField*> normal, advanced;
         for (const auto& f : fields) {
-            if (f.desc.group != g) continue;
+            if (g != f.desc.group.en) continue;
             if (multi && (f.desc.id == "header.position" || f.desc.id == "header.extent")) continue; // (one object's)
             (f.desc.advanced ? advanced : normal).push_back(&f);
         }
@@ -660,10 +699,14 @@ void PropertyPanel::fieldList(const std::vector<me::SharedField>& fields, const 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                if (f->mixed) ImGui::TextColored(editor::themeColours().warning, "%s", f->desc.label.c_str());
-                else if (f->desc.readOnly) ImGui::TextDisabled("%s", f->desc.label.c_str());
-                else ImGui::TextUnformatted(f->desc.label.c_str());
-                help(f->desc.help + (f->mixed ? "\n(The selected objects differ here.)" : ""));
+                const char* label = me::shownText(f->desc.label);
+                if (f->mixed) ImGui::TextColored(editor::themeColours().warning, "%s", label);
+                else if (f->desc.readOnly) ImGui::TextDisabled("%s", label);
+                else ImGui::TextUnformatted(label);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    const char* fieldHelp = me::shownText(f->desc.help);
+                    help(f->mixed ? fieldHelp + ("\n" + NOX_TR("editor.props.mixed_help", "(The selected objects differ here.)")) : std::string(fieldHelp));
+                }
                 ImGui::TableNextColumn();
                 ImGui::PushID(f->desc.id.c_str());
                 ImGui::SetNextItemWidth(-FLT_MIN);
@@ -677,11 +720,11 @@ void PropertyPanel::fieldList(const std::vector<me::SharedField>& fields, const 
         table(normal, ("##t" + g).c_str());
         if (!advanced.empty()) {
             ImGui::Indent();
-            if (ImGui::TreeNode(("Advanced##" + g).c_str())) {
+            if (ImGui::TreeNode((NOX_TR("editor.props.advanced", "Advanced") + "###adv" + g).c_str())) {
                 table(advanced, ("##a" + g).c_str());
                 ImGui::TreePop();
             }
-            help("Fields whose meaning is partly known, or running state the game keeps (shown as stored; edit with care).");
+            help(NOX_TRC("editor.props.advanced_help", "Fields whose meaning is partly known, or running state the game keeps (shown as stored; edit with care)."));
             ImGui::Unindent();
         }
     }
@@ -767,14 +810,14 @@ void PropertyPanel::fieldWidget(const me::SharedField& sf, const Apply& apply, c
         break;
     case K::Flags: flagsField(sf, apply); break;
     case K::Enum: {
-        std::string preview = mixed ? "-" : "value " + std::to_string(v.i);
+        std::string preview = mixed ? "-" : nox::l10n::format(NOX_TR("editor.props.enum_value", "value {n}"), {{"n", v.i}});
         for (const auto& n : f.names) {
-            if (n.value == v.i && !mixed) preview = n.name;
+            if (n.value == v.i && !mixed) preview = me::shownText(n.name);
         }
         if (ImGui::BeginCombo("##v", preview.c_str())) {
             for (const auto& n : f.names) {
-                if (ImGui::Selectable(n.name.c_str(), !mixed && n.value == v.i)) commit(withInt(v, n.value));
-                help(n.help);
+                if (ImGui::Selectable(me::shownText(n.name), !mixed && n.value == v.i)) commit(withInt(v, n.value));
+                help(me::shownText(n.help));
             }
             ImGui::EndCombo();
         }
@@ -787,25 +830,30 @@ void PropertyPanel::fieldWidget(const me::SharedField& sf, const Apply& apply, c
             std::string text = me::toMapText(*t, &lossy);
             if (text.size() > static_cast<std::size_t>(f.max)) {
                 text.resize(static_cast<std::size_t>(f.max));
-                ed_.status(f.label + ": cut to " + std::to_string(static_cast<int>(f.max)) + " bytes");
+                ed_.status(nox::l10n::format(NOX_TR("editor.props.status.text_cut", "{field}: cut to {n} bytes"),
+                                             {{"field", me::shownText(f.label)}, {"n", static_cast<int>(f.max)}}));
             }
-            if (lossy) ed_.status(f.label + ": characters the game's text can't hold became '?'");
+            if (lossy)
+                ed_.status(nox::l10n::format(NOX_TR("editor.props.status.text_lossy", "{field}: characters the game's text can't hold became '?'"),
+                                             {{"field", me::shownText(f.label)}}));
             commit(withText(v, text));
         }
         break;
     }
     case K::Function: {
         std::string fn = mixed ? std::string() : v.s;
-        if (ed_.scriptPanel_->functionPicker(f.label.c_str(), fn)) commit(withText(v, fn));
+        if (ed_.scriptPanel_->functionPicker(f.label.en, fn)) commit(withText(v, fn)); // (the English: its id, and the new function's suggested name)
         break;
     }
     case K::Thing: {
         // The type (header): a searchable list of the placeable types.
-        if (mixed) ImGui::TextDisabled("(mixed types: a pick changes them all)");
+        if (mixed) ImGui::TextDisabled("%s", NOX_TRC("editor.props.mixed_types", "(mixed types: a pick changes them all)"));
         std::string t = v.s;
         if (nameCombo("##v", t, typesOfClass(0), false)) commit(withText(v, t));
         if (!ed_.objects_->browserType().empty() && ed_.objects_->browserType() != v.s) {
-            if (ImGui::SmallButton(("Use the browser's: " + ed_.objects_->browserType()).c_str())) commit(withText(v, ed_.objects_->browserType()));
+            if (ImGui::SmallButton(
+                    nox::l10n::format(NOX_TR("editor.props.use_browser_type", "Use the browser's: {type}"), {{"type", ed_.objects_->browserType()}}).c_str()))
+                commit(withText(v, ed_.objects_->browserType()));
         }
         break;
     }
@@ -824,7 +872,8 @@ void PropertyPanel::fieldWidget(const me::SharedField& sf, const Apply& apply, c
         }
         // (SPELL_INVALID is spell 0's name, what the game's save writes for none: not a stray name.)
         if (!mixed && !v.s.empty() && std::ranges::find(names, v.s) == names.end() && !names.empty() && !(f.kind == K::Spell && v.s == "SPELL_INVALID")) {
-            ImGui::TextColored(editor::themeColours().unknown, "\"%s\" isn't a known name: the game ignores it", v.s.c_str());
+            ImGui::TextColored(editor::themeColours().unknown, "%s",
+                               nox::l10n::format(NOX_TR("editor.props.unknown_name", "\"{name}\" isn't a known name: the game ignores it"), {{"name", v.s}}).c_str());
         }
         break;
     }
@@ -840,7 +889,7 @@ void PropertyPanel::fieldWidget(const me::SharedField& sf, const Apply& apply, c
         if (const auto t = textInput("##typed", sf, now, static_cast<std::size_t>(f.max), false)) {
             commit(withText(v, me::toMapText(*t).substr(0, static_cast<std::size_t>(f.max))));
         }
-        help("Or type a map's name (one in the maps folder; the game's buffer holds 79 bytes).");
+        help(NOX_TRC("editor.props.map_name_help", "Or type a map's name (one in the maps folder; the game's buffer holds 79 bytes)."));
         break;
     }
     case K::StringKey: stringKeyField(sf, apply); break;
@@ -848,7 +897,7 @@ void PropertyPanel::fieldWidget(const me::SharedField& sf, const Apply& apply, c
         if (me::FieldValue nv = v; colourPick("##v", v.rgb, nv.rgb, ImGuiColorEditFlags_DisplayRGB)) {
             commit(nv);
         }
-        if (mixed) ImGui::TextDisabled("(mixed)");
+        if (mixed) ImGui::TextDisabled("%s", NOX_TRC("editor.props.mixed", "(mixed)"));
         break;
     }
     case K::Extent: extentField(sf, apply, origin); break;
@@ -872,9 +921,10 @@ void PropertyPanel::flagsField(const me::SharedField& sf, const Apply& apply)
         if (split && i == 8) {
             if (inTable) ImGui::EndTable();
             inTable = false;
-            ImGui::Checkbox("Show runtime-only bits", &showRuntimeFlags_);
-            help("Bits the game sets while it plays and never saves. A map that stores one has it set on load (the load ORs the "
-                 "stored word in).");
+            ImGui::Checkbox(NOX_TRI("editor.props.show_runtime_bits", "Show runtime-only bits"), &showRuntimeFlags_);
+            help(NOX_TRC("editor.props.show_runtime_bits_help",
+                         "Bits the game sets while it plays and never saves. A map that stores one has it set on load (the load ORs the "
+                         "stored word in)."));
             if (!showRuntimeFlags_) break;
             inTable = ImGui::BeginTable("##bits2", 2, ImGuiTableFlags_SizingStretchSame);
         }
@@ -882,10 +932,10 @@ void PropertyPanel::flagsField(const me::SharedField& sf, const Apply& apply)
         if (inTable) ImGui::TableNextColumn();
         const bool isMixed = (sf.mixedBits & bit) != 0;
         ImGui::PushID(static_cast<int>(i));
-        if (const auto b = mixedCheck(n.name.c_str(), (bits & bit) != 0, isMixed)) {
+        if (const auto b = mixedCheck(me::shownText(n.name), (bits & bit) != 0, isMixed)) {
             apply(f, withInt(sf.value, static_cast<std::int64_t>(*b ? (bits | bit) : (bits & ~bit))), bit);
         }
-        help(n.help + "  (" + hexText(bit) + ")");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled)) help(me::shownText(n.help) + ("  (" + hexText(bit) + ")"));
         ImGui::PopID();
     }
     if (inTable) ImGui::EndTable();
@@ -893,12 +943,14 @@ void PropertyPanel::flagsField(const me::SharedField& sf, const Apply& apply)
         for (const auto& n : f.names) named |= static_cast<std::uint64_t>(n.value);
     }
     const std::uint64_t other = bits & ~named;
-    ImGui::TextDisabled("%s%s", hexText(bits).c_str(), other ? ("  (unnamed bits " + hexText(other) + " kept)").c_str() : "");
+    ImGui::TextDisabled("%s%s", hexText(bits).c_str(),
+                        other ? nox::l10n::format(NOX_TR("editor.props.unnamed_bits", "  (unnamed bits {bits} kept)"), {{"bits", hexText(other)}}).c_str() : "");
     if (split && !showRuntimeFlags_) {
         const std::uint64_t runtime = bits & ~static_cast<std::uint64_t>(me::kSavedObjectFlags);
         if (runtime) {
             ImGui::SameLine();
-            ImGui::TextColored(editor::themeColours().unknown, "runtime bits set: %s", hexText(runtime).c_str());
+            ImGui::TextColored(editor::themeColours().unknown, "%s",
+                               nox::l10n::format(NOX_TR("editor.props.runtime_bits", "runtime bits set: {bits}"), {{"bits", hexText(runtime)}}).c_str());
         }
     }
 }
@@ -912,7 +964,7 @@ void PropertyPanel::stringKeyField(const me::SharedField& sf, const Apply& apply
     if (ImGui::SmallButton("...")) {
         ed_.markers_->browseStrings(v.s, [a = apply, copy = f, base = v](const std::string& key) { a(copy, withText(base, key), ~0ull); });
     }
-    help("Browse the game's strings (nox.csf).");
+    help(NOX_TRC("editor.props.browse_strings_help", "Browse the game's strings (nox.csf)."));
     // The text it shows, from the string table.
     if (!sf.mixed && ed_.markers_->strings()) {
         const std::string key = v.s.substr(0, v.s.find('\0'));
@@ -921,7 +973,7 @@ void PropertyPanel::stringKeyField(const me::SharedField& sf, const Apply& apply
             ImGui::TextColored(editor::themeColours().note, "%s", nox::strings::toUtf8(*text).c_str());
             ImGui::PopTextWrapPos();
         } else if (!key.empty()) {
-            ImGui::TextDisabled("(no such key: the game shows the key itself)");
+            ImGui::TextDisabled("%s", NOX_TRC("editor.props.no_such_key", "(no such key: the game shows the key itself)"));
         }
     }
 }
@@ -932,12 +984,13 @@ void PropertyPanel::extentField(const me::SharedField& sf, const Apply& apply, s
     const me::FieldValue& v = sf.value;
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 110 * ed_.imgui_->scale());
     if (const auto n = numberInput("##v", sf, static_cast<double>(v.i), true, f.min, f.max)) apply(f, withInt(v, static_cast<std::int64_t>(*n)), ~0ull);
-    pickButton(ed_, MapEditor::PickRequest::Kind::Object, "Click the object for " + f.label, origin, f.id,
+    pickButton(ed_, MapEditor::PickRequest::Kind::Object, nox::l10n::format(NOX_TR("editor.props.pick_object", "Click the object for {field}"), {{"field", me::shownText(f.label)}}),
+               origin, f.id,
                [this, a = apply, copy = f, base = v](const MapEditor::PickResult& r) {
                    if (r.object) a(copy, withInt(base, ed_.doc_.objects.at(*r.object).header.extent), ~0ull);
                });
     ImGui::SameLine();
-    if (ImGui::SmallButton("Go") && v.i != 0) {
+    if (ImGui::SmallButton(NOX_TRI("editor.props.go", "Go")) && v.i != 0) {
         const auto ids = me::objectsWithExtent(ed_.doc_, static_cast<std::uint32_t>(v.i));
         if (!ids.empty()) {
             const auto& h = ed_.doc_.objects.at(ids.front()).header;
@@ -946,7 +999,9 @@ void PropertyPanel::extentField(const me::SharedField& sf, const Apply& apply, s
     }
     if (!sf.mixed && v.i != 0) {
         const auto ids = me::objectsWithExtent(ed_.doc_, static_cast<std::uint32_t>(v.i));
-        if (ids.empty()) ImGui::TextColored(editor::themeColours().error, "no object has extent %lld", static_cast<long long>(v.i));
+        if (ids.empty())
+            ImGui::TextColored(editor::themeColours().error, "%s",
+                               nox::l10n::format(NOX_TR("editor.props.no_extent", "no object has extent {n}"), {{"n", static_cast<long long>(v.i)}}).c_str());
         else ImGui::TextDisabled("%s", label(ed_.doc_.objects.at(ids.front())).c_str());
     }
 }
@@ -957,17 +1012,20 @@ void PropertyPanel::waypointField(const me::SharedField& sf, const Apply& apply,
     const me::FieldValue& v = sf.value;
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 110 * ed_.imgui_->scale());
     if (const auto n = numberInput("##v", sf, static_cast<double>(v.i), true, f.min, f.max)) apply(f, withInt(v, static_cast<std::int64_t>(*n)), ~0ull);
-    pickButton(ed_, MapEditor::PickRequest::Kind::Waypoint, "Click the waypoint for " + f.label, origin, f.id,
+    pickButton(ed_, MapEditor::PickRequest::Kind::Waypoint,
+               nox::l10n::format(NOX_TR("editor.props.pick_waypoint", "Click the waypoint for {field}"), {{"field", me::shownText(f.label)}}), origin, f.id,
                [a = apply, copy = f, base = v](const MapEditor::PickResult& r) {
                    if (r.waypoint) a(copy, withInt(base, *r.waypoint), ~0ull);
                });
     ImGui::SameLine();
-    if (ImGui::SmallButton("Go") && v.i != 0) {
+    if (ImGui::SmallButton(NOX_TRI("editor.props.go", "Go")) && v.i != 0) {
         if (const auto* w = me::findWaypoint(ed_.doc_, static_cast<std::uint32_t>(v.i))) ed_.frameWorld(w->x, w->y, w->x, w->y);
     }
     if (!sf.mixed && v.i != 0) {
         const auto* w = me::findWaypoint(ed_.doc_, static_cast<std::uint32_t>(v.i));
-        if (!w) ImGui::TextColored(editor::themeColours().error, "no waypoint %lld", static_cast<long long>(v.i));
+        if (!w)
+            ImGui::TextColored(editor::themeColours().error, "%s",
+                               nox::l10n::format(NOX_TR("editor.props.no_waypoint", "no waypoint {n}"), {{"n", static_cast<long long>(v.i)}}).c_str());
         else if (!w->name.empty()) ImGui::TextDisabled("\"%s\"", w->name.c_str());
     }
 }
@@ -990,7 +1048,8 @@ void PropertyPanel::pointField(const me::SharedField& sf, const Apply& apply, st
         nv.g = std::clamp(static_cast<double>(p[1]), 0.0, static_cast<double>(me::kWorldSize - 1));
         apply(f, nv, ~0ull);
     }
-    pickButton(ed_, MapEditor::PickRequest::Kind::Point, "Click the point for " + f.label, origin, f.id,
+    pickButton(ed_, MapEditor::PickRequest::Kind::Point, nox::l10n::format(NOX_TR("editor.props.pick_point", "Click the point for {field}"), {{"field", me::shownText(f.label)}}),
+               origin, f.id,
                [a = apply, copy = f, base = v](const MapEditor::PickResult& r) {
                    me::FieldValue nv = base;
                    nv.f = r.at.x;
@@ -998,7 +1057,7 @@ void PropertyPanel::pointField(const me::SharedField& sf, const Apply& apply, st
                    a(copy, nv, ~0ull);
                });
     ImGui::SameLine();
-    if (ImGui::SmallButton("Go")) ed_.frameWorld(static_cast<float>(v.f), static_cast<float>(v.g), static_cast<float>(v.f), static_cast<float>(v.g));
+    if (ImGui::SmallButton(NOX_TRI("editor.props.go", "Go"))) ed_.frameWorld(static_cast<float>(v.f), static_cast<float>(v.g), static_cast<float>(v.f), static_cast<float>(v.g));
 }
 
 void PropertyPanel::angleField(const me::SharedField& sf, const Apply& apply)
@@ -1033,7 +1092,7 @@ void PropertyPanel::angleField(const me::SharedField& sf, const Apply& apply)
         apply(f, nv, ~0ull);
     }
     if (!sf.mixed) dl->AddLine(c, ImVec2(c.x + std::cos(angle) * (r - 2), c.y + std::sin(angle) * (r - 2)), col(255, 210, 90), 2.5f);
-    help("Drag the needle (5-degree steps; Ctrl: free). 0 points east, a quarter turn south (the world's y grows down).");
+    help(NOX_TRC("editor.props.dial_help", "Drag the needle (5-degree steps; Ctrl: free). 0 points east, a quarter turn south (the world's y grows down)."));
     ImGui::SameLine();
     ImGui::BeginGroup();
     ImGui::SetNextItemWidth(90 * s);
@@ -1044,8 +1103,10 @@ void PropertyPanel::angleField(const me::SharedField& sf, const Apply& apply)
         apply(f, nv, ~0ull);
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("degrees");
-    ImGui::TextDisabled("%.4f rad", v.f);
+    ImGui::TextDisabled("%s", NOX_TRC("editor.props.degrees", "degrees"));
+    char rad[32];
+    std::snprintf(rad, sizeof rad, "%.4f", v.f);
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.props.radians", "{value} rad"), {{"value", rad}}).c_str());
     ImGui::EndGroup();
 }
 
@@ -1064,11 +1125,10 @@ void PropertyPanel::directionField(const me::SharedField& sf, const Apply& apply
             for (int k = 0; k < 8; ++k) {
                 if (kSteps[static_cast<std::size_t>(k)][0] == gx && kSteps[static_cast<std::size_t>(k)][1] == gy) idx = k;
             }
-            static const char* kArrows[8] = {"E", "SE", "S", "SW", "W", "NW", "N", "NE"};
             const bool on = !sf.mixed && sf.value.i == idx;
             if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
             ImGui::PushID(idx);
-            if (ImGui::Button(kArrows[idx], ImVec2(b, b))) apply(sf.desc, withInt(sf.value, idx), ~0ull);
+            if (ImGui::Button(compassLabel(idx), ImVec2(b, b))) apply(sf.desc, withInt(sf.value, idx), ~0ull);
             ImGui::PopID();
             if (on) ImGui::PopStyleColor();
         }
@@ -1103,16 +1163,16 @@ void PropertyPanel::linkTools(ObjId id)
     const bool linkable = std::holds_alternative<xf::Transporter>(o.data) || std::holds_alternative<xf::Elevator>(o.data) ||
                           std::holds_alternative<xf::ElevatorShaft>(o.data);
     if (!linkable) return;
-    ImGui::SeparatorText("Link");
-    ImGui::Checkbox("Link both ways", &twoWay_);
-    help("Picking the partner also links it back to this one (a teleporter pair, an elevator and its shaft).");
+    ImGui::SeparatorText(NOX_TRC("editor.props.link.heading", "Link"));
+    ImGui::Checkbox(NOX_TRI("editor.props.link.both_ways", "Link both ways"), &twoWay_);
+    help(NOX_TRC("editor.props.link.both_ways_help", "Picking the partner also links it back to this one (a teleporter pair, an elevator and its shaft)."));
     ImGui::SameLine();
-    if (ImGui::Button("Pick the partner...")) {
+    if (ImGui::Button(NOX_TRI("editor.props.link.pick_partner", "Pick the partner..."))) {
         MapEditor::PickRequest r;
         r.kind = MapEditor::PickRequest::Kind::Object;
-        r.prompt = std::holds_alternative<xf::Transporter>(o.data) ? "Click the teleporter it leads to" : std::holds_alternative<xf::Elevator>(o.data)
-                                                                                                             ? "Click its elevator shaft"
-                                                                                                             : "Click its elevator";
+        r.prompt = std::holds_alternative<xf::Transporter>(o.data) ? NOX_TR("editor.props.link.pick_teleporter", "Click the teleporter it leads to")
+                   : std::holds_alternative<xf::Elevator>(o.data)  ? NOX_TR("editor.props.link.pick_shaft", "Click its elevator shaft")
+                                                                   : NOX_TR("editor.props.link.pick_elevator", "Click its elevator");
         r.from = me::WorldPoint{o.header.x, o.header.y};
         r.owner = "link";
         r.done = [this, id](const MapEditor::PickResult& p) {
@@ -1131,7 +1191,7 @@ void PropertyPanel::linkTools(ObjId id)
             if (!setLink(a, b.header.extent)) return;
             std::vector<std::pair<ObjId, me::DocObject>> changed{{id, a}};
             if (twoWay_ && setLink(b, a.header.extent)) changed.emplace_back(*p.object, b);
-            ed_.perform(me::editObjectsOp(ed_.doc_, changed, twoWay_ ? "Link both ways" : "Link"));
+            ed_.perform(me::editObjectsOp(ed_.doc_, changed, me::opLabel(twoWay_ ? ol::kLinkBothWays : ol::kLink)));
         };
         ed_.beginPick(std::move(r));
     }
@@ -1143,18 +1203,21 @@ void PropertyPanel::monsterSpells(ObjId id)
     const std::vector<xf::MonsterSpell>* spells = nullptr;
     ifCreature(o.data, [&](const auto& x) { spells = &x.spells; });
     if (!spells) return;
-    if (!section("Spells (" + std::to_string(spells->size()) + ")", "spells", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    if (!section(nox::l10n::format(NOX_TR("editor.props.spells.heading", "Spells ({n})"), {{"n", spells->size()}}), "spells", ImGuiTreeNodeFlags_DefaultOpen)) return;
     const auto mutate = [&](const std::string& lbl, const std::function<void(std::vector<xf::MonsterSpell>&)>& f) {
         edit(id, lbl, [&](me::DocObject& c) { ifCreature(c.data, [&](auto& x) { f(x.spells); }); });
     };
     if (const auto* m = std::get_if<xf::Monster>(&o.data); m && m->unknown337[3]) {
-        ImGui::TextColored(editor::themeColours().warning, "\"Spells from its type\" is ticked: the game uses its type's spells, not these.");
+        ImGui::TextColored(editor::themeColours().warning, "%s",
+                           NOX_TRC("editor.props.spells.from_type", "\"Spells from its type\" is ticked: the game uses its type's spells, not these."));
     }
     const auto names = me::namesFor(K::Spell, ctx_);
     const auto& bits = me::spellUsageBits();
+    std::vector<const char*> useNames; // (the uses' names as shown: looked up once, not per spell)
+    for (const auto& u : me::spellUsageValues()) useNames.push_back(me::shownText(u.name));
     if (ImGui::BeginTable("##spells", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
-        ImGui::TableSetupColumn("Spell", ImGuiTableColumnFlags_WidthStretch, 1.4f);
-        ImGui::TableSetupColumn("Used for", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.props.spells.spell", "Spell"), ImGuiTableColumnFlags_WidthStretch, 1.4f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.props.spells.used_for", "Used for"), ImGuiTableColumnFlags_WidthStretch, 2.0f);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 22 * ed_.imgui_->scale());
         ImGui::TableHeadersRow();
         for (std::size_t i = 0; i < spells->size(); ++i) {
@@ -1164,28 +1227,29 @@ void PropertyPanel::monsterSpells(ObjId id)
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(-FLT_MIN);
             std::string n = sp.name;
-            if (nameCombo("##name", n, names, false)) mutate("Set spell", [&](auto& v) { v[i].name = n; });
+            if (nameCombo("##name", n, names, false)) mutate(me::opLabel(ol::kSetSpell), [&](auto& v) { v[i].name = n; });
             ImGui::TableNextColumn();
             for (std::size_t b = 0; b < bits.size(); ++b) {
                 if (b) ImGui::SameLine();
                 bool on = (sp.flags & bits[b].bit) != 0;
                 ImGui::PushID(static_cast<int>(b));
-                if (ImGui::Checkbox(bits[b].name, &on)) mutate("Set spell use", [&](auto& v) { v[i].flags = on ? (v[i].flags | bits[b].bit) : (v[i].flags & ~bits[b].bit); });
-                help(bits[b].help);
+                if (ImGui::Checkbox(useNames[b], &on)) mutate(me::opLabel(ol::kSetSpellUse), [&](auto& v) { v[i].flags = on ? (v[i].flags | bits[b].bit) : (v[i].flags & ~bits[b].bit); });
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled)) help(me::shownText(me::spellUsageValues()[b].help));
                 ImGui::PopID();
             }
             ImGui::TableNextColumn();
-            if (ImGui::SmallButton("x")) mutate("Remove spell", [&](auto& v) { v.erase(v.begin() + static_cast<std::ptrdiff_t>(i)); });
-            help("Remove it.");
+            if (ImGui::SmallButton("x")) mutate(me::opLabel(ol::kRemoveSpell), [&](auto& v) { v.erase(v.begin() + static_cast<std::ptrdiff_t>(i)); });
+            help(NOX_TRC("editor.props.remove_it", "Remove it."));
             ImGui::PopID();
         }
         ImGui::EndTable();
     }
     std::string add;
     ImGui::SetNextItemWidth(220 * ed_.imgui_->scale());
-    if (nameCombo("##addspell", add, names, false) && !add.empty()) mutate("Add spell " + add, [&](auto& v) { v.push_back({add, 0x20000000u}); });
+    if (nameCombo("##addspell", add, names, false) && !add.empty())
+        mutate(me::opLabel(ol::kAddSpell, {{"name", add}}), [&](auto& v) { v.push_back({add, 0x20000000u}); });
     ImGui::SameLine();
-    ImGui::TextDisabled("add a spell (used for Attack)");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.props.spells.add_hint", "add a spell (used for Attack)"));
 }
 
 void PropertyPanel::buffs(ObjId id)
@@ -1196,8 +1260,8 @@ void PropertyPanel::buffs(ObjId id)
     if (!bf) return;
     const bool stored = std::holds_alternative<xf::Monster>(o.data) ? o.xferVersion > 0x3D : o.xferVersion > 0x3C;
     if (!stored) return;
-    if (!section("Enchantments (" + std::to_string(bf->buffs.size()) + ")", "buffs", 0)) return;
-    ImGui::TextDisabled("Enchantments it starts with (the game puts them on at the load's end).");
+    if (!section(nox::l10n::format(NOX_TR("editor.props.buffs.heading", "Enchantments ({n})"), {{"n", bf->buffs.size()}}), "buffs", 0)) return;
+    ImGui::TextDisabled("%s", NOX_TRC("editor.props.buffs.about", "Enchantments it starts with (the game puts them on at the load's end)."));
     const auto mutate = [&](const std::string& lbl, const std::function<void(xf::Buffs&)>& f) {
         edit(id, lbl, [&](me::DocObject& c) { ifCreature(c.data, [&](auto& x) { f(x.buffs); }); });
     };
@@ -1207,30 +1271,39 @@ void PropertyPanel::buffs(ObjId id)
         ImGui::PushID(static_cast<int>(i));
         ImGui::SetNextItemWidth(170 * ed_.imgui_->scale());
         std::string n = b.enchantment;
-        if (nameCombo("##e", n, names, false)) mutate("Set enchantment", [&](auto& v) { v.buffs[i].enchantment = n; });
+        if (nameCombo("##e", n, names, false)) mutate(me::opLabel(ol::kSetEnchantment), [&](auto& v) { v.buffs[i].enchantment = n; });
         ImGui::SameLine();
         const auto power = intOnRelease("##p", b.power, 60);
-        help("Its level.");
-        if (power) mutate("Set enchantment level", [&](auto& v) { v.buffs[i].power = static_cast<std::uint8_t>(std::clamp(*power, 0, 255)); });
+        help(NOX_TRC("editor.props.buffs.level_help", "Its level."));
+        if (power)
+            mutate(me::opLabel(ol::kSetEnchantmentLevel),
+                   [&](auto& v) { v.buffs[i].power = static_cast<std::uint8_t>(std::clamp(*power, 0, 255)); });
         ImGui::SameLine();
         const auto timer = intOnRelease("##t", static_cast<int>(b.timer), 80);
-        help("Frames it lasts (30 a second; 0 for ever).");
-        if (timer) mutate("Set enchantment time", [&](auto& v) { v.buffs[i].timer = static_cast<std::uint32_t>(std::max(*timer, 0)); });
+        help(NOX_TRC("editor.props.buffs.time_help", "Frames it lasts (30 a second; 0 for ever)."));
+        if (timer)
+            mutate(me::opLabel(ol::kSetEnchantmentTime),
+                   [&](auto& v) { v.buffs[i].timer = static_cast<std::uint32_t>(std::max(*timer, 0)); });
         if (b.enchantment == "ENCHANT_SHIELD" && bf->version >= 2) {
             ImGui::SameLine();
             const auto hp = intOnRelease("##h", static_cast<int>(b.shieldHealth), 70);
-            help("The shield's health.");
-            if (hp) mutate("Set shield health", [&](auto& v) { v.buffs[i].shieldHealth = static_cast<std::uint32_t>(std::max(*hp, 0)); });
+            help(NOX_TRC("editor.props.buffs.shield_help", "The shield's health."));
+            if (hp)
+                mutate(me::opLabel(ol::kSetShieldHealth),
+                       [&](auto& v) { v.buffs[i].shieldHealth = static_cast<std::uint32_t>(std::max(*hp, 0)); });
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("x")) mutate("Remove enchantment", [&](auto& v) { v.buffs.erase(v.buffs.begin() + static_cast<std::ptrdiff_t>(i)); });
+        if (ImGui::SmallButton("x"))
+            mutate(me::opLabel(ol::kRemoveEnchantment),
+                   [&](auto& v) { v.buffs.erase(v.buffs.begin() + static_cast<std::ptrdiff_t>(i)); });
         ImGui::PopID();
     }
     std::string add;
     ImGui::SetNextItemWidth(200 * ed_.imgui_->scale());
-    if (nameCombo("##addbuff", add, names, false) && !add.empty()) mutate("Add enchantment " + add, [&](auto& v) { v.buffs.push_back({add, 1, 0, 0}); });
+    if (nameCombo("##addbuff", add, names, false) && !add.empty())
+        mutate(me::opLabel(ol::kAddEnchantment, {{"name", add}}), [&](auto& v) { v.buffs.push_back({add, 1, 0, 0}); });
     ImGui::SameLine();
-    ImGui::TextDisabled("add");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.props.add", "add"));
 }
 
 void PropertyPanel::shop(ObjId id)
@@ -1238,7 +1311,7 @@ void PropertyPanel::shop(ObjId id)
     const auto& m = std::get<xf::Monster>(ed_.doc_.objects.at(id).data);
     if (!m.shop) return;
     const auto& items = m.shop->items;
-    if (!section("Shop items (" + std::to_string(items.size()) + ")", "shop", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    if (!section(nox::l10n::format(NOX_TR("editor.props.shop.heading", "Shop items ({n})"), {{"n", items.size()}}), "shop", ImGuiTreeNodeFlags_DefaultOpen)) return;
     const auto mutate = [&](const std::string& lbl, const std::function<void(std::vector<xf::Shop::Item>&)>& f) {
         edit(id, lbl, [&](me::DocObject& c) {
             auto& x = std::get<xf::Monster>(c.data);
@@ -1254,24 +1327,26 @@ void PropertyPanel::shop(ObjId id)
         ed_.objects_->drawThumbnail(it.type, 24 * s); // (the inventory rows' mini icon)
         ImGui::SameLine();
         const auto count = intOnRelease("##n", it.count, 46);
-        help("How many it has (1-255).");
-        if (count) mutate("Set shop count", [&](auto& v) { v[i].count = static_cast<std::uint8_t>(std::clamp(*count, 1, 255)); });
+        help(NOX_TRC("editor.props.shop.count_help", "How many it has (1-255)."));
+        if (count) mutate(me::opLabel(ol::kSetShopCount), [&](auto& v) { v[i].count = static_cast<std::uint8_t>(std::clamp(*count, 1, 255)); });
         ImGui::SameLine();
         ImGui::SetNextItemWidth(170 * s);
         std::string type = it.type;
         if (nameCombo("##type", type, pickups, false, true)) {
-            mutate("Set shop item", [&](auto& v) {
+            mutate(me::opLabel(ol::kSetShopItem), [&](auto& v) {
                 v[i].type = type;
                 v[i].parameter.clear();
                 v[i].modifiers = {};
             });
         }
         ImGui::SameLine();
-        if (ImGui::ArrowButton("##up", ImGuiDir_Up) && i > 0) mutate("Move shop item", [&](auto& v) { std::swap(v[i], v[i - 1]); });
+        if (ImGui::ArrowButton("##up", ImGuiDir_Up) && i > 0) mutate(me::opLabel(ol::kMoveShopItem), [&](auto& v) { std::swap(v[i], v[i - 1]); });
         ImGui::SameLine();
-        if (ImGui::ArrowButton("##down", ImGuiDir_Down) && i + 1 < items.size()) mutate("Move shop item", [&](auto& v) { std::swap(v[i], v[i + 1]); });
+        if (ImGui::ArrowButton("##down", ImGuiDir_Down) && i + 1 < items.size())
+            mutate(me::opLabel(ol::kMoveShopItem), [&](auto& v) { std::swap(v[i], v[i + 1]); });
         ImGui::SameLine();
-        if (ImGui::SmallButton("x")) mutate("Remove shop item", [&](auto& v) { v.erase(v.begin() + static_cast<std::ptrdiff_t>(i)); });
+        if (ImGui::SmallButton("x"))
+            mutate(me::opLabel(ol::kRemoveShopItem), [&](auto& v) { v.erase(v.begin() + static_cast<std::ptrdiff_t>(i)); });
         // A book's spell, ability or creature; an item's modifiers.
         const auto* def = ed_.things_.findThing(it.type);
         const std::string xfer = def ? std::string(def->lastAttribute("XFER").value_or("")) : std::string();
@@ -1280,18 +1355,22 @@ void PropertyPanel::shop(ObjId id)
             ImGui::Indent();
             ImGui::SetNextItemWidth(200 * s);
             std::string p = it.parameter;
-            if (nameCombo("##param", p, me::namesFor(pk, ctx_))) mutate("Set shop book", [&](auto& v) { v[i].parameter = p; });
+            if (nameCombo("##param", p, me::namesFor(pk, ctx_))) mutate(me::opLabel(ol::kSetShopBook), [&](auto& v) { v[i].parameter = p; });
             ImGui::Unindent();
         }
         if (xfer == "WeaponXfer" || xfer == "ArmorXfer" || xfer == "AmmoXfer") {
             ImGui::Indent();
-            static const char* kSlots[4] = {"Effectiveness", "Material", "Enchantment 1", "Enchantment 2"};
             for (int k = 0; k < 4; ++k) {
                 ImGui::PushID(k);
                 ImGui::SetNextItemWidth(150 * s);
                 std::string mod = it.modifiers[static_cast<std::size_t>(k)];
-                if (nameCombo("##mod", mod, me::namesFor(K::Modifier, ctx_, it.type, k))) mutate("Set shop item modifier", [&](auto& v) { v[i].modifiers[static_cast<std::size_t>(k)] = mod; });
-                help(kSlots[k]);
+                if (nameCombo("##mod", mod, me::namesFor(K::Modifier, ctx_, it.type, k)))
+                    mutate(me::opLabel(ol::kSetShopModifier),
+                           [&](auto& v) { v[i].modifiers[static_cast<std::size_t>(k)] = mod; });
+                help(k == 0   ? NOX_TRC("editor.props.shop.slot_effectiveness", "Effectiveness")
+                     : k == 1 ? NOX_TRC("editor.props.shop.slot_material", "Material")
+                     : k == 2 ? NOX_TRC("editor.props.shop.slot_enchantment1", "Enchantment 1")
+                              : NOX_TRC("editor.props.shop.slot_enchantment2", "Enchantment 2"));
                 if (k % 2 == 0) ImGui::SameLine();
                 ImGui::PopID();
             }
@@ -1303,19 +1382,21 @@ void PropertyPanel::shop(ObjId id)
     if (items.size() < 255) {
         std::string add = ed_.objects_->browserType();
         const bool canBrowser = std::ranges::find(pickups, add) != pickups.end();
-        if (canBrowser && ImGui::Button(("Add " + add).c_str())) mutate("Add shop item " + add, [&](auto& v) { v.push_back({1, add, {}, {}}); });
+        if (canBrowser && ImGui::Button(nox::l10n::format(NOX_TR("editor.props.add_type", "Add {type}"), {{"type", add}}).c_str()))
+            mutate(me::opLabel(ol::kAddShopItem, {{"type", add}}), [&](auto& v) { v.push_back({1, add, {}, {}}); });
         if (canBrowser) ImGui::SameLine();
         std::string pick;
         ImGui::SetNextItemWidth(200 * s);
-        if (nameCombo("##addshop", pick, pickups, false, true) && !pick.empty()) mutate("Add shop item " + pick, [&](auto& v) { v.push_back({1, pick, {}, {}}); });
-        help("Add an item to what it sells.");
+        if (nameCombo("##addshop", pick, pickups, false, true) && !pick.empty())
+            mutate(me::opLabel(ol::kAddShopItem, {{"type", pick}}), [&](auto& v) { v.push_back({1, pick, {}, {}}); });
+        help(NOX_TRC("editor.props.shop.add_help", "Add an item to what it sells."));
     }
 }
 
 void PropertyPanel::glyphSpells(ObjId id)
 {
     const auto& g = std::get<xf::Glyph>(ed_.doc_.objects.at(id).data);
-    if (!section("Glyph spells (" + std::to_string(g.spells.size()) + ")", "glyph", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    if (!section(nox::l10n::format(NOX_TR("editor.props.glyph.heading", "Glyph spells ({n})"), {{"n", g.spells.size()}}), "glyph", ImGuiTreeNodeFlags_DefaultOpen)) return;
     const auto mutate = [&](const std::string& lbl, const std::function<void(std::vector<std::string>&)>& f) {
         edit(id, lbl, [&](me::DocObject& c) { f(std::get<xf::Glyph>(c.data).spells); });
     };
@@ -1324,27 +1405,31 @@ void PropertyPanel::glyphSpells(ObjId id)
         ImGui::PushID(static_cast<int>(i));
         std::string n = g.spells[i];
         ImGui::SetNextItemWidth(220 * ed_.imgui_->scale());
-        if (nameCombo("##s", n, names, false)) mutate("Set glyph spell", [&](auto& v) { v[i] = n; });
+        if (nameCombo("##s", n, names, false)) mutate(me::opLabel(ol::kSetGlyphSpell), [&](auto& v) { v[i] = n; });
         ImGui::SameLine();
-        if (ImGui::SmallButton("x")) mutate("Remove glyph spell", [&](auto& v) { v.erase(v.begin() + static_cast<std::ptrdiff_t>(i)); });
+        if (ImGui::SmallButton("x"))
+            mutate(me::opLabel(ol::kRemoveGlyphSpell), [&](auto& v) { v.erase(v.begin() + static_cast<std::ptrdiff_t>(i)); });
         ImGui::PopID();
     }
     if (g.spells.size() > 5) {
-        ImGui::TextColored(editor::themeColours().error, "The game's glyph holds 5 spells: more run over its other data.");
+        ImGui::TextColored(editor::themeColours().error, "%s", NOX_TRC("editor.props.glyph.too_many", "The game's glyph holds 5 spells: more run over its other data."));
     }
     std::string add;
     ImGui::SetNextItemWidth(220 * ed_.imgui_->scale());
-    if (g.spells.size() < 5 && nameCombo("##add", add, names, false) && !add.empty()) mutate("Add glyph spell " + add, [&](auto& v) { v.push_back(add); });
+    if (g.spells.size() < 5 && nameCombo("##add", add, names, false) && !add.empty())
+        mutate(me::opLabel(ol::kAddGlyphSpell, {{"name", add}}), [&](auto& v) { v.push_back(add); });
 }
 
 void PropertyPanel::rewardLists(ObjId id)
 {
     const auto& r = std::get<xf::RewardMarker>(ed_.doc_.objects.at(id).data);
-    if (!section("Reward lists", "rlists", ImGuiTreeNodeFlags_DefaultOpen)) return;
-    ImGui::TextDisabled("Books come from these when \"Use the map's lists\" ticks their kind.");
-    const auto list = [&](const char* title, const std::vector<std::string>& v, K kind, std::vector<std::string> xf::RewardMarker::*m) {
-        ImGui::PushID(title);
-        ImGui::TextUnformatted(title);
+    if (!section(NOX_TR("editor.props.rewards.heading", "Reward lists"), "rlists", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    ImGui::TextDisabled("%s", NOX_TRC("editor.props.rewards.about", "Books come from these when \"Use the map's lists\" ticks their kind."));
+    // (`listId` the list's own id and English name, `title` its heading in the language in use.)
+    const auto list = [&](const char* listId, const std::string& title, const std::vector<std::string>& v, K kind,
+                          std::vector<std::string> xf::RewardMarker::*m) {
+        ImGui::PushID(listId);
+        ImGui::TextUnformatted(title.c_str());
         const auto names = me::namesFor(kind, ctx_);
         for (std::size_t i = 0; i < v.size(); ++i) {
             ImGui::PushID(static_cast<int>(i));
@@ -1352,7 +1437,7 @@ void PropertyPanel::rewardLists(ObjId id)
             ImGui::TextUnformatted(v[i].c_str());
             ImGui::SameLine();
             if (ImGui::SmallButton("x")) {
-                edit(id, std::string("Remove from ") + title, [&](me::DocObject& c) {
+                edit(id, me::opLabel(ol::kRemoveFromList, {{"list", listId}}), [&](me::DocObject& c) {
                     auto& l = std::get<xf::RewardMarker>(c.data).*m;
                     l.erase(l.begin() + static_cast<std::ptrdiff_t>(i));
                 });
@@ -1362,21 +1447,23 @@ void PropertyPanel::rewardLists(ObjId id)
         std::string add;
         ImGui::SetNextItemWidth(200 * ed_.imgui_->scale());
         if (nameCombo("##add", add, names, false) && !add.empty() && std::ranges::find(v, add) == v.end()) {
-            edit(id, std::string("Add to ") + title, [&](me::DocObject& c) { (std::get<xf::RewardMarker>(c.data).*m).push_back(add); });
+            edit(id, me::opLabel(ol::kAddToList, {{"list", listId}}),
+                 [&](me::DocObject& c) { (std::get<xf::RewardMarker>(c.data).*m).push_back(add); });
         }
         ImGui::PopID();
     };
-    list("Spells", r.spells, K::Spell, &xf::RewardMarker::spells);
-    list("Abilities", r.abilities, K::Ability, &xf::RewardMarker::abilities);
-    list("Field guides", r.creatures, K::Creature, &xf::RewardMarker::creatures);
+    list(ol::kRewardSpells.en, NOX_TR("editor.props.rewards.spells", "Spells"), r.spells, K::Spell, &xf::RewardMarker::spells);
+    list(ol::kRewardAbilities.en, NOX_TR("editor.props.rewards.abilities", "Abilities"), r.abilities, K::Ability, &xf::RewardMarker::abilities);
+    list(ol::kRewardFieldGuides.en, NOX_TR("editor.props.rewards.field_guides", "Field guides"), r.creatures, K::Creature, &xf::RewardMarker::creatures);
 }
 
 void PropertyPanel::generator(ObjId id)
 {
     const auto& g = std::get<xf::MonsterGenerator>(ed_.doc_.objects.at(id).data);
-    if (!section("Monsters", "gen", ImGuiTreeNodeFlags_DefaultOpen)) return;
-    ImGui::TextWrapped("Up to 4 monsters a variant, one picked at random each spawn. Outside quests the game uses variant 1; a quest "
-                       "picks a variant at random each time the map loads.");
+    if (!section(NOX_TR("editor.props.generator.heading", "Monsters"), "gen", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    ImGui::TextWrapped("%s", NOX_TRC("editor.props.generator.about",
+                                     "Up to 4 monsters a variant, one picked at random each spawn. Outside quests the game uses variant 1; a quest "
+                                     "picks a variant at random each time the map loads."));
     const auto monsters = typesOfClass(nox::things::ObjectClass::Monster);
     const auto mutate = [&](const std::string& lbl, const std::function<void(xf::MonsterGenerator&)>& f) {
         edit(id, lbl, [&](me::DocObject& c) {
@@ -1388,7 +1475,7 @@ void PropertyPanel::generator(ObjId id)
         for (int k = 0; k < 3; ++k) {
             const std::size_t kk = static_cast<std::size_t>(k);
             const std::size_t n = kk < g.groups.size() ? g.groups[kk].size() : 0;
-            if (!ImGui::BeginTabItem(("Variant " + std::to_string(k + 1) + " (" + std::to_string(n) + ")").c_str())) continue;
+            if (!ImGui::BeginTabItem(nox::l10n::format(NOX_TR("editor.props.generator.variant", "Variant {k} ({n})"), {{"k", k + 1}, {"n", n}}).c_str())) continue;
             for (std::size_t i = 0; i < n; ++i) {
                 const auto& t = g.groups[kk][i];
                 ImGui::PushID(static_cast<int>(i));
@@ -1400,26 +1487,27 @@ void PropertyPanel::generator(ObjId id)
                     // (A slot whose type changes starts over with the new type's fresh monster.)
                     try {
                         auto fresh = me::freshTemplate(ed_.objects_->factory(), type);
-                        mutate("Set generator monster to " + type, [&](auto& x) { x.groups[kk][i] = fresh; });
+                        mutate(me::opLabel(ol::kSetGeneratorMonster, {{"type", type}}),
+                               [&](auto& x) { x.groups[kk][i] = fresh; });
                     } catch (const std::exception& ex) {
                         ed_.status(ex.what());
                     }
                 }
                 ImGui::SameLine();
                 const bool open = templatesOpen_.contains({k, static_cast<int>(i)});
-                if (ImGui::SmallButton(open ? "Hide" : "Fields")) {
+                if (ImGui::SmallButton(open ? NOX_TRI("editor.props.generator.hide", "Hide") : NOX_TRI("editor.props.generator.fields", "Fields"))) {
                     if (open) templatesOpen_.erase({k, static_cast<int>(i)});
                     else templatesOpen_.insert({k, static_cast<int>(i)});
                 }
-                help("Its monster's own fields, here (the template the generator copies).");
+                help(NOX_TRC("editor.props.generator.fields_help", "Its monster's own fields, here (the template the generator copies)."));
                 ImGui::SameLine();
-                if (ImGui::SmallButton("x")) mutate("Remove generator monster", [&](auto& x) { x.groups[kk].erase(x.groups[kk].begin() + static_cast<std::ptrdiff_t>(i)); });
+                if (ImGui::SmallButton("x")) mutate(me::opLabel(ol::kRemoveGeneratorMonster), [&](auto& x) { x.groups[kk].erase(x.groups[kk].begin() + static_cast<std::ptrdiff_t>(i)); });
                 if (open) {
                     if (const auto obj = me::templateObject(t, ed_.things_)) {
                         me::MapDocument one; // (the template alone, for its shared fields)
                         one.objects.emplace(1, *obj);
                         auto fields = me::sharedFields(one, {1}, ctx_);
-                        std::erase_if(fields, [](const me::SharedField& f) { return f.desc.group == "Header"; });
+                        std::erase_if(fields, [](const me::SharedField& f) { return std::string_view(f.desc.group.en) == "Header"; });
                         const Apply apply = [this, id, kk, i](const me::FieldDesc& f, const me::FieldValue& v, std::uint64_t mask) {
                             const auto& gen = std::get<xf::MonsterGenerator>(ed_.doc_.objects.at(id).data);
                             if (kk >= gen.groups.size() || i >= gen.groups[kk].size()) return;
@@ -1433,15 +1521,16 @@ void PropertyPanel::generator(ObjId id)
                             }
                             f.set(*obj2, nv);
                             const auto t2 = me::makeTemplate(*obj2, ed_.things_, &keep);
-                            edit(id, "Set generator monster's " + f.label, [&](me::DocObject& c) { std::get<xf::MonsterGenerator>(c.data).groups[kk][i] = t2; });
+                            edit(id, me::opLabel(ol::kSetGeneratorField, {{"field", f.label.en}}),
+                                 [&](me::DocObject& c) { std::get<xf::MonsterGenerator>(c.data).groups[kk][i] = t2; });
                         };
                         ImGui::Indent();
                         templateInventory(id, kk, i); // (what it carries first: the fields list is long)
-                        ImGui::SeparatorText("Fields");
+                        ImGui::SeparatorText(NOX_TRC("editor.props.generator.fields", "Fields"));
                         fieldList(fields, apply, t.type, std::nullopt, false, "tpl" + std::to_string(k) + "_" + std::to_string(i));
                         ImGui::Unindent();
                     } else {
-                        ImGui::TextDisabled("(its record can't be read)");
+                        ImGui::TextDisabled("%s", NOX_TRC("editor.props.generator.unreadable", "(its record can't be read)"));
                     }
                 }
                 ImGui::PopID();
@@ -1452,22 +1541,24 @@ void PropertyPanel::generator(ObjId id)
                 const auto addMonster = [&](const std::string& type) {
                     try {
                         auto fresh = me::freshTemplate(ed_.objects_->factory(), type);
-                        mutate("Add generator monster " + type, [&](auto& x) {
-                            if (x.groups.size() < 3) x.groups.resize(3);
-                            x.groups[kk].push_back(fresh);
-                        });
+                        mutate(me::opLabel(ol::kAddGeneratorMonster, {{"type", type}}),
+                               [&](auto& x) {
+                                   if (x.groups.size() < 3) x.groups.resize(3);
+                                   x.groups[kk].push_back(fresh);
+                               });
                     } catch (const std::exception& ex) {
                         ed_.status(ex.what());
                     }
                 };
-                if (canBrowser && ImGui::Button(("Add " + add).c_str())) addMonster(add);
+                if (canBrowser && ImGui::Button(nox::l10n::format(NOX_TR("editor.props.add_type", "Add {type}"), {{"type", add}}).c_str())) addMonster(add);
                 if (canBrowser) ImGui::SameLine();
                 std::string pick;
                 ImGui::SetNextItemWidth(200 * ed_.imgui_->scale());
                 if (nameCombo("##add", pick, monsters, false) && !pick.empty()) addMonster(pick);
-                help("Add a monster to this variant.");
+                help(NOX_TRC("editor.props.generator.add_help", "Add a monster to this variant."));
                 // A monster dragged from the content browser.
-                if (const auto name = droppedThing("drop a monster here"); name && std::ranges::find(monsters, *name) != monsters.end()) addMonster(*name);
+                if (const auto name = droppedThing(NOX_TRI("editor.props.generator.drop", "drop a monster here")); name && std::ranges::find(monsters, *name) != monsters.end())
+                    addMonster(*name);
             }
             ImGui::EndTabItem();
         }
@@ -1483,13 +1574,14 @@ void PropertyPanel::templateInventory(ObjId id, std::size_t group, std::size_t s
     const auto one = me::templateDocument(ed_.doc_, where, ed_.things_);
     const int k = static_cast<int>(group), sl = static_cast<int>(slot);
     if (!one) {
-        ImGui::TextDisabled("(its items' records can't be read: they're kept as stored)");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.props.template.items_unreadable", "(its items' records can't be read: they're kept as stored)"));
         return;
     }
     const auto items = one->childrenOf(1);
     ImGui::PushID(("tinv" + std::to_string(k) + "_" + std::to_string(sl)).c_str());
-    ImGui::SeparatorText(("Inventory (" + std::to_string(items.size()) + ")").c_str());
-    help("What this monster carries. Each monster the generator makes gets copies of these (an NPC wears the worn ones).");
+    ImGui::SeparatorText(nox::l10n::format(NOX_TR("editor.props.inventory.heading", "Inventory ({n})"), {{"n", items.size()}}).c_str());
+    help(NOX_TRC("editor.props.template.inventory_help",
+                 "What this monster carries. Each monster the generator makes gets copies of these (an NPC wears the worn ones)."));
     const auto& f = ed_.objects_->factory();
     const float s = ed_.imgui_->scale();
     // Performs an edit of the template's document (made by `inner` from a fresh copy of it).
@@ -1503,7 +1595,8 @@ void PropertyPanel::templateInventory(ObjId id, std::size_t group, std::size_t s
             return false;
         }
     };
-    if (!one->objects.at(1).header.details && items.empty()) ImGui::TextDisabled("(adding an item gives it the header details that hold an inventory)");
+    if (!one->objects.at(1).header.details && items.empty())
+        ImGui::TextDisabled("%s", NOX_TRC("editor.props.inventory.adds_details", "(adding an item gives it the header details that hold an inventory)"));
     for (std::size_t i = 0; i < items.size(); ++i) {
         const ObjId item = items[i];
         const me::DocObject& it = one->objects.at(item);
@@ -1518,23 +1611,23 @@ void PropertyPanel::templateInventory(ObjId id, std::size_t group, std::size_t s
             if (open) templateItemsOpen_.erase(key);
             else templateItemsOpen_.insert(key);
         }
-        help("Click: its own fields, here.");
+        help(NOX_TRC("editor.props.inventory.click_help", "Click: its own fields, here."));
         ImGui::SameLine();
         bool done = false;
         bool worn = it.header.details && (it.header.details->flags & me::ObjectFlag::Equipped);
-        if (ImGui::Checkbox("Worn", &worn)) done = perform([&](const me::MapDocument& d) { return me::setEquippedOp(d, item, worn, &f); });
-        help("Worn (EQUIPPED): the monster wears or wields it (an NPC the generator makes wears it too).");
+        if (ImGui::Checkbox(NOX_TRI("editor.props.inventory.worn", "Worn"), &worn)) done = perform([&](const me::MapDocument& d) { return me::setEquippedOp(d, item, worn, &f); });
+        help(NOX_TRC("editor.props.template.worn_help", "Worn (EQUIPPED): the monster wears or wields it (an NPC the generator makes wears it too)."));
         ImGui::SameLine();
         if (ImGui::ArrowButton("##up", ImGuiDir_Up) && i > 0) done = perform([&](const me::MapDocument& d) { return me::moveItemOp(d, item, i - 1); });
         ImGui::SameLine();
         if (ImGui::ArrowButton("##dn", ImGuiDir_Down) && i + 1 < items.size()) done = perform([&](const me::MapDocument& d) { return me::moveItemOp(d, item, i + 1); });
         ImGui::SameLine();
-        if (ImGui::SmallButton("Clone")) done = perform([&](const me::MapDocument& d) { return me::cloneItemOp(d, item); });
+        if (ImGui::SmallButton(NOX_TRI("editor.props.inventory.clone", "Clone"))) done = perform([&](const me::MapDocument& d) { return me::cloneItemOp(d, item); });
         ImGui::SameLine();
         if (ImGui::SmallButton("x")) {
             done = perform([&](const me::MapDocument&) {
                 me::Op op;
-                op.label = "Remove " + it.type + " from the inventory";
+                op.label = me::opLabel(ol::kRemoveItem, {{"type", it.type}});
                 op.parts.push_back(me::RemoveObjects{{item}});
                 return op;
             });
@@ -1576,7 +1669,7 @@ void PropertyPanel::templateInventory(ObjId id, std::size_t group, std::size_t s
 void PropertyPanel::lightKeys(ObjId id)
 {
     const auto& l = std::get<xf::InvisibleLight>(ed_.doc_.objects.at(id).data);
-    if (!section("Light keys", "lkeys", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    if (!section(NOX_TR("editor.props.light.heading", "Light keys"), "lkeys", ImGuiTreeNodeFlags_DefaultOpen)) return;
     // A live preview: the colour and intensity as they animate.
     const std::uint32_t frame = static_cast<std::uint32_t>(SDL_GetTicks() * 30 / 1000);
     const auto c = lightColourNow(l, frame);
@@ -1589,15 +1682,24 @@ void PropertyPanel::lightKeys(ObjId id)
     dl->AddCircleFilled(ImVec2(at.x + r, at.y + r), r * glow, IM_COL32(c[0], c[1], c[2], l.isAnti ? 90 : 220));
     ImGui::Dummy(ImVec2(r * 2, r * 2));
     ImGui::SameLine();
-    ImGui::TextDisabled("now: colour %d %d %d, intensity %.1f, reach %d%s", c[0], c[1], c[2], i, lightcone::radiusOf(i), l.isAnti ? " (anti-light)" : "");
+    char intensity[32];
+    std::snprintf(intensity, sizeof intensity, "%.1f", i);
+    ImGui::TextDisabled("%s", nox::l10n::format(l.isAnti ? NOX_TR("editor.props.light.now_anti", "now: colour {r} {g} {b}, intensity {intensity}, reach {reach} (anti-light)")
+                                                         : NOX_TR("editor.props.light.now", "now: colour {r} {g} {b}, intensity {intensity}, reach {reach}"),
+                                                {{"r", c[0]}, {"g", c[1]}, {"b", c[2]}, {"intensity", intensity}, {"reach", lightcone::radiusOf(i)}})
+                                  .c_str());
     if (const auto cone = lightConeNow(ed_.doc_, ed_.things_, ed_.doc_.objects.at(id), frame)) {
         // (whole degrees, as the game turns them; a cone never darkens: the game's cone path ignores "anti")
-        ImGui::TextDisabled("cone: facing %d, %d either side%s", lightcone::degreesFromAngle(cone->direction),
-                            lightcone::degreesFromAngle(cone->width), cone->width == 0 || cone->width >= 0x8000 ? " (lights nothing)" : "");
+        const bool dark = cone->width == 0 || cone->width >= 0x8000;
+        ImGui::TextDisabled("%s", nox::l10n::format(dark ? NOX_TR("editor.props.light.cone_dark", "cone: facing {facing}, {width} either side (lights nothing)")
+                                                         : NOX_TR("editor.props.light.cone", "cone: facing {facing}, {width} either side"),
+                                                    {{"facing", lightcone::degreesFromAngle(cone->direction)}, {"width", lightcone::degreesFromAngle(cone->width)}})
+                                      .c_str());
     }
     if ((l.animFlags & 0xC0) != 0 && !lightcone::coneAnim(l).updates) {
         // (ColorLightUpdateDraw drops itself at its first run for a light with no keys at all)
-        ImGui::TextColored(editor::themeColours().unknown, "It won't turn or aim without a colour, intensity or cone key.");
+        ImGui::TextColored(editor::themeColours().unknown, "%s",
+                           NOX_TRC("editor.props.light.no_keys", "It won't turn or aim without a colour, intensity or cone key."));
     }
     const auto mutate = [&](const std::string& lbl, const std::function<void(xf::InvisibleLight&)>& f) {
         edit(id, lbl, [&](me::DocObject& x) { f(std::get<xf::InvisibleLight>(x.data)); });
@@ -1605,18 +1707,18 @@ void PropertyPanel::lightKeys(ObjId id)
     // Colour keys: a black key ends the list (the client counts the keys before it).
     std::size_t n = 0;
     while (n < 16 && (l.colorKeys[n][0] | l.colorKeys[n][1] | l.colorKeys[n][2]) != 0) ++n;
-    ImGui::TextUnformatted("Colour sequence");
-    help("The colours it fades through, a colour step apart; black ends the list. Fewer than 2: no animation.");
+    ImGui::TextUnformatted(NOX_TRC("editor.props.light.colour_sequence", "Colour sequence"));
+    help(NOX_TRC("editor.props.light.colour_sequence_help", "The colours it fades through, a colour step apart; black ends the list. Fewer than 2: no animation."));
     for (std::size_t k = 0; k < std::min<std::size_t>(n + 1, 16); ++k) {
         ImGui::PushID(static_cast<int>(k));
         if (k % 8) ImGui::SameLine();
         if (std::array<std::uint8_t, 3> v{}; colourPick("##ck", l.colorKeys[k], v, ImGuiColorEditFlags_NoInputs)) {
             if ((v[0] | v[1] | v[2]) == 0) v = {1, 1, 1}; // (black would end the list here)
-            mutate("Set light colour key", [&](auto& x) { x.colorKeys[k] = v; });
+            mutate(me::opLabel(ol::kSetColourKey), [&](auto& x) { x.colorKeys[k] = v; });
         }
-        help(k < n ? "A key (right click: remove it)" : "Add a key");
+        help(k < n ? NOX_TRC("editor.props.light.key_help", "A key (right click: remove it)") : NOX_TRC("editor.props.light.add_key", "Add a key"));
         if (k < n && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-            mutate("Remove light colour key", [&](auto& x) {
+            mutate(me::opLabel(ol::kRemoveColourKey), [&](auto& x) {
                 for (std::size_t j = k; j + 1 < 16; ++j) x.colorKeys[j] = x.colorKeys[j + 1];
                 x.colorKeys[15] = {};
             });
@@ -1624,8 +1726,10 @@ void PropertyPanel::lightKeys(ObjId id)
         ImGui::PopID();
     }
     // Intensity and cone keys: 0 ends each list.
-    const auto keys = [&](const char* title, const char* tip, const std::array<std::uint8_t, 16>& arr, std::array<std::uint8_t, 16> xf::InvisibleLight::*m) {
-        ImGui::PushID(title);
+    // (`keysId` the list's own; `title` its heading, `setLabel` its edit's, `tip` its help, in the language in use.)
+    const auto keys = [&](const char* keysId, const char* title, const std::string& setLabel, const char* tip, const std::array<std::uint8_t, 16>& arr,
+                          std::array<std::uint8_t, 16> xf::InvisibleLight::*m) {
+        ImGui::PushID(keysId);
         std::size_t len = 0;
         while (len < 16 && arr[len] != 0) ++len;
         ImGui::TextUnformatted(title);
@@ -1635,7 +1739,7 @@ void PropertyPanel::lightKeys(ObjId id)
             if (k % 8) ImGui::SameLine();
             if (const auto v = intOnRelease("##k", arr[k], 34)) {
                 const int nv = std::clamp(*v, 0, 255);
-                mutate(std::string("Set ") + title, [&](auto& x) {
+                mutate(setLabel, [&](auto& x) {
                     auto& a = x.*m;
                     a[k] = static_cast<std::uint8_t>(nv);
                     if (nv == 0) {
@@ -1647,8 +1751,12 @@ void PropertyPanel::lightKeys(ObjId id)
         }
         ImGui::PopID();
     };
-    keys("Intensity keys", "Intensities it pulses through, an intensity step apart (0 ends the list).", l.intensityKeys, &xf::InvisibleLight::intensityKeys);
-    keys("Cone keys", "Cone widths in degrees it sweeps through, a cone step apart (0 ends the list). (The old editor took these for radius keys.)",
+    keys("Intensity keys", NOX_TRC("editor.props.light.intensity_keys", "Intensity keys"), me::opLabel(ol::kSetIntensityKeys),
+         NOX_TRC("editor.props.light.intensity_keys_help", "Intensities it pulses through, an intensity step apart (0 ends the list)."), l.intensityKeys,
+         &xf::InvisibleLight::intensityKeys);
+    keys("Cone keys", NOX_TRC("editor.props.light.cone_keys", "Cone keys"), me::opLabel(ol::kSetConeKeys),
+         NOX_TRC("editor.props.light.cone_keys_help",
+                 "Cone widths in degrees it sweeps through, a cone step apart (0 ends the list). (The old editor took these for radius keys.)"),
          l.coneKeys, &xf::InvisibleLight::coneKeys);
 }
 
@@ -1656,8 +1764,11 @@ void PropertyPanel::inventory(ObjId owner)
 {
     const auto items = ed_.doc_.childrenOf(owner);
     const me::DocObject& o = ed_.doc_.objects.at(owner);
-    if (!section("Inventory (" + std::to_string(items.size()) + ")", ("inv" + std::to_string(owner)).c_str(), items.empty() ? 0 : ImGuiTreeNodeFlags_DefaultOpen)) return;
-    if (!o.header.details) ImGui::TextDisabled("(adding an item gives it the header details that hold an inventory)");
+    if (!section(nox::l10n::format(NOX_TR("editor.props.inventory.heading", "Inventory ({n})"), {{"n", items.size()}}), ("inv" + std::to_string(owner)).c_str(),
+                 items.empty() ? 0 : ImGuiTreeNodeFlags_DefaultOpen))
+        return;
+    if (!o.header.details)
+        ImGui::TextDisabled("%s", NOX_TRC("editor.props.inventory.adds_details", "(adding an item gives it the header details that hold an inventory)"));
     const auto& f = ed_.objects_->factory();
     const float s = ed_.imgui_->scale();
     for (std::size_t i = 0; i < items.size(); ++i) {
@@ -1671,17 +1782,17 @@ void PropertyPanel::inventory(ObjId owner)
             if (open) itemsOpen_.erase(item);
             else itemsOpen_.insert(item);
         }
-        help("Click: its own fields, here.");
+        help(NOX_TRC("editor.props.inventory.click_help", "Click: its own fields, here."));
         ImGui::SameLine();
         bool worn = it.header.details && (it.header.details->flags & me::ObjectFlag::Equipped);
-        if (ImGui::Checkbox("Worn", &worn)) ed_.perform(me::setEquippedOp(ed_.doc_, item, worn, &f));
-        help("Worn (EQUIPPED): a creature wears or wields it.");
+        if (ImGui::Checkbox(NOX_TRI("editor.props.inventory.worn", "Worn"), &worn)) ed_.perform(me::setEquippedOp(ed_.doc_, item, worn, &f));
+        help(NOX_TRC("editor.props.inventory.worn_help", "Worn (EQUIPPED): a creature wears or wields it."));
         ImGui::SameLine();
         if (ImGui::ArrowButton("##up", ImGuiDir_Up) && i > 0) ed_.perform(me::moveItemOp(ed_.doc_, item, i - 1));
         ImGui::SameLine();
         if (ImGui::ArrowButton("##dn", ImGuiDir_Down) && i + 1 < items.size()) ed_.perform(me::moveItemOp(ed_.doc_, item, i + 1));
         ImGui::SameLine();
-        if (ImGui::SmallButton("Clone")) {
+        if (ImGui::SmallButton(NOX_TRI("editor.props.inventory.clone", "Clone"))) {
             try {
                 ed_.perform(me::cloneItemOp(ed_.doc_, item));
             } catch (const std::exception& ex) {
@@ -1691,7 +1802,7 @@ void PropertyPanel::inventory(ObjId owner)
         ImGui::SameLine();
         if (ImGui::SmallButton("x")) {
             me::Op op;
-            op.label = "Remove " + it.type + " from the inventory";
+            op.label = me::opLabel(ol::kRemoveItem, {{"type", it.type}});
             op.parts.push_back(me::RemoveObjects{{item}});
             ed_.perform(op);
             itemsOpen_.erase(item);
@@ -1797,7 +1908,7 @@ void PropertyPanel::drawOverlay(ImDrawList* dl, const ImVec2& origin)
                         if (hot && (x.x != 0 || x.y != 0)) {
                             const ImVec2 t = S(x.x, x.y);
                             arrow(p, t, col(120, 255, 200, a));
-                            dl->AddText(ImVec2(t.x + 5, t.y - 7), col(120, 255, 200, a), "return point");
+                            dl->AddText(ImVec2(t.x + 5, t.y - 7), col(120, 255, 200, a), NOX_TRC("editor.props.overlay.return_point", "return point"));
                         }
                     } else if constexpr (std::is_same_v<T, xf::Hole>) {
                         if (x.fallX != 0 || x.fallY != 0) {
@@ -1865,8 +1976,9 @@ void PropertyPanel::drawOverlay(ImDrawList* dl, const ImVec2& origin)
         dl->AddCircle(c, R, gizmo_ == Gizmo::Rotate ? col(255, 240, 120) : col(120, 170, 255, 200), 64, 2.5f);
         if (gizmo_ == Gizmo::Rotate) {
             char t[32];
-            std::snprintf(t, sizeof t, "%+.0f deg", gizmoTurn_);
-            dl->AddText(ImVec2(c.x + R + 6, c.y - 8), col(255, 240, 120), t);
+            std::snprintf(t, sizeof t, "%+.0f", gizmoTurn_);
+            dl->AddText(ImVec2(c.x + R + 6, c.y - 8), col(255, 240, 120),
+                        nox::l10n::format(NOX_TR("editor.props.overlay.turn_degrees", "{n} deg"), {{"n", t}}).c_str());
             const float a0 = std::atan2(gizmoStart_.y - gizmoCentre_.y, gizmoStart_.x - gizmoCentre_.x);
             const float a1 = a0 + gizmoTurn_ * kPi / 180;
             dl->AddLine(c, ImVec2(c.x + std::cos(a0) * R, c.y + std::sin(a0) * R), col(255, 240, 120, 120), 1.5f);
@@ -1960,9 +2072,9 @@ me::Op PropertyPanel::turnOp() const
         me::DocObject o = ed_.doc_.objects.at(id);
         if (const auto deg = me::facingDegrees(o); deg && me::setFacingDegrees(o, *deg + gizmoTurn_)) turned.emplace_back(id, std::move(o));
     }
-    char lbl[48];
-    std::snprintf(lbl, sizeof lbl, "Turn %+.0f degrees", gizmoTurn_);
-    return me::editObjectsOp(ed_.doc_, turned, lbl);
+    char deg[24];
+    std::snprintf(deg, sizeof deg, "%+.0f", gizmoTurn_);
+    return me::editObjectsOp(ed_.doc_, turned, me::opLabel(ol::kTurn, {{"n", deg}}));
 }
 
 me::Op PropertyPanel::moveOp(std::optional<me::Selection>& moved) const
@@ -2040,7 +2152,7 @@ bool PropertyPanel::runStep(const std::string& step)
         const std::string k = kind;
         const auto i = static_cast<std::size_t>(index);
         const auto byte = [](int v) { return static_cast<std::uint8_t>(std::clamp(v, 0, 255)); };
-        edit(id, "Set light key", [&](me::DocObject& x) {
+        edit(id, me::opLabel(ol::kSetLightKey), [&](me::DocObject& x) {
             auto& l = std::get<xf::InvisibleLight>(x.data);
             if (k == "colour") l.colorKeys[i] = {byte(a), byte(b), byte(c)};
             else if (k == "intensity") l.intensityKeys[i] = byte(a);
@@ -2072,7 +2184,7 @@ bool PropertyPanel::runStep(const std::string& step)
             const ObjId id = *ed_.selection_.objects.begin();
             try {
                 auto fresh = me::freshTemplate(ed_.objects_->factory(), type);
-                edit(id, "Add generator monster " + type, [&](me::DocObject& c) {
+                edit(id, me::opLabel(ol::kAddGeneratorMonster, {{"type", type}}), [&](me::DocObject& c) {
                     if (auto* g = std::get_if<xf::MonsterGenerator>(&c.data); g && k < 3) {
                         if (g->groups.size() < 3) g->groups.resize(3);
                         if (g->groups[k].size() < 4) g->groups[k].push_back(fresh);
@@ -2192,7 +2304,7 @@ bool PropertyPanel::runStep(const std::string& step)
                     tb->targetExtent = a.header.extent;
                     changed.emplace_back(*p.object, b);
                 }
-                ed_.perform(me::editObjectsOp(ed_.doc_, changed, "Link both ways"));
+                ed_.perform(me::editObjectsOp(ed_.doc_, changed, me::opLabel(ol::kLinkBothWays)));
             };
             ed_.beginPick(std::move(r));
         }

@@ -2,6 +2,8 @@
 // switches, mouse slider and drop-downs added to the panel, and the settings they change.
 #include "options_window.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -37,34 +39,40 @@ constexpr std::int32_t kFrameRate = 2900, kBloom = 2901, kPerPixelLight = 2902, 
 using Extras = OptionsWindow::Extras;
 struct Switch {
     std::int32_t id;
-    const char* label;
+    nox::l10n::Key label;
     bool Extras::*field;
 };
 constexpr std::array<Switch, 11> kSwitches{{
-    {kFrameRate, "Frame Rate", &Extras::frameRate},
-    {kBloom, "Bloom", &Extras::bloom},
-    {kPerPixelLight, "Pixel Light", &Extras::perPixelLight},
-    {kSmoothEffects, "Smooth FX", &Extras::smoothEffects},
-    {kHdSpellFx, "HD Spell FX", &Extras::hdSpellFx},
-    {kHdImages, "Use HD Images", &Extras::hdImages},
-    {kKillFeed, "Kill Feed", &Extras::killFeed},
-    {kMouseAccel, "Win Mouse Accel", &Extras::mouseAccel},
-    {kVsync, "VSync", &Extras::vsync},
-    {kExactMaths, "Exact Original Maths", &Extras::exactMaths},
-    {kOriginalFonts, "Original Style Fonts", &Extras::originalFonts},
+    {kFrameRate, NOX_TRK("options.switch.frame_rate", "Frame Rate"), &Extras::frameRate},
+    {kBloom, NOX_TRK("options.switch.bloom", "Bloom"), &Extras::bloom},
+    {kPerPixelLight, NOX_TRK("options.switch.pixel_light", "Pixel Light"), &Extras::perPixelLight},
+    {kSmoothEffects, NOX_TRK("options.switch.smooth_fx", "Smooth FX"), &Extras::smoothEffects},
+    {kHdSpellFx, NOX_TRK("options.switch.hd_spell_fx", "HD Spell FX"), &Extras::hdSpellFx},
+    {kHdImages, NOX_TRK("options.switch.hd_images", "Use HD Images"), &Extras::hdImages},
+    {kKillFeed, NOX_TRK("options.switch.kill_feed", "Kill Feed"), &Extras::killFeed},
+    {kMouseAccel, NOX_TRK("options.switch.mouse_accel", "Win Mouse Accel"), &Extras::mouseAccel},
+    {kVsync, NOX_TRK("options.switch.vsync", "VSync"), &Extras::vsync},
+    {kExactMaths, NOX_TRK("options.switch.exact_maths", "Exact Original Maths"), &Extras::exactMaths},
+    {kOriginalFonts, NOX_TRK("options.switch.original_fonts", "Original Style Fonts"), &Extras::originalFonts},
 }};
 // Mouse speed: its label (with the speed) and slider (Extras::mouseSpeed, percent; with the 3D
 // view on, Extras::mouseSpeed3D)
 constexpr std::int32_t kMouseLabel = 2920, kMouseSlider = 2921;
 // Smoothing: its label, the drop-down's button and its choices (Extras::smoothing)
 constexpr std::int32_t kSmoothLabel = 2910, kSmoothBox = 2911, kSmoothItem = 2912;
-constexpr std::array<const char*, 4> kSmoothNames{"Off", "Smooth Movement", "Smooth Network", "Match Server"};
+constexpr std::array<nox::l10n::Key, 4> kSmoothNames{
+    NOX_TRK("options.smoothing.off", "Off"), NOX_TRK("options.smoothing.movement", "Smooth Movement"),
+    NOX_TRK("options.smoothing.network", "Smooth Network"), NOX_TRK("options.smoothing.match_server", "Match Server")};
 // Display: the same (Extras::display)
 constexpr std::int32_t kDisplayLabel = 2930, kDisplayBox = 2931, kDisplayItem = 2932;
-constexpr std::array<const char*, 3> kDisplayNames{"Windowed", "Fullscreen Windowed", "Fullscreen"};
+constexpr std::array<nox::l10n::Key, 3> kDisplayNames{NOX_TRK("options.display.windowed", "Windowed"),
+                                                      NOX_TRK("options.display.fullscreen_windowed", "Fullscreen Windowed"),
+                                                      NOX_TRK("options.display.fullscreen", "Fullscreen")};
 // Weather Effects: the same (Extras::weather), on the More page
 constexpr std::int32_t kWeatherLabel = 2950, kWeatherBox = 2951, kWeatherItem = 2952;
-constexpr std::array<const char*, 3> kWeatherNames{"On", "Reduced", "Off"};
+constexpr std::array<nox::l10n::Key, 3> kWeatherNames{NOX_TRK("options.weather.on", "On"),
+                                                      NOX_TRK("options.weather.reduced", "Reduced"),
+                                                      NOX_TRK("options.weather.off", "Off")};
 // The panel's tabs (noxsdl's), and the Server Settings' Game tab whose look they copy
 // (servopts.wnd: a radio button drawn with UITabs3, lit UITabs1)
 constexpr std::int32_t kTabGeneral = 2940, kTabMore = 2941;
@@ -134,122 +142,149 @@ std::string_view extraTooltip(std::int32_t id)
 {
     switch (id) {
     case kFrameRate:
-        return "The frame rate and frame time in the top right\n(with Smooth Motion, its delay too).";
+        return NOX_TR("options.tip.frame_rate",
+                      "The frame rate and frame time in the top right\n(with Smooth Motion, its delay too).");
     case kBloom:
-        return "A soft glow round bright effects and lights.\n+ Spells and fire look brighter.\n- A little more work for the graphics card.";
+        return NOX_TR("options.tip.bloom",
+                      "A soft glow round bright effects and lights.\n+ Spells and fire look brighter.\n- A little more work for the graphics card.");
     case kPerPixelLight:
-        return "Lights shade every pixel, smoothly.\n+ Smooth lighting with no blocky edges.\n- Off: the original's coarser light grid.";
+        return NOX_TR("options.tip.pixel_light",
+                      "Lights shade every pixel, smoothly.\n+ Smooth lighting with no blocky edges.\n- Off: the original's coarser light grid.");
     case kSmoothEffects:
-        return "Sparks, rays, glows, lines and dots drawn smooth at\n"
-               "your screen's resolution, and a smoke blast as soft dust.\n"
-               "+ Cleaner sparks, rays and glows.\n"
-               "- Off: the original's pixel shapes.\n"
-               "The poison cloud and Force Field are HD Spell FX\n"
-               "(on the More page).";
+        return NOX_TR("options.tip.smooth_fx",
+                      "Sparks, rays, glows, lines and dots drawn smooth at\n"
+                      "your screen's resolution, and a smoke blast as soft dust.\n"
+                      "+ Cleaner sparks, rays and glows.\n"
+                      "- Off: the original's pixel shapes.\n"
+                      "The poison cloud and Force Field are HD Spell FX\n"
+                      "(on the More page).");
     case kHdSpellFx:
-        return "Spells drawn anew in place of the original's sprites:\n"
-               "the poison cloud as soft billowing clouds and Force Field\n"
-               "as a glass barrier, smooth at your screen's resolution.\n"
-               "+ Detailed spell effects at any zoom.\n"
-               "- Off: the original's sprites.\n"
-               "Sparks, rays and glows are Smooth FX (on the General page).";
+        return NOX_TR("options.tip.hd_spell_fx",
+                      "Spells drawn anew in place of the original's sprites:\n"
+                      "the poison cloud as soft billowing clouds and Force Field\n"
+                      "as a glass barrier, smooth at your screen's resolution.\n"
+                      "+ Detailed spell effects at any zoom.\n"
+                      "- Off: the original's sprites.\n"
+                      "Sparks, rays and glows are Smooth FX (on the General page).");
     case kSmoothLabel:
     case kSmoothBox:
-        return "How movement between the server's 30 updates a second is drawn.\n"
-               "Off: in the server's 30 steps a second, at your frame rate.\n"
-               "Smooth Movement: each step spread over the frames between updates.\n"
-               "Smooth Network: everything drawn between updates (adds latency).\n"
-               "Match Server: follow server updates; normally 60 FPS in solo play.";
+        return NOX_TR("options.tip.smoothing",
+                      "How movement between the server's 30 updates a second is drawn.\n"
+                      "Off: in the server's 30 steps a second, at your frame rate.\n"
+                      "Smooth Movement: each step spread over the frames between updates.\n"
+                      "Smooth Network: everything drawn between updates (adds latency).\n"
+                      "Match Server: follow server updates; normally 60 FPS in solo play.");
     case kSmoothItem:
-        return "Off: everything is drawn where the server last said,\n"
-               "in its 30 steps a second, with no added delay.\n"
-               "- Above 30 FPS the steps can look uneven.";
+        return NOX_TR("options.tip.smoothing_off",
+                      "Off: everything is drawn where the server last said,\n"
+                      "in its 30 steps a second, with no added delay.\n"
+                      "- Above 30 FPS the steps can look uneven.");
     case kSmoothItem + 1:
-        return "Smooth Movement: when the server moves something, it glides\n"
-               "there over one update (~33 ms) instead of jumping.\n"
-               "+ Smooth at any frame rate, never past where the server says.\n"
-               "- About 17 ms behind on average (at most one update).";
+        return NOX_TR("options.tip.smoothing_movement",
+                      "Smooth Movement: when the server moves something, it glides\n"
+                      "there over one update (~33 ms) instead of jumping.\n"
+                      "+ Smooth at any frame rate, never past where the server says.\n"
+                      "- About 17 ms behind on average (at most one update).");
     case kSmoothItem + 2:
-        return "Smooth Network: everything you see is drawn smoothly\n"
-               "between the server's updates.\n"
-               "+ The smoothest picture: best for roleplay, video capture\n"
-               "  and for-fun servers.\n"
-               "- Everything is shown about 50 ms late (adapts to your\n"
-               "  connection), on top of your ping: lead moving targets.";
+        return NOX_TR("options.tip.smoothing_network",
+                      "Smooth Network: everything you see is drawn smoothly\n"
+                      "between the server's updates.\n"
+                      "+ The smoothest picture: best for roleplay, video capture\n"
+                      "  and for-fun servers.\n"
+                      "- Everything is shown about 50 ms late (adapts to your\n"
+                      "  connection), on top of your ping: lead moving targets.");
     case kSmoothItem + 3:
-        return "Match Server: normally a 60 FPS lock in single-player.\n"
-               "No interpolation. Draw when a server update arrives,\n"
-               "including extra movement updates (30-120 per second).\n"
-               "Menus use their normal frame rate.";
+        return NOX_TR("options.tip.smoothing_match_server",
+                      "Match Server: normally a 60 FPS lock in single-player.\n"
+                      "No interpolation. Draw when a server update arrives,\n"
+                      "including extra movement updates (30-120 per second).\n"
+                      "Menus use their normal frame rate.");
     case kDisplayLabel:
     case kDisplayBox:
-        return "How the game is shown: in a window, filling the screen\n"
-               "as a borderless window, or fullscreen.";
+        return NOX_TR("options.tip.display",
+                      "How the game is shown: in a window, filling the screen\n"
+                      "as a borderless window, or fullscreen.");
     case kDisplayItem:
-        return "Windowed: a window you can move and resize.";
+        return NOX_TR("options.tip.display_windowed",
+                      "Windowed: a window you can move and resize.");
     case kDisplayItem + 1:
-        return "Fullscreen Windowed: a borderless window the size of the screen.\n"
-               "+ Alt+Tab is instant.\n"
-               "- The desktop's compositor stays on.";
+        return NOX_TR("options.tip.display_fullscreen_windowed",
+                      "Fullscreen Windowed: a borderless window the size of the screen.\n"
+                      "+ Alt+Tab is instant.\n"
+                      "- The desktop's compositor stays on.");
     case kDisplayItem + 2:
-        return "Fullscreen: the screen is the game's alone, at your\n"
-               "desktop's resolution and refresh rate.\n"
-               "+ The least latency.\n"
-               "- Alt+Tab switches the screen's mode.";
+        return NOX_TR("options.tip.display_fullscreen",
+                      "Fullscreen: the screen is the game's alone, at your\n"
+                      "desktop's resolution and refresh rate.\n"
+                      "+ The least latency.\n"
+                      "- Alt+Tab switches the screen's mode.");
     case kVsync:
-        return "Frames wait for the screen's refresh.\n"
-               "+ No tearing.\n"
-               "- Up to a refresh's more latency.\n"
-               "Off: as many frames as the computer can draw.";
+        return NOX_TR("options.tip.vsync",
+                      "Frames wait for the screen's refresh.\n"
+                      "+ No tearing.\n"
+                      "- Up to a refresh's more latency.\n"
+                      "Off: as many frames as the computer can draw.");
     case kHdImages:
-        return "Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.";
+        return NOX_TR("options.tip.hd_images",
+                      "Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.");
     case kKillFeed:
-        return "Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.";
+        return NOX_TR("options.tip.kill_feed",
+                      "Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.");
     case kMouseAccel:
-        return "Windows' pointer speed and acceleration (Enhance Pointer\n"
-               "Precision) on the mouse's raw movement.\n"
-               "Off: the raw movement alone, one count a game pixel,\n"
-               "as the original read it (at Mouse x1.00).";
+        return NOX_TR("options.tip.mouse_accel",
+                      "Windows' pointer speed and acceleration (Enhance Pointer\n"
+                      "Precision) on the mouse's raw movement.\n"
+                      "Off: the raw movement alone, one count a game pixel,\n"
+                      "as the original read it (at Mouse x1.00).");
     case kMouseLabel:
     case kMouseSlider:
-        return "How fast the cursor moves: x0.25 to x3. At x1.00 one count\n"
-               "of the mouse moves the cursor one pixel of the game's screen,\n"
-               "as the original. The cursor stays in the window while the\n"
-               "game has the focus, as the original's did.";
+        return NOX_TR("options.tip.mouse_speed",
+                      "How fast the cursor moves: x0.25 to x3. At x1.00 one count\n"
+                      "of the mouse moves the cursor one pixel of the game's screen,\n"
+                      "as the original. The cursor stays in the window while the\n"
+                      "game has the focus, as the original's did.");
     case kExactMaths:
-        return "Rounds the game's maths exactly as the original game did.\n"
-               "Off, damage after armour, potion healing, carry capacity,\n"
-               "experience and wear can differ by a point now and then, and\n"
-               "movement, missile paths and sight edges very slightly.\n"
-               "+ For campaign and map-script players who want the\n"
-               "  original's exact behaviour.\n"
-               "For games you host and solo or campaign play, not games you join.\n"
-               "Takes effect from the next game.";
+        return NOX_TR("options.tip.exact_maths",
+                      "Rounds the game's maths exactly as the original game did.\n"
+                      "Off, damage after armour, potion healing, carry capacity,\n"
+                      "experience and wear can differ by a point now and then, and\n"
+                      "movement, missile paths and sight edges very slightly.\n"
+                      "+ For campaign and map-script players who want the\n"
+                      "  original's exact behaviour.\n"
+                      "For games you host and solo or campaign play, not games you join.\n"
+                      "Takes effect from the next game.");
     case kOriginalFonts:
-        return "The game's text in Nox-style fonts: the original's letters,\n"
-               "drawn smooth with Use HD Images.\n"
-               "Off: Caudex, a book face, with Noto Sans for what it lacks.";
+        return NOX_TR("options.tip.original_fonts",
+                      "The game's text in Nox-style fonts: the original's letters,\n"
+                      "drawn smooth with Use HD Images.\n"
+                      "Off: Caudex, a book face, with Noto Sans for what it lacks.");
     case kWeatherLabel:
     case kWeatherBox:
-        return "Rain, snow, storms and wind that a mod's game turns on,\n"
-               "drawn over the world (they never change the game).\n"
-               "- Greyed without the GPU renderer.";
+        return NOX_TR("options.tip.weather",
+                      "Rain, snow, storms and wind that a mod's game turns on,\n"
+                      "drawn over the world (they never change the game).\n"
+                      "- Greyed without the GPU renderer.");
     case kWeatherItem:
-        return "On: the weather as the mod sets it, with lightning\n"
-               "flashes in storms.";
+        return NOX_TR("options.tip.weather_on",
+                      "On: the weather as the mod sets it, with lightning\n"
+                      "flashes in storms.");
     case kWeatherItem + 1:
-        return "Reduced: fewer raindrops and flakes, and soft, gentle\n"
-               "lightning with no flicker.\n"
-               "+ Easier on slow graphics cards and on the eyes.";
+        return NOX_TR("options.tip.weather_reduced",
+                      "Reduced: fewer raindrops and flakes, and soft, gentle\n"
+                      "lightning with no flicker.\n"
+                      "+ Easier on slow graphics cards and on the eyes.");
     case kWeatherItem + 2:
-        return "Off: no weather is drawn.";
+        return NOX_TR("options.tip.weather_off",
+                      "Off: no weather is drawn.");
     case kTabGeneral:
-        return "The everyday settings.";
+        return NOX_TR("options.tip.tab_general",
+                      "The everyday settings.");
     case kTabMore:
-        return "Settings seldom changed: the line of sight's soft edge,\n"
-               "Fade Objects, the HUD, the frame-rate counter, HD Spell FX,\n"
-               "the original's exact maths for games you host, the\n"
-               "weather effects and the original style fonts.";
+        return NOX_TR("options.tip.tab_more",
+                      "Settings seldom changed: the line of sight's soft edge,\n"
+                      "Fade Objects, the HUD, the frame-rate counter, HD Spell FX,\n"
+                      "the original's exact maths for games you host, the\n"
+                      "weather effects and the original style fonts.");
     default:
         return {};
     }
@@ -279,10 +314,11 @@ void OptionsWindow::setExtraEnabled(std::int32_t id, bool enabled)
 void OptionsWindow::setMouseText()
 {
     if (gui::Window* w = advanced_ ? advanced_->find(kMouseLabel) : nullptr) {
-        char text[32];
-        std::snprintf(text, sizeof text, extras_.view3d ? "3D Mouse x%.2f" : "Mouse x%.2f",
-                      extras_.sliderSpeed() / 100.0);
-        w->text = text;
+        char speed[32];
+        std::snprintf(speed, sizeof speed, "%.2f", extras_.sliderSpeed() / 100.0);
+        w->text = nox::l10n::format(extras_.view3d ? NOX_TR("options.mouse_speed_3d", "3D Mouse x{speed}")
+                                                   : NOX_TR("options.mouse_speed", "Mouse x{speed}"),
+                                    {{"speed", speed}});
     }
 }
 
@@ -338,7 +374,7 @@ void OptionsWindow::showResolutions(int inUse, bool open)
 void OptionsWindow::setDropText(const DropDown& d)
 {
     if (gui::Window* w = advanced_ ? advanced_->find(d.box) : nullptr) {
-        w->text = d.names[static_cast<std::size_t>(std::clamp(extras_.*d.value, 0, static_cast<int>(d.names.size()) - 1))];
+        w->text = nox::l10n::tr(d.names[static_cast<std::size_t>(std::clamp(extras_.*d.value, 0, static_cast<int>(d.names.size()) - 1))]);
     }
 }
 
@@ -554,11 +590,12 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     advanced_ = gui_.load(advancedDef, proc);
     for (const Switch& s : kSwitches) {
         if (gui::Window* w = advanced_->find(s.id)) {
-            w->text = s.label; // (not string-table ids)
+            w->text = nox::l10n::tr(s.label); // (not string-table ids)
         }
     }
-    for (const auto& [id, label] :
-         {std::pair{kSmoothLabel, "Smoothing"}, std::pair{kDisplayLabel, "Display"}, std::pair{kWeatherLabel, "Weather Effects"}}) {
+    for (const auto& [id, label] : {std::pair{kSmoothLabel, NOX_TRC("options.label.smoothing", "Smoothing")},
+                                    std::pair{kDisplayLabel, NOX_TRC("options.label.display", "Display")},
+                                    std::pair{kWeatherLabel, NOX_TRC("options.label.weather", "Weather Effects")}}) {
         if (gui::Window* w = advanced_->find(id)) {
             w->text = label;
         }
@@ -575,12 +612,13 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
         }
         for (int i = 0; i < static_cast<int>(d.names.size()); ++i) {
             if (gui::Window* w = advanced_->find(d.item + i)) {
-                w->text = d.names[static_cast<std::size_t>(i)];
+                w->text = nox::l10n::tr(d.names[static_cast<std::size_t>(i)]);
                 w->largeFont = false;
             }
         }
     }
-    for (const auto& [id, label] : {std::pair{kTabGeneral, "General"}, std::pair{kTabMore, "More"}}) {
+    for (const auto& [id, label] : {std::pair{kTabGeneral, NOX_TRC("options.tab.general", "General")},
+                                    std::pair{kTabMore, NOX_TRC("options.tab.more", "More")}}) {
         if (gui::Window* w = advanced_->find(id)) {
             w->text = label;
         }

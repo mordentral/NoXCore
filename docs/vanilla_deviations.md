@@ -448,6 +448,23 @@ Options switch unless noted.
   drawn in the small font on one line when that fits, else wrapped in the small font when the box
   has room for its lines, else the small font's lines the box holds. Worked out once per text,
   box, font and scale, kept on the window. A text that fits is drawn as the game draws it.
+- **NoX Core's own text is shown in the player's language** (noxcore/include/noxcore/strings/l10n.hpp;
+  the language files in noxsdl/res/lang, the lang folder beside the program): its menus, Options,
+  hosting screens, HUD additions, the map editor and the Content Editor. The language is
+  noxcore.cfg's `Language = ru` (or `ko`, `en`), else the one nox.csf is in (a Windows-1251 table:
+  Russian; Hangul text or the header's language 8: Korean; its common words otherwise), else the
+  system's, else English; a language without a file shows English, and so does an entry whose
+  English changed since it was translated. Chosen once at start (logged, with the milliseconds it
+  took). Russian and Korean ship, machine-translated for now. The game's own text still comes from
+  nox.csf. What crosses to other programs stays English: the map editor's history labels in an
+  edit session's bytes (shown translated), the hosted server's messages, saved files.
+- **An official Korean install's text is drawn** (noxsdl text.cpp): its nox.csf is UTF-16 Hangul
+  (header language 8), which the game draws with its own multibyte font sets; NoX Core's faces had
+  no Hangul, so every string of such an install drew nothing. Noto Sans KR's Hangul
+  (fonts/NotoSansKR-SemiBold-Hangul.ttf, a subset: the syllables, jamo and CJK punctuation) is now
+  the last face of each chain, after every other, so Latin, Cyrillic and Greek text draws exactly as
+  before; the map editor and the Content Editor merge it into their font. Japanese (language 6)
+  still has no font.
 - **8-bit text from the original game shows its accents** (noxcore client/world.cpp, the lobby's
   game names and MOTD): a narrow chat line's bytes past 0x7F are Latin-1 letters (or a Russian
   install's Windows-1251), as the game widens them, where NoX Core showed U+FFFD; a game name in

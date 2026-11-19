@@ -3,6 +3,8 @@
 
 #include "editor/theme_colours.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <imgui.h>
 
 namespace videotools::gui {
@@ -10,7 +12,7 @@ namespace videotools::gui {
 void drawChanges(Workspace&, const std::vector<ChangeRow>& rows)
 {
     if (rows.empty()) {
-        ImGui::TextDisabled("No changes: everything is as the game's files have it.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.changes.none", "No changes: everything is as the game's files have it."));
         return;
     }
     const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
@@ -18,10 +20,10 @@ void drawChanges(Workspace&, const std::vector<ChangeRow>& rows)
         return;
     }
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn("Change", ImGuiTableColumnFlags_WidthStretch, 0.5f);
-    ImGui::TableSetupColumn("What", ImGuiTableColumnFlags_WidthStretch, 0.25f);
-    ImGui::TableSetupColumn("Reach", ImGuiTableColumnFlags_WidthStretch, 0.15f);
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Revert").x + ImGui::GetStyle().FramePadding.x * 2);
+    ImGui::TableSetupColumn(NOX_TRI("content.changes.col_change", "Change"), ImGuiTableColumnFlags_WidthStretch, 0.5f);
+    ImGui::TableSetupColumn(NOX_TRI("content.changes.col_what", "What"), ImGuiTableColumnFlags_WidthStretch, 0.25f);
+    ImGui::TableSetupColumn(NOX_TRI("content.changes.col_reach", "Reach"), ImGuiTableColumnFlags_WidthStretch, 0.15f);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize(NOX_TRC("content.changes.revert", "Revert")).x + ImGui::GetStyle().FramePadding.x * 2);
     ImGui::TableHeadersRow();
     ImGuiListClipper clipper;
     clipper.Begin(int(rows.size()));
@@ -39,7 +41,7 @@ void drawChanges(Workspace&, const std::vector<ChangeRow>& rows)
             ImGui::TableNextColumn();
             ImGui::TextDisabled("%s", r.reach.c_str());
             ImGui::TableNextColumn();
-            if (r.revert && ImGui::SmallButton("Revert")) {
+            if (r.revert && ImGui::SmallButton(NOX_TRI("content.changes.revert", "Revert"))) {
                 r.revert();
             }
             ImGui::PopID();
@@ -52,13 +54,13 @@ void drawProblems(Workspace&, const std::vector<ProblemRow>& rows)
 {
     const auto& theme = noxsdl::editor::themeColours();
     if (rows.empty()) {
-        ImGui::TextColored(theme.ok, "No problems.");
+        ImGui::TextColored(theme.ok, "%s", NOX_TRC("content.problems.none", "No problems."));
         return;
     }
     for (std::size_t i = 0; i < rows.size(); ++i) {
         const auto& r = rows[i];
         ImGui::PushID(int(i));
-        ImGui::TextColored(r.error ? theme.error : theme.warning, "%s", r.error ? "error" : "warning");
+        ImGui::TextColored(r.error ? theme.error : theme.warning, "%s", r.error ? NOX_TRC("content.problems.error", "error") : NOX_TRC("content.problems.warning", "warning"));
         ImGui::SameLine();
         if (r.show) {
             if (ImGui::Selectable(r.text.c_str())) {
@@ -75,7 +77,7 @@ void drawLog(Workspace& ws)
 {
     const auto& lines = ws.session.messages();
     if (lines.empty()) {
-        ImGui::TextDisabled("Nothing yet.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.log.empty", "Nothing yet."));
         return;
     }
     ImGuiListClipper clipper;

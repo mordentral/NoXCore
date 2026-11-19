@@ -6,6 +6,7 @@
 #include "hud.hpp"
 
 #include "noxcore/client/text_fields.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
@@ -30,8 +31,12 @@ constexpr std::int32_t kBotsTab = 12100, kBotsPage = 12101, kBotsBox = 12102, kB
                        kBotsLabel = 12110, kBotsMinus = 12113, kBotsCount = 12116, kBotsPlus = 12119,
                        kTierLabel = 12122, kTierButton = 12123, kBotsStatusBox = 12124, kBotsInfo = 12125,
                        kBotsList = 12126, kBotsLeave = 12127, kTierTo = 12128, kTierToButton = 12129;
-constexpr std::array<const char*, 3> kClassNames{"Warriors", "Wizards", "Conjurers"};
-constexpr std::array<const char*, 3> kTierNames{"Easy", "Medium", "Hard"};
+constexpr std::array<nox::l10n::Key, 3> kClassNames{NOX_TRK("server.bots.warriors", "Warriors"),
+                                                    NOX_TRK("server.bots.wizards", "Wizards"),
+                                                    NOX_TRK("server.bots.conjurers", "Conjurers")};
+constexpr std::array<nox::l10n::Key, 3> kTierNames{NOX_TRK("server.bots.tier_easy", "Easy"),
+                                                   NOX_TRK("server.bots.tier_medium", "Medium"),
+                                                   NOX_TRK("server.bots.tier_hard", "Hard")};
 
 // The game types (name, its text, its game flags), the quest's left out of the list
 // (windowServerOptionsFillGametypeList); the names are guiserv.c's, the file
@@ -297,7 +302,7 @@ void ServerOptions::greyForCampaign()
         hint->dimDisabled = false; // (the hint above the maps, the campaign's own: read as it is)
     }
     if (gui::Window* tab = window_->find(kBotsTab)) {
-        tab->tooltip = "Not in a " + *campaign_ + " game";
+        tab->tooltip = nox::l10n::format(NOX_TR("server.common.not_in_campaign","Not in a {campaign} game"), {{"campaign", *campaign_}});
     }
     greyServerForCampaign();
 }
@@ -432,18 +437,18 @@ void ServerOptions::setupBotsPage()
         }
     };
     const bool can = static_cast<bool>(callbacks_.bots);
-    set(kBotsTab, "Bots", "Bots this game runs itself, to play with or against");
-    set(kBotsTitle, "Bots this game runs:");
+    set(kBotsTab, NOX_TR("server.bots.tab", "Bots"), NOX_TR("server.bots.tab_tip", "Bots this game runs itself, to play with or against"));
+    set(kBotsTitle, NOX_TR("server.bots.title", "Bots this game runs:"));
     for (int i = 0; i < 3; ++i) {
-        set(kBotsLabel + i, kClassNames[static_cast<std::size_t>(i)]);
-        set(kBotsMinus + i, "-", "One fewer");
-        set(kBotsPlus + i, "+", "One more");
+        set(kBotsLabel + i, nox::l10n::tr(kClassNames[static_cast<std::size_t>(i)]));
+        set(kBotsMinus + i, "-", NOX_TR("server.bots.one_fewer", "One fewer"));
+        set(kBotsPlus + i, "+", NOX_TR("server.bots.one_more", "One more"));
     }
-    set(kTierLabel, "Difficulty");
-    set(kTierButton, "", "The easiest the bots are: click for the next");
-    set(kTierTo, "to");
-    set(kTierToButton, "", "The hardest the bots are: click for the next");
-    set(kBotsLeave, "All Leave", "Every bot leaves");
+    set(kTierLabel, NOX_TR("server.bots.difficulty", "Difficulty"));
+    set(kTierButton, "", NOX_TR("server.bots.tier_from_tip", "The easiest the bots are: click for the next"));
+    set(kTierTo, NOX_TR("server.bots.tier_to", "to"));
+    set(kTierToButton, "", NOX_TR("server.bots.tier_to_tip", "The hardest the bots are: click for the next"));
+    set(kBotsLeave, NOX_TR("server.bots.all_leave", "All Leave"), NOX_TR("server.bots.all_leave_tip", "Every bot leaves"));
     if (gui::Window* tab = window_->find(kBotsTab); tab && !can) {
         tab->status &= ~nox::gui::status::Enabled;
     }
@@ -484,15 +489,15 @@ void ServerOptions::refreshBots()
         }
     }
     if (gui::Window* w = window_->find(kTierButton)) {
-        w->text = kTierNames[static_cast<std::size_t>(std::clamp(v.minTier, 0, 2))];
+        w->text = nox::l10n::tr(kTierNames[static_cast<std::size_t>(std::clamp(v.minTier, 0, 2))]);
     }
     if (gui::Window* w = window_->find(kTierToButton)) {
-        w->text = kTierNames[static_cast<std::size_t>(std::clamp(v.maxTier, 0, 2))];
+        w->text = nox::l10n::tr(kTierNames[static_cast<std::size_t>(std::clamp(v.maxTier, 0, 2))]);
     }
     if (gui::Window* w = window_->find(kBotsInfo)) {
         const int wanted = v.wanted[0] + v.wanted[1] + v.wanted[2];
-        w->text = "In the game: " + std::to_string(v.in) + " of " + std::to_string(wanted) + " (" +
-                  std::to_string(v.most) + " at most)";
+        w->text = nox::l10n::format(NOX_TR("server.bots.in_game", "In the game: {in} of {wanted} ({most} at most)"),
+                                    {{"in", v.in}, {"wanted", wanted}, {"most", v.most}});
     }
     if (gui::Window* list = window_->find(kBotsList)) {
         list->lines.clear();
@@ -670,7 +675,7 @@ void ServerOptions::setLabels()
                                         : format(text("GameTypeIs"), {typeName(startMode_)});
     }
     if (gui::Window* w = window_->find(kGoMsg)) {
-        w->text = campaign_ ? "Co-op: set the name and access, then click OK" : text("GoMessage");
+        w->text = campaign_ ? NOX_TR("server.game.coop_hint", "Co-op: set the name and access, then click OK") : text("GoMessage");
     }
     greyForCampaign(); // (the maps and limits stay off in a campaign's)
 }

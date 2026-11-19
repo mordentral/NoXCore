@@ -7,6 +7,7 @@
 
 #include "noxcore/client/inform_text.hpp"
 #include "noxcore/server/solo.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/random.hpp"
 
 #include <algorithm>
@@ -109,7 +110,7 @@ std::string chatLine(const App& app, const std::string& text, bool team)
 {
     std::string line = resolveStringId(app, text);
     if (team) {
-        line = tableText(app, "Guirank.c:team").value_or("Team") + ": " + line;
+        line = tableText(app, "Guirank.c:team").value_or(NOX_TR("game.chat.team", "Team")) + ": " + line;
     }
     return line;
 }

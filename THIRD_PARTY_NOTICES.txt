@@ -31,6 +31,9 @@ or links the following third-party code, each under its own licence, reproduced 
                                                                 NotoSans-OFL.txt)
   Caudex Bold (Reserved Font Name    SIL Open Font License 1.1  noxcore.exe (embedded, unmodified;
     "Caudex")                                                    Caudex-OFL.txt)
+  Noto Sans KR SemiBold (its       SIL Open Font License 1.1  fonts/NotoSansKR-SemiBold-Hangul.ttf (noxcore,
+    Hangul, subset; Reserved Font                                noxcontent: Korean text; NotoSansKR-OFL.txt)
+    Name "Source")
   Dear ImGui (docking branch)        MIT                        noxcore.exe (the map editor's panels,
                                                                 static), noxcontent
   ProggyForever (Dear ImGui's        MIT                        noxcore.exe (the map editor's script panel's

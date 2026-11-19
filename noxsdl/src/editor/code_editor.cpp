@@ -2,6 +2,7 @@
 #include "editor/code_editor.hpp"
 #include "editor/theme_colours.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <SDL3/SDL.h>
@@ -915,7 +916,9 @@ void CodeEditor::render(const char* id, ImVec2 size, ImFont* mono)
                 dl->AddLine(ImVec2(std::min(xx + 2, x1), yb - 2), ImVec2(std::min(xx + 4, x1), yb), wc);
             }
             if (hovered && mouse.y >= y && mouse.y < y + lineH_ && ((mouse.x >= x0 && mouse.x <= x1) || mouse.x < winPos.x + gutterW)) {
-                hoverMessage += (hoverMessage.empty() ? "" : "\n") + std::string(m.error ? "error: " : "warning: ") + m.message;
+                hoverMessage += (hoverMessage.empty() ? "" : "\n") +
+                                nox::l10n::format(m.error ? NOX_TR("editor.code.hover_error", "error: {message}") : NOX_TR("editor.code.hover_warning", "warning: {message}"),
+                                                  {{"message", m.message}});
             }
         }
         // The caret.

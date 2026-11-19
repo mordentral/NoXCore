@@ -2,6 +2,8 @@
 
 #include "editor/panel_textures.hpp" // (noxsdl's editor host: floating panels draw copies made from these pixels)
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -229,26 +231,49 @@ void drawBackground(ImDrawList* dl, ImVec2 p0, ImVec2 p1, int background, float 
     }
 }
 
+const char* backgroundName(int background)
+{
+    switch (background) {
+    case 0: return NOX_TRC("content.background.checker", "Checker");
+    case 1: return NOX_TRC("content.background.black", "Black");
+    case 2: return NOX_TRC("content.background.grey", "Grey");
+    case 3: return NOX_TRC("content.background.white", "White");
+    default: return NOX_TRC("content.background.magenta", "Magenta");
+    }
+}
+
+std::string sliderFormat(std::string_view text)
+{
+    std::string f;
+    for (const char c : text) {
+        f += c == '%' ? std::string("%%") : std::string(1, c);
+    }
+    if (const auto at = f.find("{n}"); at != std::string::npos) {
+        f.replace(at, 3, "%d");
+    }
+    return f;
+}
+
 const char* imageTypeName(int type)
 {
     switch (type) {
     case 0:
-        return "floor tile";
+        return NOX_TRC("content.image_type.floor_tile", "floor tile");
     case 1:
-        return "tile edge";
+        return NOX_TRC("content.image_type.tile_edge", "tile edge");
     case 2:
     case 7:
-        return "full image (RGBA5551)";
+        return NOX_TRC("content.image_type.full_5551", "full image (RGBA5551)");
     case 8:
-        return "run-length sprite (RGB565)";
+        return NOX_TRC("content.image_type.rle_565", "run-length sprite (RGB565)");
     case 3:
     case 4:
     case 6:
-        return "run-length sprite";
+        return NOX_TRC("content.image_type.rle", "run-length sprite");
     case 5:
-        return "run-length sprite (RGBA4444)";
+        return NOX_TRC("content.image_type.rle_4444", "run-length sprite (RGBA4444)");
     }
-    return "unknown";
+    return NOX_TRC("content.image_type.unknown", "unknown");
 }
 
 } // namespace videotools::gui

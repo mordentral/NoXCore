@@ -10,6 +10,8 @@
 // The text counts down the seconds left of the 20.
 #pragma once
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -38,8 +40,12 @@ struct LeavingNotice {
             return std::nullopt;
         }
         const int left = secondsLeft(waitedMs);
-        return std::string("Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n") +
-               std::to_string(left) + (left == 1 ? " second left" : " seconds left");
+        return nox::l10n::format(
+            NOX_TRP("game.leaving.notice",
+                    "Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left",
+                    "Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left",
+                    left),
+            {{"n", left}});
     }
 };
 

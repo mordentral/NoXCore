@@ -8,6 +8,7 @@
 #include "noxcore/mapedit/session_doc.hpp"
 #include "noxcore/mapedit/session_merge.hpp"
 #include "noxcore/mapedit/writer.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -590,15 +591,19 @@ EditSessionClient::Selective EditSessionClient::submitSelective(const me::Op& ap
     }
     out.skipped = skips.size();
     if (!skips.empty()) {
-        // "2 left as they are: wall 30,40 (changed since by Bob), object 12 (deleted since)"
+        // "2 left as they are: wall 30,40 (changed since by Bob), object 12 (deleted since)": shown
+        // here only, in the player's language.
+        using nox::l10n::format;
         std::string list;
         for (std::size_t i = 0; i < skips.size() && i < 3; ++i) {
             const me::PeerId by = lastChangedBy(skips[i].key);
             if (!list.empty()) list += ", ";
-            list += skips[i].what() + " (" + skips[i].why + (by != 0 && by != self() ? " by " + nameOf(by) : std::string()) + ")";
+            list += by != 0 && by != self()
+                        ? format(NOX_TR("editor.undo_note.skip_by", "{what} ({why} by {who})"), {{"what", skips[i].what()}, {"why", skips[i].why}, {"who", nameOf(by)}})
+                        : format(NOX_TR("editor.undo_note.skip", "{what} ({why})"), {{"what", skips[i].what()}, {"why", skips[i].why}});
         }
-        if (skips.size() > 3) list += " and " + std::to_string(skips.size() - 3) + " more";
-        out.note = std::to_string(skips.size()) + " left as " + (skips.size() == 1 ? "it is: " : "they are: ") + list;
+        if (skips.size() > 3) list = format(NOX_TR("editor.undo_note.more", "{list} and {n} more"), {{"list", list}, {"n", skips.size() - 3}});
+        out.note = format(NOX_TRP("editor.undo_note.left", "{n} left as it is: {list}", "{n} left as they are: {list}", skips.size()), {{"n", skips.size()}, {"list", list}});
     }
     if (cut.empty()) {
         out.nothingLeft = true;

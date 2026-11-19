@@ -1,0 +1,81 @@
+# The l10n lint's exceptions for the NoX Content Editor (noxcontent: videotools/src/gui and
+# videotools/src/content). Format: see lint_allow.txt.
+
+# The product's name (the window title, the documents folder, the Help menu's first line).
+videotools/src/gui/app_main.cpp: "NoX Content Editor"
+videotools/src/gui/shell.cpp: "NoX Content Editor"
+
+# Command line switch feedback (--show).
+videotools/src/gui/app_main.cpp: "--show: nothing called "
+
+# ImGui ids of the body parts and garments (shown through bodyPartLabel / garmentLabel).
+videotools/src/gui/character_form.cpp: "Skin"
+videotools/src/gui/character_form.cpp: "Hair"
+videotools/src/gui/character_form.cpp: "Mustache"
+videotools/src/gui/character_form.cpp: "Goatee"
+videotools/src/gui/character_form.cpp: "Beard"
+videotools/src/gui/character_form.cpp: "Shirt"
+videotools/src/gui/character_form.cpp: "Shirt trim"
+videotools/src/gui/character_form.cpp: "Pants"
+videotools/src/gui/character_form.cpp: "Shoes"
+videotools/src/gui/character_form.cpp: "Shoe trim"
+
+# The panels' window names: their ids (looked up, docked and focused by them; shown through
+# panelTitle in shell.cpp).
+videotools/src/gui/shell.hpp: "Content"
+videotools/src/gui/shell.hpp: "Record"
+videotools/src/gui/shell.hpp: "Images"
+videotools/src/gui/shell.hpp: "Sprites"
+videotools/src/gui/shell.hpp: "Preview"
+videotools/src/gui/shell.hpp: "References"
+videotools/src/gui/shell.hpp: "Changes"
+videotools/src/gui/shell.hpp: "Problems"
+videotools/src/gui/shell.hpp: "Log"
+
+# Names in the game's files: a map, file and folder names, a modifier, image name prefixes,
+# gamedata.bin names, mapcycle.txt's section headers.
+videotools/src/gui/mod_form.cpp: "Estate"
+videotools/src/gui/shell.cpp: "monster.bin, soundset.bin, nox.csf, video.bag, Audio.bag..."
+videotools/src/gui/shell.cpp: "video.bag #{}  {}"
+videotools/src/gui/preview_panel.cpp: "video.bag #%d"
+videotools/src/gui/text_form.cpp: "[KING OF THE REALM]__"
+videotools/src/content/character.cpp: "UserColor{}"
+videotools/src/content/character.cpp: "Female"
+videotools/src/content/character.cpp: "Male"
+videotools/src/content/game_files.cpp: "Dialog"
+videotools/src/content/game_files.cpp: "Save"
+videotools/src/content/game_files.cpp: "mapcycle.txt, motd.txt"
+videotools/src/content/pack_edit.cpp: "Dialog"
+videotools/src/content/schema.cpp: "XPTable"
+videotools/src/content/text_files.cpp: "[CAPTURE THE FLAG]"
+videotools/src/content/text_files.cpp: "[KING OF THE REALM]"
+
+# A file's name and a reader's own error (no words of ours).
+videotools/src/content/pack_edit.cpp: "nox.csf: {}"
+videotools/src/content/pack_edit.cpp: "thing.bin: {}"
+videotools/src/content/pack_edit.cpp: "strings.patch: {}"
+videotools/src/content/pack_edit.cpp: "thing.patch: {}"
+
+# The patch files' first lines (written into the files).
+videotools/src/content/pack_edit.cpp: "# strings.patch: changes to nox.csf's texts (a NoX Core content pack{})\n"
+videotools/src/content/pack_edit.cpp: "# thing.patch: changes to thing.bin's object types{} (a NoX Core content pack{})\n"
+videotools/src/content/pack_edit.cpp: ", and new ones"
+videotools/src/content/pack_edit.cpp: "# {}: changes to {} (a NoX Core content pack{})\n"
+
+# Where NoX Core reads a field (source file paths, shown as they are).
+videotools/src/content/schema.cpp: "server/items.cpp; noxsdl/src/main.cpp (cursor); client/headless_client.cpp"
+videotools/src/content/schema.cpp: "server/items.cpp (messages); noxsdl/src/item_names.cpp"
+videotools/src/content/schema.cpp: "server/combat.cpp; noxsdl/src/inventory.cpp"
+videotools/src/content/schema.cpp: "server/combat.hpp; noxsdl/src/inventory.cpp"
+videotools/src/content/schema.cpp: "server/items.cpp; noxsdl/src/inventory.cpp"
+videotools/src/content/schema.cpp: "server/player.cpp; bot/bot.cpp"
+videotools/src/content/schema.cpp: "server/items.cpp; noxsdl/src/item_names.cpp"
+videotools/src/content/schema.cpp: "server/item_effects.cpp; noxsdl/src/inventory.cpp"
+videotools/src/content/schema.cpp: "server/world.cpp; noxsdl/src/map_view.cpp"
+videotools/src/content/schema.cpp: "server/world.cpp; noxsdl/src/thing_art.cpp"
+videotools/src/content/schema.cpp: "server/world.cpp; noxsdl/src/inventory.cpp"
+videotools/src/content/schema.cpp: "server/object_save.cpp; noxsdl/src/map_preload.cpp"
+videotools/src/content/schema.cpp: "server/monsters.cpp; noxsdl/src/thing_art.cpp"
+
+# The font view's sample text (an editable buffer drawn in the game's own bitmap font).
+videotools/src/gui/panels.hpp: "The quick brown fox, 0123456789"

@@ -1,5 +1,6 @@
 // The map editor's object edits (object_edit.hpp).
 #include "noxcore/mapedit/object_edit.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "doc_types.hpp"
 
@@ -26,21 +27,22 @@ Op single(std::string label, OpPart part)
 struct LinkKind {
     LinkTarget kind;
     const char* field;
-    const char* label; ///< (the panel's label for the source field: properties.cpp)
-    bool followsExtents; ///< Set Extent / Reorder Extents rewrite it
+    nox::l10n::Key label; ///< (the panel's label for the source field: properties.cpp's key)
+    bool followsExtents;  ///< Set Extent / Reorder Extents rewrite it
 };
-constexpr LinkKind kPartner{LinkTarget::Extent, "partner", "Leads to", true};
-constexpr LinkKind kShaft{LinkTarget::Extent, "shaft", "Shaft", true};
-constexpr LinkKind kElevator{LinkTarget::Extent, "elevator", "Elevator", true};
-constexpr LinkKind kCarries{LinkTarget::Extent, "carries", "Carries", true};
-constexpr LinkKind kLightTarget{LinkTarget::Extent, "light target", "Target", true};
-constexpr LinkKind kStartsAt{LinkTarget::Waypoint, "starts at", "Starts at", false};
-constexpr LinkKind kHeadingFor{LinkTarget::Waypoint, "heading for", "Heading for", false};
-constexpr LinkKind kCameFrom{LinkTarget::Waypoint, "came from", "Came from", false};
-constexpr LinkKind kWaypointLink{LinkTarget::Waypoint, "waypoint link", "Link", false};
+// (The field names are the link kinds' ids, kept English; the labels are the fields' own keys.)
+constexpr LinkKind kPartner{LinkTarget::Extent, "partner", NOX_TRK("editor.prop.transporter.target.label", "Leads to"), true};
+constexpr LinkKind kShaft{LinkTarget::Extent, "shaft", NOX_TRK("editor.prop.elevator.link.label", "Shaft"), true};
+constexpr LinkKind kElevator{LinkTarget::Extent, "elevator", NOX_TRK("editor.prop.shaft.link.label", "Elevator"), true};
+constexpr LinkKind kCarries{LinkTarget::Extent, "carries", NOX_TRK("editor.prop.mover.carries.label", "Carries"), true};
+constexpr LinkKind kLightTarget{LinkTarget::Extent, "light target", NOX_TRK("editor.prop.light.target.label", "Target"), true};
+constexpr LinkKind kStartsAt{LinkTarget::Waypoint, "starts at", NOX_TRK("editor.prop.mover.waypoint.label", "Starts at"), false};
+constexpr LinkKind kHeadingFor{LinkTarget::Waypoint, "heading for", NOX_TRK("editor.prop.mover.target.label", "Heading for"), false};
+constexpr LinkKind kCameFrom{LinkTarget::Waypoint, "came from", NOX_TRK("editor.prop.mover.previous.label", "Came from"), false};
+constexpr LinkKind kWaypointLink{LinkTarget::Waypoint, "waypoint link", NOX_TRK("editor.prop.link.waypoint_link", "Link"), false};
 // (A group's members: objects by extent, waypoints by id. renumberOp rewrites object groups itself.)
-constexpr LinkKind kObjectMember{LinkTarget::Extent, "member", "member", false};
-constexpr LinkKind kWaypointMember{LinkTarget::Waypoint, "member", "member", false};
+constexpr LinkKind kObjectMember{LinkTarget::Extent, "member", NOX_TRK("editor.prop.link.member", "member"), false};
+constexpr LinkKind kWaypointMember{LinkTarget::Waypoint, "member", NOX_TRK("editor.prop.link.member", "member"), false};
 
 /// Calls fn(field, kind) for every link field in an object's data (a DocObject or a const one):
 /// the one list of link kinds (Link, extent edits, the links layer).
@@ -168,7 +170,7 @@ Op changeTypeOp(const MapDocument& d, const ObjectFactory& factory, const std::s
     }
     if (changed.empty()) return {};
     const std::size_t n = changed.size();
-    return editObjectsOp(d, changed, "Change " + std::to_string(n) + (n == 1 ? " object" : " objects") + " to " + std::string(type));
+    return editObjectsOp(d, changed, opLabel(oplabels::kChangeType, {{"n", n}, {"type", type}}));
 }
 
 Op resetTypeDataOp(const MapDocument& d, const ObjectFactory& factory, const std::set<ObjId>& ids)
@@ -184,7 +186,7 @@ Op resetTypeDataOp(const MapDocument& d, const ObjectFactory& factory, const std
         carryFacing(it->second, c);
         changed.emplace_back(id, std::move(c));
     }
-    return editObjectsOp(d, changed, "Reset type data");
+    return editObjectsOp(d, changed, opLabel(oplabels::kResetTypeData));
 }
 
 // --- Extents -------------------------------------------------------------------------------------
@@ -201,6 +203,26 @@ std::vector<ExtentLink> extentLinks(const MapDocument& d)
 }
 
 // --- Links, both ways ------------------------------------------------------------------------------
+
+std::string linkFieldText(std::string_view field)
+{
+    static const std::pair<std::string_view, nox::l10n::Key> kFields[] = {
+        {kPartner.field, NOX_TRK("editor.link.field.partner", "partner")},
+        {kShaft.field, NOX_TRK("editor.link.field.shaft", "shaft")},
+        {kElevator.field, NOX_TRK("editor.link.field.elevator", "elevator")},
+        {kCarries.field, NOX_TRK("editor.link.field.carries", "carries")},
+        {kLightTarget.field, NOX_TRK("editor.link.field.light_target", "light target")},
+        {kStartsAt.field, NOX_TRK("editor.link.field.starts_at", "starts at")},
+        {kHeadingFor.field, NOX_TRK("editor.link.field.heading_for", "heading for")},
+        {kCameFrom.field, NOX_TRK("editor.link.field.came_from", "came from")},
+        {kWaypointLink.field, NOX_TRK("editor.link.field.waypoint_link", "waypoint link")},
+        {kObjectMember.field, NOX_TRK("editor.link.field.member", "member")},
+    };
+    for (const auto& [id, text] : kFields) {
+        if (id == field) return nox::l10n::tr(text);
+    }
+    return std::string(field);
+}
 
 std::vector<Link> objectLinks(ObjId id, const DocObject& o)
 {
@@ -284,7 +306,7 @@ Op setExtentOp(const MapDocument& d, ObjId id, std::uint32_t extent)
     std::map<ObjId, std::uint32_t> rename{{id, extent}};
     std::map<std::uint32_t, std::uint32_t> follow;
     if (objectsWithExtent(d, old).size() == 1) follow[old] = extent; // (shared: links keep naming the other)
-    return renumberOp(d, rename, follow, "Set extent of " + it->second.type + " to " + std::to_string(extent));
+    return renumberOp(d, rename, follow, opLabel(oplabels::kSetExtent, {{"type", it->second.type}, {"extent", extent}}));
 }
 
 Op reorderExtentsOp(const MapDocument& d, std::uint32_t first)
@@ -299,7 +321,7 @@ Op reorderExtentsOp(const MapDocument& d, std::uint32_t first)
         follow.try_emplace(old, next); // (a shared extent: links follow the first with it)
         ++next;
     }
-    return renumberOp(d, rename, follow, "Reorder extents from " + std::to_string(first));
+    return renumberOp(d, rename, follow, opLabel(oplabels::kReorderExtents, {{"extent", first}}));
 }
 
 // --- Header ----------------------------------------------------------------------------------------
@@ -333,7 +355,7 @@ Op setDetailsOp(const MapDocument& d, ObjId id, bool on, const ObjectFactory* fa
         c.header.details.reset();
         c.header.detailsFlag = 0;
     }
-    std::string label = std::string(on ? "Add" : "Remove") + " header details of " + c.type; // (before c is moved from)
+    std::string label = opLabel(on ? oplabels::kAddDetailsOf : oplabels::kRemoveDetailsOf, {{"type", c.type}}); // (before c is moved from)
     return single(std::move(label), SetObjects{{{id, std::move(c)}}});
 }
 
@@ -344,7 +366,7 @@ Op addItemOp(const MapDocument& d, const ObjectFactory& factory, ObjId owner, st
     const auto it = d.objects.find(owner);
     if (it == d.objects.end()) return {};
     Op op;
-    op.label = "Add " + std::string(type) + " to " + it->second.type + "'s inventory";
+    op.label = opLabel(oplabels::kAddItem, {{"item", type}, {"type", it->second.type}});
     if (!it->second.header.details) {
         op.parts.push_back(SetObjects{{{owner, withDetails(it->second, factory.freshFlags(it->second.type))}}});
     }
@@ -386,7 +408,7 @@ Op cloneItemOp(const MapDocument& d, ObjId item, ObjId* added)
     const auto items = d.childrenOf(owner);
     if (items.size() >= 255) throw FormatError("map editor: an inventory holds at most 255 items");
     Op op;
-    op.label = "Clone " + it->second.type;
+    op.label = opLabel(oplabels::kCloneItem, {{"type", it->second.type}});
     // Room after it: the later items move up one.
     SetObjects renumber;
     std::uint64_t k = 0;
@@ -442,7 +464,7 @@ Op moveItemOp(const MapDocument& d, ObjId item, std::size_t to)
             part.objects.push_back({items[i], std::move(c)});
         }
     }
-    return single("Move " + it->second.type + " to slot " + std::to_string(to + 1), std::move(part));
+    return single(opLabel(oplabels::kMoveItem, {{"type", it->second.type}, {"n", to + 1}}), std::move(part));
 }
 
 Op setEquippedOp(const MapDocument& d, ObjId item, bool on, const ObjectFactory* factory)
@@ -453,7 +475,7 @@ Op setEquippedOp(const MapDocument& d, ObjId item, bool on, const ObjectFactory*
     auto& f = c.header.details->flags;
     f = on ? (f | ObjectFlag::Equipped) : (f & ~ObjectFlag::Equipped);
     if (c == it->second) return {};
-    std::string label = std::string(on ? "Equip " : "Unequip ") + c.type; // (before c is moved from)
+    std::string label = opLabel(on ? oplabels::kEquip : oplabels::kUnequip, {{"type", c.type}}); // (before c is moved from)
     return single(std::move(label), SetObjects{{{item, std::move(c)}}});
 }
 
@@ -652,7 +674,7 @@ Op templateEditOp(const MapDocument& d, const TemplateSlot& slot, const Op& inne
     if (t == *keep) return {};
     DocObject c = d.objects.at(slot.generator);
     std::get<xf::MonsterGenerator>(c.data).groups[slot.group][slot.slot] = std::move(t);
-    return single(inner.label + " (generator monster)", SetObjects{{{slot.generator, std::move(c)}}});
+    return single(opLabel(oplabels::kGeneratorMonsterEdit, {{"label", inner.label}}), SetObjects{{{slot.generator, std::move(c)}}});
 }
 
 // --- Edits through copies ---------------------------------------------------------------------------

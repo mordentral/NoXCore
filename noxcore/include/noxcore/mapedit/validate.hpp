@@ -27,7 +27,11 @@ struct Issue {
     std::string message;
 };
 
-std::vector<Issue> validate(const MapDocument& doc, const things::ThingDb& things);
+/// The language of an Issue's message and of mapNameProblem's text: the player's, for the editor's
+/// own lists, or English, for errors thrown and passed on (the edit server sends them to editors).
+enum class IssueText { Shown, English };
+
+std::vector<Issue> validate(const MapDocument& doc, const things::ThingDb& things, IssueText text = IssueText::Shown);
 
 /// Why `name` can't be a map's name (it names the map's folder and files), or nothing if it can.
 /// Any printable name a folder can hold is fine, '!' and '#' included (as the game takes them),
@@ -35,7 +39,7 @@ std::vector<Issue> validate(const MapDocument& doc, const things::ThingDb& thing
 /// is never listed). Stock map names are refused, and the solo maps' prefix (wiz, war or con and a
 /// digit), which the scan leaves out of the map lists. Maps already named otherwise still open;
 /// only saving under such a name is refused.
-std::optional<std::string> mapNameProblem(std::string_view name);
+std::optional<std::string> mapNameProblem(std::string_view name, IssueText text = IssueText::Shown);
 
 /// The name a copy of map `from` is offered under: "<from>_ed", or "ed_<start of from>" to keep
 /// within the game's 8 characters (lower case).

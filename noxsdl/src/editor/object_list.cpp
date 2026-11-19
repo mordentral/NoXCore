@@ -7,6 +7,7 @@
 #include "editor/map_editor.hpp"
 #include "editor/ui_helpers.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <imgui.h>
@@ -20,7 +21,7 @@ namespace noxsdl {
 
 void ObjectTools::objectListPanel()
 {
-    if (!ImGui::Begin("Object List", &showList)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.object_list", "Object List"), &showList)) {
         ImGui::End();
         return;
     }
@@ -33,6 +34,7 @@ void ObjectTools::objectListPanel()
         for (const auto& [id, o] : ed_.doc_.objects) {
             if (o.parent != 0) ++items[o.parent];
         }
+        std::map<std::string, std::string, std::less<>> folders; // (each folder's text as shown, looked up once)
         for (const auto& [id, o] : ed_.doc_.objects) {
             if (o.parent != 0) continue;
             ListRow r;
@@ -42,21 +44,28 @@ void ObjectTools::objectListPanel()
             r.scriptName = o.header.details ? o.header.details->scriptName : std::string();
             r.team = o.header.details ? o.header.details->team : 0;
             const auto* e = catalog_.find(o.type);
-            r.folder = e ? e->folder : std::string();
+            if (e) {
+                auto f = folders.find(e->folder);
+                if (f == folders.end()) f = folders.emplace(e->folder, me::folderText(e->folder)).first;
+                r.folder = f->second;
+            }
             r.displayName = e ? e->displayName : std::string();
             r.x = o.header.x;
             r.y = o.header.y;
             r.items = items[id];
-            r.search = nox::util::lowered(r.type + ' ' + r.displayName + ' ' + r.scriptName + ' ' + r.folder + " #" + std::to_string(r.extent));
+            // (The folder as shown, and its English: either finds it.)
+            r.search = nox::util::lowered(r.type + ' ' + r.displayName + ' ' + r.scriptName + ' ' + r.folder + (e && e->folder != r.folder ? ' ' + e->folder : std::string()) +
+                                          " #" + std::to_string(r.extent));
             rows_.push_back(std::move(r));
         }
         rowsRevision_ = ed_.history_.revision();
     }
     ImGui::SetNextItemWidth(200 * scale);
-    ImGui::InputTextWithHint("##listsearch", "search (type, game name, script name, folder, #extent)", listSearch_, sizeof listSearch_);
+    ImGui::InputTextWithHint("##listsearch", NOX_TRC("editor.object_list.search_hint", "search (type, game name, script name, folder, #extent)"), listSearch_,
+                             sizeof listSearch_);
     ImGui::SameLine();
-    ImGui::Checkbox("In view", &listInView_);
-    editor::help("Only the objects the map panel shows.");
+    ImGui::Checkbox(NOX_TRI("editor.object_list.in_view", "In view"), &listInView_);
+    editor::help(NOX_TR("editor.object_list.in_view_help", "Only the objects the map panel shows."));
     // The rows shown.
     const std::string q = nox::util::lowered(listSearch_);
     std::vector<const ListRow*> shown;
@@ -74,15 +83,15 @@ void ObjectTools::objectListPanel()
         if (ok) shown.push_back(&r);
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("%zu of %zu objects", shown.size(), rows_.size());
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.object_list.count", "{n} of {total} objects"), {{"n", shown.size()}, {"total", rows_.size()}}).c_str());
     const auto& sel = ed_.selection_.objects;
     ImGui::BeginDisabled(sel.empty());
-    if (ImGui::SmallButton("Go to")) ed_.frameSelection();
+    if (ImGui::SmallButton(NOX_TRI("editor.object_list.go_to", "Go to"))) ed_.frameSelection();
     ImGui::SameLine();
-    if (ImGui::SmallButton("Delete")) ed_.deleteSelection();
+    if (ImGui::SmallButton(NOX_TRI("editor.common.delete", "Delete"))) ed_.deleteSelection();
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::SmallButton("Select listed")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.object_list.select_listed", "Select listed"))) {
         me::Selection s;
         for (const auto* r : shown) s.objects.insert(r->id);
         ed_.setSelection(std::move(s));
@@ -91,13 +100,13 @@ void ObjectTools::objectListPanel()
                                   ImGuiTableFlags_Sortable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
     if (ImGui::BeginTable("##objects", 7, flags)) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Extent", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 44 * scale);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 2.0f);
-        ImGui::TableSetupColumn("Script name", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.object_list.col_extent", "Extent"), ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 44 * scale);
+        ImGui::TableSetupColumn(NOX_TRI("editor.object_list.col_type", "Type"), ImGuiTableColumnFlags_WidthStretch, 2.0f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.object_list.col_script_name", "Script name"), ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed, 40 * scale);
         ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed, 40 * scale);
-        ImGui::TableSetupColumn("Team", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultHide, 38 * scale);
-        ImGui::TableSetupColumn("Folder", ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultHide);
+        ImGui::TableSetupColumn(NOX_TRI("editor.object_list.col_team", "Team"), ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultHide, 38 * scale);
+        ImGui::TableSetupColumn(NOX_TRI("editor.object_list.col_folder", "Folder"), ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultHide);
         ImGui::TableHeadersRow();
         if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsCount > 0) {
             sortColumn_ = specs->Specs[0].ColumnIndex;
@@ -145,10 +154,11 @@ void ObjectTools::objectListPanel()
                     if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ed_.frameSelection(); // (go to)
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-                    const std::string carried = r.items ? "\n" + std::to_string(r.items) + " items carried" : std::string();
+                    const std::string carried =
+                        r.items ? "\n" + nox::l10n::format(NOX_TR("editor.object_list.items_carried", "{n} items carried"), {{"n", r.items}}) : std::string();
                     const std::string shownName = r.displayName.empty() ? std::string() : "\"" + r.displayName + "\"\n";
-                    ImGui::SetTooltip("%s #%u\n%s%s%s\nDouble click: go to it", r.type.c_str(), r.extent, shownName.c_str(), r.folder.c_str(),
-                                      carried.c_str());
+                    ImGui::SetTooltip("%s #%u\n%s%s%s\n%s", r.type.c_str(), r.extent, shownName.c_str(), r.folder.c_str(), carried.c_str(),
+                                      NOX_TRC("editor.object_list.double_click", "Double click: go to it"));
                 }
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(r.type.c_str());

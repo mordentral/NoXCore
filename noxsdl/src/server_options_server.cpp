@@ -2,6 +2,7 @@
 // pages and the General page's Advanced Server window.
 #include "server_options.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
@@ -606,19 +607,21 @@ void ServerOptions::fillGeneral()
         advanced->show(s.wol);
     }
     if (gui::Window* label = window_->find(kRateLabel)) {
-        label->text = "Update Rate";
+        label->text = NOX_TR("server.general.update_rate", "Update Rate");
     }
     if (gui::Window* rate = window_->find(kRateButton)) {
-        rate->text = std::to_string(s.updateRate) + " Hz";
-        rate->tooltip = "How often NoX Core players get the characters' and spells' positions: smoother at 60-120 Hz. "
-                        "The game itself, and players on the original game, stay at 30.";
+        rate->text = nox::l10n::format(NOX_TR("server.general.update_rate_hz", "{rate} Hz"), {{"rate", s.updateRate}});
+        rate->tooltip = NOX_TR("server.general.update_rate_tip",
+                               "How often NoX Core players get the characters' and spells' positions: smoother at 60-120 Hz. "
+                               "The game itself, and players on the original game, stay at 30.");
     }
     if (gui::Window* vote = window_->find(kMapVote)) {
-        vote->text = "Map Vote";
-        vote->tooltip = "At a match's end the players vote for the next map (NoX Core players click its picture, others "
-                        "say its number), and anyone can call a vote (NoX Core players with the in-game menu's Vote Map, others by "
-                        "saying \"?MapVote\"), once "
-                        "every 5 minutes (more than half changes the map).";
+        vote->text = NOX_TR("server.general.map_vote", "Map Vote");
+        vote->tooltip = NOX_TR("server.general.map_vote_tip",
+                               "At a match's end the players vote for the next map (NoX Core players click its picture, others "
+                               "say its number), and anyone can call a vote (NoX Core players with the in-game menu's Vote Map, others by "
+                               "saying \"?MapVote\"), once "
+                               "every 5 minutes (more than half changes the map).");
         gui::setChecked(vote, s.mapVote);
     }
     greyServerForCampaign();
@@ -637,7 +640,7 @@ void ServerOptions::greyServerForCampaign()
         gui::setGreyed(window_->find(id), true);
     }
     if (gui::Window* tab = window_->find(kSubTeams)) {
-        tab->tooltip = "Not in a " + *campaign_ + " game";
+        tab->tooltip = nox::l10n::format(NOX_TR("server.common.not_in_campaign", "Not in a {campaign} game"), {{"campaign", *campaign_}});
     }
 }
 

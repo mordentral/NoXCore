@@ -33,6 +33,8 @@ original game is included.
   HD images.
 - **Mods:** game modes written in Luau, loaded from the `mods` folder.
 - **The NoX Content Editor** for the game's files, saving changes into content packs.
+- **Languages:** NoX Core's own text in Russian and Korean as well as English (machine
+  translations for now: corrections welcome), and Korean installs' game text drawn.
 
 ## Building
 
@@ -85,6 +87,11 @@ and can still be joined. `servers.txt` beside the program is read as well; one a
 | `docs/original_bugs.md` | The bugs found in the original game, and which are fixed or kept. |
 | `docs/vanilla_deviations.md` | Where NoX Core deliberately behaves differently from the original, and why. |
 | `cmake/`, `.github/`, `packaging/` | Build settings and pinned dependencies, the automatic build, and a debug launcher. |
+
+## Contributing and translations
+
+See [CONTRIBUTING.md](CONTRIBUTING.md): how player-facing text is written so it can be
+translated, and the rule that keeps every language current with the English.
 
 ## Reporting bugs
 

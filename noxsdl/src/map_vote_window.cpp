@@ -3,9 +3,10 @@
 
 #include "draw_box.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cmath>
-#include <format>
 
 namespace noxsdl {
 
@@ -118,15 +119,18 @@ void MapVoteWindow::draw(SDL_Renderer* renderer, const State& vote, int w, int h
     std::string title;
     std::string sub;
     if (vote.open) {
-        title = vote.kind == 0 ? "Vote for the next map" : "Map vote: a majority changes the map now";
+        title = vote.kind == 0 ? NOX_TR("game.map_vote.title_next", "Vote for the next map")
+                               : NOX_TR("game.map_vote.title_called", "Map vote: a majority changes the map now");
         const auto now = static_cast<std::uint32_t>(nowMs_);
         // Whole seconds left, rounded up; the 32-bit difference read as signed so a passed end shows 0.
         const int left = static_cast<int>(vote.endsAtMs - now) > 0 ? static_cast<int>((vote.endsAtMs - now + 999) / 1000) : 0;
-        sub = std::format("{} s left - click a map, or type its number in chat", left);
+        sub = nox::l10n::format(NOX_TR("game.map_vote.time_left", "{n} s left - click a map, or type its number in chat"), {{"n", left}});
     } else if (vote.result && *vote.result >= 0 && *vote.result < static_cast<int>(vote.candidates.size())) {
-        title = "Next map: " + vote.candidates[static_cast<std::size_t>(*vote.result)];
+        title = nox::l10n::format(NOX_TR("game.map_vote.next_map", "Next map: {map}"),
+                                  {{"map", vote.candidates[static_cast<std::size_t>(*vote.result)]}});
     } else {
-        title = vote.kind == 0 ? "No votes: the map cycle goes on" : "The vote failed";
+        title = vote.kind == 0 ? NOX_TR("game.map_vote.no_votes", "No votes: the map cycle goes on")
+                               : NOX_TR("game.map_vote.failed", "The vote failed");
     }
     font_->draw(title, tx, ty, size, vote.open ? white : gold);
     ty += line;
@@ -167,7 +171,8 @@ void MapVoteWindow::draw(SDL_Renderer* renderer, const State& vote, int w, int h
         if (picture.texture) {
             SDL_RenderTexture(renderer, picture.texture, nullptr, &r);
         } else {
-            const char* what = picture.done ? "not on this computer" : "drawing...";
+            const std::string& what = picture.done ? NOX_TR("game.map_vote.not_here", "not on this computer")
+                                                   : NOX_TR("game.map_vote.drawing", "drawing...");
             const float tw = font_->measure(what, size);
             font_->draw(what, r.x + (r.w - tw) / 2, r.y + (r.h - line) / 2, size, grey);
         }
@@ -196,7 +201,8 @@ void MapVoteWindow::draw(SDL_Renderer* renderer, const State& vote, int w, int h
         }
         font_->draw(name, r.x, r.y + r.h + 2 * scale, size, mine || won ? gold : white);
         const int votes = i < vote.tally.size() ? vote.tally[i] : 0;
-        font_->draw(votes == 1 ? "1 vote" : std::format("{} votes", votes), r.x, r.y + r.h + 2 * scale + line, size, grey);
+        font_->draw(nox::l10n::format(NOX_TRP("game.map_vote.votes", "{n} vote", "{n} votes", votes), {{"n", votes}}), r.x,
+                    r.y + r.h + 2 * scale + line, size, grey);
     }
 }
 

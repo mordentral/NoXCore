@@ -2,6 +2,8 @@
 // the mapping removed again when it's destroyed.
 #include "port_mapper.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <miniupnpc.h>
 #include <upnpcommands.h>
 #include <upnperrors.h>
@@ -116,7 +118,7 @@ void PortMapper::run()
     // Up to 2 seconds for routers to answer.
     UPNPDev* devices = upnpDiscover(2000, nullptr, nullptr, UPNP_LOCAL_PORT_ANY, 0, 2, &error);
     if (!devices) {
-        fail("no UPnP router found");
+        fail(NOX_TR("server.upnp.no_router", "no UPnP router found"));
         return;
     }
     UPNPUrls urls{};
@@ -132,9 +134,11 @@ void PortMapper::run()
         }
         // (UPNP_PRIVATEIP_IGD: the router's own outside address is private, behind another NAT:
         // a mapping there wouldn't reach us.)
-        fail(igd == UPNP_NO_IGD ? "no UPnP router found"
-             : igd == UPNP_PRIVATEIP_IGD ? std::string("the router is behind another NAT (its address ") + wan + ")"
-                                          : "the UPnP router isn't connected");
+        fail(igd == UPNP_NO_IGD ? NOX_TR("server.upnp.no_router", "no UPnP router found")
+             : igd == UPNP_PRIVATEIP_IGD
+                 ? nox::l10n::format(NOX_TR("server.upnp.double_nat", "the router is behind another NAT (its address {address})"),
+                                     {{"address", wan}})
+                 : NOX_TR("server.upnp.not_connected", "the UPnP router isn't connected"));
         return;
     }
     const std::string port = std::to_string(port_);
@@ -146,7 +150,8 @@ void PortMapper::run()
     }
     if (r != UPNPCOMMAND_SUCCESS) {
         const char* what = strupnperror(r);
-        fail("the router refused the mapping (" + std::string(what ? what : std::to_string(r)) + ")");
+        fail(nox::l10n::format(NOX_TR("server.upnp.refused", "the router refused the mapping ({why})"),
+                               {{"why", what ? std::string(what) : std::to_string(r)}}));
         FreeUPNPUrls(&urls);
         return;
     }

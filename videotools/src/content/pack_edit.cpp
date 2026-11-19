@@ -4,6 +4,7 @@
 #include "noxcore/audio/pcm.hpp"
 #include "noxcore/content/audio_writer.hpp"
 #include "noxcore/crypto/noxcrypt.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/io/file.hpp"
 #include "noxcore/util/text.hpp"
@@ -102,7 +103,7 @@ std::vector<std::string> PackEditor::openPack(const fs::path& contentDir, std::s
             for (const auto& r : patch.records()) {
                 if (f == TableFormat::Monster && b && !b->find(r.name) && baseThings_ && !baseThings_->findThing(r.name)) {
                     // (GAME.EXE drops every monster over a name that isn't a type: not kept)
-                    problems.push_back("monster.patch: " + r.name + " isn't a thing.bin type: refused (the original game would lose every monster over it)");
+                    problems.push_back(nox::l10n::format(NOX_TR("content.pack.monster_not_type", "monster.patch: {name} isn't a thing.bin type: refused (the original game would lose every monster over it)"), {{"name", r.name}}));
                     continue;
                 }
                 if (b && !b->find(r.name, r.section) && f != TableFormat::GameData) {
@@ -202,12 +203,12 @@ std::vector<std::string> PackEditor::openPack(const fs::path& contentDir, std::s
                            std::ranges::any_of(newThings_, [&](const NewThing& o) { return nox::util::equalsNoCase(o.name, n); });
                 };
                 if (why.empty() && taken(r.name)) {
-                    why = "there's a type of that name already";
+                    why = NOX_TR("content.pack.type_name_taken", "there's a type of that name already");
                 } else if (why.empty() && !(baseThings_ && baseThings_->findThing(r.like)) && !isNewThing(r.like)) {
-                    why = "there's no type " + r.like + " to make it like";
+                    why = nox::l10n::format(NOX_TR("content.pack.no_like_type", "there's no type {name} to make it like"), {{"name", r.like}});
                 }
                 if (!why.empty()) {
-                    problems.push_back("thing.patch: NEW " + r.name + ": " + why + " (left out)");
+                    problems.push_back(nox::l10n::format(NOX_TR("content.pack.new_left_out", "thing.patch: NEW {name}: {why} (left out)"), {{"name", r.name}, {"why", why}}));
                     refused.push_back(r.name);
                 } else {
                     newThings_.push_back({r.name, r.like});
@@ -218,7 +219,7 @@ std::vector<std::string> PackEditor::openPack(const fs::path& contentDir, std::s
                     continue;
                 }
                 if (!r.isNew() && baseThings_ && !baseThings_->findThing(r.name) && !isNewThing(r.name)) {
-                    problems.push_back("thing.patch: thing.bin has no type " + r.name + " (a new one is added with NEW " + r.name + " LIKE <type>)");
+                    problems.push_back(nox::l10n::format(NOX_TR("content.pack.no_such_type", "thing.patch: thing.bin has no type {name} (a new one is added with NEW {name} LIKE <type>)"), {{"name", r.name}}));
                 }
                 for (const auto& l : r.lines) {
                     ThingEdit e{r.name, l.key, l.remove ? std::nullopt : std::optional<std::string>(l.hasEquals ? l.value : std::string())};
@@ -266,7 +267,7 @@ std::string PackEditor::setStrings(std::string_view label, std::vector<std::u16s
         return why;
     }
     if (variants.size() > nox::content::kMaxStringVariants) {
-        return std::format("A label has at most {} texts.", nox::content::kMaxStringVariants);
+        return nox::l10n::format(NOX_TR("content.pack.too_many_variants", "A label has at most {n} texts."), {{"n", nox::content::kMaxStringVariants}});
     }
     const bool inverted = b && !b->variants.empty() && b->variants.front().inverted();
     const auto want = b && !b->variants.empty() ? nox::content::printfConversions(b->variants.front().text()) : std::vector<std::string>{};
@@ -276,13 +277,14 @@ std::string PackEditor::setStrings(std::string_view label, std::vector<std::u16s
         }
         const auto now = nox::content::printfConversions(v);
         if (std::ranges::any_of(now, [](const std::string& c) { return c.find('n') != std::string::npos; })) {
-            return "%n isn't allowed in a text.";
+            return NOX_TR("content.pack.no_percent_n", "%n isn't allowed in a text.");
         }
         if (now != want) {
             std::string codes;
             for (const auto& c : want) codes += (codes.empty() ? "" : " ") + c;
-            return want.empty() ? "This text can't hold printf codes (a % other than %%): the game would read past its arguments."
-                                : "The text must keep the game's own printf codes, in order: " + codes + " (the game fills them in).";
+            return want.empty() ? NOX_TR("content.pack.no_printf", "This text can't hold printf codes (a % other than %%): the game would read past its arguments.")
+                                : nox::l10n::format(NOX_TR("content.pack.keep_printf", "The text must keep the game's own printf codes, in order: {codes} (the game fills them in)."),
+                                                    {{"codes", codes}});
         }
     }
     if (speech) {
@@ -402,29 +404,30 @@ std::string PackEditor::checkThingEdit(std::string_view type, std::string& key, 
 {
     const auto trimmed = nox::util::trim(key);
     if (trimmed.empty() || std::ranges::any_of(trimmed, [](char c) { return c <= ' ' || c >= 0x7F || c == '='; })) {
-        return "A key is one word of plain letters, without blanks or '='.";
+        return NOX_TR("content.pack.bad_key", "A key is one word of plain letters, without blanks or '='.");
     }
     key = std::string(nox::content::thingKeySpelling(trimmed).value_or(trimmed)); // (as GAME.EXE's readers spell it)
     if (key == "DRAW") {
-        return "DRAW (the animation data) isn't changed by a pack.";
+        return NOX_TR("content.pack.no_draw", "DRAW (the animation data) isn't changed by a pack.");
     }
     // A type the pack adds chooses its own CLASS, XFER, FLAGS, COLLIDE and MENUICON (its NEW record's).
     const bool fresh = isNewThing(type);
     if (nox::content::lockedThingKey(key) && !fresh) {
-        return key + " of a type thing.bin has never changes: every player's game and the maps read its objects by it. Only a new type (New type...) chooses its own.";
+        return nox::l10n::format(NOX_TR("content.pack.locked_key", "{key} of a type thing.bin has never changes: every player's game and the maps read its objects by it. Only a new type (New type...) chooses its own."), {{"key", key}});
     }
     const nox::things::ThingDb* db = fresh ? workingThings() : (baseThings_ ? &*baseThings_ : nullptr);
     const nox::things::ThingDef* t = db ? db->findThing(type) : nullptr;
     if (!value && t && !nox::content::thingValue(*t, key)) {
-        return std::string(type) + " has no " + key + " to remove.";
+        return nox::l10n::format(NOX_TR("content.pack.nothing_to_remove", "{type} has no {key} to remove."), {{"type", type}, {"key", key}});
     }
     if (key == "MENUICON" && t && t->menuIcon.has_value() != (value != nullptr) && !fresh) {
-        return value ? "Only types with a MENUICON are kept in saves: one can't be added." : "Only types with a MENUICON are kept in saves: it can't be taken away.";
+        return value ? NOX_TR("content.pack.menuicon_add", "Only types with a MENUICON are kept in saves: one can't be added.")
+                     : NOX_TR("content.pack.menuicon_remove", "Only types with a MENUICON are kept in saves: it can't be taken away.");
     }
     if (value) {
         if (std::string error = nox::content::checkThingValue(key, *value, t ? nox::content::thingValue(*t, key).value_or("") : std::string()); !error.empty()) {
             error[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(error[0])));
-            return key + ": " + error + ".";
+            return nox::l10n::format(NOX_TR("content.pack.key_error", "{key}: {error}."), {{"key", key}, {"error", error}});
         }
     }
     return {};
@@ -534,17 +537,17 @@ std::string PackEditor::addThing(std::string_view name, std::string_view like)
     }
     const nox::things::ThingDb* work = workingThings();
     if (!work) {
-        return "thing.bin didn't load.";
+        return NOX_TR("content.common.thing_bin_not_loaded", "thing.bin didn't load.");
     }
     if (std::ranges::any_of(work->things, [&](const auto& t) { return nox::util::equalsNoCase(t.name, n); }) ||
         std::ranges::any_of(newThings_, [&](const NewThing& o) { return nox::util::equalsNoCase(o.name, n); })) {
-        return "There's a type called " + n + " already (names are compared without case).";
+        return nox::l10n::format(NOX_TR("content.pack.type_exists", "There's a type called {name} already (names are compared without case)."), {{"name", n}});
     }
     if (!work->findThing(base)) {
-        return "There's no type " + base + " to make it like.";
+        return nox::l10n::format(NOX_TR("content.pack.no_like_type_sentence", "There's no type {name} to make it like."), {{"name", base}});
     }
     if (work->things.size() >= nox::content::kMaxThingTypes) {
-        return std::format("thing.bin can't have more than {} types.", nox::content::kMaxThingTypes);
+        return nox::l10n::format(NOX_TR("content.pack.too_many_types", "thing.bin can't have more than {n} types."), {{"n", nox::content::kMaxThingTypes}});
     }
     newThings_.push_back({n, base});
     thingsStale_ = true;
@@ -555,10 +558,10 @@ std::string PackEditor::addThing(std::string_view name, std::string_view like)
 std::string PackEditor::removeNewThing(std::string_view name)
 {
     if (const auto other = std::ranges::find_if(newThings_, [&](const NewThing& n) { return n.like == name; }); other != newThings_.end()) {
-        return other->name + " is made like it: take that one out first.";
+        return nox::l10n::format(NOX_TR("content.pack.made_like_it", "{name} is made like it: take that one out first."), {{"name", other->name}});
     }
     if (std::erase_if(newThings_, [&](const NewThing& n) { return n.name == name; }) == 0) {
-        return std::string(name) + " isn't a type the pack adds.";
+        return nox::l10n::format(NOX_TR("content.pack.not_new_type", "{name} isn't a type the pack adds."), {{"name", name}});
     }
     std::erase_if(thingEdits_, [&](const ThingEdit& e) { return e.type == name; });
     thingsStale_ = true;
@@ -773,7 +776,7 @@ std::string PackEditor::patchText(TableFormat f) const
 void PackEditor::save()
 {
     if (contentDir_.empty()) {
-        throw std::runtime_error("no content pack is open");
+        throw std::runtime_error(NOX_TR("content.pack.none_open", "no content pack is open"));
     }
     fs::create_directories(contentDir_);
     for (const TableFormat f : nox::content::kTableFormats) {

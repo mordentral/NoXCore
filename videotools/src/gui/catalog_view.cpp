@@ -5,6 +5,7 @@
 #include "editor/theme_colours.hpp"
 #include "image_source.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <imgui.h>
@@ -35,11 +36,11 @@ std::string describe(const Sequence& s)
         even = even && t.frames.size() == s.tracks.front().frames.size();
     }
     if (s.trackKind == TrackKind::Direction && even) {
-        d = std::format("8 dir x {}", s.tracks.front().frames.size());
+        d = nox::l10n::format(NOX_TR("content.sprites.eight_dirs", "8 dir x {n}"), {{"n", s.tracks.front().frames.size()}});
     } else if (s.tracks.size() > 1 && even) {
         d = std::format("{} x {}", s.tracks.size(), s.tracks.front().frames.size());
     } else {
-        d = std::format("{} images", s.imageCount());
+        d = nox::l10n::format(NOX_TR("content.sprites.n_images", "{n} images"), {{"n", s.imageCount()}});
     }
     if (!s.kind.empty()) {
         d += "  " + s.kind;
@@ -59,7 +60,7 @@ void CatalogView::load(const nox::things::ThingDb* things, const std::string& th
     if (s_.bag()) {
         try {
             if (!things) {
-                throw std::runtime_error(thingsError.empty() ? std::string("thing.bin isn't open") : thingsError);
+                throw std::runtime_error(thingsError.empty() ? NOX_TR("content.sprites.no_things", "thing.bin isn't open") : thingsError);
             }
             catalog_ = buildCatalog(*things, s_.bag()->bag());
         } catch (const std::exception& ex) {
@@ -215,12 +216,14 @@ void CatalogView::startExport(std::string label, fs::path folder, std::size_t to
         ImageSource source(paths); // (video.bag as it is on disk, without unsaved edits)
         ExportContext ctx{source, paths, &progress};
         const std::size_t written = run(ctx);
-        std::string msg = std::format("{} {} images", progress.cancel ? "cancelled after" : "wrote", written);
+        std::string msg = nox::l10n::format(progress.cancel ? NOX_TR("content.sprites.cancelled_after", "cancelled after {n} images")
+                                                            : NOX_TR("content.sprites.wrote", "wrote {n} images"),
+                                            {{"n", written}});
         if (progress.empty) {
-            msg += std::format(", {} empty frames", progress.empty.load());
+            msg += nox::l10n::format(NOX_TR("content.sprites.empty_frames", ", {n} empty frames"), {{"n", progress.empty.load()}});
         }
         if (progress.failed) {
-            msg += std::format(", {} failed (see animation.json)", progress.failed.load());
+            msg += nox::l10n::format(NOX_TR("content.sprites.failed", ", {n} failed (see animation.json)"), {{"n", progress.failed.load()}});
         }
         return msg;
     });
@@ -233,7 +236,7 @@ void CatalogView::exportEverything()
         total += c.imageCount();
     }
     const Catalog* cat = &catalog_;
-    startExport("Exporting everything", outDir(), total, [cat, out = outDir()](ExportContext& ctx) {
+    startExport(NOX_TR("content.sprites.exporting_everything", "Exporting everything"), outDir(), total, [cat, out = outDir()](ExportContext& ctx) {
         std::size_t n = 0;
         for (const auto& c : cat->categories) {
             n += exportCategory(ctx, c, out);
@@ -246,7 +249,7 @@ void CatalogView::leftPane(float height)
 {
     ImGui::BeginChild("left", ImVec2(0, height));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##search", "Search all names, or #index for a bag image", filterBuf_, sizeof filterBuf_);
+    ImGui::InputTextWithHint("##search", NOX_TRC("content.sprites.search_hint", "Search all names, or #index for a bag image"), filterBuf_, sizeof filterBuf_);
     const bool searching = filterBuf_[0] != 0;
     const float line = ImGui::GetTextLineHeightWithSpacing();
     const float buttonRow = ImGui::GetFrameHeightWithSpacing();
@@ -297,27 +300,27 @@ void CatalogView::leftPane(float height)
             const float tx = a.x + rowH + 6 * s_.scale();
             dl->AddText(ImVec2(tx, a.y + 2), ImGui::GetColorU32(ImGuiCol_Text), e.name.c_str());
             const std::string sub = (searching ? cat.name + "  ·  " : std::string()) +
-                                    std::format("{} {}, {} images", e.sequences.size(),
-                                                e.sequences.size() == 1 ? "animation" : "animations", e.imageCount());
+                                    nox::l10n::format(NOX_TRP("content.sprites.entry_sub", "{n} animation, {images} images", "{n} animations, {images} images", e.sequences.size()),
+                                                      {{"n", e.sequences.size()}, {"images", e.imageCount()}});
             dl->AddText(ImVec2(tx, a.y + rowH / 2), ImGui::GetColorU32(ImGuiCol_TextDisabled), sub.c_str());
             ImGui::PopID();
         }
     }
     if (list_.empty()) {
-        ImGui::TextDisabled(searching ? "Nothing matches." : "No entries.");
+        ImGui::TextDisabled("%s", searching ? NOX_TRC("content.images.nothing_matches", "Nothing matches.") : NOX_TRC("content.sprites.no_entries", "No entries."));
     }
     ImGui::EndChild();
 
     if (!searching && listCat_ < int(catalog_.categories.size())) {
         const auto& cat = catalog_.categories[std::size_t(listCat_)];
         ImGui::BeginDisabled(s_.busy());
-        if (ImGui::Button(std::format("Export category ({} images)", cat.imageCount()).c_str(), ImVec2(-FLT_MIN, 0))) {
-            startExport("Exporting " + cat.name, outDir() / safeName(cat.name), cat.imageCount(),
+        if (ImGui::Button(nox::l10n::format(NOX_TR("content.sprites.export_category", "Export category ({n} images)"), {{"n", cat.imageCount()}}).c_str(), ImVec2(-FLT_MIN, 0))) {
+            startExport(nox::l10n::format(NOX_TR("content.sprites.exporting", "Exporting {what}"), {{"what", cat.name}}), outDir() / safeName(cat.name), cat.imageCount(),
                         [c = &cat, out = outDir()](ExportContext& ctx) { return exportCategory(ctx, *c, out); });
         }
         ImGui::EndDisabled();
     } else {
-        ImGui::TextDisabled("%zu matches", list_.size());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.sprites.n_matches", "{n} matches"), {{"n", list_.size()}}).c_str());
     }
     ImGui::EndChild();
 }
@@ -328,7 +331,7 @@ void CatalogView::middlePane(float height)
     const Category* cat = category();
     const Entry* e = entry();
     if (!e) {
-        ImGui::TextDisabled("Pick an entry on the left.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.sprites.pick_entry", "Pick an entry on the left."));
         ImGui::EndChild();
         return;
     }
@@ -338,12 +341,12 @@ void CatalogView::middlePane(float height)
         facts += "  ·  " + e->drawType;
     }
     if (e->thingId) {
-        facts += std::format("  ·  type id {}", e->thingId);
+        facts += nox::l10n::format(NOX_TR("content.sprites.type_id", "  ·  type id {n}"), {{"n", e->thingId}});
     }
     ImGui::TextDisabled("%s", facts.c_str());
     ImGui::BeginDisabled(s_.busy());
-    if (ImGui::Button(std::format("Export all animations ({} images)", e->imageCount()).c_str(), ImVec2(-FLT_MIN, 0))) {
-        startExport("Exporting " + e->name, entryDir(outDir(), *cat, *e), e->imageCount(),
+    if (ImGui::Button(nox::l10n::format(NOX_TR("content.sprites.export_all", "Export all animations ({n} images)"), {{"n", e->imageCount()}}).c_str(), ImVec2(-FLT_MIN, 0))) {
+        startExport(nox::l10n::format(NOX_TR("content.sprites.exporting", "Exporting {what}"), {{"what", e->name}}), entryDir(outDir(), *cat, *e), e->imageCount(),
                     [c = cat, en = e, out = outDir()](ExportContext& ctx) { return exportEntry(ctx, *c, *en, out); });
     }
     ImGui::EndDisabled();
@@ -358,8 +361,8 @@ void CatalogView::middlePane(float height)
         }
         if (ImGui::BeginPopupContextItem()) {
             ImGui::BeginDisabled(s_.busy());
-            if (ImGui::MenuItem("Export this animation")) {
-                startExport("Exporting " + e->name + "/" + s.path(), sequenceDir(outDir(), *cat, *e, s), s.imageCount(),
+            if (ImGui::MenuItem(NOX_TRI("content.sprites.export_animation", "Export this animation"))) {
+                startExport(nox::l10n::format(NOX_TR("content.sprites.exporting", "Exporting {what}"), {{"what", e->name + "/" + s.path()}}), sequenceDir(outDir(), *cat, *e, s), s.imageCount(),
                             [c = cat, en = e, sq = &s, out = outDir()](ExportContext& ctx) {
                                 return exportSequence(ctx, *c, *en, *sq, out);
                             });
@@ -396,7 +399,7 @@ void CatalogView::middlePane(float height)
     }
     if (!e->attributes.empty()) {
         ImGui::Spacing();
-        if (ImGui::TreeNode("Thing attributes")) {
+        if (ImGui::TreeNode(NOX_TRI("content.sprites.thing_attributes", "Thing attributes"))) {
             for (const auto& a : e->attributes) {
                 ImGui::TextWrapped("%s", a.c_str());
             }
@@ -455,14 +458,14 @@ void CatalogView::canvas(const Track& track, ImVec2 size)
     bag.title = "video.bag";
     bag.image = t;
     PaneView hd;
-    hd.title = "HD (image pack)";
+    hd.title = NOX_TRC("content.images.hd_pane", "HD (image pack)");
     hd.hd = true;
     hd.image = hdFor(index, hd.standIn);
     std::string error;
     if (index < 0 && n > 0) {
-        bag.note = hd.note = "This frame's image reference doesn't resolve.";
+        bag.note = hd.note = NOX_TRC("content.sprites.unresolved", "This frame's image reference doesn't resolve.");
     } else if (t && !t->error.empty()) {
-        error = std::format("Can't decode #{}: {}", index, t->error);
+        error = nox::l10n::format(NOX_TR("content.sprites.cant_decode", "Can't decode #{index}: {error}"), {{"index", index}, {"error", t->error}});
         bag.note = error.c_str();
     }
     const bool placed = t && t->texture && reg;
@@ -541,9 +544,13 @@ void CatalogView::canvas(const Track& track, ImVec2 size)
     compare_.draw(bag, hd, ImVec2(avail.x, std::max(1.0f, avail.y - textH)));
     if (regText) {
         const IRect r = reg->canvasRect(std::size_t(frame_));
-        ImGui::TextDisabled("canvas %dx%d  origin (%d, %d)  crop %dx%d at %d,%d (offset %d, %d)", reg->width, reg->height,
-                            reg->originX, reg->originY, t->width, t->height, r.x, r.y, t->offsetX, t->offsetY);
-        ImGui::TextDisabled("grey: canvas (padding %d)   orange: all frames   cyan: this frame's crop", reg->options.padding);
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.sprites.registration", "canvas {w}x{h}  origin ({ox}, {oy})  crop {cw}x{ch} at {x},{y} (offset {dx}, {dy})"),
+                                                    {{"w", reg->width}, {"h", reg->height}, {"ox", reg->originX}, {"oy", reg->originY}, {"cw", t->width}, {"ch", t->height},
+                                                     {"x", r.x}, {"y", r.y}, {"dx", t->offsetX}, {"dy", t->offsetY}})
+                                      .c_str());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.sprites.registration_key", "grey: canvas (padding {n})   orange: all frames   cyan: this frame's crop"),
+                                                    {{"n", reg->options.padding}})
+                                      .c_str());
     }
     ImGui::EndChild();
 }
@@ -606,48 +613,52 @@ void CatalogView::frameInfo(const Sequence& seq, const Track& track)
             ImGui::TextUnformatted(v.c_str());
         };
         const Tex* tex = s_.sd().get(index);
-        rowText("Exports as", tex && tex->empty ? "nothing (empty frame, listed in animation.json)"
-                                                : frameFileName(seq, track, std::size_t(frame_)));
-        rowText("Frame", std::format("{}{} of {}", track.name.empty() ? "" : track.name + " ", frame_, track.frames.size()));
+        rowText(NOX_TRC("content.sprites.exports_as", "Exports as"), tex && tex->empty ? NOX_TR("content.sprites.exports_nothing", "nothing (empty frame, listed in animation.json)")
+                                                                                       : frameFileName(seq, track, std::size_t(frame_)));
+        rowText(NOX_TRC("content.sprites.frame", "Frame"), nox::l10n::format(NOX_TR("content.sprites.frame_of", "{track}{n} of {total}"),
+                                                                             {{"track", track.name.empty() ? std::string() : track.name + " "}, {"n", frame_}, {"total", track.frames.size()}}));
         if (index >= 0 && s_.bag()) {
             const auto& info = s_.bag()->bag().images()[std::size_t(index)];
-            rowText("Bag index", std::format("#{}{}", index, s_.bag()->edited(index) ? "  (edited)" : ""));
-            rowText("Bag name", info.name);
-            rowText("Image type", std::format("{} ({})", info.type, imageTypeName(info.type)));
+            rowText(NOX_TRC("content.sprites.bag_index", "Bag index"),
+                    std::format("#{}{}", index, s_.bag()->edited(index) ? NOX_TR("content.sprites.edited_suffix", "  (edited)") : std::string()));
+            rowText(NOX_TRC("content.sprites.bag_name", "Bag name"), info.name);
+            rowText(NOX_TRC("content.sprites.image_type", "Image type"), std::format("{} ({})", info.type, imageTypeName(info.type)));
             if (tex && tex->error.empty()) {
-                rowText("Size", std::format("{} x {}", tex->width, tex->height));
-                rowText("Draw offset", std::format("{}, {}", tex->offsetX, tex->offsetY));
-                rowText("Header byte", std::to_string(tex->headerByte));
+                rowText(NOX_TRC("content.label.size", "Size"), std::format("{} x {}", tex->width, tex->height));
+                rowText(NOX_TRC("content.images.fact_draw_offset", "Draw offset"), std::format("{}, {}", tex->offsetX, tex->offsetY));
+                rowText(NOX_TRC("content.images.fact_header_byte", "Header byte"), std::to_string(tex->headerByte));
                 std::string slots;
                 for (const auto s : tex->materialSlots) {
                     slots += (slots.empty() ? "" : ", ") + std::to_string(s);
                 }
-                rowText("Material slots", slots.empty() ? "none" : slots + "  (grey pixels the game tints)");
+                rowText(NOX_TRC("content.images.fact_material_slots", "Material slots"),
+                        slots.empty() ? NOX_TR("content.record.none", "none")
+                                      : nox::l10n::format(NOX_TR("content.sprites.slots_tinted", "{slots}  (grey pixels the game tints)"), {{"slots", slots}}));
                 if (tex->edgeMask) {
-                    rowText("Edge mask", "yes (exported to masks/)");
+                    rowText(NOX_TRC("content.images.fact_edge_mask", "Edge mask"), NOX_TR("content.sprites.edge_mask_yes", "yes (exported to masks/)"));
                 }
             } else if (tex) {
-                rowText("Error", tex->error);
+                rowText(NOX_TRC("content.sprites.error", "Error"), tex->error);
             }
             if (s_.pack()) {
                 const auto* e = s_.pack()->entry(std::uint32_t(index));
-                rowText("HD image", e ? std::format("{} x {}", e->pixelWidth, e->pixelHeight) : std::string("none"));
+                rowText(NOX_TRC("content.sprites.hd_image", "HD image"), e ? std::format("{} x {}", e->pixelWidth, e->pixelHeight) : NOX_TR("content.record.none", "none"));
             }
         } else {
-            rowText("Bag index", "unresolved");
+            rowText(NOX_TRC("content.sprites.bag_index", "Bag index"), NOX_TR("content.sprites.unresolved_short", "unresolved"));
         }
         if (std::size_t(frame_) < track.drawOffsets.size()) {
             const auto& o = track.drawOffsets[std::size_t(frame_)];
-            rowText("Wall offset", std::format("{}, {}", o[0], o[1]));
+            rowText(NOX_TRC("content.sprites.wall_offset", "Wall offset"), std::format("{}, {}", o[0], o[1]));
         }
         ImGui::EndTable();
     }
     if (index >= 0) {
-        if (ImGui::SmallButton("Find every use of this image")) {
+        if (ImGui::SmallButton(NOX_TRI("content.sprites.find_uses", "Find every use of this image"))) {
             std::snprintf(filterBuf_, sizeof filterBuf_, "#%d", index);
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("Edit in Images")) {
+        if (ImGui::SmallButton(NOX_TRI("content.sprites.edit_in_images", "Edit in Images"))) {
             openInEditor_(index);
         }
     }
@@ -661,7 +672,7 @@ void CatalogView::previewPane(float height)
     const Entry* e = entry();
     const Sequence* seq = sequence();
     if (!seq || seq->tracks.empty()) {
-        ImGui::TextDisabled(e ? "Pick an animation." : "");
+        ImGui::TextDisabled("%s", e ? NOX_TRC("content.sprites.pick_animation", "Pick an animation.") : "");
         ImGui::EndChild();
         return;
     }
@@ -673,16 +684,16 @@ void CatalogView::previewPane(float height)
     ImGui::Text("%s / %s", e->name.c_str(), seq->path().c_str());
     std::string facts;
     if (!seq->kind.empty()) {
-        facts = seq->kind + std::format("  ·  {} game frames per frame ({:.1f} fps)", seq->frameDelay + 1,
-                                        kGameFps / (seq->frameDelay + 1));
+        facts = seq->kind + nox::l10n::format(NOX_TR("content.sprites.frame_rate", "  ·  {n} game frames per frame ({fps} fps)"),
+                                              {{"n", seq->frameDelay + 1}, {"fps", std::format("{:.1f}", kGameFps / (seq->frameDelay + 1))}});
     } else {
-        facts = "still images";
+        facts = NOX_TR("content.sprites.still_images", "still images");
     }
     if (seq->state >= 0) {
-        facts += std::format("  ·  state {}", seq->state);
+        facts += nox::l10n::format(NOX_TR("content.sprites.state", "  ·  state {n}"), {{"n", seq->state}});
     }
     if (!seq->sound.empty()) {
-        facts += "  ·  sound " + seq->sound;
+        facts += nox::l10n::format(NOX_TR("content.sprites.sound", "  ·  sound {name}"), {{"name", seq->sound}});
     }
     for (const auto& [k, v] : seq->info) {
         facts += "  ·  " + k + " " + v;
@@ -690,25 +701,26 @@ void CatalogView::previewPane(float height)
     ImGui::TextDisabled("%s", facts.c_str());
 
     auto& settings = s_.settings();
-    if (ImGui::Button(playing_ ? "Pause" : "Play", ImVec2(60 * s_.scale(), 0))) {
+    if (ImGui::Button(playing_ ? NOX_TRI("content.preview.pause", "Pause") : NOX_TRI("content.common.play", "Play"), ImVec2(60 * s_.scale(), 0))) {
         playing_ = !playing_;
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(220 * s_.scale());
-    if (ImGui::SliderInt("##frame", &frame_, 0, std::max(0, frames - 1), "frame %d")) {
+    static const std::string frameFormat = sliderFormat(NOX_TR("content.sprites.frame_slider", "frame {n}"));
+    if (ImGui::SliderInt("##frame", &frame_, 0, std::max(0, frames - 1), frameFormat.c_str())) {
         playing_ = false;
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(70 * s_.scale());
     ImGui::Combo("##speed", &settings.speed, kSpeedNames, int(std::size(kSpeedNames)));
     ImGui::SameLine();
-    ImGui::Checkbox("Registration", &showRegistration_);
+    ImGui::Checkbox(NOX_TRI("content.sprites.registration_box", "Registration"), &showRegistration_);
     ImGui::SameLine();
-    ImGui::Checkbox("Onion skin", &onionSkin_);
+    ImGui::Checkbox(NOX_TRI("content.sprites.onion_skin", "Onion skin"), &onionSkin_);
     ImGui::SameLine();
     ImGui::BeginDisabled(s_.busy());
-    if (ImGui::Button("Export this animation")) {
-        startExport("Exporting " + e->name + "/" + seq->path(), sequenceDir(outDir(), *cat, *e, *seq), seq->imageCount(),
+    if (ImGui::Button(NOX_TRI("content.sprites.export_animation", "Export this animation"))) {
+        startExport(nox::l10n::format(NOX_TR("content.sprites.exporting", "Exporting {what}"), {{"what", e->name + "/" + seq->path()}}), sequenceDir(outDir(), *cat, *e, *seq), seq->imageCount(),
                     [c = cat, en = e, sq = seq, out = outDir()](ExportContext& ctx) {
                         return exportSequence(ctx, *c, *en, *sq, out);
                     });
@@ -808,7 +820,8 @@ void CatalogView::advance(double dt)
 void CatalogView::draw(float height, double dt)
 {
     if (!catalogError_.empty()) {
-        ImGui::TextColored(noxsdl::editor::themeColours().error, "No catalog (thing.bin): %s", catalogError_.c_str());
+        ImGui::TextColored(noxsdl::editor::themeColours().error, "%s",
+                           nox::l10n::format(NOX_TR("content.sprites.no_catalog", "No catalog (thing.bin): {error}"), {{"error", catalogError_}}).c_str());
         return;
     }
     if (keys_) {
@@ -816,9 +829,9 @@ void CatalogView::draw(float height, double dt)
     }
     advance(dt);
     if (ImGui::BeginTable("panes", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImVec2(0, height))) {
-        ImGui::TableSetupColumn("Browse", ImGuiTableColumnFlags_WidthFixed, 320 * s_.scale());
-        ImGui::TableSetupColumn("Animations", ImGuiTableColumnFlags_WidthFixed, 300 * s_.scale());
-        ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("content.sprites.col_browse", "Browse"), ImGuiTableColumnFlags_WidthFixed, 320 * s_.scale());
+        ImGui::TableSetupColumn(NOX_TRI("content.sprites.col_animations", "Animations"), ImGuiTableColumnFlags_WidthFixed, 300 * s_.scale());
+        ImGui::TableSetupColumn(NOX_TRI("content.sprites.col_preview", "Preview"), ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         leftPane(height);

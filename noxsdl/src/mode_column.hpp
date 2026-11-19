@@ -9,6 +9,7 @@
 
 #include "noxcore/lobby/browser.hpp"
 #include "noxcore/lobby/listing.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <string>
 #include <string_view>
@@ -41,7 +42,7 @@ inline std::string fromText(const nox::lobby::ServerEntry& e, bool saved)
     } else if (e.sources & nox::lobby::kFromLan) {
         from += "LAN";
     } else if (e.sources & nox::lobby::kFromList) {
-        from += saved ? "Saved" : "list";
+        from += saved ? NOX_TR("menus.browser.from_saved", "Saved") : NOX_TR("menus.browser.from_list", "list");
     }
     while (!from.empty() && from.back() == ' ') {
         from.pop_back();
@@ -62,7 +63,18 @@ inline std::string modeText(const nox::lobby::ServerEntry& e)
     if (e.extended && !e.extended->modeName.empty()) {
         return e.extended->modeName;
     }
-    return std::string(nox::lobby::gameModeName(e.game.gameFlags));
+    // (gameModeName's names are the console's too: shown here in the player's language.)
+    const std::string_view name = nox::lobby::gameModeName(e.game.gameFlags);
+    if (name == "kotr") return NOX_TR("menus.browser.mode.kotr", "kotr");
+    if (name == "ctf") return NOX_TR("menus.browser.mode.ctf", "ctf");
+    if (name == "flagball") return NOX_TR("menus.browser.mode.flagball", "flagball");
+    if (name == "chat") return NOX_TR("menus.browser.mode.chat", "chat");
+    if (name == "arena") return NOX_TR("menus.browser.mode.arena", "arena");
+    if (name == "elimination") return NOX_TR("menus.browser.mode.elimination", "elimination");
+    if (name == "quest") return NOX_TR("menus.browser.mode.quest", "quest");
+    if (name == "coop") return NOX_TR("menus.browser.mode.coop", "coop");
+    if (name == "custom") return NOX_TR("menus.browser.mode.custom", "custom");
+    return std::string(name);
 }
 
 /// `text` fitted into `room` as `measure(s)` (a float width) measures it: whole as it is when it

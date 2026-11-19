@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include "backend_hooks.hpp"
 #include "effects_draw.hpp"
+#include "language_pick.hpp"
 #include "snapshot_pacing.hpp"
 
 #include "noxcore/io/file.hpp"
@@ -161,6 +162,10 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
             e.csfText = v == "cp1251" ? OptionsWindow::Extras::kCsfTextCp1251
                         : v == "latin1" ? OptionsWindow::Extras::kCsfTextLatin1
                                         : OptionsWindow::Extras::kCsfTextAuto;
+        } else if (name == "Language") {
+            std::string v = line.substr(eq + 1);
+            std::erase_if(v, [](char c) { return c == ' ' || c == '\t' || c == '\r'; });
+            e.language = nox::util::lowered(v);
         } else if (name == "Gamma") {
             e.gamma = std::clamp(std::atoi(line.c_str() + eq + 1), 1, 10);
         } else if (name == "MouseAccel") {
@@ -214,6 +219,9 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
             : e.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? std::string("latin1")
                                                                  : std::string("auto"))
         << "\n";
+    if (!e.language.empty()) {
+        out << "Language = " << e.language << "\n"; // (only when set: an unset one stays chosen at start)
+    }
     for (std::size_t i = 0; i < e.modAbilityKeys.size(); ++i) {
         out << "ModAbilityKey" << (i + 1) << " = " << e.modAbilityKeys[i] << "\n";
     }
@@ -237,6 +245,7 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.originalFonts = app.originalFonts;
     e.csfText = app.csfText;
     e.csfShift = app.csfShift;
+    e.language = app.language;
     e.gamma = app.gamma;
     e.gpu = app.shaders != nullptr && app.white != nullptr;
     e.mouseAccel = app.mouseAccel;
@@ -486,6 +495,7 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     applyFonts(app);
     app.csfText = e.csfText; // (taken at start, with nox.csf: applyTextCodepage)
     app.csfShift = e.csfShift;
+    app.language = e.language; // (taken at start: applyLanguage)
     if (!app.shaders || !app.white) {
         return;
     }
@@ -540,6 +550,14 @@ void applyTextCodepage(App& app)
                 "converted where they meet the original game",
                 text.shift);
     }
+}
+
+/// NoX Core's own text's language, once at start after applyTextCodepage (language_pick.hpp):
+/// noxcore.cfg's Language, else nox.csf's, else the system's, else English. Before the menus and
+/// windows are built, so they are built in it.
+void applyLanguage(App& app)
+{
+    pickLanguage(app.language, app.strings.get(), nox::strings::wireCodepage());
 }
 
 /// Opens the Options window on the current settings (in a game the resolution stays).

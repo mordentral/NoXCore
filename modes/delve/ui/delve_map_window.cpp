@@ -7,6 +7,7 @@
 
 #include "noxcore/mapgen/biome.hpp"
 #include "noxcore/server/record_class.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <array>
@@ -37,31 +38,31 @@ int widthOf(int row)
 
 struct RoomLook {
     const char* mark;
-    const char* name; ///< as the legend and a hover say it
+    nox::l10n::Key name; ///< as the legend and a hover say it
     const char* icon; ///< the HD pack's "Delve/<icon>"
     SDL_Color fill;
 };
 
 // By server::DelveRoom's numbers: fight, elite, mystery, shop, campfire, guardian, blessing.
 constexpr std::array<RoomLook, 7> kLooks{{
-    {"F", "Fight", "Fight", {120, 70, 60, 255}},
-    {"E", "Elite", "Elite", {130, 60, 150, 255}},
-    {"?", "Mystery", "Mystery", {50, 90, 160, 255}},
-    {"$", "Shop", "Shop", {170, 140, 40, 255}},
-    {"C", "Campfire", "Campfire", {200, 100, 30, 255}},
-    {"B", "Guardian", "Guardian", {170, 30, 30, 255}},
-    {"+", "Blessing", "Shrine", {210, 190, 110, 255}},
+    {"F", NOX_TRK("modes.delve.room.fight", "Fight"), "Fight", {120, 70, 60, 255}},
+    {"E", NOX_TRK("modes.delve.room.elite", "Elite"), "Elite", {130, 60, 150, 255}},
+    {"?", NOX_TRK("modes.delve.room.mystery", "Mystery"), "Mystery", {50, 90, 160, 255}},
+    {"$", NOX_TRK("modes.delve.room.shop", "Shop"), "Shop", {170, 140, 40, 255}},
+    {"C", NOX_TRK("modes.delve.room.campfire", "Campfire"), "Campfire", {200, 100, 30, 255}},
+    {"B", NOX_TRK("modes.delve.room.guardian", "Guardian"), "Guardian", {170, 30, 30, 255}},
+    {"+", NOX_TRK("modes.delve.room.blessing", "Blessing"), "Shrine", {210, 190, 110, 255}},
 }};
 // A mystery once it's entered (server::DelveMystery's order: stash, purse, shrine, obelisk,
 // skirmish, fire, champion), on the HD pack's icons that fit.
 constexpr std::array<RoomLook, 7> kMysteries{{
-    {"T", "Stash", "Treasure", {190, 160, 50, 255}},
-    {"G", "Purse", "Treasure", {200, 170, 40, 255}},
-    {"S", "Shrine", "Shrine", {70, 150, 170, 255}},
-    {"O", "Obelisk", "Mystery", {60, 90, 200, 255}},
-    {"A", "Skirmish", "Ambush", {150, 40, 40, 255}},
-    {"C", "Campfire", "Campfire", {200, 100, 30, 255}},
-    {"E", "Champion", "Elite", {130, 60, 150, 255}},
+    {"T", NOX_TRK("modes.delve.mystery.stash", "Stash"), "Treasure", {190, 160, 50, 255}},
+    {"G", NOX_TRK("modes.delve.mystery.purse", "Purse"), "Treasure", {200, 170, 40, 255}},
+    {"S", NOX_TRK("modes.delve.mystery.shrine", "Shrine"), "Shrine", {70, 150, 170, 255}},
+    {"O", NOX_TRK("modes.delve.mystery.obelisk", "Obelisk"), "Mystery", {60, 90, 200, 255}},
+    {"A", NOX_TRK("modes.delve.mystery.skirmish", "Skirmish"), "Ambush", {150, 40, 40, 255}},
+    {"C", NOX_TRK("modes.delve.room.campfire", "Campfire"), "Campfire", {200, 100, 30, 255}},
+    {"E", NOX_TRK("modes.delve.mystery.champion", "Champion"), "Elite", {130, 60, 150, 255}},
 }};
 
 const RoomLook& look(std::uint8_t room)
@@ -140,19 +141,33 @@ std::string titleOf(const std::string& biome)
     return b ? std::string(b->title) : biome;
 }
 
-// The biome's climate note after its title, if it has one.
-std::string airOf(const std::string& biome)
+// A biome's title with its climate note after it, if it has one.
+std::string titleWithAir(const std::string& biome)
 {
+    const std::string title = titleOf(biome);
     const auto* b = nox::mapgen::findBiome(biome);
     if (!b) {
-        return {};
+        return title;
     }
     switch (b->climate) {
-    case nox::mapgen::Climate::Freezing: return " (bitter cold: slowed)";
-    case nox::mapgen::Climate::Scorching: return " (searing heat: burns)";
+    case nox::mapgen::Climate::Freezing:
+        return nox::l10n::format(NOX_TR("modes.delve.map.biome_freezing", "{biome} (bitter cold: slowed)"), {{"biome", title}});
+    case nox::mapgen::Climate::Scorching:
+        return nox::l10n::format(NOX_TR("modes.delve.map.biome_scorching", "{biome} (searing heat: burns)"), {{"biome", title}});
     case nox::mapgen::Climate::Mild: break;
     }
-    return {};
+    return title;
+}
+
+// A record's class as the records' table names it (server::recordClassName's).
+const std::string& recordClassText(std::uint8_t cls)
+{
+    switch (cls) {
+    case 1: return NOX_TR("modes.delve.records.class_wizard", "wizard");
+    case 2: return NOX_TR("modes.delve.records.class_conjurer", "conjurer");
+    case 3: return NOX_TR("modes.delve.records.class_multiclass", "MultiClass");
+    default: return NOX_TR("modes.delve.records.class_warrior", "warrior");
+    }
 }
 
 } // namespace
@@ -187,7 +202,10 @@ void DelveMapWindow::drawObjective(const SDL_FRect& button, float scale) const
         return;
     }
     const nox::server::delvemap::Objective& o = *objective_;
-    std::string line = (o.state == 1 ? "Bonus done: " : o.state == 2 ? "Bonus lost: " : "Bonus: ") + o.text;
+    std::string line = nox::l10n::format(o.state == 1   ? NOX_TR("modes.delve.objective.done", "Bonus done: {objective}")
+                                         : o.state == 2 ? NOX_TR("modes.delve.objective.lost", "Bonus lost: {objective}")
+                                                        : NOX_TR("modes.delve.objective.open", "Bonus: {objective}"),
+                                         {{"objective", o.text}});
     if (o.state == 0 && o.secondsLeft != 0xFFFF) {
         const auto gone = static_cast<std::int64_t>((SDL_GetTicks() - objectiveAtMs_) / 1000);
         const auto left = std::max<std::int64_t>(0, o.secondsLeft - gone);
@@ -254,16 +272,18 @@ void DelveMapWindow::drawRecords(SDL_Renderer* renderer, int w, int h, float sca
     const SDL_Color gold{255, 200, 60, 255};
     const SDL_Color white{235, 235, 235, 255};
     const SDL_Color grey{150, 150, 150, 255};
-    const std::string title = "The deepest delves";
+    const std::string& title = NOX_TR("modes.delve.records.title", "The deepest delves");
     font_->draw(title, p.x + (p.w - font_->measure(title, text)) / 2, p.y + kPad * s, text, gold);
     float y = p.y + kPad * s + line * 1.6f;
     for (std::size_t i = 0; records_ && i < records_->size() && i < 10; ++i) {
         const auto& r = (*records_)[i];
         std::string party;
         for (const auto& [name, cls] : r.party) {
-            party += (party.empty() ? "" : ", ") + name + " (" + std::string(nox::server::recordClassName(cls)) + ")";
+            party += (party.empty() ? "" : ", ") +
+                     nox::l10n::format(NOX_TR("modes.delve.records.member", "{name} ({class})"), {{"name", name}, {"class", recordClassText(cls)}});
         }
-        const std::string head = std::to_string(i + 1) + ".  depth " + std::to_string(r.depth) + "  (act " + std::to_string(r.act) + ")";
+        const std::string head = nox::l10n::format(NOX_TR("modes.delve.records.row", "{rank}.  depth {depth}  (act {act})"),
+                                                   {{"rank", i + 1}, {"depth", r.depth}, {"act", r.act}});
         font_->draw(head, p.x + kPad * s, y, text, i == 0 ? gold : white);
         const float dw = font_->measure(r.date, text);
         font_->draw(r.date, p.x + p.w - kPad * s - dw, y, text, grey);
@@ -276,7 +296,7 @@ void DelveMapWindow::drawRecords(SDL_Renderer* renderer, int w, int h, float sca
         y += line * 1.1f;
     }
     // The rest online.
-    const std::string more(nox::server::kFullLeaderboard);
+    const std::string& more = NOX_TR("modes.delve.records.full_leaderboard", "Full leaderboard at noxhub.net"); // (server::kFullLeaderboard)
     font_->draw(more, p.x + (p.w - font_->measure(more, text)) / 2, p.y + p.h - kPad * s - line, text, grey);
 }
 
@@ -326,7 +346,7 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
     if (!run) {
         // No run (the lobby): the records' table behind a "TOP" button, when there are any.
         if (hasRecords()) {
-            drawButton(renderer, buttonRect(w, h, scale), "TOP", scale, mouse);
+            drawButton(renderer, buttonRect(w, h, scale), NOX_TR("modes.delve.records.button", "TOP"), scale, mouse);
             if (open_) {
                 drawRecords(renderer, w, h, scale);
             }
@@ -339,7 +359,7 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
     const SDL_Color gold{255, 200, 60, 255};
     const SDL_Color parchment{200, 190, 160, 255};
 
-    drawButton(renderer, l.button, "MAP", scale, mouse);
+    drawButton(renderer, l.button, NOX_TR("modes.delve.map.button", "MAP"), scale, mouse);
     drawObjective(l.button, scale);
     if (!open_) {
         return;
@@ -354,10 +374,12 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
     const auto centred = [&](const std::string& text, float x, float y, SDL_Color c) {
         font_->draw(text, x - font_->measure(text, l.text) / 2, y, l.text, c);
     };
-    centred("The Delve - depth " + std::to_string(run->depth), cx, l.panel.y + kPad * s, gold);
+    centred(nox::l10n::format(NOX_TR("modes.delve.map.title", "The Delve - depth {depth}"), {{"depth", run->depth}}), cx, l.panel.y + kPad * s, gold);
     if (hasRecords()) { // (the record to beat, at the top right)
         const auto& best = records_->front();
-        const std::string line = "Record: depth " + std::to_string(best.depth) + (run->depth > best.depth ? " - beaten!" : "");
+        const std::string line = nox::l10n::format(run->depth > best.depth ? NOX_TR("modes.delve.map.record_beaten", "Record: depth {depth} - beaten!")
+                                                                           : NOX_TR("modes.delve.map.record", "Record: depth {depth}"),
+                                                   {{"depth", best.depth}});
         font_->draw(line, l.panel.x + l.panel.w - kPad * s - font_->measure(line, l.text), l.panel.y + kPad * s, l.text,
                     run->depth > best.depth ? gold : grey);
     }
@@ -494,7 +516,8 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
 
     // The names: the act's under its rows; the left gate's over its act, the right's under its.
     {
-        const std::string name = "Act " + std::to_string(actNumber) + ": " + titleOf(run->act.biome) + airOf(run->act.biome);
+        const std::string name =
+            nox::l10n::format(NOX_TR("modes.delve.map.act", "Act {n}: {biome}"), {{"n", actNumber}, {"biome", titleWithAir(run->act.biome)}});
         font_->draw(name, l.left - l.node / 2, l.middle + 2 * l.spread + l.node * 0.75f, l.text, white);
     }
     if (run->fork) {
@@ -507,8 +530,11 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
             const float x = rooms[forks[f][0][0]].at.x - l.node / 2;
             const float laneY = l.middle + (f == 0 ? -l.lane : l.lane);
             const float y0 = f == 0 ? laneY - forkHalf - l.line * 2.2f : laneY + forkHalf + l.line * 0.2f;
-            font_->draw((f == 0 ? "Left gate - act " : "Right gate - act ") + std::to_string(actNumber + 1), x, y0, l.text, parchment);
-            font_->draw(titleOf(a.biome) + airOf(a.biome), x, y0 + l.line, l.text, parchment);
+            font_->draw(nox::l10n::format(f == 0 ? NOX_TR("modes.delve.map.left_gate", "Left gate - act {n}")
+                                                 : NOX_TR("modes.delve.map.right_gate", "Right gate - act {n}"),
+                                          {{"n", actNumber + 1}}),
+                        x, y0, l.text, parchment);
+            font_->draw(titleWithAir(a.biome), x, y0 + l.line, l.text, parchment);
         }
     }
 
@@ -517,14 +543,16 @@ void DelveMapWindow::draw(SDL_Renderer* renderer, const std::optional<Run>& run,
     const std::size_t first = run->past.size() > kPastShown ? run->past.size() - kPastShown : 0;
     for (std::size_t i = first; i < run->past.size(); ++i) {
         const auto& a = run->past[i];
-        const std::string gate = a.taken == 0 ? " - left gate" : a.taken == 1 ? " - right gate" : "";
-        font_->draw("Act " + std::to_string(run->earlier + i + 1) + ": " + titleOf(a.biome) + gate, x0, y, l.text, grey);
+        const std::string& pattern = a.taken == 0   ? NOX_TR("modes.delve.map.act_left", "Act {n}: {biome} - left gate")
+                                     : a.taken == 1 ? NOX_TR("modes.delve.map.act_right", "Act {n}: {biome} - right gate")
+                                                    : NOX_TR("modes.delve.map.act", "Act {n}: {biome}");
+        font_->draw(nox::l10n::format(pattern, {{"n", run->earlier + i + 1}, {"biome", titleOf(a.biome)}}), x0, y, l.text, grey);
         y += l.line;
     }
 
     // A room under the pointer: its name by it.
     if (hovered) {
-        const std::string name = hovered->look->name;
+        const std::string& name = nox::l10n::tr(hovered->look->name);
         const float tw = font_->measure(name, l.text) + 8 * s;
         const SDL_FRect tip{hovered->at.x - tw / 2, hovered->at.y + l.node / 2 + 4 * s, tw, l.line + 4 * s};
         SDL_SetRenderDrawColor(renderer, 30, 24, 16, 235);

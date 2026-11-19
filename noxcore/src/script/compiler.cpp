@@ -22,6 +22,7 @@
 
 #include "noxcore/script/arg_values.hpp"
 #include "noxcore/script/opcodes.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include "language.hpp"
 
@@ -143,7 +144,7 @@ private:
                     advance();
                 }
                 if (!closed) {
-                    error(loc, "unterminated /* comment");
+                    error(loc, NOX_TR("editor.script.compile.unterminated_comment", "unterminated /* comment"));
                 }
             } else {
                 break;
@@ -169,9 +170,9 @@ private:
                 advance();
             }
             if (digits == 0) {
-                error(t.loc, "a hex number needs digits after 0x");
+                error(t.loc, NOX_TR("editor.script.compile.hex_no_digits", "a hex number needs digits after 0x"));
             } else if (big) {
-                error(t.loc, "the number is too big for 32 bits");
+                error(t.loc, NOX_TR("editor.script.compile.hex_too_big", "the number is too big for 32 bits"));
             }
             t.kind = Tk::Int;
             t.ival = static_cast<std::uint32_t>(v);
@@ -213,7 +214,7 @@ private:
             }
             const auto r = std::from_chars(s.data(), s.data() + s.size(), t.fval);
             if (r.ec == std::errc::result_out_of_range) {
-                error(t.loc, "the float " + t.text + " is out of range");
+                error(t.loc, l10n::format(NOX_TR("editor.script.compile.float_range", "the float {text} is out of range"), {{"text", t.text}}));
             }
         } else {
             t.kind = Tk::Int;
@@ -224,14 +225,14 @@ private:
             for (const char d : t.text) {
                 const int digit = d - '0';
                 if (octal && digit > 7) {
-                    error(t.loc, "bad digit in the octal number " + t.text);
+                    error(t.loc, l10n::format(NOX_TR("editor.script.compile.octal_digit", "bad digit in the octal number {text}"), {{"text", t.text}}));
                     break;
                 }
                 v = v * (octal ? 8 : 10) + static_cast<std::uint64_t>(digit);
                 big = big || v > 0xFFFFFFFFull;
             }
             if (big) {
-                error(t.loc, "the number " + t.text + " is too big for 32 bits");
+                error(t.loc, l10n::format(NOX_TR("editor.script.compile.number_too_big", "the number {text} is too big for 32 bits"), {{"text", t.text}}));
             }
             t.ival = static_cast<std::uint32_t>(v);
         }
@@ -242,7 +243,7 @@ private:
     void trailing(const Token& t)
     {
         if (at_ < src_.size() && (std::isalnum(static_cast<unsigned char>(src_[at_])) || src_[at_] == '_')) {
-            error(t.loc, "bad suffix on the number " + t.text);
+            error(t.loc, l10n::format(NOX_TR("editor.script.compile.number_suffix", "bad suffix on the number {text}"), {{"text", t.text}}));
             while (at_ < src_.size() && (std::isalnum(static_cast<unsigned char>(src_[at_])) || src_[at_] == '_')) {
                 advance();
             }
@@ -255,7 +256,7 @@ private:
         advance(); // "
         for (;;) {
             if (at_ >= src_.size() || src_[at_] == '\n') {
-                error(t.loc, "unterminated string");
+                error(t.loc, NOX_TR("editor.script.compile.unterminated_string", "unterminated string"));
                 return;
             }
             const char c = src_[at_];
@@ -271,7 +272,7 @@ private:
             const SourceLoc escLoc = here();
             advance();
             if (at_ >= src_.size()) {
-                error(t.loc, "unterminated string");
+                error(t.loc, NOX_TR("editor.script.compile.unterminated_string", "unterminated string"));
                 return;
             }
             const char e = src_[at_];
@@ -298,7 +299,7 @@ private:
                     advance();
                 }
                 if (n == 0) {
-                    error(escLoc, "\\x needs hex digits");
+                    error(escLoc, NOX_TR("editor.script.compile.escape_x_digits", "\\x needs hex digits"));
                 }
                 t.text += static_cast<char>(v);
                 break;
@@ -313,11 +314,11 @@ private:
                         advance();
                     }
                     if (v > 255) {
-                        error(escLoc, "octal escape out of range");
+                        error(escLoc, NOX_TR("editor.script.compile.escape_octal_range", "octal escape out of range"));
                     }
                     t.text += static_cast<char>(v);
                 } else {
-                    error(escLoc, std::string("unknown escape \\") + e);
+                    error(escLoc, l10n::format(NOX_TR("editor.script.compile.escape_unknown", "unknown escape \\{c}"), {{"c", std::string(1, e)}}));
                 }
                 break;
             }
@@ -352,7 +353,7 @@ private:
             advance();
             return;
         }
-        error(t.loc, std::string("unexpected character '") + (std::isprint(static_cast<unsigned char>(c)) ? std::string(1, c) : "\\x" + std::to_string(static_cast<unsigned char>(c))) + "'");
+        error(t.loc, l10n::format(NOX_TR("editor.script.compile.unexpected_char", "unexpected character '{c}'"), {{"c", std::isprint(static_cast<unsigned char>(c)) ? std::string(1, c) : "\\x" + std::to_string(static_cast<unsigned char>(c))}}));
         advance();
         t.kind = Tk::Punct;
         t.text = "?";
@@ -448,7 +449,7 @@ private:
     {
         if (++depth_ > kMaxNesting && !tooDeep_) {
             tooDeep_ = true;
-            error(peek().loc, "nested too deeply (more than " + std::to_string(kMaxNesting) + " levels of statements and expressions)");
+            error(peek().loc, l10n::format(NOX_TR("editor.script.compile.too_deep", "nested too deeply (more than {n} levels of statements and expressions)"), {{"n", kMaxNesting}}));
         }
         return !tooDeep_;
     }
@@ -511,11 +512,11 @@ private:
     std::string describe(const Token& t) const
     {
         switch (t.kind) {
-        case Tk::End: return "the end of the file";
+        case Tk::End: return NOX_TR("editor.script.compile.found_end", "the end of the file");
         case Tk::Ident: return "'" + t.text + "'";
         case Tk::Int:
-        case Tk::Float: return "the number " + t.text;
-        case Tk::Str: return "a string";
+        case Tk::Float: return l10n::format(NOX_TR("editor.script.compile.found_number", "the number {text}"), {{"text", t.text}});
+        case Tk::Str: return NOX_TR("editor.script.compile.found_string", "a string");
         default: return "'" + t.text + "'";
         }
     }
@@ -524,7 +525,7 @@ private:
         if (accept(s)) {
             return true;
         }
-        error(peek().loc, "expected '" + std::string(s) + "' but found " + describe(peek()));
+        error(peek().loc, l10n::format(NOX_TR("editor.script.compile.expected_punct", "expected '{what}' but found {found}"), {{"what", s}, {"found", describe(peek())}}));
         return false;
     }
     // After an error at the top level: on to the next ';' or the '}' closing a body.
@@ -570,7 +571,7 @@ private:
     bool identifier(std::string& out, SourceLoc& loc)
     {
         if (peek().kind != Tk::Ident || typeWord(peek()) || isKeyword(peek().text)) {
-            error(peek().loc, "expected a name but found " + describe(peek()));
+            error(peek().loc, l10n::format(NOX_TR("editor.script.compile.expected_name", "expected a name but found {found}"), {{"found", describe(peek())}}));
             return false;
         }
         loc = peek().loc;
@@ -608,7 +609,7 @@ private:
     {
         const auto type = typeWord(peek());
         if (!type) {
-            error(peek().loc, "expected a declaration (a type: int, float, string, object or void) but found " + describe(peek()));
+            error(peek().loc, l10n::format(NOX_TR("editor.script.compile.expected_declaration", "expected a declaration (a type: int, float, string, object or void) but found {found}"), {{"found", describe(peek())}}));
             return;
         }
         next();
@@ -626,7 +627,7 @@ private:
         }
         if (isPunct("(")) {
             if (first.objectVar) {
-                error(first.loc, "a function can't be named object." + first.name);
+                error(first.loc, l10n::format(NOX_TR("editor.script.compile.function_object_name", "a function can't be named object.{name}"), {{"name", first.name}}));
                 return;
             }
             first.k = TopItem::K::Function;
@@ -637,14 +638,14 @@ private:
             } else if (isPunct("{")) {
                 first.body = block();
             } else {
-                error(peek().loc, "expected '{' or ';' after the function's parameters but found " + describe(peek()));
+                error(peek().loc, l10n::format(NOX_TR("editor.script.compile.expected_body", "expected '{' or ';' after the function's parameters but found {found}"), {{"found", describe(peek())}}));
                 return;
             }
             items.push_back(std::move(first));
             return;
         }
         if (*type == Type::Void) {
-            error(first.loc, "a variable can't be void");
+            error(first.loc, NOX_TR("editor.script.compile.void_variable", "a variable can't be void"));
         }
         // Globals: "type a, b[4], c = expr;".
         TopItem item = std::move(first);
@@ -654,9 +655,9 @@ private:
             arraySuffix(item.arraySize);
             if (accept("=")) {
                 if (item.objectVar) {
-                    error(item.loc, "an object variable can't have an initialiser: every object's start at 0");
+                    error(item.loc, NOX_TR("editor.script.compile.object_var_init", "an object variable can't have an initialiser: every object's start at 0"));
                 } else if (item.arraySize) {
-                    error(item.loc, "an array can't have an initialiser");
+                    error(item.loc, NOX_TR("editor.script.compile.array_init", "an array can't have an initialiser"));
                 }
                 item.init = expression();
             }
@@ -679,13 +680,13 @@ private:
         }
         const SourceLoc loc = next().loc;
         if (peek().kind != Tk::Int) {
-            error(peek().loc, "an array's length must be a number");
+            error(peek().loc, NOX_TR("editor.script.compile.array_length_number", "an array's length must be a number"));
             syncStmt();
             return;
         }
         size = next().ival;
         if (size < 2) {
-            error(loc, "an array's length must be more than 1");
+            error(loc, NOX_TR("editor.script.compile.array_length_min", "an array's length must be more than 1"));
             size = 2;
         }
         expect("]");
@@ -706,7 +707,7 @@ private:
             p.loc = peek().loc;
             const auto type = typeWord(peek());
             if (!type || *type == Type::Void) {
-                error(peek().loc, "expected a parameter's type but found " + describe(peek()));
+                error(peek().loc, l10n::format(NOX_TR("editor.script.compile.expected_param_type", "expected a parameter's type but found {found}"), {{"found", describe(peek())}}));
                 syncStmt();
                 return;
             }
@@ -716,7 +717,7 @@ private:
                 return;
             }
             if (isPunct("[")) {
-                error(peek().loc, "a parameter can't be an array");
+                error(peek().loc, NOX_TR("editor.script.compile.param_array", "a parameter can't be an array"));
                 std::uint32_t ignored = 0;
                 arraySuffix(ignored);
             }
@@ -781,7 +782,7 @@ private:
         if (const auto type = objectUse ? std::nullopt : typeWord(t)) {
             next();
             if (*type == Type::Void) {
-                error(loc, "a variable can't be void");
+                error(loc, NOX_TR("editor.script.compile.void_variable", "a variable can't be void"));
             }
             // "type a, b = 1;" as a block of declarations (the block adds no scope: Decls only).
             auto group = make(Stmt::K::Block, loc);
@@ -791,7 +792,7 @@ private:
                 auto d = make(Stmt::K::Decl, peek().loc);
                 d->type = *type;
                 if (isWord("object") && isPunct(".", 1)) {
-                    error(peek().loc, "object variables are declared at the top level, outside functions");
+                    error(peek().loc, NOX_TR("editor.script.compile.object_var_in_function", "object variables are declared at the top level, outside functions"));
                     return nullptr;
                 }
                 if (!identifier(d->name, d->loc)) {
@@ -800,7 +801,7 @@ private:
                 arraySuffix(d->arraySize);
                 if (accept("=")) {
                     if (d->arraySize) {
-                        error(d->loc, "an array can't have an initialiser");
+                        error(d->loc, NOX_TR("editor.script.compile.array_init", "an array can't have an initialiser"));
                     }
                     d->e = expression();
                 }
@@ -847,7 +848,7 @@ private:
                 expect("(");
                 if (!isPunct(";")) {
                     if (typeWord(peek()) && !(isWord("object") && isPunct(".", 1))) {
-                        error(peek().loc, "no declarations in a for's first part (declare the variable before the loop)");
+                        error(peek().loc, NOX_TR("editor.script.compile.for_declaration", "no declarations in a for's first part (declare the variable before the loop)"));
                     }
                     s->s1 = simple();
                 }
@@ -870,7 +871,7 @@ private:
                 s->e = assignment(); // (switch (v = value): v is its temporary)
                 expect(")");
                 if (!isPunct("{")) {
-                    error(peek().loc, "a switch needs a { block }");
+                    error(peek().loc, NOX_TR("editor.script.compile.switch_block", "a switch needs a { block }"));
                     return nullptr;
                 }
                 s->s1 = block();
@@ -925,12 +926,12 @@ private:
                 return s;
             }
             if (t.text == "else") {
-                error(loc, "'else' without an 'if'");
+                error(loc, NOX_TR("editor.script.compile.else_without_if", "'else' without an 'if'"));
                 next();
                 return nullptr;
             }
             if (t.text == "do") {
-                error(loc, "do ... while isn't part of the language (use while)");
+                error(loc, NOX_TR("editor.script.compile.do_while", "do ... while isn't part of the language (use while)"));
                 next();
                 return nullptr;
             }
@@ -1123,7 +1124,7 @@ private:
         default:
             break;
         }
-        error(t.loc, "expected an expression but found " + describe(t));
+        error(t.loc, l10n::format(NOX_TR("editor.script.compile.expected_expression", "expected an expression but found {found}"), {{"found", describe(t)}}));
         e->k = Expr::K::Int;
         return e;
     }
@@ -1212,7 +1213,7 @@ public:
         }
         for (const auto& [name, f] : functions_) {
             if (!f.defined) {
-                error(f.loc, "the function " + name + " is declared but never defined");
+                error(f.loc, l10n::format(NOX_TR("editor.script.compile.declared_not_defined", "the function {name} is declared but never defined"), {{"name", name}}));
             }
         }
         if (opts.lint) {
@@ -1221,9 +1222,9 @@ public:
         // The game's loader puts the constants in its 1024-entry string table without a check
         // (docs/original_bugs.md, OB-200); the strings made while a script runs share what's left.
         if (strings_.size() > 1024) {
-            error({1, 1}, std::to_string(strings_.size()) + " string constants: the game's string table holds 1024");
+            error({1, 1}, l10n::format(NOX_TR("editor.script.compile.too_many_strings", "{n} string constants: the game's string table holds 1024"), {{"n", strings_.size()}}));
         } else if (strings_.size() > 960) {
-            warning({1, 1}, std::to_string(strings_.size()) + " string constants leave few of the game's 1024 strings for the ones made while it runs");
+            warning({1, 1}, l10n::format(NOX_TR("editor.script.compile.many_strings", "{n} string constants leave few of the game's 1024 strings for the ones made while it runs"), {{"n", strings_.size()}}));
         }
         if (hasErrors()) {
             return std::nullopt;
@@ -1250,7 +1251,7 @@ public:
         }
         for (std::size_t i = 0; i < file.functions.size(); ++i) {
             if (const auto bad = check(file, i)) {
-                error({1, 1}, "internal: the code made doesn't check: " + *bad);
+                error({1, 1}, l10n::format(NOX_TR("editor.script.compile.internal_check", "internal: the code made doesn't check: {why}"), {{"why", *bad}}));
                 return std::nullopt;
             }
         }
@@ -1297,31 +1298,33 @@ private:
     {
         for (const auto& [name, g] : globals_) {
             if (!g.readOnly && !globalReads_.contains(g.symbol)) {
-                warning(g.loc, "the global " + name + " is never read");
+                warning(g.loc, l10n::format(NOX_TR("editor.script.compile.global_unread", "the global {name} is never read"), {{"name", name}}));
             }
         }
         for (const auto& [name, v] : objectVars_) {
             if (!objectReads_.contains(v.symbol)) {
-                warning(v.loc, "the object variable object." + name + " is never read");
+                warning(v.loc, l10n::format(NOX_TR("editor.script.compile.object_var_unread", "the object variable object.{name} is never read"), {{"name", name}}));
             }
         }
         for (const std::string& name : functionOrder_) {
             const FunctionInfo& f = functions_.at(name);
             if (f.defined && f.returns != Type::Void && isEntryPointName(name)) {
-                warning(f.loc, "the entry point " + name + " returns a value: the game calls it without taking the value, which on a "
-                               "stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); "
-                               "declare it void");
+                warning(f.loc, l10n::format(NOX_TR("editor.script.compile.entry_returns",
+                                                   "the entry point {name} returns a value: the game calls it without taking the value, which on a "
+                                                   "stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); "
+                                                   "declare it void"),
+                                            {{"name", name}}));
             }
             // Object variables where the game calls with no object (self).
             if (f.defined && isEntryPointName(name)) {
                 if (const auto used = objectUseFrom(name)) {
-                    warning(f.loc, noObjectText(name, *used, "the game calls the entry point " + name));
+                    warning(f.loc, noObjectText(name, *used, l10n::format(NOX_TR("editor.script.compile.caller_entry_point", "the game calls the entry point {name}"), {{"name", name}})));
                 }
             }
         }
         for (const auto& [name, loc, builtin] : timerSites_) {
             if (const auto used = objectUseFrom(name)) {
-                warning(loc, noObjectText(name, *used, builtin + " calls " + name));
+                warning(loc, noObjectText(name, *used, l10n::format(NOX_TR("editor.script.compile.caller_builtin", "{builtin} calls {name}"), {{"builtin", builtin}, {"name", name}})));
             }
         }
         if (!opts.externalNames) {
@@ -1332,7 +1335,7 @@ private:
             const FunctionInfo& f = functions_.at(name);
             if (f.defined && !usedFunctions_.contains(name) && !external.contains(name) && !isEntryPointName(name) &&
                 !name.starts_with(kTestPrefix)) {
-                warning(f.loc, "the function " + name + " is never called, given to a builtin or named by the map");
+                warning(f.loc, l10n::format(NOX_TR("editor.script.compile.function_unused", "the function {name} is never called, given to a builtin or named by the map"), {{"name", name}}));
             }
         }
     }
@@ -1350,7 +1353,7 @@ private:
                 continue;
             }
             if (const auto u = objectUse_.find(f); u != objectUse_.end()) {
-                return f == name ? u->second : u->second + " (in " + f + ")";
+                return f == name ? u->second : l10n::format(NOX_TR("editor.script.compile.object_use_in", "{name} (in {function})"), {{"name", u->second}, {"function", f}});
             }
             if (const auto c = callees_.find(f); c != callees_.end()) {
                 todo.insert(todo.end(), c->second.rbegin(), c->second.rend());
@@ -1361,8 +1364,10 @@ private:
 
     static std::string noObjectText(const std::string& function, const std::string& used, const std::string& caller)
     {
-        return function + " uses object." + used + ", but " + caller + " with no object (self): there object variables read 0 and "
-               "their stores are lost, and GAME.EXE crashes";
+        return l10n::format(NOX_TR("editor.script.compile.no_object",
+                                   "{function} uses object.{used}, but {caller} with no object (self): there object variables read 0 and "
+                                   "their stores are lost, and GAME.EXE crashes"),
+                            {{"function", function}, {"used", used}, {"caller", caller}});
     }
 
 public:
@@ -1379,12 +1384,17 @@ private:
         }
         if (!refusedObject_) {
             refusedObject_ = true;
-            error(loc, "object." + name + ": object variables are a NoX Core-only feature and are off. The original game never gives "
-                       "objects their storage and crashes on a script that uses them, so a map with them needs a NoX Core server. "
-                       "To allow them: " + std::string(kObjectVariablesHowToEnable));
+            error(loc, l10n::format(NOX_TR("editor.script.compile.object_vars_off_first",
+                                           "object.{name}: object variables are a NoX Core-only feature and are off. The original game never gives "
+                                           "objects their storage and crashes on a script that uses them, so a map with them needs a NoX Core server. "
+                                           "To allow them: {how}"),
+                                    {{"name", name},
+                                     {"how", NOX_TR("editor.script.compile.object_vars_how",
+                                                    "in the map editor, Editor Settings > \"Allow NoX Core-only script features (object variables)\"; "
+                                                    "with noxscript, --allow-object-vars")}}));
             return;
         }
-        error(loc, "object." + name + ": object variables are off (a NoX Core-only feature; the first error says how to allow them)");
+        error(loc, l10n::format(NOX_TR("editor.script.compile.object_vars_off", "object.{name}: object variables are off (a NoX Core-only feature; the first error says how to allow them)"), {{"name", name}}));
     }
 
     /// `type object.name[N];`: the next symbol of function 0 (the pad first, unless raw).
@@ -1393,7 +1403,7 @@ private:
         const Type type = norm(it.type);
         const std::uint32_t size = it.arraySize ? it.arraySize : 1;
         if (objectVars_.contains(it.name)) {
-            error(it.loc, "object." + it.name + " is declared twice");
+            error(it.loc, l10n::format(NOX_TR("editor.script.compile.object_var_twice", "object.{name} is declared twice"), {{"name", it.name}}));
             return;
         }
         refuseObjectVariable(it.loc, it.name);
@@ -1402,8 +1412,9 @@ private:
             // to null when it's made and nothing ever allocates it, so the VM's object-variable
             // loads and stores fault there.
             if (allowObject_) {
-                warning(it.loc, "object variables work only in NoX Core: GAME.EXE never gives objects their storage, so a script "
-                                "that reads or writes one crashes the game there (docs/original_bugs.md)");
+                warning(it.loc, NOX_TR("editor.script.compile.object_vars_core_only",
+                                       "object variables work only in NoX Core: GAME.EXE never gives objects their storage, so a script "
+                                       "that reads or writes one crashes the game there (docs/original_bugs.md)"));
             }
             if (!rawObject_) {
                 // The pad: the first variable would sit at offset 0, which the VM's store negates to
@@ -1429,11 +1440,11 @@ private:
         refuseObjectVariable(e.loc, e.text);
         const auto it = objectVars_.find(e.text);
         if (it == objectVars_.end()) {
-            error(e.loc, "no object variable object." + e.text + " (declare it at the top level: int object." + e.text + ";)");
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.no_object_var", "no object variable object.{name} (declare it at the top level: int object.{name};)"), {{"name", e.text}}));
             return {};
         }
         if (!fn_) {
-            error(e.loc, "object." + e.text + " in a global's initialiser: GLOBAL runs with no object");
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.object_var_in_global", "object.{name} in a global's initialiser: GLOBAL runs with no object"), {{"name", e.text}}));
             return {};
         }
         if (!objectUse_.contains(fn_->name)) {
@@ -1454,9 +1465,11 @@ private:
     void warnOffsetZero(const VarRef& v, SourceLoc loc)
     {
         if (v.object && v.symbol == 1) {
-            warning(loc, "a store to " + v.name + " goes to the function's own first local, not the object: it is at offset 0 "
-                         "of the object's variables and the VM negates that offset to 0 (declare it after another, or drop "
-                         "//@raw_object_vars)");
+            warning(loc, l10n::format(NOX_TR("editor.script.compile.object_offset_zero",
+                                             "a store to {name} goes to the function's own first local, not the object: it is at offset 0 "
+                                             "of the object's variables and the VM negates that offset to 0 (declare it after another, or drop "
+                                             "//@raw_object_vars)"),
+                                      {{"name", v.name}}));
         }
     }
 
@@ -1499,9 +1512,12 @@ private:
     void lintBuiltStringInGlobal(const Expr& value, const std::string& name, SourceLoc loc)
     {
         if (lint_ && builtString(value)) {
-            const std::string what = name.starts_with("object.") ? "the object variable " + name : "the global " + name;
-            warning(loc, "a built string kept in " + what + ": the game drops it at the end of the next handler "
-                         "and gives its id to the next string made, so " + name + " then reads another string (OB-201)");
+            const std::string what = name.starts_with("object.") ? l10n::format(NOX_TR("editor.script.compile.what_object_var", "the object variable {name}"), {{"name", name}})
+                                                                 : l10n::format(NOX_TR("editor.script.compile.what_global", "the global {name}"), {{"name", name}});
+            warning(loc, l10n::format(NOX_TR("editor.script.compile.built_string_global",
+                                             "a built string kept in {what}: the game drops it at the end of the next handler "
+                                             "and gives its id to the next string made, so {name} then reads another string (OB-201)"),
+                                      {{"what", what}, {"name", name}}));
         }
     }
 
@@ -1513,15 +1529,15 @@ private:
     Type assertCall(Expr& e, bool statement)
     {
         if (e.args.empty() || e.args.size() > 2) {
-            error(e.loc, "assert takes a condition and, optionally, a message (a string literal)");
+            error(e.loc, NOX_TR("editor.script.compile.assert_args", "assert takes a condition and, optionally, a message (a string literal)"));
             return Type::Void;
         }
         if (e.args.size() == 2 && e.args[1]->k != Expr::K::Str) {
-            error(e.args[1]->loc, "assert's message must be a string literal");
+            error(e.args[1]->loc, NOX_TR("editor.script.compile.assert_message", "assert's message must be a string literal"));
             return Type::Void;
         }
         if (!statement) {
-            error(e.loc, "assert is a statement, not a value");
+            error(e.loc, NOX_TR("editor.script.compile.assert_value", "assert is a statement, not a value"));
             return Type::Void;
         }
         condition(*e.args[0], "assert");
@@ -1579,23 +1595,25 @@ private:
     Type waitCall(Expr& e, bool statement)
     {
         if (!fn_ || !fn_->resume) {
-            error(e.loc, "Wait(frames) works only in a test: a void function named " + std::string(kTestPrefix) +
-                             "* with no arguments (the test runner calls it again after the frames)");
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.wait_not_test",
+                                             "Wait(frames) works only in a test: a void function named {prefix}* with no arguments (the test "
+                                             "runner calls it again after the frames)"),
+                                      {{"prefix", kTestPrefix}}));
             return Type::Void;
         }
         if (e.args.size() != 1) {
-            error(e.loc, "Wait takes one argument: the frames to wait (an int)");
+            error(e.loc, NOX_TR("editor.script.compile.wait_args", "Wait takes one argument: the frames to wait (an int)"));
             return Type::Void;
         }
         if (!statement) {
-            error(e.loc, "Wait is a statement, not a value");
+            error(e.loc, NOX_TR("editor.script.compile.wait_value", "Wait is a statement, not a value"));
             return Type::Void;
         }
         const auto k = static_cast<std::uint32_t>(++fn_->waits);
         emit(w(Op::LoadVarPtr), 0, *fn_->resume, w(Op::PushInt), k, w(Op::StoreInt));
         const Type t = expr(*e.args[0], Type::Int);
         if (t != Type::Int && t != Type::Void) {
-            error(e.args[0]->loc, "Wait's frames must be an int, not a " + std::string(typeName(t)));
+            error(e.args[0]->loc, l10n::format(NOX_TR("editor.script.compile.wait_type", "Wait's frames must be an int, not a {type}"), {{"type", typeName(t)}}));
         }
         emit(w(Op::PushInt), fn_->info->index, w(Op::CallBuiltin), *findBuiltin("FrameTimer"), w(Op::Return0));
         if (k <= fn_->resumeJumps.size()) {
@@ -1710,10 +1728,17 @@ private:
                 continue;
             }
             const std::string& name = st.debug.symbols.at(symbol).name;
-            warning(unset[b]->loc, "the local " + name + " in " + st.name + " is given a built string and can be read before this call "
-                                   "sets it" + (st.resume ? " (a Wait ends the call)" : "") + ": locals keep their values between calls, "
-                                   "and the game drops a built string at the end of the next handler and gives its id to the next "
-                                   "string made, so " + name + " then reads another string (OB-201)");
+            warning(unset[b]->loc, l10n::format(st.resume ? NOX_TR("editor.script.compile.built_string_local_wait",
+                                                                   "the local {name} in {function} is given a built string and can be read before this call "
+                                                                   "sets it (a Wait ends the call): locals keep their values between calls, "
+                                                                   "and the game drops a built string at the end of the next handler and gives its id to the next "
+                                                                   "string made, so {name} then reads another string (OB-201)")
+                                                            : NOX_TR("editor.script.compile.built_string_local",
+                                                                   "the local {name} in {function} is given a built string and can be read before this call "
+                                                                   "sets it: locals keep their values between calls, "
+                                                                   "and the game drops a built string at the end of the next handler and gives its id to the next "
+                                                                   "string made, so {name} then reads another string (OB-201)"),
+                                                {{"name", name}, {"function", st.name}}));
         }
     }
 
@@ -1735,25 +1760,25 @@ private:
     bool nameTaken(const std::string& name, SourceLoc loc, bool checkLocals)
     {
         if (Parser::isKeyword(name)) {
-            error(loc, "'" + name + "' is a keyword");
+            error(loc, l10n::format(NOX_TR("editor.script.compile.name_keyword", "'{name}' is a keyword"), {{"name", name}}));
             return true;
         }
         if (findBuiltin(name) && !isNewBuiltinName(name)) {
-            error(loc, "'" + name + "' is a builtin's name");
+            error(loc, l10n::format(NOX_TR("editor.script.compile.name_builtin", "'{name}' is a builtin's name"), {{"name", name}}));
             return true;
         }
         if (functions_.contains(name)) {
-            error(loc, "'" + name + "' is a function's name");
+            error(loc, l10n::format(NOX_TR("editor.script.compile.name_function", "'{name}' is a function's name"), {{"name", name}}));
             return true;
         }
         if (const auto it = globals_.find(name); it != globals_.end()) {
-            error(loc, it->second.readOnly ? "'" + name + "' is a name of the language" : "'" + name + "' is already a global variable");
+            error(loc, it->second.readOnly ? l10n::format(NOX_TR("editor.script.compile.name_language", "'{name}' is a name of the language"), {{"name", name}}) : l10n::format(NOX_TR("editor.script.compile.name_global", "'{name}' is already a global variable"), {{"name", name}}));
             return true;
         }
         if (checkLocals) {
             for (const auto& scope : scopes_) {
                 if (scope.contains(name)) {
-                    error(loc, "'" + name + "' is already declared in this function");
+                    error(loc, l10n::format(NOX_TR("editor.script.compile.name_local", "'{name}' is already declared in this function"), {{"name", name}}));
                     return true;
                 }
             }
@@ -1773,11 +1798,11 @@ private:
                 same = norm(f.params[i].type) == norm(it.params[i].type);
             }
             if (!same) {
-                error(it.loc, "the function " + it.name + " doesn't match its earlier declaration");
+                error(it.loc, l10n::format(NOX_TR("editor.script.compile.function_mismatch", "the function {name} doesn't match its earlier declaration"), {{"name", it.name}}));
             }
             if (it.k == TopItem::K::Function) {
                 if (f.defined) {
-                    error(it.loc, "the function " + it.name + " is defined twice");
+                    error(it.loc, l10n::format(NOX_TR("editor.script.compile.function_twice", "the function {name} is defined twice"), {{"name", it.name}}));
                 }
                 f.defined = true;
                 f.params = it.params;
@@ -1785,15 +1810,15 @@ private:
             return;
         }
         if (it.name == "GLOBAL") {
-            error(it.loc, "GLOBAL is the name of the script's own first two functions");
+            error(it.loc, NOX_TR("editor.script.compile.function_global", "GLOBAL is the name of the script's own first two functions"));
             return;
         }
         if (it.name.empty() || it.name.size() > 1023) {
-            error(it.loc, "a function's name must be 1 to 1023 bytes");
+            error(it.loc, NOX_TR("editor.script.compile.function_name_length", "a function's name must be 1 to 1023 bytes"));
             return;
         }
         if (!it.quoted && (Parser::isKeyword(it.name) || (findBuiltin(it.name) && !isNewBuiltinName(it.name)))) {
-            error(it.loc, "'" + it.name + "' is " + (findBuiltin(it.name) ? "a builtin's name" : "a keyword"));
+            error(it.loc, findBuiltin(it.name) ? l10n::format(NOX_TR("editor.script.compile.name_builtin", "'{name}' is a builtin's name"), {{"name", it.name}}) : l10n::format(NOX_TR("editor.script.compile.name_keyword", "'{name}' is a keyword"), {{"name", it.name}}));
             return;
         }
         FunctionInfo f;
@@ -1817,14 +1842,14 @@ private:
             // match; its initialiser runs where this declaration is.
             g = &found->second;
             if (g->type != type || g->size != size) {
-                error(it.loc, "the global " + it.name + " is declared again with another type");
+                error(it.loc, l10n::format(NOX_TR("editor.script.compile.global_redeclared", "the global {name} is declared again with another type"), {{"name", it.name}}));
                 return;
             }
             if (!it.init) {
                 return;
             }
             if (initialised_.contains(g->symbol)) {
-                error(it.loc, "the global " + it.name + " has two initialisers");
+                error(it.loc, l10n::format(NOX_TR("editor.script.compile.global_two_inits", "the global {name} has two initialisers"), {{"name", it.name}}));
                 return;
             }
         } else {
@@ -1851,7 +1876,7 @@ private:
         emit(w(Op::LoadVarPtr), 1, g->symbol);
         const Type t = expr(*it.init, type);
         if (t != type && t != Type::Void) {
-            error(it.init->loc, "can't initialise the " + std::string(typeName(type)) + " " + it.name + " with a " + std::string(typeName(t)));
+            error(it.init->loc, l10n::format(NOX_TR("editor.script.compile.init_type", "can't initialise the {type} {name} with a {other}"), {{"type", typeName(type)}, {"name", it.name}, {"other", typeName(t)}}));
         }
         emit(storeOp(type));
         if (type == Type::String) {
@@ -1942,25 +1967,25 @@ private:
         for (const auto& [at, label, loc] : st.gotos) {
             const auto l = st.labels.find(label);
             if (l == st.labels.end()) {
-                error(loc, "no label " + label + " in " + it.name);
+                error(loc, l10n::format(NOX_TR("editor.script.compile.no_label", "no label {label} in {function}"), {{"label", label}, {"function", it.name}}));
                 continue;
             }
             code[at] = l->second.first;
         }
         for (const auto& [label, where] : st.labels) {
             if (!st.usedLabels.contains(label)) {
-                warning(where.second, "the label " + label + " is never used");
+                warning(where.second, l10n::format(NOX_TR("editor.script.compile.label_unused", "the label {label} is never used"), {{"label", label}}));
             }
         }
         if (info.returns != Type::Void && !returnsValue_) {
-            warning(it.loc, "the function " + it.name + " never returns a value");
+            warning(it.loc, l10n::format(NOX_TR("editor.script.compile.never_returns", "the function {name} never returns a value"), {{"name", it.name}}));
         }
         if (lint_) {
             // Locals (not the arguments, nor a switch's temporary) that nothing reads.
             for (std::size_t i = it.params.size(); i < st.debug.symbols.size(); ++i) {
                 const DebugVar& v = st.debug.symbols[i];
                 if (!v.name.empty() && !st.reads.contains(v.symbol)) {
-                    warning(v.loc, "the local " + v.name + " in " + it.name + " is never read");
+                    warning(v.loc, l10n::format(NOX_TR("editor.script.compile.local_unread", "the local {name} in {function} is never read"), {{"name", v.name}, {"function", it.name}}));
                 }
             }
             lintBuiltStringInLocals(st, code, it.params.size());
@@ -2023,7 +2048,7 @@ private:
                 emit(w(Op::LoadVarPtr), 0, symbol);
                 const Type t = expr(*s.e, type);
                 if (t != type && t != Type::Void) {
-                    error(s.e->loc, "can't initialise the " + std::string(typeName(type)) + " " + s.name + " with a " + std::string(typeName(t)));
+                    error(s.e->loc, l10n::format(NOX_TR("editor.script.compile.init_type", "can't initialise the {type} {name} with a {other}"), {{"type", typeName(type)}, {"name", s.name}, {"other", typeName(t)}}));
                 }
                 if (type == Type::String && !s.arraySize) {
                     noteStringUse(lookup(s.name), here(), true, s.loc);
@@ -2101,7 +2126,7 @@ private:
             break;
         case Stmt::K::Case:
         case Stmt::K::Default:
-            error(s.loc, std::string(s.k == Stmt::K::Case ? "case" : "default") + " outside a switch's own block");
+            error(s.loc, l10n::format(NOX_TR("editor.script.compile.case_outside_switch", "{label} outside a switch's own block"), {{"label", s.k == Stmt::K::Case ? "case" : "default"}}));
             break;
         case Stmt::K::Break:
         case Stmt::K::Continue: {
@@ -2114,7 +2139,7 @@ private:
                 }
             }
             if (!target) {
-                error(s.loc, isBreak ? "break outside a loop or switch" : "continue outside a loop");
+                error(s.loc, isBreak ? NOX_TR("editor.script.compile.break_outside", "break outside a loop or switch") : NOX_TR("editor.script.compile.continue_outside", "continue outside a loop"));
                 break;
             }
             emit(w(Op::Jump), 0);
@@ -2126,13 +2151,13 @@ private:
             if (s.e) {
                 const Type t = expr(*s.e, want);
                 if (want == Type::Void) {
-                    error(s.loc, "the void function " + fn_->name + " can't return a value");
+                    error(s.loc, l10n::format(NOX_TR("editor.script.compile.void_returns", "the void function {name} can't return a value"), {{"name", fn_->name}}));
                 } else if (t != want && t != Type::Void) {
-                    error(s.e->loc, "the function " + fn_->name + " returns " + std::string(typeName(want)) + ", not " + std::string(typeName(t)));
+                    error(s.e->loc, l10n::format(NOX_TR("editor.script.compile.return_type", "the function {name} returns {type}, not {other}"), {{"name", fn_->name}, {"type", typeName(want)}, {"other", typeName(t)}}));
                 }
                 returnsValue_ = true;
             } else if (want != Type::Void) {
-                error(s.loc, "the function " + fn_->name + " must return a " + std::string(typeName(want)));
+                error(s.loc, l10n::format(NOX_TR("editor.script.compile.must_return", "the function {name} must return a {type}"), {{"name", fn_->name}, {"type", typeName(want)}}));
             }
             emit(w(Op::Return0));
             break;
@@ -2151,7 +2176,7 @@ private:
             break;
         case Stmt::K::Label:
             if (fn_->labels.contains(s.name)) {
-                error(s.loc, "the label " + s.name + " is defined twice");
+                error(s.loc, l10n::format(NOX_TR("editor.script.compile.label_twice", "the label {label} is defined twice"), {{"label", s.name}}));
             } else {
                 fn_->labels.emplace(s.name, std::make_pair(here(), s.loc));
             }
@@ -2199,7 +2224,7 @@ private:
             emit(w(Op::StoreInt));
         }
         if (t != Type::Int && t != Type::Object && t != Type::Void) {
-            error(s.e->loc, "a switch's value must be an int, not a " + std::string(typeName(t)));
+            error(s.e->loc, l10n::format(NOX_TR("editor.script.compile.switch_type", "a switch's value must be an int, not a {type}"), {{"type", typeName(t)}}));
         }
         std::vector<Stmt*> labels;
         for (auto& b : s.s1->body) {
@@ -2213,7 +2238,7 @@ private:
         for (std::size_t i = 0; i < labels.size(); ++i) {
             if (labels[i]->k == Stmt::K::Default) {
                 if (++defaults > 1) {
-                    error(labels[i]->loc, "a switch with two defaults");
+                    error(labels[i]->loc, NOX_TR("editor.script.compile.switch_two_defaults", "a switch with two defaults"));
                 }
                 defaultLabel = i;
                 caseJumps.push_back(0);
@@ -2228,7 +2253,7 @@ private:
             }
             const Type ct = expr(*labels[i]->e, Type::Int);
             if (ct != t && ct != Type::Void) {
-                error(labels[i]->e->loc, "the case is a " + std::string(typeName(ct)) + ", the switch's value a " + std::string(typeName(t)));
+                error(labels[i]->e->loc, l10n::format(NOX_TR("editor.script.compile.case_type", "the case is a {type}, the switch's value a {other}"), {{"type", typeName(ct)}, {"other", typeName(t)}}));
             }
             emit(w(Op::IntEq), w(Op::JumpIf), 0);
             caseJumps.push_back(here() - 1);
@@ -2278,7 +2303,7 @@ private:
     {
         const Type t = expr(e, Type::Int);
         if (t != Type::Int && t != Type::Void) {
-            error(e.loc, std::string(what) + "'s condition must be an int, not a " + std::string(typeName(t)));
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.condition_type", "{what}'s condition must be an int, not a {type}"), {{"what", what}, {"type", typeName(t)}}));
         }
     }
 
@@ -2334,7 +2359,7 @@ private:
                 // A function argument naming its function by a string literal.
                 const auto f = functions_.find(e.text);
                 if (f == functions_.end()) {
-                    error(e.loc, "no function named \"" + e.text + "\"");
+                    error(e.loc, l10n::format(NOX_TR("editor.script.compile.no_function_quoted", "no function named \"{name}\""), {{"name", e.text}}));
                     return Type::Void;
                 }
                 functionArgument(f->first, f->second, e.loc);
@@ -2352,14 +2377,14 @@ private:
                         emit(w(Op::PushInt), f->second.index);
                         return Type::Function;
                     }
-                    error(e.loc, "the function " + e.text + " is used as a value (only a builtin's function argument takes one)");
+                    error(e.loc, l10n::format(NOX_TR("editor.script.compile.function_as_value", "the function {name} is used as a value (only a builtin's function argument takes one)"), {{"name", e.text}}));
                     return Type::Void;
                 }
-                error(e.loc, findBuiltin(e.text) ? "the builtin " + e.text + " needs ( ) to be called" : "no variable or function named " + e.text);
+                error(e.loc, findBuiltin(e.text) ? l10n::format(NOX_TR("editor.script.compile.builtin_needs_call", "the builtin {name} needs ( ) to be called"), {{"name", e.text}}) : l10n::format(NOX_TR("editor.script.compile.no_variable_or_function", "no variable or function named {name}"), {{"name", e.text}}));
                 return Type::Void;
             }
             if (v.size > 1) {
-                error(e.loc, "the array " + e.text + " must be indexed");
+                error(e.loc, l10n::format(NOX_TR("editor.script.compile.array_unindexed", "the array {name} must be indexed"), {{"name", e.text}}));
                 return Type::Void;
             }
             markRead(v);
@@ -2374,7 +2399,7 @@ private:
                 return Type::Void;
             }
             if (v.size > 1) {
-                error(e.loc, "the array " + v.name + " must be indexed");
+                error(e.loc, l10n::format(NOX_TR("editor.script.compile.array_unindexed", "the array {name} must be indexed"), {{"name", v.name}}));
                 return Type::Void;
             }
             markRead(v);
@@ -2384,7 +2409,7 @@ private:
         case Expr::K::Index: {
             const Expr& base = *e.args[0];
             if (base.k != Expr::K::Name && base.k != Expr::K::ObjVar) {
-                error(e.loc, "only an array variable can be indexed");
+                error(e.loc, NOX_TR("editor.script.compile.index_non_array", "only an array variable can be indexed"));
                 return Type::Void;
             }
             const VarRef v = base.k == Expr::K::ObjVar ? objectRef(base) : lookup(base.text);
@@ -2392,7 +2417,7 @@ private:
                 return Type::Void;
             }
             if (!v.found || v.size <= 1) {
-                error(base.loc, v.found ? v.name + " isn't an array" : "no variable named " + base.text);
+                error(base.loc, v.found ? l10n::format(NOX_TR("editor.script.compile.not_array", "{name} isn't an array"), {{"name", v.name}}) : l10n::format(NOX_TR("editor.script.compile.no_variable", "no variable named {name}"), {{"name", base.text}}));
                 return Type::Void;
             }
             markRead(v);
@@ -2407,8 +2432,10 @@ private:
                 return v.type;
             }
             if (v.object) {
-                warning(e.loc, "reading an element of " + v.name + " with //@raw_object_vars: the VM's IndexInt reads below the "
-                               "object's variables there, so this reads 0 (drop the flag to read it)");
+                warning(e.loc, l10n::format(NOX_TR("editor.script.compile.raw_object_index",
+                                                   "reading an element of {name} with //@raw_object_vars: the VM's IndexInt reads below the "
+                                                   "object's variables there, so this reads 0 (drop the flag to read it)"),
+                                            {{"name", v.name}}));
             }
             emit(w(v.type == Type::Float ? Op::IndexFloat : Op::IndexInt));
             return v.type;
@@ -2422,7 +2449,7 @@ private:
             }
             if (e.text == "+") {
                 if (t != Type::Int && t != Type::Float) {
-                    error(e.loc, "unary + needs an int or a float");
+                    error(e.loc, NOX_TR("editor.script.compile.unary_plus", "unary + needs an int or a float"));
                 }
                 return t;
             }
@@ -2432,12 +2459,12 @@ private:
                 } else if (t == Type::Float) {
                     emit(w(Op::FloatNeg));
                 } else {
-                    error(e.loc, "can't negate a " + std::string(typeName(t)));
+                    error(e.loc, l10n::format(NOX_TR("editor.script.compile.negate_type", "can't negate a {type}"), {{"type", typeName(t)}}));
                 }
                 return t;
             }
             if (t != Type::Int) {
-                error(e.loc, "'" + e.text + "' needs an int, not a " + std::string(typeName(t)));
+                error(e.loc, l10n::format(NOX_TR("editor.script.compile.unary_type", "'{op}' needs an int, not a {type}"), {{"op", e.text}, {"type", typeName(t)}}));
             }
             emit(w(e.text == "!" ? Op::BoolNot : Op::IntNot));
             return Type::Int;
@@ -2454,7 +2481,7 @@ private:
     {
         const Type t = expr(e, Type::Int);
         if (t != Type::Int && t != Type::Void) {
-            error(e.loc, "an array index must be an int, not a " + std::string(typeName(t)));
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.index_type", "an array index must be an int, not a {type}"), {{"type", typeName(t)}}));
         }
     }
 
@@ -2468,9 +2495,9 @@ private:
         const std::string& op = e.text;
         const auto bad = [&] {
             if (l != r) {
-                error(e.loc, "the operands of '" + op + "' are a " + std::string(typeName(l)) + " and a " + std::string(typeName(r)));
+                error(e.loc, l10n::format(NOX_TR("editor.script.compile.operand_types", "the operands of '{op}' are a {left} and a {right}"), {{"op", op}, {"left", typeName(l)}, {"right", typeName(r)}}));
             } else {
-                error(e.loc, "'" + op + "' doesn't work on " + std::string(typeName(l)) + "s");
+                error(e.loc, l10n::format(NOX_TR("editor.script.compile.operator_type", "'{op}' doesn't work on {type}s"), {{"op", op}, {"type", typeName(l)}}));
             }
             return Type::Void;
         };
@@ -2508,15 +2535,15 @@ private:
             name = lhs.text;
             v = lookup(name);
             if (!v.found) {
-                error(lhs.loc, "no variable named " + name);
+                error(lhs.loc, l10n::format(NOX_TR("editor.script.compile.no_variable", "no variable named {name}"), {{"name", name}}));
                 return Type::Void;
             }
             if (v.size > 1) {
-                error(lhs.loc, "the array " + name + " must be indexed");
+                error(lhs.loc, l10n::format(NOX_TR("editor.script.compile.array_unindexed", "the array {name} must be indexed"), {{"name", name}}));
                 return Type::Void;
             }
             if (v.readOnly) {
-                error(lhs.loc, "can't assign to " + name);
+                error(lhs.loc, l10n::format(NOX_TR("editor.script.compile.assign_read_only", "can't assign to {name}"), {{"name", name}}));
                 return Type::Void;
             }
             emit(w(Op::LoadVarPtr), v.global ? 1 : 0, v.symbol);
@@ -2527,7 +2554,7 @@ private:
             }
             name = v.name;
             if (v.size > 1) {
-                error(lhs.loc, "the array " + name + " must be indexed");
+                error(lhs.loc, l10n::format(NOX_TR("editor.script.compile.array_unindexed", "the array {name} must be indexed"), {{"name", name}}));
                 return Type::Void;
             }
             warnOffsetZero(v, lhs.loc);
@@ -2540,7 +2567,7 @@ private:
             }
             name = object ? v.name : lhs.args[0]->text;
             if (!v.found || v.size <= 1) {
-                error(lhs.loc, v.found ? name + " isn't an array" : "no variable named " + name);
+                error(lhs.loc, v.found ? l10n::format(NOX_TR("editor.script.compile.not_array", "{name} isn't an array"), {{"name", name}}) : l10n::format(NOX_TR("editor.script.compile.no_variable", "no variable named {name}"), {{"name", name}}));
                 return Type::Void;
             }
             warnOffsetZero(v, lhs.loc);
@@ -2548,7 +2575,7 @@ private:
             index(*lhs.args[1]);
             emit(w(Op::IndexPtr));
         } else {
-            error(lhs.loc, "can only assign to a variable or an array element");
+            error(lhs.loc, NOX_TR("editor.script.compile.assign_target", "can only assign to a variable or an array element"));
             return Type::Void;
         }
         const Type t = v.type;
@@ -2557,7 +2584,7 @@ private:
             return Type::Void;
         }
         if (r != t) {
-            error(e.loc, "can't assign a " + std::string(typeName(r)) + " to the " + std::string(typeName(t)) + " " + name);
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.assign_type", "can't assign a {other} to the {type} {name}"), {{"other", typeName(r)}, {"type", typeName(t)}, {"name", name}}));
             return Type::Void;
         }
         const std::string& op = e.text;
@@ -2569,7 +2596,7 @@ private:
             o = t == Type::Int ? row->i : t == Type::Float ? row->f : t == Type::String ? row->s : detail::kNoOp;
         }
         if (o == detail::kNoOp) {
-            error(e.loc, "'" + op + "' doesn't work on " + std::string(typeName(t)) + "s");
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.operator_type", "'{op}' doesn't work on {type}s"), {{"op", op}, {"type", typeName(t)}}));
             return Type::Void;
         }
         if ((v.global || v.object) && t == Type::String) {
@@ -2608,9 +2635,11 @@ private:
             }
         }
         if (lint_ && f.returns != Type::Void && currentBuiltin_ != *findBuiltin("SetCallback")) {
-            warning(loc, "the function " + name + " returns a value: the game calls a timer's or a dialog's function without "
-                         "taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; "
-                         "NoX Core drops it); declare it void");
+            warning(loc, l10n::format(NOX_TR("editor.script.compile.callback_returns",
+                                             "the function {name} returns a value: the game calls a timer's or a dialog's function without "
+                                             "taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; "
+                                             "NoX Core drops it); declare it void"),
+                                      {{"name", name}}));
         }
     }
 
@@ -2626,16 +2655,21 @@ private:
         }
         const std::size_t n = f.params.size();
         if (withArg && n == 0) {
-            warning(loc, builtin + " gives " + name + " an argument, but " + name + " takes none: the game passes a timer's "
-                         "argument only to a function that has one, so the value is lost (use " +
-                             builtin.substr(0, builtin.size() - 7) + ", or give " + name + " a parameter)");
+            warning(loc, l10n::format(NOX_TR("editor.script.compile.timer_arg_lost",
+                                             "{builtin} gives {name} an argument, but {name} takes none: the game passes a timer's "
+                                             "argument only to a function that has one, so the value is lost (use {plain}, or give {name} a parameter)"),
+                                      {{"builtin", builtin}, {"name", name}, {"plain", builtin.substr(0, builtin.size() - 7)}}));
         } else if (!withArg && n > 0) {
-            warning(loc, name + " takes " + (n == 1 ? std::string("an argument") : std::to_string(n) + " arguments") + ", but " + builtin +
-                             " gives it none: " + f.params[0].name + " reads 0" + (n > 1 ? " and the rest whatever is on the stack" : "") +
-                             " (use " + builtin + "WithArg)");
+            warning(loc, l10n::format(n == 1 ? NOX_TR("editor.script.compile.timer_no_arg_one",
+                                                      "{name} takes an argument, but {builtin} gives it none: {param} reads 0 (use {builtin}WithArg)")
+                                             : NOX_TR("editor.script.compile.timer_no_arg_many",
+                                                      "{name} takes {n} arguments, but {builtin} gives it none: {param} reads 0 and the rest "
+                                                      "whatever is on the stack (use {builtin}WithArg)"),
+                                      {{"name", name}, {"n", n}, {"builtin", builtin}, {"param", f.params[0].name}}));
         } else if (withArg && n > 1) {
-            warning(loc, name + " takes " + std::to_string(n) + " arguments, but " + builtin + " gives it one: the rest read whatever is "
-                         "on the stack");
+            warning(loc, l10n::format(NOX_TR("editor.script.compile.timer_one_arg",
+                                             "{name} takes {n} arguments, but {builtin} gives it one: the rest read whatever is on the stack"),
+                                      {{"name", name}, {"n", n}, {"builtin", builtin}}));
         }
     }
 
@@ -2696,11 +2730,12 @@ private:
                 callees_[fn_->name].push_back(f->first);
             }
         } else {
-            error(e.loc, lookup(e.text).found ? e.text + " is a variable, not a function" : "no function named " + e.text);
+            error(e.loc, lookup(e.text).found ? l10n::format(NOX_TR("editor.script.compile.variable_not_function", "{name} is a variable, not a function"), {{"name", e.text}}) : l10n::format(NOX_TR("editor.script.compile.no_function", "no function named {name}"), {{"name", e.text}}));
             return Type::Void;
         }
         if (e.args.size() != want.size()) {
-            error(e.loc, e.text + " takes " + std::to_string(want.size()) + " argument" + (want.size() == 1 ? "" : "s") + ", not " + std::to_string(e.args.size()));
+            error(e.loc, l10n::format(NOX_TRP("editor.script.compile.arg_count", "{name} takes {n} argument, not {got}", "{name} takes {n} arguments, not {got}", want.size()),
+                                      {{"name", e.text}, {"n", want.size()}, {"got", e.args.size()}}));
             return Type::Void;
         }
         if (builtin && argValues_) {
@@ -2716,15 +2751,17 @@ private:
                 continue;
             }
             if (t != want[i]) {
-                error(e.args[i]->loc, e.text + "'s argument " + std::to_string(i + 1) + " is a " + std::string(typeName(want[i])) +
-                                          (want[i] == Type::Function ? " (a function's name)" : "") + ", not a " + std::string(typeName(t)));
+                error(e.args[i]->loc, l10n::format(want[i] == Type::Function
+                                                       ? NOX_TR("editor.script.compile.arg_type_function", "{name}'s argument {n} is a {type} (a function's name), not a {other}")
+                                                       : NOX_TR("editor.script.compile.arg_type", "{name}'s argument {n} is a {type}, not a {other}"),
+                                                   {{"name", e.text}, {"n", i + 1}, {"type", typeName(want[i])}, {"other", typeName(t)}}));
                 ok = false;
             }
         }
         currentBuiltin_ = outerBuiltin;
         emit(callOp, operand);
         if (returns == Type::Void && !statement) {
-            error(e.loc, e.text + " doesn't return a value");
+            error(e.loc, l10n::format(NOX_TR("editor.script.compile.no_value", "{name} doesn't return a value"), {{"name", e.text}}));
             return Type::Void;
         }
         return ok ? returns : Type::Void;
@@ -2793,7 +2830,7 @@ CompileResult compile(std::string_view source, const CompileOptions& options)
         } else if (f.name == "raw_object_vars") {
             rawObjectVars = true;
         } else {
-            result.diagnostics.push_back({Diagnostic::Severity::Warning, f.loc, "unknown compile flag //@" + f.name});
+            result.diagnostics.push_back({Diagnostic::Severity::Warning, f.loc, l10n::format(NOX_TR("editor.script.compile.unknown_flag", "unknown compile flag //@{name}"), {{"name", f.name}})});
         }
     }
     auto items = Parser(std::move(tokens), result.diagnostics).program();

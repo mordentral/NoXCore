@@ -67,6 +67,7 @@ add_library(noxcore
     src/mapedit/mod_files.cpp
     src/mapedit/new_map.cpp
     src/mapedit/object_edit.cpp
+    src/mapedit/op_label.cpp
     src/mapedit/ops.cpp
     src/mapedit/paint.cpp
     src/mapedit/pending.cpp
@@ -166,6 +167,8 @@ add_library(noxcore
     src/server/update_writer.cpp
     src/server/world.cpp
     src/server/xfer.cpp
+    src/strings/csf_language.cpp
+    src/strings/l10n.cpp
     src/strings/string_table.cpp
     src/things/draw.cpp
     src/things/field_guide.cpp

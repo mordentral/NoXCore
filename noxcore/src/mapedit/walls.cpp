@@ -1,7 +1,9 @@
 // The wall tool's rules (walls.hpp).
 #include "noxcore/mapedit/walls.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "noxcore/mapedit/selection.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
@@ -376,8 +378,9 @@ Op placeWallsOp(const MapDocument& doc, const things::ThingDb& things, const std
             }
         }
     }
-    const std::string name = brush.material < things.walls.size() ? things.walls[brush.material].name : "wall";
-    return opFrom(doc, plan.changes, "Place " + std::to_string(placed.size()) + (placed.size() == 1 ? " wall (" : " walls (") + name + ")");
+    const std::string name = brush.material < things.walls.size() ? things.walls[brush.material].name : opLabel(oplabels::kWallUnnamed);
+    return opFrom(doc, plan.changes,
+                  opLabel(oplabels::kPlaceWalls, {{"n", placed.size()}, {"name", name}}));
 }
 
 Op removeWallsOp(const MapDocument& doc, const things::ThingDb& things, const std::vector<Cell>& cells, bool refaceNeighbours)
@@ -412,7 +415,7 @@ Op removeWallsOp(const MapDocument& doc, const things::ThingDb& things, const st
             }
         }
     }
-    return opFrom(doc, plan.changes, "Remove " + std::to_string(removed.size()) + (removed.size() == 1 ? " wall" : " walls"));
+    return opFrom(doc, plan.changes, opLabel(oplabels::kRemoveWalls, {{"n", removed.size()}}));
 }
 
 Op setWallsOp(const MapDocument& doc, const things::ThingDb& things, const std::map<Cell, WallState>& states, std::string label)

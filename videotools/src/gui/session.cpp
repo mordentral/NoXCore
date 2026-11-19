@@ -2,6 +2,8 @@
 
 #include "editor/insert.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -16,7 +18,6 @@ namespace videotools::gui {
 namespace {
 
 constexpr SDL_DialogFileFilter kBagFilter[] = {{"video.bag", "bag"}};
-constexpr SDL_DialogFileFilter kPackFilter[] = {{"Image pack", "nxp"}};
 
 std::string crcText(std::uint32_t crc)
 {
@@ -24,6 +25,12 @@ std::string crcText(std::uint32_t crc)
 }
 
 } // namespace
+
+const SDL_DialogFileFilter* packFileFilter()
+{
+    static const SDL_DialogFileFilter filter[] = {{NOX_TRC("content.dialog.image_pack_filter", "Image pack"), "nxp"}};
+    return filter;
+}
 
 fs::path pathFromUtf8(const std::string& s) { return fs::path(std::u8string(s.begin(), s.end())); }
 
@@ -63,7 +70,7 @@ void loadSettings(const fs::path& file, Settings& s)
         } else if (key == "zoom") {
             number(s.zoom, 1, 16);
         } else if (key == "background") {
-            number(s.background, 0, int(std::size(kBackgrounds)) - 1);
+            number(s.background, 0, kBackgroundCount - 1);
         } else if (key == "speed") {
             number(s.speed, 0, 4);
         } else if (key == "compare") {
@@ -204,7 +211,7 @@ void Session::openPack(const fs::path& path)
             pack_ = std::make_unique<editor::PackDocument>(path);
         } catch (const std::exception& ex) {
             pack_.reset();
-            error(std::format("Couldn't open the pack {}: {}", utf8(path), ex.what()));
+            error(nox::l10n::format(NOX_TR("content.session.cant_open_pack", "Couldn't open the pack {file}: {error}"), {{"file", utf8(path)}, {"error", ex.what()}}));
             return;
         }
         encode_.bc7 = pack_->hasBc7();
@@ -231,9 +238,15 @@ void Session::openPack(const fs::path& path)
         l.material = std::move(img->material);
         l.edgeMask = !img->edgeMask.empty();
         if (const auto* e = pack_->entry(std::uint32_t(index))) {
-            static constexpr const char* kCodecs[] = {"stored", "zstd", "zstd + gradient", "BC7"};
-            l.extra = std::format("{}{}", e->codec < 4 ? kCodecs[e->codec] : "?",
-                                  e->codec == nox::video::kCodecBc7 ? std::format(", {} mip levels", e->levels) : "");
+            const char* codec = e->codec == 0   ? NOX_TRC("content.session.codec_stored", "stored")
+                                : e->codec == 1 ? "zstd"
+                                : e->codec == 2 ? NOX_TRC("content.session.codec_gradient", "zstd + gradient")
+                                : e->codec == 3 ? "BC7"
+                                                : "?";
+            l.extra = std::format("{}{}", codec,
+                                  e->codec == nox::video::kCodecBc7
+                                      ? nox::l10n::format(NOX_TR("content.session.mip_levels", ", {n} mip levels"), {{"n", e->levels}})
+                                      : std::string());
         }
         return l;
     });
@@ -248,7 +261,7 @@ void Session::newPack()
     pack_ = std::make_unique<editor::PackDocument>(std::uint32_t(bag_->size()), std::uint32_t(bag_->size()), bagIdxCrc_);
     encode_.bc7 = true;
     openPack({});
-    setStatus("New empty image pack: put HD images in and save it as a new file");
+    setStatus(NOX_TR("content.session.new_pack", "New empty image pack: put HD images in and save it as a new file"));
 }
 
 void Session::closePack()
@@ -297,10 +310,12 @@ void Session::replaceBag(std::int32_t index, const editor::ImageFile& file)
             log(std::format("#{}: {}", index, w));
         }
         changed(index);
-        setStatus(std::format("#{}: video.bag image replaced from {}{}", index, utf8(file.png.filename()),
-                              bag_->edited(index) ? "" : " (the same as the original: no change)"));
+        setStatus(nox::l10n::format(bag_->edited(index) ? NOX_TR("content.session.bag_replaced", "#{index}: video.bag image replaced from {file}")
+                                                        : NOX_TR("content.session.bag_replaced_same", "#{index}: video.bag image replaced from {file} (the same as the original: no change)"),
+                                      {{"index", index}, {"file", utf8(file.png.filename())}}));
     } catch (const std::exception& ex) {
-        error(std::format("Couldn't put {} into video.bag #{}: {}", utf8(file.png.filename()), index, ex.what()));
+        error(nox::l10n::format(NOX_TR("content.session.cant_put_bag", "Couldn't put {file} into video.bag #{index}: {error}"),
+                                {{"file", utf8(file.png.filename())}, {"index", index}, {"error", ex.what()}}));
     }
 }
 
@@ -322,7 +337,8 @@ void Session::removePack(const std::vector<std::int32_t>& indexes)
             ++n;
         }
     }
-    setStatus(std::format("Removed {} HD image{} from the pack (saved with it)", n, n == 1 ? "" : "s"));
+    setStatus(nox::l10n::format(NOX_TRP("content.session.removed_hd", "Removed {n} HD image from the pack (saved with it)", "Removed {n} HD images from the pack (saved with it)", n),
+                                  {{"n", n}}));
 }
 
 void Session::revert(const std::vector<std::int32_t>& indexes)
@@ -339,7 +355,7 @@ void Session::revert(const std::vector<std::int32_t>& indexes)
         }
         changed(i);
     }
-    setStatus(std::format("Reverted {} edit{}", n, n == 1 ? "" : "s"));
+    setStatus(nox::l10n::format(NOX_TRP("content.session.reverted", "Reverted {n} edit", "Reverted {n} edits", n), {{"n", n}}));
 }
 
 void Session::queueInserts(std::vector<InsertTask> tasks)
@@ -383,17 +399,17 @@ void Session::pumpInserts()
             std::vector<std::string> warnings;
             if (t.target == editor::Target::Bag) {
                 if (!bag_) {
-                    throw std::runtime_error("no video.bag open");
+                    throw std::runtime_error(NOX_TR("content.session.no_bag_open", "no video.bag open"));
                 }
                 bag_->replace(t.index, editor::bagImageForSlot(t.file, t.index, *bag_, warnings));
                 changed(t.index);
                 ++insertDone_;
             } else {
                 if (!pack_) {
-                    throw std::runtime_error("an HD image, but no pack is open (open one or make a new one)");
+                    throw std::runtime_error(NOX_TR("content.session.no_pack_open", "an HD image, but no pack is open (open one or make a new one)"));
                 }
                 if (!bag_) {
-                    throw std::runtime_error("no video.bag open");
+                    throw std::runtime_error(NOX_TR("content.session.no_bag_open", "no video.bag open"));
                 }
                 auto image = std::make_shared<const nox::video::PackImage>(
                     editor::packImageForSlot(t.file, t.index, *bag_, *pack_, warnings));
@@ -411,8 +427,8 @@ void Session::pumpInserts()
         }
     }
     if (insertQueue_.empty() && encoding_.empty() && (insertDone_ || insertFailed_)) {
-        setStatus(std::format("Put in {} image{}{}", insertDone_, insertDone_ == 1 ? "" : "s",
-                              insertFailed_ ? std::format(", {} failed (see Messages)", insertFailed_) : std::string()));
+        setStatus(nox::l10n::format(NOX_TRP("content.session.put_in", "Put in {n} image", "Put in {n} images", insertDone_), {{"n", insertDone_}}) +
+                  (insertFailed_ ? nox::l10n::format(NOX_TR("content.session.put_in_failed", ", {n} failed (see Messages)"), {{"n", insertFailed_}}) : std::string()));
         insertDone_ = insertFailed_ = 0;
     }
 }
@@ -438,7 +454,7 @@ void Session::chosenBagTarget(const fs::path& chosen)
     for (const auto& target : {bagPath, idxPath}) {
         const std::string why = editor::checkSaveTarget(target, sources(), {gameDir_});
         if (!why.empty()) {
-            error("Not saved: " + why);
+            error(nox::l10n::format(NOX_TR("content.common.not_saved", "Not saved: {why}"), {{"why", why}}));
             return;
         }
     }
@@ -448,23 +464,25 @@ void Session::chosenBagTarget(const fs::path& chosen)
         const auto paths = paths_;
         auto crc = std::make_shared<std::uint32_t>(0);
         startJob(
-            "Saving " + utf8(bagPath.filename()), bagPath.parent_path(), bag_->bag().segments().size(),
+            nox::l10n::format(NOX_TR("content.session.saving", "Saving {file}"), {{"file", utf8(bagPath.filename())}}), bagPath.parent_path(), bag_->bag().segments().size(),
             [paths, edits, bagPath, crc](ExportProgress& p) {
                 const auto r = editor::BagDocument::save(paths, edits, bagPath, [&p](std::size_t done, std::size_t total) {
                     p.done = done;
                     p.total = total;
                 });
                 *crc = r.idxCrc;
-                return std::format("Saved {} and {}: {} image{} replaced ({} segments rebuilt, {} copied); video.idx CRC "
-                                   "{:08X}",
-                                   utf8(bagPath), utf8(editor::idxBeside(bagPath).filename()), r.imagesReplaced,
-                                   r.imagesReplaced == 1 ? "" : "s", r.segmentsRebuilt, r.segmentsCopied, r.idxCrc);
+                return nox::l10n::format(NOX_TRP("content.session.saved_bag",
+                                                 "Saved {bag} and {idx}: {n} image replaced ({rebuilt} segments rebuilt, {copied} copied); video.idx CRC {crc}",
+                                                 "Saved {bag} and {idx}: {n} images replaced ({rebuilt} segments rebuilt, {copied} copied); video.idx CRC {crc}",
+                                                 r.imagesReplaced),
+                                         {{"bag", utf8(bagPath)}, {"idx", utf8(editor::idxBeside(bagPath).filename())}, {"n", r.imagesReplaced},
+                                          {"rebuilt", r.segmentsRebuilt}, {"copied", r.segmentsCopied}, {"crc", std::format("{:08X}", r.idxCrc)}});
             },
             [this, crc] {
                 savedIdxCrc_ = *crc;
                 if (pack_ && pack_->sourceIdxCrc() != 0 && pack_->sourceIdxCrc() != *crc) {
-                    log("The saved video.idx differs from the one the pack was made for: NoX Core uses a pack only with "
-                        "its own video.idx. Save the pack too, stamped for the saved video.idx.");
+                    log(NOX_TR("content.session.idx_differs", "The saved video.idx differs from the one the pack was made for: NoX Core uses a pack only with "
+                                                              "its own video.idx. Save the pack too, stamped for the saved video.idx."));
                 }
             });
     };
@@ -475,7 +493,8 @@ void Session::chosenBagTarget(const fs::path& chosen)
         }
     }
     if (!exists.empty()) {
-        confirm("Overwrite?", "These files exist and will be replaced:" + exists, save);
+        confirm(NOX_TR("content.common.overwrite_title", "Overwrite?"),
+                nox::l10n::format(NOX_TR("content.common.files_exist", "These files exist and will be replaced:{files}"), {{"files", exists}}), save);
     } else {
         save();
     }
@@ -494,32 +513,39 @@ void Session::savePackAs()
 void Session::savePackOptions()
 {
     if (packOptionsOpen_) {
-        ImGui::OpenPopup("Save the image pack");
+        ImGui::OpenPopup(NOX_TRI("content.session.save_pack_title", "Save the image pack"));
         packOptionsOpen_ = false;
     }
-    if (!ImGui::BeginPopupModal("Save the image pack", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(NOX_TRI("content.session.save_pack_title", "Save the image pack"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
-    ImGui::TextUnformatted("NoX Core uses a pack only with the video.idx it was made for. Stamp it for:");
-    ImGui::RadioButton(std::format("the video.idx it was made for ({})", crcText(pack_->sourceIdxCrc())).c_str(),
+    ImGui::TextUnformatted(NOX_TRC("content.session.stamp_for", "NoX Core uses a pack only with the video.idx it was made for. Stamp it for:"));
+    ImGui::RadioButton((nox::l10n::format(NOX_TR("content.session.stamp_made_for", "the video.idx it was made for ({crc})"), {{"crc", crcText(pack_->sourceIdxCrc())}}) +
+                        "###stampMadeFor")
+                           .c_str(),
                        &stampChoice_, 0);
-    ImGui::RadioButton(std::format("the open game folder's video.idx ({})", crcText(bagIdxCrc_)).c_str(), &stampChoice_, 1);
+    ImGui::RadioButton((nox::l10n::format(NOX_TR("content.session.stamp_open", "the open game folder's video.idx ({crc})"), {{"crc", crcText(bagIdxCrc_)}}) +
+                        "###stampOpen")
+                           .c_str(),
+                       &stampChoice_, 1);
     ImGui::BeginDisabled(!savedIdxCrc_);
-    ImGui::RadioButton(std::format("the video.bag saved last ({})", savedIdxCrc_ ? crcText(*savedIdxCrc_) : std::string("none yet"))
+    ImGui::RadioButton((nox::l10n::format(NOX_TR("content.session.stamp_saved", "the video.bag saved last ({crc})"),
+                                          {{"crc", savedIdxCrc_ ? crcText(*savedIdxCrc_) : NOX_TR("content.session.none_yet", "none yet")}}) +
+                        "###stampSaved")
                            .c_str(),
                        &stampChoice_, 2);
     ImGui::EndDisabled();
     if (!pack_->path().empty()) {
-        ImGui::Checkbox("Copy its animations sidecar (<pack>.animations.json) beside the new pack", &copySidecar_);
+        ImGui::Checkbox(NOX_TRI("content.session.copy_sidecar", "Copy its animations sidecar (<pack>.animations.json) beside the new pack"), &copySidecar_);
     }
     ImGui::Spacing();
-    if (ImGui::Button("Choose the file...")) {
+    if (ImGui::Button(NOX_TRI("content.session.choose_file", "Choose the file..."))) {
         const fs::path start = settings_.saveDir.empty() ? fs::path() : pathFromUtf8(settings_.saveDir) / "video_hd.nxp";
-        dialogs_.request(kDialogSavePack, Dialogs::Save, window_, utf8(start), kPackFilter, 1);
+        dialogs_.request(kDialogSavePack, Dialogs::Save, window_, utf8(start), packFileFilter(), 1);
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
+    if (ImGui::Button(NOX_TRI("content.common.cancel", "Cancel"))) {
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
@@ -533,7 +559,7 @@ void Session::chosenPackTarget(const fs::path& chosen)
     }
     const std::string why = editor::checkSaveTarget(out, sources(), {gameDir_});
     if (!why.empty()) {
-        error("Not saved: " + why);
+        error(nox::l10n::format(NOX_TR("content.common.not_saved", "Not saved: {why}"), {{"why", why}}));
         return;
     }
     settings_.saveDir = utf8(out.parent_path());
@@ -550,15 +576,16 @@ void Session::chosenPackTarget(const fs::path& chosen)
         const std::uint32_t images = pack_->sourceImages();
         const std::uint32_t crc = pack_->sourceIdxCrc();
         const auto edits = pack_->packEdits();
-        startJob("Saving " + utf8(out.filename()), out.parent_path(), slots,
+        startJob(nox::l10n::format(NOX_TR("content.session.saving", "Saving {file}"), {{"file", utf8(out.filename())}}), out.parent_path(), slots,
                  [=](ExportProgress& p) {
                      const auto r = editor::PackDocument::save(source, slots, images, crc, edits, out, options,
                                                                [&p](std::size_t done, std::size_t total) {
                                                                    p.done = done;
                                                                    p.total = total;
                                                                });
-                     return std::format("Saved {}: {} written, {} removed, {} copied as stored{}", utf8(out), r.written,
-                                        r.removed, r.copied, r.sidecarCopied ? ", animations sidecar copied" : "");
+                     return nox::l10n::format(NOX_TR("content.session.saved_pack", "Saved {file}: {written} written, {removed} removed, {copied} copied as stored"),
+                                              {{"file", utf8(out)}, {"written", r.written}, {"removed", r.removed}, {"copied", r.copied}}) +
+                            (r.sidecarCopied ? NOX_TR("content.session.sidecar_copied", ", animations sidecar copied") : std::string());
                  });
     };
     std::string exists;
@@ -570,7 +597,8 @@ void Session::chosenPackTarget(const fs::path& chosen)
         }
     }
     if (!exists.empty()) {
-        confirm("Overwrite?", "These files exist and will be replaced:" + exists, save);
+        confirm(NOX_TR("content.common.overwrite_title", "Overwrite?"),
+                nox::l10n::format(NOX_TR("content.common.files_exist", "These files exist and will be replaced:{files}"), {{"files", exists}}), save);
     } else {
         save();
     }
@@ -606,8 +634,8 @@ void Session::pollJob()
     }
     job_->thread.join();
     if (!job_->error.empty()) {
-        error(job_->label + " failed: " + job_->error);
-        setStatus(job_->label + " failed");
+        error(nox::l10n::format(NOX_TR("content.session.job_failed_because", "{job} failed: {error}"), {{"job", job_->label}, {"error", job_->error}}));
+        setStatus(nox::l10n::format(NOX_TR("content.session.job_failed", "{job} failed"), {{"job", job_->label}}));
     } else {
         setStatus(job_->message, job_->folder);
         log(job_->message);
@@ -641,7 +669,7 @@ void Session::error(std::string text)
 {
     errorText_ = std::move(text);
     errorOpen_ = true;
-    log("error: " + errorText_);
+    log(nox::l10n::format(NOX_TR("content.session.log_error", "error: {text}"), {{"text", errorText_}}));
 }
 
 void Session::confirm(std::string title, std::string text, std::function<void()> yes)
@@ -653,14 +681,14 @@ void Session::confirm(std::string title, std::string text, std::function<void()>
 void Session::popups()
 {
     if (errorOpen_) {
-        ImGui::OpenPopup("Problem");
+        ImGui::OpenPopup(NOX_TRI("content.session.problem_title", "Problem"));
         errorOpen_ = false;
     }
-    if (ImGui::BeginPopupModal("Problem", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(NOX_TRI("content.session.problem_title", "Problem"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40);
         ImGui::TextUnformatted(errorText_.c_str());
         ImGui::PopTextWrapPos();
-        if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        if (ImGui::Button(NOX_TRI("content.common.ok", "OK")) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -674,12 +702,12 @@ void Session::popups()
         ImGui::Spacing();
         bool close = false;
         std::function<void()> yes;
-        if (ImGui::Button("Yes")) {
+        if (ImGui::Button(NOX_TRI("content.common.yes", "Yes"))) {
             yes = question_->yes;
             close = true;
         }
         ImGui::SameLine();
-        if (ImGui::Button("No") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (ImGui::Button(NOX_TRI("content.common.no", "No")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             close = true;
         }
         if (close) {

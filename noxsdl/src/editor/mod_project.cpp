@@ -6,6 +6,7 @@
 #include "noxcore/mapedit/mod_files.hpp"
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/manifest.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -130,14 +131,15 @@ bool writeWhole(const fs::path& path, std::string_view text, std::string& error)
         std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
         out.write(text.data(), static_cast<std::streamsize>(text.size()));
         if (!out) {
-            error = "can't write " + u8text(path.filename());
+            error = nox::l10n::format(NOX_TR("editor.mod.project.cant_write", "can't write {file}"), {{"file", u8text(path.filename())}});
             fs::remove(tmp, ec);
             return false;
         }
     }
     fs::rename(tmp, path, ec);
     if (ec) {
-        error = "can't write " + u8text(path.filename()) + ": " + ec.message();
+        error = nox::l10n::format(NOX_TR("editor.mod.project.cant_write_why", "can't write {file}: {why}"),
+                                  {{"file", u8text(path.filename())}, {"why", ec.message()}});
         fs::remove(tmp, ec);
         return false;
     }
@@ -334,7 +336,7 @@ std::optional<ModProject> ModProject::open(const fs::path& folder, std::string& 
 {
     const auto text = readWhole(folder / "mode.json", kMaxFileBytes);
     if (!text) {
-        error = "no mode.json in " + u8text(folder.filename());
+        error = nox::l10n::format(NOX_TR("editor.mod.project.no_manifest", "no mode.json in {folder}"), {{"folder", u8text(folder.filename())}});
         return std::nullopt;
     }
     ModProject p;
@@ -346,7 +348,7 @@ std::optional<ModProject> ModProject::open(const fs::path& folder, std::string& 
         return std::nullopt;
     }
     if (!p.manifest_.isObject()) {
-        error = "mode.json must hold one object";
+        error = NOX_TR("editor.mod.project.manifest_not_object", "mode.json must hold one object");
         return std::nullopt;
     }
     return p;
@@ -355,13 +357,13 @@ std::optional<ModProject> ModProject::open(const fs::path& folder, std::string& 
 std::optional<ModProject> ModProject::create(const fs::path& modsDir, const std::string& id, const std::string& name, std::string& error)
 {
     if (!nox::modes::script::validModeId(id) || id.size() > 24) {
-        error = "an id is 1-24 of a-z, 0-9 and _";
+        error = NOX_TR("editor.mod.project.bad_id", "an id is 1-24 of a-z, 0-9 and _");
         return std::nullopt;
     }
     const fs::path folder = modsDir / id;
     std::error_code ec;
     if (fs::exists(folder, ec)) {
-        error = "mods\\" + id + " is there already";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.exists", "{path} is there already"), {{"path", "mods\\" + id}});
         return std::nullopt;
     }
     const std::string title = name.empty() ? id : name.substr(0, 32);
@@ -378,7 +380,7 @@ std::optional<ModProject> ModProject::copyOf(const fs::path& source, const fs::p
                                              std::string& error)
 {
     if (!nox::modes::script::validModeId(id) || id.size() > 24) {
-        error = "an id is 1-24 of a-z, 0-9 and _";
+        error = NOX_TR("editor.mod.project.bad_id", "an id is 1-24 of a-z, 0-9 and _");
         return std::nullopt;
     }
     std::optional<ModProject> from = open(source, error);
@@ -388,7 +390,7 @@ std::optional<ModProject> ModProject::copyOf(const fs::path& source, const fs::p
     const fs::path folder = modsDir / id;
     std::error_code ec;
     if (fs::exists(folder, ec)) {
-        error = "mods\\" + id + " is there already";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.exists", "{path} is there already"), {{"path", "mods\\" + id}});
         return std::nullopt;
     }
     for (const Entry& e : from->files()) {
@@ -398,7 +400,9 @@ std::optional<ModProject> ModProject::copyOf(const fs::path& source, const fs::p
         } else if (e.path != "mode.json") {
             const auto bytes = from->read(e.path);
             if (!bytes || !writeWhole(to, *bytes, error)) {
-                error = "can't copy " + e.path + (error.empty() ? "" : ": " + error);
+                error = error.empty() ? nox::l10n::format(NOX_TR("editor.mod.project.cant_copy", "can't copy {file}"), {{"file", e.path}})
+                                      : nox::l10n::format(NOX_TR("editor.mod.project.cant_copy_why", "can't copy {file}: {why}"),
+                                                          {{"file", e.path}, {"why", error}});
                 return std::nullopt;
             }
         }
@@ -498,11 +502,11 @@ bool ModProject::write(std::string_view rel, std::string_view text, std::string&
 {
     const auto p = pathOf(rel);
     if (!p) {
-        error = "\"" + std::string(rel) + "\" isn't a path inside the mod";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.outside", "\"{path}\" isn't a path inside the mod"), {{"path", rel}});
         return false;
     }
     if (text.size() > kMaxFileBytes) {
-        error = "over the 1 MB a file the game reads";
+        error = NOX_TR("editor.mod.project.too_big", "over the 1 MB a file the game reads");
         return false;
     }
     return writeWhole(*p, text, error);
@@ -513,7 +517,7 @@ bool ModProject::newFile(std::string_view rel, std::string_view text, std::strin
     const auto p = pathOf(rel);
     std::error_code ec;
     if (p && fs::exists(*p, ec)) {
-        error = std::string(rel) + " is there already";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.exists", "{path} is there already"), {{"path", rel}});
         return false;
     }
     return write(rel, text, error);
@@ -523,12 +527,12 @@ bool ModProject::newFolder(std::string_view rel, std::string& error) const
 {
     const auto p = pathOf(rel);
     if (!p) {
-        error = "\"" + std::string(rel) + "\" isn't a path inside the mod";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.outside", "\"{path}\" isn't a path inside the mod"), {{"path", rel}});
         return false;
     }
     std::error_code ec;
     if (fs::exists(*p, ec)) {
-        error = std::string(rel) + " is there already";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.exists", "{path} is there already"), {{"path", rel}});
         return false;
     }
     fs::create_directories(*p, ec);
@@ -544,24 +548,24 @@ bool ModProject::rename(std::string_view from, std::string_view to, std::string&
     const auto a = pathOf(from);
     const auto b = pathOf(to);
     if (!a || !b) {
-        error = "\"" + std::string(a ? to : from) + "\" isn't a path inside the mod";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.outside", "\"{path}\" isn't a path inside the mod"), {{"path", a ? to : from}});
         return false;
     }
     if (from == "mode.json") {
-        error = "mode.json keeps its name (the game looks for it)";
+        error = NOX_TR("editor.mod.project.manifest_keeps_name", "mode.json keeps its name (the game looks for it)");
         return false;
     }
     std::error_code ec;
     if (!fs::exists(*a, ec)) {
-        error = std::string(from) + " isn't there";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.missing", "{path} isn't there"), {{"path", from}});
         return false;
     }
     if (fs::exists(*b, ec)) {
-        error = std::string(to) + " is there already";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.exists", "{path} is there already"), {{"path", to}});
         return false;
     }
     if (std::string(to).starts_with(std::string(from) + "/")) {
-        error = "a folder can't go inside itself";
+        error = NOX_TR("editor.mod.project.folder_into_itself", "a folder can't go inside itself");
         return false;
     }
     fs::create_directories(b->parent_path(), ec);
@@ -595,12 +599,12 @@ bool ModProject::rename(std::string_view from, std::string_view to, std::string&
 bool ModProject::remove(std::string_view rel, std::string& error) const
 {
     if (rel == "mode.json") {
-        error = "mode.json is the mod itself: it stays";
+        error = NOX_TR("editor.mod.project.manifest_stays", "mode.json is the mod itself: it stays");
         return false;
     }
     const auto p = pathOf(rel);
     if (!p) {
-        error = "\"" + std::string(rel) + "\" isn't a path inside the mod";
+        error = nox::l10n::format(NOX_TR("editor.mod.project.outside", "\"{path}\" isn't a path inside the mod"), {{"path", rel}});
         return false;
     }
     std::error_code ec;
@@ -651,18 +655,20 @@ std::string mapPrefixProblem(std::string_view prefix, const fs::path& modsDir, c
         return {};
     }
     if (prefix.size() < 2 || prefix.size() > 3 || !std::ranges::all_of(prefix, [](char c) { return c >= 'A' && c <= 'Z'; })) {
-        return "a map prefix is 2-3 capital letters (A-Z)";
+        return NOX_TR("editor.mod.project.bad_prefix", "a map prefix is 2-3 capital letters (A-Z)");
     }
     std::error_code ec;
     for (const ModListing& l : listMods(modsDir)) {
         if (l.mapPrefix == prefix && !fs::equivalent(l.folder, self, ec)) {
-            return "mods\\" + u8text(l.folder.filename()) + " names its maps " + std::string(prefix) + "_ too";
+            return nox::l10n::format(NOX_TR("editor.mod.project.prefix_taken_mod", "mods\\{folder} names its maps {prefix}_ too"),
+                                     {{"folder", u8text(l.folder.filename())}, {"prefix", prefix}});
         }
     }
     const std::string probe = std::string(prefix) + "_1";
     for (const nox::modes::Mode* m : registry.all()) {
         if (m->info.id != selfId && m->info.ownsMap && m->info.ownsMap(probe)) {
-            return "the mode " + m->info.name + " names its maps " + std::string(prefix) + "_...";
+            return nox::l10n::format(NOX_TR("editor.mod.project.prefix_taken_mode", "the mode {mode} names its maps {prefix}_..."),
+                                     {{"mode", m->info.name}, {"prefix", prefix}});
         }
     }
     return {};

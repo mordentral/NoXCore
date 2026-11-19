@@ -1,7 +1,9 @@
 // The collaborative session's op transforms (session_merge.hpp).
 #include "noxcore/mapedit/session_merge.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "noxcore/mapedit/writer.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -464,7 +466,7 @@ std::size_t mergeParts(map::Polygons& nowPolys, std::vector<std::uint32_t>& nowP
                 p->keys = r.keys;
                 skipped += r.skipped.size();
                 if (skips) {
-                    for (const auto k : r.skipped) skips->push_back({ElementKey::polygon(k), "changed since"});
+                    for (const auto k : r.skipped) skips->push_back({ElementKey::polygon(k), NOX_TR("editor.undo_skip.changed", "changed since")});
                 }
                 if (moves) {
                     for (const auto& [a, b] : r.renamed) moves->polygonKeys[a] = b;
@@ -516,7 +518,7 @@ std::size_t mergeParts(map::Polygons& nowPolys, std::vector<std::uint32_t>& nowP
                 g->keys = r.keys;
                 skipped += r.skipped.size();
                 if (skips) {
-                    for (const auto k : r.skipped) skips->push_back({ElementKey::group(k), "changed since"});
+                    for (const auto k : r.skipped) skips->push_back({ElementKey::group(k), NOX_TR("editor.undo_skip.changed", "changed since")});
                 }
                 if (moves) {
                     for (const auto& [a, b] : r.renamed) moves->groupKeys[a] = b;
@@ -627,7 +629,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
             todo.pop_back();
             const auto e = objects.find(c);
             if (e == objects.end() || !e->second || !(*e->second == doc.objects.at(c))) {
-                return std::string("has items put in it since");
+                return NOX_TR("editor.undo_skip.items_added", "has items put in it since");
             }
             const auto more = doc.childrenOf(c);
             todo.insert(todo.end(), more.begin(), more.end());
@@ -643,7 +645,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                     const auto k = std::ranges::find(groups->second, doc.groupKeys[i]);
                     expected = k != groups->second.end() && groups->first.groups[static_cast<std::size_t>(k - groups->second.begin())] == g;
                 }
-                if (!expected) return "is in group " + g.name + " since";
+                if (!expected) return l10n::format(NOX_TR("editor.undo_skip.in_group", "is in group {name} since"), {{"name", g.name}});
             }
         }
         return std::nullopt;
@@ -657,7 +659,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                            for (const auto& c : p.cells) {
                                const auto e = walls.find(c.cell);
                                if (e != walls.end() && wallState(doc, c.cell) != e->second) {
-                                   skip(ElementKey::wall(c.cell), "changed since");
+                                   skip(ElementKey::wall(c.cell), NOX_TR("editor.undo_skip.changed", "changed since"));
                                    continue;
                                }
                                kept.cells.push_back(c);
@@ -671,7 +673,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                                const map::FloorTile* now = doc.floor.tile(t.gx, t.gy);
                                const std::optional<map::FloorTile> cur = now ? std::optional(*now) : std::nullopt;
                                if (e != tiles.end() && cur != e->second) {
-                                   skip(ElementKey::tile({t.gx, t.gy}), "changed since");
+                                   skip(ElementKey::tile({t.gx, t.gy}), NOX_TR("editor.undo_skip.changed", "changed since"));
                                    continue;
                                }
                                kept.tiles.push_back(t);
@@ -683,12 +685,12 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                            for (const ObjId id : p.ids) {
                                const auto now = doc.objects.find(id);
                                if (now == doc.objects.end()) {
-                                   skip(ElementKey::object(id), "deleted since");
+                                   skip(ElementKey::object(id), NOX_TR("editor.undo_skip.deleted", "deleted since"));
                                    continue;
                                }
                                const auto e = objects.find(id);
                                if (e != objects.end() && e->second && !(*e->second == now->second)) {
-                                   skip(ElementKey::object(id), "changed since");
+                                   skip(ElementKey::object(id), NOX_TR("editor.undo_skip.changed", "changed since"));
                                    continue;
                                }
                                if (const auto why = removalBlocked(id)) {
@@ -709,15 +711,15 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                            for (const auto& e : p.objects) {
                                const ElementKey what = ElementKey::object(e.id);
                                if (doc.objects.contains(e.id)) {
-                                   if (e.object.parent == 0) skip(what, "made again since");
+                                   if (e.object.parent == 0) skip(what, NOX_TR("editor.undo_skip.made_again", "made again since"));
                                    continue;
                                }
                                if (e.object.parent != 0 && !doc.objects.contains(e.object.parent) && !adding.contains(e.object.parent)) {
-                                   if (!objects.contains(e.object.parent)) skip(what, "its owner was deleted since");
+                                   if (!objects.contains(e.object.parent)) skip(what, NOX_TR("editor.undo_skip.owner_deleted", "its owner was deleted since"));
                                    continue; // (an item of a root left out goes with it)
                                }
                                if (e.object.parent == 0 && e.object.header.extent != 0 && extents.contains(e.object.header.extent)) {
-                                   skip(what, "its extent is another object's now");
+                                   skip(what, NOX_TR("editor.undo_skip.extent_taken", "its extent is another object's now"));
                                    continue;
                                }
                                adding.insert(e.id);
@@ -730,16 +732,16 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                            for (const auto& e : p.objects) {
                                const auto now = doc.objects.find(e.id);
                                if (now == doc.objects.end()) {
-                                   skip(ElementKey::object(e.id), "deleted since");
+                                   skip(ElementKey::object(e.id), NOX_TR("editor.undo_skip.deleted", "deleted since"));
                                    continue;
                                }
                                const auto x = objects.find(e.id);
                                if (x != objects.end() && x->second && !(*x->second == now->second)) {
-                                   skip(ElementKey::object(e.id), "changed since");
+                                   skip(ElementKey::object(e.id), NOX_TR("editor.undo_skip.changed", "changed since"));
                                    continue;
                                }
                                if (e.object.parent != 0 && !doc.objects.contains(e.object.parent)) {
-                                   skip(ElementKey::object(e.id), "its owner was deleted since");
+                                   skip(ElementKey::object(e.id), NOX_TR("editor.undo_skip.owner_deleted", "its owner was deleted since"));
                                    continue;
                                }
                                kept.objects.push_back(e);
@@ -751,13 +753,13 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                            for (const auto& m : p.moves) {
                                const auto now = doc.objects.find(m.id);
                                if (now == doc.objects.end()) {
-                                   skip(ElementKey::object(m.id), "deleted since");
+                                   skip(ElementKey::object(m.id), NOX_TR("editor.undo_skip.deleted", "deleted since"));
                                    continue;
                                }
                                const auto x = objects.find(m.id);
                                if (x != objects.end() && x->second &&
                                    (x->second->header.x != now->second.header.x || x->second->header.y != now->second.header.y)) {
-                                   skip(ElementKey::object(m.id), "moved since");
+                                   skip(ElementKey::object(m.id), NOX_TR("editor.undo_skip.moved", "moved since"));
                                    continue;
                                }
                                kept.moves.push_back(m);
@@ -774,7 +776,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                                const std::optional<map::Waypoint> cur = now == doc.waypoints.waypoints.end() ? std::nullopt : std::optional(*now);
                                const auto e = waypoints.find(c.id);
                                if (e != waypoints.end() && cur != e->second) {
-                                   skip(what, cur ? "changed since" : "deleted since");
+                                   skip(what, cur ? NOX_TR("editor.undo_skip.changed", "changed since") : NOX_TR("editor.undo_skip.deleted", "deleted since"));
                                    continue;
                                }
                                if (!c.waypoint && cur) {
@@ -783,7 +785,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                                        return !inPart.contains(w.id) && std::ranges::any_of(w.links, [&](const auto& l) { return l.target == c.id; });
                                    });
                                    if (linked != doc.waypoints.waypoints.end()) {
-                                       skip(what, "waypoint " + std::to_string(linked->id) + " links to it since");
+                                       skip(what, l10n::format(NOX_TR("editor.undo_skip.linked", "waypoint {id} links to it since"), {{"id", linked->id}}));
                                        continue;
                                    }
                                }
@@ -794,7 +796,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                                               std::ranges::find(doc.waypoints.waypoints, l.target, &map::Waypoint::id) == doc.waypoints.waypoints.end();
                                    });
                                    if (dangling) {
-                                       skip(what, "a waypoint it links to was deleted since");
+                                       skip(what, NOX_TR("editor.undo_skip.link_target_deleted", "a waypoint it links to was deleted since"));
                                        continue;
                                    }
                                }
@@ -803,27 +805,27 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
                            if (!kept.waypoints.empty()) out.parts.push_back(std::move(kept));
                        },
                        [&](const SetMapInfo& p) {
-                           if (info && !sameSection(*info, doc.info)) return skip(ElementKey::mapInfo(), "changed since");
+                           if (info && !sameSection(*info, doc.info)) return skip(ElementKey::mapInfo(), NOX_TR("editor.undo_skip.changed", "changed since"));
                            out.parts.push_back(p);
                        },
                        [&](const SetAmbient& p) {
-                           if (ambient && !sameSection(*ambient, doc.ambient)) return skip(ElementKey::mapInfo(), "changed since");
+                           if (ambient && !sameSection(*ambient, doc.ambient)) return skip(ElementKey::mapInfo(), NOX_TR("editor.undo_skip.changed", "changed since"));
                            out.parts.push_back(p);
                        },
                        [&](const SetIntro& p) {
-                           if (intro && !sameSection(*intro, doc.intro)) return skip(ElementKey::mapInfo(), "changed since");
+                           if (intro && !sameSection(*intro, doc.intro)) return skip(ElementKey::mapInfo(), NOX_TR("editor.undo_skip.changed", "changed since"));
                            out.parts.push_back(p);
                        },
                        [&](const SetDebug& p) {
-                           if (debug && !sameSection(*debug, doc.debugData)) return skip(ElementKey::mapInfo(), "changed since");
+                           if (debug && !sameSection(*debug, doc.debugData)) return skip(ElementKey::mapInfo(), NOX_TR("editor.undo_skip.changed", "changed since"));
                            out.parts.push_back(p);
                        },
                        [&](const SetScript& p) {
-                           if (script && !sameSection(*script, doc.script)) return skip(ElementKey{ElementKey::Kind::ScriptFunction, 0, 0, "*"}, "changed since");
+                           if (script && !sameSection(*script, doc.script)) return skip(ElementKey{ElementKey::Kind::ScriptFunction, 0, 0, "*"}, NOX_TR("editor.undo_skip.changed", "changed since"));
                            out.parts.push_back(p);
                        },
                        [&](const SetScriptSource& p) {
-                           if (source && *source != doc.scriptSource) return skip(ElementKey{ElementKey::Kind::ScriptFunction, 0, 0, "*"}, "changed since");
+                           if (source && *source != doc.scriptSource) return skip(ElementKey{ElementKey::Kind::ScriptFunction, 0, 0, "*"}, NOX_TR("editor.undo_skip.changed", "changed since"));
                            out.parts.push_back(p);
                        },
                        [&](const SetPolygons& p) {
@@ -870,7 +872,7 @@ Op selectiveOp(const MapDocument& doc, const Op& apply, const Op& expect, std::v
 std::optional<Op> diffOp(const MapDocument& from, const MapDocument& to)
 {
     Op op;
-    op.label = "Snapshot";
+    op.label = opLabel(oplabels::kSnapshot);
     // Walls, with the secret, breakable and window lists in `to`'s order.
     {
         std::set<Cell> cells;

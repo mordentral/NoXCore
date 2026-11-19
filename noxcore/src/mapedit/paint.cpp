@@ -1,7 +1,9 @@
 // Floor painting and auto-edge (paint.hpp).
 #include "noxcore/mapedit/paint.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "noxcore/mapedit/walls.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
@@ -466,7 +468,7 @@ Op autoEdgeOp(const MapDocument& doc, const things::ThingDb& things, const EdgeR
         part.tiles.push_back({t.gx, t.gy, std::move(next)});
     }
     Op op;
-    op.label = "Auto-edge " + std::to_string(part.tiles.size()) + (part.tiles.size() == 1 ? " tile" : " tiles");
+    op.label = opLabel(oplabels::kAutoEdge, {{"n", part.tiles.size()}});
     if (!part.tiles.empty()) op.parts.push_back(std::move(part));
     return op;
 }
@@ -710,15 +712,15 @@ Op FloorStroke::finish(std::vector<TileCell>* restored)
     Op op;
     if (part.tiles.empty()) return op;
     using Mode = FloorBrush::Mode;
-    const std::string floor = brush_.floor < things_.floors.size() ? things_.floors[brush_.floor].name : "floor";
-    const std::string n = std::to_string(part.tiles.size()) + (part.tiles.size() == 1 ? " tile" : " tiles");
+    const std::string floor = brush_.floor < things_.floors.size() ? things_.floors[brush_.floor].name : opLabel(oplabels::kFloorUnnamed);
+    const std::string n = opLabel(oplabels::kTiles, {{"n", part.tiles.size()}});
     switch (brush_.mode) {
-    case Mode::Paint: op.label = "Paint " + floor + " (" + n + ")"; break;
-    case Mode::Erase: op.label = "Erase floor (" + n + ")"; break;
-    case Mode::Replace: op.label = "Replace with " + floor + " (" + n + ")"; break;
-    case Mode::Fill: op.label = "Fill with " + floor + " (" + n + ")"; break;
-    case Mode::Smooth: op.label = "Smooth floor (" + n + ")"; break;
-    case Mode::EdgesOnly: op.label = "Recompute edges (" + n + ")"; break;
+    case Mode::Paint: op.label = opLabel(oplabels::kPaintFloor, {{"floor", floor}, {"tiles", n}}); break;
+    case Mode::Erase: op.label = opLabel(oplabels::kEraseFloor, {{"tiles", n}}); break;
+    case Mode::Replace: op.label = opLabel(oplabels::kReplaceFloor, {{"floor", floor}, {"tiles", n}}); break;
+    case Mode::Fill: op.label = opLabel(oplabels::kFillFloor, {{"floor", floor}, {"tiles", n}}); break;
+    case Mode::Smooth: op.label = opLabel(oplabels::kSmoothFloor, {{"tiles", n}}); break;
+    case Mode::EdgesOnly: op.label = opLabel(oplabels::kRecomputeEdges, {{"tiles", n}}); break;
     }
     op.parts.push_back(std::move(part));
     return op;

@@ -12,6 +12,7 @@
 
 #include "noxcore/io/file.hpp"
 #include "noxcore/modes/builtin.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -226,7 +227,7 @@ namespace {
 std::string startPlayTest(App& app, const editor::PlayTestRequest& req)
 {
     if (app.host || app.live) {
-        return "a game is already running here";
+        return NOX_TR("editor.play.game_running", "a game is already running here");
     }
     HostSettings s;
     s.map = req.map.string();
@@ -249,10 +250,12 @@ std::string startPlayTest(App& app, const editor::PlayTestRequest& req)
         if (!nox::modes::registry().find(req.modeId)) {
             for (const auto& b : modsReport().broken) {
                 if (b.folder.filename().string() == req.modeId) {
-                    return "the mod " + req.modeId + " doesn't load: " + b.why;
+                    return nox::l10n::format(NOX_TR("editor.play.mod_doesnt_load", "the mod {mod} doesn't load: {why}"),
+                                             {{"mod", req.modeId}, {"why", b.why}});
                 }
             }
-            return "no mod " + req.modeId + " in " + nox::pathUtf8(modsFolderPath());
+            return nox::l10n::format(NOX_TR("editor.play.no_mod", "no mod {mod} in {folder}"),
+                                     {{"mod", req.modeId}, {"folder", nox::pathUtf8(modsFolderPath())}});
         }
         s.modeId = req.modeId;
         if (req.modeMap) {
@@ -591,7 +594,11 @@ void showEditSessionSetup(App& app, bool closeOnCancel)
         [&app, port, listed](const editor::SessionSetup& setup) {
             if (const std::string error = hostEditSession(app, setup, port, listed); !error.empty()) {
                 SDL_Log("edit session: not hosted: %s", error.c_str());
-                if (app.console) app.console->print("The edit session wasn't hosted: " + error, Yellow);
+                if (app.console) {
+                    app.console->print(nox::l10n::format(NOX_TR("editor.session.not_hosted", "The edit session wasn't hosted: {error}"),
+                                                         {{"error", error}}),
+                                       Yellow);
+                }
             }
         },
         std::move(cancelled));
@@ -606,7 +613,7 @@ void showEditSessionSetup(App& app, bool closeOnCancel)
 std::string hostEditSession(App& app, const editor::SessionSetup& setup, std::uint16_t port, bool listed)
 {
     if (app.host || app.live) {
-        return "a game is already running here";
+        return NOX_TR("editor.play.game_running", "a game is already running here");
     }
     const fs::path mapsDir = !app.editorMapsDir.empty() ? app.editorMapsDir : app.gameDir / "maps";
     if (const std::string problem = editor::prepareSessionMap(setup, mapsDir, app.gameDir / "maps", app.things); !problem.empty()) {
@@ -686,7 +693,7 @@ std::string startPrivateTest(App& app, const editor::PlayTestRequest& req)
     if (app.privateTest) {
         int code = 0;
         if (!SDL_WaitProcess(app.privateTest, false, &code)) {
-            return "a private test is running already (close its window first)";
+            return NOX_TR("editor.play.private_test_running", "a private test is running already (close its window first)");
         }
         SDL_DestroyProcess(app.privateTest);
         app.privateTest = nullptr;
@@ -725,7 +732,8 @@ std::string startPrivateTest(App& app, const editor::PlayTestRequest& req)
     argv.push_back(nullptr);
     app.privateTest = SDL_CreateProcess(argv.data(), false);
     if (!app.privateTest) {
-        return std::string("couldn't start ") + pathText(exe) + ": " + SDL_GetError();
+        return nox::l10n::format(NOX_TR("editor.play.couldnt_start", "couldn't start {program}: {error}"),
+                                 {{"program", pathText(exe)}, {"error", SDL_GetError()}});
     }
     SDL_Log("private test: %s in its own process (%s)", pathText(req.map).c_str(), req.modeId.empty() ? mode : req.modeId.c_str());
     return {};
@@ -870,7 +878,9 @@ void checkSession(App& app)
     if (!app.sessionNoticed) {
         app.sessionNoticed = true;
         if (app.console) {
-            app.console->print("This game is a map editor session: F2 opens the editor (/edit asks the host for edit rights).", Yellow);
+            app.console->print(NOX_TR("editor.session.joined_notice",
+                                      "This game is a map editor session: F2 opens the editor (/edit asks the host for edit rights)."),
+                               Yellow);
         }
         SDL_Log("edit session: %s, map %s", app.sessionHosting ? "ours" : "joined", app.editSession->hello()->map.c_str());
     }

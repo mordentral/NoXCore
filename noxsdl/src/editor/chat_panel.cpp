@@ -4,6 +4,8 @@
 #include "editor/map_editor.hpp"
 #include "editor/theme_colours.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <imgui.h>
 #include <imgui_internal.h> // (a layout without the panel: docked beside History)
 
@@ -20,7 +22,9 @@ void MapEditor::addChat(editor::ChatLine line)
     if (!showChat_ || !session_) {
         std::string said = line.speaker.empty() || line.kind == editor::ChatLine::Kind::System ? line.text : line.speaker + ": " + line.text;
         if (said.size() > 90) said = said.substr(0, 87) + "...";
-        status("Chat - " + said + (session_ ? "  (Window > Chat)" : ""));
+        status(nox::l10n::format(session_ ? NOX_TR("editor.chat.status_closed", "Chat - {line}  (Window > Chat)")
+                                          : NOX_TR("editor.chat.status", "Chat - {line}"),
+                                 {{"line", said}}));
     }
     chat_.add(std::move(line));
 }
@@ -30,7 +34,9 @@ void MapEditor::chatPanel()
     // The title carries the unread count; "###Chat" keeps the window (its dock, its place in the
     // layout) the same whatever the title says.
     const std::size_t unread = chat_.unread();
-    const std::string title = unread > 0 ? "Chat (" + std::to_string(unread) + ")###Chat" : std::string("Chat###Chat");
+    const std::string title = (unread > 0 ? nox::l10n::format(NOX_TR("editor.chat.title_unread", "Chat ({n})"), {{"n", unread}})
+                                          : NOX_TR("editor.chat.title", "Chat")) +
+                              "###Chat";
     // The tab of a docked window is drawn in the colours current at its Begin: lines it hasn't
     // shown mark its tab amber (and the dot of ImGuiWindowFlags_UnsavedDocument) till it's seen.
     int pushed = 0;
@@ -48,7 +54,7 @@ void MapEditor::chatPanel()
         ImGui::SetNextWindowFocus();
     }
     // A layout from before the panel (no place of its own in it): tabbed with Session at first.
-    if (const ImGuiWindow* session = ImGui::FindWindowByName("Session"); session && session->DockId != 0) {
+    if (const ImGuiWindow* session = ImGui::FindWindowByName(NOX_TRI("editor.window.session", "Session")); session && session->DockId != 0) {
         ImGui::SetNextWindowDockID(session->DockId, ImGuiCond_FirstUseEver);
     }
     const bool open = ImGui::Begin(title.c_str(), &showChat_, unread > 0 ? ImGuiWindowFlags_UnsavedDocument : ImGuiWindowFlags_None);
@@ -65,7 +71,7 @@ void MapEditor::chatPanel()
         // Follows the end unless scrolled up to read back.
         const bool atEnd = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f;
         if (chat_.lines().empty()) {
-            ImGui::TextDisabled("The game's chat shows here: what players say (team lines too), who comes and goes.");
+            ImGui::TextDisabled("%s", NOX_TRC("editor.chat.empty", "The game's chat shows here: what players say (team lines too), who comes and goes."));
         }
         for (const auto& l : chat_.lines()) {
             switch (l.kind) {
@@ -77,8 +83,8 @@ void MapEditor::chatPanel()
             case editor::ChatLine::Kind::Team:
             case editor::ChatLine::Kind::Chat: {
                 const bool team = l.kind == editor::ChatLine::Kind::Team;
-                ImGui::TextColored(team ? editor::themeColours().chatTeam : editor::themeColours().chatAll, "%s%s:", team ? "(team) " : "",
-                                   l.speaker.empty() ? "Someone" : l.speaker.c_str());
+                ImGui::TextColored(team ? editor::themeColours().chatTeam : editor::themeColours().chatAll, "%s%s:", team ? NOX_TRC("editor.chat.team_mark", "(team) ") : "",
+                                   l.speaker.empty() ? NOX_TRC("editor.chat.someone", "Someone") : l.speaker.c_str());
                 ImGui::SameLine(0, 6 * scale);
                 ImGui::TextWrapped("%s", l.text.c_str());
                 break;
@@ -96,13 +102,13 @@ void MapEditor::chatPanel()
     const bool canSay = static_cast<bool>(sessionHooks_.say);
     ImGui::BeginDisabled(!canSay);
     ImGui::SetNextItemWidth(std::max(80.0f, ImGui::GetContentRegionAvail().x - 120 * scale));
-    bool send = ImGui::InputTextWithHint("##chatsay", canSay ? "Say something to the players..." : "Not in the game", chatInput_, sizeof chatInput_,
+    bool send = ImGui::InputTextWithHint("##chatsay", canSay ? NOX_TRC("editor.chat.say_hint", "Say something to the players...") : NOX_TRC("editor.chat.not_in_game", "Not in the game"), chatInput_, sizeof chatInput_,
                                          ImGuiInputTextFlags_EnterReturnsTrue);
     if (send) ImGui::SetKeyboardFocusHere(-1); // (the box keeps the keyboard after Enter)
     ImGui::SameLine();
-    ImGui::Checkbox("Team", &chatTeam_);
+    ImGui::Checkbox(NOX_TRI("editor.chat.team", "Team"), &chatTeam_);
     ImGui::SameLine();
-    send = ImGui::Button("Send") || send;
+    send = ImGui::Button(NOX_TRI("editor.chat.send", "Send")) || send;
     ImGui::EndDisabled();
     if (send && canSay && chatInput_[0] != 0) {
         sessionHooks_.say(chatInput_, chatTeam_);

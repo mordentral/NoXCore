@@ -44,7 +44,9 @@
 #include "sprite_cache.hpp"
 
 #include "noxcore/mapedit/locks.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 #include "noxcore/mapedit/quest_pictures.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/text.hpp"
@@ -63,6 +65,7 @@
 #include <thread>
 
 namespace me = nox::mapedit;
+namespace ol = nox::mapedit::oplabels;
 namespace nm = nox::map;
 
 namespace noxsdl {
@@ -92,6 +95,7 @@ void flow(const char* next)
 
 using editor::hexText;
 using editor::numbersAfter;
+using nox::l10n::format;
 using nox::util::lowered;
 
 int resizeCallback(ImGuiInputTextCallbackData* d)
@@ -253,39 +257,39 @@ void MarkerTools::registerCommands()
     const auto window = [&](const char* id, const char* label, const char* shortcut, const char* helpText, bool MarkerTools::*field) {
         add(id, label, "Window", shortcut, helpText, [this, field] { this->*field = !(this->*field); }, {}, [this, field] { return this->*field; });
     };
-    window("window.mapInfo", "Map Info", "Ctrl+Shift+M", "The map's title, credits, game types, version, players, quest intro, ambient light and intro text.",
+    window("window.mapInfo", NOX_TRC("editor.cmd.window.map_info.label", "Map Info"), "Ctrl+Shift+M", NOX_TRC("editor.cmd.window.map_info.help", "The map's title, credits, game types, version, players, quest intro, ambient light and intro text."),
            &MarkerTools::showMapInfo);
-    window("window.waypoints", "Waypoints", "Ctrl+Shift+W", "Every waypoint: search, sort, select, enable or disable, go to.", &MarkerTools::showWaypoints);
-    window("window.polygons", "Polygons", "", "The polygons in their list order (the game's priority): select, reorder, new, delete.",
+    window("window.waypoints", NOX_TRC("editor.cmd.window.waypoints.label", "Waypoints"), "Ctrl+Shift+W", NOX_TRC("editor.cmd.window.waypoints.help", "Every waypoint: search, sort, select, enable or disable, go to."), &MarkerTools::showWaypoints);
+    window("window.polygons", NOX_TRC("editor.cmd.window.polygons.label", "Polygons"), "", NOX_TRC("editor.cmd.window.polygons.help", "The polygons in their list order (the game's priority): select, reorder, new, delete."),
            &MarkerTools::showPolygons);
-    window("window.groups", "Groups", "Ctrl+Shift+G", "Script groups of objects, waypoints, walls or groups: members picked on the map.",
+    window("window.groups", NOX_TRC("editor.cmd.window.groups.label", "Groups"), "Ctrl+Shift+G", NOX_TRC("editor.cmd.window.groups.help", "Script groups of objects, waypoints, walls or groups: members picked on the map."),
            &MarkerTools::showGroups);
-    window("window.minimap", "Minimap", "M", "The whole map at a glance: click or drag to move the view; the symmetry guides.", &MarkerTools::showMinimap);
-    window("window.strings", "Game Texts", "", "The game's string table (nox.csf): search labels and texts, copy a label.", &MarkerTools::showStrings);
-    add("waypoint.enableAll", "Enable All Waypoints", "Tools", "", "Turns every waypoint on (the old editor's button of this name deleted them all).",
+    window("window.minimap", NOX_TRC("editor.cmd.window.minimap.label", "Minimap"), "M", NOX_TRC("editor.cmd.window.minimap.help", "The whole map at a glance: click or drag to move the view; the symmetry guides."), &MarkerTools::showMinimap);
+    window("window.strings", NOX_TRC("editor.cmd.window.strings.label", "Game Texts"), "", NOX_TRC("editor.cmd.window.strings.help", "The game's string table (nox.csf): search labels and texts, copy a label."), &MarkerTools::showStrings);
+    add("waypoint.enableAll", NOX_TRC("editor.cmd.waypoint.enable_all.label", "Enable All Waypoints"), "Tools", "", NOX_TRC("editor.cmd.waypoint.enable_all.help", "Turns every waypoint on (the old editor's button of this name deleted them all)."),
         [this] {
             std::set<std::uint32_t> all;
             for (const auto& w : ed_.doc_.waypoints.waypoints) all.insert(w.id);
-            if (!ed_.perform(me::setWaypointsEnabledOp(ed_.doc_, all, true))) ed_.status("Every waypoint is enabled already");
+            if (!ed_.perform(me::setWaypointsEnabledOp(ed_.doc_, all, true))) ed_.status(NOX_TR("editor.waypoints.all_enabled", "Every waypoint is enabled already"));
         },
         [this] { return !ed_.doc_.waypoints.waypoints.empty(); });
-    add("waypoint.disableAll", "Disable All Waypoints", "Tools", "", "Turns every waypoint off (scripts can turn them on).",
+    add("waypoint.disableAll", NOX_TRC("editor.cmd.waypoint.disable_all.label", "Disable All Waypoints"), "Tools", "", NOX_TRC("editor.cmd.waypoint.disable_all.help", "Turns every waypoint off (scripts can turn them on)."),
         [this] {
             std::set<std::uint32_t> all;
             for (const auto& w : ed_.doc_.waypoints.waypoints) all.insert(w.id);
-            if (!ed_.perform(me::setWaypointsEnabledOp(ed_.doc_, all, false))) ed_.status("Every waypoint is disabled already");
+            if (!ed_.perform(me::setWaypointsEnabledOp(ed_.doc_, all, false))) ed_.status(NOX_TR("editor.waypoints.all_disabled", "Every waypoint is disabled already"));
         },
         [this] { return !ed_.doc_.waypoints.waypoints.empty(); });
-    add("waypoint.connect", "Waypoint Connect Mode", "Tools", "",
-        "The Waypoint tool links: click links the selected waypoint to the one clicked and selects it (chains), Shift+click unlinks.",
+    add("waypoint.connect", NOX_TRC("editor.cmd.waypoint.connect.label", "Waypoint Connect Mode"), "Tools", "",
+        NOX_TRC("editor.cmd.waypoint.connect.help", "The Waypoint tool links: click links the selected waypoint to the one clicked and selects it (chains), Shift+click unlinks."),
         [this] {
             ed_.tool_ = MapEditor::Tool::Waypoint;
             wpMode_ = wpMode_ == WpMode::Connect ? WpMode::Place : WpMode::Connect;
         },
         {}, [this] { return wpMode_ == WpMode::Connect; });
-    add("polygon.new", "New Polygon", "Tools", "", "Draw a new polygon: click its corners; Enter, a double click or a click on the first corner closes it.",
+    add("polygon.new", NOX_TRC("editor.cmd.polygon.new.label", "New Polygon"), "Tools", "", NOX_TRC("editor.cmd.polygon.new.help", "Draw a new polygon: click its corners; Enter, a double click or a click on the first corner closes it."),
         [this] { startDrawing(); });
-    add("view.ambientPreview", "Polygons' Ambient Preview", "View", "", "Fills each polygon with its ambient light (darker polygons more opaque).",
+    add("view.ambientPreview", NOX_TRC("editor.cmd.view.ambient_preview.label", "Polygons' Ambient Preview"), "View", "", NOX_TRC("editor.cmd.view.ambient_preview.help", "Fills each polygon with its ambient light (darker polygons more opaque)."),
         [this] { ambientPreview_ = !ambientPreview_; }, {}, [this] { return ambientPreview_; });
 
     // Delete and Escape mean the Polygon tool's corner and drawing first (wrapping the editor's own).
@@ -375,7 +379,7 @@ void MarkerTools::openGroup(std::uint32_t key)
     if (openGroup_ != key && pickingMembers_) ed_.cancelPick();
     openGroup_ = key;
     showGroups = true;
-    ImGui::SetWindowFocus("Groups");
+    ImGui::SetWindowFocus(NOX_TRI("editor.window.groups", "Groups"));
 }
 
 void MarkerTools::selectPolygon(std::optional<std::uint32_t> key, bool add)
@@ -424,13 +428,14 @@ void MarkerTools::linkTo(std::uint32_t target, bool unlink)
     const auto from = currentWaypoint();
     if (!from) {
         selectWaypoints({target}, target);
-        ed_.status("Links start from waypoint " + std::to_string(target) + ": click the next one");
+        ed_.status(format(NOX_TR("editor.waypoints.links_start", "Links start from waypoint {id}: click the next one"), {{"id", target}}));
         return;
     }
     if (*from == target) return;
     const me::Op op = unlink ? me::unlinkWaypointsOp(ed_.doc_, *from, target, bothWays_) : me::linkWaypointsOp(ed_.doc_, *from, target, bothWays_, linkFlags_);
     if (op.empty()) {
-        ed_.status(unlink ? "No link from " + std::to_string(*from) + " to " + std::to_string(target) : "Already linked with these flags");
+        ed_.status(unlink ? format(NOX_TR("editor.waypoints.no_link", "No link from {from} to {to}"), {{"from", *from}, {"to", target}})
+                          : NOX_TR("editor.waypoints.already_linked", "Already linked with these flags"));
     } else {
         ed_.perform(op);
     }
@@ -477,7 +482,7 @@ void MarkerTools::waypointInput(float wx, float wy, bool hovered, bool rightClic
     const auto hit = waypointAt(wx, wy);
     if (wpMode_ == WpMode::Connect) {
         if (!hit) {
-            ed_.status("Connect: click a waypoint (Shift+click unlinks)");
+            ed_.status(NOX_TR("editor.waypoints.connect_hint", "Connect: click a waypoint (Shift+click unlinks)"));
             return;
         }
         linkTo(*hit, io.KeyShift);
@@ -520,13 +525,13 @@ void MarkerTools::startDrawing()
     polyMode_ = PolyMode::Draw;
     drawing_.clear();
     activeCorner_.reset();
-    ed_.status("New polygon: click its corners; Enter, a double click or the first corner closes it; Escape cancels");
+    ed_.status(NOX_TR("editor.polygons.new_hint", "New polygon: click its corners; Enter, a double click or the first corner closes it; Escape cancels"));
 }
 
 void MarkerTools::finishDrawing()
 {
     if (drawing_.size() < 3) {
-        ed_.status("A polygon needs at least 3 corners");
+        ed_.status(NOX_TR("editor.polygons.needs_3", "A polygon needs at least 3 corners"));
         return;
     }
     std::uint32_t key = 0;
@@ -540,7 +545,7 @@ void MarkerTools::cancelDrawing()
 {
     drawing_.clear();
     polyMode_ = PolyMode::Edit;
-    ed_.status("Polygon cancelled");
+    ed_.status(NOX_TR("editor.polygons.cancelled", "Polygon cancelled"));
 }
 
 bool MarkerTools::deleteActiveCorner()
@@ -552,7 +557,7 @@ bool MarkerTools::deleteActiveCorner()
         return false;
     }
     if (ed_.doc_.polygons.polygons[*i].points.size() <= 3) {
-        ed_.status("A polygon keeps at least 3 corners (Delete with no corner picked deletes the polygon)");
+        ed_.status(NOX_TR("editor.polygons.keeps_3", "A polygon keeps at least 3 corners (Delete with no corner picked deletes the polygon)"));
         activeCorner_.reset();
         return true;
     }
@@ -659,7 +664,7 @@ void MarkerTools::polygonInput(float wx, float wy, bool hovered, bool rightClick
         auto edge = sel ? me::polygonEdgeAt(ed_.doc_, wx, wy, r, sel) : std::nullopt;
         if (!edge) edge = me::polygonEdgeAt(ed_.doc_, wx, wy, r);
         if (!edge) {
-            ed_.status("Shift+click on a polygon's edge to add a corner there");
+            ed_.status(NOX_TR("editor.polygons.shift_click_edge", "Shift+click on a polygon's edge to add a corner there"));
             return;
         }
         const me::WorldPoint at = polySnap(edge->at, edge->key);
@@ -868,8 +873,9 @@ void MarkerTools::drawOverlay(ImDrawList* dl, const ImVec2& origin)
                 const ImVec2 p = S(next->x, next->y);
                 dl->AddCircle(p, 5, col(255, 255, 255), 0, 1.5f);
             }
-            const std::string hint = drawing_.empty() ? "Draw a polygon: click its first corner"
-                                                      : std::to_string(drawing_.size()) + " corners: Enter, a double click or the first corner closes it; right click takes one back; Escape cancels";
+            const std::string hint = drawing_.empty() ? NOX_TR("editor.polygons.draw_first", "Draw a polygon: click its first corner")
+                                                      : format(NOX_TR("editor.polygons.draw_more", "{n} corners: Enter, a double click or the first corner closes it; right click takes one back; Escape cancels"),
+                                                               {{"n", drawing_.size()}});
             dl->AddText(ImVec2(origin.x + 10, origin.y + 10), col(255, 230, 140), hint.c_str());
         } else {
             for (const auto key : ed_.selection_.polygons) {
@@ -907,7 +913,7 @@ void MarkerTools::drawOverlay(ImDrawList* dl, const ImVec2& origin)
                 if (edge) {
                     const me::WorldPoint at = polySnap(edge->at, edge->key);
                     dl->AddCircleFilled(S(at.x, at.y), 5, col(120, 255, 160));
-                    dl->AddText(ImVec2(S(at.x, at.y).x + 8, S(at.x, at.y).y - 8), col(160, 255, 190), "+ corner");
+                    dl->AddText(ImVec2(S(at.x, at.y).x + 8, S(at.x, at.y).y - 8), col(160, 255, 190), NOX_TRC("editor.polygons.add_corner", "+ corner"));
                 }
             }
         }
@@ -1002,23 +1008,23 @@ bool MarkerTools::textField(const char* id, const std::string& current, std::siz
     if (ImGui::IsItemDeactivatedAfterEdit()) {
         bool cut = false;
         out = me::fitMapText(e.text, maxBytes, &lossy, &cut);
-        if (cut) ed_.status("Cut to " + std::to_string(maxBytes) + " bytes (the field's room in the map)");
-        else if (lossy) ed_.status("Characters the map's 8-bit text can't hold became '?'");
+        if (cut) ed_.status(format(NOX_TR("editor.markers.text_cut", "Cut to {n} bytes (the field's room in the map)"), {{"n", maxBytes}}));
+        else if (lossy) ed_.status(NOX_TR("editor.markers.text_lossy", "Characters the map's 8-bit text can't hold became '?'"));
         done = out != me::toMapText(current); // (`current` is UTF-8, `out` the map's 8-bit text)
         e.active = false;
     }
     if (!multiline) ImGui::SameLine();
     if (bytes > maxBytes) {
         ImGui::TextColored(editor::themeColours().error, "%s", count);
-        help("Longer than the field's room in the map: it's cut when the edit ends.");
+        help(NOX_TR("editor.markers.text_too_long", "Longer than the field's room in the map: it's cut when the edit ends."));
     } else {
         ImGui::TextDisabled("%s", count);
-        help("Bytes of the map's 8-bit (Windows-1252) text, against the field's room.");
+        help(NOX_TR("editor.markers.text_bytes", "Bytes of the map's 8-bit (Windows-1252) text, against the field's room."));
     }
     if (lossy) {
         ImGui::SameLine();
         ImGui::TextColored(editor::themeColours().warning, "(?)");
-        help("Some characters aren't in the map's 8-bit text: they're stored as '?'.");
+        help(NOX_TR("editor.markers.text_lossy_help", "Some characters aren't in the map's 8-bit text: they're stored as '?'."));
     }
     return done;
 }
@@ -1080,7 +1086,7 @@ bool MarkerTools::bitsField(const char* id, const std::vector<me::FlagBit>& bits
         help(b.help);
     }
     if (const std::uint32_t other = value & ~known) {
-        ImGui::TextDisabled("Other bits: %s (the game doesn't read them; kept as stored)", hexText(other).c_str());
+        ImGui::TextDisabled("%s", format(NOX_TR("editor.markers.other_bits", "Other bits: {bits} (the game doesn't read them; kept as stored)"), {{"bits", hexText(other)}}).c_str());
     }
     ImGui::PopID();
     return clicked;
@@ -1091,10 +1097,10 @@ bool MarkerTools::linkFlagsButton(const char* id, std::uint8_t value, std::uint8
     ImGui::PushID(id);
     const std::string label = hexText(value) + "##lf";
     if (ImGui::SmallButton(label.c_str())) ImGui::OpenPopup("##linkflags");
-    help("The link's route classes: click to change them.");
+    help(NOX_TR("editor.waypoints.link_classes_help", "The link's route classes: click to change them."));
     bool changed = false;
     if (ImGui::BeginPopup("##linkflags")) {
-        ImGui::TextDisabled("Route classes of this link");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.waypoints.link_classes", "Route classes of this link"));
         for (const auto& b : me::waypointLinkFlagBits()) {
             bool v = (value & b.bit) != 0;
             if (ImGui::Checkbox(b.name, &v)) {
@@ -1114,74 +1120,84 @@ bool MarkerTools::linkFlagsButton(const char* id, std::uint8_t value, std::uint8
 void MarkerTools::toolPanel()
 {
     if (ed_.tool_ == MapEditor::Tool::Waypoint) {
-        ImGui::SeparatorText("Waypoint");
+        ImGui::SeparatorText(NOX_TRC("editor.tool.waypoint", "Waypoint"));
         int mode = wpMode_ == WpMode::Place ? 0 : 1;
-        ImGui::RadioButton("Place / select", &mode, 0);
-        help("Click on empty map places a waypoint (enabled, the lowest free number); click one selects it, drag moves the selection. "
-             "Shift+click adds or removes one, Ctrl+click removes.");
+        ImGui::RadioButton(NOX_TRI("editor.waypoints.mode_place", "Place / select"), &mode, 0);
+        help(NOX_TR("editor.waypoints.mode_place_help", "Click on empty map places a waypoint (enabled, the lowest free number); click one selects it, drag moves the selection. "
+                                                        "Shift+click adds or removes one, Ctrl+click removes."));
         ImGui::SameLine();
-        ImGui::RadioButton("Connect", &mode, 1);
-        help("Click a waypoint: the selected one links to it and it becomes the selected one, so clicks chain. Shift+click removes the link "
-             "from the selected one to the one clicked.");
+        ImGui::RadioButton(NOX_TRI("editor.waypoints.mode_connect", "Connect"), &mode, 1);
+        help(NOX_TR("editor.waypoints.mode_connect_help", "Click a waypoint: the selected one links to it and it becomes the selected one, so clicks chain. Shift+click removes the link "
+                                                          "from the selected one to the one clicked."));
         wpMode_ = mode == 0 ? WpMode::Place : WpMode::Connect;
-        ImGui::Checkbox("Both ways", &bothWays_);
-        help("Links (and unlinks) go both ways: each waypoint links to the other.");
-        ImGui::Checkbox("Place linked", &placeLinked_);
-        help("Each waypoint placed is linked from the selected one (a path laid out click by click).");
-        ImGui::Checkbox("Right click deletes", &wpRightDeletes_);
-        help("A right click on a waypoint deletes it (else the right click opens the map's menu).");
+        ImGui::Checkbox(NOX_TRI("editor.waypoints.both_ways", "Both ways"), &bothWays_);
+        help(NOX_TR("editor.waypoints.both_ways_help", "Links (and unlinks) go both ways: each waypoint links to the other."));
+        ImGui::Checkbox(NOX_TRI("editor.waypoints.place_linked", "Place linked"), &placeLinked_);
+        help(NOX_TR("editor.waypoints.place_linked_help", "Each waypoint placed is linked from the selected one (a path laid out click by click)."));
+        ImGui::Checkbox(NOX_TRI("editor.waypoints.right_deletes", "Right click deletes"), &wpRightDeletes_);
+        help(NOX_TR("editor.waypoints.right_deletes_help", "A right click on a waypoint deletes it (else the right click opens the map's menu)."));
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("New links' classes");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.waypoints.new_link_classes", "New links' classes"));
         ImGui::SameLine();
         std::uint8_t f = linkFlags_;
         if (linkFlagsButton("newlinks", linkFlags_, f)) linkFlags_ = f;
         ImGui::SameLine();
-        if (ImGui::SmallButton("Default")) linkFlags_ = me::kDefaultLinkFlags;
-        help("0x80: the class roaming monsters and Blink use (every stock link has it).");
+        if (ImGui::SmallButton(NOX_TRI("editor.waypoints.default_classes", "Default"))) linkFlags_ = me::kDefaultLinkFlags;
+        help(NOX_TR("editor.waypoints.default_classes_help", "0x80: the class roaming monsters and Blink use (every stock link has it)."));
         ImGui::Spacing();
-        ImGui::TextWrapped("Snap: the toolbar's. Delete removes the selected waypoints (and the links to them).");
-        if (const auto from = currentWaypoint()) ImGui::TextDisabled("Links start from waypoint %u.", *from);
+        ImGui::TextWrapped("%s", NOX_TRC("editor.waypoints.tool_note", "Snap: the toolbar's. Delete removes the selected waypoints (and the links to them)."));
+        if (const auto from = currentWaypoint()) {
+            ImGui::TextDisabled("%s", format(NOX_TR("editor.waypoints.links_from", "Links start from waypoint {id}."), {{"id", *from}}).c_str());
+        }
         ImGui::Spacing();
-        if (ImGui::Button("Waypoints...")) showWaypoints = true;
-        flow("Enable All");
-        if (ImGui::Button("Enable All")) ed_.commands_.run("waypoint.enableAll");
-        help("Turns every waypoint on.");
+        if (ImGui::Button(NOX_TRI("editor.waypoints.open_list", "Waypoints..."))) showWaypoints = true;
+        const char* enableAll = NOX_TRI("editor.waypoints.enable_all", "Enable All");
+        flow(enableAll);
+        if (ImGui::Button(enableAll)) ed_.commands_.run("waypoint.enableAll");
+        help(NOX_TR("editor.waypoints.enable_all_help", "Turns every waypoint on."));
         return;
     }
-    ImGui::SeparatorText("Polygon");
+    ImGui::SeparatorText(NOX_TRC("editor.tool.polygon", "Polygon"));
     int mode = polyMode_ == PolyMode::Edit ? 0 : 1;
-    if (ImGui::RadioButton("Edit", &mode, 0)) polyMode_ = PolyMode::Edit;
-    help("Click inside a polygon selects it (the first in the list where they overlap, as the game picks); drag a corner to move it, drag "
-         "inside the selected polygon to move it whole; Shift+click an edge adds a corner; right click or Delete removes the corner picked.");
+    if (ImGui::RadioButton(NOX_TRI("editor.polygons.mode_edit", "Edit"), &mode, 0)) polyMode_ = PolyMode::Edit;
+    help(NOX_TR("editor.polygons.mode_edit_help", "Click inside a polygon selects it (the first in the list where they overlap, as the game picks); drag a corner to move it, drag "
+                                                  "inside the selected polygon to move it whole; Shift+click an edge adds a corner; right click or Delete removes the corner picked."));
     ImGui::SameLine();
-    if (ImGui::RadioButton("Draw new", &mode, 1) && polyMode_ != PolyMode::Draw) startDrawing();
-    help("Click the corners; Enter, a double click or a click on the first corner closes it (3 or more). It goes at the END of the list.");
-    ImGui::Checkbox("Snap to other polygons' corners", &polygonSnap_);
-    help("A corner dragged or drawn near another polygon's corner lands on it (so neighbours share edges with no gap). Else the toolbar's grid snap.");
+    if (ImGui::RadioButton(NOX_TRI("editor.polygons.mode_draw", "Draw new"), &mode, 1) && polyMode_ != PolyMode::Draw) startDrawing();
+    help(NOX_TR("editor.polygons.mode_draw_help", "Click the corners; Enter, a double click or a click on the first corner closes it (3 or more). It goes at the END of the list."));
+    ImGui::Checkbox(NOX_TRI("editor.polygons.snap_corners", "Snap to other polygons' corners"), &polygonSnap_);
+    help(NOX_TR("editor.polygons.snap_corners_help", "A corner dragged or drawn near another polygon's corner lands on it (so neighbours share edges with no gap). Else the toolbar's grid snap."));
     if (polygonSnap_) {
         ImGui::SetNextItemWidth(120 * ed_.imgui_->scale());
-        ImGui::SliderFloat("Snap radius (pixels)", &polygonSnapPx_, 4, 40, "%.0f");
+        ImGui::SliderFloat(NOX_TRI("editor.polygons.snap_radius", "Snap radius (pixels)"), &polygonSnapPx_, 4, 40, "%.0f");
     }
-    ImGui::Checkbox("Right click deletes a corner", &polyRightDeletes_);
-    ImGui::Checkbox("Ambient preview", &ambientPreview_);
-    help("Each polygon filled with its ambient light: dark ones more opaque.");
+    ImGui::Checkbox(NOX_TRI("editor.polygons.right_deletes", "Right click deletes a corner"), &polyRightDeletes_);
+    ImGui::Checkbox(NOX_TRI("editor.polygons.ambient_preview", "Ambient preview"), &ambientPreview_);
+    help(NOX_TR("editor.polygons.ambient_preview_help", "Each polygon filled with its ambient light: dark ones more opaque."));
     ImGui::Spacing();
     if (polyMode_ == PolyMode::Draw) {
-        ImGui::Text("%zu corners drawn", drawing_.size());
+        ImGui::TextUnformatted(format(NOX_TR("editor.polygons.corners_drawn", "{n} corners drawn"), {{"n", drawing_.size()}}).c_str());
         ImGui::BeginDisabled(drawing_.size() < 3);
-        if (ImGui::Button("Close Polygon")) finishDrawing();
+        if (ImGui::Button(NOX_TRI("editor.polygons.close", "Close Polygon"))) finishDrawing();
         ImGui::EndDisabled();
-        flow("Cancel");
-        if (ImGui::Button("Cancel")) cancelDrawing();
+        const char* cancel = NOX_TRI("editor.common.cancel", "Cancel");
+        flow(cancel);
+        if (ImGui::Button(cancel)) cancelDrawing();
     } else if (const auto key = selectedPolygon()) {
         const auto i = ed_.doc_.polygonIndex(*key);
         if (i) {
-            ImGui::Text("%s: %zu corners, position %zu of %zu", me::fromMapText(ed_.doc_.polygons.polygons[*i].name).c_str(),
-                        ed_.doc_.polygons.polygons[*i].points.size(), *i + 1, ed_.doc_.polygons.polygons.size());
+            ImGui::TextUnformatted(format(NOX_TR("editor.polygons.info", "{name}: {corners} corners, position {position} of {count}"),
+                                          {{"name", me::fromMapText(ed_.doc_.polygons.polygons[*i].name)},
+                                           {"corners", ed_.doc_.polygons.polygons[*i].points.size()},
+                                           {"position", *i + 1},
+                                           {"count", ed_.doc_.polygons.polygons.size()}})
+                                       .c_str());
         }
-        if (activeCorner_) ImGui::TextDisabled("Corner %zu picked (Delete removes it).", activeCorner_->second + 1);
+        if (activeCorner_) {
+            ImGui::TextDisabled("%s", format(NOX_TR("editor.polygons.corner_picked", "Corner {n} picked (Delete removes it)."), {{"n", activeCorner_->second + 1}}).c_str());
+        }
     }
-    if (ImGui::Button("Polygons...")) showPolygons = true;
+    if (ImGui::Button(NOX_TRI("editor.polygons.open_list", "Polygons..."))) showPolygons = true;
 }
 
 // --- Waypoint properties ---------------------------------------------------------------------------
@@ -1200,29 +1216,31 @@ void MarkerTools::waypointProperties()
     for (const auto& w : copies) ws.push_back(&w);
     const IdScope scope("wp" + std::to_string(*sel.begin()) + "." + std::to_string(sel.size()));
     if (ws.size() > 1) {
-        ImGui::SeparatorText((std::to_string(ws.size()) + " waypoints").c_str());
+        ImGui::SeparatorText(format(NOX_TR("editor.waypoints.n_waypoints", "{n} waypoints"), {{"n", ws.size()}}).c_str());
         std::uint32_t all = ~0u, any = 0;
         for (const auto* w : ws) {
             all &= w->flags;
             any |= w->flags;
         }
-        if (ImGui::Button("Enable")) ed_.perform(me::setWaypointsEnabledOp(doc, sel, true));
-        flow("Disable");
-        if (ImGui::Button("Disable")) ed_.perform(me::setWaypointsEnabledOp(doc, sel, false));
-        flow("Delete");
-        if (ImGui::Button("Delete")) ed_.deleteSelection();
-        ImGui::SeparatorText("Flags (on all)");
+        if (ImGui::Button(NOX_TRI("editor.markers.enable", "Enable"))) ed_.perform(me::setWaypointsEnabledOp(doc, sel, true));
+        const char* disable = NOX_TRI("editor.markers.disable", "Disable");
+        flow(disable);
+        if (ImGui::Button(disable)) ed_.perform(me::setWaypointsEnabledOp(doc, sel, false));
+        const char* del = NOX_TRI("editor.common.delete", "Delete");
+        flow(del);
+        if (ImGui::Button(del)) ed_.deleteSelection();
+        ImGui::SeparatorText(NOX_TRC("editor.waypoints.flags_all", "Flags (on all)"));
         std::uint32_t bit = 0;
         bool on = false;
         if (bitsField("wpflags", me::waypointFlagBits(), any, any & ~all, bit, on)) ed_.perform(me::setWaypointFlagOp(doc, sel, bit, on));
-        ImGui::SeparatorText("Links");
+        ImGui::SeparatorText(NOX_TRC("editor.waypoints.links", "Links"));
         std::size_t links = 0;
         for (const auto* w : ws) links += w->links.size();
-        ImGui::Text("%zu links from these waypoints", links);
-        if (ImGui::Button("Link them in a chain")) {
+        ImGui::TextUnformatted(format(NOX_TR("editor.waypoints.links_from_these", "{n} links from these waypoints"), {{"n", links}}).c_str());
+        if (ImGui::Button(NOX_TRI("editor.waypoints.chain", "Link them in a chain"))) {
             // In id order, one way (or both): one op.
             me::Op op;
-            op.label = "Link " + std::to_string(ws.size()) + " waypoints in a chain";
+            op.label = me::opLabel(ol::kLinkChain, {{"n", ws.size()}});
             me::MapDocument scratch = doc;
             for (std::size_t k = 0; k + 1 < ws.size(); ++k) {
                 const me::Op step = me::linkWaypointsOp(scratch, ws[k]->id, ws[k + 1]->id, bothWays_, linkFlags_);
@@ -1232,54 +1250,55 @@ void MarkerTools::waypointProperties()
             }
             ed_.perform(op);
         }
-        help("Each links to the next in id order (both ways when the tool's Both ways is on), with the tool's link classes.");
+        help(NOX_TR("editor.waypoints.chain_help", "Each links to the next in id order (both ways when the tool's Both ways is on), with the tool's link classes."));
         return;
     }
     const nm::Waypoint w = *ws.front();
-    ImGui::SeparatorText(("Waypoint " + std::to_string(w.id)).c_str());
+    ImGui::SeparatorText(format(NOX_TR("editor.waypoints.title", "Waypoint {id}"), {{"id", w.id}}).c_str());
     std::string text;
-    row("Name", "Scripts find waypoints by name (Waypoint(\"name\")). The map stores it as 8-bit text.");
+    row(NOX_TRC("editor.waypoints.name", "Name"), NOX_TRC("editor.waypoints.name_help", "Scripts find waypoints by name (Waypoint(\"name\")). The map stores it as 8-bit text."));
     if (textField("##wpname", me::fromMapText(w.name), me::kMarkerNameMax, text)) {
         nm::Waypoint c = w;
         c.name = text;
-        ed_.perform(me::setWaypointOp(doc, c, "Rename waypoint " + std::to_string(w.id)));
+        ed_.perform(me::setWaypointOp(doc, c, me::opLabel(ol::kRenameWaypoint, {{"id", w.id}})));
     }
-    row("Enabled", "Creatures, movers and scripts' waypoint searches use only enabled waypoints.");
+    row(NOX_TRC("editor.waypoints.enabled", "Enabled"), NOX_TRC("editor.waypoints.enabled_help", "Creatures, movers and scripts' waypoint searches use only enabled waypoints."));
     bool on = (w.flags & me::kWaypointEnabled) != 0;
     if (ImGui::Checkbox("##wpon", &on)) ed_.perform(me::setWaypointsEnabledOp(doc, {w.id}, on));
-    row("Position");
+    row(NOX_TRC("editor.waypoints.position", "Position"));
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2;
     float v = 0;
     ImGui::SetNextItemWidth(half);
     if (floatField("##wpx", w.x, v, 1, 0, me::kWorldSize - 1)) {
         nm::Waypoint c = w;
         c.x = v;
-        ed_.perform(me::setWaypointOp(doc, c, "Move waypoint " + std::to_string(w.id)));
+        ed_.perform(me::setWaypointOp(doc, c, me::opLabel(ol::kMoveWaypoint, {{"id", w.id}})));
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(half);
     if (floatField("##wpy", w.y, v, 1, 0, me::kWorldSize - 1)) {
         nm::Waypoint c = w;
         c.y = v;
-        ed_.perform(me::setWaypointOp(doc, c, "Move waypoint " + std::to_string(w.id)));
+        ed_.perform(me::setWaypointOp(doc, c, me::opLabel(ol::kMoveWaypoint, {{"id", w.id}})));
     }
-    ImGui::SeparatorText("Flags");
+    ImGui::SeparatorText(NOX_TRC("editor.markers.flags", "Flags"));
     std::uint32_t bit = 0;
     bool set = false;
     if (bitsField("wpflags", me::waypointFlagBits(), w.flags, 0, bit, set)) ed_.perform(me::setWaypointFlagOp(doc, {w.id}, bit, set));
     if (w.flags & me::kWaypointRegistered) {
-        ImGui::TextColored(editor::themeColours().error, "Flag 0x2 is the game's run-time mark: stored, it keeps the waypoint out of the searches.");
-        if (ImGui::Button("Clear 0x2")) ed_.perform(me::setWaypointFlagOp(doc, {w.id}, me::kWaypointRegistered, false));
+        ImGui::TextColored(editor::themeColours().error, "%s",
+                           NOX_TRC("editor.waypoints.flag2_warning", "Flag 0x2 is the game's run-time mark: stored, it keeps the waypoint out of the searches."));
+        if (ImGui::Button(NOX_TRI("editor.waypoints.clear_flag2", "Clear 0x2"))) ed_.perform(me::setWaypointFlagOp(doc, {w.id}, me::kWaypointRegistered, false));
     }
     const std::uint8_t mask = me::waypointRouteMask(doc, w.id);
-    ImGui::TextDisabled("Route classes it offers (its links and links to it): %s", hexText(mask).c_str());
-    help("The game gives each waypoint the classes of its own links and of the links pointing at it; a search takes a waypoint when its classes "
-         "meet the ones wanted (roaming monsters and Blink want 0x80).");
+    ImGui::TextDisabled("%s", format(NOX_TR("editor.waypoints.route_classes", "Route classes it offers (its links and links to it): {classes}"), {{"classes", hexText(mask)}}).c_str());
+    help(NOX_TR("editor.waypoints.route_classes_help", "The game gives each waypoint the classes of its own links and of the links pointing at it; a search takes a waypoint when its classes "
+                                                       "meet the ones wanted (roaming monsters and Blink want 0x80)."));
 
-    ImGui::SeparatorText(("Links (" + std::to_string(w.links.size()) + ")").c_str());
+    ImGui::SeparatorText(format(NOX_TR("editor.waypoints.links_n", "Links ({n})"), {{"n", w.links.size()}}).c_str());
     if (ImGui::BeginTable("##wplinks", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit)) {
-        ImGui::TableSetupColumn("To", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Classes");
+        ImGui::TableSetupColumn(NOX_TRI("editor.waypoints.col_to", "To"), ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("editor.waypoints.col_classes", "Classes"));
         ImGui::TableSetupColumn("");
         ImGui::TableSetupColumn("");
         for (std::size_t k = 0; k < w.links.size(); ++k) {
@@ -1289,30 +1308,31 @@ void MarkerTools::waypointProperties()
             ImGui::TableNextColumn();
             const auto* t = me::findWaypoint(doc, l.target);
             const bool back = t && std::ranges::any_of(t->links, [&](const nm::WaypointLink& b) { return b.target == w.id; });
-            const std::string label = std::to_string(l.target) + (t && !t->name.empty() ? " " + me::fromMapText(t->name) : "") + (back ? "  (both ways)" : "");
+            const std::string label = std::to_string(l.target) + (t && !t->name.empty() ? " " + me::fromMapText(t->name) : "") +
+                                      (back ? "  " + NOX_TR("editor.waypoints.both_ways_note", "(both ways)") : std::string());
             ImGui::TextUnformatted(label.c_str());
             ImGui::TableNextColumn();
             std::uint8_t f = l.flags;
             if (linkFlagsButton("lf", l.flags, f)) ed_.perform(me::setLinkFlagsOp(doc, w.id, l.target, f));
             ImGui::TableNextColumn();
-            if (ImGui::SmallButton("Go to") && t) {
+            if (ImGui::SmallButton(NOX_TRI("editor.waypoints.go_to", "Go to")) && t) {
                 locate(t->x, t->y);
                 selectWaypoints({t->id}, t->id);
             }
-            help("Select the waypoint it leads to and show it.");
+            help(NOX_TR("editor.waypoints.go_to_help", "Select the waypoint it leads to and show it."));
             ImGui::TableNextColumn();
-            if (ImGui::SmallButton("Remove")) ed_.perform(me::unlinkWaypointsOp(doc, w.id, l.target, false));
-            help("Removes this link (one way: the link back, if any, stays).");
+            if (ImGui::SmallButton(NOX_TRI("editor.waypoints.remove_link", "Remove"))) ed_.perform(me::unlinkWaypointsOp(doc, w.id, l.target, false));
+            help(NOX_TR("editor.waypoints.remove_link_help", "Removes this link (one way: the link back, if any, stays)."));
             ImGui::PopID();
         }
         ImGui::EndTable();
     }
     const auto from = w.id;
     const me::WorldPoint fromAt{w.x, w.y};
-    if (ImGui::Button("Add Link...")) {
+    if (ImGui::Button(NOX_TRI("editor.waypoints.add_link", "Add Link..."))) {
         MapEditor::PickRequest req;
         req.kind = MapEditor::PickRequest::Kind::Waypoint;
-        req.prompt = "Click the waypoint " + std::to_string(from) + " links to (Shift: both ways)";
+        req.prompt = format(NOX_TR("editor.waypoints.add_link_prompt", "Click the waypoint {id} links to (Shift: both ways)"), {{"id", from}});
         req.from = fromAt;
         req.owner = "waypoint.addLink";
         req.done = [this, from](const MapEditor::PickResult& r) {
@@ -1320,10 +1340,10 @@ void MarkerTools::waypointProperties()
         };
         ed_.beginPick(std::move(req));
     }
-    help("Pick the waypoint on the map. The new link gets the Waypoint tool's link classes.");
+    help(NOX_TR("editor.waypoints.add_link_help", "Pick the waypoint on the map. The new link gets the Waypoint tool's link classes."));
     const auto in = me::incomingLinks(doc, w.id);
     if (!in.empty()) {
-        ImGui::TextDisabled("Linked from:");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.waypoints.linked_from", "Linked from:"));
         for (const auto& [id, f] : in) {
             ImGui::SameLine();
             const std::string b = std::to_string(id) + "##in" + std::to_string(id);
@@ -1333,7 +1353,7 @@ void MarkerTools::waypointProperties()
                     selectWaypoints({id}, id);
                 }
             }
-            help(("A link from waypoint " + std::to_string(id) + " (classes " + hexText(f) + "): click to go to it.").c_str());
+            help(format(NOX_TR("editor.waypoints.incoming_help", "A link from waypoint {id} (classes {classes}): click to go to it."), {{"id", id}, {"classes", hexText(f)}}));
         }
     }
     // Objects naming it (a mover's waypoints) and waypoint groups with it: the Properties panel's
@@ -1356,11 +1376,12 @@ void MarkerTools::polygonProperties()
     }
     if (keys.empty()) return;
     if (keys.size() > 1) {
-        ImGui::SeparatorText((std::to_string(keys.size()) + " polygons").c_str());
-        if (ImGui::Button("Delete")) ed_.deleteSelection();
-        flow("Frame");
-        if (ImGui::Button("Frame")) frameKeys(ed_.selection_.polygons);
-        ImGui::TextWrapped("Select one polygon to edit its name, light, group, handlers and flags.");
+        ImGui::SeparatorText(format(NOX_TR("editor.polygons.n_polygons", "{n} polygons"), {{"n", keys.size()}}).c_str());
+        if (ImGui::Button(NOX_TRI("editor.common.delete", "Delete"))) ed_.deleteSelection();
+        const char* frame = NOX_TRI("editor.polygons.frame", "Frame");
+        flow(frame);
+        if (ImGui::Button(frame)) frameKeys(ed_.selection_.polygons);
+        ImGui::TextWrapped("%s", NOX_TRC("editor.polygons.select_one", "Select one polygon to edit its name, light, group, handlers and flags."));
         for (const auto k : keys) {
             const auto i = *doc.polygonIndex(k);
             ImGui::BulletText("%zu. %s", i + 1, me::fromMapText(doc.polygons.polygons[i].name).c_str());
@@ -1371,88 +1392,96 @@ void MarkerTools::polygonProperties()
     const std::size_t i = *doc.polygonIndex(key);
     const nm::Polygon p = doc.polygons.polygons[i]; // (a copy: ops below replace the list)
     const IdScope scope("poly" + std::to_string(key));
-    ImGui::SeparatorText(("Polygon: " + me::fromMapText(p.name)).c_str());
+    ImGui::SeparatorText(format(NOX_TR("editor.polygons.title", "Polygon: {name}"), {{"name", me::fromMapText(p.name)}}).c_str());
     const auto commit = [&](nm::Polygon n, const std::string& label) { ed_.perform(me::setPolygonPropsOp(doc, key, n, label)); };
     std::string text;
-    row("Name", "Its name (shown in the editor; scripts don't name polygons).");
+    row(NOX_TRC("editor.polygons.name", "Name"), NOX_TRC("editor.polygons.name_help", "Its name (shown in the editor; scripts don't name polygons)."));
     if (textField("##polyname", me::fromMapText(p.name), me::kMarkerNameMax, text)) {
         nm::Polygon n = p;
         n.name = text;
-        commit(n, "Rename polygon " + text);
+        commit(n, me::opLabel(ol::kRenamePolygon, {{"name", text}}));
     }
-    row("Ambient light",
-        "Its ambient light: while the view's centre (the player) is inside it, the game lights the whole view with this colour, "
-        "switching at once on entering (no fade). Where polygons overlap, the one entered first keeps the light; otherwise the "
-        "first in the list. Outside every polygon the map's own ambient light (Map Info) applies.");
+    row(NOX_TRC("editor.polygons.ambient", "Ambient light"),
+        NOX_TRC("editor.polygons.ambient_help",
+                "Its ambient light: while the view's centre (the player) is inside it, the game lights the whole view with this colour, "
+                "switching at once on entering (no fade). Where polygons overlap, the one entered first keeps the light; otherwise the "
+                "first in the list. Outside every polygon the map's own ambient light (Map Info) applies."));
     std::array<std::uint8_t, 3> c{};
     if (colourField("##polyambient", p.ambientLight, c)) {
         nm::Polygon n = p;
         n.ambientLight = c;
-        commit(n, "Polygon ambient light");
+        commit(n, me::opLabel(ol::kPolygonAmbient));
     }
-    row("Minimap group", "The minimap group of the walls inside it (0-255; 100: none). The game's minimap shows a group's walls once one is seen.");
+    row(NOX_TRC("editor.polygons.minimap_group", "Minimap group"),
+        NOX_TRC("editor.polygons.minimap_group_help", "The minimap group of the walls inside it (0-255; 100: none). The game's minimap shows a group's walls once one is seen."));
     int g = 0;
     ImGui::SetNextItemWidth(std::max(80.0f, ImGui::GetContentRegionAvail().x - 70 * ed_.imgui_->scale()));
     if (intField("##polygroup", p.minimapGroup, g, 0, 255)) {
         nm::Polygon n = p;
         n.minimapGroup = static_cast<std::uint8_t>(g);
-        commit(n, "Polygon minimap group " + std::to_string(g));
+        commit(n, me::opLabel(ol::kPolygonMinimapGroup, {{"n", g}}));
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(p.minimapGroup == me::kNoMinimapGroup);
-    if (ImGui::SmallButton("None")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.polygons.no_group", "None"))) {
         nm::Polygon n = p;
         n.minimapGroup = me::kNoMinimapGroup;
-        commit(n, "Polygon minimap group none");
+        commit(n, me::opLabel(ol::kPolygonMinimapNone));
     }
     ImGui::EndDisabled();
-    help("100: no group (what walls outside every polygon get).");
-    ImGui::SeparatorText("Handlers");
-    row("Player enters", "The script function called when a player walks in.");
+    help(NOX_TR("editor.polygons.no_group_help", "100: no group (what walls outside every polygon get)."));
+    ImGui::SeparatorText(NOX_TRC("editor.polygons.handlers", "Handlers"));
+    row(NOX_TRC("editor.polygons.player_enters", "Player enters"), NOX_TRC("editor.polygons.player_enters_help", "The script function called when a player walks in."));
     std::string fn = p.playerEnter.function;
     if (ed_.scriptPanel_->functionPicker("Player enters", fn)) {
         nm::Polygon n = p;
         n.playerEnter.function = fn;
-        commit(n, "Polygon player-enter handler " + (fn.empty() ? std::string("none") : fn));
+        commit(n, fn.empty() ? me::opLabel(ol::kPolygonPlayerHandlerNone)
+                             : me::opLabel(ol::kPolygonPlayerHandler, {{"function", fn}}));
     }
-    help("The script function called when a player walks in.");
-    row("Monster enters", "The script function called when a monster walks in (monsters look only at polygons with a handler).");
+    help(NOX_TR("editor.polygons.player_enters_help", "The script function called when a player walks in."));
+    row(NOX_TRC("editor.polygons.monster_enters", "Monster enters"),
+        NOX_TRC("editor.polygons.monster_enters_help", "The script function called when a monster walks in (monsters look only at polygons with a handler)."));
     fn = p.monsterEnter.function;
     if (ed_.scriptPanel_->functionPicker("Monster enters", fn)) {
         nm::Polygon n = p;
         n.monsterEnter.function = fn;
-        commit(n, "Polygon monster-enter handler " + (fn.empty() ? std::string("none") : fn));
+        commit(n, fn.empty() ? me::opLabel(ol::kPolygonMonsterHandlerNone)
+                             : me::opLabel(ol::kPolygonMonsterHandler, {{"function", fn}}));
     }
-    help("The script function called when a monster walks in (monsters look only at polygons with a handler).");
-    ImGui::SeparatorText("Flags");
+    help(NOX_TR("editor.polygons.monster_enters_help", "The script function called when a monster walks in (monsters look only at polygons with a handler)."));
+    ImGui::SeparatorText(NOX_TRC("editor.markers.flags", "Flags"));
     std::uint32_t bit = 0;
     bool on = false;
     if (bitsField("polyflags", me::polygonFlagBits(), p.flags, 0, bit, on)) {
         nm::Polygon n = p;
         n.flags = on ? (p.flags | bit) : (p.flags & ~bit);
-        commit(n, std::string(on ? "Set" : "Clear") + " polygon flag " + hexText(bit));
+        commit(n, me::opLabel(on ? ol::kPolygonFlagSet : ol::kPolygonFlagClear,
+                         {{"bit", hexText(bit)}}));
     }
-    ImGui::SeparatorText("Order");
-    ImGui::Text("Position %zu of %zu", i + 1, doc.polygons.polygons.size());
-    help("The game takes the FIRST polygon in the list that holds a point: where polygons overlap, the earlier one wins.");
+    ImGui::SeparatorText(NOX_TRC("editor.polygons.order", "Order"));
+    ImGui::TextUnformatted(format(NOX_TR("editor.polygons.position", "Position {position} of {count}"), {{"position", i + 1}, {"count", doc.polygons.polygons.size()}}).c_str());
+    help(NOX_TR("editor.polygons.position_help", "The game takes the FIRST polygon in the list that holds a point: where polygons overlap, the earlier one wins."));
     ImGui::SameLine();
     ImGui::BeginDisabled(i == 0);
     if (ImGui::ArrowButton("##up", ImGuiDir_Up)) ed_.perform(me::reorderPolygonOp(doc, key, i - 1));
     ImGui::EndDisabled();
-    help("Earlier in the list: it wins over the ones after it where they overlap.");
+    help(NOX_TR("editor.polygons.earlier_help", "Earlier in the list: it wins over the ones after it where they overlap."));
     ImGui::SameLine();
     ImGui::BeginDisabled(i + 1 >= doc.polygons.polygons.size());
     if (ImGui::ArrowButton("##down", ImGuiDir_Down)) ed_.perform(me::reorderPolygonOp(doc, key, i + 1));
     ImGui::EndDisabled();
-    flow("First");
-    if (ImGui::SmallButton("First")) ed_.perform(me::reorderPolygonOp(doc, key, 0));
-    flow("Last");
-    if (ImGui::SmallButton("Last")) ed_.perform(me::reorderPolygonOp(doc, key, doc.polygons.polygons.size() - 1));
+    const char* first = NOX_TRI("editor.polygons.first", "First");
+    flow(first);
+    if (ImGui::SmallButton(first)) ed_.perform(me::reorderPolygonOp(doc, key, 0));
+    const char* last = NOX_TRI("editor.polygons.last", "Last");
+    flow(last);
+    if (ImGui::SmallButton(last)) ed_.perform(me::reorderPolygonOp(doc, key, doc.polygons.polygons.size() - 1));
     const auto now = doc.polygonIndex(key); // (it may have moved in the list above)
     if (!now) return;
     const auto corners = me::polygonCorners(doc, *now);
-    ImGui::SeparatorText(("Corners (" + std::to_string(corners.size()) + ")").c_str());
-    ImGui::TextDisabled("Drag them with the Polygon tool; Shift+click an edge adds one.");
+    ImGui::SeparatorText(format(NOX_TR("editor.polygons.corners_n", "Corners ({n})"), {{"n", corners.size()}}).c_str());
+    ImGui::TextDisabled("%s", NOX_TRC("editor.polygons.corners_note", "Drag them with the Polygon tool; Shift+click an edge adds one."));
     if (ImGui::BeginTable("##corners", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY,
                           ImVec2(0, std::min(10.0f, static_cast<float>(corners.size()) + 1.5f) * ImGui::GetTextLineHeightWithSpacing()))) {
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 30 * ed_.imgui_->scale());
@@ -1475,10 +1504,11 @@ void MarkerTools::polygonProperties()
         }
         ImGui::EndTable();
     }
-    if (ImGui::Button("Frame")) frameKeys({key});
-    flow("Edit Corners");
-    if (ImGui::Button("Edit Corners")) ed_.tool_ = MapEditor::Tool::Polygon;
-    help("The Polygon tool: drag corners, Shift+click edges, right click deletes a corner.");
+    if (ImGui::Button(NOX_TRI("editor.polygons.frame", "Frame"))) frameKeys({key});
+    const char* editCorners = NOX_TRI("editor.polygons.edit_corners", "Edit Corners");
+    flow(editCorners);
+    if (ImGui::Button(editCorners)) ed_.tool_ = MapEditor::Tool::Polygon;
+    help(NOX_TR("editor.polygons.edit_corners_help", "The Polygon tool: drag corners, Shift+click edges, right click deletes a corner."));
 }
 
 // --- Panels ------------------------------------------------------------------------------------------
@@ -1537,7 +1567,7 @@ void MarkerTools::panels()
 void MarkerTools::waypointsPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(360 * ed_.imgui_->scale(), 420 * ed_.imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Waypoints", &showWaypoints)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.waypoints", "Waypoints"), &showWaypoints)) {
         ImGui::End();
         return;
     }
@@ -1549,36 +1579,41 @@ void MarkerTools::waypointsPanel()
         links += w.links.size();
     }
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##wpsearch", "Search by number or name", wpSearch_, sizeof wpSearch_);
+    ImGui::InputTextWithHint("##wpsearch", NOX_TRC("editor.waypoints.search_hint", "Search by number or name"), wpSearch_, sizeof wpSearch_);
     const std::string q = lowered(wpSearch_);
     std::vector<std::size_t> rows;
     for (std::size_t i = 0; i < list.size(); ++i) {
         if (q.empty() || std::to_string(list[i].id).find(q) != std::string::npos || lowered(me::fromMapText(list[i].name)).find(q) != std::string::npos) rows.push_back(i);
     }
-    ImGui::Text("%zu waypoints, %zu enabled, %zu links", list.size(), enabled, links);
+    ImGui::TextUnformatted(format(NOX_TR("editor.waypoints.counts", "{n} waypoints, {enabled} enabled, {links} links"),
+                                  {{"n", list.size()}, {"enabled", enabled}, {"links", links}})
+                               .c_str());
     if (!q.empty()) {
         ImGui::SameLine();
-        ImGui::TextDisabled("(%zu listed)", rows.size());
+        ImGui::TextDisabled("%s", format(NOX_TR("editor.common.n_listed", "({n} listed)"), {{"n", rows.size()}}).c_str());
     }
     std::set<std::uint32_t> listed;
     for (const auto r : rows) listed.insert(list[r].id);
     bool changed = false;
     ImGui::BeginDisabled(listed.empty());
-    if (ImGui::Button("Enable All")) changed = ed_.perform(me::setWaypointsEnabledOp(doc, listed, true));
-    help("Turns every listed waypoint on (with no search: every waypoint). The old editor's button of this name deleted them all.");
-    flow("Disable All");
-    if (ImGui::Button("Disable All")) changed = ed_.perform(me::setWaypointsEnabledOp(doc, listed, false));
-    help("Turns every listed waypoint off.");
-    flow("Select Listed");
-    if (ImGui::Button("Select Listed")) selectWaypoints(listed);
-    flow("Delete Listed");
-    if (ImGui::Button("Delete Listed")) {
+    if (ImGui::Button(NOX_TRI("editor.waypoints.enable_all", "Enable All"))) changed = ed_.perform(me::setWaypointsEnabledOp(doc, listed, true));
+    help(NOX_TR("editor.waypoints.enable_listed_help", "Turns every listed waypoint on (with no search: every waypoint). The old editor's button of this name deleted them all."));
+    const char* disableAll = NOX_TRI("editor.waypoints.disable_all", "Disable All");
+    flow(disableAll);
+    if (ImGui::Button(disableAll)) changed = ed_.perform(me::setWaypointsEnabledOp(doc, listed, false));
+    help(NOX_TR("editor.waypoints.disable_listed_help", "Turns every listed waypoint off."));
+    const char* selectListed = NOX_TRI("editor.waypoints.select_listed", "Select Listed");
+    flow(selectListed);
+    if (ImGui::Button(selectListed)) selectWaypoints(listed);
+    const char* deleteListed = NOX_TRI("editor.waypoints.delete_listed", "Delete Listed");
+    flow(deleteListed);
+    if (ImGui::Button(deleteListed)) {
         me::Selection s;
         s.waypoints = listed;
         changed = ed_.perform(me::deleteOp(doc, s));
         if (changed) ed_.setSelection({}, true);
     }
-    help("Deletes every listed waypoint and the links to them (undoable).");
+    help(NOX_TR("editor.waypoints.delete_listed_help", "Deletes every listed waypoint and the links to them (undoable)."));
     ImGui::EndDisabled();
     if (changed) {
         ImGui::End(); // (the list is drawn again next frame, from the changed waypoints)
@@ -1587,12 +1622,12 @@ void MarkerTools::waypointsPanel()
     if (ImGui::BeginTable("##wps", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable |
                                           ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Id", ImGuiTableColumnFlags_DefaultSort, 0.55f);
-        ImGui::TableSetupColumn("Name", 0, 1.6f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.waypoints.col_id", "Id"), ImGuiTableColumnFlags_DefaultSort, 0.55f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.waypoints.col_name", "Name"), 0, 1.6f);
         ImGui::TableSetupColumn("X", 0, 0.65f);
         ImGui::TableSetupColumn("Y", 0, 0.65f);
-        ImGui::TableSetupColumn("On", 0, 0.4f);
-        ImGui::TableSetupColumn("Links", 0, 0.5f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.waypoints.col_on", "On"), 0, 0.4f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.waypoints.col_links", "Links"), 0, 0.5f);
         ImGui::TableHeadersRow();
         if (const ImGuiTableSortSpecs* ss = ImGui::TableGetSortSpecs(); ss && ss->SpecsCount > 0) {
             const int c = ss->Specs[0].ColumnIndex;
@@ -1638,7 +1673,7 @@ void MarkerTools::waypointsPanel()
                     }
                     if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) locate(w.x, w.y, true);
                 }
-                editor::help("Double click to go to it; Ctrl / Shift to select several.");
+                editor::help(NOX_TR("editor.waypoints.row_help", "Double click to go to it; Ctrl / Shift to select several."));
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(me::fromMapText(w.name).c_str());
                 ImGui::TableNextColumn();
@@ -1646,7 +1681,7 @@ void MarkerTools::waypointsPanel()
                 ImGui::TableNextColumn();
                 ImGui::Text("%.0f", w.y);
                 ImGui::TableNextColumn();
-                ImGui::TextUnformatted((w.flags & me::kWaypointEnabled) ? "on" : "-");
+                ImGui::TextUnformatted((w.flags & me::kWaypointEnabled) ? NOX_TRC("editor.waypoints.on", "on") : "-");
                 ImGui::TableNextColumn();
                 ImGui::Text("%zu", w.links.size());
             }
@@ -1659,50 +1694,51 @@ void MarkerTools::waypointsPanel()
 void MarkerTools::polygonsPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(360 * ed_.imgui_->scale(), 420 * ed_.imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Polygons", &showPolygons)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.polygons", "Polygons"), &showPolygons)) {
         ImGui::End();
         return;
     }
     auto& doc = ed_.doc_;
     const auto& list = doc.polygons.polygons;
-    ImGui::TextDisabled("%zu polygons, in the game's order", list.size());
-    help("The list order is the game's priority: it takes the FIRST polygon that holds a point, so where polygons overlap the earlier one "
-         "wins (its light, its handlers, its minimap group).");
-    if (ImGui::Button("New")) startDrawing();
-    help("Draw a new polygon on the map (the Polygon tool's Draw mode). It goes at the end of the list.");
+    ImGui::TextDisabled("%s", format(NOX_TR("editor.polygons.count", "{n} polygons, in the game's order"), {{"n", list.size()}}).c_str());
+    help(NOX_TR("editor.polygons.count_help", "The list order is the game's priority: it takes the FIRST polygon that holds a point, so where polygons overlap the earlier one "
+                                              "wins (its light, its handlers, its minimap group)."));
+    if (ImGui::Button(NOX_TRI("editor.markers.new", "New"))) startDrawing();
+    help(NOX_TR("editor.polygons.new_help", "Draw a new polygon on the map (the Polygon tool's Draw mode). It goes at the end of the list."));
     const auto sel = selectedPolygon();
     const auto si = sel ? doc.polygonIndex(*sel) : std::nullopt;
-    flow("Delete");
+    const char* del = NOX_TRI("editor.common.delete", "Delete");
+    flow(del);
     ImGui::BeginDisabled(ed_.selection_.polygons.empty());
-    if (ImGui::Button("Delete")) {
+    if (ImGui::Button(del)) {
         if (ed_.perform(me::deletePolygonsOp(doc, ed_.selection_.polygons))) ed_.setSelection({}, true);
     }
-    help("Deletes the selected polygons (undoable).");
+    help(NOX_TR("editor.polygons.delete_help", "Deletes the selected polygons (undoable)."));
     ImGui::EndDisabled();
     flow("WW");
     ImGui::BeginDisabled(!si || *si == 0);
     if (ImGui::ArrowButton("##pup", ImGuiDir_Up)) ed_.perform(me::reorderPolygonOp(doc, *sel, *si - 1));
     ImGui::EndDisabled();
-    help("Move the selected polygon up: earlier polygons win where they overlap.");
+    help(NOX_TR("editor.polygons.up_help", "Move the selected polygon up: earlier polygons win where they overlap."));
     flow("WW");
     ImGui::BeginDisabled(!si || *si + 1 >= list.size());
     if (ImGui::ArrowButton("##pdown", ImGuiDir_Down)) ed_.perform(me::reorderPolygonOp(doc, *sel, *si + 1));
     ImGui::EndDisabled();
-    help("Move the selected polygon down.");
-    ImGui::Checkbox("Ambient preview", &ambientPreview_);
-    help("Fill each polygon with its ambient light on the map.");
+    help(NOX_TR("editor.polygons.down_help", "Move the selected polygon down."));
+    ImGui::Checkbox(NOX_TRI("editor.polygons.ambient_preview", "Ambient preview"), &ambientPreview_);
+    help(NOX_TR("editor.polygons.ambient_fill_help", "Fill each polygon with its ambient light on the map."));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##polysearch", "Search by name or handler", polySearch_, sizeof polySearch_);
+    ImGui::InputTextWithHint("##polysearch", NOX_TRC("editor.polygons.search_hint", "Search by name or handler"), polySearch_, sizeof polySearch_);
     const std::string q = lowered(polySearch_);
     if (ImGui::BeginTable("##polys", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable |
                                             ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("#", 0, 0.35f);
-        ImGui::TableSetupColumn("Name", 0, 1.6f);
-        ImGui::TableSetupColumn("Light", 0, 0.5f);
-        ImGui::TableSetupColumn("Pts", 0, 0.4f);
-        ImGui::TableSetupColumn("Grp", 0, 0.4f);
-        ImGui::TableSetupColumn("Handlers", 0, 1.2f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.polygons.col_name", "Name"), 0, 1.6f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.polygons.col_light", "Light"), 0, 0.5f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.polygons.col_points", "Pts"), 0, 0.4f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.polygons.col_group", "Grp"), 0, 0.4f);
+        ImGui::TableSetupColumn(NOX_TRI("editor.polygons.col_handlers", "Handlers"), 0, 1.2f);
         ImGui::TableHeadersRow();
         for (std::size_t i = 0; i < list.size(); ++i) {
             const auto& p = list[i];
@@ -1720,12 +1756,12 @@ void MarkerTools::polygonsPanel()
                 selectPolygon(key, ImGui::GetIO().KeyCtrl);
                 if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) frameKeys({key});
             }
-            editor::help("Click selects it on the map; double click frames it.");
+            editor::help(NOX_TR("editor.polygons.row_help", "Click selects it on the map; double click frames it."));
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(name.c_str());
             if (p.flags & 1) {
                 ImGui::SameLine();
-                ImGui::TextColored(editor::themeColours().warning, "secret");
+                ImGui::TextColored(editor::themeColours().warning, "%s", NOX_TRC("editor.polygons.secret", "secret"));
             }
             ImGui::TableNextColumn();
             const ImVec2 sw(ImGui::GetTextLineHeight() * 1.6f, ImGui::GetTextLineHeight());
@@ -1739,8 +1775,10 @@ void MarkerTools::polygonsPanel()
             else ImGui::Text("%d", p.minimapGroup);
             ImGui::TableNextColumn();
             std::string h;
-            if (!p.playerEnter.function.empty()) h += "player: " + p.playerEnter.function;
-            if (!p.monsterEnter.function.empty()) h += (h.empty() ? "" : ", ") + std::string("monster: ") + p.monsterEnter.function;
+            if (!p.playerEnter.function.empty()) h += format(NOX_TR("editor.polygons.handler_player", "player: {function}"), {{"function", p.playerEnter.function}});
+            if (!p.monsterEnter.function.empty()) {
+                h += (h.empty() ? "" : ", ") + format(NOX_TR("editor.polygons.handler_monster", "monster: {function}"), {{"function", p.monsterEnter.function}});
+            }
             ImGui::TextUnformatted(h.c_str());
         }
         ImGui::EndTable();
@@ -1763,26 +1801,28 @@ std::string MarkerTools::memberLabel(const nm::Group& g, std::size_t i) const
                 return s;
             }
         }
-        return "#" + std::to_string(ext) + " (no object has it)";
+        return format(NOX_TR("editor.groups.member_no_object", "#{extent} (no object has it)"), {{"extent", ext}});
     }
     case nm::Group::Kind::Waypoints: {
         const auto* w = me::findWaypoint(doc, static_cast<std::uint32_t>(g.members[i]));
-        if (!w) return "Waypoint " + std::to_string(g.members[i]) + " (missing)";
-        return "Waypoint " + std::to_string(w->id) + (w->name.empty() ? "" : " \"" + me::fromMapText(w->name) + "\"");
+        if (!w) return format(NOX_TR("editor.groups.member_waypoint_missing", "Waypoint {id} (missing)"), {{"id", g.members[i]}});
+        return format(NOX_TR("editor.waypoints.title", "Waypoint {id}"), {{"id", w->id}}) + (w->name.empty() ? "" : " \"" + me::fromMapText(w->name) + "\"");
     }
     case nm::Group::Kind::Walls: {
         const auto& p = g.walls[i];
-        std::string s = "Wall " + std::to_string(p.x) + "," + std::to_string(p.y);
+        std::string s = format(NOX_TR("editor.groups.member_wall", "Wall {x},{y}"), {{"x", p.x}, {"y", p.y}});
         if (p.x >= 0 && p.x < 256 && p.y >= 0 && p.y < 256) {
             const auto it = doc.walls.find(me::Cell{static_cast<std::uint8_t>(p.x), static_cast<std::uint8_t>(p.y)});
-            if (it == doc.walls.end()) s += " (no wall)";
+            if (it == doc.walls.end()) s += " " + NOX_TR("editor.groups.member_no_wall", "(no wall)");
             else if (it->second.material < ed_.things_.walls.size()) s += " " + ed_.things_.walls[it->second.material].name;
         }
         return s;
     }
     case nm::Group::Kind::Unknown3: {
         const auto* sub = me::findGroupById(doc, g.members[i]);
-        return "Group " + std::to_string(g.members[i]) + (sub ? " \"" + me::fromMapText(sub->name) + "\" (" + me::groupKindName(sub->kind) + ")" : " (missing)");
+        return sub ? format(NOX_TR("editor.groups.member_group", "Group {id} \"{name}\" ({kind})"),
+                            {{"id", g.members[i]}, {"name", me::fromMapText(sub->name)}, {"kind", me::groupKindName(sub->kind)}})
+                   : format(NOX_TR("editor.groups.member_group_missing", "Group {id} (missing)"), {{"id", g.members[i]}});
     }
     }
     return "?";
@@ -1815,8 +1855,10 @@ void MarkerTools::pickMembers(std::uint32_t key)
     req.kind = g.kind == nm::Group::Kind::Objects ? MapEditor::PickRequest::Kind::Object
              : g.kind == nm::Group::Kind::Waypoints ? MapEditor::PickRequest::Kind::Waypoint
                                                     : MapEditor::PickRequest::Kind::Wall;
-    req.prompt = "Click " + std::string(g.kind == nm::Group::Kind::Objects ? "objects" : g.kind == nm::Group::Kind::Waypoints ? "waypoints" : "walls") +
-                 " to add to " + me::fromMapText(g.name) + " (Shift+click removes)";
+    req.prompt = format(g.kind == nm::Group::Kind::Objects     ? NOX_TR("editor.groups.pick_objects", "Click objects to add to {group} (Shift+click removes)")
+                        : g.kind == nm::Group::Kind::Waypoints ? NOX_TR("editor.groups.pick_waypoints", "Click waypoints to add to {group} (Shift+click removes)")
+                                                               : NOX_TR("editor.groups.pick_walls", "Click walls to add to {group} (Shift+click removes)"),
+                        {{"group", me::fromMapText(g.name)}});
     req.repeat = true;
     req.owner = "group.members";
     req.done = [this, key](const MapEditor::PickResult& r) {
@@ -1825,7 +1867,7 @@ void MarkerTools::pickMembers(std::uint32_t key)
         if (r.waypoint) s.waypoints.insert(*r.waypoint);
         if (r.wall) s.walls.insert(*r.wall);
         const me::Op op = r.shift ? me::removeGroupMembersOp(ed_.doc_, key, s) : me::addGroupMembersOp(ed_.doc_, key, s);
-        if (op.empty()) ed_.status(r.shift ? "Not a member" : "Already a member");
+        if (op.empty()) ed_.status(r.shift ? NOX_TR("editor.groups.not_member", "Not a member") : NOX_TR("editor.groups.already_member", "Already a member"));
         else ed_.perform(op);
     };
     ed_.beginPick(std::move(req));
@@ -1835,7 +1877,7 @@ void MarkerTools::pickMembers(std::uint32_t key)
 void MarkerTools::groupsPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(380 * ed_.imgui_->scale(), 520 * ed_.imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Groups", &showGroups)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.groups", "Groups"), &showGroups)) {
         ImGui::End();
         return;
     }
@@ -1843,17 +1885,19 @@ void MarkerTools::groupsPanel()
     const auto& list = doc.groups.groups;
     // A new group.
     ImGui::SetNextItemWidth(160 * ed_.imgui_->scale());
-    ImGui::InputTextWithHint("##newgroup", "New group's name", newGroupName_, sizeof newGroupName_);
-    help("Scripts find a group by its name (ObjectGroup(\"name\"), WaypointGroup, WallGroup).");
+    ImGui::InputTextWithHint("##newgroup", NOX_TRC("editor.groups.new_name_hint", "New group's name"), newGroupName_, sizeof newGroupName_);
+    help(NOX_TR("editor.groups.new_name_help", "Scripts find a group by its name (ObjectGroup(\"name\"), WaypointGroup, WallGroup)."));
     flow("Waypoints  WW");
     ImGui::SetNextItemWidth(110 * ed_.imgui_->scale());
-    const char* kinds[] = {"Objects", "Waypoints", "Walls", "Groups"};
+    const char* kinds[] = {NOX_TRC("editor.groups.kind_objects", "Objects"), NOX_TRC("editor.groups.kind_waypoints", "Waypoints"),
+                           NOX_TRC("editor.groups.kind_walls", "Walls"), NOX_TRC("editor.groups.kind_groups", "Groups")};
     ImGui::Combo("##newkind", &newGroupKind_, kinds, 4);
-    help("What its members are: objects (by extent), waypoints, walls, or other groups (a group of groups: the scripts' for-each walks each).");
-    flow("Create");
+    help(NOX_TR("editor.groups.new_kind_help", "What its members are: objects (by extent), waypoints, walls, or other groups (a group of groups: the scripts' for-each walks each)."));
+    const char* create = NOX_TRI("editor.groups.create", "Create");
+    flow(create);
     const std::string newName = me::toMapText(newGroupName_);
     ImGui::BeginDisabled(newName.empty() || newName.size() > me::kGroupNameMax);
-    if (ImGui::Button("Create")) {
+    if (ImGui::Button(create)) {
         std::uint32_t key = 0;
         if (ed_.perform(me::addGroupOp(doc, newName, kKinds[newGroupKind_], &key))) {
             openGroup_ = key;
@@ -1861,17 +1905,17 @@ void MarkerTools::groupsPanel()
         }
     }
     ImGui::EndDisabled();
-    if (newName.size() > me::kGroupNameMax) ImGui::TextColored(editor::themeColours().error, "Longer than the game's 75-byte name buffer.");
+    if (newName.size() > me::kGroupNameMax) ImGui::TextColored(editor::themeColours().error, "%s", NOX_TRC("editor.groups.name_too_long", "Longer than the game's 75-byte name buffer."));
 
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##groupsearch", "Search groups", groupSearch_, sizeof groupSearch_);
+    ImGui::InputTextWithHint("##groupsearch", NOX_TRC("editor.groups.search_hint", "Search groups"), groupSearch_, sizeof groupSearch_);
     const std::string q = lowered(groupSearch_);
     const float listH = openGroup_ ? std::min(9.0f, static_cast<float>(list.size()) + 1.5f) * ImGui::GetTextLineHeightWithSpacing() : 0.0f;
     if (ImGui::BeginTable("##groups", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV, ImVec2(0, listH))) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthFixed, 70 * ed_.imgui_->scale());
-        ImGui::TableSetupColumn("Members", ImGuiTableColumnFlags_WidthFixed, 56 * ed_.imgui_->scale());
+        ImGui::TableSetupColumn(NOX_TRI("editor.groups.col_name", "Name"), ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("editor.groups.col_kind", "Kind"), ImGuiTableColumnFlags_WidthFixed, 70 * ed_.imgui_->scale());
+        ImGui::TableSetupColumn(NOX_TRI("editor.groups.col_members", "Members"), ImGuiTableColumnFlags_WidthFixed, 56 * ed_.imgui_->scale());
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 16 * ed_.imgui_->scale());
         ImGui::TableHeadersRow();
         for (std::size_t i = 0; i < list.size(); ++i) {
@@ -1881,7 +1925,7 @@ void MarkerTools::groupsPanel()
             const std::uint32_t key = i < doc.groupKeys.size() ? doc.groupKeys[i] : 0;
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            const std::string label = (name.empty() ? std::string("(no name)") : name) + "##g" + std::to_string(key);
+            const std::string label = (name.empty() ? NOX_TR("editor.groups.no_name", "(no name)") : name) + "##g" + std::to_string(key);
             if (ImGui::Selectable(label.c_str(), openGroup_ == key, ImGuiSelectableFlags_SpanAllColumns)) {
                 if (openGroup_ != key) {
                     if (pickingMembers_) ed_.cancelPick();
@@ -1890,7 +1934,7 @@ void MarkerTools::groupsPanel()
             }
             if (const auto h = ed_.otherHolder(me::ElementKey::group(key))) {
                 ImGui::SameLine();
-                ImGui::TextColored(editor::themeColours().caution, "(being edited by %s)", ed_.peerName(*h).c_str());
+                ImGui::TextColored(editor::themeColours().caution, "%s", format(NOX_TR("editor.groups.being_edited", "(being edited by {who})"), {{"who", ed_.peerName(*h)}}).c_str());
             }
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(me::groupKindName(g.kind));
@@ -1909,32 +1953,36 @@ void MarkerTools::groupsPanel()
         }
         ImGui::EndTable();
     }
-    if (list.empty()) ImGui::TextDisabled("No groups yet.");
+    if (list.empty()) ImGui::TextDisabled("%s", NOX_TRC("editor.groups.none", "No groups yet."));
     if (openGroup_) {
         if (const auto gi = doc.groupIndex(*openGroup_)) groupDetails(*gi);
     }
     // The kind change's confirmation (members are cleared: a destructive change).
-    if (kindChange_) ImGui::OpenPopup("Change group kind?");
-    if (ImGui::BeginPopupModal("Change group kind?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (kindChange_) ImGui::OpenPopup(NOX_TRI("editor.groups.change_kind_title", "Change group kind?"));
+    if (ImGui::BeginPopupModal(NOX_TRI("editor.groups.change_kind_title", "Change group kind?"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const auto gi = kindChange_ ? doc.groupIndex(kindChange_->first) : std::nullopt;
         if (!gi) {
             kindChange_.reset();
             ImGui::CloseCurrentPopup();
         } else {
             const nm::Group& g = doc.groups.groups[*gi];
-            ImGui::Text("%s has %zu members. Changing its kind to %s clears them.", me::fromMapText(g.name).c_str(),
-                        g.kind == nm::Group::Kind::Walls ? g.walls.size() : g.members.size(), me::groupKindName(kKinds[kindChange_->second]));
-            if (ImGui::Button("Change and Clear")) {
+            ImGui::TextUnformatted(format(NOX_TR("editor.groups.change_kind_text", "{name} has {n} members. Changing its kind to {kind} clears them."),
+                                          {{"name", me::fromMapText(g.name)},
+                                           {"n", g.kind == nm::Group::Kind::Walls ? g.walls.size() : g.members.size()},
+                                           {"kind", me::groupKindName(kKinds[kindChange_->second])}})
+                                       .c_str());
+            if (ImGui::Button(NOX_TRI("editor.groups.change_and_clear", "Change and Clear"))) {
                 nm::Group n = g;
                 n.kind = kKinds[kindChange_->second];
                 n.members.clear();
                 n.walls.clear();
-                ed_.perform(me::setGroupOp(doc, kindChange_->first, n, "Group " + me::fromMapText(g.name) + " kind " + me::groupKindName(n.kind)));
+                ed_.perform(me::setGroupOp(doc, kindChange_->first, n,
+                                           me::opLabel(ol::kGroupKind, {{"name", me::fromMapText(g.name)}, {"kind", me::groupKindKey(n.kind).en}})));
                 kindChange_.reset();
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                 kindChange_.reset();
                 ImGui::CloseCurrentPopup();
             }
@@ -1950,38 +1998,40 @@ void MarkerTools::groupDetails(std::size_t index)
     const nm::Group g = doc.groups.groups[index]; // (a copy: ops below replace the list)
     const std::uint32_t key = doc.groupKeys[index];
     const IdScope scope("group" + std::to_string(key));
-    ImGui::SeparatorText(("Group: " + me::fromMapText(g.name)).c_str());
+    ImGui::SeparatorText(format(NOX_TR("editor.groups.title", "Group: {name}"), {{"name", me::fromMapText(g.name)}}).c_str());
     std::string text;
-    row("Name", "Scripts find the group by this name (compiled into its id).");
+    row(NOX_TRC("editor.groups.name", "Name"), NOX_TRC("editor.groups.name_help", "Scripts find the group by this name (compiled into its id)."));
     if (textField("##gname", me::fromMapText(g.name), me::kGroupNameMax, text)) {
         nm::Group n = g;
         n.name = text;
         n.terminated = true;
-        ed_.perform(me::setGroupOp(doc, key, n, "Rename group " + text));
+        ed_.perform(me::setGroupOp(doc, key, n, me::opLabel(ol::kRenameGroup, {{"name", text}})));
     }
-    row("Kind", "What its members are. Changing it clears the members (asks first).");
+    row(NOX_TRC("editor.groups.kind", "Kind"), NOX_TRC("editor.groups.kind_help", "What its members are. Changing it clears the members (asks first)."));
     int kind = static_cast<int>(g.kind);
-    const char* kinds[] = {"Objects", "Waypoints", "Walls", "Groups (kind 3)"};
+    const char* kinds[] = {NOX_TRC("editor.groups.kind_objects", "Objects"), NOX_TRC("editor.groups.kind_waypoints", "Waypoints"),
+                           NOX_TRC("editor.groups.kind_walls", "Walls"), NOX_TRC("editor.groups.kind_groups3", "Groups (kind 3)")};
     if (ImGui::Combo("##gkind", &kind, kinds, 4) && kind != static_cast<int>(g.kind)) {
         const std::size_t members = g.kind == nm::Group::Kind::Walls ? g.walls.size() : g.members.size();
         if (members == 0) {
             nm::Group n = g;
             n.kind = kKinds[kind];
-            ed_.perform(me::setGroupOp(doc, key, n, "Group " + me::fromMapText(g.name) + " kind " + me::groupKindName(n.kind)));
+            ed_.perform(me::setGroupOp(doc, key, n,
+                                       me::opLabel(ol::kGroupKind, {{"name", me::fromMapText(g.name)}, {"kind", me::groupKindKey(n.kind).en}})));
         } else {
             kindChange_ = std::pair{key, kind};
         }
     }
-    row("Id", "The number scripts reach the group by (the compiler turns the name into it). It must be unique.");
+    row(NOX_TRC("editor.groups.id", "Id"), NOX_TRC("editor.groups.id_help", "The number scripts reach the group by (the compiler turns the name into it). It must be unique."));
     ImGui::Text("%d", g.id);
     if (std::ranges::count_if(doc.groups.groups, [&](const nm::Group& o) { return o.id == g.id; }) > 1) {
         ImGui::SameLine();
-        if (ImGui::SmallButton("Give it a fresh id")) {
+        if (ImGui::SmallButton(NOX_TRI("editor.groups.fresh_id", "Give it a fresh id"))) {
             nm::Group n = g;
             n.id = me::freeGroupId(doc);
-            ed_.perform(me::setGroupOp(doc, key, n, "Group " + me::fromMapText(g.name) + " id " + std::to_string(n.id)));
+            ed_.perform(me::setGroupOp(doc, key, n, me::opLabel(ol::kGroupId, {{"name", me::fromMapText(g.name)}, {"id", n.id}})));
         }
-        help("Another group has the same id: scripts reach only the last of them.");
+        help(NOX_TR("editor.groups.fresh_id_help", "Another group has the same id: scripts reach only the last of them."));
     }
     for (const auto& p : me::groupProblems(doc, index)) {
         ImGui::PushTextWrapPos();
@@ -1991,69 +2041,78 @@ void MarkerTools::groupDetails(std::size_t index)
     if (g.kind == nm::Group::Kind::Unknown3) {
         // Members are other groups, picked from the list (never one leading back to this one).
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::BeginCombo("##addgroup", "Add a group...")) {
+        if (ImGui::BeginCombo("##addgroup", NOX_TRC("editor.groups.add_group", "Add a group..."))) {
             for (const auto& o : doc.groups.groups) {
                 if (o.id == g.id || me::groupCycle(doc, g.id, o.id) || std::ranges::find(g.members, o.id) != g.members.end()) continue;
-                const std::string l = me::fromMapText(o.name) + " (" + me::groupKindName(o.kind) + ", id " + std::to_string(o.id) + ")";
+                const std::string l = format(NOX_TR("editor.groups.add_group_item", "{name} ({kind}, id {id})"),
+                                             {{"name", me::fromMapText(o.name)}, {"kind", me::groupKindName(o.kind)}, {"id", o.id}});
                 if (ImGui::Selectable(l.c_str())) ed_.perform(me::addGroupMemberIdsOp(doc, key, {o.id}));
             }
             ImGui::EndCombo();
         }
-        help("The scripts' for-each over this group walks each member group in turn.");
+        help(NOX_TR("editor.groups.add_group_help", "The scripts' for-each over this group walks each member group in turn."));
     } else {
         const bool armed = pickingMembers_ && ed_.picking();
-        if (ImGui::Button(armed ? "Picking... (click to stop)" : "Pick on the Map")) {
+        if (ImGui::Button(armed ? NOX_TRI("editor.groups.picking", "Picking... (click to stop)") : NOX_TRI("editor.groups.pick", "Pick on the Map"))) {
             if (armed) ed_.cancelPick();
             else pickMembers(key);
         }
-        help("Click members on the map one after another; Shift+click removes one. Right click or Escape stops.");
-        flow("Add Selection");
+        help(NOX_TR("editor.groups.pick_help", "Click members on the map one after another; Shift+click removes one. Right click or Escape stops."));
+        const char* addSel = NOX_TRI("editor.groups.add_selection", "Add Selection");
+        flow(addSel);
         ImGui::BeginDisabled(ed_.selection_.empty());
-        if (ImGui::Button("Add Selection")) {
-            if (!ed_.perform(me::addGroupMembersOp(doc, key, ed_.selection_))) ed_.status("Nothing selected fits this group's kind (or it's in already)");
+        if (ImGui::Button(addSel)) {
+            if (!ed_.perform(me::addGroupMembersOp(doc, key, ed_.selection_))) {
+                ed_.status(NOX_TR("editor.groups.nothing_fits", "Nothing selected fits this group's kind (or it's in already)"));
+            }
         }
-        help("The selected objects, waypoints or walls (those of the group's kind) become members.");
-        flow("Remove Selection");
-        if (ImGui::Button("Remove Selection")) ed_.perform(me::removeGroupMembersOp(doc, key, ed_.selection_));
+        help(NOX_TR("editor.groups.add_selection_help", "The selected objects, waypoints or walls (those of the group's kind) become members."));
+        const char* removeSel = NOX_TRI("editor.groups.remove_selection", "Remove Selection");
+        flow(removeSel);
+        if (ImGui::Button(removeSel)) ed_.perform(me::removeGroupMembersOp(doc, key, ed_.selection_));
         ImGui::EndDisabled();
-        flow("Select Members");
-        if (ImGui::Button("Select Members")) {
+        const char* selectMembers = NOX_TRI("editor.groups.select_members", "Select Members");
+        flow(selectMembers);
+        if (ImGui::Button(selectMembers)) {
             const me::Selection s = me::groupSelection(doc, g);
             if (const auto b = me::bounds(doc, s)) ed_.frameWorld(b->first.x, b->first.y, b->second.x, b->second.y);
             ed_.setSelection(s);
         }
-        help("Selects the members on the map (and frames them).");
+        help(NOX_TR("editor.groups.select_members_help", "Selects the members on the map (and frames them)."));
     }
-    if (ImGui::Button("Delete Group")) {
+    if (ImGui::Button(NOX_TRI("editor.groups.delete", "Delete Group"))) {
         if (pickingMembers_) ed_.cancelPick();
         ed_.perform(me::deleteGroupOp(doc, key));
         openGroup_.reset();
         return;
     }
-    help("Deletes the group (undoable); its members stay on the map.");
+    help(NOX_TR("editor.groups.delete_help", "Deletes the group (undoable); its members stay on the map."));
     const std::size_t count = g.kind == nm::Group::Kind::Walls ? g.walls.size() : g.members.size();
-    ImGui::SeparatorText(("Members (" + std::to_string(count) + ")").c_str());
+    ImGui::SeparatorText(format(NOX_TR("editor.groups.members_n", "Members ({n})"), {{"n", count}}).c_str());
     ImGui::BeginChild("##members", ImVec2(0, 0), ImGuiChildFlags_Borders);
     std::optional<std::size_t> drop;
     for (std::size_t k = 0; k < count; ++k) {
         ImGui::PushID(static_cast<int>(k));
         if (ImGui::SmallButton("x")) drop = k;
-        help("Remove this member.");
+        help(NOX_TR("editor.groups.remove_member_help", "Remove this member."));
         ImGui::SameLine();
         const std::string l = memberLabel(g, k);
         if (ImGui::Selectable(l.c_str())) {
             if (const auto at = memberPlace(g, k)) locate(at->x, at->y);
         }
-        editor::help("Click to show it on the map.");
+        editor::help(NOX_TR("editor.groups.member_help", "Click to show it on the map."));
         ImGui::PopID();
     }
-    if (count == 0) ImGui::TextDisabled(g.kind == nm::Group::Kind::Unknown3 ? "No member groups." : "No members: pick them on the map.");
+    if (count == 0) {
+        ImGui::TextDisabled("%s", g.kind == nm::Group::Kind::Unknown3 ? NOX_TRC("editor.groups.no_member_groups", "No member groups.")
+                                                                      : NOX_TRC("editor.groups.no_members", "No members: pick them on the map."));
+    }
     ImGui::EndChild();
     if (drop) {
         nm::Group n = g;
         if (n.kind == nm::Group::Kind::Walls) n.walls.erase(n.walls.begin() + static_cast<std::ptrdiff_t>(*drop));
         else n.members.erase(n.members.begin() + static_cast<std::ptrdiff_t>(*drop));
-        ed_.perform(me::setGroupOp(doc, key, n, "Remove a member from group " + me::fromMapText(g.name)));
+        ed_.perform(me::setGroupOp(doc, key, n, me::opLabel(ol::kGroupRemoveMember, {{"name", me::fromMapText(g.name)}})));
     }
 }
 
@@ -2062,7 +2121,7 @@ void MarkerTools::groupDetails(std::size_t index)
 void MarkerTools::mapInfoPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(420 * ed_.imgui_->scale(), 640 * ed_.imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Map Info", &showMapInfo)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.map_info", "Map Info"), &showMapInfo)) {
         ImGui::End();
         return;
     }
@@ -2070,119 +2129,132 @@ void MarkerTools::mapInfoPanel()
     const bool held = ed_.panelLocks_.contains(me::ElementKey::mapInfo());
     if (!held) {
         const auto h = ed_.locks_.holder(me::ElementKey::mapInfo());
-        ImGui::TextColored(editor::themeColours().caution, "Being edited by %s.", h ? ed_.peerName(*h).c_str() : "another editor");
+        ImGui::TextColored(editor::themeColours().caution, "%s",
+                           format(NOX_TR("editor.map_info.being_edited", "Being edited by {who}."),
+                                  {{"who", h ? ed_.peerName(*h) : NOX_TR("editor.map_info.another_editor", "another editor")}})
+                               .c_str());
     }
     ImGui::BeginDisabled(!held);
     const nm::MapInfo& cur = doc.info;
     const auto commit = [&](const nm::MapInfo& n, const std::string& label) { ed_.perform(me::Op{label, {me::SetMapInfo{n}}}); };
     std::string text;
     // A fixed text field: N-1 bytes of 8-bit text and the NUL.
-    const auto fixed = [&](const char* label, auto member, const char* tip, bool multiline = false) {
+    const auto fixed = [&](const char* label, const nox::l10n::Key& field, auto member, const char* tip, bool multiline = false) {
         constexpr std::size_t kN = sizeof((cur.*member).raw);
         row(label, tip);
-        const std::string id = std::string("##mi") + label;
+        const std::string id = std::string("##mi") + field.en;
         if (textField(id.c_str(), me::fromMapText((cur.*member).view()), kN - 1, text, multiline, multiline ? 90 * ed_.imgui_->scale() : 0)) {
             nm::MapInfo n = cur;
             (n.*member).set(text);
-            commit(n, std::string("Map info: ") + label);
+            commit(n, me::opLabel(ol::kMapInfoField, {{"field", field.en}}));
         }
     };
-    ImGui::SeparatorText("About the map");
-    fixed("Title", &nm::MapInfo::title, "The name the game's map lists show (63 bytes).");
-    fixed("Description", &nm::MapInfo::description, "Shown with the map in the game's lists (511 bytes).", true);
-    fixed("Version", &nm::MapInfo::mapVersion, "The map's own version text (15 bytes).");
-    fixed("Date", &nm::MapInfo::date, "Free text (31 bytes).");
-    fixed("Copyright", &nm::MapInfo::copyright, "127 bytes.");
-    ImGui::SeparatorText("Authors");
-    fixed("Author", &nm::MapInfo::author, "63 bytes.");
-    fixed("E-mail", &nm::MapInfo::email, "63 bytes.");
-    fixed("Second author", &nm::MapInfo::author2, "127 bytes.");
-    fixed("Second e-mail", &nm::MapInfo::email2, "127 bytes.");
+    ImGui::SeparatorText(NOX_TRC("editor.map_info.about", "About the map"));
+    fixed(NOX_TRC("editor.map_info.title", "Title"), ol::kMapInfoTitle, &nm::MapInfo::title, NOX_TRC("editor.map_info.title_help", "The name the game's map lists show (63 bytes)."));
+    fixed(NOX_TRC("editor.map_info.description", "Description"), ol::kMapInfoDescription, &nm::MapInfo::description,
+          NOX_TRC("editor.map_info.description_help", "Shown with the map in the game's lists (511 bytes)."), true);
+    fixed(NOX_TRC("editor.map_info.version", "Version"), ol::kMapInfoMapVersion, &nm::MapInfo::mapVersion, NOX_TRC("editor.map_info.version_help", "The map's own version text (15 bytes)."));
+    fixed(NOX_TRC("editor.map_info.date", "Date"), ol::kMapInfoDate, &nm::MapInfo::date, NOX_TRC("editor.map_info.date_help", "Free text (31 bytes)."));
+    fixed(NOX_TRC("editor.map_info.copyright", "Copyright"), ol::kMapInfoCopyright, &nm::MapInfo::copyright, NOX_TRC("editor.map_info.copyright_help", "127 bytes."));
+    ImGui::SeparatorText(NOX_TRC("editor.map_info.authors", "Authors"));
+    fixed(NOX_TRC("editor.map_info.author", "Author"), ol::kMapInfoAuthor, &nm::MapInfo::author, NOX_TRC("editor.map_info.bytes63", "63 bytes."));
+    fixed(NOX_TRC("editor.map_info.email", "E-mail"), ol::kMapInfoEmail, &nm::MapInfo::email, NOX_TRC("editor.map_info.bytes63", "63 bytes."));
+    fixed(NOX_TRC("editor.map_info.author2", "Second author"), ol::kMapInfoAuthor2, &nm::MapInfo::author2, NOX_TRC("editor.map_info.copyright_help", "127 bytes."));
+    fixed(NOX_TRC("editor.map_info.email2", "Second e-mail"), ol::kMapInfoEmail2, &nm::MapInfo::email2, NOX_TRC("editor.map_info.copyright_help", "127 bytes."));
 
-    ImGui::SeparatorText("Game types");
-    help("The modes the map offers (a bitfield: any number of them). The game's map lists filter by these bits.");
+    ImGui::SeparatorText(NOX_TRC("editor.map_info.game_types", "Game types"));
+    help(NOX_TR("editor.map_info.game_types_help", "The modes the map offers (a bitfield: any number of them). The game's map lists filter by these bits."));
     std::uint32_t bit = 0;
     bool on = false;
     if (bitsField("gametypes", me::gameTypeBits(), cur.gameFlags, 0, bit, on)) {
         nm::MapInfo n = cur;
         n.gameFlags = on ? (cur.gameFlags | bit) : (cur.gameFlags & ~bit);
-        commit(n, std::string("Map info: ") + (on ? "add" : "remove") + " game type " + hexText(bit));
+        commit(n, me::opLabel(on ? ol::kMapInfoGameTypeAdd : ol::kMapInfoGameTypeRemove,
+                         {{"bit", hexText(bit)}}));
     }
 
-    ImGui::SeparatorText("Version and players");
-    row("Info version", "Version 2 stores the recommended players; version 3 stores the quest intro title and picture instead (the game's own save "
-                        "writes 3). Changing it keeps the other fields.");
-    const std::string vlabel = cur.version == 2 ? "2: recommended players" : cur.version == 3 ? "3: quest intro" : std::to_string(cur.version) + " (as stored)";
+    ImGui::SeparatorText(NOX_TRC("editor.map_info.version_players", "Version and players"));
+    row(NOX_TRC("editor.map_info.info_version", "Info version"),
+        NOX_TRC("editor.map_info.info_version_help", "Version 2 stores the recommended players; version 3 stores the quest intro title and picture instead (the game's own save "
+                                                     "writes 3). Changing it keeps the other fields."));
+    const std::string vlabel = cur.version == 2   ? NOX_TR("editor.map_info.version2", "2: recommended players")
+                               : cur.version == 3 ? NOX_TR("editor.map_info.version3", "3: quest intro")
+                                                  : format(NOX_TR("editor.map_info.version_stored", "{n} (as stored)"), {{"n", cur.version}});
     if (ImGui::BeginCombo("##miversion", vlabel.c_str())) {
         for (const int v : {2, 3}) {
-            const std::string l = v == 2 ? "2: recommended players" : "3: quest intro";
+            const std::string& l = v == 2 ? NOX_TR("editor.map_info.version2", "2: recommended players") : NOX_TR("editor.map_info.version3", "3: quest intro");
             if (ImGui::Selectable(l.c_str(), cur.version == v) && cur.version != v) {
                 nm::MapInfo n = cur;
                 n.version = static_cast<std::uint16_t>(v);
-                commit(n, "Map info: version " + std::to_string(v));
+                commit(n, me::opLabel(ol::kMapInfoVersion, {{"n", v}}));
             }
         }
         ImGui::EndCombo();
     }
     if (cur.version == 2) {
         int v = 0;
-        row("Min players", "Recommended, shown in the game's lists (stored only in version 2).");
+        row(NOX_TRC("editor.map_info.min_players", "Min players"), NOX_TRC("editor.map_info.min_players_help", "Recommended, shown in the game's lists (stored only in version 2)."));
         if (intField("##minp", cur.minPlayers, v, 0, 255)) {
             nm::MapInfo n = cur;
             n.minPlayers = static_cast<std::uint8_t>(v);
-            commit(n, "Map info: min players " + std::to_string(v));
+            commit(n, me::opLabel(ol::kMapInfoMinPlayers, {{"n", v}}));
         }
-        row("Max players", "Recommended (stored only in version 2).");
+        row(NOX_TRC("editor.map_info.max_players", "Max players"), NOX_TRC("editor.map_info.max_players_help", "Recommended (stored only in version 2)."));
         if (intField("##maxp", cur.maxPlayers, v, 0, 255)) {
             nm::MapInfo n = cur;
             n.maxPlayers = static_cast<std::uint8_t>(v);
-            commit(n, "Map info: max players " + std::to_string(v));
+            commit(n, me::opLabel(ol::kMapInfoMaxPlayers, {{"n", v}}));
         }
-        if (cur.minPlayers > cur.maxPlayers) ImGui::TextColored(editor::themeColours().warning, "The minimum is above the maximum.");
+        if (cur.minPlayers > cur.maxPlayers) ImGui::TextColored(editor::themeColours().warning, "%s", NOX_TRC("editor.map_info.min_above_max", "The minimum is above the maximum."));
     } else {
-        ImGui::TextDisabled("Recommended players are stored only in version 2 (the game reads 2 / 16 here).");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.map_info.players_v2_only", "Recommended players are stored only in version 2 (the game reads 2 / 16 here)."));
     }
     if (cur.version == 3) {
-        row("Quest intro", "The quest intro's title (31 bytes: the game reads it into a 32-byte buffer without a check).");
+        row(NOX_TRC("editor.map_info.quest_intro", "Quest intro"),
+            NOX_TRC("editor.map_info.quest_intro_help", "The quest intro's title (31 bytes: the game reads it into a 32-byte buffer without a check)."));
         if (textField("##qintro", me::fromMapText(cur.questIntro), me::kQuestIntroMax, text)) {
             nm::MapInfo n = cur;
             n.questIntro = text;
-            commit(n, "Map info: quest intro");
+            commit(n, me::opLabel(ol::kMapInfoQuestIntro));
         }
-        flow("Texts...");
-        if (ImGui::SmallButton("Texts...")) {
+        const char* texts = NOX_TRI("editor.map_info.texts", "Texts...");
+        flow(texts);
+        if (ImGui::SmallButton(texts)) {
             browseStrings(cur.questIntro, [this](const std::string& label) {
                 nm::MapInfo n = ed_.doc_.info;
                 n.questIntro = me::fitMapText(label, me::kQuestIntroMax);
-                ed_.perform(me::Op{"Map info: quest intro", {me::SetMapInfo{n}}});
+                ed_.perform(me::Op{me::opLabel(ol::kMapInfoQuestIntro), {me::SetMapInfo{n}}});
             });
         }
-        help("Pick a label from the game's texts.");
-        row("Quest picture", "The quest intro's picture: one of thing.bin's named images, by name (31 bytes: the game reads it into a "
-                             "32-byte buffer without a check). A name the game hasn't shows WarriorChapterBegin8.");
+        help(NOX_TR("editor.map_info.texts_help", "Pick a label from the game's texts."));
+        row(NOX_TRC("editor.map_info.quest_picture", "Quest picture"),
+            NOX_TRC("editor.map_info.quest_picture_help", "The quest intro's picture: one of thing.bin's named images, by name (31 bytes: the game reads it into a "
+                                                          "32-byte buffer without a check). A name the game hasn't shows WarriorChapterBegin8."));
         if (textField("##qgraphic", me::fromMapText(cur.questGraphic), me::kQuestIntroMax, text)) {
             nm::MapInfo n = cur;
             n.questGraphic = text;
-            commit(n, "Map info: quest picture");
+            commit(n, me::opLabel(ol::kMapInfoQuestPicture));
         }
-        flow("Pictures...");
-        if (ImGui::SmallButton("Pictures...")) showPictures_ = true;
-        help("Browse the game's pictures with thumbnails (a click sets the field).");
+        const char* pictures = NOX_TRI("editor.map_info.pictures", "Pictures...");
+        flow(pictures);
+        if (ImGui::SmallButton(pictures)) showPictures_ = true;
+        help(NOX_TR("editor.map_info.pictures_help", "Browse the game's pictures with thumbnails (a click sets the field)."));
         // (gLoadImg compares the names exactly.)
         const std::string graphic = cur.questGraphic.substr(0, cur.questGraphic.find('\0'));
         if (!graphic.empty() && std::ranges::none_of(ed_.things_.images, [&](const nox::things::ImageDef& d) { return d.name == graphic; })) {
-            ImGui::TextColored(editor::themeColours().warning, "Not one of the game's named images: it shows WarriorChapterBegin8.");
+            ImGui::TextColored(editor::themeColours().warning, "%s", NOX_TRC("editor.map_info.not_named_image", "Not one of the game's named images: it shows WarriorChapterBegin8."));
         }
     } else {
-        ImGui::TextDisabled("The quest intro title and picture are stored only in version 3.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.map_info.quest_v3_only", "The quest intro title and picture are stored only in version 3."));
     }
 
-    ImGui::SeparatorText("Light and intro");
-    row("Ambient light",
-        "The map's light where the view's centre (the player) is outside every polygon (AmbientData). Inside a polygon the game "
-        "lights the whole view with that polygon's own ambient light instead, so on a map whose polygons cover the play area "
-        "(most stock maps) this one never shows. The Lighting Preview layer (L) shows the light the game would use where the "
-        "view's centre is.");
+    ImGui::SeparatorText(NOX_TRC("editor.map_info.light_intro", "Light and intro"));
+    row(NOX_TRC("editor.map_info.ambient", "Ambient light"),
+        NOX_TRC("editor.map_info.ambient_help",
+                "The map's light where the view's centre (the player) is outside every polygon (AmbientData). Inside a polygon the game "
+                "lights the whole view with that polygon's own ambient light instead, so on a map whose polygons cover the play area "
+                "(most stock maps) this one never shows. The Lighting Preview layer (L) shows the light the game would use where the "
+                "view's centre is."));
     std::array<std::uint8_t, 3> amb{static_cast<std::uint8_t>(std::min<std::uint32_t>(doc.ambient.r, 255)), static_cast<std::uint8_t>(std::min<std::uint32_t>(doc.ambient.g, 255)),
                                     static_cast<std::uint8_t>(std::min<std::uint32_t>(doc.ambient.b, 255))};
     std::array<std::uint8_t, 3> na{};
@@ -2191,35 +2263,39 @@ void MarkerTools::mapInfoPanel()
         a.r = na[0];
         a.g = na[1];
         a.b = na[2];
-        ed_.perform(me::Op{"Map ambient light", {me::SetAmbient{a}}});
+        ed_.perform(me::Op{me::opLabel(ol::kMapAmbient), {me::SetAmbient{a}}});
     }
     // Where it shows: the polygon the preview's light comes from (the game's rule: ambientAt).
     if (!ed_.settings_.layers.lighting) {
-        ImGui::TextDisabled("Turn on the Lighting Preview layer (L) to see it on the map.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.map_info.turn_on_lighting", "Turn on the Lighting Preview layer (L) to see it on the map."));
     } else if (const std::uint32_t in = ed_.view_ ? ed_.view_->ambientPolygon() : 0; in != 0 && in <= doc.polygons.polygons.size()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(editor::themeColours().warning, "The view's centre is in polygon %u (%s): its ambient light shows there, not this one.", in,
-                           me::fromMapText(doc.polygons.polygons[in - 1].name).c_str());
+        ImGui::TextColored(editor::themeColours().warning, "%s",
+                           format(NOX_TR("editor.map_info.centre_in_polygon", "The view's centre is in polygon {n} ({name}): its ambient light shows there, not this one."),
+                                  {{"n", in}, {"name", me::fromMapText(doc.polygons.polygons[in - 1].name)}})
+                               .c_str());
         ImGui::PopTextWrapPos();
     }
-    ImGui::TextDisabled("Intro text (shown when the map starts)");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.map_info.intro_text", "Intro text (shown when the map starts)"));
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (textField("##intro", me::fromMapText(doc.intro.text), 0xFFFF, text, true, 110 * ed_.imgui_->scale())) {
         nm::MapIntro in = doc.intro;
         in.text = text;
-        ed_.perform(me::Op{"Map intro text", {me::SetIntro{in}}});
+        ed_.perform(me::Op{me::opLabel(ol::kMapIntro), {me::SetIntro{in}}});
     }
     ImGui::PushStyleColor(ImGuiCol_Header, editor::themeColours().section); // (as Properties' sections)
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, editor::themeColours().sectionHovered);
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, editor::themeColours().sectionActive);
-    const bool advanced = ImGui::CollapsingHeader("Advanced");
+    const bool advanced = ImGui::CollapsingHeader(NOX_TRI("editor.map_info.advanced", "Advanced"));
     ImGui::PopStyleColor(3);
     if (advanced) {
         const auto& raw = cur.unknown.raw;
         const auto set = std::ranges::count_if(raw, [](char c) { return c != 0; });
-        ImGui::TextWrapped("The 256-byte field after the second e-mail: the game reads it and never uses it. Kept as stored (%td bytes set).", set);
-        if (set > 0) ImGui::TextDisabled("Text: %s", me::fromMapText(cur.unknown.view()).c_str());
-        ImGui::TextDisabled("Raw flags: %s", hexText(cur.gameFlags).c_str());
+        ImGui::TextWrapped("%s", format(NOX_TR("editor.map_info.unknown_field", "The 256-byte field after the second e-mail: the game reads it and never uses it. Kept as stored ({n} bytes set)."),
+                                        {{"n", set}})
+                                     .c_str());
+        if (set > 0) ImGui::TextDisabled("%s", format(NOX_TR("editor.map_info.unknown_text", "Text: {text}"), {{"text", me::fromMapText(cur.unknown.view())}}).c_str());
+        ImGui::TextDisabled("%s", format(NOX_TR("editor.map_info.raw_flags", "Raw flags: {flags}"), {{"flags", hexText(cur.gameFlags)}}).c_str());
     }
     ImGui::EndDisabled();
     ImGui::End();
@@ -2230,55 +2306,58 @@ void MarkerTools::mapInfoPanel()
 bool MarkerTools::setQuestPicture(const std::string& name)
 {
     if (name.size() > me::kQuestIntroMax) {
-        ed_.status("\"" + name + "\" is " + std::to_string(name.size()) + " bytes: the quest picture's name holds 31 (the game's 32-byte buffer)");
+        ed_.status(format(NOX_TR("editor.map_info.picture_too_long", "\"{name}\" is {n} bytes: the quest picture's name holds 31 (the game's 32-byte buffer)"),
+                          {{"name", name}, {"n", name.size()}}));
         return false;
     }
     nm::MapInfo n = ed_.doc_.info;
     if (n.version != 3 || n.questGraphic == name) return false;
     n.questGraphic = name;
-    return ed_.perform(me::Op{"Map info: quest picture " + name, {me::SetMapInfo{n}}});
+    return ed_.perform(me::Op{me::opLabel(ol::kMapInfoQuestPictureName, {{"name", name}}), {me::SetMapInfo{n}}});
 }
 
 void MarkerTools::picturePicker()
 {
     const float s = ed_.imgui_->scale();
     ImGui::SetNextWindowSize(ImVec2(760 * s, 600 * s), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Quest Pictures", &showPictures_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.quest_pictures", "Quest Pictures"), &showPictures_)) {
         ImGui::End();
         return;
     }
     if (!pictures_) {
         if (ed_.ctx_.gameDir.empty()) {
-            ImGui::TextDisabled("No game folder: no pictures to show. The name can still be typed in Map Info.");
+            ImGui::TextDisabled("%s", NOX_TRC("editor.pictures.no_game_folder", "No game folder: no pictures to show. The name can still be typed in Map Info."));
             ImGui::End();
             return;
         }
         pictures_ = std::make_unique<QuestPictures>(ed_.things_, ed_.ctx_.gameDir);
     }
     if (!pictures_->ready()) {
-        ImGui::TextDisabled("Reading the game's pictures...");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.pictures.reading", "Reading the game's pictures..."));
         ImGui::End();
         return;
     }
     if (pictures_->entries().empty()) {
-        ImGui::TextDisabled("No pictures (%s). The name can still be typed in Map Info.", pictures_->error().c_str());
+        ImGui::TextDisabled("%s", format(NOX_TR("editor.pictures.none", "No pictures ({error}). The name can still be typed in Map Info."), {{"error", pictures_->error()}}).c_str());
         ImGui::End();
         return;
     }
     const bool held = ed_.panelLocks_.contains(me::ElementKey::mapInfo());
     const nm::MapInfo& info = ed_.doc_.info;
     const std::string current = info.questGraphic.substr(0, info.questGraphic.find('\0'));
-    ImGui::TextWrapped("The picture the quest's screens show for this map (the game loads it by name from thing.bin's named images). "
-                       "A click sets the Quest picture field; typing it there still works.");
-    if (info.version != 3) ImGui::TextColored(editor::themeColours().warning, "Only map info version 3 stores a quest picture (Map Info: Info version).");
+    ImGui::TextWrapped("%s", NOX_TRC("editor.pictures.intro", "The picture the quest's screens show for this map (the game loads it by name from thing.bin's named images). "
+                                                              "A click sets the Quest picture field; typing it there still works."));
+    if (info.version != 3) {
+        ImGui::TextColored(editor::themeColours().warning, "%s", NOX_TRC("editor.pictures.v3_only", "Only map info version 3 stores a quest picture (Map Info: Info version)."));
+    }
     ImGui::SetNextItemWidth(220 * s);
-    ImGui::InputTextWithHint("##picfilter", "Filter by name", pictureFilter_, sizeof pictureFilter_);
+    ImGui::InputTextWithHint("##picfilter", NOX_TRC("editor.pictures.filter_hint", "Filter by name"), pictureFilter_, sizeof pictureFilter_);
     ImGui::SameLine();
-    ImGui::Checkbox("Every named image", &picturesAll_);
-    help("Off: the full-screen pictures (the chapters' briefings, the quest's own, the menus' backgrounds) and any a stock map uses. "
-         "On: all of thing.bin's named images (any works, drawn from the screen's top left).");
+    ImGui::Checkbox(NOX_TRI("editor.pictures.every_image", "Every named image"), &picturesAll_);
+    help(NOX_TR("editor.pictures.every_image_help", "Off: the full-screen pictures (the chapters' briefings, the quest's own, the menus' backgrounds) and any a stock map uses. "
+                                                    "On: all of thing.bin's named images (any works, drawn from the screen's top left)."));
     ImGui::SameLine();
-    ImGui::TextDisabled("Now: %s", current.empty() ? "(none)" : current.c_str());
+    ImGui::TextDisabled("%s", format(NOX_TR("editor.pictures.now", "Now: {name}"), {{"name", current.empty() ? NOX_TR("editor.common.none", "(none)") : current}}).c_str());
     const std::string filter = lowered(pictureFilter_);
     auto& entries = pictures_->entries();
     std::vector<QuestPictures::Entry*> shown;
@@ -2289,7 +2368,7 @@ void MarkerTools::picturePicker()
     }
     // The stock maps' choices first, then thing.bin's order.
     std::ranges::stable_sort(shown, [](const auto* a, const auto* b) { return !a->info.usedBy.empty() && b->info.usedBy.empty(); });
-    ImGui::TextDisabled("%zu pictures", shown.size());
+    ImGui::TextDisabled("%s", format(NOX_TR("editor.pictures.count", "{n} pictures"), {{"n", shown.size()}}).c_str());
     ImGui::BeginChild("##pictures", ImVec2(0, 0), ImGuiChildFlags_Borders);
     const float cellW = QuestPictures::kThumbW * s, cellH = QuestPictures::kThumbH * s;
     const float pad = ImGui::GetStyle().ItemSpacing.x;
@@ -2309,10 +2388,12 @@ void MarkerTools::picturePicker()
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
             std::string tip = e.info.name + "\n" + std::to_string(e.info.width) + " x " + std::to_string(e.info.height);
             if (!e.info.usedBy.empty()) {
-                tip += "\nUsed by the stock quest maps:";
+                tip += "\n" + NOX_TR("editor.pictures.used_by_maps", "Used by the stock quest maps:");
                 for (const auto& m : e.info.usedBy) tip += " " + m;
             }
-            if (!fits) tip += "\n" + std::to_string(e.info.name.size()) + " bytes: the quest picture's name holds 31 (the game's 32-byte buffer).";
+            if (!fits) {
+                tip += "\n" + format(NOX_TR("editor.pictures.name_too_long", "{n} bytes: the quest picture's name holds 31 (the game's 32-byte buffer)."), {{"n", e.info.name.size()}});
+            }
             ImGui::SetTooltip("%s", tip.c_str());
         }
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2325,21 +2406,22 @@ void MarkerTools::picturePicker()
             const ImVec2 p0(at.x + 4 * s + (cellW - w) / 2, at.y + 4 * s + (cellH - h) / 2);
             dl->AddImage(texId(t), p0, ImVec2(p0.x + w, p0.y + h), ImVec2(0, 0), ImVec2(1, 1), fits ? IM_COL32_WHITE : IM_COL32(255, 255, 255, 90));
         } else {
-            dl->AddText(ImVec2(at.x + 6 * s, at.y + cellH / 2), editor::onPanelU32(col(150, 150, 150)), "(no image)");
+            dl->AddText(ImVec2(at.x + 6 * s, at.y + cellH / 2), editor::onPanelU32(col(150, 150, 150)), NOX_TRC("editor.pictures.no_image", "(no image)"));
         }
         const ImU32 textCol = fits ? (isCurrent ? ImGui::ColorConvertFloat4ToU32(editor::themeColours().highlightText) : ImGui::GetColorU32(ImGuiCol_Text)) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
         const ImVec2 tp(at.x + 4 * s, at.y + cellH + 6 * s);
         dl->PushClipRect(tp, ImVec2(at.x + cellW + 4 * s, tp.y + ImGui::GetTextLineHeightWithSpacing() * 2), true);
         dl->AddText(tp, textCol, e.info.name.c_str());
-        const std::string sub = !fits ? "too long (" + std::to_string(e.info.name.size()) + " bytes)"
-                                      : !e.info.usedBy.empty() ? "used by " + std::to_string(e.info.usedBy.size()) + (e.info.usedBy.size() == 1 ? " stock map" : " stock maps")
-                                                               : std::to_string(e.info.width) + " x " + std::to_string(e.info.height);
+        const std::string sub = !fits ? format(NOX_TR("editor.pictures.too_long", "too long ({n} bytes)"), {{"n", e.info.name.size()}})
+                                : !e.info.usedBy.empty()
+                                    ? format(NOX_TRP("editor.pictures.used_by", "used by {n} stock map", "used by {n} stock maps", e.info.usedBy.size()), {{"n", e.info.usedBy.size()}})
+                                    : std::to_string(e.info.width) + " x " + std::to_string(e.info.height);
         dl->AddText(ImVec2(tp.x, tp.y + ImGui::GetTextLineHeight()), ImGui::GetColorU32(ImGuiCol_TextDisabled), sub.c_str());
         dl->PopClipRect();
         ImGui::EndGroup();
         ImGui::PopID();
     }
-    if (shown.empty()) ImGui::TextDisabled("No picture's name has \"%s\".", pictureFilter_);
+    if (shown.empty()) ImGui::TextDisabled("%s", format(NOX_TR("editor.pictures.no_match", "No picture's name has \"{filter}\"."), {{"filter", pictureFilter_}}).c_str());
     ImGui::EndChild();
     ImGui::End();
     if (!picked.empty()) setQuestPicture(picked);
@@ -2425,7 +2507,7 @@ void MarkerTools::rebuildMinimap()
 void MarkerTools::minimapPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(560 * ed_.imgui_->scale(), 600 * ed_.imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Minimap", &showMinimap)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.minimap", "Minimap"), &showMinimap)) {
         ImGui::End();
         return;
     }
@@ -2434,28 +2516,29 @@ void MarkerTools::minimapPanel()
     if (!minimap_ || minimapRevision_ != ed_.history_.revision() || minimapPendingSerial_ != ed_.pendingPlanSerial_) rebuildMinimap();
     if (focus_[4] > 0 || minimapShownZoom_ != minimapZoom_) minimapCentre_ = true; // (opened or zoomed: the view's place in sight)
     minimapShownZoom_ = minimapZoom_;
-    ImGui::TextUnformatted("Zoom");
+    ImGui::TextUnformatted(NOX_TRC("editor.minimap.zoom", "Zoom"));
     ImGui::SameLine();
     for (const int zv : {2, 3, 4}) {
         ImGui::SameLine();
         ImGui::RadioButton((std::to_string(zv) + "x").c_str(), &minimapZoom_, zv);
-        help("Pixels a wall cell.");
+        help(NOX_TR("editor.minimap.zoom_help", "Pixels a wall cell."));
     }
-    flow("Go to Centre");
-    if (ImGui::Button("Go to Centre")) {
+    const char* goCentre = NOX_TRI("editor.minimap.go_centre", "Go to Centre");
+    flow(goCentre);
+    if (ImGui::Button(goCentre)) {
         ed_.camera_.x = me::kWorldSize / 2;
         ed_.camera_.y = me::kWorldSize / 2;
         minimapCentre_ = true;
     }
-    help("The main view to the map's centre (where the symmetry guides cross).");
-    ImGui::Checkbox("Guides", &minimapGuides_);
-    help("The two diagonals (the old editor's Divide1 / Divide2): the axes Spin / mirror copies across.");
+    help(NOX_TR("editor.minimap.go_centre_help", "The main view to the map's centre (where the symmetry guides cross)."));
+    ImGui::Checkbox(NOX_TRI("editor.minimap.guides", "Guides"), &minimapGuides_);
+    help(NOX_TR("editor.minimap.guides_help", "The two diagonals (the old editor's Divide1 / Divide2): the axes Spin / mirror copies across."));
     flow("WW Polygons");
-    ImGui::Checkbox("Polygons", &minimapPolygons_);
+    ImGui::Checkbox(NOX_TRI("editor.minimap.polygons", "Polygons"), &minimapPolygons_);
     flow("WW Objects");
-    ImGui::Checkbox("Objects", &minimapObjects_);
+    ImGui::Checkbox(NOX_TRI("editor.minimap.objects", "Objects"), &minimapObjects_);
     flow("WW Waypoints");
-    ImGui::Checkbox("Waypoints", &minimapWaypoints_);
+    ImGui::Checkbox(NOX_TRI("editor.minimap.waypoints", "Waypoints"), &minimapWaypoints_);
     // A session's walls not yet published (the Pending changes setting's plan): counted for the key
     // under the options.
     const auto& plan = ed_.pendingPlan_;
@@ -2478,13 +2561,13 @@ void MarkerTools::minimapPanel()
             help(tip);
         };
         if (pendingWalls > 0) {
-            key(col(255, 48, 48), false, std::to_string(pendingWalls) + (pendingWalls == 1 ? " pending wall" : " pending walls"),
-                "New or changed walls not published yet: only NoX Core players see them, and nothing in the game is blocked by them.");
+            key(col(255, 48, 48), false, format(NOX_TRP("editor.minimap.pending_walls", "{n} pending wall", "{n} pending walls", pendingWalls), {{"n", pendingWalls}}),
+                NOX_TRC("editor.minimap.pending_walls_help", "New or changed walls not published yet: only NoX Core players see them, and nothing in the game is blocked by them."));
             if (removedWalls > 0) ImGui::SameLine(0, 16);
         }
         if (removedWalls > 0) {
-            key(col(120, 14, 14), true, std::to_string(removedWalls) + " removed, still in the game",
-                "Walls the working copy removed: the game keeps them (they still block) until a publish.");
+            key(col(120, 14, 14), true, format(NOX_TR("editor.minimap.removed_walls", "{n} removed, still in the game"), {{"n", removedWalls}}),
+                NOX_TRC("editor.minimap.removed_walls_help", "Walls the working copy removed: the game keeps them (they still block) until a publish."));
         }
     }
     const float zoom = static_cast<float>(minimapZoom_);
@@ -2550,7 +2633,9 @@ void MarkerTools::minimapPanel()
     }
     if (ImGui::IsItemHovered()) {
         const ImVec2 m = ImGui::GetIO().MousePos;
-        ImGui::SetTooltip("Cell %d, %d (click or drag to move the view)", static_cast<int>((m.x - o.x) / zoom), static_cast<int>((m.y - o.y) / zoom));
+        ImGui::SetTooltip("%s", format(NOX_TR("editor.minimap.cell_tip", "Cell {x}, {y} (click or drag to move the view)"),
+                                       {{"x", static_cast<int>((m.x - o.x) / zoom)}, {"y", static_cast<int>((m.y - o.y) / zoom)}})
+                                    .c_str());
     }
     ImGui::EndChild();
     ImGui::End();
@@ -2577,13 +2662,13 @@ void MarkerTools::browseStrings(std::string current, std::function<void(const st
 void MarkerTools::stringsPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(640 * ed_.imgui_->scale(), 420 * ed_.imgui_->scale()), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Game Texts", &showStrings)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.game_texts", "Game Texts"), &showStrings)) {
         ImGui::End();
         return;
     }
     if (!showStrings) stringPicked_ = nullptr;
     if (!strings_) {
-        ImGui::TextWrapped("The game's string table (nox.csf) wasn't found in the game folder.");
+        ImGui::TextWrapped("%s", NOX_TRC("editor.game_texts.no_table", "The game's string table (nox.csf) wasn't found in the game folder."));
         ImGui::End();
         return;
     }
@@ -2595,16 +2680,18 @@ void MarkerTools::stringsPanel()
         }
     }
     if (stringPicked_) {
-        ImGui::TextColored(editor::themeColours().info, "Pick a text for the field (it stores the label)%s", stringCurrent_.empty() ? "" : (": now " + stringCurrent_).c_str());
+        ImGui::TextColored(editor::themeColours().info, "%s",
+                           stringCurrent_.empty() ? NOX_TRC("editor.game_texts.pick", "Pick a text for the field (it stores the label)")
+                                                  : format(NOX_TR("editor.game_texts.pick_now", "Pick a text for the field (it stores the label): now {label}"), {{"label", stringCurrent_}}).c_str());
     }
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::InputTextWithHint("##strsearch", "Search labels and texts", stringSearch_, sizeof stringSearch_)) stringSel_ = -1;
+    if (ImGui::InputTextWithHint("##strsearch", NOX_TRC("editor.game_texts.search_hint", "Search labels and texts"), stringSearch_, sizeof stringSearch_)) stringSel_ = -1;
     const std::string q = lowered(stringSearch_);
     std::vector<int> rows;
     for (std::size_t i = 0; i < entries.size(); ++i) {
         if (q.empty() || stringIndex_[i].first.find(q) != std::string::npos || stringIndex_[i].second.find(q) != std::string::npos) rows.push_back(static_cast<int>(i));
     }
-    ImGui::TextDisabled("%zu of %zu texts", rows.size(), entries.size());
+    ImGui::TextDisabled("%s", format(NOX_TR("editor.game_texts.count", "{n} of {total} texts"), {{"n", rows.size()}, {"total", entries.size()}}).c_str());
     const float leftW = ImGui::GetContentRegionAvail().x * 0.45f;
     ImGui::BeginChild("##strlist", ImVec2(leftW, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeX);
     ImGuiListClipper clip;
@@ -2639,33 +2726,35 @@ void MarkerTools::stringsPanel()
         const auto& e = entries[static_cast<std::size_t>(stringSel_)];
         ImGui::TextUnformatted(e.label.c_str());
         if (stringPicked_) {
-            if (ImGui::Button("Use")) {
+            if (ImGui::Button(NOX_TRI("editor.game_texts.use", "Use"))) {
                 auto done = std::move(stringPicked_);
                 stringPicked_ = nullptr;
                 done(e.label);
             }
-            help("Puts this label in the field the browser was opened from.");
+            help(NOX_TR("editor.game_texts.use_help", "Puts this label in the field the browser was opened from."));
             ImGui::SameLine();
         }
-        if (ImGui::Button("Copy Label")) {
+        if (ImGui::Button(NOX_TRI("editor.game_texts.copy_label", "Copy Label"))) {
             SDL_SetClipboardText(e.label.c_str());
-            ed_.status("Copied " + e.label);
+            ed_.status(format(NOX_TR("editor.status.copied_text", "Copied {text}"), {{"text", e.label}}));
         }
         ImGui::SameLine();
-        if (!e.variants.empty() && ImGui::Button("Copy Text")) {
+        if (!e.variants.empty() && ImGui::Button(NOX_TRI("editor.game_texts.copy_text", "Copy Text"))) {
             SDL_SetClipboardText(nox::strings::toUtf8(e.variants[0].text).c_str());
-            ed_.status("Copied the text of " + e.label);
+            ed_.status(format(NOX_TR("editor.game_texts.copied_text_of", "Copied the text of {label}"), {{"label", e.label}}));
         }
         ImGui::Separator();
         for (std::size_t v = 0; v < e.variants.size(); ++v) {
-            if (e.variants.size() > 1) ImGui::TextDisabled("Variant %zu (the game picks one at random)", v + 1);
+            if (e.variants.size() > 1) {
+                ImGui::TextDisabled("%s", format(NOX_TR("editor.game_texts.variant", "Variant {n} (the game picks one at random)"), {{"n", v + 1}}).c_str());
+            }
             ImGui::PushTextWrapPos();
             ImGui::TextUnformatted(nox::strings::toUtf8(e.variants[v].text).c_str());
             ImGui::PopTextWrapPos();
-            if (!e.variants[v].extra.empty()) ImGui::TextDisabled("Speech: %s", e.variants[v].extra.c_str());
+            if (!e.variants[v].extra.empty()) ImGui::TextDisabled("%s", format(NOX_TR("editor.game_texts.speech", "Speech: {file}"), {{"file", e.variants[v].extra}}).c_str());
         }
     } else {
-        ImGui::TextDisabled("Pick a text on the left.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.game_texts.pick_left", "Pick a text on the left."));
     }
     ImGui::EndChild();
     ImGui::End();
@@ -2823,7 +2912,7 @@ bool MarkerTools::runStep(const std::string& step)
         a.r = static_cast<std::uint32_t>(std::clamp((*n)[0], 0.0f, 255.0f));
         a.g = static_cast<std::uint32_t>(std::clamp((*n)[1], 0.0f, 255.0f));
         a.b = static_cast<std::uint32_t>(std::clamp((*n)[2], 0.0f, 255.0f));
-        ed_.perform(me::Op{"Map ambient light", {me::SetAmbient{a}}});
+        ed_.perform(me::Op{me::opLabel(ol::kMapAmbient), {me::SetAmbient{a}}});
         return true;
     }
     if (const auto n = numbersAfter(step, "polyambient:", 4)) {
@@ -2832,14 +2921,16 @@ bool MarkerTools::runStep(const std::string& step)
         if (const auto i = doc.polygonIndex(key)) {
             nm::Polygon p = doc.polygons.polygons[*i];
             for (std::size_t c = 0; c < 3; ++c) p.ambientLight[c] = static_cast<std::uint8_t>(std::clamp((*n)[c + 1], 0.0f, 255.0f));
-            ed_.perform(me::setPolygonPropsOp(doc, key, p, "Polygon ambient light"));
+            ed_.perform(me::setPolygonPropsOp(doc, key, p, me::opLabel(ol::kPolygonAmbient)));
         }
         return true;
     }
     if (step.starts_with("mapinfo-version:")) {
         nm::MapInfo n = ed_.doc_.info;
         n.version = static_cast<std::uint16_t>(std::atoi(step.c_str() + 16));
-        if (n.version != ed_.doc_.info.version) ed_.perform(me::Op{"Map info: version " + std::to_string(n.version), {me::SetMapInfo{n}}});
+        if (n.version != ed_.doc_.info.version) {
+            ed_.perform(me::Op{me::opLabel(ol::kMapInfoVersion, {{"n", n.version}}), {me::SetMapInfo{n}}});
+        }
         return true;
     }
     if (step == "minimap-open") {

@@ -3,6 +3,7 @@
 #include "noxcore/mapedit/content.hpp"
 
 #include "noxcore/io/byte_reader.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/modifier.hpp"
 #include "noxcore/things/object_class.hpp"
@@ -170,6 +171,96 @@ constexpr std::string_view kTopOrder[] = {"Monsters", "NPCs", "Generators", "Wea
                                           "Traps & Hazards", "Lights", "Readables & Signs", "Obelisks", "Quest Rewards", "Movers",
                                           "Decorations", "Ambient Sounds", "Markers", "Hidden"};
 
+/// The rule table's folder names as shown (by their English, the paths' parts).
+const nox::l10n::Key kFolderTexts[] = {
+    NOX_TRK("editor.content.folder.monsters", "Monsters"),
+    NOX_TRK("editor.content.folder.npcs", "NPCs"),
+    NOX_TRK("editor.content.folder.generators", "Generators"),
+    NOX_TRK("editor.content.folder.weapons", "Weapons"),
+    NOX_TRK("editor.content.folder.armour", "Armour"),
+    NOX_TRK("editor.content.folder.potions_food", "Potions & Food"),
+    NOX_TRK("editor.content.folder.books", "Books"),
+    NOX_TRK("editor.content.folder.keys_treasure_flags", "Keys, Treasure & Flags"),
+    NOX_TRK("editor.content.folder.items", "Items"),
+    NOX_TRK("editor.content.folder.doors", "Doors"),
+    NOX_TRK("editor.content.folder.exits_travel", "Exits & Travel"),
+    NOX_TRK("editor.content.folder.triggers_plates", "Triggers & Plates"),
+    NOX_TRK("editor.content.folder.traps_hazards", "Traps & Hazards"),
+    NOX_TRK("editor.content.folder.lights", "Lights"),
+    NOX_TRK("editor.content.folder.readables_signs", "Readables & Signs"),
+    NOX_TRK("editor.content.folder.obelisks", "Obelisks"),
+    NOX_TRK("editor.content.folder.quest_rewards", "Quest Rewards"),
+    NOX_TRK("editor.content.folder.movers", "Movers"),
+    NOX_TRK("editor.content.folder.decorations", "Decorations"),
+    NOX_TRK("editor.content.folder.ambient_sounds", "Ambient Sounds"),
+    NOX_TRK("editor.content.folder.markers", "Markers"),
+    NOX_TRK("editor.content.folder.hidden", "Hidden"),
+    NOX_TRK("editor.content.folder.other", "Other"),
+    NOX_TRK("editor.content.folder.shopkeepers", "Shopkeepers"),
+    NOX_TRK("editor.content.folder.maidens", "Maidens"),
+    NOX_TRK("editor.content.folder.wounded", "Wounded"),
+    NOX_TRK("editor.content.folder.bombers", "Bombers"),
+    NOX_TRK("editor.content.folder.undead", "Undead"),
+    NOX_TRK("editor.content.folder.large", "Large"),
+    NOX_TRK("editor.content.folder.medium", "Medium"),
+    NOX_TRK("editor.content.folder.small", "Small"),
+    NOX_TRK("editor.content.folder.swords", "Swords"),
+    NOX_TRK("editor.content.folder.axes", "Axes"),
+    NOX_TRK("editor.content.folder.maces_hammers", "Maces & Hammers"),
+    NOX_TRK("editor.content.folder.bows_arrows", "Bows & Arrows"),
+    NOX_TRK("editor.content.folder.crossbows", "Crossbows"),
+    NOX_TRK("editor.content.folder.throwing", "Throwing"),
+    NOX_TRK("editor.content.folder.staves_wands", "Staves & Wands"),
+    NOX_TRK("editor.content.folder.helmets", "Helmets"),
+    NOX_TRK("editor.content.folder.shields", "Shields"),
+    NOX_TRK("editor.content.folder.body", "Body"),
+    NOX_TRK("editor.content.folder.arms", "Arms"),
+    NOX_TRK("editor.content.folder.legs", "Legs"),
+    NOX_TRK("editor.content.folder.boots", "Boots"),
+    NOX_TRK("editor.content.folder.back", "Back"),
+    NOX_TRK("editor.content.folder.potions", "Potions"),
+    NOX_TRK("editor.content.folder.food", "Food"),
+    NOX_TRK("editor.content.folder.flags_balls", "Flags & Balls"),
+    NOX_TRK("editor.content.folder.keys", "Keys"),
+    NOX_TRK("editor.content.folder.treasure_gold", "Treasure & Gold"),
+    NOX_TRK("editor.content.folder.exits", "Exits"),
+    NOX_TRK("editor.content.folder.teleporters", "Teleporters"),
+    NOX_TRK("editor.content.folder.elevators", "Elevators"),
+    NOX_TRK("editor.content.folder.pits", "Pits"),
+    NOX_TRK("editor.content.folder.starts", "Starts"),
+    NOX_TRK("editor.content.folder.blockers", "Blockers"),
+    NOX_TRK("editor.content.folder.missiles", "Missiles"),
+    NOX_TRK("editor.content.folder.effects", "Effects"),
+    NOX_TRK("editor.content.folder.bodies_bones", "Bodies & Bones"),
+    NOX_TRK("editor.content.folder.containers", "Containers"),
+    NOX_TRK("editor.content.folder.bridges_stairs", "Bridges & Stairs"),
+    NOX_TRK("editor.content.folder.water_shore", "Water & Shore"),
+    NOX_TRK("editor.content.folder.lava_ice_mud", "Lava, Ice & Mud"),
+    NOX_TRK("editor.content.folder.trees_plants", "Trees & Plants"),
+    NOX_TRK("editor.content.folder.rocks_crystals", "Rocks & Crystals"),
+    NOX_TRK("editor.content.folder.tombs_shrines", "Tombs & Shrines"),
+    NOX_TRK("editor.content.folder.columns_statues", "Columns & Statues"),
+    NOX_TRK("editor.content.folder.lights_fire", "Lights & Fire"),
+    NOX_TRK("editor.content.folder.furniture", "Furniture"),
+    NOX_TRK("editor.content.folder.machines_tools", "Machines & Tools"),
+    NOX_TRK("editor.content.folder.traders", "Traders"),
+    NOX_TRK("editor.content.folder.ix_temple", "Ix Temple"),
+    NOX_TRK("editor.content.folder.land_of_the_dead", "Land of the Dead"),
+    NOX_TRK("editor.content.folder.dun_mir", "Dun Mir"),
+    NOX_TRK("editor.content.folder.galava", "Galava"),
+    NOX_TRK("editor.content.folder.ogres_urchins", "Ogres & Urchins"),
+    NOX_TRK("editor.content.folder.webs_debris", "Webs & Debris"),
+};
+
+/// One part of a folder path as shown.
+std::string_view folderPartText(std::string_view part)
+{
+    for (const auto& k : kFolderTexts) {
+        if (part == k.en) return nox::l10n::tr(k);
+    }
+    return part;
+}
+
 std::size_t topRank(std::string_view folder)
 {
     const auto top = folder.substr(0, folder.find('/'));
@@ -231,6 +322,19 @@ std::string contentFolder(const things::ThingDef& thing)
     if (c & oc::Monster) return "Hidden/Monsters";
     if (c & (oc::Weapon | oc::Armor | oc::Wand)) return "Hidden/Items";
     return "Hidden/Effects";
+}
+
+std::string folderText(std::string_view folder)
+{
+    std::string out;
+    while (true) {
+        const auto slash = folder.find('/');
+        out += folderPartText(folder.substr(0, slash));
+        if (slash == std::string_view::npos) break;
+        out += '/';
+        folder.remove_prefix(slash + 1);
+    }
+    return out;
 }
 
 std::string thingDisplayName(const things::ThingDef& thing, const strings::StringTable* strings, const things::ModifierDb* modifiers)
@@ -306,6 +410,11 @@ ContentCatalog ContentCatalog::build(const things::ThingDb& things)
     }
     cat.folders.assign(folders.begin(), folders.end());
     std::ranges::sort(cat.folders, folderLess);
+    cat.folderNames.reserve(cat.folders.size());
+    for (const auto& f : cat.folders) {
+        const auto slash = f.rfind('/');
+        cat.folderNames.emplace_back(folderPartText(slash == std::string::npos ? std::string_view(f) : std::string_view(f).substr(slash + 1)));
+    }
     return cat;
 }
 

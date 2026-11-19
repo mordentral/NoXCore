@@ -4,6 +4,7 @@
 #include "draw_box.hpp"
 #include "quickbar_mana.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/spell_ids.hpp"
 
 #include <algorithm>
@@ -540,7 +541,7 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
             }
             if (font) {
                 // "Trap Set n" (quickbarDraw) on the tray's 0x6E-wide title at (0x14, -7).
-                std::string title = "Trap Set " + std::to_string(bars.trapRow + 1);
+                std::string title = nox::l10n::format(NOX_TR("hud.quickbar.trap_set", "Trap Set {n}"), {{"n", bars.trapRow + 1}});
                 const float tw = textWidth(title);
                 text(title, tx + 0x14 + (0x6E - tw) / 2 - 8, ty - 7, {255, 255, 255, 255});
             }
@@ -559,7 +560,7 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
             // "Spell Set n" over the bar: centred on QuickBarTitle's 101 x 14 child at (115, 6),
             // a pixel down (the small font's height + 1 less the default's).
             if (font) {
-                std::string title = "Spell Set " + std::to_string(bars.row + 1);
+                std::string title = nox::l10n::format(NOX_TR("hud.quickbar.spell_set", "Spell Set {n}"), {{"n", bars.row + 1}});
                 const float tw = textWidth(title);
                 text(title, bx + 115 + (101 - tw) / 2, by + 6 + 1, {255, 255, 255, 255});
             }

@@ -40,7 +40,11 @@ struct ContentEntry {
 };
 
 /// The folder thing.bin's `thing` goes in (the rule table; "Hidden/..." for one not placeable).
+/// The path is English: it is the folder's key (compared, searched, kept in the editor's settings).
 std::string contentFolder(const things::ThingDef& thing);
+/// A folder's path as shown, in the language in use: each part the rule table names translated
+/// ("Monsters/Undead"), any other part (a user's) as it is. A lookup per part: for what is drawn.
+std::string folderText(std::string_view folder);
 /// The SUBCLASS attribute's names, as written (upper case), in order.
 std::vector<std::string> subclassNames(const things::ThingDef& thing);
 /// Whether the game's object save writes things of this type (it has a MENUICON).
@@ -64,6 +68,9 @@ struct ContentCatalog {
     /// Every folder path (parents included), in the tree's display order: the rule table's
     /// top-level order, children sorted by name, "Other" last.
     std::vector<std::string> folders;
+    /// Each folder's own name (its path's last part) as shown, by index into `folders` (made once
+    /// by build, in the language in use then: the tree draws these every frame).
+    std::vector<std::string> folderNames;
 
     static ContentCatalog build(const things::ThingDb& things);
     /// Gives every entry its display name (thingDisplayName), which search then matches too.

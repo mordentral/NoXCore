@@ -1,7 +1,9 @@
 // The map editor's prefabs (prefab.hpp).
 #include "noxcore/mapedit/prefab.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -100,7 +102,7 @@ Op placePrefabOp(const MapDocument& doc, const Prefab& prefab, WorldPoint at, Se
         }
         op = pasteMarkersOp(doc, prefab.clip, dx, dy, placed);
     }
-    op.label = "Place prefab " + prefab.name;
+    op.label = opLabel(oplabels::kPlacePrefab, {{"name", prefab.name}});
     return op;
 }
 

@@ -1,6 +1,8 @@
 // The mod editor's order-keeping JSON (ordered_json.hpp).
 #include "editor/ordered_json.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -25,7 +27,7 @@ public:
         Value v = value(0);
         space();
         if (at_ != s_.size()) {
-            fail("more after the value");
+            fail(NOX_TR("editor.json.more_after_value", "more after the value"));
         }
         return v;
     }
@@ -34,7 +36,7 @@ private:
     [[noreturn]] void fail(const std::string& why) const
     {
         const auto line = 1 + std::count(s_.begin(), s_.begin() + static_cast<std::ptrdiff_t>(std::min(at_, s_.size())), '\n');
-        throw ParseError("line " + std::to_string(line) + ": " + why);
+        throw ParseError(nox::l10n::format(NOX_TR("editor.json.at_line", "line {line}: {why}"), {{"line", line}, {"why", why}}));
     }
 
     void space()
@@ -57,7 +59,7 @@ private:
     void expect(char c)
     {
         if (!take(c)) {
-            fail(std::string("'") + c + "' expected");
+            fail(nox::l10n::format(NOX_TR("editor.json.char_expected", "'{c}' expected"), {{"c", std::string(1, c)}}));
         }
     }
 
@@ -92,7 +94,7 @@ private:
     std::uint32_t hex4()
     {
         if (at_ + 4 > s_.size()) {
-            fail("a \\u escape needs four hex digits");
+            fail(NOX_TR("editor.json.u_escape_hex", "a \\u escape needs four hex digits"));
         }
         std::uint32_t v = 0;
         for (int i = 0; i < 4; ++i) {
@@ -101,7 +103,7 @@ private:
             if (c >= '0' && c <= '9') v |= static_cast<std::uint32_t>(c - '0');
             else if (c >= 'a' && c <= 'f') v |= static_cast<std::uint32_t>(c - 'a' + 10);
             else if (c >= 'A' && c <= 'F') v |= static_cast<std::uint32_t>(c - 'A' + 10);
-            else fail("a \\u escape needs four hex digits");
+            else fail(NOX_TR("editor.json.u_escape_hex", "a \\u escape needs four hex digits"));
         }
         return v;
     }
@@ -112,21 +114,21 @@ private:
         std::string out;
         while (true) {
             if (at_ >= s_.size()) {
-                fail("a string isn't closed");
+                fail(NOX_TR("editor.json.string_not_closed", "a string isn't closed"));
             }
             const char c = s_[at_++];
             if (c == '"') {
                 return out;
             }
             if (static_cast<unsigned char>(c) < 0x20) {
-                fail("a control character in a string (write it as an escape)");
+                fail(NOX_TR("editor.json.control_char", "a control character in a string (write it as an escape)"));
             }
             if (c != '\\') {
                 out += c;
                 continue;
             }
             if (at_ >= s_.size()) {
-                fail("a string isn't closed");
+                fail(NOX_TR("editor.json.string_not_closed", "a string isn't closed"));
             }
             switch (const char e = s_[at_++]) {
             case '"': out += '"'; break;
@@ -149,7 +151,7 @@ private:
                 utf8(out, cp);
                 break;
             }
-            default: fail(std::string("an unknown escape \\") + e);
+            default: fail(nox::l10n::format(NOX_TR("editor.json.unknown_escape", "an unknown escape \\{e}"), {{"e", std::string(1, e)}}));
             }
         }
     }
@@ -157,11 +159,11 @@ private:
     Value value(int depth)
     {
         if (depth > 64) {
-            fail("nested deeper than 64");
+            fail(NOX_TR("editor.json.too_deep", "nested deeper than 64"));
         }
         space();
         if (at_ >= s_.size()) {
-            fail("a value expected");
+            fail(NOX_TR("editor.json.value_expected", "a value expected"));
         }
         Value v;
         const char c = s_[at_];
@@ -177,7 +179,7 @@ private:
                 expect(':');
                 Value member = value(depth + 1);
                 if (v.find(key)) {
-                    fail("the key \"" + key + "\" is there twice");
+                    fail(nox::l10n::format(NOX_TR("editor.json.key_twice", "the key \"{key}\" is there twice"), {{"key", key}}));
                 }
                 v.members.emplace_back(std::move(key), std::move(member));
             } while (take(','));
@@ -213,10 +215,10 @@ private:
             double d = 0;
             const auto [end, ec] = std::from_chars(v.text.data(), v.text.data() + v.text.size(), d);
             if (ec != std::errc() || end != v.text.data() + v.text.size()) {
-                fail("\"" + v.text + "\" isn't a number");
+                fail(nox::l10n::format(NOX_TR("editor.json.not_a_number", "\"{text}\" isn't a number"), {{"text", v.text}}));
             }
         } else {
-            fail(std::string("unexpected '") + c + "'");
+            fail(nox::l10n::format(NOX_TR("editor.json.unexpected", "unexpected '{c}'"), {{"c", std::string(1, c)}}));
         }
         return v;
     }

@@ -2,6 +2,7 @@
 
 #include "editor/insert.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 #include "noxcore/video/sprite_encode.hpp"
 
@@ -17,11 +18,38 @@ namespace videotools::gui {
 
 namespace {
 
-constexpr SDL_DialogFileFilter kPngFilter[] = {{"PNG image", "png"}};
+const SDL_DialogFileFilter* pngFilter()
+{
+    static const SDL_DialogFileFilter filter[] = {{NOX_TRC("content.images.png_filter", "PNG image"), "png"}};
+    return filter;
+}
 
-const char* const kTypeItems[] = {"All types", "0 floor tile", "1 tile edge", "2 full image", "3 sprite", "4 sprite",
-                                  "5 sprite (RGBA4444)", "6 sprite", "7 full image", "8 sprite (RGB565)"};
-const char* const kHdItems[] = {"With or without HD", "With an HD image", "Without an HD image"};
+// The type filter's items (all, then each video.bag image type) and the HD filter's.
+constexpr int kTypeItemCount = 10;
+const char* typeFilterItem(void*, int i)
+{
+    switch (i) {
+    case 0: return NOX_TRC("content.images.all_types", "All types");
+    case 1: return NOX_TRC("content.images.type0", "0 floor tile");
+    case 2: return NOX_TRC("content.images.type1", "1 tile edge");
+    case 3: return NOX_TRC("content.images.type2", "2 full image");
+    case 4: return NOX_TRC("content.images.type3", "3 sprite");
+    case 5: return NOX_TRC("content.images.type4", "4 sprite");
+    case 6: return NOX_TRC("content.images.type5", "5 sprite (RGBA4444)");
+    case 7: return NOX_TRC("content.images.type6", "6 sprite");
+    case 8: return NOX_TRC("content.images.type7", "7 full image");
+    default: return NOX_TRC("content.images.type8", "8 sprite (RGB565)");
+    }
+}
+constexpr int kHdItemCount = 3;
+const char* hdFilterItem(void*, int i)
+{
+    switch (i) {
+    case 0: return NOX_TRC("content.images.hd_any", "With or without HD");
+    case 1: return NOX_TRC("content.images.hd_with", "With an HD image");
+    default: return NOX_TRC("content.images.hd_without", "Without an HD image");
+    }
+}
 
 std::string lowered(std::string_view s) { return nox::util::lowered(s); }
 
@@ -110,7 +138,7 @@ void ImagesView::draw(float height)
     pollDialogs();
     rebuild();
     if (!s_.bagOpen()) {
-        ImGui::TextDisabled("Open a game folder (with video.bag and video.idx) above.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.images.open_game", "Open a game folder (with video.bag and video.idx) above."));
         return;
     }
     if (ImGui::BeginTable("imagesPanes", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImVec2(0, height))) {
@@ -129,22 +157,22 @@ void ImagesView::listPane(float height)
 {
     ImGui::BeginChild("imageList", ImVec2(0, height));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##filter", "Name, or #index / 100-200,305", filter_, sizeof filter_);
+    ImGui::InputTextWithHint("##filter", NOX_TRC("content.images.filter_hint", "Name, or #index / 100-200,305"), filter_, sizeof filter_);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
     int typeItem = typeFilter_ + 1;
-    if (ImGui::Combo("##type", &typeItem, kTypeItems, int(std::size(kTypeItems)))) {
+    if (ImGui::Combo("##type", &typeItem, typeFilterItem, nullptr, kTypeItemCount)) {
         typeFilter_ = typeItem - 1;
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::BeginDisabled(!s_.packOpen());
-    ImGui::Combo("##hd", &hdFilter_, kHdItems, int(std::size(kHdItems)));
+    ImGui::Combo("##hd", &hdFilter_, hdFilterItem, nullptr, kHdItemCount);
     ImGui::EndDisabled();
-    ImGui::Checkbox("Edited only", &editedOnly_);
+    ImGui::Checkbox(NOX_TRI("content.images.edited_only", "Edited only"), &editedOnly_);
     ImGui::SameLine();
-    ImGui::TextDisabled("%zu images, %zu selected", list_.size(), selected_.size());
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.images.count_selected", "{n} images, {selected} selected"), {{"n", list_.size()}, {"selected", selected_.size()}}).c_str());
     ImGui::SameLine();
-    if (ImGui::SmallButton("Select all")) {
+    if (ImGui::SmallButton(NOX_TRI("content.images.select_all", "Select all"))) {
         selected_ = {list_.begin(), list_.end()};
     }
     rebuild();
@@ -218,7 +246,8 @@ void ImagesView::listPane(float height)
             const float tx = a.x + rowH + 6 * s_.scale();
             const std::string name = inBag ? bag->bag().images()[std::size_t(i)].name : (pack ? pack->name(std::uint32_t(i)) : "");
             dl->AddText(ImVec2(tx, a.y + 2), ImGui::GetColorU32(ImGuiCol_Text), std::format("#{}  {}", i, name).c_str());
-            std::string sub = inBag ? std::format("type {}", int(bag->bag().images()[std::size_t(i)].type)) : "extra pack slot";
+            std::string sub = inBag ? nox::l10n::format(NOX_TR("content.images.type_n", "type {n}"), {{"n", int(bag->bag().images()[std::size_t(i)].type)}})
+                                    : NOX_TR("content.images.extra_slot", "extra pack slot");
             if (thumb && thumb->texture) {
                 sub += std::format("  ·  {}x{}", thumb->width, thumb->height);
             }
@@ -227,14 +256,14 @@ void ImagesView::listPane(float height)
                 sub += e->width > 0 ? std::format("  ·  HD {:.3g}x", double(e->pixelWidth) / e->width) : std::string("  ·  HD");
             }
             if (bag->edited(i) || (pack && pack->edited(std::uint32_t(i)))) {
-                sub += "  ·  edited";
+                sub += NOX_TR("content.images.edited_suffix", "  ·  edited");
             }
             dl->AddText(ImVec2(tx, a.y + rowH / 2), ImGui::GetColorU32(ImGuiCol_TextDisabled), sub.c_str());
             ImGui::PopID();
         }
     }
     if (list_.empty()) {
-        ImGui::TextDisabled("Nothing matches.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.images.nothing_matches", "Nothing matches."));
     }
     ImGui::EndChild();
     ImGui::EndChild();
@@ -256,38 +285,40 @@ void ImagesView::factsTable(const char* id, const Tex* t, bool hd, std::int32_t 
     auto* pack = s_.pack();
     if (!hd && std::size_t(index) < bag->size()) {
         const auto& info = bag->bag().images()[std::size_t(index)];
-        row("Name", info.name);
-        row("Type", std::format("{} ({}){}", int(info.type), imageTypeName(info.type),
-                                nox::video::canEncodeImage(info.type) ? "" : "  read-only"));
-        row("Stored", std::format("{} bytes in segment {}", info.size, info.segment));
+        row(NOX_TRC("content.label.name", "Name"), info.name);
+        row(NOX_TRC("content.images.fact_type", "Type"), std::format("{} ({}){}", int(info.type), imageTypeName(info.type),
+                                nox::video::canEncodeImage(info.type) ? std::string() : NOX_TR("content.images.read_only", "  read-only")));
+        row(NOX_TRC("content.images.fact_stored", "Stored"),
+            nox::l10n::format(NOX_TR("content.images.bytes_in_segment", "{n} bytes in segment {segment}"), {{"n", info.size}, {"segment", info.segment}}));
     } else if (hd && pack && pack->present(std::uint32_t(index))) {
-        row("Name", pack->name(std::uint32_t(index)));
+        row(NOX_TRC("content.label.name", "Name"), pack->name(std::uint32_t(index)));
     }
     if (t && t->error.empty() && !t->missing) {
-        row("Size", std::format("{} x {}", t->width, t->height));
+        row(NOX_TRC("content.label.size", "Size"), std::format("{} x {}", t->width, t->height));
         if (hd) {
-            row("Stored at", std::format("{} x {}  ({:.3g}x)", t->pixelWidth, t->pixelHeight,
+            row(NOX_TRC("content.images.fact_stored_at", "Stored at"), std::format("{} x {}  ({:.3g}x)", t->pixelWidth, t->pixelHeight,
                                          t->width > 0 ? double(t->pixelWidth) / t->width : 0.0));
         }
         if (t->type != 0 && t->type != 1) {
-            row("Draw offset", std::format("{}, {}", t->offsetX, t->offsetY));
-            row("Header byte", std::to_string(t->headerByte));
+            row(NOX_TRC("content.images.fact_draw_offset", "Draw offset"), std::format("{}, {}", t->offsetX, t->offsetY));
+            row(NOX_TRC("content.images.fact_header_byte", "Header byte"), std::to_string(t->headerByte));
         }
         std::string slots;
         for (const auto m : t->materialSlots) {
             slots += (slots.empty() ? "" : ", ") + std::to_string(m);
         }
-        row("Material slots", slots.empty() ? "none" : slots);
+        row(NOX_TRC("content.images.fact_material_slots", "Material slots"), slots.empty() ? NOX_TR("content.record.none", "none") : slots);
         if (t->edgeMask) {
-            row("Edge mask", "yes");
+            row(NOX_TRC("content.images.fact_edge_mask", "Edge mask"), NOX_TR("content.images.yes", "yes"));
         }
         if (!t->extra.empty()) {
-            row("Stored as", t->extra);
+            row(NOX_TRC("content.images.fact_stored_as", "Stored as"), t->extra);
         }
     }
     const bool edited = hd ? pack && pack->edited(std::uint32_t(index)) : bag->edited(index);
     if (edited) {
-        row("Edited", hd && !pack->present(std::uint32_t(index)) ? "removed (saved with the pack)" : "yes (not saved yet)");
+        row(NOX_TRC("content.images.fact_edited", "Edited"), hd && !pack->present(std::uint32_t(index)) ? NOX_TR("content.images.edited_removed", "removed (saved with the pack)")
+                                                                                                         : NOX_TR("content.images.edited_unsaved", "yes (not saved yet)"));
     }
     ImGui::EndTable();
 }
@@ -302,12 +333,12 @@ void ImagesView::detailPane(float height)
         selected_ = {focus_};
     }
     if (focus_ < 0) {
-        ImGui::TextDisabled("Pick an image on the left.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.images.pick", "Pick an image on the left."));
         ImGui::EndChild();
         return;
     }
     const bool inBag = std::size_t(focus_) < bag->size();
-    ImGui::Text("#%d  %s", focus_, inBag ? bag->bag().images()[std::size_t(focus_)].name.c_str() : "(extra pack slot)");
+    ImGui::Text("#%d  %s", focus_, inBag ? bag->bag().images()[std::size_t(focus_)].name.c_str() : NOX_TRC("content.images.extra_slot_paren", "(extra pack slot)"));
     ImGui::SameLine(0, 30 * s_.scale());
     compare_.controls();
     if (keys_) {
@@ -323,7 +354,7 @@ void ImagesView::detailPane(float height)
     bagPane.title = "video.bag";
     bagPane.image = sd;
     PaneView hdPane;
-    hdPane.title = "HD (image pack)";
+    hdPane.title = NOX_TRC("content.images.hd_pane", "HD (image pack)");
     hdPane.image = hd;
     hdPane.hd = true;
     compare_.draw(bagPane, hdPane, ImVec2(ImGui::GetContentRegionAvail().x, imageH));
@@ -334,7 +365,7 @@ void ImagesView::detailPane(float height)
         ImGui::TextUnformatted("video.bag");
         factsTable("sdFacts", sd, false, focus_);
         ImGui::TableNextColumn();
-        ImGui::TextUnformatted(pack ? "HD (image pack)" : "HD: no image pack open");
+        ImGui::TextUnformatted(pack ? NOX_TRC("content.images.hd_pane", "HD (image pack)") : NOX_TRC("content.images.hd_no_pack", "HD: no image pack open"));
         if (pack) {
             factsTable("hdFacts", hd, true, focus_);
         }
@@ -353,43 +384,51 @@ void ImagesView::actions()
     const bool busy = s_.busy();
     ImGui::Separator();
     ImGui::BeginDisabled(busy || sel.empty());
-    if (ImGui::Button(std::format("Extract video.bag ({})", sel.size()).c_str())) {
+    if (ImGui::Button(nox::l10n::format(NOX_TR("content.images.extract_bag", "Extract video.bag ({n})"), {{"n", sel.size()}}).c_str())) {
         extractWhat_ = 1;
         s_.dialogs().request(kDialogExtract, Dialogs::Folder, s_.window(), s_.settings().extractDir);
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(!pack);
-    if (ImGui::Button("Extract HD")) {
+    if (ImGui::Button(NOX_TRI("content.images.extract_hd", "Extract HD"))) {
         extractWhat_ = 2;
         s_.dialogs().request(kDialogExtract, Dialogs::Folder, s_.window(), s_.settings().extractDir);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Extract both")) {
+    if (ImGui::Button(NOX_TRI("content.images.extract_both", "Extract both"))) {
         extractWhat_ = 3;
         s_.dialogs().request(kDialogExtract, Dialogs::Folder, s_.window(), s_.settings().extractDir);
     }
     ImGui::EndDisabled();
     ImGui::EndDisabled();
     ImGui::SameLine();
-    ImGui::TextDisabled("PNG + .json sidecar (+ masks), to edit and put back");
+    ImGui::TextDisabled("%s", NOX_TRC("content.images.extract_what", "PNG + .json sidecar (+ masks), to edit and put back"));
 
     const bool inBag = focus_ >= 0 && std::size_t(focus_) < bag->size();
     const bool encodable = inBag && nox::video::canEncodeImage(bag->bag().images()[std::size_t(focus_)].type);
     ImGui::BeginDisabled(!encodable || s_.inserting());
-    if (ImGui::Button("Replace video.bag image...")) {
+    if (ImGui::Button(NOX_TRI("content.images.replace_bag", "Replace video.bag image..."))) {
         replaceIndex_ = focus_;
         pendingBagReplace_ = true;
-        s_.dialogs().request(kDialogReplaceBag, Dialogs::Open, s_.window(), s_.settings().extractDir, kPngFilter, 1);
+        s_.dialogs().request(kDialogReplaceBag, Dialogs::Open, s_.window(), s_.settings().extractDir, pngFilter(), 1);
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("A PNG for #%d, re-encoded in the slot's type (offsets from its .json sidecar if it has one)", focus_);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.images.replace_bag_tip", "A PNG for #{index}, re-encoded in the slot's type (offsets from its .json sidecar if it has one)"),
+                                                  {{"index", focus_}})
+                                    .c_str());
+    }
     ImGui::SameLine();
     ImGui::BeginDisabled(!pack || focus_ < 0 || s_.inserting());
-    if (ImGui::Button(pack && pack->present(std::uint32_t(std::max(0, focus_))) ? "Replace HD image..." : "Add HD image...")) {
+    if (ImGui::Button(pack && pack->present(std::uint32_t(std::max(0, focus_))) ? NOX_TRI("content.images.replace_hd", "Replace HD image...")
+                                                                                : NOX_TRI("content.images.add_hd", "Add HD image..."))) {
         replaceIndex_ = focus_;
-        s_.dialogs().request(kDialogReplacePack, Dialogs::Open, s_.window(), s_.settings().extractDir, kPngFilter, 1);
+        s_.dialogs().request(kDialogReplacePack, Dialogs::Open, s_.window(), s_.settings().extractDir, pngFilter(), 1);
     }
-    ImGui::SetItemTooltip("A larger PNG for #%d: drawn over the original's size and offsets", focus_);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.images.replace_hd_tip", "A larger PNG for #{index}: drawn over the original's size and offsets"), {{"index", focus_}})
+                                    .c_str());
+    }
     ImGui::EndDisabled();
     ImGui::SameLine();
     std::size_t hdSelected = 0, editedSelected = 0;
@@ -398,37 +437,39 @@ void ImagesView::actions()
         editedSelected += bag->edited(i) || (pack && pack->edited(std::uint32_t(i)));
     }
     ImGui::BeginDisabled(hdSelected == 0);
-    if (ImGui::Button(std::format("Remove HD ({})", hdSelected).c_str())) {
-        s_.confirm("Remove HD images?",
-                   std::format("Remove {} HD image{} from the pack? NoX Core then draws the video.bag images.\n"
-                               "(Nothing is written until you save the pack.)",
-                               hdSelected, hdSelected == 1 ? "" : "s"),
+    if (ImGui::Button(nox::l10n::format(NOX_TR("content.images.remove_hd", "Remove HD ({n})"), {{"n", hdSelected}}).c_str())) {
+        s_.confirm(NOX_TR("content.images.remove_hd_title", "Remove HD images?"),
+                   nox::l10n::format(NOX_TRP("content.images.remove_hd_ask",
+                                             "Remove {n} HD image from the pack? NoX Core then draws the video.bag images.\n(Nothing is written until you save the pack.)",
+                                             "Remove {n} HD images from the pack? NoX Core then draws the video.bag images.\n(Nothing is written until you save the pack.)",
+                                             hdSelected),
+                                     {{"n", hdSelected}}),
                    [this, sel] { s_.removePack(sel); });
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(editedSelected == 0);
-    if (ImGui::Button(std::format("Revert ({})", editedSelected).c_str())) {
+    if (ImGui::Button(nox::l10n::format(NOX_TR("content.images.revert_n", "Revert ({n})"), {{"n", editedSelected}}).c_str())) {
         s_.revert(sel);
     }
     ImGui::EndDisabled();
 
     ImGui::BeginDisabled(s_.inserting());
-    if (ImGui::Button("Put in a folder of PNGs...")) {
+    if (ImGui::Button(NOX_TRI("content.images.put_folder", "Put in a folder of PNGs..."))) {
         s_.dialogs().request(kDialogInsertFolder, Dialogs::Folder, s_.window(), s_.settings().extractDir);
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("Every PNG with a sidecar (or named <index>_name.png / <index>_name.hd.png) into its slot");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.images.put_folder_tip", "Every PNG with a sidecar (or named <index>_name.png / <index>_name.hd.png) into its slot"));
     ImGui::SameLine();
     ImGui::BeginDisabled(!pack);
-    ImGui::Checkbox("New HD images as BC7", &s_.encodeOptions().bc7);
-    ImGui::SetItemTooltip("BC7 with mips, as NoX Core's HD pack stores them (else lossless)");
+    ImGui::Checkbox(NOX_TRI("content.images.bc7", "New HD images as BC7"), &s_.encodeOptions().bc7);
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.images.bc7_tip", "BC7 with mips, as NoX Core's HD pack stores them (else lossless)"));
     ImGui::EndDisabled();
     if (s_.inserting()) {
         ImGui::SameLine();
-        ImGui::TextDisabled("Putting in... %zu left", s_.insertsLeft());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.images.putting_in", "Putting in... {n} left"), {{"n", s_.insertsLeft()}}).c_str());
     }
-    if (!s_.messages().empty() && ImGui::CollapsingHeader(std::format("Messages ({})###msgs", s_.messages().size()).c_str())) {
+    if (!s_.messages().empty() && ImGui::CollapsingHeader((nox::l10n::format(NOX_TR("content.images.messages", "Messages ({n})"), {{"n", s_.messages().size()}}) + "###msgs").c_str())) {
         ImGui::BeginChild("msgs", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 6), ImGuiChildFlags_Borders);
         for (const auto& m : s_.messages()) {
             ImGui::TextWrapped("%s", m.c_str());
@@ -455,7 +496,7 @@ void ImagesView::pollDialogs()
         req.fromPack = (extractWhat_ & 2) && s_.pack();
         req.dir = dir;
         const std::size_t n = req.indexes.size();
-        s_.startJob("Extracting", dir, n, [req = std::move(req)](ExportProgress& progress) {
+        s_.startJob(NOX_TR("content.images.extracting", "Extracting"), dir, n, [req = std::move(req)](ExportProgress& progress) {
             const auto c = editor::extractImages(
                 req,
                 [&progress](std::size_t done, std::size_t total) {
@@ -463,8 +504,9 @@ void ImagesView::pollDialogs()
                     progress.total = total;
                 },
                 &progress.cancel);
-            std::string msg = std::format("Extracted {} video.bag and {} HD images to {}{}", c.bag, c.pack, utf8(req.dir),
-                                          c.failed ? std::format(" ({} failed)", c.failed) : std::string());
+            std::string msg = nox::l10n::format(NOX_TR("content.images.extracted", "Extracted {bag} video.bag and {hd} HD images to {folder}"),
+                                                {{"bag", c.bag}, {"hd", c.pack}, {"folder", utf8(req.dir)}}) +
+                              (c.failed ? nox::l10n::format(NOX_TR("content.images.n_failed", " ({n} failed)"), {{"n", c.failed}}) : std::string());
             for (const auto& e : c.errors) {
                 msg += "\n  " + e;
             }
@@ -493,13 +535,13 @@ void ImagesView::pollDialogs()
                 const auto slot = editor::fileSlot(f);
                 if (!slot) {
                     ++unknown;
-                    s_.log(utf8(f.png.filename()) + ": no sidecar and no index in its name; skipped");
+                    s_.log(nox::l10n::format(NOX_TR("content.images.skipped", "{file}: no sidecar and no index in its name; skipped"), {{"file", utf8(f.png.filename())}}));
                     continue;
                 }
                 tasks.push_back({std::move(f), slot->first, slot->second});
             }
-            s_.setStatus(std::format("Putting in {} PNGs from {}{}", tasks.size(), *p,
-                                     unknown ? std::format(" ({} skipped: see Messages)", unknown) : std::string()));
+            s_.setStatus(nox::l10n::format(NOX_TR("content.images.putting_in_from", "Putting in {n} PNGs from {folder}"), {{"n", tasks.size()}, {"folder", *p}}) +
+                         (unknown ? nox::l10n::format(NOX_TR("content.images.n_skipped", " ({n} skipped: see Messages)"), {{"n", unknown}}) : std::string()));
             s_.queueInserts(std::move(tasks));
         } catch (const std::exception& ex) {
             s_.error(ex.what());

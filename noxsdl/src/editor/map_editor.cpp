@@ -18,6 +18,8 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/mapedit/writer.hpp"
+#include "noxcore/mapedit/op_label.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/text.hpp"
 #include "noxcore/video/nxz.hpp"
@@ -35,6 +37,7 @@
 
 namespace fs = std::filesystem;
 namespace me = nox::mapedit;
+namespace ol = nox::mapedit::oplabels;
 
 namespace noxsdl {
 
@@ -43,6 +46,7 @@ namespace {
 using ObjId = me::ObjId;
 using editor::numbersAfter;
 using editor::pathText;
+using nox::l10n::format;
 
 /// A map file as a document: a .map (encrypted or not), or a .nxz (the map download's).
 me::MapDocument readDocument(const fs::path& path, const nox::things::ThingDb& things)
@@ -167,15 +171,17 @@ void MapEditor::status(std::string text)
 std::string MapEditor::title() const
 {
     if (session_) {
-        return "[EDIT] " + docName_ + " (session) - NoX Core Map Editor";
+        return format(NOX_TR("editor.title.session", "[EDIT] {name} (session) - NoX Core Map Editor"), {{"name", docName_}});
     }
-    std::string name = !docName_.empty() ? docName_ : !doc_.origin.name.empty() ? doc_.origin.name + " (copy)" : "Untitled";
-    return name + (history_.dirty() ? " *" : "") + " - NoX Core Map Editor";
+    std::string name = !docName_.empty()             ? docName_
+                       : !doc_.origin.name.empty() ? format(NOX_TR("editor.title.copy", "{name} (copy)"), {{"name", doc_.origin.name}})
+                                                   : NOX_TR("editor.title.untitled", "Untitled");
+    return format(NOX_TR("editor.title.map", "{name} - NoX Core Map Editor"), {{"name", name + (history_.dirty() ? " *" : "")}});
 }
 
 std::string MapEditor::elementName(const me::ElementKey& key) const
 {
-    return key.text();
+    return key.shownText();
 }
 
 std::string MapEditor::peerName(me::PeerId peer) const
@@ -183,7 +189,7 @@ std::string MapEditor::peerName(me::PeerId peer) const
     if (session_) {
         return session_->nameOf(peer);
     }
-    return peer == 0 ? std::string("the host") : "editor " + std::to_string(peer);
+    return peer == 0 ? NOX_TR("editor.status.the_host", "the host") : format(NOX_TR("editor.status.editor_n", "editor {n}"), {{"n", peer}});
 }
 
 std::optional<me::PeerId> MapEditor::otherHolder(const me::ElementKey& key) const
@@ -224,7 +230,8 @@ void MapEditor::newDocument(const me::NewMapOptions& options)
     sidecar_ = {};
     if (scriptPanel_) scriptPanel_->documentOpened();
     loadPaintSettings();
-    status("Started a new map (" + (options.size > 0 ? std::to_string(options.size) + " x " + std::to_string(options.size) + " cells of floor" : std::string("no floor")) + ")");
+    status(options.size > 0 ? format(NOX_TR("editor.status.new_map_floor", "Started a new map ({n} x {n} cells of floor)"), {{"n", options.size}})
+                            : NOX_TR("editor.status.new_map_no_floor", "Started a new map (no floor)"));
 }
 
 bool MapEditor::open(const fs::path& path)
@@ -233,8 +240,8 @@ bool MapEditor::open(const fs::path& path)
         me::MapDocument d = readDocument(path, things_);
         doc_ = std::move(d);
     } catch (const std::exception& ex) {
-        errorText_ = "Can't open " + pathText(path) + ":\n" + ex.what();
-        status("Open failed: " + std::string(ex.what()));
+        errorText_ = format(NOX_TR("editor.error.cant_open", "Can't open {path}:\n{error}"), {{"path", pathText(path)}, {"error", ex.what()}});
+        status(format(NOX_TR("editor.status.open_failed", "Open failed: {error}"), {{"error", ex.what()}}));
         return false;
     }
     resetDocumentState();
@@ -251,16 +258,17 @@ bool MapEditor::open(const fs::path& path)
             const auto bytes = nox::readFileBytes(side);
             sidecar_ = me::Sidecar::fromJson(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
         } catch (const std::exception& ex) {
-            status("Sidecar ignored: " + std::string(ex.what()));
+            status(format(NOX_TR("editor.status.sidecar_ignored", "Sidecar ignored: {error}"), {{"error", ex.what()}}));
         }
     }
     scriptPanel_->documentOpened();
     loadPaintSettings();
     settings_.addRecent(pathText(path));
     saveSettings();
-    status("Opened " + pathText(path) + (doc_.origin.stock      ? " (a stock map: Save asks for a new name)"
-                                         : saveNeedsName() ? " (its name doesn't fit the game's 8 characters: Save asks for a new one)"
-                                                           : ""));
+    status(format(doc_.origin.stock ? NOX_TR("editor.status.opened_stock", "Opened {path} (a stock map: Save asks for a new name)")
+                  : saveNeedsName() ? NOX_TR("editor.status.opened_rename", "Opened {path} (its name doesn't fit the game's 8 characters: Save asks for a new one)")
+                                    : NOX_TR("editor.status.opened", "Opened {path}"),
+                  {{"path", pathText(path)}}));
     return true;
 }
 
@@ -296,7 +304,7 @@ std::string MapEditor::saveAsOffer() const
 bool MapEditor::saveAs(const std::string& name)
 {
     if (const auto problem = me::mapNameProblem(name)) {
-        errorText_ = "Can't save as \"" + name + "\": " + *problem;
+        errorText_ = format(NOX_TR("editor.error.cant_save_as", "Can't save as \"{name}\": {why}"), {{"name", name}, {"why", *problem}});
         return false;
     }
     try {
@@ -315,10 +323,10 @@ bool MapEditor::saveAs(const std::string& name)
         history_.markSaved();
         settings_.addRecent(pathText(paths.map));
         saveSettings();
-        status("Saved " + pathText(paths.map));
+        status(format(NOX_TR("editor.status.saved", "Saved {path}"), {{"path", pathText(paths.map)}}));
     } catch (const std::exception& ex) {
-        errorText_ = std::string("Not saved:\n") + ex.what();
-        status("Save failed");
+        errorText_ = format(NOX_TR("editor.error.not_saved", "Not saved:\n{error}"), {{"error", ex.what()}});
+        status(NOX_TR("editor.status.save_failed", "Save failed"));
         return false;
     }
     if (afterSave_) {
@@ -350,9 +358,9 @@ void MapEditor::autosave()
         }
         std::ofstream(dir / (name + ".map"), std::ios::binary | std::ios::trunc)
             .write(reinterpret_cast<const char*>(files.map.data()), static_cast<std::streamsize>(files.map.size()));
-        status("Autosaved a recovery copy");
+        status(NOX_TR("editor.status.autosaved", "Autosaved a recovery copy"));
     } catch (const std::exception& ex) {
-        status(std::string("Autosave failed: ") + ex.what());
+        status(format(NOX_TR("editor.status.autosave_failed", "Autosave failed: {error}"), {{"error", ex.what()}}));
     }
 }
 
@@ -378,7 +386,7 @@ void MapEditor::guarded(Pending action, std::function<void()> then)
                 wantsClose_ = true;
             }
         } else {
-            status("In a session the map is the session's (leave the game to open another)");
+            status(NOX_TR("editor.status.session_map", "In a session the map is the session's (leave the game to open another)"));
         }
         return;
     }
@@ -433,7 +441,8 @@ bool MapEditor::perform(const me::Op& op)
     }
     // The host's rule: an op touching what another editor holds is refused.
     if (const auto c = locks_.conflict(self_, me::elementsTouched(doc_, op))) {
-        status(op.label + " refused: " + elementName(c->first) + " is being edited by " + peerName(c->second));
+        status(format(NOX_TR("editor.status.refused_held", "{action} refused: {element} is being edited by {who}"),
+                      {{"action", me::shownOpLabel(op.label)}, {"element", elementName(c->first)}, {"who", peerName(c->second)}}));
         return false;
     }
     const std::size_t before = history_.dropped() + history_.position();
@@ -444,7 +453,7 @@ bool MapEditor::perform(const me::Op& op)
         std::string why;
         const auto seq = session_->submit(op, &inverse, &why);
         if (!seq) {
-            status(op.label + " refused: " + why);
+            status(format(NOX_TR("editor.status.refused", "{action} refused: {why}"), {{"action", me::shownOpLabel(op.label)}, {"why", why}}));
             return false;
         }
         history_.recordApplied(op, std::move(inverse));
@@ -454,7 +463,7 @@ bool MapEditor::perform(const me::Op& op)
         try {
             history_.perform(doc_, op);
         } catch (const std::exception& ex) {
-            status(op.label + " failed: " + ex.what());
+            status(format(NOX_TR("editor.status.failed", "{action} failed: {error}"), {{"action", me::shownOpLabel(op.label)}, {"error", ex.what()}}));
             return false;
         }
     }
@@ -464,7 +473,7 @@ bool MapEditor::perform(const me::Op& op)
     locks_.touch(self_, SDL_GetTicks());
     selection_.prune(doc_);
     changedMs_ = SDL_GetTicks();
-    status(op.label);
+    status(me::shownOpLabel(op.label));
     return true;
 }
 
@@ -477,7 +486,8 @@ void MapEditor::undo()
     }
     if (!session_) {
         if (const auto c = locks_.conflict(self_, me::elementsTouched(doc_, *op))) {
-            status("Can't undo: " + elementName(c->first) + " is being edited by " + peerName(c->second));
+            status(format(NOX_TR("editor.status.cant_undo_held", "Can't undo: {element} is being edited by {who}"),
+                          {{"element", elementName(c->first)}, {"who", peerName(c->second)}}));
             return;
         }
     }
@@ -490,22 +500,23 @@ void MapEditor::undo()
         const me::Op& done = history_.entries()[history_.position() - 1].op;
         const auto r = session_->submitSelective(applied, done);
         if (!r.seq && !r.nothingLeft) {
-            status("Can't undo: " + r.why); // (the entry stays: e.g. a lock let go later)
+            status(format(NOX_TR("editor.status.cant_undo", "Can't undo: {why}"), {{"why", r.why}})); // (the entry stays: e.g. a lock let go later)
             return;
         }
         history_.stepBack();
         sessionRevision_ = session_->revision();
         if (r.nothingLeft) {
-            status("Nothing left to undo in " + applied.label + ": " + r.note);
+            status(format(NOX_TR("editor.status.nothing_to_undo", "Nothing left to undo in {action}: {note}"), {{"action", me::shownOpLabel(applied.label)}, {"note", r.note}}));
         } else {
             viewAfterOp(applied);
-            status("Undid " + applied.label + (r.note.empty() ? std::string() : " (" + r.note + ")"));
+            status(r.note.empty() ? format(NOX_TR("editor.status.undid", "Undid {action}"), {{"action", me::shownOpLabel(applied.label)}})
+                                  : format(NOX_TR("editor.status.undid_note", "Undid {action} ({note})"), {{"action", me::shownOpLabel(applied.label)}, {"note", r.note}}));
         }
     } else try {
-        status("Undid " + history_.undo(doc_));
+        status(format(NOX_TR("editor.status.undid", "Undid {action}"), {{"action", me::shownOpLabel(history_.undo(doc_))}}));
         viewAfterOp(applied);
     } catch (const std::exception& ex) {
-        status(std::string("Undo failed: ") + ex.what());
+        status(format(NOX_TR("editor.status.undo_failed", "Undo failed: {error}"), {{"error", ex.what()}}));
     }
     if (const auto it = selectionAt_.find(history_.dropped() + history_.position()); it != selectionAt_.end()) {
         setSelection(it->second, true); // (what was selected before the change)
@@ -524,7 +535,8 @@ void MapEditor::redo()
     }
     if (!session_) {
         if (const auto c = locks_.conflict(self_, me::elementsTouched(doc_, *op))) {
-            status("Can't redo: " + elementName(c->first) + " is being edited by " + peerName(c->second));
+            status(format(NOX_TR("editor.status.cant_redo_held", "Can't redo: {element} is being edited by {who}"),
+                          {{"element", elementName(c->first)}, {"who", peerName(c->second)}}));
             return;
         }
     }
@@ -535,22 +547,23 @@ void MapEditor::redo()
         const me::Op& undone = history_.entries()[history_.position()].inverse;
         const auto r = session_->submitSelective(applied, undone);
         if (!r.seq && !r.nothingLeft) {
-            status("Can't redo: " + r.why);
+            status(format(NOX_TR("editor.status.cant_redo", "Can't redo: {why}"), {{"why", r.why}}));
             return;
         }
         history_.stepForward();
         sessionRevision_ = session_->revision();
         if (r.nothingLeft) {
-            status("Nothing left to redo in " + applied.label + ": " + r.note);
+            status(format(NOX_TR("editor.status.nothing_to_redo", "Nothing left to redo in {action}: {note}"), {{"action", me::shownOpLabel(applied.label)}, {"note", r.note}}));
         } else {
             viewAfterOp(applied);
-            status("Redid " + applied.label + (r.note.empty() ? std::string() : " (" + r.note + ")"));
+            status(r.note.empty() ? format(NOX_TR("editor.status.redid", "Redid {action}"), {{"action", me::shownOpLabel(applied.label)}})
+                                  : format(NOX_TR("editor.status.redid_note", "Redid {action} ({note})"), {{"action", me::shownOpLabel(applied.label)}, {"note", r.note}}));
         }
     } else try {
-        status("Redid " + history_.redo(doc_));
+        status(format(NOX_TR("editor.status.redid", "Redid {action}"), {{"action", me::shownOpLabel(history_.redo(doc_))}}));
         viewAfterOp(applied);
     } catch (const std::exception& ex) {
-        status(std::string("Redo failed: ") + ex.what());
+        status(format(NOX_TR("editor.status.redo_failed", "Redo failed: {error}"), {{"error", ex.what()}}));
     }
     if (const auto it = selectionAt_.find(history_.dropped() + history_.position()); it != selectionAt_.end()) {
         setSelection(it->second, true); // (what was selected after the change)
@@ -614,7 +627,8 @@ void MapEditor::setSelection(me::Selection s, bool quiet)
         sendLocks(); // (the host answers with what it grants: sessionFrame)
     }
     if (skipped > 0 && !quiet) {
-        status(std::to_string(skipped) + (skipped == 1 ? " item" : " items") + " skipped: being edited by others");
+        status(format(NOX_TRP("editor.status.skipped", "{n} item skipped: being edited by others", "{n} items skipped: being edited by others", skipped),
+                      {{"n", skipped}}));
     }
 }
 
@@ -629,7 +643,7 @@ bool MapEditor::holdPanel(const me::ElementKey& key, bool on)
     }
     if (panelLocks_.contains(key)) return true;
     if (const auto h = otherHolder(key)) {
-        status(elementName(key) + " is being edited by " + peerName(*h));
+        status(format(NOX_TR("editor.status.held_by", "{element} is being edited by {who}"), {{"element", elementName(key)}, {"who", peerName(*h)}}));
         return false;
     }
     if (!locks_.request(self_, {key}, SDL_GetTicks()).empty()) return false;
@@ -645,37 +659,39 @@ void MapEditor::takeOverPanel(const me::ElementKey& key)
         return;
     }
     const auto h = otherHolder(key);
-    const std::string from = h ? " from " + peerName(*h) : std::string();
+    const std::string took = h ? format(NOX_TR("editor.status.took_over_from", "Took over {element} from {who}"), {{"element", elementName(key)}, {"who", peerName(*h)}})
+                               : format(NOX_TR("editor.status.took_over", "Took over {element}"), {{"element", elementName(key)}});
     session_->takeOver(key);
     locks_ = session_->locks(); // (ours already here; the host's table follows)
     panelLocks_.insert(key);
-    status("Took over " + elementName(key) + from);
+    status(took);
 }
 
 void MapEditor::beginPick(PickRequest request)
 {
     pick_ = std::move(request);
-    status(pick_->prompt + " (right click or Escape cancels)");
+    status(format(NOX_TR("editor.status.pick_prompt", "{prompt} (right click or Escape cancels)"), {{"prompt", pick_->prompt}}));
 }
 
 void MapEditor::cancelPick()
 {
     if (pick_) {
         pick_.reset();
-        status("Pick cancelled");
+        status(NOX_TR("editor.status.pick_cancelled", "Pick cancelled"));
     }
 }
 
 void MapEditor::copySelection(bool cut)
 {
     if (selection_.empty()) {
-        status("Nothing selected to copy");
+        status(NOX_TR("editor.status.nothing_to_copy", "Nothing selected to copy"));
         return;
     }
     clip_ = me::copySelection(doc_, selection_);
     SDL_SetClipboardText(me::clipToText(*clip_, things_).c_str());
     const std::size_t n = clip_->walls.size() + clip_->tiles.size() + clip_->objects.size() + clip_->waypoints.size();
-    status((cut ? "Cut " : "Copied ") + std::to_string(n) + (n == 1 ? " item" : " items"));
+    status(format(cut ? NOX_TRP("editor.status.cut_items", "Cut {n} item", "Cut {n} items", n) : NOX_TRP("editor.status.copied_items", "Copied {n} item", "Copied {n} items", n),
+                  {{"n", n}}));
     if (cut) {
         deleteSelection();
     }
@@ -692,7 +708,7 @@ void MapEditor::paste(std::optional<me::Cell> at)
         clip = clip_;
     }
     if (!clip || clip->empty()) {
-        status("Nothing to paste");
+        status(NOX_TR("editor.status.nothing_to_paste", "Nothing to paste"));
         return;
     }
     if (!at) {
@@ -710,14 +726,14 @@ void MapEditor::paste(std::optional<me::Cell> at)
 void MapEditor::duplicate()
 {
     if (selection_.empty()) {
-        status("Nothing selected to duplicate");
+        status(NOX_TR("editor.status.nothing_to_duplicate", "Nothing selected to duplicate"));
         return;
     }
     const me::Clip clip = me::copySelection(doc_, selection_);
     const me::Cell at{static_cast<std::uint8_t>(std::min(clip.anchor.x + 2, 254)), static_cast<std::uint8_t>(std::min(clip.anchor.y + 2, 255))};
     me::Selection pasted;
     me::Op op = me::pasteOp(doc_, clip, at, &pasted);
-    op.label = "Duplicate " + std::to_string(pasted.size()) + (pasted.size() == 1 ? " item" : " items");
+    op.label = me::opLabel(ol::kDuplicate, {{"n", pasted.size()}});
     if (perform(op)) {
         setSelection(std::move(pasted), true);
     }
@@ -735,7 +751,7 @@ void MapEditor::deleteSelection()
     if (!selection_.walls.empty()) {
         const me::Op walls = withWallEdges(me::removeWallsOp(doc_, things_, std::vector<me::Cell>(selection_.walls.begin(), selection_.walls.end()), wallReface_));
         op.parts.insert(op.parts.end(), walls.parts.begin(), walls.parts.end());
-        op.label = rest.empty() ? walls.label : "Delete " + std::to_string(selection_.size()) + " items";
+        op.label = rest.empty() ? walls.label : me::opLabel(ol::kDeleteItems, {{"n", selection_.size()}});
     }
     if (perform(op)) {
         setSelection({}, true);
@@ -813,7 +829,7 @@ void MapEditor::locate(const me::Issue& issue)
         frameWorld(bb->first.x, bb->first.y, bb->second.x, bb->second.y);
         setSelection(std::move(s));
     } else {
-        status(issue.where + ": nothing on the map to show");
+        status(format(NOX_TR("editor.status.nothing_to_show", "{where}: nothing on the map to show"), {{"where", issue.where}}));
     }
 }
 
@@ -831,21 +847,21 @@ void MapEditor::registerCommands()
     const auto hasSelection = [this] { return !selection_.empty(); };
 
     // File
-    add("file.new", "New Map...", "File", "Ctrl+N", "A new map: its floored size, base floor and game types.",
+    add("file.new", NOX_TRC("editor.cmd.file.new.label", "New Map..."), "File", "Ctrl+N", NOX_TRC("editor.cmd.file.new.help", "A new map: its floored size, base floor and game types."),
         [this] { guarded(Pending::New, [this] { newOpen_ = true; }); });
-    add("file.open", "Open...", "File", "Ctrl+O", "Open a map from the maps folder, or any .map / .nxz file.",
+    add("file.open", NOX_TRC("editor.cmd.file.open.label", "Open..."), "File", "Ctrl+O", NOX_TRC("editor.cmd.file.open.help", "Open a map from the maps folder, or any .map / .nxz file."),
         [this] { guarded(Pending::Open, [this] { refreshMapList(); openOpen_ = true; }); });
-    add("file.save", "Save", "File", "Ctrl+S", "Save the map (.map, .nxz and the editor's .nxe) into the maps folder.", [this] { save(); });
-    add("file.saveAs", "Save As...", "File", "Ctrl+Shift+S", "Save under a new name. Stock maps' names are refused.", [this] {
+    add("file.save", NOX_TRC("editor.cmd.file.save.label", "Save"), "File", "Ctrl+S", NOX_TRC("editor.cmd.file.save.help", "Save the map (.map, .nxz and the editor's .nxe) into the maps folder."), [this] { save(); });
+    add("file.saveAs", NOX_TRC("editor.cmd.file.save_as.label", "Save As..."), "File", "Ctrl+Shift+S", NOX_TRC("editor.cmd.file.save_as.help", "Save under a new name. Stock maps' names are refused."), [this] {
         std::snprintf(nameBuf_, sizeof nameBuf_, "%s", saveAsOffer().c_str());
         saveAsOpen_ = true;
     });
-    add("file.validate", "Validate", "File", "F7", "Check the map against what the game accepts (the Problems panel).", [this] {
+    add("file.validate", NOX_TRC("editor.cmd.file.validate.label", "Validate"), "File", "F7", NOX_TRC("editor.cmd.file.validate.help", "Check the map against what the game accepts (the Problems panel)."), [this] {
         validatedRevision_ = ~0ull;
         changedMs_ = 0;
         showProblems_ = true;
     });
-    add("file.recover", "Open Autosave...", "File", "", "Open the last recovery copy the autosave wrote (saved under a new name).",
+    add("file.recover", NOX_TRC("editor.cmd.file.recover.label", "Open Autosave..."), "File", "", NOX_TRC("editor.cmd.file.recover.help", "Open the last recovery copy the autosave wrote (saved under a new name)."),
         [this] {
             guarded(Pending::Open, [this] {
                 const fs::path dir = ctx_.prefDir / "autosave";
@@ -859,37 +875,37 @@ void MapEditor::registerCommands()
                     }
                 }
                 if (newest.empty()) {
-                    status("No autosave to recover");
+                    status(NOX_TR("editor.status.no_autosave", "No autosave to recover"));
                 } else if (open(newest)) {
                     docName_.clear();
                     docPath_.clear();
-                    status("Recovered " + pathText(newest) + ": Save asks for a name");
+                    status(format(NOX_TR("editor.status.recovered", "Recovered {path}: Save asks for a name"), {{"path", pathText(newest)}}));
                 }
             });
         });
-    add("file.close", "Close Editor", "File", "Ctrl+W",
-        "Back to the main menu (asks about unsaved changes). Hosting a session, it ends the session for everyone (asked "
-        "first); in someone else's, its game comes in front.",
+    add("file.close", NOX_TRC("editor.cmd.file.close.label", "Close Editor"), "File", "Ctrl+W",
+        NOX_TRC("editor.cmd.file.close.help", "Back to the main menu (asks about unsaved changes). Hosting a session, it ends the session for everyone (asked "
+        "first); in someone else's, its game comes in front."),
         [this] { guarded(Pending::Close, [this] { wantsClose_ = true; }); });
 
     // Edit
-    add("edit.undo", "Undo", "Edit", "Ctrl+Z", "Undo the last change.", [this] { undo(); }, [this] { return history_.canUndo(); });
-    add("edit.redo", "Redo", "Edit", "Ctrl+Y", "Redo what was undone.", [this] { redo(); }, [this] { return history_.canRedo(); });
-    add("edit.cut", "Cut", "Edit", "Ctrl+X", "Copy the selection to the clipboard and delete it.", [this] { copySelection(true); }, hasSelection);
-    add("edit.copy", "Copy", "Edit", "Ctrl+C", "Copy the selection (walls, tiles, objects with their items, waypoints) to the clipboard.",
+    add("edit.undo", NOX_TRC("editor.cmd.edit.undo.label", "Undo"), "Edit", "Ctrl+Z", NOX_TRC("editor.cmd.edit.undo.help", "Undo the last change."), [this] { undo(); }, [this] { return history_.canUndo(); });
+    add("edit.redo", NOX_TRC("editor.cmd.edit.redo.label", "Redo"), "Edit", "Ctrl+Y", NOX_TRC("editor.cmd.edit.redo.help", "Redo what was undone."), [this] { redo(); }, [this] { return history_.canRedo(); });
+    add("edit.cut", NOX_TRC("editor.cmd.edit.cut.label", "Cut"), "Edit", "Ctrl+X", NOX_TRC("editor.cmd.edit.cut.help", "Copy the selection to the clipboard and delete it."), [this] { copySelection(true); }, hasSelection);
+    add("edit.copy", NOX_TRC("editor.cmd.edit.copy.label", "Copy"), "Edit", "Ctrl+C", NOX_TRC("editor.cmd.edit.copy.help", "Copy the selection (walls, tiles, objects with their items, waypoints) to the clipboard."),
         [this] { copySelection(false); }, hasSelection);
-    add("edit.paste", "Paste", "Edit", "Ctrl+V", "Paste at the mouse: new extents and waypoint ids, links inside the copy kept.",
+    add("edit.paste", NOX_TRC("editor.cmd.edit.paste.label", "Paste"), "Edit", "Ctrl+V", NOX_TRC("editor.cmd.edit.paste.help", "Paste at the mouse: new extents and waypoint ids, links inside the copy kept."),
         [this] { paste(std::nullopt); });
-    add("edit.duplicate", "Duplicate", "Edit", "Ctrl+D", "Copy the selection two cells down and select the copy.", [this] { duplicate(); },
+    add("edit.duplicate", NOX_TRC("editor.cmd.edit.duplicate.label", "Duplicate"), "Edit", "Ctrl+D", NOX_TRC("editor.cmd.edit.duplicate.help", "Copy the selection two cells down and select the copy."), [this] { duplicate(); },
         hasSelection);
-    add("edit.delete", "Delete", "Edit", "Delete", "Delete the selection (undoable).", [this] { deleteSelection(); }, hasSelection);
-    add("edit.areaCopy", "Copy Area", "Edit", "Ctrl+Shift+C",
-        "Drag a box on the map: everything in it, of the layers ticked in Tool Options, goes to the clipboard.", [this] {
+    add("edit.delete", NOX_TRC("editor.cmd.edit.delete.label", "Delete"), "Edit", "Delete", NOX_TRC("editor.cmd.edit.delete.help", "Delete the selection (undoable)."), [this] { deleteSelection(); }, hasSelection);
+    add("edit.areaCopy", NOX_TRC("editor.cmd.edit.area_copy.label", "Copy Area"), "Edit", "Ctrl+Shift+C",
+        NOX_TRC("editor.cmd.edit.area_copy.help", "Drag a box on the map: everything in it, of the layers ticked in Tool Options, goes to the clipboard."), [this] {
             tool_ = Tool::Select;
             areaCopyArmed_ = true;
-            status("Copy area: drag a box on the map (Escape cancels)");
+            status(NOX_TR("editor.status.copy_area_armed", "Copy area: drag a box on the map (Escape cancels)"));
         });
-    add("edit.copyCoords", "Copy Coordinates", "Edit", "", "The mouse's (or the selection's) world coordinates as text.", [this] {
+    add("edit.copyCoords", NOX_TRC("editor.cmd.edit.copy_coords.label", "Copy Coordinates"), "Edit", "", NOX_TRC("editor.cmd.edit.copy_coords.help", "The mouse's (or the selection's) world coordinates as text."), [this] {
         me::WorldPoint p{camera_.x, camera_.y};
         if (const auto b = me::bounds(doc_, selection_)) {
             p = {(b->first.x + b->second.x) / 2, (b->first.y + b->second.y) / 2};
@@ -897,55 +913,56 @@ void MapEditor::registerCommands()
         char text[64];
         std::snprintf(text, sizeof text, "%.1f, %.1f", p.x, p.y);
         SDL_SetClipboardText(text);
-        status(std::string("Copied ") + text);
+        status(format(NOX_TR("editor.status.copied_text", "Copied {text}"), {{"text", text}}));
     });
-    add("edit.copyExtents", "Copy Extents", "Edit", "", "The selected objects' extents as text.", [this] {
+    add("edit.copyExtents", NOX_TRC("editor.cmd.edit.copy_extents.label", "Copy Extents"), "Edit", "", NOX_TRC("editor.cmd.edit.copy_extents.help", "The selected objects' extents as text."), [this] {
         std::string text;
         for (const ObjId id : selection_.objects) {
             text += (text.empty() ? "" : " ") + std::to_string(doc_.objects.at(id).header.extent);
         }
         SDL_SetClipboardText(text.c_str());
-        status("Copied extents: " + text);
+        status(format(NOX_TR("editor.status.copied_extents", "Copied extents: {list}"), {{"list", text}}));
     }, [this] { return !selection_.objects.empty(); });
-    add("edit.copyWaypoints", "Copy Waypoint Ids", "Edit", "", "The selected waypoints' ids as text.", [this] {
+    add("edit.copyWaypoints", NOX_TRC("editor.cmd.edit.copy_waypoints.label", "Copy Waypoint Ids"), "Edit", "", NOX_TRC("editor.cmd.edit.copy_waypoints.help", "The selected waypoints' ids as text."), [this] {
         std::string text;
         for (const auto id : selection_.waypoints) {
             text += (text.empty() ? "" : " ") + std::to_string(id);
         }
         SDL_SetClipboardText(text.c_str());
-        status("Copied waypoint ids: " + text);
+        status(format(NOX_TR("editor.status.copied_waypoints", "Copied waypoint ids: {list}"), {{"list", text}}));
     }, [this] { return !selection_.waypoints.empty(); });
     const auto nudgeCmd = [&](const char* id, const char* label, const char* k, int dx, int dy, bool cell) {
-        add(id, label, "Edit", k, "Move the selection (or pan the view when nothing is selected).", [this, dx, dy, cell] { nudge(dx, dy, cell); });
+        add(id, label, "Edit", k, NOX_TRC("editor.cmd.edit.nudge.help", "Move the selection (or pan the view when nothing is selected)."),
+            [this, dx, dy, cell] { nudge(dx, dy, cell); });
     };
-    nudgeCmd("edit.nudgeLeft", "Nudge Left", "Left", -1, 0, false);
-    nudgeCmd("edit.nudgeRight", "Nudge Right", "Right", 1, 0, false);
-    nudgeCmd("edit.nudgeUp", "Nudge Up", "Up", 0, -1, false);
-    nudgeCmd("edit.nudgeDown", "Nudge Down", "Down", 0, 1, false);
-    nudgeCmd("edit.nudgeCellLeft", "Nudge a Cell Left", "Shift+Left", -1, 0, true);
-    nudgeCmd("edit.nudgeCellRight", "Nudge a Cell Right", "Shift+Right", 1, 0, true);
-    nudgeCmd("edit.nudgeCellUp", "Nudge a Cell Up", "Shift+Up", 0, -1, true);
-    nudgeCmd("edit.nudgeCellDown", "Nudge a Cell Down", "Shift+Down", 0, 1, true);
+    nudgeCmd("edit.nudgeLeft", NOX_TRC("editor.cmd.edit.nudge_left.label", "Nudge Left"), "Left", -1, 0, false);
+    nudgeCmd("edit.nudgeRight", NOX_TRC("editor.cmd.edit.nudge_right.label", "Nudge Right"), "Right", 1, 0, false);
+    nudgeCmd("edit.nudgeUp", NOX_TRC("editor.cmd.edit.nudge_up.label", "Nudge Up"), "Up", 0, -1, false);
+    nudgeCmd("edit.nudgeDown", NOX_TRC("editor.cmd.edit.nudge_down.label", "Nudge Down"), "Down", 0, 1, false);
+    nudgeCmd("edit.nudgeCellLeft", NOX_TRC("editor.cmd.edit.nudge_cell_left.label", "Nudge a Cell Left"), "Shift+Left", -1, 0, true);
+    nudgeCmd("edit.nudgeCellRight", NOX_TRC("editor.cmd.edit.nudge_cell_right.label", "Nudge a Cell Right"), "Shift+Right", 1, 0, true);
+    nudgeCmd("edit.nudgeCellUp", NOX_TRC("editor.cmd.edit.nudge_cell_up.label", "Nudge a Cell Up"), "Shift+Up", 0, -1, true);
+    nudgeCmd("edit.nudgeCellDown", NOX_TRC("editor.cmd.edit.nudge_cell_down.label", "Nudge a Cell Down"), "Shift+Down", 0, 1, true);
 
     // Select
-    add("select.all", "Select All", "Select", "Ctrl+A", "Everything of the kinds the selection filter allows.",
+    add("select.all", NOX_TRC("editor.cmd.select.all.label", "Select All"), "Select", "Ctrl+A", NOX_TRC("editor.cmd.select.all.help", "Everything of the kinds the selection filter allows."),
         [this] { setSelection(me::selectAll(doc_, pickFilter())); });
-    add("select.none", "Deselect / Cancel", "Select", "Escape", "Cancel a drag or the area copy, else clear the selection.", [this] {
+    add("select.none", NOX_TRC("editor.cmd.select.none.label", "Deselect / Cancel"), "Select", "Escape", NOX_TRC("editor.cmd.select.none.help", "Cancel a drag or the area copy, else clear the selection."), [this] {
         if (drag_ != Drag::None) {
             drag_ = Drag::None;
         } else if (areaCopyArmed_) {
             areaCopyArmed_ = false;
-            status("Copy area cancelled");
+            status(NOX_TR("editor.status.copy_area_cancelled", "Copy area cancelled"));
         } else {
             setSelection({}, true);
         }
     });
-    add("select.invert", "Invert Selection", "Select", "Ctrl+I", "Select what isn't selected (of the kinds the filter allows).", [this] {
+    add("select.invert", NOX_TRC("editor.cmd.select.invert.label", "Invert Selection"), "Select", "Ctrl+I", NOX_TRC("editor.cmd.select.invert.help", "Select what isn't selected (of the kinds the filter allows)."), [this] {
         me::Selection all = me::selectAll(doc_, pickFilter());
         all.remove(selection_);
         setSelection(std::move(all));
     });
-    add("select.sameType", "Select Same Type", "Select", "Shift+T", "Every object of the selected objects' types.", [this] {
+    add("select.sameType", NOX_TRC("editor.cmd.select.same_type.label", "Select Same Type"), "Select", "Shift+T", NOX_TRC("editor.cmd.select.same_type.help", "Every object of the selected objects' types."), [this] {
         me::Selection s;
         for (const ObjId id : selection_.objects) {
             s.add(me::selectType(doc_, doc_.objects.at(id).type));
@@ -956,55 +973,56 @@ void MapEditor::registerCommands()
         add(id, label, "Select", k, help, [this, shape] { settings_.regionShape = shape; }, {},
             [this, shape] { return settings_.regionShape == shape; });
     };
-    shapeCmd("select.shapeBox", "Box Select", "", 0, "Dragging on empty map selects a screen-aligned box.");
-    shapeCmd("select.shape45", "45-Degree Box Select", "Ctrl+Shift+D", 1, "Dragging selects a box along the floor's diagonals.");
-    shapeCmd("select.shapeLasso", "Lasso Select", "", 2, "Dragging draws the outline to select inside.");
+    shapeCmd("select.shapeBox", NOX_TRC("editor.cmd.select.shape_box.label", "Box Select"), "", 0, NOX_TRC("editor.cmd.select.shape_box.help", "Dragging on empty map selects a screen-aligned box."));
+    shapeCmd("select.shape45", NOX_TRC("editor.cmd.select.shape45.label", "45-Degree Box Select"), "Ctrl+Shift+D", 1, NOX_TRC("editor.cmd.select.shape45.help", "Dragging selects a box along the floor's diagonals."));
+    shapeCmd("select.shapeLasso", NOX_TRC("editor.cmd.select.shape_lasso.label", "Lasso Select"), "", 2, NOX_TRC("editor.cmd.select.shape_lasso.help", "Dragging draws the outline to select inside."));
     const auto filterCmd = [&](const char* id, const char* label, bool me::KindFilter::*field) {
-        add(id, label, "Select", "", "Whether clicks and boxes take this kind.", [this, field] { settings_.pick.*field = !(settings_.pick.*field); },
+        add(id, label, "Select", "", NOX_TRC("editor.cmd.select.filter.help", "Whether clicks and boxes take this kind."),
+            [this, field] { settings_.pick.*field = !(settings_.pick.*field); },
             {}, [this, field] { return settings_.pick.*field; });
     };
-    filterCmd("select.filterObjects", "Pick Objects", &me::KindFilter::objects);
-    filterCmd("select.filterWalls", "Pick Walls", &me::KindFilter::walls);
-    filterCmd("select.filterTiles", "Pick Floor Tiles", &me::KindFilter::tiles);
-    filterCmd("select.filterWaypoints", "Pick Waypoints", &me::KindFilter::waypoints);
+    filterCmd("select.filterObjects", NOX_TRC("editor.cmd.select.filter_objects.label", "Pick Objects"), &me::KindFilter::objects);
+    filterCmd("select.filterWalls", NOX_TRC("editor.cmd.select.filter_walls.label", "Pick Walls"), &me::KindFilter::walls);
+    filterCmd("select.filterTiles", NOX_TRC("editor.cmd.select.filter_tiles.label", "Pick Floor Tiles"), &me::KindFilter::tiles);
+    filterCmd("select.filterWaypoints", NOX_TRC("editor.cmd.select.filter_waypoints.label", "Pick Waypoints"), &me::KindFilter::waypoints);
 
     // View
-    add("view.frame", "Frame Selection", "View", "F", "Centre and zoom on the selection.", [this] { frameSelection(); });
-    add("view.zoomIn", "Zoom In", "View", "=", "", [this] { camera_.zoom = std::min(camera_.zoom * 1.25f, 16.0f); });
-    add("view.zoomOut", "Zoom Out", "View", "-", "", [this] { camera_.zoom = std::max(camera_.zoom / 1.25f, 1.0f / 8); });
-    add("view.zoomReset", "Actual Size", "View", "0", "One screen pixel a world unit, as the game draws.", [this] { camera_.zoom = 1; });
-    add("view.grid", "Grid: Off / Wall Cells / Floor Tiles", "View", "Ctrl+K", "Cycles the grid.", [this] {
+    add("view.frame", NOX_TRC("editor.cmd.view.frame.label", "Frame Selection"), "View", "F", NOX_TRC("editor.cmd.view.frame.help", "Centre and zoom on the selection."), [this] { frameSelection(); });
+    add("view.zoomIn", NOX_TRC("editor.cmd.view.zoom_in.label", "Zoom In"), "View", "=", "", [this] { camera_.zoom = std::min(camera_.zoom * 1.25f, 16.0f); });
+    add("view.zoomOut", NOX_TRC("editor.cmd.view.zoom_out.label", "Zoom Out"), "View", "-", "", [this] { camera_.zoom = std::max(camera_.zoom / 1.25f, 1.0f / 8); });
+    add("view.zoomReset", NOX_TRC("editor.cmd.view.zoom_reset.label", "Actual Size"), "View", "0", NOX_TRC("editor.cmd.view.zoom_reset.help", "One screen pixel a world unit, as the game draws."), [this] { camera_.zoom = 1; });
+    add("view.grid", NOX_TRC("editor.cmd.view.grid.label", "Grid: Off / Wall Cells / Floor Tiles"), "View", "Ctrl+K", NOX_TRC("editor.cmd.view.grid.help", "Cycles the grid."), [this] {
         settings_.layers.grid = (settings_.layers.grid + 1) % 3;
     }, {}, [this] { return settings_.layers.grid != 0; });
     const auto layerCmd = [&](const char* id, const char* label, const char* k, bool editor::Layers::*field, bool rebuild) {
-        add(id, label, "View", k, "Shows or hides this layer.", [this, field, rebuild] {
+        add(id, label, "View", k, NOX_TRC("editor.cmd.view.layer.help", "Shows or hides this layer."), [this, field, rebuild] {
             settings_.layers.*field = !(settings_.layers.*field);
             if (rebuild) ++layerRevision_;
         }, {}, [this, field] { return settings_.layers.*field; });
     };
-    layerCmd("view.floor", "Floor", "", &editor::Layers::floor, true);
-    layerCmd("view.edges", "Floor Edges", "", &editor::Layers::edges, true);
-    layerCmd("view.walls", "Walls", "F6", &editor::Layers::walls, true);
-    layerCmd("view.objects", "Objects", "", &editor::Layers::objects, true);
-    layerCmd("view.waypoints", "Waypoints", "", &editor::Layers::waypoints, false);
-    layerCmd("view.polygons", "Polygons", "", &editor::Layers::polygons, false);
-    layerCmd("view.lighting", "Lighting Preview", "L", &editor::Layers::lighting, false);
-    layerCmd("view.seeThroughWalls", "See-Through Walls Near the View Centre", "", &editor::Layers::seeThroughWalls, false);
-    layerCmd("view.labelTypes", "Labels: Type Names", "", &editor::Layers::labelTypes, false);
-    layerCmd("view.labelScriptNames", "Labels: Script Names", "", &editor::Layers::labelScriptNames, false);
-    layerCmd("view.labelExtents", "Labels: Extents", "", &editor::Layers::labelExtents, false);
-    layerCmd("view.facing", "Facing Arrows", "", &editor::Layers::facing, false);
-    layerCmd("view.markDisabled", "Mark Disabled Objects", "", &editor::Layers::markDisabled, false);
-    layerCmd("view.schematic", "Schematic Overlay", "Ctrl+F", &editor::Layers::schematic, false);
-    add("view.extents", "Extents: Hidden / Colliding / All", "View", "F8", "Cycles the collision shapes shown.",
+    layerCmd("view.floor", NOX_TRC("editor.cmd.view.floor.label", "Floor"), "", &editor::Layers::floor, true);
+    layerCmd("view.edges", NOX_TRC("editor.cmd.view.edges.label", "Floor Edges"), "", &editor::Layers::edges, true);
+    layerCmd("view.walls", NOX_TRC("editor.cmd.view.walls.label", "Walls"), "F6", &editor::Layers::walls, true);
+    layerCmd("view.objects", NOX_TRC("editor.cmd.view.objects.label", "Objects"), "", &editor::Layers::objects, true);
+    layerCmd("view.waypoints", NOX_TRC("editor.cmd.view.waypoints.label", "Waypoints"), "", &editor::Layers::waypoints, false);
+    layerCmd("view.polygons", NOX_TRC("editor.cmd.view.polygons.label", "Polygons"), "", &editor::Layers::polygons, false);
+    layerCmd("view.lighting", NOX_TRC("editor.cmd.view.lighting.label", "Lighting Preview"), "L", &editor::Layers::lighting, false);
+    layerCmd("view.seeThroughWalls", NOX_TRC("editor.cmd.view.see_through_walls.label", "See-Through Walls Near the View Centre"), "", &editor::Layers::seeThroughWalls, false);
+    layerCmd("view.labelTypes", NOX_TRC("editor.cmd.view.label_types.label", "Labels: Type Names"), "", &editor::Layers::labelTypes, false);
+    layerCmd("view.labelScriptNames", NOX_TRC("editor.cmd.view.label_script_names.label", "Labels: Script Names"), "", &editor::Layers::labelScriptNames, false);
+    layerCmd("view.labelExtents", NOX_TRC("editor.cmd.view.label_extents.label", "Labels: Extents"), "", &editor::Layers::labelExtents, false);
+    layerCmd("view.facing", NOX_TRC("editor.cmd.view.facing.label", "Facing Arrows"), "", &editor::Layers::facing, false);
+    layerCmd("view.markDisabled", NOX_TRC("editor.cmd.view.mark_disabled.label", "Mark Disabled Objects"), "", &editor::Layers::markDisabled, false);
+    layerCmd("view.schematic", NOX_TRC("editor.cmd.view.schematic.label", "Schematic Overlay"), "Ctrl+F", &editor::Layers::schematic, false);
+    add("view.extents", NOX_TRC("editor.cmd.view.extents.label", "Extents: Hidden / Colliding / All"), "View", "F8", NOX_TRC("editor.cmd.view.extents.help", "Cycles the collision shapes shown."),
         [this] { settings_.layers.extents = (settings_.layers.extents + 1) % 3; }, {}, [this] { return settings_.layers.extents != 0; });
-    add("view.palette", "Command Palette", "View", "Ctrl+P", "Search every command by name.", [this] {
+    add("view.palette", NOX_TRC("editor.cmd.view.palette.label", "Command Palette"), "View", "Ctrl+P", NOX_TRC("editor.cmd.view.palette.help", "Search every command by name."), [this] {
         paletteOpen_ = true;
         paletteFocus_ = true;
         paletteQuery_.clear();
         paletteIndex_ = 0;
     });
-    add("help.palette", "Command Palette (F1)", "Help", "F1", "Search every command by name.", [this] { commands_.run("view.palette"); });
+    add("help.palette", NOX_TRC("editor.cmd.help.palette.label", "Command Palette (F1)"), "Help", "F1", NOX_TRC("editor.cmd.help.palette.help", "Search every command by name."), [this] { commands_.run("view.palette"); });
 
     // Tools (the old editor's number keys for the tool groups)
     const auto toolCmd = [&](const char* id, const char* label, const char* k, Tool t, const char* help) {
@@ -1015,22 +1033,22 @@ void MapEditor::registerCommands()
             }
         }, {}, [this, t] { return tool_ == t; });
     };
-    toolCmd("tool.select", "Select", "1", Tool::Select, "Click, Shift-click to add, Ctrl-click to remove; drag to box-select or move.");
-    toolCmd("tool.wall", "Wall Tool", "2", Tool::Wall, "Draw, place, line, rectangle, outline and erase walls; wall properties.");
-    toolCmd("tool.floor", "Floor Tool", "3", Tool::Floor, "The floor brush: paint, erase, replace, fill, smooth, with auto-edges.");
-    toolCmd("tool.object", "Object Tool", "4", Tool::Object, "Objects from the content browser (P2c).");
-    toolCmd("tool.waypoint", "Waypoint Tool", "5", Tool::Waypoint, "Place waypoints, link them (one way or both), unlink, move.");
-    toolCmd("tool.edge", "Edge Tool", "6", Tool::Edge, "Floor edges by hand: add, remove, or auto-edge where clicked.");
-    toolCmd("tool.polygon", "Polygon Tool", "7", Tool::Polygon, "Draw polygons, drag, insert and delete their corners, move them.");
-    add("tool.toggle", "Previous Tool", "Tools", "`", "Back to the tool used before.", [this] { std::swap(tool_, lastTool_); });
-    add("tool.eyedropper", "Eyedropper", "Tools", "I",
-        "Pick what's under the mouse into the tool: a wall's material, a tile's floor, an edge (also Alt+click; Shift for everything).", [this] {
+    toolCmd("tool.select", NOX_TRC("editor.cmd.tool.select.label", "Select"), "1", Tool::Select, NOX_TRC("editor.cmd.tool.select.help", "Click, Shift-click to add, Ctrl-click to remove; drag to box-select or move."));
+    toolCmd("tool.wall", NOX_TRC("editor.cmd.tool.wall.label", "Wall Tool"), "2", Tool::Wall, NOX_TRC("editor.cmd.tool.wall.help", "Draw, place, line, rectangle, outline and erase walls; wall properties."));
+    toolCmd("tool.floor", NOX_TRC("editor.cmd.tool.floor.label", "Floor Tool"), "3", Tool::Floor, NOX_TRC("editor.cmd.tool.floor.help", "The floor brush: paint, erase, replace, fill, smooth, with auto-edges."));
+    toolCmd("tool.object", NOX_TRC("editor.cmd.tool.object.label", "Object Tool"), "4", Tool::Object, NOX_TRC("editor.cmd.tool.object.help", "Objects from the content browser (P2c)."));
+    toolCmd("tool.waypoint", NOX_TRC("editor.cmd.tool.waypoint.label", "Waypoint Tool"), "5", Tool::Waypoint, NOX_TRC("editor.cmd.tool.waypoint.help", "Place waypoints, link them (one way or both), unlink, move."));
+    toolCmd("tool.edge", NOX_TRC("editor.cmd.tool.edge.label", "Edge Tool"), "6", Tool::Edge, NOX_TRC("editor.cmd.tool.edge.help", "Floor edges by hand: add, remove, or auto-edge where clicked."));
+    toolCmd("tool.polygon", NOX_TRC("editor.cmd.tool.polygon.label", "Polygon Tool"), "7", Tool::Polygon, NOX_TRC("editor.cmd.tool.polygon.help", "Draw polygons, drag, insert and delete their corners, move them."));
+    add("tool.toggle", NOX_TRC("editor.cmd.tool.toggle.label", "Previous Tool"), "Tools", "`", NOX_TRC("editor.cmd.tool.toggle.help", "Back to the tool used before."), [this] { std::swap(tool_, lastTool_); });
+    add("tool.eyedropper", NOX_TRC("editor.cmd.tool.eyedropper.label", "Eyedropper"), "Tools", "I",
+        NOX_TRC("editor.cmd.tool.eyedropper.help", "Pick what's under the mouse into the tool: a wall's material, a tile's floor, an edge (also Alt+click; Shift for everything)."), [this] {
             if (const auto w = mouseWorld()) eyedropper(*w, ImGui::GetIO().KeyShift);
         });
-    add("brush.bigger", "Bigger Brush", "Tools", "]", "The floor brush one tile bigger.", [this] { brush_.size = std::min(brush_.size + 1, 16); });
-    add("brush.smaller", "Smaller Brush", "Tools", "[", "The floor brush one tile smaller.", [this] { brush_.size = std::max(brush_.size - 1, 1); });
-    add("edges.recompute", "Recompute Edges", "Tools", "Ctrl+E",
-        "Auto-edge again on the selected tiles (or every tile when none are), with the floor tool's edge options.", [this] {
+    add("brush.bigger", NOX_TRC("editor.cmd.brush.bigger.label", "Bigger Brush"), "Tools", "]", NOX_TRC("editor.cmd.brush.bigger.help", "The floor brush one tile bigger."), [this] { brush_.size = std::min(brush_.size + 1, 16); });
+    add("brush.smaller", NOX_TRC("editor.cmd.brush.smaller.label", "Smaller Brush"), "Tools", "[", NOX_TRC("editor.cmd.brush.smaller.help", "The floor brush one tile smaller."), [this] { brush_.size = std::max(brush_.size - 1, 1); });
+    add("edges.recompute", NOX_TRC("editor.cmd.edges.recompute.label", "Recompute Edges"), "Tools", "Ctrl+E",
+        NOX_TRC("editor.cmd.edges.recompute.help", "Auto-edge again on the selected tiles (or every tile when none are), with the floor tool's edge options."), [this] {
             std::set<me::TileCell> cells = selection_.tiles;
             if (cells.empty()) {
                 for (int gy = -1; gy <= 254; ++gy) {
@@ -1040,50 +1058,50 @@ void MapEditor::registerCommands()
                 }
             }
             me::Op op = me::autoEdgeOp(doc_, things_, rules_, edgeOptions(), cells, paint_.customEdges);
-            if (op.empty()) status("Edges: nothing to change");
+            if (op.empty()) status(NOX_TR("editor.status.edges_unchanged", "Edges: nothing to change"));
             else perform(op);
         });
-    add("window.edgeRules", "Edge Rules...", "Window", "", "Floor priorities and the edge each pair laps with.", [this] { showEdgeRules_ = true; });
-    add("view.specialWalls", "Tint Special Walls", "View", "F11", "Secret walls blue, breakable red, windows cyan.",
+    add("window.edgeRules", NOX_TRC("editor.cmd.window.edge_rules.label", "Edge Rules..."), "Window", "", NOX_TRC("editor.cmd.window.edge_rules.help", "Floor priorities and the edge each pair laps with."), [this] { showEdgeRules_ = true; });
+    add("view.specialWalls", NOX_TRC("editor.cmd.view.special_walls.label", "Tint Special Walls"), "View", "F11", NOX_TRC("editor.cmd.view.special_walls.help", "Secret walls blue, breakable red, windows cyan."),
         [this] { settings_.layers.specialWalls = !settings_.layers.specialWalls; }, {}, [this] { return settings_.layers.specialWalls; });
     // A session's edits not yet published.
     const auto pendingCmd = [&](const char* id, const char* label, int mode, const char* help) {
         add(id, label, "View", "", help, [this, mode] { settings_.layers.pendingView = mode; }, {},
             [this, mode] { return settings_.layers.pendingView == mode; });
     };
-    pendingCmd("view.pendingShaded", "Pending Changes: Shaded", 0,
-               "In a session: walls, floor and client-only things not yet published greyed; what they remove as ghosts.");
-    pendingCmd("view.pendingFinal", "Pending Changes: As Final", 1, "In a session: the working copy as it will look once published.");
-    pendingCmd("view.pendingHidden", "Pending Changes: Hidden", 2, "In a session: only what the game has (the published map).");
-    add("view.pendingPublished", "Show Published / Working Copy", "View", "G",
-        "In a session: flips between the published map (Pending Changes: Hidden) and the working copy as the setting had it.", [this] {
+    pendingCmd("view.pendingShaded", NOX_TRC("editor.cmd.view.pending_shaded.label", "Pending Changes: Shaded"), 0,
+               NOX_TRC("editor.cmd.view.pending_shaded.help", "In a session: walls, floor and client-only things not yet published greyed; what they remove as ghosts."));
+    pendingCmd("view.pendingFinal", NOX_TRC("editor.cmd.view.pending_final.label", "Pending Changes: As Final"), 1, NOX_TRC("editor.cmd.view.pending_final.help", "In a session: the working copy as it will look once published."));
+    pendingCmd("view.pendingHidden", NOX_TRC("editor.cmd.view.pending_hidden.label", "Pending Changes: Hidden"), 2, NOX_TRC("editor.cmd.view.pending_hidden.help", "In a session: only what the game has (the published map)."));
+    add("view.pendingPublished", NOX_TRC("editor.cmd.view.pending_published.label", "Show Published / Working Copy"), "View", "G",
+        NOX_TRC("editor.cmd.view.pending_published.help", "In a session: flips between the published map (Pending Changes: Hidden) and the working copy as the setting had it."), [this] {
             if (settings_.layers.pendingView != 2) {
                 pendingKeptView_ = settings_.layers.pendingView;
                 settings_.layers.pendingView = 2;
-                status("Showing the published map (G: the working copy)");
+                status(NOX_TR("editor.status.showing_published", "Showing the published map (G: the working copy)"));
             } else {
                 settings_.layers.pendingView = pendingKeptView_ == 2 ? 0 : pendingKeptView_;
-                status("Showing the working copy (G: the published map)");
+                status(NOX_TR("editor.status.showing_working", "Showing the working copy (G: the published map)"));
             }
         }, {}, [this] { return settings_.layers.pendingView == 2; });
 
     // Window
     const auto windowCmd = [&](const char* id, const char* label, const char* k, bool MapEditor::*field) {
-        add(id, label, "Window", k, "Shows or hides the panel.", [this, field] { this->*field = !(this->*field); }, {},
+        add(id, label, "Window", k, NOX_TRC("editor.cmd.window.panel.help", "Shows or hides the panel."), [this, field] { this->*field = !(this->*field); }, {},
             [this, field] { return this->*field; });
     };
-    windowCmd("window.layers", "Layers", "Ctrl+Shift+L", &MapEditor::showLayers_);
-    windowCmd("window.properties", "Properties", "Ctrl+Shift+O", &MapEditor::showProperties_);
-    windowCmd("window.tool", "Tool Options", "Ctrl+Shift+T", &MapEditor::showTool_);
-    windowCmd("window.history", "History", "Ctrl+Shift+H", &MapEditor::showHistory_);
-    windowCmd("window.problems", "Problems", "Ctrl+Shift+P", &MapEditor::showProblems_);
-    add("window.chat", "Chat", "Window", "", "Shows or hides the Chat panel: the session's in-game chat, and a box to chat to the players.",
+    windowCmd("window.layers", NOX_TRC("editor.cmd.window.layers.label", "Layers"), "Ctrl+Shift+L", &MapEditor::showLayers_);
+    windowCmd("window.properties", NOX_TRC("editor.cmd.window.properties.label", "Properties"), "Ctrl+Shift+O", &MapEditor::showProperties_);
+    windowCmd("window.tool", NOX_TRC("editor.cmd.window.tool.label", "Tool Options"), "Ctrl+Shift+T", &MapEditor::showTool_);
+    windowCmd("window.history", NOX_TRC("editor.cmd.window.history.label", "History"), "Ctrl+Shift+H", &MapEditor::showHistory_);
+    windowCmd("window.problems", NOX_TRC("editor.cmd.window.problems.label", "Problems"), "Ctrl+Shift+P", &MapEditor::showProblems_);
+    add("window.chat", NOX_TRC("editor.cmd.window.chat.label", "Chat"), "Window", "", NOX_TRC("editor.cmd.window.chat.help", "Shows or hides the Chat panel: the session's in-game chat, and a box to chat to the players."),
         [this] { showChat_ = !showChat_; }, [this] { return session_ != nullptr; }, [this] { return showChat_; });
-    add("window.resetLayout", "Reset Layout", "Window", "", "The panels back where they start.", [this] { resetLayout_ = true; });
-    add("window.settings", "Editor Settings...", "Window", "Ctrl+,", "Interface scale, theme, autosave.", [this] { showSettings_ = true; });
-    add("help.keys", "Keyboard Shortcuts...", "Help", "Ctrl+Shift+K", "Every command's shortcut; click one to rebind it.",
+    add("window.resetLayout", NOX_TRC("editor.cmd.window.reset_layout.label", "Reset Layout"), "Window", "", NOX_TRC("editor.cmd.window.reset_layout.help", "The panels back where they start."), [this] { resetLayout_ = true; });
+    add("window.settings", NOX_TRC("editor.cmd.window.settings.label", "Editor Settings..."), "Window", "Ctrl+,", NOX_TRC("editor.cmd.window.settings.help", "Interface scale, theme, autosave."), [this] { showSettings_ = true; });
+    add("help.keys", NOX_TRC("editor.cmd.help.keys.label", "Keyboard Shortcuts..."), "Help", "Ctrl+Shift+K", NOX_TRC("editor.cmd.help.keys.help", "Every command's shortcut; click one to rebind it."),
         [this] { showKeys_ = true; });
-    add("help.about", "About the Map Editor", "Help", "", "", [this] { showAbout_ = true; });
+    add("help.about", NOX_TRC("editor.cmd.help.about.label", "About the Map Editor"), "Help", "", "", [this] { showAbout_ = true; });
 }
 
 void MapEditor::runCommands(const std::string& list)
@@ -1420,9 +1438,9 @@ void MapEditor::frame()
         try {
             const auto bytes = nox::readFileBytes(ctx_.prefDir / "layouts" / (loadLayout_ + ".ini"));
             ImGui::LoadIniSettingsFromMemory(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-            status("Layout " + loadLayout_);
+            status(format(NOX_TR("editor.status.layout_loaded", "Layout {name}"), {{"name", loadLayout_}}));
         } catch (const std::exception&) {
-            status("Layout " + loadLayout_ + " can't be read");
+            status(format(NOX_TR("editor.status.layout_unreadable", "Layout {name} can't be read"), {{"name", loadLayout_}}));
         }
         loadLayout_.clear();
     }

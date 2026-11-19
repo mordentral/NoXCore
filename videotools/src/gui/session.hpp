@@ -48,6 +48,9 @@ struct Settings {
 void loadSettings(const std::filesystem::path& file, Settings& s);
 void saveSettings(const std::filesystem::path& file, const Settings& s);
 
+/// The file dialogs' filter for image packs (.nxp).
+const SDL_DialogFileFilter* packFileFilter();
+
 std::filesystem::path pathFromUtf8(const std::string& s);
 std::string utf8(const std::filesystem::path& p);
 

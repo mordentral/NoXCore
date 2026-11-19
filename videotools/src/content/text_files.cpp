@@ -9,6 +9,7 @@
 #include "noxcore/server/map_cycle.hpp"
 #include "noxcore/server/modes.hpp"
 #include "noxcore/server/rules.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -55,14 +56,14 @@ struct Scratch {
 std::string listOf(const std::vector<std::string>& names, std::size_t most = 8)
 {
     if (names.empty()) {
-        return "none";
+        return NOX_TR("content.text.none", "none");
     }
     std::string out;
     for (std::size_t i = 0; i < names.size() && i < most; ++i) {
         out += (i ? ", " : "") + names[i];
     }
     if (names.size() > most) {
-        out += std::format(" and {} more", names.size() - most);
+        out += nox::l10n::format(NOX_TR("content.text.and_more", " and {n} more"), {{"n", names.size() - most}});
     }
     return out;
 }
@@ -75,7 +76,7 @@ TextReport checkRules(std::string_view text, const GameFiles& files)
     TextReport r;
     const auto* things = files.things();
     if (!things) {
-        r.problems.push_back("thing.bin isn't loaded: the spells can't be checked");
+        r.problems.push_back(NOX_TR("content.text.rules_no_things", "thing.bin isn't loaded: the spells can't be checked"));
         return r;
     }
     // readRules reads a map folder's file: this text as a rule set of a scratch map's.
@@ -102,7 +103,8 @@ TextReport checkRules(std::string_view text, const GameFiles& files)
         for (const auto& a : nox::server::ruleArmour()) {
             if (!(rules.armor & a.bit)) armour.emplace_back(a.thing);
         }
-        r.facts.emplace_back(name, std::format("spells off: {}; weapons off: {}; armour off: {}", listOf(spells), listOf(weapons), listOf(armour)));
+        r.facts.emplace_back(name, nox::l10n::format(NOX_TR("content.text.rules_off", "spells off: {spells}; weapons off: {weapons}; armour off: {armour}"),
+                                                       {{"spells", listOf(spells)}, {"weapons", listOf(weapons)}, {"armour", listOf(armour)}}));
     }
     // A section the game has no mode for is skipped whole.
     std::string_view rest = text;
@@ -114,9 +116,10 @@ TextReport checkRules(std::string_view text, const GameFiles& files)
         ++lineNo;
         if (line.size() > 2 && line.front() == '[' && line.back() == ']') {
             if (std::ranges::none_of(sections, [&](const std::string& known) { return equalsNoCase(known, line); })) {
-                r.problems.push_back(std::format("line {}: {} isn't a section the game knows: the lines after it still count for the section before "
-                                                 "it (the sections: {})",
-                                                 lineNo, line, listOf(sections, 10)));
+                r.problems.push_back(nox::l10n::format(NOX_TR("content.text.rules_unknown_section",
+                                                              "line {line}: {section} isn't a section the game knows: the lines after it still count for the "
+                                                              "section before it (the sections: {sections})"),
+                                                       {{"line", lineNo}, {"section", line}, {"sections", listOf(sections, 10)}}));
             }
         }
     }
@@ -189,20 +192,21 @@ TextReport checkMapCycle(std::string_view text, const GameFiles& files)
             continue;
         }
         if (count[std::size_t(section)] >= 25) {
-            r.problems.push_back(std::format("line {}: {} is past the 25 maps a section holds: dropped", lineNo, name));
+            r.problems.push_back(nox::l10n::format(NOX_TR("content.text.cycle_full", "line {line}: {name} is past the 25 maps a section holds: dropped"), {{"line", lineNo}, {"name", name}}));
             continue;
         }
         const std::uint32_t modes = modesOf(name);
         if (modes == 0) {
-            r.problems.push_back(std::format("line {}: there's no map {} (maps\\{}\\{}.map): dropped", lineNo, name, name, name));
+            r.problems.push_back(nox::l10n::format(NOX_TR("content.text.cycle_no_map", "line {line}: there's no map {name} (maps\\{name}\\{name}.map): dropped"), {{"line", lineNo}, {"name", name}}));
         } else if (!(modes & kSections[std::size_t(section)].second)) {
-            r.problems.push_back(std::format("line {}: {} isn't a {} map: dropped", lineNo, name, kSections[std::size_t(section)].first));
+            r.problems.push_back(nox::l10n::format(NOX_TR("content.text.cycle_wrong_mode", "line {line}: {name} isn't a {mode} map: dropped"),
+                                                     {{"line", lineNo}, {"name", name}, {"mode", kSections[std::size_t(section)].first}}));
         } else {
             ++count[std::size_t(section)];
         }
     }
     if (!text.empty() && text.find('[') == std::string_view::npos) {
-        r.problems.push_back("no section headers: every map is read as a deathmatch one (and the first line is left out)");
+        r.problems.push_back(NOX_TR("content.text.cycle_no_headers", "no section headers: every map is read as a deathmatch one (and the first line is left out)"));
     }
     return r;
 }
@@ -211,10 +215,10 @@ TextReport checkMotd(std::string_view text)
 {
     TextReport r;
     const auto lines = std::ranges::count(text, '\n') + (text.empty() || text.back() == '\n' ? 0 : 1);
-    r.facts.emplace_back("Sent", "whole, to each player who joins a network game (not a quest), when the host sends it");
-    r.facts.emplace_back("Size", std::format("{} bytes, {} lines", text.size(), lines));
+    r.facts.emplace_back(NOX_TR("content.text.motd_sent", "Sent"), NOX_TR("content.text.motd_sent_how", "whole, to each player who joins a network game (not a quest), when the host sends it"));
+    r.facts.emplace_back(NOX_TR("content.text.motd_size", "Size"), nox::l10n::format(NOX_TR("content.text.motd_size_value", "{bytes} bytes, {lines} lines"), {{"bytes", text.size()}, {"lines", lines}}));
     if (const auto z = text.find('\0'); z != std::string_view::npos) {
-        r.problems.push_back(std::format("a zero byte at {}: the players' games stop reading there", z));
+        r.problems.push_back(nox::l10n::format(NOX_TR("content.text.motd_zero", "a zero byte at {at}: the players' games stop reading there"), {{"at", z}}));
     }
     return r;
 }
@@ -223,12 +227,12 @@ void windowFacts(const nox::gui::WindowDef& w, const GameFiles& files, TextRepor
 {
     ++count;
     if (w.type == nox::gui::WindowType::Unknown) {
-        r.problems.push_back(std::format("window {}: type \"{}\" isn't one the game makes", w.id, w.typeName));
+        r.problems.push_back(nox::l10n::format(NOX_TR("content.text.window_bad_type", "window {id}: type \"{type}\" isn't one the game makes"), {{"id", w.id}, {"type", w.typeName}}));
     }
     const auto* strings = files.strings();
     for (const std::string* label : {&w.text, &w.tooltip}) {
         if (!label->empty() && strings && !strings->find(*label)) {
-            r.problems.push_back(std::format("window {}: nox.csf has no {} (the game shows the label itself)", w.id, *label));
+            r.problems.push_back(nox::l10n::format(NOX_TR("content.text.window_no_label", "window {id}: nox.csf has no {label} (the game shows the label itself)"), {{"id", w.id}, {"label", *label}}));
         }
     }
     for (const auto& c : w.children) {
@@ -243,9 +247,10 @@ TextReport checkWindow(std::string_view text, const GameFiles& files)
         const nox::gui::WindowDef root = nox::gui::parseWindowFile(text);
         int count = 0;
         windowFacts(root, files, r, count);
-        r.facts.emplace_back("Windows", std::format("{} (the top one {}, {} x {})", count, root.id, root.width, root.height));
+        r.facts.emplace_back(NOX_TR("content.text.windows", "Windows"), nox::l10n::format(NOX_TR("content.text.windows_value", "{n} (the top one {id}, {w} x {h})"),
+                                                                                         {{"n", count}, {"id", root.id}, {"w", root.width}, {"h", root.height}}));
     } catch (const std::exception& ex) {
-        r.problems.push_back(std::string("the game can't read it: ") + ex.what());
+        r.problems.push_back(nox::l10n::format(NOX_TR("content.text.cant_read", "the game can't read it: {error}"), {{"error", ex.what()}}));
     }
     return r;
 }
@@ -255,23 +260,24 @@ TextReport checkManifest(std::string_view text, const fs::path& dir)
     TextReport r;
     const auto read = nox::modes::script::readManifest(text);
     if (!read.manifest) {
-        r.problems.push_back("NoX Core won't list this mode: " + read.error);
+        r.problems.push_back(nox::l10n::format(NOX_TR("content.text.mode_refused", "NoX Core won't list this mode: {error}"), {{"error", read.error}}));
         return r;
     }
     const auto& m = *read.manifest;
-    r.facts.emplace_back("Mode", std::format("{} (\"{}\")", m.info.name, m.info.id));
+    r.facts.emplace_back(NOX_TR("content.text.mode", "Mode"), std::format("{} (\"{}\")", m.info.name, m.info.id));
     if (!m.info.description.empty()) {
-        r.facts.emplace_back("Description", m.info.description);
+        r.facts.emplace_back(NOX_TR("content.text.description", "Description"), m.info.description);
     }
-    r.facts.emplace_back("Players", std::format("{} to {}", m.info.minPlayers, m.info.maxPlayers));
-    r.facts.emplace_back("Stock players", m.info.stockClients ? "can join (GAME.EXE)" : "can't: NoX Core players only");
-    r.facts.emplace_back("Server script", m.serverScript);
-    r.facts.emplace_back("UI script", m.uiScript.empty() ? std::string("none (text only)") : m.uiScript);
+    r.facts.emplace_back(NOX_TR("content.text.players", "Players"), nox::l10n::format(NOX_TR("content.text.players_range", "{min} to {max}"), {{"min", m.info.minPlayers}, {"max", m.info.maxPlayers}}));
+    r.facts.emplace_back(NOX_TR("content.text.stock_players", "Stock players"),
+                             m.info.stockClients ? NOX_TR("content.text.stock_can_join", "can join (GAME.EXE)") : NOX_TR("content.text.stock_cant_join", "can't: NoX Core players only"));
+    r.facts.emplace_back(NOX_TR("content.text.server_script", "Server script"), m.serverScript);
+    r.facts.emplace_back(NOX_TR("content.text.ui_script", "UI script"), m.uiScript.empty() ? NOX_TR("content.text.no_ui_script", "none (text only)") : m.uiScript);
     if (!dir.empty()) {
         for (const std::string* script : {&m.serverScript, &m.uiScript}) {
             std::error_code ec;
             if (!script->empty() && !fs::exists(dir / fs::path(*script), ec)) {
-                r.problems.push_back(std::format("{} isn't in the mod's folder", *script));
+                r.problems.push_back(nox::l10n::format(NOX_TR("content.text.script_missing", "{file} isn't in the mod's folder"), {{"file", *script}}));
             }
         }
     }
@@ -295,14 +301,14 @@ TextKind textKindOf(const fs::path& file)
 const char* textKindName(TextKind kind)
 {
     switch (kind) {
-    case TextKind::Rules: return "rule set";
-    case TextKind::MapCycle: return "map cycle";
-    case TextKind::Motd: return "message of the day";
-    case TextKind::Window: return "window file";
-    case TextKind::ModManifest: return "game mode's manifest";
-    case TextKind::Other: return "text";
+    case TextKind::Rules: return NOX_TRC("content.text.kind_rules", "rule set");
+    case TextKind::MapCycle: return NOX_TRC("content.text.kind_map_cycle", "map cycle");
+    case TextKind::Motd: return NOX_TRC("content.text.kind_motd", "message of the day");
+    case TextKind::Window: return NOX_TRC("content.text.kind_window", "window file");
+    case TextKind::ModManifest: return NOX_TRC("content.text.kind_manifest", "game mode's manifest");
+    case TextKind::Other: return NOX_TRC("content.text.kind_text", "text");
     }
-    return "text";
+    return NOX_TRC("content.text.kind_text", "text");
 }
 
 TextReport checkText(TextKind kind, std::string_view text, const GameFiles& files, const fs::path& file)

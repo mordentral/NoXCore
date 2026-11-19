@@ -1,6 +1,7 @@
 // The editors' themes by name (theme.hpp).
 #include "editor/theme.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <string>
@@ -19,9 +20,9 @@ const char* themeKey(Theme theme)
 const char* themeLabel(Theme theme)
 {
     switch (theme) {
-    case Theme::Medium: return "Medium";
-    case Theme::Light: return "Light";
-    default: return "Dark";
+    case Theme::Medium: return NOX_TRC("editor.theme.medium", "Medium");
+    case Theme::Light: return NOX_TRC("editor.theme.light", "Light");
+    default: return NOX_TRC("editor.theme.dark", "Dark");
     }
 }
 

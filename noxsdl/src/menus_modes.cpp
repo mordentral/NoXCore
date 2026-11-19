@@ -15,10 +15,12 @@
 #include "mods_folder.hpp"
 
 #include "noxcore/modes/registry.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <string>
 #include <utility>
@@ -51,19 +53,27 @@ constexpr int kOptionLabelW = 220; ///< an option line's label, then its value
 constexpr int kOptionValueW = 160;
 
 struct Column {
-    const char* title;
+    nox::l10n::Key title;
     int x;
     int w;
 };
-constexpr Column kColumns[] = {{"Mode", 12, 122}, {"Description", 138, 238}, {"Players", 380, 52}, {"Stock clients", 436, 78}, {"Levels", 518, 70}};
+constexpr Column kColumns[] = {{NOX_TRK("menus.modes.col_mode", "Mode"), 12, 122},
+                               {NOX_TRK("menus.modes.col_description", "Description"), 138, 238},
+                               {NOX_TRK("menus.modes.col_players", "Players"), 380, 52},
+                               {NOX_TRK("menus.modes.col_stock_clients", "Stock clients"), 436, 78},
+                               {NOX_TRK("menus.modes.col_levels", "Levels"), 518, 70}};
+constexpr std::size_t kColumnCount = std::size(kColumns);
 
 enum Button { OpenFolder, Refresh, Cancel, Host, kButtonCount };
 struct ButtonDef {
-    const char* label;
+    nox::l10n::Key label;
     int x;
     int w;
 };
-constexpr ButtonDef kButtons[kButtonCount] = {{"Open Mods Folder", 12, 132}, {"Refresh", 150, 80}, {"Cancel", 430, 70}, {"Host", 506, 82}};
+constexpr ButtonDef kButtons[kButtonCount] = {{NOX_TRK("menus.modes.open_mods_folder", "Open Mods Folder"), 12, 132},
+                                              {NOX_TRK("menus.modes.refresh", "Refresh"), 150, 80},
+                                              {NOX_TRK("menus.common.cancel", "Cancel"), 430, 70},
+                                              {NOX_TRK("menus.modes.host", "Host"), 506, 82}};
 
 const nox::gui::Color kGold{240, 180, 42};
 const nox::gui::Color kBright{255, 236, 170};
@@ -298,10 +308,14 @@ void Menus::modeList(ModeListFor list)
     // The headings, the column lines, and the chosen row's panel heading (its settings, or why a
     // broken mod didn't load).
     if (gui::Window* canvas = dialog_->find(kCanvasId)) {
-        canvas->draw = [chosenRow, hosting](gui::Window& w, gui::Painter& p) {
+        std::array<std::string, kColumnCount> titles;
+        for (std::size_t c = 0; c < kColumnCount; ++c) {
+            titles[c] = nox::l10n::tr(kColumns[c].title);
+        }
+        canvas->draw = [chosenRow, hosting, titles](gui::Window& w, gui::Painter& p) {
             const SDL_Point pos = w.screenPos();
-            for (const Column& c : kColumns) {
-                p.text(c.title, pos.x + c.x, pos.y + kHeaderY, false, kGold);
+            for (std::size_t c = 0; c < kColumnCount; ++c) {
+                p.text(fit(p, titles[c], kColumns[c].w - 4, false), pos.x + kColumns[c].x, pos.y + kHeaderY, false, kGold); // (a long translation cut as the rows are)
             }
             p.fill(pos.x + 8, pos.y + kRowsY - 3, kWidth - 16, 1, nox::gui::Color{120, 90, 30});
             p.fill(pos.x + 8, pos.y + kPanelY - 4, kWidth - 16, 1, nox::gui::Color{120, 90, 30});
@@ -313,26 +327,36 @@ void Menus::modeList(ModeListFor list)
             const int y = pos.y + kPanelY;
             switch (row->kind) {
             case Row::Kind::Broken:
-                p.text(fit(p, row->name + " didn't load", kWidth - 24, false), x, y, false, kGold);
+                p.text(fit(p, nox::l10n::format(NOX_TR("menus.modes.didnt_load_heading", "{name} didn't load"), {{"name", row->name}}),
+                           kWidth - 24, false),
+                       x, y, false, kGold);
                 p.text(row->description, x, y + 18, false, kDim, kWidth - 24);
                 break;
             case Row::Kind::Quest:
-                p.text("Quest: the game's own. Its settings are chosen in the game, as always.", x, y, false, kDim, kWidth - 24);
+                p.text(NOX_TR("menus.modes.quest_about", "Quest: the game's own. Its settings are chosen in the game, as always."), x,
+                       y, false, kDim, kWidth - 24);
                 break;
             case Row::Kind::Editor:
-                p.text(hosting ? "Map Editor: the map, who may edit and the sandbox are chosen in its session dialog, after your character."
-                               : "Map Editor: your own maps, on this computer. Its File > Host a Session shares one with others.",
+                p.text(hosting ? NOX_TR("menus.modes.editor_about_hosted",
+                                        "Map Editor: the map, who may edit and the sandbox are chosen in its session dialog, after your character.")
+                               : NOX_TR("menus.modes.editor_about_local",
+                                        "Map Editor: your own maps, on this computer. Its File > Host a Session shares one with others."),
                        x, y, false, kDim, kWidth - 24);
                 break;
             default: {
                 p.text(row->description, x, y, false, kGold, kWidth - 24); // (whole: the list's column cuts it)
                 const int sy = y + kAboutH;
                 if (row->options.empty()) {
-                    p.text(fit(p, row->name + ": no settings to choose here.", kWidth - 24, false), x, sy, false, kDim);
+                    p.text(fit(p, nox::l10n::format(NOX_TR("menus.modes.no_settings", "{name}: no settings to choose here."), {{"name", row->name}}),
+                               kWidth - 24, false),
+                           x, sy, false, kDim);
                 } else {
-                    p.text(fit(p, row->name + " settings", kWidth - 24, false), x, sy, false, kGold);
+                    p.text(fit(p, nox::l10n::format(NOX_TR("menus.modes.settings_heading", "{name} settings"), {{"name", row->name}}),
+                               kWidth - 24, false),
+                           x, sy, false, kGold);
                     if (row->options.size() > static_cast<std::size_t>(kVisibleOptions)) {
-                        p.text("(the first " + std::to_string(kVisibleOptions) + ")", x + 300, sy, false, kDim);
+                        p.text(nox::l10n::format(NOX_TR("menus.modes.first_options", "(the first {n})"), {{"n", kVisibleOptions}}), x + 300,
+                               sy, false, kDim);
                     }
                 }
                 break;
@@ -364,9 +388,14 @@ void Menus::modeList(ModeListFor list)
                 const nox::gui::Color about = broken ? kGrey : chosen ? kGold : kDim;
                 const int ty = pos.y + (kRowH - p.fontHeight(false)) / 2;
                 const int dx = pos.x - 8; // (the columns are the dialog's)
-                const std::string name = r.builtIn() ? r.name + " (built in)" : r.name;
+                const std::string name =
+                    r.builtIn() ? nox::l10n::format(NOX_TR("menus.modes.built_in_name", "{name} (built in)"), {{"name", r.name}}) : r.name;
                 p.text(fit(p, name, kColumns[0].w - 4, false), dx + kColumns[0].x, ty, false, c);
-                p.text(fit(p, broken ? "Didn't load: " + r.description : r.description, kColumns[1].w - 4, false), dx + kColumns[1].x, ty, false, about);
+                p.text(fit(p,
+                           broken ? nox::l10n::format(NOX_TR("menus.modes.didnt_load_row", "Didn't load: {why}"), {{"why", r.description}})
+                                  : r.description,
+                           kColumns[1].w - 4, false),
+                       dx + kColumns[1].x, ty, false, about);
                 p.text(fit(p, r.players.empty() ? "-" : r.players, kColumns[2].w - 4, false), dx + kColumns[2].x, ty, false, about);
                 p.text(fit(p, r.stock.empty() ? "-" : r.stock, kColumns[3].w - 4, false), dx + kColumns[3].x, ty, false, about);
                 p.text(fit(p, r.levels.empty() ? "-" : r.levels, kColumns[4].w - 4, false), dx + kColumns[4].x, ty, false, about);
@@ -396,14 +425,15 @@ void Menus::modeList(ModeListFor list)
     }
     for (int b = 0; b < kButtonCount; ++b) {
         if (gui::Window* w = dialog_->find(kButtonId + b)) {
-            w->draw = [chosenRow, b, hosting](gui::Window& win, gui::Painter& p) {
+            const std::string label =
+                b == Host && !hosting ? NOX_TR("menus.modes.start", "Start") : nox::l10n::tr(kButtons[b].label);
+            w->draw = [chosenRow, b, label](gui::Window& win, gui::Painter& p) {
                 const SDL_Point pos = win.screenPos();
                 const bool held = (win.state & gui::kPressed) != 0;
                 const Row* row = chosenRow();
                 const bool off = b == Host && (!row || row->kind == Row::Kind::Broken);
                 p.fillAlpha(pos.x, pos.y, win.rect.w, win.rect.h, SDL_Color{0, 0, 0, 120});
                 p.outline(pos.x, pos.y, win.rect.w, win.rect.h, off ? nox::gui::Color{90, 80, 60} : nox::gui::Color{200, 150, 40});
-                const std::string label = b == Host && !hosting ? "Start" : kButtons[b].label;
                 const int tw = p.textWidth(label, false);
                 p.text(label, pos.x + (win.rect.w - tw) / 2, pos.y + (kButtonH - p.fontHeight(false)) / 2 + (held ? 1 : 0), false,
                        off ? kGrey : b == Host ? kBright : kGold);
@@ -413,7 +443,7 @@ void Menus::modeList(ModeListFor list)
     gui::centreOnScreen(*dialog_);
     dialog_->status |= st::Above;
     if (gui::Window* t = dialog_->find(kDlgTitle)) {
-        t->text = hosting ? "Host Custom" : "Game Modes";
+        t->text = hosting ? NOX_TR("menus.servers.host_custom", "Host Custom") : NOX_TR("menus.main.game_modes", "Game Modes");
         t->largeFont = true;
     }
     // The keys: Up / Down (Home / End, Page Up / Down) move the choice, Enter starts it.

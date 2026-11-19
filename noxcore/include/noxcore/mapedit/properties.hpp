@@ -18,6 +18,7 @@
 #include "noxcore/mapedit/document.hpp"
 #include "noxcore/mapedit/markers.hpp"
 #include "noxcore/mapedit/ops.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <array>
 #include <cstdint>
@@ -71,17 +72,21 @@ struct FieldValue {
     bool operator==(const FieldValue&) const = default;
 };
 
+/// The tables' texts (a field's section, label and help, a value's name) are keys with their
+/// English (nox::l10n::Key): the English is what ops, ids and tests use; shownText gives the text in
+/// the language in use, for what is drawn. A key with an empty id is a game name ("MISSILE"),
+/// shown as it is.
 struct NamedValue {
     std::int64_t value = 0;
-    std::string name;
-    std::string help;
+    nox::l10n::Key name{"", ""};
+    nox::l10n::Key help{"", ""};
 };
 
 struct FieldDesc {
     std::string id;    ///< stable: "door.lock", "header.team" (multi-select and tests match by it)
-    std::string group; ///< the panel's section ("Header", "Combat", "Spells"...)
-    std::string label;
-    std::string help;  ///< what the game does with it
+    nox::l10n::Key group{"", ""}; ///< the panel's section ("Header", "Combat", "Spells"...)
+    nox::l10n::Key label{"", ""};
+    nox::l10n::Key help{"", ""};  ///< what the game does with it
     FieldKind kind = FieldKind::Int;
     double min = 0;    ///< Int / Float: the range; Text: unused
     double max = 0;    ///< Int / Float: the range; Text: the most bytes
@@ -102,6 +107,10 @@ struct FieldContext {
     const things::ModifierDb* modifiers = nullptr;
     const things::SoundSets* soundSets = nullptr;
 };
+
+/// A table text in the language in use ("" for none; a game name as it is). A lookup: call it for
+/// what is drawn, never for every field of a table.
+const char* shownText(const nox::l10n::Key& text);
 
 /// The object's fields: the header's, then its type's (those its record's versions hold).
 std::vector<FieldDesc> objectFields(const DocObject& o, const FieldContext& ctx);
@@ -129,13 +138,15 @@ const std::vector<FlagBit>& xStatusBits();
 /// The teams by number, with their colours (0: none).
 struct TeamName {
     std::uint8_t team = 0;
-    const char* name = "";
+    nox::l10n::Key name{"", ""};
     std::array<std::uint8_t, 3> rgb{};
 };
 const std::vector<TeamName>& teamNames();
 /// The monster status flags (MonsterStatus) and the spell usage flags.
 const std::vector<FlagBit>& monsterStatusBits();
 const std::vector<FlagBit>& spellUsageBits();
+/// The spell usage flags as the panel shows them (their names and help as table texts).
+const std::vector<NamedValue>& spellUsageValues();
 /// The creature starting actions (ACTION_* names the map may name).
 std::vector<std::string> actionNames();
 /// The names a field of this kind picks from (spells, abilities, creatures, enchantments...);

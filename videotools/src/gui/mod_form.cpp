@@ -7,6 +7,7 @@
 
 #include "noxcore/content/content_pack.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -33,7 +34,7 @@ bool RecordPanel::modForm(const content::Record& r)
     std::error_code ec;
     ImGui::TextDisabled("%s", utf8(*folder).c_str());
     ImGui::SameLine();
-    if (ImGui::SmallButton("Show in folder")) {
+    if (ImGui::SmallButton(NOX_TRI("content.common.show_in_folder", "Show in folder"))) {
         SDL_OpenURL(("file:///" + utf8(folder->generic_u8string())).c_str());
     }
     // Its content pack (mods\<id>\content), as NoX Core finds it.
@@ -49,12 +50,14 @@ bool RecordPanel::modForm(const content::Record& r)
             if (p.music) add("music\\");
         }
     }
-    ImGui::Text("Content pack: %s", packFiles.empty() ? "none" : packFiles.c_str());
+    ImGui::TextUnformatted(nox::l10n::format(NOX_TR("content.mod.content_pack", "Content pack: {files}"),
+                                              {{"files", packFiles.empty() ? NOX_TR("content.mod.none", "none") : packFiles}})
+                               .c_str());
     if (!packFiles.empty()) {
         ImGui::SameLine();
-        if (ImGui::SmallButton("Edit it")) {
+        if (ImGui::SmallButton(NOX_TRI("content.mod.edit_it", "Edit it"))) {
             ws_.session.settings().packId = folder->filename().string();
-            ws_.session.setStatus("Pick it at the top (Pack) to edit it: " + folder->filename().string());
+            ws_.session.setStatus(nox::l10n::format(NOX_TR("content.mod.pick_it", "Pick it at the top (Pack) to edit it: {id}"), {{"id", folder->filename().string()}}));
         }
     }
     const fs::path manifestFile = nox::findNoCase(*folder, "mode.json");
@@ -69,10 +72,14 @@ bool RecordPanel::modForm(const content::Record& r)
         } catch (const std::exception&) {
         }
     }
-    ImGui::Text("Game mode: %s", mode ? (modeId.empty() ? "mode.json (NoX Core won't list it as it is)" : ("\"" + modeId + "\"").c_str()) : "none");
+    ImGui::TextUnformatted(nox::l10n::format(NOX_TR("content.mod.game_mode", "Game mode: {mode}"),
+                                              {{"mode", !mode                ? NOX_TR("content.mod.none", "none")
+                                                        : modeId.empty() ? NOX_TR("content.mod.unlisted", "mode.json (NoX Core won't list it as it is)")
+                                                                         : "\"" + modeId + "\""}})
+                               .c_str());
 
     // The test launch: noxcore.exe from beside this program, hosting on this computer only.
-    ImGui::SeparatorText("Try it");
+    ImGui::SeparatorText(NOX_TRI("content.mod.try_it", "Try it"));
     const char* base = SDL_GetBasePath();
     const fs::path here = base ? fs::path(reinterpret_cast<const char8_t*>(base)) : fs::current_path();
     const fs::path exe = nox::findNoCase(here, "noxcore.exe");
@@ -80,17 +87,22 @@ bool RecordPanel::modForm(const content::Record& r)
     const fs::path itsMods = here / "mods";
     const bool sameMods = fs::exists(itsMods, ec) && fs::equivalent(itsMods, folder->parent_path(), ec);
     if (!haveExe) {
-        ImGui::TextColored(theme.warning, "noxcore.exe isn't beside this program (%s): put noxcontent.exe beside it to test from here.", utf8(here).c_str());
+        ImGui::TextColored(theme.warning, "%s",
+                           nox::l10n::format(NOX_TR("content.mod.no_exe", "noxcore.exe isn't beside this program ({folder}): put noxcontent.exe beside it to test from here."),
+                                             {{"folder", utf8(here)}})
+                               .c_str());
     } else if (!sameMods) {
-        ImGui::TextColored(theme.warning, "noxcore.exe reads the mods folder beside it (%s); this mod is somewhere else: copy it there to test it.",
-                           utf8(itsMods).c_str());
+        ImGui::TextColored(theme.warning, "%s",
+                           nox::l10n::format(NOX_TR("content.mod.other_mods", "noxcore.exe reads the mods folder beside it ({folder}); this mod is somewhere else: copy it there to test it."),
+                                             {{"folder", utf8(itsMods)}})
+                               .c_str());
     }
     // A map to host: any of the game's (the deathmatch ones suit most modes).
     if (testMap_.empty()) {
         testMap_ = "Estate";
     }
     ImGui::SetNextItemWidth(200 * ws_.session.scale());
-    if (ImGui::BeginCombo("Map", testMap_.c_str())) {
+    if (ImGui::BeginCombo(NOX_TRI("content.mod.map", "Map"), testMap_.c_str())) {
         for (const auto& m : ws_.files.maps()) {
             const std::string name = m.stem().string();
             if (ImGui::Selectable(name.c_str(), name == testMap_)) {
@@ -101,7 +113,7 @@ bool RecordPanel::modForm(const content::Record& r)
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(!haveExe || !sameMods || (mode && modeId.empty()));
-    if (ImGui::Button("Test launch")) {
+    if (ImGui::Button(NOX_TRI("content.mod.test_launch", "Test launch"))) {
         // Hosted with no router port and nothing posted online: a game on this computer only.
         // (Any free port: it's for this computer only, and the usual one may be taken.)
         // --private-test: unlisted, no router port asked for, on the loopback alone (as Play From Here's).
@@ -114,15 +126,22 @@ bool RecordPanel::modForm(const content::Record& r)
         argv.push_back(nullptr);
         if (SDL_Process* p = SDL_CreateProcess(argv.data(), false)) {
             SDL_DestroyProcess(p); // (it runs on by itself)
-            ws_.session.setStatus(std::format("Started noxcore.exe hosting {}{} (this computer only).", testMap_, modeId.empty() ? "" : " as " + modeId));
+            ws_.session.setStatus(modeId.empty() ? nox::l10n::format(NOX_TR("content.mod.started", "Started noxcore.exe hosting {map} (this computer only)."), {{"map", testMap_}})
+                                                 : nox::l10n::format(NOX_TR("content.mod.started_as", "Started noxcore.exe hosting {map} as {mode} (this computer only)."),
+                                                                     {{"map", testMap_}, {"mode", modeId}}));
         } else {
-            ws_.session.error(std::string("Couldn't start noxcore.exe: ") + SDL_GetError());
+            ws_.session.error(nox::l10n::format(NOX_TR("content.mod.cant_start", "Couldn't start noxcore.exe: {error}"), {{"error", SDL_GetError()}}));
         }
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("noxcore.exe hosts %s %s, with every installed pack and mod, on this computer only\n"
-                          "(no router port, not listed online). Close it when you're done.",
-                          testMap_.c_str(), modeId.empty() ? "as a deathmatch" : ("as " + modeId).c_str());
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        ImGui::SetTooltip("%s", nox::l10n::format(modeId.empty() ? NOX_TR("content.mod.launch_tip", "noxcore.exe hosts {map} as a deathmatch, with every installed pack and mod, on this computer only\n"
+                                                                                          "(no router port, not listed online). Close it when you're done.")
+                                                                 : NOX_TR("content.mod.launch_tip_as", "noxcore.exe hosts {map} as {mode}, with every installed pack and mod, on this computer only\n"
+                                                                                             "(no router port, not listed online). Close it when you're done."),
+                                                  {{"map", testMap_}, {"mode", modeId}})
+                                    .c_str());
+    }
     if (mode) {
         ImGui::SeparatorText("mode.json");
         // (Its own ID scope: the editor's buttons are named like this page's, Show in folder.)

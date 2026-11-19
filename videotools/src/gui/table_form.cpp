@@ -9,6 +9,7 @@
 #include "noxcore/audio/pcm.hpp"
 #include "noxcore/audio/sound_names.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/util/text.hpp"
@@ -93,7 +94,7 @@ bool valueEditor(const FieldSpec* spec, const std::string& value, std::string& o
     const FieldType type = spec ? spec->type : FieldType::Text;
     if (type == FieldType::Enum && spec) {
         bool changed = false;
-        if (ImGui::BeginCombo("##v", value.empty() ? "(none)" : value.c_str())) {
+        if (ImGui::BeginCombo("##v", value.empty() ? NOX_TRC("content.form.none", "(none)") : value.c_str())) {
             for (const auto n : spec->names) {
                 if (ImGui::Selectable(std::string(n).c_str(), nox::util::equalsNoCase(n, value))) {
                     out = std::string(n);
@@ -106,16 +107,16 @@ bool valueEditor(const FieldSpec* spec, const std::string& value, std::string& o
     }
     if (type == FieldType::Sound) {
         bool changed = false;
-        if (ImGui::BeginCombo("##v", value.empty() ? "(none)" : value.c_str(), ImGuiComboFlags_HeightLarge)) {
+        if (ImGui::BeginCombo("##v", value.empty() ? NOX_TRC("content.form.none", "(none)") : value.c_str(), ImGuiComboFlags_HeightLarge)) {
             static char filter[64] = {};
             if (ImGui::IsWindowAppearing()) {
                 filter[0] = 0;
                 ImGui::SetKeyboardFocusHere();
             }
             ImGui::SetNextItemWidth(-FLT_MIN);
-            ImGui::InputTextWithHint("##f", "filter", filter, sizeof filter);
+            ImGui::InputTextWithHint("##f", NOX_TRC("content.form.filter_hint", "filter"), filter, sizeof filter);
             const std::string f = nox::util::lowered(filter);
-            if (ImGui::Selectable("NULL (none)", value == "NULL")) {
+            if (ImGui::Selectable(NOX_TRI("content.form.null_none", "NULL (none)"), value == "NULL")) {
                 out = "NULL";
                 changed = true;
             }
@@ -220,7 +221,7 @@ std::string RecordPanel::tableText(const content::Record& r) const
             out += "    " + a + "\n";
         }
         if (t.draw) {
-            out += "    DRAW " + t.draw->type + std::format(" ({} bytes)\n", t.draw->data.size());
+            out += "    DRAW " + nox::l10n::format(NOX_TR("content.record.draw_bytes", "{type} ({n} bytes)"), {{"type", t.draw->type}, {"n", t.draw->data.size()}}) + "\n";
         }
         if (t.menuIcon) {
             out += "    MENUICON " + nox::content::thingValue(t, "MENUICON").value_or("") + "\n";
@@ -263,7 +264,8 @@ bool RecordPanel::tableForm(const content::Record& r)
     const content::TextTable* work = pack.working(target->format);
     const content::TextTable* base = pack.base(target->format);
     if (!work || !base) {
-        ImGui::TextColored(noxsdl::editor::themeColours().error, "%s didn't load.", nox::content::tableFileName(target->format));
+        ImGui::TextColored(noxsdl::editor::themeColours().error, "%s",
+                           nox::l10n::format(NOX_TR("content.form.file_not_loaded", "{file} didn't load."), {{"file", nox::content::tableFileName(target->format)}}).c_str());
         return true;
     }
     const auto& theme = noxsdl::editor::themeColours();
@@ -271,7 +273,7 @@ bool RecordPanel::tableForm(const content::Record& r)
     const auto wr = work->find(recordName, target->section);
     const auto br = base->find(recordName, target->section);
     if (!wr) {
-        ImGui::TextDisabled("Not in %s.", nox::content::tableFileName(target->format));
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.form.not_in_file", "Not in {file}."), {{"file", nox::content::tableFileName(target->format)}}).c_str());
         return true;
     }
     const nox::content::TableRecord& wrec = work->records()[*wr];
@@ -299,7 +301,7 @@ bool RecordPanel::tableForm(const content::Record& r)
     }
     const bool kinds = target->format == TableFormat::Monster || target->format == TableFormat::GameData;
     if (!pack.packOpen()) {
-        ImGui::TextColored(theme.note, "Changes go into a content pack: pick one at the top (or make one) before you save.");
+        ImGui::TextColored(theme.note, "%s", NOX_TRC("content.form.pick_pack", "Changes go into a content pack: pick one at the top (or make one) before you save."));
     }
     const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
     const int columns = kinds ? 5 : 4;
@@ -307,15 +309,15 @@ bool RecordPanel::tableForm(const content::Record& r)
         return true;
     }
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("MELEE_ATTACK_POISON_STRENGTH").x + 8);
+    ImGui::TableSetupColumn(NOX_TRI("content.record_panel.col_field", "Field"), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("MELEE_ATTACK_POISON_STRENGTH").x + 8);
     if (kinds) {
-        ImGui::TableSetupColumn("Solo", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Network (arena)", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("content.form.col_solo", "Solo"), ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("content.form.col_network", "Network (arena)"), ImGuiTableColumnFlags_WidthStretch);
     } else {
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("content.record_panel.col_value", "Value"), ImGuiTableColumnFlags_WidthStretch);
     }
-    ImGui::TableSetupColumn("Read by", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("server").x + 12);
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Revert").x + 12);
+    ImGui::TableSetupColumn(NOX_TRI("content.form.col_read_by", "Read by"), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize(content::readByLabel(content::ReadBy::Server)).x + 12);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize(NOX_TRC("content.changes.revert", "Revert")).x + 12);
     ImGui::TableHeadersRow();
     for (std::size_t i = 0; i < keys.size(); ++i) {
         const std::string& key = keys[i];
@@ -335,12 +337,13 @@ bool RecordPanel::tableForm(const content::Record& r)
             ImGui::TextUnformatted(key.c_str());
         }
         if (ImGui::IsItemHovered()) {
-            std::string tip = spec ? std::string(spec->docs) : std::string("The game doesn't read this key.");
+            std::string tip = spec ? nox::l10n::tr(spec->docs) : NOX_TR("content.form.key_unread", "The game doesn't read this key.");
             if (spec && !spec->readers.empty()) {
-                tip += std::format("\nRead in {}.", spec->readers);
+                tip += nox::l10n::format(NOX_TR("content.form.read_in", "\nRead in {files}."), {{"files", spec->readers}});
             }
             if (spec) {
-                tip += std::string("\n\nReach: ") + content::reachLabel(content::reachOf(spec->readBy)) + ". " + content::reachDocs(content::reachOf(spec->readBy));
+                tip += nox::l10n::format(NOX_TR("content.form.reach_tip", "\n\nReach: {reach}. {docs}"),
+                                         {{"reach", content::reachLabel(content::reachOf(spec->readBy))}, {"docs", content::reachDocs(content::reachOf(spec->readBy))}});
             }
             ImGui::SetTooltip("%s", tip.c_str());
         }
@@ -351,12 +354,12 @@ bool RecordPanel::tableForm(const content::Record& r)
             const std::string stock = brec ? brec->effective(key, kind).value_or("") : std::string();
             std::string out;
             const bool sound = spec && spec->type == FieldType::Sound;
-            const float playW = sound ? ImGui::CalcTextSize("Play").x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x : 0.0f;
+            const float playW = sound ? ImGui::CalcTextSize(NOX_TRC("content.common.play", "Play")).x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x : 0.0f;
             if (valueEditor(spec, now, out, sound ? -playW : -FLT_MIN)) {
                 if (!pack.set(target->format, target->section, recordName, key, kind, out)) {
                     ws_.session.error(target->format == nox::content::TableFormat::Monster || target->format == nox::content::TableFormat::SoundSet
-                                          ? "A value here is one word (words join only across a '+'): the game would read the next word as a key."
-                                          : "That value can't be written so the game reads it back.");
+                                          ? NOX_TR("content.form.one_word", "A value here is one word (words join only across a '+'): the game would read the next word as a key.")
+                                          : NOX_TR("content.form.unwritable", "That value can't be written so the game reads it back."));
                 }
             }
             const bool plainText = !spec || (spec->type != FieldType::Sound && spec->type != FieldType::Flags && spec->type != FieldType::Enum &&
@@ -365,16 +368,18 @@ bool RecordPanel::tableForm(const content::Record& r)
                 // (an absent key: the game reads 0 or none)
                 const ImVec2 a = ImGui::GetItemRectMin();
                 ImGui::GetWindowDrawList()->AddText(ImVec2(a.x + ImGui::GetStyle().FramePadding.x, a.y + ImGui::GetStyle().FramePadding.y),
-                                                    ImGui::GetColorU32(ImGuiCol_TextDisabled), "(not set)");
+                                                    ImGui::GetColorU32(ImGuiCol_TextDisabled), NOX_TRC("content.form.not_set", "(not set)"));
             }
             if (sound && !now.empty() && !nox::util::equalsNoCase(now, "NULL")) {
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Play")) {
+                if (ImGui::SmallButton(NOX_TRI("content.common.play", "Play"))) {
                     playSoundEvent(ws_, now);
                 }
             }
             if (ImGui::IsItemHovered() && now != stock) {
-                ImGui::SetTooltip("The game's own: %s", stock.empty() ? "(none)" : stock.c_str());
+                ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.form.games_own", "The game's own: {value}"),
+                                                          {{"value", stock.empty() ? NOX_TR("content.form.none", "(none)") : stock}})
+                                            .c_str());
             }
             if (spec && !now.empty() && now != stock) { // (the game's own values aren't questioned)
                 if (const std::string why = content::checkValue(*spec, now); !why.empty()) {
@@ -392,22 +397,25 @@ bool RecordPanel::tableForm(const content::Record& r)
         ImGui::TableNextColumn();
         ImGui::AlignTextToFramePadding();
         if (spec && spec->readBy == content::ReadBy::Unknown) {
-            ImGui::TextDisabled("nothing");
-            ImGui::SetItemTooltip("%s", std::string(spec->docs).c_str());
+            ImGui::TextDisabled("%s", NOX_TRC("content.form.read_by_nothing", "nothing"));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                ImGui::SetTooltip("%s", nox::l10n::tr(spec->docs).c_str());
+            }
         } else if (spec) {
             ImGui::TextColored(readByColour(spec->readBy), "%s", content::readByLabel(spec->readBy));
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s: %s", content::reachLabel(content::reachOf(spec->readBy)), content::reachDocs(content::reachOf(spec->readBy)));
             }
         } else {
-            ImGui::TextDisabled(target->format == TableFormat::GameData ? "mods" : "nothing");
+            ImGui::TextDisabled("%s", target->format == TableFormat::GameData ? NOX_TRC("content.form.read_by_mods", "mods") : NOX_TRC("content.form.read_by_nothing", "nothing"));
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(target->format == TableFormat::GameData ? "Nothing in the game reads this name; a game-mode mod can (nox.gameNumber), on the host."
-                                                                          : "The game doesn't read this key.");
+                ImGui::SetTooltip("%s", target->format == TableFormat::GameData
+                                            ? NOX_TRC("content.form.name_mods_only", "Nothing in the game reads this name; a game-mode mod can (nox.gameNumber), on the host.")
+                                            : NOX_TRC("content.form.key_unread", "The game doesn't read this key."));
             }
         }
         ImGui::TableNextColumn();
-        if (edited && ImGui::SmallButton("Revert")) {
+        if (edited && ImGui::SmallButton(NOX_TRI("content.changes.revert", "Revert"))) {
             for (const GameKind k : {GameKind::Both, GameKind::Solo, GameKind::Arena}) {
                 for (std::size_t e = 0; e < pack.edits().size(); ++e) {
                     const auto& fe = pack.edits()[e];
@@ -435,7 +443,7 @@ bool RecordPanel::thingForm(const content::Record& r)
     const nox::things::ThingDb* base = pack.baseThings();
     const auto& theme = noxsdl::editor::themeColours();
     if (!work || !base || std::size_t(r.ref.index) >= work->things.size()) {
-        ImGui::TextColored(theme.error, "thing.bin didn't load.");
+        ImGui::TextColored(theme.error, "%s", NOX_TRC("content.common.thing_bin_not_loaded", "thing.bin didn't load."));
         return true;
     }
     // (a copy: an edit below rebuilds the working types, which would leave a reference dangling)
@@ -446,37 +454,47 @@ bool RecordPanel::thingForm(const content::Record& r)
     const nox::things::ThingDef* stockT = std::size_t(r.ref.index) < base->things.size() ? &base->things[std::size_t(r.ref.index)] : nullptr;
     if (fresh) {
         const auto it = std::ranges::find_if(pack.newThings(), [&](const content::NewThing& n) { return n.name == t.name; });
-        ImGui::TextColored(theme.warning, "Type %d: new in this pack, made like %s.", r.ref.index + 1, it != pack.newThings().end() ? it->like.c_str() : "?");
+        ImGui::TextColored(theme.warning, "%s",
+                           nox::l10n::format(NOX_TR("content.form.new_type_like", "Type {n}: new in this pack, made like {like}."),
+                                             {{"n", r.ref.index + 1}, {"like", it != pack.newThings().end() ? it->like : std::string("?")}})
+                               .c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton("Remove this new type")) {
+        if (ImGui::SmallButton(NOX_TRI("content.form.remove_new_type", "Remove this new type"))) {
             if (const std::string why = pack.removeNewThing(name); !why.empty()) {
                 ws_.session.error(why);
             }
             return true; // (its record goes at the next frame's sync)
         }
-        ImGui::TextDisabled("It goes after thing.bin's types. Its CLASS, XFER, FLAGS, COLLIDE and MENUICON are its own to choose.\n"
-                            "A game hosted with this pack lets in only NoX Core games with the same pack (stock players can't join it).");
+        ImGui::TextDisabled("%s", NOX_TRC("content.form.new_type_about", "It goes after thing.bin's types. Its CLASS, XFER, FLAGS, COLLIDE and MENUICON are its own to choose.\n"
+                                                                         "A game hosted with this pack lets in only NoX Core games with the same pack (stock players can't join it)."));
         // A monster's numbers (strength, speed, what it casts...) are monster.bin's, by its name.
         if (nox::things::thingClasses(t) & nox::things::ObjectClass::Monster) {
             if (const auto* monsters = pack.working(content::TableFormat::Monster); monsters && !monsters->find(name)) {
-                ImGui::TextColored(theme.note, "monster.bin has no %s: as a monster it has only its own lines' numbers (no strength, speed\n"
-                                               "or spells of monster.bin's). A record for it in the pack's monster.patch gives it some.",
-                                   name.c_str());
+                ImGui::TextColored(theme.note, "%s",
+                                   nox::l10n::format(NOX_TR("content.form.no_monster_record", "monster.bin has no {name}: as a monster it has only its own lines' numbers (no strength, speed\n"
+                                                                                              "or spells of monster.bin's). A record for it in the pack's monster.patch gives it some."),
+                                                     {{"name", name}})
+                                       .c_str());
             }
         }
     } else {
-        ImGui::TextDisabled("Type %d: its number in thing.bin, which maps and the network use (types are never moved).", r.ref.index + 1);
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.form.type_number", "Type {n}: its number in thing.bin, which maps and the network use (types are never moved)."),
+                                                      {{"n", r.ref.index + 1}})
+                                        .c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton("New type like this...")) {
+        if (ImGui::SmallButton(NOX_TRI("content.form.new_type_button", "New type like this..."))) {
             std::snprintf(newThingName_, sizeof newThingName_, "%s2", t.name.c_str());
             newThingLike_ = t.name;
-            ImGui::OpenPopup("New type");
+            ImGui::OpenPopup(NOX_TRI("content.form.new_type_title", "New type"));
         }
-        ImGui::SetItemTooltip("A new type for this pack: a copy of %s that chooses its own lines, CLASS too.", t.name.c_str());
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+            ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.form.new_type_tip", "A new type for this pack: a copy of {name} that chooses its own lines, CLASS too."), {{"name", t.name}})
+                                        .c_str());
+        }
     }
     newThingPopup();
     if (!pack.packOpen()) {
-        ImGui::TextColored(theme.note, "Changes go into a content pack: pick one at the top (or make one) before you save.");
+        ImGui::TextColored(theme.note, "%s", NOX_TRC("content.form.pick_pack", "Changes go into a content pack: pick one at the top (or make one) before you save."));
     }
     // The rows: each key the type has, once (a change sets every line of it), then its pictures,
     // then keys removed by the pack.
@@ -501,10 +519,11 @@ bool RecordPanel::thingForm(const content::Record& r)
         return true;
     }
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("LIGHTINTENSITY__").x + 8);
-    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableSetupColumn("Read by", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("server").x + 12);
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Revert").x + ImGui::CalcTextSize("Remove").x + 24);
+    ImGui::TableSetupColumn(NOX_TRI("content.record_panel.col_field", "Field"), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("LIGHTINTENSITY__").x + 8);
+    ImGui::TableSetupColumn(NOX_TRI("content.record_panel.col_value", "Value"), ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn(NOX_TRI("content.form.col_read_by", "Read by"), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize(content::readByLabel(content::ReadBy::Server)).x + 12);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                            ImGui::CalcTextSize(NOX_TRC("content.changes.revert", "Revert")).x + ImGui::CalcTextSize(NOX_TRC("content.form.remove", "Remove")).x + 24);
     ImGui::TableHeadersRow();
     for (std::size_t i = 0; i < keys.size(); ++i) {
         const std::string& key = keys[i];
@@ -529,33 +548,40 @@ bool RecordPanel::thingForm(const content::Record& r)
             ImGui::TextUnformatted(key.c_str());
         }
         if (ImGui::IsItemHovered()) {
-            std::string tip = spec ? std::string(spec->docs) : std::string("NoX Core doesn't read this key.");
+            std::string tip = spec ? nox::l10n::tr(spec->docs) : NOX_TR("content.form.key_unread_noxcore", "NoX Core doesn't read this key.");
             if (spec) {
-                tip += std::string("\n\nReach: ") + content::reachLabel(content::reachOf(*spec)) + ". " + content::reachDocs(content::reachOf(*spec));
+                tip += nox::l10n::format(NOX_TR("content.form.reach_tip", "\n\nReach: {reach}. {docs}"),
+                                         {{"reach", content::reachLabel(content::reachOf(*spec))}, {"docs", content::reachDocs(content::reachOf(*spec))}});
             }
             ImGui::SetTooltip("%s", tip.c_str());
         }
         ImGui::TableNextColumn();
         if (edit && !edit->value) {
-            ImGui::TextDisabled("(removed; the game's own: %s)", stock.value_or("none").c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.form.removed_own", "(removed; the game's own: {value})"),
+                                                      {{"value", stock.value_or(NOX_TR("content.record.none", "none"))}})
+                                        .c_str());
         } else if (nox::util::equalsNoCase(key, "DRAW")) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("%s (%zu bytes of animation data; shown in Preview and Sprites)", t.draw ? t.draw->type.c_str() : "?",
-                                t.draw ? t.draw->data.size() : std::size_t(0));
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.form.draw_bytes", "{type} ({n} bytes of animation data; shown in Preview and Sprites)"),
+                                                      {{"type", t.draw ? t.draw->type : std::string("?")}, {"n", t.draw ? t.draw->data.size() : std::size_t(0)}})
+                                        .c_str());
         } else if (locked && !edit) {
             // (thing.bin's own types keep these: only a new one chooses its own)
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(now.value_or("").c_str());
             ImGui::SameLine();
-            ImGui::TextDisabled("(locked)");
-            ImGui::SetItemTooltip("A type's %s never changes: every player's game and the maps read its objects by it.\n"
-                                  "A new type (New type like this...) chooses its own.",
-                                  key.c_str());
+            ImGui::TextDisabled("%s", NOX_TRC("content.form.locked", "(locked)"));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.form.locked_tip", "A type's {key} never changes: every player's game and the maps read its objects by it.\n"
+                                                                                       "A new type (New type like this...) chooses its own."),
+                                                          {{"key", key}})
+                                            .c_str());
+            }
         } else {
             std::string out;
             const bool sound = spec && spec->type == FieldType::Sound;
             const float side = image ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x
-                               : sound ? ImGui::CalcTextSize("Play").x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x
+                               : sound ? ImGui::CalcTextSize(NOX_TRC("content.common.play", "Play")).x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x
                                        : 0.0f;
             content::FieldSpec text;
             text.key = key;
@@ -566,7 +592,7 @@ bool RecordPanel::thingForm(const content::Record& r)
                 }
             }
             if (ImGui::IsItemHovered() && now != stock) {
-                ImGui::SetTooltip("The game's own: %s", stock.value_or("(none)").c_str());
+                ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.form.games_own", "The game's own: {value}"), {{"value", stock.value_or(NOX_TR("content.form.none", "(none)"))}}).c_str());
             }
             if (image && now) {
                 ImGui::SameLine();
@@ -577,7 +603,7 @@ bool RecordPanel::thingForm(const content::Record& r)
             }
             if (sound && now && !now->empty()) {
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Play")) {
+                if (ImGui::SmallButton(NOX_TRI("content.common.play", "Play"))) {
                     playSoundEvent(ws_, *now);
                 }
             }
@@ -590,20 +616,22 @@ bool RecordPanel::thingForm(const content::Record& r)
         ImGui::TableNextColumn();
         ImGui::AlignTextToFramePadding();
         if (spec && spec->readBy == content::ReadBy::Unknown) {
-            ImGui::TextDisabled("nothing");
-            ImGui::SetItemTooltip("%s", std::string(spec->docs).c_str());
+            ImGui::TextDisabled("%s", NOX_TRC("content.form.read_by_nothing", "nothing"));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                ImGui::SetTooltip("%s", nox::l10n::tr(spec->docs).c_str());
+            }
         } else if (spec) {
             const content::Reach reach = content::reachOf(*spec);
             ImGui::TextColored(reach == content::Reach::Structural ? theme.error : readByColour(spec->readBy), "%s",
-                               reach == content::Reach::Structural ? "both!" : content::readByLabel(spec->readBy));
+                               reach == content::Reach::Structural ? NOX_TRC("content.form.read_by_both_structural", "both!") : content::readByLabel(spec->readBy));
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s: %s", content::reachLabel(reach), content::reachDocs(reach));
             }
         } else {
-            ImGui::TextDisabled("nothing");
+            ImGui::TextDisabled("%s", NOX_TRC("content.form.read_by_nothing", "nothing"));
         }
         ImGui::TableNextColumn();
-        if (edit && ImGui::SmallButton("Revert")) {
+        if (edit && ImGui::SmallButton(NOX_TRI("content.changes.revert", "Revert"))) {
             for (std::size_t k = 0; k < pack.thingEdits().size(); ++k) {
                 if (&pack.thingEdits()[k] == edit) {
                     pack.revertThing(k);
@@ -611,12 +639,14 @@ bool RecordPanel::thingForm(const content::Record& r)
                 }
             }
         } else if (!edit && now && !nox::util::equalsNoCase(key, "DRAW") && !locked) {
-            if (ImGui::SmallButton("Remove")) {
+            if (ImGui::SmallButton(NOX_TRI("content.form.remove", "Remove"))) {
                 if (const std::string why = pack.removeThing(t.name, key); !why.empty()) {
                     ws_.session.error(why);
                 }
             }
-            ImGui::SetItemTooltip("Removes every %s line of this type", key.c_str());
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.form.remove_tip", "Removes every {key} line of this type"), {{"key", key}}).c_str());
+            }
         }
         ImGui::PopID();
     }
@@ -625,7 +655,7 @@ bool RecordPanel::thingForm(const content::Record& r)
     static char newKey[64] = {};
     static char newValue[256] = {};
     ImGui::SetNextItemWidth(ImGui::CalcTextSize("LIGHTINTENSITY__").x);
-    if (ImGui::BeginCombo("##newKey", newKey[0] ? newKey : "Add a line...")) {
+    if (ImGui::BeginCombo("##newKey", newKey[0] ? newKey : NOX_TRC("content.form.add_line", "Add a line..."))) {
         for (const auto& f : content::thingFields()) {
             if (std::ranges::any_of(keys, [&](const std::string& k) { return nox::util::equalsNoCase(k, f.key); }) || f.key == "DRAW" ||
                 ((f.key == "MENUICON" || nox::content::lockedThingKey(f.key)) && !fresh)) { // (saves keep only the types with one: never added; locked keys)
@@ -634,16 +664,18 @@ bool RecordPanel::thingForm(const content::Record& r)
             if (ImGui::Selectable(std::string(f.key).c_str())) {
                 std::snprintf(newKey, sizeof newKey, "%s", std::string(f.key).c_str());
             }
-            ImGui::SetItemTooltip("%s", std::string(f.docs).c_str());
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                ImGui::SetTooltip("%s", nox::l10n::tr(f.docs).c_str());
+            }
         }
         ImGui::EndCombo();
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Add").x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
-    const bool enter = ImGui::InputTextWithHint("##newValue", "value", newValue, sizeof newValue, ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::SetNextItemWidth(-ImGui::CalcTextSize(NOX_TRC("content.form.add", "Add")).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+    const bool enter = ImGui::InputTextWithHint("##newValue", NOX_TRC("content.form.value_hint", "value"), newValue, sizeof newValue, ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::BeginDisabled(!newKey[0]);
-    if (ImGui::Button("Add") || (enter && newKey[0])) {
+    if (ImGui::Button(NOX_TRI("content.form.add", "Add")) || (enter && newKey[0])) {
         if (const std::string why = pack.setThing(t.name, newKey, newValue); !why.empty()) {
             ws_.session.error(why); // (kept in the boxes, to be put right)
         } else {
@@ -656,25 +688,27 @@ bool RecordPanel::thingForm(const content::Record& r)
 }
 void RecordPanel::newThingPopup()
 {
-    if (!ImGui::BeginPopupModal("New type", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(NOX_TRI("content.form.new_type_title", "New type"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
     const auto& theme = noxsdl::editor::themeColours();
-    ImGui::Text("A new object type for this pack, made like %s: its lines, animation and pictures, which you then change.", newThingLike_.c_str());
-    ImGui::TextColored(theme.warning, "A pack that adds types changes the game's list of types, which games send each other by number:\n"
-                                      "a game hosted with it lets in only NoX Core games with the same pack. Stock players, and NoX Core\n"
-                                      "players without the pack, can't join it.");
+    ImGui::TextUnformatted(nox::l10n::format(NOX_TR("content.form.new_type_made_like", "A new object type for this pack, made like {name}: its lines, animation and pictures, which you then change."),
+                                             {{"name", newThingLike_}})
+                               .c_str());
+    ImGui::TextColored(theme.warning, "%s", NOX_TRC("content.form.new_type_warning", "A pack that adds types changes the game's list of types, which games send each other by number:\n"
+                                                                                     "a game hosted with it lets in only NoX Core games with the same pack. Stock players, and NoX Core\n"
+                                                                                     "players without the pack, can't join it."));
     ImGui::SetNextItemWidth(320 * ws_.session.scale());
     if (ImGui::IsWindowAppearing()) {
         ImGui::SetKeyboardFocusHere();
         newThingError_.clear();
     }
-    const bool enter = ImGui::InputText("Name", newThingName_, sizeof newThingName_, ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::TextDisabled("Letters, digits and '_', starting with a letter; a name no type has.");
+    const bool enter = ImGui::InputText(NOX_TRI("content.form.name", "Name"), newThingName_, sizeof newThingName_, ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::TextDisabled("%s", NOX_TRC("content.form.name_rule", "Letters, digits and '_', starting with a letter; a name no type has."));
     if (!newThingError_.empty()) {
         ImGui::TextColored(theme.error, "%s", newThingError_.c_str());
     }
-    if (ImGui::Button("Add") || enter) {
+    if (ImGui::Button(NOX_TRI("content.form.add", "Add")) || enter) {
         newThingError_ = ws_.pack.addThing(newThingName_, newThingLike_);
         if (newThingError_.empty()) {
             ws_.selectAfterSync = std::string(nox::util::trim(newThingName_)); // (listed, then selected, at the next frame's sync)
@@ -682,7 +716,7 @@ void RecordPanel::newThingPopup()
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
+    if (ImGui::Button(NOX_TRI("content.common.cancel", "Cancel"))) {
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
@@ -698,19 +732,21 @@ bool RecordPanel::stringForm(const content::Record& r)
     const auto* base = pack.baseStrings();
     const auto& theme = noxsdl::editor::themeColours();
     if (!work || !base) {
-        ImGui::TextColored(theme.error, "nox.csf didn't load.");
+        ImGui::TextColored(theme.error, "%s", NOX_TRC("content.form.csf_not_loaded", "nox.csf didn't load."));
         return true;
     }
     const nox::content::CsfEntry* stock = base->find(r.name);
     const nox::content::CsfEntry* now = work->find(r.name);
     const content::StringEdit* edit = pack.stringEditOf(r.name);
     if (!pack.packOpen()) {
-        ImGui::TextColored(theme.note, "Changes go into a content pack: pick one at the top (or make one) before you save.");
+        ImGui::TextColored(theme.note, "%s", NOX_TRC("content.form.pick_pack", "Changes go into a content pack: pick one at the top (or make one) before you save."));
     }
-    ImGui::TextDisabled("Texts the host sends as text (a map script's Print / PrintToAll / Chat, the server's messages) follow the host's pack, for\neveryone; the rest (menus, the HUD, names, lines sent by their label) come from each player's own game: only those who install the\npack see them.");
+    ImGui::TextDisabled("%s", NOX_TRC("content.form.strings_reach", "Texts the host sends as text (a map script's Print / PrintToAll / Chat, the server's messages) follow the host's pack, for\neveryone; the rest (menus, the HUD, names, lines sent by their label) come from each player's own game: only those who install the\npack see them."));
     if (!now) {
-        ImGui::TextDisabled("(removed by the pack; the game's own: %s)", stock && !stock->variants.empty() ? nox::strings::toUtf8(stock->variants.front().shown()).c_str() : "");
-        if (edit && ImGui::Button("Revert")) {
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.form.string_removed", "(removed by the pack; the game's own: {text})"),
+                                                  {{"text", stock && !stock->variants.empty() ? nox::strings::toUtf8(stock->variants.front().shown()) : std::string()}})
+                                    .c_str());
+        if (edit && ImGui::Button(NOX_TRI("content.changes.revert", "Revert"))) {
             pack.revertString(static_cast<std::size_t>(edit - pack.stringEdits().data()));
         }
         return true;
@@ -725,7 +761,8 @@ bool RecordPanel::stringForm(const content::Record& r)
     const float lineH = ImGui::GetTextLineHeightWithSpacing();
     for (std::size_t i = 0; i < texts.size(); ++i) {
         ImGui::PushID(int(i));
-        ImGui::SeparatorText(texts.size() == 1 ? "Text" : std::format("Variant {}", i + 1).c_str());
+        ImGui::SeparatorText(texts.size() == 1 ? NOX_TRC("content.label.text", "Text")
+                                               : nox::l10n::format(NOX_TR("content.label.variant_n", "Variant {n}"), {{"n", i + 1}}).c_str());
         std::string utf8 = nox::strings::toUtf8(texts[i]);
         char buf[4096];
         std::snprintf(buf, sizeof buf, "%s", utf8.c_str());
@@ -740,16 +777,19 @@ bool RecordPanel::stringForm(const content::Record& r)
             const std::size_t was = stock->variants[i].shown().size();
             const std::size_t is = texts[i].size();
             if (was > 0 && is > was + std::max<std::size_t>(8, was / 4)) {
-                ImGui::TextColored(theme.warning, "%zu characters, the game's own %zu: check that it fits where the game shows it.", is, was);
+                ImGui::TextColored(theme.warning, "%s",
+                                   nox::l10n::format(NOX_TR("content.form.text_longer", "{n} characters, the game's own {own}: check that it fits where the game shows it."),
+                                                     {{"n", is}, {"own", was}})
+                                       .c_str());
             }
         }
         if (i < now->variants.size() && now->variants[i].wide()) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("Speech file:");
+            ImGui::TextDisabled("%s", NOX_TRC("content.form.speech_file", "Speech file:"));
             ImGui::SameLine();
             ImGui::TextUnformatted(now->variants[i].speech.c_str());
         }
-        if (texts.size() > 1 && ImGui::SmallButton("Remove this variant")) {
+        if (texts.size() > 1 && ImGui::SmallButton(NOX_TRI("content.form.remove_variant", "Remove this variant"))) {
             texts.erase(texts.begin() + static_cast<std::ptrdiff_t>(i));
             changed = true;
             ImGui::PopID();
@@ -757,22 +797,22 @@ bool RecordPanel::stringForm(const content::Record& r)
         }
         ImGui::PopID();
     }
-    if (ImGui::Button("Add a variant")) {
+    if (ImGui::Button(NOX_TRI("content.form.add_variant", "Add a variant"))) {
         texts.push_back(u"");
         changed = true;
     }
     ImGui::SameLine();
-    if (edit && ImGui::Button("Revert")) {
+    if (edit && ImGui::Button(NOX_TRI("content.changes.revert", "Revert"))) {
         pack.revertString(static_cast<std::size_t>(edit - pack.stringEdits().data()));
         return true;
     }
     if (stock) {
         ImGui::SameLine();
-        if (ImGui::Button("Remove the label")) {
+        if (ImGui::Button(NOX_TRI("content.form.remove_label", "Remove the label"))) {
             pack.removeString(r.name);
             return true;
         }
-        ImGui::SetItemTooltip("The game then shows nothing (or the label's name) where it used it.");
+        ImGui::SetItemTooltip("%s", NOX_TRC("content.form.remove_label_tip", "The game then shows nothing (or the label's name) where it used it."));
     }
     if (changed) {
         if (const std::string why = pack.setStrings(r.name, std::move(texts), speech); !why.empty()) {
@@ -801,43 +841,52 @@ bool RecordPanel::soundForm(const content::Record& r)
         form(fields_, true);
     }
     // The game's own.
-    if (ImGui::Button("Play")) {
+    if (ImGui::Button(NOX_TRI("content.common.play", "Play"))) {
         if (sample) {
             playSample(ws_, r.name);
         } else if (const fs::path* p = recordFile(ws_.files, r.ref)) {
             playSoundFile(ws_, *p);
         }
     }
-    ImGui::SetItemTooltip("The game's own %s.", sample ? "sample, from Audio.bag" : "line, from the dialog folder");
-    ImGui::SeparatorText("In the content pack");
-    ImGui::TextDisabled("Played by the players' own games (client-visible): only those who install the pack hear it.");
+    ImGui::SetItemTooltip("%s", sample ? NOX_TRC("content.form.own_sample", "The game's own sample, from Audio.bag.")
+                                       : NOX_TRC("content.form.own_line", "The game's own line, from the dialog folder."));
+    ImGui::SeparatorText(NOX_TRI("content.form.in_pack", "In the content pack"));
+    ImGui::TextDisabled("%s", NOX_TRC("content.form.sound_reach", "Played by the players' own games (client-visible): only those who install the pack hear it."));
     if (edit) {
-        ImGui::TextColored(theme.highlightText, "Replaced by %s%s", utf8(edit->source).c_str(), edit->saved ? "" : " (copied in when the pack is saved)");
-        if (ImGui::Button("Play the pack's")) {
+        ImGui::TextColored(theme.highlightText, "%s",
+                           nox::l10n::format(edit->saved ? NOX_TR("content.form.replaced_by", "Replaced by {file}")
+                                                         : NOX_TR("content.form.replaced_by_unsaved", "Replaced by {file} (copied in when the pack is saved)"),
+                                             {{"file", utf8(edit->source)}})
+                               .c_str());
+        if (ImGui::Button(NOX_TRI("content.form.play_packs", "Play the pack's"))) {
             playSoundFile(ws_, edit->source);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Revert")) {
+        if (ImGui::Button(NOX_TRI("content.changes.revert", "Revert"))) {
             pack.revertSound(static_cast<std::size_t>(edit - pack.soundEdits().data()));
         }
         ImGui::SameLine();
     }
-    if (ImGui::Button(edit ? "Replace again..." : "Replace with a .wav...")) {
-        static constexpr SDL_DialogFileFilter kWav[] = {{"Wave sound", "wav"}};
+    if (ImGui::Button(edit ? NOX_TRI("content.form.replace_again", "Replace again...") : NOX_TRI("content.form.replace_wav", "Replace with a .wav..."))) {
+        static const SDL_DialogFileFilter kWav[] = {{NOX_TRC("content.form.wav_filter", "Wave sound"), "wav"}};
         soundTarget_ = {folder == content::SoundEdit::Audio, name};
         ws_.session.dialogs().request(kDialogReplaceSound, Dialogs::Open, ws_.session.window(), ws_.session.settings().extractDir, kWav, 1);
     }
-    ImGui::SetItemTooltip("The .wav goes into the pack's %s folder as %s.wav (PCM, IMA ADPCM or MP3 in a WAV; the original game's own\naudio folder plays only PCM ones properly).",
-                          sample ? "audio" : "dialog", name.c_str());
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.form.wav_tip", "The .wav goes into the pack's {folder} folder as {name}.wav (PCM, IMA ADPCM or MP3 in a WAV; the original game's own\naudio folder plays only PCM ones properly)."),
+                                                  {{"folder", sample ? "audio" : "dialog"}, {"name", name}})
+                                    .c_str());
+    }
     if (const auto picked = ws_.session.dialogs().take(kDialogReplaceSound); picked && soundTarget_) {
         const fs::path source = pathFromUtf8(*picked);
         try {
             const auto pcm = nox::audio::decodeFile(nox::readFileBytes(source)); // (one the game can't play isn't taken)
             pack.setSound(soundTarget_->first ? content::SoundEdit::Audio : content::SoundEdit::Dialog, soundTarget_->second, source);
-            ws_.session.setStatus(std::format("{}: {:.1f} s, {} Hz{}", source.filename().string(), double(pcm.frames()) / std::max(1u, pcm.rate), pcm.rate,
-                                              pcm.channels == 2 ? " stereo" : ""));
+            ws_.session.setStatus(nox::l10n::format(NOX_TR("content.form.wav_taken", "{file}: {seconds} s, {rate} Hz{stereo}"),
+                                                    {{"file", source.filename().string()}, {"seconds", std::format("{:.1f}", double(pcm.frames()) / std::max(1u, pcm.rate))},
+                                                     {"rate", pcm.rate}, {"stereo", pcm.channels == 2 ? NOX_TR("content.record.stereo", " stereo") : std::string()}}));
         } catch (const std::exception& ex) {
-            ws_.session.error(std::string("That file can't be played: ") + ex.what());
+            ws_.session.error(nox::l10n::format(NOX_TR("content.form.cant_play_file", "That file can't be played: {error}"), {{"error", ex.what()}}));
         }
         soundTarget_.reset();
     }

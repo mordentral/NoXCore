@@ -6,6 +6,7 @@
 #include "editor/theme_colours.hpp"
 
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <imgui.h>
@@ -62,7 +63,7 @@ void RecordPanel::textEditor(const fs::path& path)
             textOriginal_.assign(bytes.begin(), bytes.end());
         } catch (const std::exception& ex) {
             textOriginal_.clear();
-            ws_.session.setStatus(std::string("Can't read it: ") + ex.what());
+            ws_.session.setStatus(nox::l10n::format(NOX_TR("content.text_form.cant_read", "Can't read it: {error}"), {{"error", ex.what()}}));
         }
         textEdit_ = textOriginal_;
         textReport_ = content::checkText(textKind_, textEdit_, ws_.files, textFile_);
@@ -70,7 +71,7 @@ void RecordPanel::textEditor(const fs::path& path)
     }
     ImGui::TextDisabled("%s (%s)", utf8(*file).c_str(), content::textKindName(textKind_));
     ImGui::SameLine();
-    if (ImGui::SmallButton("Show in folder")) {
+    if (ImGui::SmallButton(NOX_TRI("content.common.show_in_folder", "Show in folder"))) {
         SDL_OpenURL(("file:///" + utf8(file->parent_path().generic_u8string())).c_str());
     }
 
@@ -90,18 +91,18 @@ void RecordPanel::textEditor(const fs::path& path)
     }
     const bool changed = textEdit_ != textOriginal_;
     if (changed) {
-        ImGui::TextColored(theme.highlightText, "Changed (not saved).");
+        ImGui::TextColored(theme.highlightText, "%s", NOX_TRC("content.text_form.changed", "Changed (not saved)."));
         ImGui::SameLine();
     }
-    if (ImGui::Button("Save as...")) {
-        static constexpr SDL_DialogFileFilter kAll[] = {{"Text", "txt;rul;wnd;json"}};
+    if (ImGui::Button(NOX_TRI("content.text_form.save_as", "Save as..."))) {
+        static const SDL_DialogFileFilter kAll[] = {{NOX_TRC("content.text_form.filter_text", "Text"), "txt;rul;wnd;json"}};
         const std::string start = ws_.session.settings().saveDir.empty() ? std::string() : ws_.session.settings().saveDir + "/" + utf8(file->filename());
         ws_.session.dialogs().request(kDialogSaveText, Dialogs::Save, ws_.session.window(), start, kAll, 1);
     }
-    ImGui::SetItemTooltip("Writes a new file (never over this one, never into the game's folder). To use it, put it in a copy of the game.");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.text_form.save_as_tip", "Writes a new file (never over this one, never into the game's folder). To use it, put it in a copy of the game."));
     if (changed) {
         ImGui::SameLine();
-        if (ImGui::Button("Revert")) {
+        if (ImGui::Button(NOX_TRI("content.text_form.revert", "Revert"))) {
             textEdit_ = textOriginal_;
             textStale_ = true;
             textEditedAt_ = 0;
@@ -110,20 +111,21 @@ void RecordPanel::textEditor(const fs::path& path)
     if (const auto picked = ws_.session.dialogs().take(kDialogSaveText)) {
         const fs::path target = pathFromUtf8(*picked);
         if (const std::string why = content::checkSaveOutsideGame(target, *file, ws_.session.gameDir()); !why.empty()) {
-            ws_.session.error("Not there: " + why);
+            ws_.session.error(nox::l10n::format(NOX_TR("content.common.not_there", "Not there: {why}"), {{"why", why}}));
         } else {
             const auto save = [this, target] {
                 try {
                     nox::writeFileBytes(target, std::vector<std::uint8_t>(textEdit_.begin(), textEdit_.end()));
                     ws_.session.settings().saveDir = utf8(target.parent_path());
-                    ws_.session.setStatus("Saved " + utf8(target), target.parent_path());
+                    ws_.session.setStatus(nox::l10n::format(NOX_TR("content.common.saved_file", "Saved {file}"), {{"file", utf8(target)}}), target.parent_path());
                 } catch (const std::exception& ex) {
-                    ws_.session.error(std::string("Couldn't save it: ") + ex.what());
+                    ws_.session.error(nox::l10n::format(NOX_TR("content.common.cant_save", "Couldn't save it: {error}"), {{"error", ex.what()}}));
                 }
             };
             std::error_code ec;
             if (fs::exists(target, ec)) {
-                ws_.session.confirm("Replace it?", utf8(target) + " is there already. Replace it?", save);
+                ws_.session.confirm(NOX_TR("content.common.replace_title", "Replace it?"),
+                                    nox::l10n::format(NOX_TR("content.common.replace_ask", "{file} is there already. Replace it?"), {{"file", utf8(target)}}), save);
             } else {
                 save();
             }
@@ -132,13 +134,13 @@ void RecordPanel::textEditor(const fs::path& path)
     if (!checked) {
         return;
     }
-    ImGui::SeparatorText("What the game reads");
+    ImGui::SeparatorText(NOX_TRI("content.text_form.what_game_reads", "What the game reads"));
     if (ImGui::BeginChild("report", ImVec2(0, 0))) {
         for (const auto& p : textReport_.problems) {
             ImGui::TextColored(theme.warning, "%s", p.c_str());
         }
         if (textReport_.problems.empty()) {
-            ImGui::TextDisabled("Nothing it would drop or misread.");
+            ImGui::TextDisabled("%s", NOX_TRC("content.text_form.nothing_wrong", "Nothing it would drop or misread."));
         }
         if (!textReport_.facts.empty() && ImGui::BeginTable("facts", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
             ImGui::TableSetupColumn("what", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("[KING OF THE REALM]__").x);

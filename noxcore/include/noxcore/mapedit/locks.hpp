@@ -56,8 +56,10 @@ struct ElementKey {
     static ElementKey group(std::uint32_t key) { return {Kind::Group, static_cast<std::int32_t>(key), 0, {}}; }
     static ElementKey mapInfo() { return {Kind::MapInfo, 0, 0, {}}; }
     static ElementKey script() { return {Kind::ScriptFunction, 0, 0, "*"}; } ///< the whole script
-    /// "object 12", "wall 30,40"... for messages.
+    /// "object 12", "wall 30,40"... for messages: English (the edit server sends it to editors).
     std::string text() const;
+    /// The same in the player's language, for this editor's own UI.
+    std::string shownText() const;
 };
 
 /// The elements a selection locks: its objects with their inventories, walls, tiles, waypoints.

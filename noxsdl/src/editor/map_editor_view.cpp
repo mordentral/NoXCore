@@ -20,6 +20,7 @@
 #include "noxcore/mapedit/markers.hpp"
 #include "noxcore/mapedit/placement.hpp"
 #include "noxcore/mapedit/writer.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <imgui.h>
@@ -138,7 +139,7 @@ bool MapEditor::cancelDrags()
     markers_->cancelDrag();
     props_->cancelGizmo();
     endPreview();
-    status("Drag cancelled");
+    status(NOX_TR("editor.status.drag_cancelled", "Drag cancelled"));
     return true;
 }
 
@@ -193,7 +194,7 @@ void MapEditor::rebuildView()
             prefetchImages(file);
         }
     } catch (const std::exception& ex) {
-        status(std::string("The map can't be drawn: ") + ex.what());
+        status(nox::l10n::format(NOX_TR("editor.status.cant_draw", "The map can't be drawn: {error}"), {{"error", ex.what()}}));
     }
     if (view_ && !cameraSet_) {
         cameraSet_ = true;
@@ -321,11 +322,11 @@ void MapEditor::mapPanel()
     ImGuiWindowClass mapClass;
     mapClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoUndocking | static_cast<ImGuiDockNodeFlags>(ImGuiDockNodeFlags_NoDockingOverMe);
     ImGui::SetNextWindowClass(&mapClass);
-    if (const ImGuiWindow* w = ImGui::FindWindowByName("Map"); !w || w->DockId == 0) {
+    if (const ImGuiWindow* w = ImGui::FindWindowByName(NOX_TRI("editor.window.map", "Map")); !w || w->DockId == 0) {
         ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
     }
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    const bool open = ImGui::Begin("Map", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    const bool open = ImGui::Begin(NOX_TRI("editor.window.map", "Map"), nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PopStyleVar();
     if (!open) {
         panelW_ = panelH_ = 0;
@@ -360,7 +361,7 @@ void MapEditor::mapPanel()
     if (follow_) {
         const auto it = std::ranges::find_if(live_, [&](const LiveEntity& e) { return e.player && e.id == *follow_; });
         if (it != live_.end()) {
-            const std::string text = "Following " + it->name + "  (pan or Escape stops)";
+            const std::string text = nox::l10n::format(NOX_TR("editor.view.following", "Following {name}  (pan or Escape stops)"), {{"name", it->name}});
             dl->AddRectFilled(ImVec2(origin.x + 8, origin.y + size.y - 28), ImVec2(origin.x + 16 + ImGui::CalcTextSize(text.c_str()).x, origin.y + size.y - 8),
                               IM_COL32(0, 0, 0, 170), 3);
             dl->AddText(ImVec2(origin.x + 12, origin.y + size.y - 26), IM_COL32(255, 220, 90, 255), text.c_str());
@@ -372,7 +373,7 @@ void MapEditor::mapPanel()
             const me::Selection under = me::pickAt(doc_, w->x, w->y, clickRadius(), pickFilter());
             for (const auto& k : me::elementsOf(doc_, under)) {
                 if (const auto h = otherHolder(k)) {
-                    ImGui::SetTooltip("being edited by %s", peerName(*h).c_str());
+                    ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("editor.view.held_tip", "being edited by {who}"), {{"who", peerName(*h)}}).c_str());
                 }
             }
         }
@@ -482,7 +483,7 @@ void MapEditor::mapInput(const ImVec2& origin, bool hovered)
             std::size_t skipped = 0;
             const me::Selection pick = me::withoutLocked(doc_, me::pickAt(doc_, w.x, w.y, clickRadius(), pickFilter()), locks_, self_, &skipped);
             if (skipped > 0) {
-                status("Being edited by another editor");
+                status(NOX_TR("editor.status.held_other", "Being edited by another editor"));
             }
             dragPick_ = pick;
             if (!pick.empty() && dragMods_ == 0) {
@@ -575,13 +576,17 @@ void MapEditor::mapInput(const ImVec2& origin, bool hovered)
             const me::Clip clip = me::copySelection(doc_, s, settings_.copyLayers);
             const std::size_t n = clip.walls.size() + clip.tiles.size() + clip.objects.size() + clip.waypoints.size();
             if (n == 0) {
-                status("Copy area: nothing of the ticked layers in it");
+                status(NOX_TR("editor.status.copy_area_empty", "Copy area: nothing of the ticked layers in it"));
             } else {
                 clip_ = clip;
                 SDL_SetClipboardText(me::clipToText(clip, things_).c_str());
-                status("Copied an area: " + std::to_string(clip.walls.size()) + " walls, " + std::to_string(clip.tiles.size()) + " tiles, " +
-                       std::to_string(clip.objects.size()) + " objects, " + std::to_string(clip.waypoints.size()) + " waypoints" +
-                       (skipped ? " (" + std::to_string(skipped) + " skipped: being edited by others)" : ""));
+                std::string text = nox::l10n::format(NOX_TR("editor.status.copied_area", "Copied an area: {walls} walls, {tiles} tiles, {objects} objects, {waypoints} waypoints"),
+                                                     {{"walls", clip.walls.size()},
+                                                      {"tiles", clip.tiles.size()},
+                                                      {"objects", clip.objects.size()},
+                                                      {"waypoints", clip.waypoints.size()}});
+                if (skipped) text += " " + nox::l10n::format(NOX_TR("editor.status.copied_area_skipped", "({n} skipped: being edited by others)"), {{"n", skipped}});
+                status(std::move(text));
             }
         } else if (was == Drag::Move) {
             endPreview(); // (the document as it was: the drag's one op from it)
@@ -605,7 +610,7 @@ void MapEditor::mapContextMenu()
     }
     menuItem("edit.cut");
     menuItem("edit.copy");
-    if (ImGui::MenuItem("Paste Here", commands_.shortcut("edit.paste").text().c_str())) {
+    if (ImGui::MenuItem(NOX_TRI("editor.view.paste_here", "Paste Here"), commands_.shortcut("edit.paste").text().c_str())) {
         paste(me::wallCellAt(contextAt_.x, contextAt_.y));
     }
     menuItem("edit.duplicate");
@@ -614,18 +619,18 @@ void MapEditor::mapContextMenu()
     menuItem("select.sameType");
     menuItem("view.frame");
     ImGui::Separator();
-    if (ImGui::MenuItem("Copy Coordinates Here")) {
+    if (ImGui::MenuItem(NOX_TRI("editor.view.copy_coords_here", "Copy Coordinates Here"))) {
         char text[64];
         std::snprintf(text, sizeof text, "%.1f, %.1f", contextAt_.x, contextAt_.y);
         SDL_SetClipboardText(text);
-        status(std::string("Copied ") + text);
+        status(nox::l10n::format(NOX_TR("editor.status.copied_text", "Copied {text}"), {{"text", text}}));
     }
     menuItem("edit.copyExtents");
     menuItem("edit.copyWaypoints");
     if (ctx_.playTest.available()) {
         ImGui::Separator();
         // Jump in at the cursor: the play-test from the point clicked (or a running one's player put there).
-        if (ImGui::MenuItem("Play From Here", commands_.shortcut("play.here").text().c_str())) {
+        if (ImGui::MenuItem(NOX_TRI("editor.view.play_from_here", "Play From Here"), commands_.shortcut("play.here").text().c_str())) {
             scriptPanel_->playFrom(SDL_FPoint{contextAt_.x, contextAt_.y});
         }
     }
@@ -885,7 +890,7 @@ void MapEditor::drawOverlays(ImDrawList* dl, const ImVec2& origin, const ImVec2&
         }
     }
     if (areaCopyArmed_ && drag_ == Drag::None) {
-        dl->AddText(ImVec2(origin.x + 10, origin.y + 10), col(120, 220, 255), "Copy area: drag a box (Escape cancels)");
+        dl->AddText(ImVec2(origin.x + 10, origin.y + 10), col(120, 220, 255), NOX_TRC("editor.view.copy_area_hint", "Copy area: drag a box (Escape cancels)"));
     }
     drawToolOverlay(dl, origin);
     props_->drawOverlay(dl, origin); // (the link lines, the gizmos)
@@ -1061,8 +1066,8 @@ void MapEditor::drawLive(ImDrawList* dl, const ImVec2& origin)
             // they're doing (a parked editor observes: "editing" / "idle" says why).
             const auto* ed = session_ ? session_->editorByNetCode(e.id) : nullptr;
             const char* doing = ed ? editor::activityText(ed->activity) : nullptr;
-            const std::string label = e.name + (ed ? std::string("  (") + doing + ")" : e.observer ? "  (observing)" : "") +
-                                      (e.stockClient ? "  [stock]" : "  [NoX Core]");
+            const std::string label = e.name + (ed ? std::string("  (") + doing + ")" : e.observer ? "  " + NOX_TR("editor.view.observing", "(observing)") : std::string()) +
+                                      "  " + (e.stockClient ? NOX_TR("editor.view.client_stock", "[stock]") : NOX_TR("editor.view.client_noxcore", "[NoX Core]"));
             const ImVec2 sz = ImGui::CalcTextSize(label.c_str());
             const float pencil = ed ? std::round(sz.y * 1.3f) : 0;
             const float lx = (sprite ? p.x - (sz.x + pencil) / 2 : p.x + 9) + pencil;
@@ -1108,7 +1113,7 @@ bool MapEditor::pickInput(const me::WorldPoint& w, bool hovered)
         if (pick_->kind == PickRequest::Kind::Point && pick_->snap) r.at = {snapValue(w.x), snapValue(w.y)};
         r.shift = ImGui::GetIO().KeyShift;
         if (!found) {
-            status("Nothing of that kind there: " + pick_->prompt);
+            status(nox::l10n::format(NOX_TR("editor.status.pick_nothing", "Nothing of that kind there: {prompt}"), {{"prompt", pick_->prompt}}));
             return true;
         }
         PickRequest req = *pick_;
@@ -1123,8 +1128,7 @@ void MapEditor::drawPick(ImDrawList* dl, const ImVec2& origin)
     if (!pick_) return;
     const float z = camera_.zoom;
     const auto S = [&](float x, float y) { return ImVec2(origin.x + (x - camera_.left()) * z, origin.y + (y - camera_.top()) * z); };
-    const char* hint = "  (right click or Escape cancels)";
-    const std::string text = pick_->prompt + hint;
+    const std::string text = nox::l10n::format(NOX_TR("editor.view.pick_hint", "{prompt}  (right click or Escape cancels)"), {{"prompt", pick_->prompt}});
     const ImVec2 sz = ImGui::CalcTextSize(text.c_str());
     dl->AddRectFilled(ImVec2(origin.x + 6, origin.y + 6), ImVec2(origin.x + 14 + sz.x, origin.y + 10 + sz.y), col(20, 30, 50, 220), 4);
     dl->AddText(ImVec2(origin.x + 10, origin.y + 8), col(140, 220, 255), text.c_str());
@@ -1166,8 +1170,9 @@ std::string MapEditor::underCursor(float x, float y) const
     const me::Selection p = me::pickAt(doc_, x, y, r, me::KindFilter{.objects = true, .walls = false, .tiles = false, .waypoints = true});
     for (const auto id : p.waypoints) {
         const auto it = std::ranges::find(doc_.waypoints.waypoints, id, &nox::map::Waypoint::id);
-        add("waypoint " + std::to_string(id) + (it->name.empty() ? "" : " \"" + it->name + "\"") + ((it->flags & 1) ? "" : " (off)") + ", " +
-            std::to_string(it->links.size()) + " links");
+        add(nox::l10n::format(NOX_TR("editor.status.under_waypoint", "waypoint {id}"), {{"id", id}}) + (it->name.empty() ? "" : " \"" + it->name + "\"") +
+            ((it->flags & 1) ? std::string() : " " + NOX_TR("editor.status.under_off", "(off)")) + ", " +
+            nox::l10n::format(NOX_TR("editor.status.under_links", "{n} links"), {{"n", it->links.size()}}));
     }
     for (const ObjId id : p.objects) {
         const auto& o = doc_.objects.at(id);
@@ -1178,20 +1183,23 @@ std::string MapEditor::underCursor(float x, float y) const
     if (const auto c = me::wallCellAt(x, y)) {
         if (const auto st = me::wallState(doc_, *c)) {
             const auto& w = st->wall;
-            std::string s = "wall " + (w.material < things_.walls.size() ? things_.walls[w.material].name : std::to_string(w.material)) +
-                            " dir " + std::to_string(w.direction & 0x7F) + " var " + std::to_string(w.variant);
-            if (st->secret) s += " secret";
-            if (st->destructible) s += " breakable";
-            if (st->window) s += " window";
+            std::string s = nox::l10n::format(NOX_TR("editor.status.under_wall", "wall {material} dir {direction} var {variant}"),
+                                              {{"material", w.material < things_.walls.size() ? things_.walls[w.material].name : std::to_string(w.material)},
+                                               {"direction", w.direction & 0x7F},
+                                               {"variant", static_cast<int>(w.variant)}});
+            if (st->secret) s += " " + NOX_TR("editor.status.under_secret", "secret");
+            if (st->destructible) s += " " + NOX_TR("editor.status.under_breakable", "breakable");
+            if (st->window) s += " " + NOX_TR("editor.status.under_window", "window");
             add(s);
         }
     }
     if (const auto t = me::tileAt(x, y)) {
         if (const auto* tile = doc_.floor.tile(t->gx, t->gy)) {
-            std::string s = "floor " + (tile->image < things_.floors.size() ? things_.floors[tile->image].name : std::to_string(tile->image)) +
-                            " var " + std::to_string(tile->variant);
+            std::string s = nox::l10n::format(NOX_TR("editor.status.under_floor", "floor {name} var {variant}"),
+                                              {{"name", tile->image < things_.floors.size() ? things_.floors[tile->image].name : std::to_string(tile->image)},
+                                               {"variant", static_cast<int>(tile->variant)}});
             if (!tile->edges.empty()) {
-                s += ", edges:";
+                s += ", " + NOX_TR("editor.status.under_edges", "edges:");
                 for (const auto& e : tile->edges) {
                     s += " " + (e.edge < things_.edges.size() ? things_.edges[e.edge].name : std::to_string(e.edge)) + "/" + std::to_string(e.direction);
                 }

@@ -9,6 +9,7 @@
 #include "noxcore/server/script_names.hpp"
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/spells.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
@@ -123,10 +124,10 @@ const std::map<std::pair<std::uint32_t, std::size_t>, ValueSetId>& paramIndex()
 std::string effectNote(server::EffectKind kind)
 {
     switch (kind) {
-    case server::EffectKind::Point: return "point at (x1, y1)";
-    case server::EffectKind::Ray: return "ray from (x1, y1) to (x2, y2)";
-    case server::EffectKind::Burst: return "burst at (x1, y1); x2 its size";
-    case server::EffectKind::Quake: return "screen shake round (x1, y1); x2 its strength";
+    case server::EffectKind::Point: return NOX_TR("editor.script.args.effect_point", "point at (x1, y1)");
+    case server::EffectKind::Ray: return NOX_TR("editor.script.args.effect_ray", "ray from (x1, y1) to (x2, y2)");
+    case server::EffectKind::Burst: return NOX_TR("editor.script.args.effect_burst", "burst at (x1, y1); x2 its size");
+    case server::EffectKind::Quake: return NOX_TR("editor.script.args.effect_quake", "screen shake round (x1, y1); x2 its strength");
     case server::EffectKind::None: break;
     }
     return {};
@@ -150,8 +151,8 @@ ValueSet effectSet()
         if (e.kind != server::EffectKind::None) {
             values.push_back({std::string(e.name), effectNote(e.kind), -1});
         } else {
-            inert.emplace_back(std::string(e.name), e.op == 0x98 ? "the original sends it from leftover coordinates (OB-055); NoX Core sends nothing"
-                                                                 : "it is in the game's list of effects, but Effect doesn't send it");
+            inert.emplace_back(std::string(e.name), e.op == 0x98 ? NOX_TR("editor.script.args.effect_leftover", "the original sends it from leftover coordinates (OB-055); NoX Core sends nothing")
+                                                                 : NOX_TR("editor.script.args.effect_not_sent", "it is in the game's list of effects, but Effect doesn't send it"));
         }
     }
     ValueSet s(ValueSetId::Effect, ValueMatch::NoCase, std::move(values));
@@ -173,10 +174,13 @@ ValueSet soundSet(const ArgValueSources& src)
         if (name.empty()) {
             continue;
         }
-        std::string note = "sound " + std::to_string(id);
+        std::string note;
         if (table) {
             const server::SoundInfo& info = (*table)[id];
-            note += info.files <= 0 ? ", no sound files: plays nothing" : ", heard to " + std::to_string(info.range) + " units";
+            note = info.files <= 0 ? l10n::format(NOX_TR("editor.script.args.sound_silent", "sound {id}, no sound files: plays nothing"), {{"id", id}})
+                                   : l10n::format(NOX_TR("editor.script.args.sound_range", "sound {id}, heard to {range} units"), {{"id", id}, {"range", info.range}});
+        } else {
+            note = l10n::format(NOX_TR("editor.script.args.sound", "sound {id}"), {{"id", id}});
         }
         values.push_back({std::string(name), std::move(note), -1});
     }
@@ -194,7 +198,7 @@ ValueSet spellSet(const ArgValueSources& src, bool trap)
         values.push_back({std::string(name), spellTitle(src, id), -1});
     }
     if (trap) {
-        values.push_back({"NULL", "an empty slot", -1});
+        values.push_back({"NULL", NOX_TR("editor.script.args.empty_slot", "an empty slot"), -1});
     }
     return {trap ? ValueSetId::TrapSpell : ValueSetId::Spell, ValueMatch::Exact, std::move(values)};
 }
@@ -206,9 +210,9 @@ ValueSet enchantSet(const ArgValueSources& src)
         std::string note;
         if (const std::uint32_t spell = server::enchantmentSpell(e)) {
             const std::string title = spellTitle(src, spell);
-            note = "from " + (title.empty() ? std::string(things::spellName(spell)) : title);
+            note = l10n::format(NOX_TR("editor.script.args.enchant_from", "from {spell}"), {{"spell", title.empty() ? std::string(things::spellName(spell)) : title}});
         } else {
-            note = "no spell gives it";
+            note = NOX_TR("editor.script.args.enchant_no_spell", "no spell gives it");
         }
         values.push_back({std::string(server::kEnchantNames[e]), std::move(note), -1});
     }
@@ -219,10 +223,13 @@ ValueSet classSet(const mapedit::ContentCatalog* catalog)
 {
     std::vector<ArgValue> values;
     for (int bit = 0; bit < 32; ++bit) {
-        std::string note = "class bit " + std::to_string(bit);
+        std::string note;
         if (catalog) {
             const auto n = std::ranges::count_if(catalog->entries, [&](const mapedit::ContentEntry& e) { return (e.classes >> bit) & 1u; });
-            note += ", " + std::to_string(n) + (n == 1 ? " thing type" : " thing types");
+            note = l10n::format(NOX_TRP("editor.script.args.class_bit_types", "class bit {bit}, {n} thing type", "class bit {bit}, {n} thing types", n),
+                                {{"bit", bit}, {"n", n}});
+        } else {
+            note = l10n::format(NOX_TR("editor.script.args.class_bit", "class bit {bit}"), {{"bit", bit}});
         }
         values.push_back({std::string(server::kScriptClassNames[bit]), std::move(note), -1});
     }
@@ -236,7 +243,7 @@ ValueSet subclassSet()
     for (const server::ScriptSubclassTable& t : server::scriptSubclassTables()) {
         for (std::size_t bit = 0; bit < t.names.size(); ++bit) {
             if (seen.insert(t.names[bit]).second) { // (HasSubclass takes the first table naming it)
-                values.push_back({std::string(t.names[bit]), std::string(t.what) + " subclass, bit " + std::to_string(bit), -1});
+                values.push_back({std::string(t.names[bit]), l10n::format(NOX_TR("editor.script.args.subclass_bit", "{what} subclass, bit {bit}"), {{"what", t.what}, {"bit", bit}}), -1});
             }
         }
     }
@@ -285,9 +292,9 @@ ValueSet textSet(const strings::StringTable& table, bool journal)
             continue;
         }
         std::string text = e.variants.empty() ? std::string() : strings::toUtf8(e.variants.front().text);
-        std::string note = text.empty() ? std::string("(empty text)") : firstLine(text);
+        std::string note = text.empty() ? NOX_TR("editor.script.args.empty_text", "(empty text)") : firstLine(text);
         if (e.variants.size() > 1) {
-            note += "  (" + std::to_string(e.variants.size()) + " variants)";
+            note += "  " + l10n::format(NOX_TR("editor.script.args.variants", "({n} variants)"), {{"n", e.variants.size()}});
         }
         values.push_back({std::string(label), std::move(note), -1});
     }
@@ -308,7 +315,7 @@ ValueSet portraitSet(const things::ThingDb& things)
         if (!portrait(d.name) || !seen.insert(d.name).second) {
             continue;
         }
-        values.push_back({d.name, d.animation ? "animated portrait" : "portrait", -1});
+        values.push_back({d.name, d.animation ? NOX_TR("editor.script.args.portrait_animated", "animated portrait") : NOX_TR("editor.script.args.portrait", "portrait"), -1});
     }
     return {ValueSetId::Portrait, ValueMatch::Exact, std::move(values)};
 }
@@ -320,27 +327,27 @@ std::string problem(const ValueSet& set, std::string_view lit)
     switch (set.id()) {
     case ValueSetId::Effect:
         if (const std::string* why = set.inertReason(lit)) {
-            return "Effect doesn't send " + l + ", so nothing shows (" + *why + ")";
+            return l10n::format(NOX_TR("editor.script.args.problem_effect_inert", "Effect doesn't send {name}, so nothing shows ({why})"), {{"name", l}, {"why", *why}});
         }
-        return "no effect is named " + l + ", so nothing shows";
-    case ValueSetId::Sound: return "no sound is named " + l + ", so nothing plays";
-    case ValueSetId::ThingType: return "no thing type is named " + l + " (case counts), so nothing is made";
-    case ValueSetId::Spell: return "no spell is named " + l + " (case counts), so nothing happens";
-    case ValueSetId::TrapSpell: return "no spell is named " + l + " (case counts): the slot stays empty";
-    case ValueSetId::Enchant: return "no enchantment is named " + l + " (case counts), so nothing happens";
-    case ValueSetId::ObjectClass: return "no class is named " + l + " (case counts): HasClass then returns nothing at all (an original bug)";
-    case ValueSetId::Subclass: return "no subclass is named " + l + " (case counts): HasSubclass then returns nothing at all (an original bug)";
-    case ValueSetId::DialogType: return "no dialog type is named " + l + " (case counts): it counts as NORMAL";
-    case ValueSetId::TextKey: return "the string table (nox.csf) has no text named " + l + ": the game shows MISSING:'" + l + "' instead";
-    case ValueSetId::JournalEntry: return "the string table (nox.csf) has no journal text Journal:" + l + ": the entry shows as missing text";
-    case ValueSetId::Portrait: return "no portrait image is named " + l + " (case counts): the dialog shows no picture";
-    case ValueSetId::ObjectName: return "no object on the map is named " + l;
-    case ValueSetId::WaypointName: return "no waypoint on the map is named " + l;
-    case ValueSetId::ObjectGroup: return "no object group on the map is named " + l;
-    case ValueSetId::WaypointGroup: return "no waypoint group on the map is named " + l;
-    case ValueSetId::WallGroup: return "no wall group on the map is named " + l;
+        return l10n::format(NOX_TR("editor.script.args.problem_effect", "no effect is named {name}, so nothing shows"), {{"name", l}});
+    case ValueSetId::Sound: return l10n::format(NOX_TR("editor.script.args.problem_sound", "no sound is named {name}, so nothing plays"), {{"name", l}});
+    case ValueSetId::ThingType: return l10n::format(NOX_TR("editor.script.args.problem_thing", "no thing type is named {name} (case counts), so nothing is made"), {{"name", l}});
+    case ValueSetId::Spell: return l10n::format(NOX_TR("editor.script.args.problem_spell", "no spell is named {name} (case counts), so nothing happens"), {{"name", l}});
+    case ValueSetId::TrapSpell: return l10n::format(NOX_TR("editor.script.args.problem_trap_spell", "no spell is named {name} (case counts): the slot stays empty"), {{"name", l}});
+    case ValueSetId::Enchant: return l10n::format(NOX_TR("editor.script.args.problem_enchant", "no enchantment is named {name} (case counts), so nothing happens"), {{"name", l}});
+    case ValueSetId::ObjectClass: return l10n::format(NOX_TR("editor.script.args.problem_class", "no class is named {name} (case counts): HasClass then returns nothing at all (an original bug)"), {{"name", l}});
+    case ValueSetId::Subclass: return l10n::format(NOX_TR("editor.script.args.problem_subclass", "no subclass is named {name} (case counts): HasSubclass then returns nothing at all (an original bug)"), {{"name", l}});
+    case ValueSetId::DialogType: return l10n::format(NOX_TR("editor.script.args.problem_dialog", "no dialog type is named {name} (case counts): it counts as NORMAL"), {{"name", l}});
+    case ValueSetId::TextKey: return l10n::format(NOX_TR("editor.script.args.problem_text", "the string table (nox.csf) has no text named {name}: the game shows MISSING:'{name}' instead"), {{"name", l}});
+    case ValueSetId::JournalEntry: return l10n::format(NOX_TR("editor.script.args.problem_journal", "the string table (nox.csf) has no journal text Journal:{name}: the entry shows as missing text"), {{"name", l}});
+    case ValueSetId::Portrait: return l10n::format(NOX_TR("editor.script.args.problem_portrait", "no portrait image is named {name} (case counts): the dialog shows no picture"), {{"name", l}});
+    case ValueSetId::ObjectName: return l10n::format(NOX_TR("editor.script.args.problem_object", "no object on the map is named {name}"), {{"name", l}});
+    case ValueSetId::WaypointName: return l10n::format(NOX_TR("editor.script.args.problem_waypoint", "no waypoint on the map is named {name}"), {{"name", l}});
+    case ValueSetId::ObjectGroup: return l10n::format(NOX_TR("editor.script.args.problem_object_group", "no object group on the map is named {name}"), {{"name", l}});
+    case ValueSetId::WaypointGroup: return l10n::format(NOX_TR("editor.script.args.problem_waypoint_group", "no waypoint group on the map is named {name}"), {{"name", l}});
+    case ValueSetId::WallGroup: return l10n::format(NOX_TR("editor.script.args.problem_wall_group", "no wall group on the map is named {name}"), {{"name", l}});
     }
-    return "not a known value";
+    return NOX_TR("editor.script.args.problem_unknown", "not a known value");
 }
 
 bool identStart(char c)
@@ -360,49 +367,49 @@ bool identChar(char c)
 std::string_view valueSetName(ValueSetId id)
 {
     switch (id) {
-    case ValueSetId::Effect: return "effect";
-    case ValueSetId::Sound: return "sound";
-    case ValueSetId::ThingType: return "thing type";
-    case ValueSetId::Spell: return "spell";
-    case ValueSetId::TrapSpell: return "spell";
-    case ValueSetId::Enchant: return "enchantment";
-    case ValueSetId::ObjectClass: return "class";
-    case ValueSetId::Subclass: return "subclass";
-    case ValueSetId::DialogType: return "dialog type";
-    case ValueSetId::TextKey: return "text key";
-    case ValueSetId::JournalEntry: return "journal entry";
-    case ValueSetId::Portrait: return "portrait";
-    case ValueSetId::ObjectName: return "object";
-    case ValueSetId::WaypointName: return "waypoint";
-    case ValueSetId::ObjectGroup: return "object group";
-    case ValueSetId::WaypointGroup: return "waypoint group";
-    case ValueSetId::WallGroup: return "wall group";
+    case ValueSetId::Effect: return NOX_TR("editor.script.args.set_name.effect", "effect");
+    case ValueSetId::Sound: return NOX_TR("editor.script.args.set_name.sound", "sound");
+    case ValueSetId::ThingType: return NOX_TR("editor.script.args.set_name.thing_type", "thing type");
+    case ValueSetId::Spell: return NOX_TR("editor.script.args.set_name.spell", "spell");
+    case ValueSetId::TrapSpell: return NOX_TR("editor.script.args.set_name.trap_spell", "spell");
+    case ValueSetId::Enchant: return NOX_TR("editor.script.args.set_name.enchant", "enchantment");
+    case ValueSetId::ObjectClass: return NOX_TR("editor.script.args.set_name.class", "class");
+    case ValueSetId::Subclass: return NOX_TR("editor.script.args.set_name.subclass", "subclass");
+    case ValueSetId::DialogType: return NOX_TR("editor.script.args.set_name.dialog_type", "dialog type");
+    case ValueSetId::TextKey: return NOX_TR("editor.script.args.set_name.text_key", "text key");
+    case ValueSetId::JournalEntry: return NOX_TR("editor.script.args.set_name.journal_entry", "journal entry");
+    case ValueSetId::Portrait: return NOX_TR("editor.script.args.set_name.portrait", "portrait");
+    case ValueSetId::ObjectName: return NOX_TR("editor.script.args.set_name.object", "object");
+    case ValueSetId::WaypointName: return NOX_TR("editor.script.args.set_name.waypoint", "waypoint");
+    case ValueSetId::ObjectGroup: return NOX_TR("editor.script.args.set_name.object_group", "object group");
+    case ValueSetId::WaypointGroup: return NOX_TR("editor.script.args.set_name.waypoint_group", "waypoint group");
+    case ValueSetId::WallGroup: return NOX_TR("editor.script.args.set_name.wall_group", "wall group");
     }
-    return "value";
+    return NOX_TR("editor.script.args.set_name.value", "value");
 }
 
 std::string_view valueSetTitle(ValueSetId id)
 {
     switch (id) {
-    case ValueSetId::Effect: return "Effect names (the ones Effect sends)";
-    case ValueSetId::Sound: return "Sound names (the game's sound table)";
-    case ValueSetId::ThingType: return "Thing types (thing.bin)";
-    case ValueSetId::Spell: return "Spell names";
-    case ValueSetId::TrapSpell: return "Spell names, or NULL for an empty slot";
-    case ValueSetId::Enchant: return "Enchantment names";
-    case ValueSetId::ObjectClass: return "Class names (HasClass's table)";
-    case ValueSetId::Subclass: return "Subclass names (HasSubclass's tables)";
-    case ValueSetId::DialogType: return "Dialog types";
-    case ValueSetId::TextKey: return "Text keys (the string table, nox.csf)";
-    case ValueSetId::JournalEntry: return "Journal entries (nox.csf's Journal: texts)";
-    case ValueSetId::Portrait: return "Portraits (thing.bin's named images)";
-    case ValueSetId::ObjectName: return "Objects on this map (their script names)";
-    case ValueSetId::WaypointName: return "Waypoints on this map";
-    case ValueSetId::ObjectGroup: return "Object groups on this map";
-    case ValueSetId::WaypointGroup: return "Waypoint groups on this map";
-    case ValueSetId::WallGroup: return "Wall groups on this map";
+    case ValueSetId::Effect: return NOX_TR("editor.script.args.set_title.effect", "Effect names (the ones Effect sends)");
+    case ValueSetId::Sound: return NOX_TR("editor.script.args.set_title.sound", "Sound names (the game's sound table)");
+    case ValueSetId::ThingType: return NOX_TR("editor.script.args.set_title.thing_type", "Thing types (thing.bin)");
+    case ValueSetId::Spell: return NOX_TR("editor.script.args.set_title.spell", "Spell names");
+    case ValueSetId::TrapSpell: return NOX_TR("editor.script.args.set_title.trap_spell", "Spell names, or NULL for an empty slot");
+    case ValueSetId::Enchant: return NOX_TR("editor.script.args.set_title.enchant", "Enchantment names");
+    case ValueSetId::ObjectClass: return NOX_TR("editor.script.args.set_title.class", "Class names (HasClass's table)");
+    case ValueSetId::Subclass: return NOX_TR("editor.script.args.set_title.subclass", "Subclass names (HasSubclass's tables)");
+    case ValueSetId::DialogType: return NOX_TR("editor.script.args.set_title.dialog_type", "Dialog types");
+    case ValueSetId::TextKey: return NOX_TR("editor.script.args.set_title.text_key", "Text keys (the string table, nox.csf)");
+    case ValueSetId::JournalEntry: return NOX_TR("editor.script.args.set_title.journal_entry", "Journal entries (nox.csf's Journal: texts)");
+    case ValueSetId::Portrait: return NOX_TR("editor.script.args.set_title.portrait", "Portraits (thing.bin's named images)");
+    case ValueSetId::ObjectName: return NOX_TR("editor.script.args.set_title.object", "Objects on this map (their script names)");
+    case ValueSetId::WaypointName: return NOX_TR("editor.script.args.set_title.waypoint", "Waypoints on this map");
+    case ValueSetId::ObjectGroup: return NOX_TR("editor.script.args.set_title.object_group", "Object groups on this map");
+    case ValueSetId::WaypointGroup: return NOX_TR("editor.script.args.set_title.waypoint_group", "Waypoint groups on this map");
+    case ValueSetId::WallGroup: return NOX_TR("editor.script.args.set_title.wall_group", "Wall groups on this map");
     }
-    return "Values";
+    return NOX_TR("editor.script.args.set_title.values", "Values");
 }
 
 bool isMapValueSet(ValueSetId id)
@@ -601,7 +608,7 @@ std::optional<std::string> checkArgValue(const ArgValueSets& sets, std::uint32_t
     }
     std::string msg = std::string(builtinSignature(builtin).name) + "(\"" + std::string(literal) + "\"): ";
     if (literal.empty()) {
-        msg += "an empty " + std::string(valueSetName(*id)) + " name matches nothing";
+        msg += l10n::format(NOX_TR("editor.script.args.empty_name", "an empty {kind} name matches nothing"), {{"kind", valueSetName(*id)}});
         return msg;
     }
     msg += problem(*set, literal);
@@ -610,11 +617,11 @@ std::optional<std::string> checkArgValue(const ArgValueSets& sets, std::uint32_t
     }
     const auto near = set->closest(literal);
     if (!near.empty()) {
-        msg += "; did you mean ";
+        std::string list;
         for (std::size_t i = 0; i < near.size(); ++i) {
-            msg += (i == 0 ? "" : i + 1 == near.size() ? " or " : ", ") + near[i];
+            list += (i == 0 ? std::string() : i + 1 == near.size() ? NOX_TR("editor.script.args.list_or", " or ") : std::string(", ")) + near[i];
         }
-        msg += "?";
+        msg += l10n::format(NOX_TR("editor.script.args.did_you_mean", "; did you mean {list}?"), {{"list", list}});
     }
     return msg;
 }

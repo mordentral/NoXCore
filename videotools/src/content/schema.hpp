@@ -5,6 +5,7 @@
 #pragma once
 
 #include "noxcore/content/text_table.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <cstdint>
 #include <span>
@@ -27,6 +28,7 @@ enum class ReadBy : std::uint8_t { Unknown, Server, Client, Both };
 ///    modifier order): every player needs the same pack.
 enum class Reach : std::uint8_t { ServerOnly, ClientVisible, ServerShown, Structural };
 
+// Display text, in the editor's language.
 const char* readByLabel(ReadBy r);   ///< "server", "client", "both", "?"
 const char* reachLabel(Reach r);     ///< "server-only", "client-visible", "server, shown by clients", "structural"
 const char* reachDocs(Reach r);      ///< a sentence for tooltips
@@ -55,7 +57,7 @@ struct FieldSpec {
     std::string_view key;
     FieldType type = FieldType::Int;
     ReadBy readBy = ReadBy::Unknown;
-    std::string_view docs;
+    nox::l10n::Key docs{"", ""};        ///< what it does (shown: nox::l10n::tr)
     double min = 0, max = 0;            ///< for numbers: the range the game reads sensibly (both 0: none)
     std::span<const std::string_view> names; ///< Flags / Enum
     bool gameKinds = false;             ///< has SOLO / ARENA lines (monster.bin, gamedata.bin)

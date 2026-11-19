@@ -1,11 +1,44 @@
 // The mode lists' rows (mode_list.hpp).
 #include "mode_list.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
 #include <cstdlib>
 #include <iterator>
 
 namespace noxsdl {
+
+namespace {
+
+/// A built-in mode's own words (its registry's English in modes/: kept English there, as hosts and
+/// the dedicated server have them), shown translated. A mod's text is its own.
+std::string builtInText(const std::string& en)
+{
+    static constexpr nox::l10n::Key kTexts[] = {
+        NOX_TRK("modes.coop.name", "Co-op Campaign"),
+        NOX_TRK("modes.coop.description", "The story campaign, with friends."),
+        NOX_TRK("modes.delve.description", "Endless generated levels to fight through."),
+        NOX_TRK("modes.tide.description", "Survive an endless tide of the undead."),
+        NOX_TRK("modes.coop.difficulty", "Difficulty"),
+        NOX_TRK("modes.coop.difficulty_easy", "Easy"),
+        NOX_TRK("modes.coop.difficulty_normal", "Normal"),
+        NOX_TRK("modes.coop.difficulty_hard", "Hard"),
+        NOX_TRK("modes.coop.difficulty_nightmare", "Nightmare"),
+        NOX_TRK("modes.coop.campaign", "Campaign"),
+        NOX_TRK("modes.coop.class_warrior", "Warrior"),
+        NOX_TRK("modes.coop.class_wizard", "Wizard"),
+        NOX_TRK("modes.coop.class_conjurer", "Conjurer"),
+    };
+    for (const auto& k : kTexts) {
+        if (en == k.en) {
+            return nox::l10n::tr(k);
+        }
+    }
+    return en;
+}
+
+} // namespace
 
 std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Registry& registry, const nox::modes::ModsReport& report,
                                       const std::function<bool(std::string_view)>& soloScreens)
@@ -25,11 +58,23 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
         r.description = m->info.description;
         r.players = m->info.minPlayers == m->info.maxPlayers ? std::to_string(m->info.maxPlayers)
                                                              : std::to_string(m->info.minPlayers) + "-" + std::to_string(m->info.maxPlayers);
-        r.stock = m->info.stockClients ? "Yes" : "No";
-        r.levels = m->info.levels == nox::modes::ModeInfo::Levels::Generated ? "Generated" : "Map files";
+        r.stock = m->info.stockClients ? NOX_TR("menus.modes.yes", "Yes") : NOX_TR("menus.modes.no", "No");
+        r.levels = m->info.levels == nox::modes::ModeInfo::Levels::Generated ? NOX_TR("menus.modes.levels_generated", "Generated")
+                                                                             : NOX_TR("menus.modes.levels_map_files", "Map files");
         for (const nox::modes::OptionSpec& s : m->info.options) {
             if (s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text) {
                 r.options.push_back(s); // (text settings: the dedicated server's command line only, for now)
+            }
+        }
+        if (!r.fromMods) {
+            // (What's shown only: an option's key and its values' numbers stay as they are.)
+            r.name = builtInText(r.name);
+            r.description = builtInText(r.description);
+            for (nox::modes::OptionSpec& s : r.options) {
+                s.label = builtInText(s.label);
+                for (auto& c : s.choices) {
+                    c = builtInText(c);
+                }
             }
         }
         r.soloScreens = soloScreens && soloScreens(m->info.id);
@@ -46,22 +91,22 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     }
     ModeListRow quest;
     quest.kind = ModeListRow::Kind::Quest;
-    quest.name = "Quest";
-    quest.description = "The original quest, stage after stage.";
-    quest.stock = "Yes";
-    quest.levels = "Map files";
+    quest.name = NOX_TR("menus.modes.quest_name", "Quest");
+    quest.description = NOX_TR("menus.modes.quest_description", "The original quest, stage after stage.");
+    quest.stock = NOX_TR("menus.modes.yes", "Yes");
+    quest.levels = NOX_TR("menus.modes.levels_map_files", "Map files");
     rows.push_back(std::move(quest));
     ModeListRow editor;
     editor.kind = ModeListRow::Kind::Editor;
-    editor.name = "Map Editor";
-    editor.levels = "Map files";
+    editor.name = NOX_TR("menus.modes.editor_name", "Map Editor");
+    editor.levels = NOX_TR("menus.modes.levels_map_files", "Map files");
     if (list == ModeListFor::HostCustom) {
         // (A session is a live game: stock players play it as it's published, NoX Core's edit.)
-        editor.description = "Build a map together with others.";
+        editor.description = NOX_TR("menus.modes.editor_description_hosted", "Build a map together with others.");
         editor.players = "1-32";
-        editor.stock = "Yes";
+        editor.stock = NOX_TR("menus.modes.yes", "Yes");
     } else {
-        editor.description = "Build and edit your own maps.";
+        editor.description = NOX_TR("menus.modes.editor_description_local", "Build and edit your own maps.");
         editor.players = "1";
     }
     rows.push_back(std::move(editor));
@@ -109,7 +154,7 @@ std::string modeOptionText(const nox::modes::OptionSpec& s, int v)
     switch (s.kind) {
     case nox::modes::OptionSpec::Kind::Choice:
         return v >= 0 && v < static_cast<int>(s.choices.size()) ? s.choices[static_cast<std::size_t>(v)] : std::to_string(v);
-    case nox::modes::OptionSpec::Kind::Toggle: return v != 0 ? "On" : "Off";
+    case nox::modes::OptionSpec::Kind::Toggle: return v != 0 ? NOX_TR("menus.modes.option_on", "On") : NOX_TR("menus.modes.option_off", "Off");
     default: return std::to_string(v);
     }
 }

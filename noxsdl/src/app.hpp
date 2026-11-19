@@ -686,6 +686,8 @@ struct App {
     int csfText = OptionsWindow::Extras::kCsfTextAuto;
     int csfShift = -1; ///< CsfText = cp1251:N's N (-1: the guess's)
     nox::strings::CodepageGuess csfGuess;
+    /// noxcore.cfg's Language (empty: chosen: applyLanguage), taken at start.
+    std::string language;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game
     bool autoSpawn = false;     ///< --spawn: leave observer mode once in the game (for tests)
@@ -835,6 +837,7 @@ void preloadSession(App& app);
 void applyExtras(App& app, const OptionsWindow::Extras& e);
 void applyFonts(App& app);
 void applyTextCodepage(App& app);
+void applyLanguage(App& app);
 void openOptions(App& app);
 int trackData(App& app);
 void setTrackData(App& app, int mask);

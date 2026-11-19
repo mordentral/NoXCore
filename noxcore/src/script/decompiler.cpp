@@ -20,6 +20,7 @@
 #include "noxcore/script/decompiler.hpp"
 
 #include "noxcore/script/opcodes.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include "language.hpp"
 
@@ -171,7 +172,7 @@ public:
                         ++mode[f];
                         changed = true;
                     } else if (f < 2) {
-                        res.notes.push_back("doesn't compile: " + d.format("decompiled"));
+                        res.notes.push_back(l10n::format(NOX_TR("editor.script.decompile.no_compile", "doesn't compile: {error}"), {{"error", d.format("decompiled")}}));
                     }
                 }
                 if (!changed) {
@@ -181,10 +182,10 @@ public:
             }
             const ScriptFile& b = *back.file;
             if (b.strings != file_.strings) {
-                res.notes.push_back("the string constants differ");
+                res.notes.push_back(NOX_TR("editor.script.decompile.strings_differ", "the string constants differ"));
             }
             if (b.functions.size() != n) {
-                res.notes.push_back("the function count differs");
+                res.notes.push_back(NOX_TR("editor.script.decompile.count_differs", "the function count differs"));
                 break;
             }
             for (std::size_t f = 0; f < n; ++f) {

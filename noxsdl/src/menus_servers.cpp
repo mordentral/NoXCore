@@ -1,6 +1,7 @@
 // One address per action: the saved-address dropdown is independent of discovery results.
 #include "menus.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
@@ -94,7 +95,7 @@ void Menus::serverDialog()
         state->confirming = false;
         for (const int id : {kOk, kClose, kEntry, kDrop, kRemove}) dialog_->find(id)->show(true);
         for (const int id : {kYes, kNo}) dialog_->find(id)->show(false);
-        dialog_->find(kTitle)->text = "Add/Remove Servers";
+        dialog_->find(kTitle)->text = NOX_TR("menus.servers.dialog_title", "Add/Remove Servers");
         auto* text = dialog_->find(kText);
         text->rect = {12, 180, 216, 32};
         text->largeFont = false;
@@ -107,13 +108,14 @@ void Menus::serverDialog()
         try { state->addresses = browser_.savedServerAddresses(); }
         catch (const std::exception& ex) {
             SDL_Log("saved servers: %s", ex.what());
-            dialog_->find(kText)->text = "Could not read servers.txt. Close and try again.";
+            dialog_->find(kText)->text = NOX_TR("menus.servers.read_failed", "Could not read servers.txt. Close and try again.");
         }
         auto* list = dialog_->find(kList);
         list->lines.clear(); list->selectedLine = -1; list->scroll = 0;
         for (const auto& address : state->addresses) list->lines.push_back({label(address), list->textColor});
         auto* box = dialog_->find(kDrop);
-        box->text = state->addresses.empty() ? "No saved addresses" : "Select saved address";
+        box->text = state->addresses.empty() ? NOX_TR("menus.servers.no_saved", "No saved addresses")
+                                             : NOX_TR("menus.servers.select_saved", "Select saved address");
         box->tooltip.clear();
         gui::setGreyed(box, state->addresses.empty());
         gui::setGreyed(dialog_->find(kRemove), true);
@@ -133,18 +135,20 @@ void Menus::serverDialog()
         const auto address = adding ? nox::strings::toUtf8(dialog_->find(kEntry)->entry)
                                    : state->addresses[static_cast<std::size_t>(state->selected)];
         if (adding && !normalizedServerAddress(address)) {
-            dialog_->find(kText)->text = "Enter a hostname or IPv4 address; optional port: 1-65535.";
+            dialog_->find(kText)->text =
+                NOX_TR("menus.servers.bad_address", "Enter a hostname or IPv4 address; optional port: 1-65535.");
             return;
         }
         drop(false);
         state->confirming = true; state->adding = adding; state->pending = address;
         for (const int id : {kOk, kClose, kEntry, kDrop, kRemove}) dialog_->find(id)->show(false);
         for (const int id : {kYes, kNo}) dialog_->find(id)->show(true);
-        dialog_->find(kTitle)->text = adding ? "Add this server?" : "Remove saved address?";
+        dialog_->find(kTitle)->text = adding ? NOX_TR("menus.servers.confirm_add", "Add this server?")
+                                             : NOX_TR("menus.servers.confirm_remove", "Remove saved address?");
         auto* text = dialog_->find(kText);
         text->rect = {12, 38, 216, 145};
         text->text = address;
-        dialog_->find(kYes)->text = adding ? "Add" : "Remove";
+        dialog_->find(kYes)->text = adding ? NOX_TR("menus.servers.add", "Add") : NOX_TR("menus.servers.remove", "Remove");
         gui_.setFocus(nullptr);
     };
     dialog_ = gui_.load(def, [this, state, scroll, drop, choose, ask, normal, reload](gui::Window&, int message, gui::Window& from) {
@@ -176,11 +180,13 @@ void Menus::serverDialog()
                     if (state->adding) changed = browser_.addSavedServer(state->pending);
                     else browser_.removeSavedServer(state->pending);
                     SDL_Log("saved servers: %s %s", state->adding ? "added" : "removed", state->pending.c_str());
-                    result = !changed ? "Already saved." : state->adding ? "Server added." : "Saved address removed.";
+                    result = !changed        ? NOX_TR("menus.servers.already_saved", "Already saved.")
+                             : state->adding ? NOX_TR("menus.servers.added", "Server added.")
+                                             : NOX_TR("menus.servers.removed", "Saved address removed.");
                     succeeded = true;
                 } catch (const std::exception& ex) {
                     SDL_Log("saved servers: %s", ex.what());
-                    result = "Could not change servers.txt. Check that it is writable and try again.";
+                    result = NOX_TR("menus.servers.write_failed", "Could not change servers.txt. Check that it is writable and try again.");
                 }
                 // Reload after failures too: a final rename may have left a partial removal.
                 browser_.refreshSavedServers(nowMs_);
@@ -202,12 +208,15 @@ void Menus::serverDialog()
     auto* entry = dialog_->find(kEntry);
     entry->rect = kInputRect; entry->entryMax = 260; entry->largeFont = false;
     std::get<nox::gui::EntryFieldData>(entry->data).width = static_cast<std::uint16_t>(kInputRect.w);
-    entry->tooltip = "Hostname or IPv4 address, optional :port (default 18590)";
-    dialog_->find(kOk)->rect = {kActionX, kInputRect.y, kButtonWidth, kButtonHeight}; dialog_->find(kOk)->text = "Add";
-    dialog_->find(kRemove)->text = "Remove";
-    dialog_->find(kClose)->rect = {(kDialogWidth - kButtonWidth) / 2, 216, kButtonWidth, kButtonHeight}; dialog_->find(kClose)->text = "Close";
+    entry->tooltip = NOX_TR("menus.servers.address_tip", "Hostname or IPv4 address, optional :port (default 18590)");
+    dialog_->find(kOk)->rect = {kActionX, kInputRect.y, kButtonWidth, kButtonHeight};
+    dialog_->find(kOk)->text = NOX_TR("menus.servers.add", "Add");
+    dialog_->find(kRemove)->text = NOX_TR("menus.servers.remove", "Remove");
+    dialog_->find(kClose)->rect = {(kDialogWidth - kButtonWidth) / 2, 216, kButtonWidth, kButtonHeight};
+    dialog_->find(kClose)->text = NOX_TR("menus.common.close", "Close");
     dialog_->find(kYes)->rect = {45, 206, kButtonWidth, kButtonHeight};
-    dialog_->find(kNo)->rect = {140, 206, kButtonWidth, kButtonHeight}; dialog_->find(kNo)->text = "Cancel";
+    dialog_->find(kNo)->rect = {140, 206, kButtonWidth, kButtonHeight};
+    dialog_->find(kNo)->text = NOX_TR("menus.common.cancel", "Cancel");
     auto* box = dialog_->find(kDrop); box->dropArrow = true; box->largeFont = false;
     dialog_->find(kList)->largeFont = false;
     for (const auto& [id, image] : {std::pair{kUp, "UIScrollUp"}, std::pair{kDown, "UIScrollDn"}}) {
@@ -261,7 +270,8 @@ void Menus::serverDialog()
                 const auto text = nox::strings::fromUtf8(pasted);
                 SDL_free(pasted);
                 if (text.size() >= entry->entryMax) {
-                    dialog_->find(kText)->text = "Address is too long. Paste a hostname or IPv4 address with an optional port.";
+                    dialog_->find(kText)->text =
+                        NOX_TR("menus.servers.address_too_long", "Address is too long. Paste a hostname or IPv4 address with an optional port.");
                 } else {
                     entry->entry = text;
                 }

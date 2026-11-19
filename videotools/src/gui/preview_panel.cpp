@@ -7,6 +7,7 @@
 
 #include "noxcore/audio/pcm.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -114,20 +115,20 @@ void playSample(Workspace& ws, const std::string& sample)
 {
     auto* bag = ws.files.audio();
     if (!bag) {
-        ws.session.setStatus("No Audio.bag is open.");
+        ws.session.setStatus(NOX_TR("content.preview.no_audio_bag", "No Audio.bag is open."));
         return;
     }
     const auto i = bag->find(sample);
     if (!i) {
-        ws.session.setStatus(std::format("Audio.bag has no sample named {}.", sample));
+        ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.no_sample", "Audio.bag has no sample named {name}."), {{"name", sample}}));
         return;
     }
     try {
         if (!ws.audio.play(bag->decode(*i), sample)) {
-            ws.session.setStatus("Can't play it: " + ws.audio.error());
+            ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.cant_play", "Can't play it: {error}"), {{"error", ws.audio.error()}}));
         }
     } catch (const std::exception& ex) {
-        ws.session.setStatus(std::format("Can't decode {}: {}", sample, ex.what()));
+        ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.cant_decode", "Can't decode {name}: {error}"), {{"name", sample}, {"error", ex.what()}}));
     }
 }
 
@@ -136,7 +137,7 @@ void playSoundEvent(Workspace& ws, std::string_view name)
     const auto* db = ws.files.things();
     auto* bag = ws.files.audio();
     if (!db || !bag) {
-        ws.session.setStatus("No thing.bin or Audio.bag to play it from.");
+        ws.session.setStatus(NOX_TR("content.preview.nothing_to_play_from", "No thing.bin or Audio.bag to play it from."));
         return;
     }
     const std::vector<std::string>* files = nullptr;
@@ -155,7 +156,7 @@ void playSoundEvent(Workspace& ws, std::string_view name)
         }
     }
     if (!files || files->empty()) {
-        ws.session.setStatus(std::format("thing.bin has no sound files for {}.", name));
+        ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.no_sound_files", "thing.bin has no sound files for {name}."), {{"name", name}}));
         return;
     }
     // (the game picks one at random each time; the preview plays them in turn)
@@ -163,15 +164,15 @@ void playSoundEvent(Workspace& ws, std::string_view name)
     const std::string file = fs::path((*files)[turn++ % files->size()]).stem().string();
     const auto i = bag->find(file);
     if (!i) {
-        ws.session.setStatus(std::format("Audio.bag has no sample named {}.", file));
+        ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.no_sample", "Audio.bag has no sample named {name}."), {{"name", file}}));
         return;
     }
     try {
         if (!ws.audio.play(bag->decode(*i), std::string(name) + ": " + file)) {
-            ws.session.setStatus("Can't play it: " + ws.audio.error());
+            ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.cant_play", "Can't play it: {error}"), {{"error", ws.audio.error()}}));
         }
     } catch (const std::exception& ex) {
-        ws.session.setStatus(std::format("Can't decode {}: {}", file, ex.what()));
+        ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.cant_decode", "Can't decode {name}: {error}"), {{"name", file}, {"error", ex.what()}}));
     }
 }
 
@@ -179,10 +180,10 @@ void playSoundFile(Workspace& ws, const fs::path& file)
 {
     try {
         if (!ws.audio.play(nox::audio::decodeFile(nox::readFileBytes(file)), file.filename().string())) {
-            ws.session.setStatus("Can't play it: " + ws.audio.error());
+            ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.cant_play", "Can't play it: {error}"), {{"error", ws.audio.error()}}));
         }
     } catch (const std::exception& ex) {
-        ws.session.setStatus(std::format("Can't decode {}: {}", file.filename().string(), ex.what()));
+        ws.session.setStatus(nox::l10n::format(NOX_TR("content.preview.cant_decode", "Can't decode {name}: {error}"), {{"name", file.filename().string()}, {"error", ex.what()}}));
     }
 }
 
@@ -192,10 +193,10 @@ void playingBar(Workspace& ws)
         return;
     }
     ImGui::PushID("playing");
-    const float stopW = ImGui::CalcTextSize("Stop").x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x;
+    const float stopW = ImGui::CalcTextSize(NOX_TRC("content.preview.stop", "Stop")).x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x;
     ImGui::ProgressBar(float(ws.audio.position() / std::max(0.001, ws.audio.length())), ImVec2(-stopW, 0), ws.audio.label().c_str());
     ImGui::SameLine();
-    if (ImGui::SmallButton("Stop")) {
+    if (ImGui::SmallButton(NOX_TRI("content.preview.stop", "Stop"))) {
         ws.audio.stop();
     }
     ImGui::PopID();
@@ -207,7 +208,7 @@ void PreviewPanel::draw(double dt)
         refresh();
     }
     if (!shown_) {
-        ImGui::TextDisabled("Nothing selected.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.preview.nothing_selected", "Nothing selected."));
         return;
     }
     const float scale = ImGui::GetFontSize() / 15.0f;
@@ -257,30 +258,30 @@ void PreviewPanel::draw(double dt)
         drawFit(dl, ws_.session.sd().get((*frames)[std::size_t(f)]), ImVec2(p0.x + 4, p0.y + 4), ImVec2(side - 8, side - 8));
         ImGui::Dummy(ImVec2(side, side));
         if (n > 1) {
-            if (ImGui::SmallButton(playing_ ? "Pause" : "Play")) {
+            if (ImGui::SmallButton(playing_ ? NOX_TRI("content.preview.pause", "Pause") : NOX_TRI("content.common.play", "Play"))) {
                 playing_ = !playing_;
             }
             ImGui::SameLine();
-            ImGui::TextDisabled("frame %d of %d  ·  #%d", f + 1, n, (*frames)[std::size_t(f)]);
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.preview.frame_of", "frame {n} of {total}  ·  #{image}"), {{"n", f + 1}, {"total", n}, {"image", (*frames)[std::size_t(f)]}}).c_str());
         } else {
             ImGui::TextDisabled("video.bag #%d", (*frames)[0]);
         }
-        if (entry_ && ImGui::SmallButton("Open in Sprites")) {
+        if (entry_ && ImGui::SmallButton(NOX_TRI("content.preview.open_in_sprites", "Open in Sprites"))) {
             ws_.catalog.selectThing(thingIndex_ + 1);
             ws_.focus(panel::kSprites);
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("Edit image")) {
+        if (ImGui::SmallButton(NOX_TRI("content.preview.edit_image", "Edit image"))) {
             ws_.images.show((*frames)[std::size_t(f)]);
             ws_.focus(panel::kImages);
         }
     }
     // Sounds.
     if (!info_.sounds.empty()) {
-        ImGui::SeparatorText("Sounds");
+        ImGui::SeparatorText(NOX_TRI("content.preview.sounds", "Sounds"));
         for (const auto& s : info_.sounds) {
             ImGui::PushID(s.c_str());
-            if (ImGui::SmallButton("Play")) {
+            if (ImGui::SmallButton(NOX_TRI("content.common.play", "Play"))) {
                 playSample(ws_, s);
             }
             ImGui::SameLine();
@@ -289,10 +290,10 @@ void PreviewPanel::draw(double dt)
         }
     }
     if (!events_.empty()) {
-        ImGui::SeparatorText("Its sound set");
+        ImGui::SeparatorText(NOX_TRI("content.preview.its_sound_set", "Its sound set"));
         for (const auto& e : events_) {
             ImGui::PushID(e.c_str());
-            if (ImGui::SmallButton("Play")) {
+            if (ImGui::SmallButton(NOX_TRI("content.common.play", "Play"))) {
                 playSoundEvent(ws_, e);
             }
             ImGui::SameLine();
@@ -302,7 +303,7 @@ void PreviewPanel::draw(double dt)
     }
     if (shown_->list == RecordList::File && shown_->kind == content::FileKind::Dialog) {
         if (const fs::path* p = recordFile(ws_.files, *shown_)) {
-            if (ImGui::Button("Play")) {
+            if (ImGui::Button(NOX_TRI("content.common.play", "Play"))) {
                 playSoundFile(ws_, *p);
             }
         }
@@ -322,7 +323,8 @@ void PreviewPanel::draw(double dt)
             texts.push_back(info_.text);
         }
         for (std::size_t i = 0; i < texts.size(); ++i) {
-            ImGui::SeparatorText(texts.size() == 1 ? "Text" : std::format("Variant {}", i + 1).c_str());
+            ImGui::SeparatorText(texts.size() == 1 ? NOX_TRC("content.label.text", "Text")
+                                                   : nox::l10n::format(NOX_TR("content.label.variant_n", "Variant {n}"), {{"n", i + 1}}).c_str());
             ImGui::TextWrapped("%s", texts[i].c_str());
         }
     }
@@ -343,13 +345,14 @@ void ReferencesPanel::draw()
         const content::Record* self = ws_.index.find(*shown_);
         if (!ws_.mapUsage.valid()) {
         } else if (ws_.mapUsage.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            ImGui::TextDisabled("maps: looking through them...");
+            ImGui::TextDisabled("%s", NOX_TRC("content.preview.maps_looking", "maps: looking through them..."));
         } else if (self) {
             const content::MapUsage& usage = ws_.mapUsage.get();
             const auto* maps = usage.mapsUsing(self->name);
             if (!maps) {
-                ImGui::TextDisabled("used in no map");
-            } else if (ImGui::TreeNodeEx("maps", ImGuiTreeNodeFlags_SpanAvailWidth, "used in %zu map%s", maps->size(), maps->size() == 1 ? "" : "s")) {
+                ImGui::TextDisabled("%s", NOX_TRC("content.preview.used_in_no_map", "used in no map"));
+            } else if (ImGui::TreeNodeEx("maps", ImGuiTreeNodeFlags_SpanAvailWidth, "%s",
+                                         nox::l10n::format(NOX_TRP("content.preview.used_in_maps", "used in {n} map", "used in {n} maps", maps->size()), {{"n", maps->size()}}).c_str())) {
                 for (const std::size_t m : *maps) {
                     ImGui::BulletText("%s", usage.maps()[m].c_str());
                 }
@@ -358,7 +361,7 @@ void ReferencesPanel::draw()
         }
     }
     if (refs_.empty()) {
-        ImGui::TextDisabled("No links found.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.preview.no_links", "No links found."));
         return;
     }
     for (std::size_t i = 0; i < refs_.size(); ++i) {
@@ -370,7 +373,7 @@ void ReferencesPanel::draw()
             }
         } else {
             ImGui::TextColored(theme.unknown, "%s", r.text.c_str());
-            ImGui::SetItemTooltip("Not found in the open files.");
+            ImGui::SetItemTooltip("%s", NOX_TRC("content.preview.not_found", "Not found in the open files."));
         }
         ImGui::PopID();
     }

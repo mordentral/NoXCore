@@ -287,6 +287,15 @@ GameFonts::GameFonts(SDL_Renderer* renderer, const std::filesystem::path& gameDi
         plain_ = make(std::vector<std::uint8_t>(kCaudexFont, kCaudexFont + kCaudexFontSize), "Caudex Bold (built in)");
     }
     noto_ = make(std::vector<std::uint8_t>(kEmbeddedFont, kEmbeddedFont + kEmbeddedFontSize), "Noto Sans SemiBold (built in)");
+    // Hangul, after every other face (so nothing else they draw changes): Noto Sans KR's syllables,
+    // jamo and CJK punctuation, from the fonts folder.
+    if (const auto path = fontDir_ / kHangulFontFile; std::filesystem::is_regular_file(path)) {
+        try {
+            hangul_ = make(nox::readFileBytes(path), kHangulFontFile);
+        } catch (const std::exception& ex) {
+            SDL_Log("%s: %s (no Hangul)", nox::pathUtf8(path).c_str(), ex.what());
+        }
+    }
     // Which Nox-style files there are, looked for once (read when first chosen).
     std::string missing;
     for (std::size_t i = 0; i < kNoxFaces; ++i) {
@@ -350,6 +359,9 @@ void GameFonts::applyRole(Font& font, FontRole role, bool originalStyle, bool hd
     }
     chain.push_back(plain_.link());
     chain.push_back(noto_.link());
+    if (hangul_.face) {
+        chain.push_back(hangul_.link());
+    }
     font.setFaces(std::move(chain), isNoxFace(face));
     SDL_Log("font: %s for %s's text", font.name().c_str(), role == FontRole::Large ? "large.fnt" : "default.fnt");
 }

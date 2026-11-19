@@ -1,5 +1,7 @@
 #include "gui/compare_view.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -10,30 +12,31 @@ namespace videotools::gui {
 void CompareView::controls(bool fillOption)
 {
     int& m = s_.settings().compare;
-    ImGui::RadioButton("Side by side", &m, SideBySide);
+    ImGui::RadioButton(NOX_TRI("content.compare.side_by_side", "Side by side"), &m, SideBySide);
     ImGui::SameLine();
     ImGui::RadioButton("video.bag", &m, BagOnly);
     ImGui::SameLine();
     ImGui::RadioButton("HD", &m, HdOnly);
-    ImGui::SetItemTooltip("Tab switches between video.bag and HD");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.compare.tab_tip", "Tab switches between video.bag and HD"));
     ImGui::SameLine(0, 20 * s_.scale());
-    ImGui::Checkbox("Fit", &fit_);
+    ImGui::Checkbox(NOX_TRI("content.compare.fit", "Fit"), &fit_);
     ImGui::SameLine();
     ImGui::BeginDisabled(fit_);
     ImGui::SetNextItemWidth(110 * s_.scale());
-    ImGui::SliderInt("##zoom", &s_.settings().zoom, 1, 16, "zoom %dx");
+    static const std::string zoomFormat = sliderFormat(NOX_TR("content.compare.zoom", "zoom {n}x"));
+    ImGui::SliderInt("##zoom", &s_.settings().zoom, 1, 16, zoomFormat.c_str());
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100 * s_.scale());
-    ImGui::Combo("##bg", &s_.settings().background, kBackgrounds, int(std::size(kBackgrounds)));
+    ImGui::Combo("##bg", &s_.settings().background, [](void*, int i) { return backgroundName(i); }, nullptr, kBackgroundCount);
     ImGui::SameLine();
-    ImGui::Checkbox("Tint", &tint_);
-    ImGui::SetItemTooltip("Shade material-slot pixels (grey in the data; the game tints them) with sample colours");
+    ImGui::Checkbox(NOX_TRI("content.compare.tint", "Tint"), &tint_);
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.compare.tint_tip", "Shade material-slot pixels (grey in the data; the game tints them) with sample colours"));
     if (fillOption) {
         ImGui::SameLine();
         ImGui::BeginDisabled(m == BagOnly);
-        ImGui::Checkbox("Fill from video.bag", &fillFromBag_);
-        ImGui::SetItemTooltip("In the HD pane, frames the pack has no HD image for show the video.bag image, as NoX Core draws them");
+        ImGui::Checkbox(NOX_TRI("content.compare.fill", "Fill from video.bag"), &fillFromBag_);
+        ImGui::SetItemTooltip("%s", NOX_TRC("content.compare.fill_tip", "In the HD pane, frames the pack has no HD image for show the video.bag image, as NoX Core draws them"));
         ImGui::EndDisabled();
     }
 }
@@ -106,13 +109,13 @@ void CompareView::pane(const PaneView& v, ImVec2 size)
     if (v.note) {
         // (the caller's)
     } else if (!t) {
-        note = v.hd && !s_.packOpen() ? "No image pack open" : "Loading...";
+        note = v.hd && !s_.packOpen() ? NOX_TRC("content.compare.no_pack", "No image pack open") : NOX_TRC("content.compare.loading", "Loading...");
     } else if (v.standIn && shows) {
-        note = "No HD image in the pack for this frame: video.bag shown";
+        note = NOX_TRC("content.compare.stand_in", "No HD image in the pack for this frame: video.bag shown");
     } else if (t->missing) {
-        note = v.hd ? "No HD image in the pack for this slot" : "No video.bag image here";
+        note = v.hd ? NOX_TRC("content.compare.no_hd", "No HD image in the pack for this slot") : NOX_TRC("content.compare.no_bag_image", "No video.bag image here");
     } else if (t->empty) {
-        note = "Empty image (0 x 0): draws nothing";
+        note = NOX_TRC("content.compare.empty", "Empty image (0 x 0): draws nothing");
     } else if (!t->error.empty()) {
         note = t->error.c_str();
     }

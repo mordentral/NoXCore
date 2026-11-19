@@ -12,7 +12,9 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/map/xfer.hpp"
 #include "noxcore/mapedit/object_edit.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 #include "noxcore/mapedit/paint.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/thing_db.hpp"
 
@@ -27,6 +29,7 @@
 
 namespace fs = std::filesystem;
 namespace me = nox::mapedit;
+namespace ol = nox::mapedit::oplabels;
 namespace xf = nox::map::xfer;
 
 namespace noxsdl {
@@ -34,6 +37,7 @@ namespace noxsdl {
 namespace {
 
 using editor::numbersAfter;
+using nox::l10n::format;
 
 constexpr float kBoxHalf = 0.35355339f; // a BOX's corners: 1 / (2 sqrt 2) of its sides (turned 45 degrees)
 
@@ -101,34 +105,35 @@ void ObjectTools::registerCommands()
                          std::function<bool()> enabled = {}, std::function<bool()> checked = {}) {
         reg.add(Command{id, label, category, Shortcut::parse(shortcut).value_or(Shortcut{}), help, std::move(run), std::move(enabled), std::move(checked)});
     };
-    add("window.browser", "Content Browser", "Window", "Ctrl+Shift+B", "Every object type by folder with thumbnails; floors, walls and edges.",
+    add("window.browser", NOX_TRC("editor.cmd.window.browser.label", "Content Browser"), "Window", "Ctrl+Shift+B", NOX_TRC("editor.cmd.window.browser.help", "Every object type by folder with thumbnails; floors, walls and edges."),
         [this] { showBrowser = !showBrowser; }, {}, [this] { return showBrowser; });
-    add("window.objectList", "Object List", "Window", "Ctrl+Shift+J", "Every object on the map: search, sort, select, go to.",
+    add("window.objectList", NOX_TRC("editor.cmd.window.object_list.label", "Object List"), "Window", "Ctrl+Shift+J", NOX_TRC("editor.cmd.window.object_list.help", "Every object on the map: search, sort, select, go to."),
         [this] { showList = !showList; }, {}, [this] { return showList; });
-    add("object.rotateLeft", "Rotate Left", "Tools", "Q",
-        "The object tool's facing (or the selected objects') a step anticlockwise: doors a quarter, creatures an eighth, sentries 5 degrees.",
+    add("object.rotateLeft", NOX_TRC("editor.cmd.object.rotate_left.label", "Rotate Left"), "Tools", "Q",
+        NOX_TRC("editor.cmd.object.rotate_left.help", "The object tool's facing (or the selected objects') a step anticlockwise: doors a quarter, creatures an eighth, sentries 5 degrees."),
         [this] { rotate(-1); });
-    add("object.rotateRight", "Rotate Right", "Tools", "E", "The object tool's facing (or the selected objects') a step clockwise.", [this] { rotate(1); });
-    add("object.scatter", "Scatter Brush", "Tools", "", "The object tool paints objects from a weighted list (density, spacing, random facing).",
+    add("object.rotateRight", NOX_TRC("editor.cmd.object.rotate_right.label", "Rotate Right"), "Tools", "E", NOX_TRC("editor.cmd.object.rotate_right.help", "The object tool's facing (or the selected objects') a step clockwise."), [this] { rotate(1); });
+    add("object.scatter", NOX_TRC("editor.cmd.object.scatter.label", "Scatter Brush"), "Tools", "", NOX_TRC("editor.cmd.object.scatter.help", "The object tool paints objects from a weighted list (density, spacing, random facing)."),
         [this] {
             mode_ = mode_ == Mode::Scatter ? Mode::Place : Mode::Scatter;
             ed_.tool_ = MapEditor::Tool::Object;
         },
         {}, [this] { return mode_ == Mode::Scatter; });
-    add("object.random", "Random From Folder", "Tools", "", "Each object placed is a random type from the browser's folder (the old editor's Randomize).",
+    add("object.random", NOX_TRC("editor.cmd.object.random.label", "Random From Folder"), "Tools", "", NOX_TRC("editor.cmd.object.random.help", "Each object placed is a random type from the browser's folder (the old editor's Randomize)."),
         [this] { randomFromFolder_ = !randomFromFolder_; }, {}, [this] { return randomFromFolder_; });
-    add("prefab.save", "Save Selection as Prefab...", "Edit", "", "The selected objects (and walls, floor, waypoints) saved under a name, to place again.",
+    add("prefab.save", NOX_TRC("editor.cmd.prefab.save.label", "Save Selection as Prefab..."), "Edit", "", NOX_TRC("editor.cmd.prefab.save.help", "The selected objects (and walls, floor, waypoints) saved under a name, to place again."),
         [this] {
             prefabName_[0] = 0;
             prefabOpen_ = true;
         },
         [this] { return !ed_.selection_.empty(); });
     const auto layer = [&](const char* id, const char* label, bool editor::Layers::*field) {
-        add(id, label, "View", "", "Shows or hides this layer.", [this, field] { ed_.settings_.layers.*field = !(ed_.settings_.layers.*field); }, {},
+        add(id, label, "View", "", NOX_TRC("editor.cmd.view.layer.help", "Shows or hides this layer."),
+            [this, field] { ed_.settings_.layers.*field = !(ed_.settings_.layers.*field); }, {},
             [this, field] { return ed_.settings_.layers.*field; });
     };
-    layer("view.triggers", "Trigger and Plate Boxes", &editor::Layers::triggers);
-    layer("view.lightRings", "Light Radius Rings", &editor::Layers::lightRings);
+    layer("view.triggers", NOX_TRC("editor.cmd.view.triggers.label", "Trigger and Plate Boxes"), &editor::Layers::triggers);
+    layer("view.lightRings", NOX_TRC("editor.cmd.view.light_rings.label", "Light Radius Rings"), &editor::Layers::lightRings);
 }
 
 // --- Placement -------------------------------------------------------------------------------------
@@ -152,7 +157,7 @@ std::optional<me::DocObject> ObjectTools::makeAt(const std::string& type, me::Wo
         me::setFacingDegrees(o, facing_);
         return o;
     } catch (const std::exception& ex) {
-        ed_.status("Can't place " + type + ": " + ex.what());
+        ed_.status(format(NOX_TR("editor.objects.cant_place", "Can't place {type}: {error}"), {{"type", type}, {"error", ex.what()}}));
         return std::nullopt;
     }
 }
@@ -180,7 +185,7 @@ bool ObjectTools::placeAt(me::WorldPoint at, std::string type)
     }
     if (type.empty()) type = randomFromFolder_ ? randomType() : type_;
     if (type.empty()) {
-        ed_.status("Pick something to place in the Content Browser");
+        ed_.status(NOX_TR("editor.objects.pick_something", "Pick something to place in the Content Browser"));
         return false;
     }
     const auto o = makeAt(type, at);
@@ -198,7 +203,7 @@ void ObjectTools::rotate(int steps)
         const auto* e = catalog_.find(type_);
         const float step = e && e->xfer == "DoorXfer" ? 90.0f : e && e->xfer == "SentryXfer" ? 5.0f : 45.0f;
         facing_ = std::fmod(facing_ + static_cast<float>(steps) * step + 3600.0f, 360.0f);
-        ed_.status("Facing " + std::to_string(static_cast<int>(std::lround(facing_))) + " degrees");
+        ed_.status(format(NOX_TR("editor.objects.facing_status", "Facing {n} degrees"), {{"n", static_cast<int>(std::lround(facing_))}}));
         return;
     }
     std::vector<std::pair<me::ObjId, me::DocObject>> turned;
@@ -207,10 +212,10 @@ void ObjectTools::rotate(int steps)
         if (me::rotateFacing(o, steps)) turned.emplace_back(id, std::move(o));
     }
     if (turned.empty()) {
-        ed_.status("Nothing selected turns (doors, creatures, NPCs and sentries do)");
+        ed_.status(NOX_TR("editor.objects.nothing_turns", "Nothing selected turns (doors, creatures, NPCs and sentries do)"));
         return;
     }
-    ed_.perform(me::setObjectsOp(ed_.doc_, turned, "Rotate " + std::to_string(turned.size()) + (turned.size() == 1 ? " object" : " objects")));
+    ed_.perform(me::setObjectsOp(ed_.doc_, turned, me::opLabel(ol::kRotateObjects, {{"n", turned.size()}})));
 }
 
 void ObjectTools::deleteAt(float wx, float wy)
@@ -240,7 +245,7 @@ void ObjectTools::input(float wx, float wy, bool hovered, bool rightClick)
             if (b.types.empty() && !type_.empty()) b.types = {{type_, 1}};
             b.seed = 0x5CA7u + ed_.strokeSeed_;
             if (b.types.empty()) {
-                ed_.status("Scatter: add types to the list (or pick one in the browser)");
+                ed_.status(NOX_TR("editor.objects.scatter_no_types", "Scatter: add types to the list (or pick one in the browser)"));
                 return;
             }
             stroke_.emplace(ed_.doc_, *factory_, b);
@@ -261,7 +266,7 @@ void ObjectTools::input(float wx, float wy, bool hovered, bool rightClick)
             stroke_.reset();
             ++ed_.strokeSeed_;
             if (op.empty()) {
-                ed_.status("Scatter: nothing fitted (spacing, walls or holes)");
+                ed_.status(NOX_TR("editor.objects.scatter_nothing", "Scatter: nothing fitted (spacing, walls or holes)"));
             } else if (ed_.perform(op)) {
                 ed_.setSelection(std::move(placed), true);
             }
@@ -276,7 +281,7 @@ void ObjectTools::input(float wx, float wy, bool hovered, bool rightClick)
             const me::DocObject& o = ed_.doc_.objects.at(*pick.objects.begin());
             pickType(o.type);
             if (const auto f = me::facingDegrees(o)) facing_ = *f;
-            ed_.status("Eyedropper: " + o.type);
+            ed_.status(format(NOX_TR("editor.objects.eyedropper", "Eyedropper: {type}"), {{"type", o.type}}));
         }
         return;
     }
@@ -472,9 +477,10 @@ void ObjectTools::drawOverlay(ImDrawList* dl, const ImVec2& origin)
     const ImVec2 p = S(at.x, at.y);
     dl->AddLine(ImVec2(p.x - 6, p.y), ImVec2(p.x + 6, p.y), IM_COL32(255, 230, 120, 220), 1.5f);
     dl->AddLine(ImVec2(p.x, p.y - 6), ImVec2(p.x, p.y + 6), IM_COL32(255, 230, 120, 220), 1.5f);
-    std::string label = prefab_ >= 0 && prefab_ < static_cast<int>(prefabs_.size()) ? "prefab " + prefabs_[static_cast<std::size_t>(prefab_)].name
-                        : randomFromFolder_                                         ? "random from " + folder_
-                                                                                    : type_;
+    std::string label = prefab_ >= 0 && prefab_ < static_cast<int>(prefabs_.size())
+                            ? format(NOX_TR("editor.objects.cursor_prefab", "prefab {name}"), {{"name", prefabs_[static_cast<std::size_t>(prefab_)].name}})
+                        : randomFromFolder_ ? format(NOX_TR("editor.objects.cursor_random", "random from {folder}"), {{"folder", folder_}})
+                                            : type_;
     if (!label.empty()) {
         const auto* e = catalog_.find(type_);
         if (prefab_ < 0 && e && e->xfer != "DefaultXfer") {
@@ -503,73 +509,82 @@ void ObjectTools::summary(me::ObjId id)
         std::snprintf(b, sizeof b, "%.2f", std::bit_cast<float>(bits));
         return std::string(b);
     };
-    ImGui::SeparatorText("Type");
+    ImGui::SeparatorText(NOX_TRC("editor.summary.type", "Type"));
     if (e) {
-        row("Folder", e->folder);
-        row("Xfer", e->xfer + " v0x" + [&] {
+        row(NOX_TRC("editor.summary.folder", "Folder"), me::folderText(e->folder));
+        row(NOX_TRC("editor.summary.xfer", "Xfer"), e->xfer + " v0x" + [&] {
             char b[8];
             std::snprintf(b, sizeof b, "%X", o.xferVersion);
             return std::string(b);
         }());
     }
-    if (const auto deg = me::facingDegrees(o)) row("Facing", std::to_string(static_cast<int>(std::lround(*deg))) + " degrees (Q / E turn it)");
+    if (const auto deg = me::facingDegrees(o)) {
+        row(NOX_TRC("editor.summary.facing", "Facing"),
+            format(NOX_TR("editor.summary.facing_value", "{n} degrees (Q / E turn it)"), {{"n", static_cast<int>(std::lround(*deg))}}));
+    }
     std::visit(
         [&](const auto& v) {
             using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, xf::Door>) {
-                static constexpr const char* kLocks[] = {"none", "silver", "gold", "ruby", "sapphire", "mechanism"};
-                row("Lock", v.lock < 6 ? kLocks[v.lock] : std::to_string(v.lock));
-                row("Direction", std::to_string(v.direction));
+                const std::string* const kLocks[] = {&NOX_TR("editor.summary.lock_none", "none"),         &NOX_TR("editor.summary.lock_silver", "silver"),
+                                                     &NOX_TR("editor.summary.lock_gold", "gold"),         &NOX_TR("editor.summary.lock_ruby", "ruby"),
+                                                     &NOX_TR("editor.summary.lock_sapphire", "sapphire"), &NOX_TR("editor.summary.lock_mechanism", "mechanism")};
+                row(NOX_TRC("editor.summary.lock", "Lock"), v.lock < 6 ? *kLocks[v.lock] : std::to_string(v.lock));
+                row(NOX_TRC("editor.summary.direction", "Direction"), std::to_string(v.direction));
             } else if constexpr (std::is_same_v<T, xf::Monster>) {
-                row("Health", std::to_string(v.health));
-                row("Sight", f(v.sightRange));
-                row("Aggression", f(v.aggression));
-                row("Action", v.action);
-                row("Spells", std::to_string(v.spells.size()) + (v.unknown337[3] ? " (its type's)" : ""));
-                if (v.shop) row("Shop", std::to_string(v.shop->items.size()) + " items");
+                row(NOX_TRC("editor.summary.health", "Health"), std::to_string(v.health));
+                row(NOX_TRC("editor.summary.sight", "Sight"), f(v.sightRange));
+                row(NOX_TRC("editor.summary.aggression", "Aggression"), f(v.aggression));
+                row(NOX_TRC("editor.summary.action", "Action"), v.action);
+                row(NOX_TRC("editor.summary.spells", "Spells"),
+                    std::to_string(v.spells.size()) + (v.unknown337[3] ? " " + NOX_TR("editor.summary.spells_type", "(its type's)") : std::string()));
+                if (v.shop) row(NOX_TRC("editor.summary.shop", "Shop"), format(NOX_TR("editor.summary.shop_items", "{n} items"), {{"n", v.shop->items.size()}}));
             } else if constexpr (std::is_same_v<T, xf::Npc>) {
-                row("Health", std::to_string(v.healthCurrent) + " / " + std::to_string(v.healthMax));
-                row("Voice", v.voiceSet);
-                row("Action", v.action);
+                row(NOX_TRC("editor.summary.health", "Health"), std::to_string(v.healthCurrent) + " / " + std::to_string(v.healthMax));
+                row(NOX_TRC("editor.summary.voice", "Voice"), v.voiceSet);
+                row(NOX_TRC("editor.summary.action", "Action"), v.action);
             } else if constexpr (std::is_same_v<T, xf::Trigger>) {
-                row("Size", std::to_string(v.sizeX) + " x " + std::to_string(v.sizeY));
-                row("Pressed", v.onPressed.function.empty() ? "-" : v.onPressed.function);
+                row(NOX_TRC("editor.summary.size", "Size"), std::to_string(v.sizeX) + " x " + std::to_string(v.sizeY));
+                row(NOX_TRC("editor.summary.pressed", "Pressed"), v.onPressed.function.empty() ? "-" : v.onPressed.function);
             } else if constexpr (std::is_same_v<T, xf::InvisibleLight>) {
-                row("Radius", std::to_string(v.radius));
-                char b[48];
-                std::snprintf(b, sizeof b, "%.2f, colour %d %d %d", v.intensity, v.color[0], v.color[1], v.color[2]);
-                row("Intensity", b);
+                row(NOX_TRC("editor.summary.radius", "Radius"), std::to_string(v.radius));
+                char b[16];
+                std::snprintf(b, sizeof b, "%.2f", v.intensity);
+                row(NOX_TRC("editor.summary.intensity", "Intensity"),
+                    format(NOX_TR("editor.summary.intensity_value", "{intensity}, colour {r} {g} {b}"),
+                           {{"intensity", b}, {"r", static_cast<int>(v.color[0])}, {"g", static_cast<int>(v.color[1])}, {"b", static_cast<int>(v.color[2])}}));
             } else if constexpr (std::is_same_v<T, xf::Exit>) {
-                row("Map", v.mapName.substr(0, v.mapName.find('\0')).empty() ? "-" : v.mapName.substr(0, v.mapName.find('\0')));
+                row(NOX_TRC("editor.summary.map", "Map"), v.mapName.substr(0, v.mapName.find('\0')).empty() ? "-" : v.mapName.substr(0, v.mapName.find('\0')));
             } else if constexpr (std::is_same_v<T, xf::Transporter>) {
-                row("Links to", v.targetExtent ? "#" + std::to_string(v.targetExtent) : "-");
+                row(NOX_TRC("editor.summary.links_to", "Links to"), v.targetExtent ? "#" + std::to_string(v.targetExtent) : "-");
             } else if constexpr (std::is_same_v<T, xf::Elevator> || std::is_same_v<T, xf::ElevatorShaft>) {
-                row("Links to", v.linkedExtent ? "#" + std::to_string(v.linkedExtent) : "-");
+                row(NOX_TRC("editor.summary.links_to", "Links to"), v.linkedExtent ? "#" + std::to_string(v.linkedExtent) : "-");
             } else if constexpr (std::is_same_v<T, xf::Gold>) {
-                row("Amount", std::to_string(v.amount));
+                row(NOX_TRC("editor.summary.amount", "Amount"), std::to_string(v.amount));
             } else if constexpr (std::is_same_v<T, xf::Obelisk>) {
-                row("Mana", std::to_string(v.manaPool));
+                row(NOX_TRC("editor.summary.mana", "Mana"), std::to_string(v.manaPool));
             } else if constexpr (std::is_same_v<T, xf::Readable>) {
-                row("Text", v.text.substr(0, v.text.find('\0')).empty() ? "-" : v.text.substr(0, v.text.find('\0')));
+                row(NOX_TRC("editor.summary.text", "Text"), v.text.substr(0, v.text.find('\0')).empty() ? "-" : v.text.substr(0, v.text.find('\0')));
             } else if constexpr (std::is_same_v<T, xf::Weapon> || std::is_same_v<T, xf::Armor>) {
-                row("Durability", std::to_string(v.health));
+                row(NOX_TRC("editor.summary.durability", "Durability"), std::to_string(v.health));
                 std::string mods;
                 for (const auto& m : v.modifiers) {
                     if (!m.empty()) mods += (mods.empty() ? "" : ", ") + m;
                 }
-                row("Modifiers", mods.empty() ? "-" : mods);
+                row(NOX_TRC("editor.summary.modifiers", "Modifiers"), mods.empty() ? "-" : mods);
             } else if constexpr (std::is_same_v<T, xf::Sentry>) {
-                char b[32];
-                std::snprintf(b, sizeof b, "%.2f rad, speed %.3f", v.basePosition, v.rotateSpeed);
-                row("Beam", b);
+                char pos[16], speed[16];
+                std::snprintf(pos, sizeof pos, "%.2f", v.basePosition);
+                std::snprintf(speed, sizeof speed, "%.3f", v.rotateSpeed);
+                row(NOX_TRC("editor.summary.beam", "Beam"), format(NOX_TR("editor.summary.beam_value", "{position} rad, speed {speed}"), {{"position", pos}, {"speed", speed}}));
             } else if constexpr (std::is_same_v<T, xf::MonsterGenerator>) {
                 std::size_t n = 0;
                 for (const auto& g : v.groups) n += g.size();
-                row("Templates", std::to_string(n));
+                row(NOX_TRC("editor.summary.templates", "Templates"), std::to_string(n));
             } else if constexpr (std::is_same_v<T, xf::RewardMarker>) {
                 char b[16];
                 std::snprintf(b, sizeof b, "0x%X", v.rewardType);
-                row("Kinds", b);
+                row(NOX_TRC("editor.summary.kinds", "Kinds"), b);
             }
         },
         o.data);
@@ -586,45 +601,47 @@ void ObjectTools::reloadPrefabs()
 void ObjectTools::savePrefab(const std::string& name)
 {
     if (ed_.selection_.empty()) {
-        ed_.status("Select what the prefab holds first");
+        ed_.status(NOX_TR("editor.prefab.select_first", "Select what the prefab holds first"));
         return;
     }
     const me::Prefab p = me::makePrefab(ed_.doc_, ed_.selection_, name);
     if (writeDir_.empty()) {
         // (a test's run with no user folder: kept for this session only)
         prefabs_.push_back(p);
-        ed_.status("Prefab " + name + " kept for this session (no user folder to save it in)");
+        ed_.status(format(NOX_TR("editor.prefab.kept_session", "Prefab {name} kept for this session (no user folder to save it in)"), {{"name", name}}));
         return;
     }
     try {
         const fs::path file = me::savePrefab(writeDir_ / "prefabs", p, ed_.things_);
         reloadPrefabs();
-        ed_.status("Saved prefab " + name + " (" + std::to_string(p.objectCount()) + " objects) to " + nox::pathUtf8(file));
+        ed_.status(format(NOX_TR("editor.prefab.saved", "Saved prefab {name} ({n} objects) to {path}"),
+                          {{"name", name}, {"n", p.objectCount()}, {"path", nox::pathUtf8(file)}}));
     } catch (const std::exception& ex) {
-        ed_.status(std::string("Prefab not saved: ") + ex.what());
+        ed_.status(format(NOX_TR("editor.prefab.not_saved", "Prefab not saved: {error}"), {{"error", ex.what()}}));
     }
 }
 
 void ObjectTools::prefabDialog()
 {
     if (prefabOpen_) {
-        ImGui::OpenPopup("Save Prefab");
+        ImGui::OpenPopup(NOX_TRI("editor.prefab.title", "Save Prefab"));
         prefabOpen_ = false;
     }
-    if (!ImGui::BeginPopupModal("Save Prefab", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-    ImGui::Text("%zu selected: they're saved with their places relative to each other,", ed_.selection_.size());
-    ImGui::TextUnformatted("their links between each other (teleporters, elevators, movers, waypoints) kept.");
+    if (!ImGui::BeginPopupModal(NOX_TRI("editor.prefab.title", "Save Prefab"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    ImGui::TextUnformatted(
+        format(NOX_TR("editor.prefab.selected", "{n} selected: they're saved with their places relative to each other,"), {{"n", ed_.selection_.size()}}).c_str());
+    ImGui::TextUnformatted(NOX_TRC("editor.prefab.links_kept", "their links between each other (teleporters, elevators, movers, waypoints) kept."));
     if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-    ImGui::InputTextWithHint("##prefab", "name", prefabName_, sizeof prefabName_);
+    ImGui::InputTextWithHint("##prefab", NOX_TRC("editor.prefab.name_hint", "name"), prefabName_, sizeof prefabName_);
     const bool ok = prefabName_[0] != 0;
     ImGui::BeginDisabled(!ok);
-    if (ImGui::Button("Save") || (ok && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+    if (ImGui::Button(NOX_TRI("editor.common.save", "Save")) || (ok && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
         savePrefab(prefabName_);
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+    if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
 }
 

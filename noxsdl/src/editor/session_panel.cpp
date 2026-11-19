@@ -12,9 +12,11 @@
 
 #include "noxcore/client/edit_session_client.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 #include "noxcore/mapedit/pending.hpp"
 #include "noxcore/mapedit/validate.hpp"
 #include "noxcore/server/world.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
 #include <imgui.h>
@@ -48,6 +50,18 @@ void help(const char* text)
 
 using editor::kSessionModes;
 
+/// A role as the People table shows it (roleName's English is the session log's).
+const char* roleText(ss::Role r)
+{
+    switch (r) {
+    case ss::Role::Player: return NOX_TRC("editor.session.role.player", "player");
+    case ss::Role::Viewer: return NOX_TRC("editor.session.role.viewer", "viewer");
+    case ss::Role::Editor: return NOX_TRC("editor.session.role.editor", "editor");
+    case ss::Role::Owner: return NOX_TRC("editor.session.role.host", "host");
+    }
+    return ss::roleName(r);
+}
+
 } // namespace
 
 void MapEditor::attachSession(nox::client::EditSessionClient* session, SessionHooks hooks)
@@ -70,7 +84,7 @@ void MapEditor::attachSession(nox::client::EditSessionClient* session, SessionHo
             history_.touch();
             docPath_.clear();
             sessionSeqs_.clear();
-            status("The session ended: the map stays here as an unsaved copy (Save As keeps it)");
+            status(NOX_TR("editor.session.ended", "The session ended: the map stays here as an unsaved copy (Save As keeps it)"));
         }
         return;
     }
@@ -87,7 +101,8 @@ void MapEditor::attachSession(nox::client::EditSessionClient* session, SessionHo
     sessionLiveVersion_ = ~0u;
     pendingFor_ = {};
     if (scriptPanel_) scriptPanel_->documentOpened();
-    status(session_->synced() ? "In the session: " + docName_ : "Joining the session...");
+    status(session_->synced() ? nox::l10n::format(NOX_TR("editor.session.in_session", "In the session: {map}"), {{"map", docName_}})
+                          : NOX_TR("editor.session.joining", "Joining the session..."));
 }
 
 void MapEditor::showSessionSetup(std::function<void(const editor::SessionSetup&)> host, std::function<void()> cancelled)
@@ -160,11 +175,11 @@ bool MapEditor::liveInput(const ImVec2& origin, bool hovered)
         const auto it = std::ranges::find_if(live_, [&](const LiveEntity& e) { return e.player && e.id == *follow_; });
         if (it == live_.end()) {
             follow_.reset();
-            status("The player you followed left the game");
+            status(NOX_TR("editor.session.followed_left", "The player you followed left the game"));
         } else if (drag_ == Drag::Pan || (rightDragging_ && ImGui::IsMouseDown(ImGuiMouseButton_Right)) ||
                    (hovered && ImGui::IsKeyPressed(ImGuiKey_Escape, false))) {
             follow_.reset();
-            status("Stopped following " + it->name);
+            status(nox::l10n::format(NOX_TR("editor.session.stopped_following", "Stopped following {name}"), {{"name", it->name}}));
         } else {
             std::tie(camera_.x, camera_.y) = livePos(*it);
             cameraSet_ = true;
@@ -175,7 +190,8 @@ bool MapEditor::liveInput(const ImVec2& origin, bool hovered)
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         if (const LiveEntity* e = liveAt(origin, m)) {
             follow_ = e->id;
-            status("Following " + e->name + " (pan or Escape stops; right-click: Jump in here)");
+            status(nox::l10n::format(NOX_TR("editor.session.following_click", "Following {name} (pan or Escape stops; right-click: Jump in here)"),
+                                     {{"name", e->name}}));
             return true;
         }
     }
@@ -193,25 +209,26 @@ void MapEditor::liveMenu()
     }
     if (liveMenu_) {
         const LiveEntity e = *liveMenu_;
-        ImGui::TextDisabled("%s%s", e.name.c_str(), e.stockClient ? "  [stock]" : "  [NoX Core]");
+        ImGui::TextDisabled("%s%s", e.name.c_str(), e.stockClient ? NOX_TRC("editor.session.stock_mark", "  [stock]") : "  [NoX Core]");
         ImGui::Separator();
         const bool following = follow_ && *follow_ == e.id;
-        if (ImGui::MenuItem(following ? "Stop following" : "Follow")) {
+        if (ImGui::MenuItem(following ? NOX_TRI("editor.session.stop_following", "Stop following") : NOX_TRI("editor.session.follow", "Follow"))) {
             if (following) {
                 follow_.reset();
             } else {
                 follow_ = e.id;
-                status("Following " + e.name + " (pan or Escape stops)");
+                status(nox::l10n::format(NOX_TR("editor.session.following", "Following {name} (pan or Escape stops)"), {{"name", e.name}}));
             }
             liveMenu_.reset();
         }
         const bool self = e.name == session_->nameOf(self_);
-        if (ImGui::MenuItem("Jump in here", nullptr, false, !self && !session_->playTestRunning())) {
+        if (ImGui::MenuItem(NOX_TRI("editor.session.jump_in_here", "Jump in here"), nullptr, false, !self && !session_->playTestRunning())) {
             jumpInAt(e);
             liveMenu_.reset();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip("%s", self ? "That's you" : "Your character into the game beside this player, and play (F2 comes back)");
+            ImGui::SetTooltip("%s", self ? NOX_TRC("editor.session.thats_you", "That's you")
+                                        : NOX_TRC("editor.session.jump_in_tip", "Your character into the game beside this player, and play (F2 comes back)"));
         }
     }
     ImGui::EndPopup();
@@ -222,7 +239,7 @@ void MapEditor::jumpInAt(const LiveEntity& e)
     if (!session_) return;
     session_->jumpIn(e.id);
     follow_.reset();
-    status("Jumping in beside " + e.name);
+    status(nox::l10n::format(NOX_TR("editor.session.jumping_in", "Jumping in beside {name}"), {{"name", e.name}}));
     if (sessionHooks_.toGameAsIs) {
         sessionHooks_.toGameAsIs();
     } else if (sessionHooks_.toGame) {
@@ -236,7 +253,7 @@ void MapEditor::sessionPlayFrom(float x, float y)
     follow_.reset();
     char where[48];
     std::snprintf(where, sizeof where, "%.0f, %.0f", x, y);
-    status(std::string("Playing in the session from ") + where);
+    status(nox::l10n::format(NOX_TR("editor.session.playing_from", "Playing in the session from {where}"), {{"where", where}}));
     if (sessionHooks_.toGameAt) {
         sessionHooks_.toGameAt(x, y);
     } else if (sessionHooks_.toGame) {
@@ -256,23 +273,24 @@ void MapEditor::sessionPublish()
 {
     if (!session_) return;
     if (!session_->isOwner()) {
-        status("Only the session's host publishes");
+        status(NOX_TR("editor.session.only_host_publishes", "Only the session's host publishes"));
         return;
     }
     scriptPanel_->commit(); // (what's being typed goes first, as an op)
     session_->publish(true);
-    status("Publishing: the map changes for everyone (stock clients download it)");
+    status(NOX_TR("editor.session.publishing", "Publishing: the map changes for everyone (stock clients download it)"));
 }
 
 void MapEditor::sessionReloadScript(bool hot)
 {
     if (!session_) return;
     if (!session_->canEdit()) {
-        status("Only editors can reload the session's script");
+        status(NOX_TR("editor.session.only_editors_reload", "Only editors can reload the session's script"));
         return;
     }
     session_->reloadScript(hot);
-    status(std::string("Asked the host to ") + (hot ? "hot-reload" : "restart") + " the script for everyone in the game");
+    status(hot ? NOX_TR("editor.session.asked_hot_reload", "Asked the host to hot-reload the script for everyone in the game")
+               : NOX_TR("editor.session.asked_restart", "Asked the host to restart the script for everyone in the game"));
 }
 
 bool MapEditor::sessionStep(const std::string& step)
@@ -343,7 +361,7 @@ bool MapEditor::sessionStep(const std::string& step)
         commands_.run("play.start");
     } else if (step == "session-show") {
         showSession_ = true;
-        ImGui::SetWindowFocus("Session");
+        ImGui::SetWindowFocus(NOX_TRI("editor.window.session", "Session"));
     } else if (step == "session-setup") {
         showSessionSetup([this](const editor::SessionSetup& s) { status("Would host " + s.name); }); // (tests: the dialog alone)
     } else if (!session_) {
@@ -380,11 +398,11 @@ void MapEditor::sessionFrame()
             docName_ = session_->hello() ? session_->hello()->map : docName_;
             cameraSet_ = false;
             if (scriptPanel_) scriptPanel_->documentOpened();
-            status("In step with the session: " + docName_);
+            status(nox::l10n::format(NOX_TR("editor.session.in_step", "In step with the session: {map}"), {{"map", docName_}}));
             break;
         case Kind::Committed:
             if (e.author != 0) {
-                status(session_->nameOf(e.author) + ": " + (e.op ? e.op->label : std::string("an edit")));
+                status(session_->nameOf(e.author) + ": " + (e.op ? me::shownOpLabel(e.op->label) : NOX_TR("editor.session.an_edit", "an edit")));
             }
             break;
         case Kind::Acked:
@@ -402,7 +420,9 @@ void MapEditor::sessionFrame()
             break;
         case Kind::Rejected:
         case Kind::RolledBack:
-            status((e.kind == Kind::Rejected ? "Refused by the host: " : "Undone (another's edit came first): ") + e.text);
+            status(nox::l10n::format(e.kind == Kind::Rejected ? NOX_TR("editor.session.refused", "Refused by the host: {why}")
+                                                             : NOX_TR("editor.session.undone", "Undone (another's edit came first): {why}"),
+                                     {{"why", e.text}}));
             if (const auto it = sessionSeqs_.find(e.seq); it != sessionSeqs_.end()) {
                 if (it->second + 1 == history_.dropped() + history_.position()) {
                     history_.stepBack(); // (left to redo once it can: the lock let go)
@@ -412,18 +432,21 @@ void MapEditor::sessionFrame()
             break;
         case Kind::Role:
             sessionRoleText_ = e.text;
-            if (!e.text.empty()) status("Session: " + e.text);
+            if (!e.text.empty()) status(nox::l10n::format(NOX_TR("editor.session.host_says", "Session: {text}"), {{"text", e.text}}));
             break;
         case Kind::Request:
-            if (e.request.open && session_->isOwner()) status(e.request.name + " asks to edit");
+            if (e.request.open && session_->isOwner()) {
+                status(nox::l10n::format(NOX_TR("editor.session.asks_to_edit_status", "{name} asks to edit"), {{"name", e.request.name}}));
+            }
             break;
         case Kind::Published:
-            status(e.published.full ? "Published version " + std::to_string(e.published.version) + ": the map changes for everyone"
-                                    : "Objects published (auto) for players who join later");
+            status(e.published.full ? nox::l10n::format(NOX_TR("editor.session.published", "Published version {version}: the map changes for everyone"),
+                                                      {{"version", e.published.version}})
+                                    : NOX_TR("editor.session.published_auto", "Objects published (auto) for players who join later"));
             pendingFor_ = {};
             break;
         case Kind::ScriptDiag:
-            status("Script: " + e.diag.summary);
+            status(nox::l10n::format(NOX_TR("editor.session.script_status", "Script: {summary}"), {{"summary", e.diag.summary}}));
             break;
         case Kind::Locks:
         case Kind::LockAnswer: {
@@ -432,7 +455,9 @@ void MapEditor::sessionFrame()
             me::Selection held = me::withoutLocked(doc_, selection_, locks_, self_, &skipped);
             if (skipped > 0) {
                 selection_ = std::move(held);
-                status(std::to_string(skipped) + (skipped == 1 ? " item" : " items") + " let go: being edited by others");
+                status(nox::l10n::format(NOX_TRP("editor.session.let_go", "{n} item let go: being edited by others",
+                                                 "{n} items let go: being edited by others", skipped),
+                                         {{"n", skipped}}));
             }
             for (auto it = panelLocks_.begin(); it != panelLocks_.end();) {
                 it = otherHolder(*it) ? panelLocks_.erase(it) : std::next(it);
@@ -443,11 +468,11 @@ void MapEditor::sessionFrame()
             break;
         case Kind::Park:
             // (Our character stood aside or back: the host's reason when it didn't do as asked.)
-            if (!e.text.empty()) status("Session: " + e.text);
+            if (!e.text.empty()) status(nox::l10n::format(NOX_TR("editor.session.host_says", "Session: {text}"), {{"text", e.text}}));
             break;
         case Kind::Problem:
             if (e.problem.open) {
-                status("Session problem: " + e.problem.text);
+                status(nox::l10n::format(NOX_TR("editor.session.problem", "Session problem: {text}"), {{"text", e.problem.text}}));
                 showProblems_ = true;
             }
             break;
@@ -551,7 +576,7 @@ void MapEditor::drawSession(ImDrawList* dl, const ImVec2& origin, const ImVec2& 
         // (the host's Editors message).
         const auto* ed = session_->editorByPeer(peer);
         const bool idle = ed && ed->activity == ss::Activity::Idle;
-        const std::string name = session_->nameOf(peer) + (idle ? "  (idle)" : "");
+        const std::string name = session_->nameOf(peer) + (idle ? NOX_TR("editor.session.idle_mark", "  (idle)") : std::string());
         const float h = ImGui::GetTextLineHeight();
         const float pencil = std::round(h * 1.2f);
         dl->AddRectFilled(ImVec2(c.x + 8, c.y + 4), ImVec2(c.x + 14 + pencil + ImGui::CalcTextSize(name.c_str()).x, c.y + 6 + h), col(0, 0, 0, 160), 3);
@@ -564,41 +589,50 @@ void MapEditor::drawSession(ImDrawList* dl, const ImVec2& origin, const ImVec2& 
 
 void MapEditor::sessionPanel()
 {
-    if (!ImGui::Begin("Session", &showSession_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.session", "Session"), &showSession_)) {
         ImGui::End();
         return;
     }
     const ss::Hello* h = session_->hello();
     const bool owner = session_->isOwner();
-    ImGui::Text("Map: %s   version %u", docName_.c_str(), h ? h->version : 0);
-    ImGui::Text("You: %s%s", session_->nameOf(self_).c_str(),
-                owner ? " (host)" : session_->role() >= ss::Role::Editor ? " (editor)" : " (viewer: ask to edit)");
+    ImGui::TextUnformatted(nox::l10n::format(NOX_TR("editor.session.map_version", "Map: {map}   version {version}"),
+                                             {{"map", docName_}, {"version", h ? h->version : 0u}})
+                               .c_str());
+    ImGui::TextUnformatted(nox::l10n::format(owner                                    ? NOX_TR("editor.session.you_host", "You: {name} (host)")
+                                             : session_->role() >= ss::Role::Editor ? NOX_TR("editor.session.you_editor", "You: {name} (editor)")
+                                                                                    : NOX_TR("editor.session.you_viewer", "You: {name} (viewer: ask to edit)"),
+                                             {{"name", session_->nameOf(self_)}})
+                               .c_str());
     const editor::ThemeColours& tc = editor::themeColours();
-    if (!session_->synced()) ImGui::TextColored(tc.warning, "Catching up with the session...");
-    if (session_->playTestRunning()) ImGui::TextColored(tc.info, "A play-test round is running: editing waits");
+    if (!session_->synced()) ImGui::TextColored(tc.warning, "%s", NOX_TRC("editor.session.catching_up", "Catching up with the session..."));
+    if (session_->playTestRunning()) ImGui::TextColored(tc.info, "%s", NOX_TRC("editor.session.round_running", "A play-test round is running: editing waits"));
     if (h) {
-        ImGui::TextDisabled("%s%s", (h->flags & ss::kPlayersCantDie) ? "Sandbox: players can't die" : "Players can die",
-                            (h->flags & ss::kAutoPublish) ? "  |  object changes published automatically" : "");
+        ImGui::TextDisabled("%s%s",
+                            (h->flags & ss::kPlayersCantDie) ? NOX_TRC("editor.session.sandbox_cant_die", "Sandbox: players can't die")
+                                                             : NOX_TRC("editor.session.players_can_die_state", "Players can die"),
+                            (h->flags & ss::kAutoPublish) ? NOX_TRC("editor.session.auto_publish_mark", "  |  object changes published automatically") : "");
     }
-    if (!sessionRoleText_.empty()) ImGui::TextWrapped("Host: %s", sessionRoleText_.c_str());
+    if (!sessionRoleText_.empty()) {
+        ImGui::TextWrapped("%s", nox::l10n::format(NOX_TR("editor.session.host_role_text", "Host: {text}"), {{"text", sessionRoleText_}}).c_str());
+    }
 
     if (!owner && session_->role() < ss::Role::Editor) {
-        ImGui::SeparatorText("Edit rights");
+        ImGui::SeparatorText(NOX_TRC("editor.session.edit_rights", "Edit rights"));
         ImGui::SetNextItemWidth(-110);
-        ImGui::InputTextWithHint("##reason", "why (optional)", requestReason_, sizeof requestReason_);
+        ImGui::InputTextWithHint("##reason", NOX_TRC("editor.session.reason_hint", "why (optional)"), requestReason_, sizeof requestReason_);
         ImGui::SameLine();
-        if (ImGui::Button("Request edit")) {
+        if (ImGui::Button(NOX_TRI("editor.session.request_edit", "Request edit"))) {
             session_->requestEdit(requestReason_);
-            status("Asked the host for edit rights");
+            status(NOX_TR("editor.session.asked_edit_rights", "Asked the host for edit rights"));
         }
     }
 
-    ImGui::SeparatorText("People");
+    ImGui::SeparatorText(NOX_TRC("editor.session.people", "People"));
     if (ImGui::BeginTable("##roster", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableSetupColumn("Name");
-        ImGui::TableSetupColumn("Role");
-        ImGui::TableSetupColumn("Doing");
-        ImGui::TableSetupColumn("Client");
+        ImGui::TableSetupColumn(NOX_TRI("editor.session.col_name", "Name"));
+        ImGui::TableSetupColumn(NOX_TRI("editor.session.col_role", "Role"));
+        ImGui::TableSetupColumn(NOX_TRI("editor.session.col_doing", "Doing"));
+        ImGui::TableSetupColumn(NOX_TRI("editor.session.col_client", "Client"));
         ImGui::TableSetupColumn("");
         ImGui::TableHeadersRow();
         for (const auto& r : session_->roster()) {
@@ -613,14 +647,14 @@ void MapEditor::sessionPanel()
                 const ImVec2 at = ImGui::GetCursorScreenPos();
                 ImGui::Dummy(ImVec2(lineH, lineH));
                 editor::pencilMark(ImGui::GetWindowDrawList(), ImVec2(at.x + lineH / 2, at.y + lineH / 2), lineH, r.peer, ed->activity == ss::Activity::Idle);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Editing the map (the pencil marks their character in the game)");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", NOX_TRC("editor.session.editing_tip", "Editing the map (the pencil marks their character in the game)"));
             } else {
                 ImGui::ColorButton("##c", ImGui::ColorConvertU32ToFloat4(peerColour(r.peer)), ImGuiColorEditFlags_NoTooltip, ImVec2(10, 10));
             }
             ImGui::SameLine();
             ImGui::TextUnformatted(r.name.c_str());
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(ss::roleName(r.role));
+            ImGui::TextUnformatted(roleText(r.role));
             ImGui::TableNextColumn();
             if (ed) {
                 // What they're doing, and what they're working on (their locks, as the map shows
@@ -628,7 +662,7 @@ void MapEditor::sessionPanel()
                 const std::set<me::ElementKey> held = locks_.heldBy(r.peer);
                 std::string doing = editor::activityText(ed->activity);
                 if (!held.empty()) {
-                    doing += ": " + held.begin()->text();
+                    doing += ": " + held.begin()->shownText();
                     if (held.size() > 1) doing += " +" + std::to_string(held.size() - 1);
                 }
                 const ImVec4 tint = ed->activity == ss::Activity::Idle ? tc.idle
@@ -640,10 +674,10 @@ void MapEditor::sessionPanel()
                     std::size_t n = 0;
                     for (const auto& k : held) {
                         if (++n > 20) {
-                            all += "\n... " + std::to_string(held.size() - 20) + " more";
+                            all += "\n... " + nox::l10n::format(NOX_TR("editor.session.n_more", "{n} more"), {{"n", held.size() - 20}});
                             break;
                         }
-                        all += (all.empty() ? "" : "\n") + k.text();
+                        all += (all.empty() ? "" : "\n") + k.shownText();
                     }
                     ImGui::SetTooltip("%s", all.c_str());
                 }
@@ -651,11 +685,11 @@ void MapEditor::sessionPanel()
                 ImGui::TextDisabled("-");
             }
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(r.stock ? "stock" : "NoX Core");
+            ImGui::TextUnformatted(r.stock ? NOX_TRC("editor.session.client_stock", "stock") : "NoX Core");
             ImGui::TableNextColumn();
             if (owner && r.peer != self_) {
-                if (r.role == ss::Role::Editor && ImGui::SmallButton("Revoke")) session_->revoke(r.peer);
-                if (r.role == ss::Role::Viewer && ImGui::SmallButton("Let edit")) session_->answer(r.peer, 1);
+                if (r.role == ss::Role::Editor && ImGui::SmallButton(NOX_TRI("editor.session.revoke", "Revoke"))) session_->revoke(r.peer);
+                if (r.role == ss::Role::Viewer && ImGui::SmallButton(NOX_TRI("editor.session.let_edit", "Let edit"))) session_->answer(r.peer, 1);
                 ImGui::SameLine();
             }
             // The camera on them, or our character in beside them.
@@ -663,19 +697,19 @@ void MapEditor::sessionPanel()
                 const auto live = std::ranges::find_if(live_, [&](const LiveEntity& e) { return e.player && e.name == r.name; });
                 if (live != live_.end()) {
                     const bool following = follow_ && *follow_ == live->id;
-                    if (ImGui::SmallButton(following ? "Unfollow" : "Follow")) {
+                    if (ImGui::SmallButton(following ? NOX_TRI("editor.session.unfollow", "Unfollow") : NOX_TRI("editor.session.follow", "Follow"))) {
                         if (following) {
                             follow_.reset();
                         } else {
                             follow_ = live->id;
                         }
                     }
-                    help("The camera follows this player in the game (pan or Escape stops).");
+                    help(NOX_TRC("editor.session.follow_tip", "The camera follows this player in the game (pan or Escape stops)."));
                     ImGui::SameLine();
                     ImGui::BeginDisabled(session_->playTestRunning());
-                    if (ImGui::SmallButton("Jump in")) jumpInAt(*live);
+                    if (ImGui::SmallButton(NOX_TRI("editor.session.jump_in", "Jump in"))) jumpInAt(*live);
                     ImGui::EndDisabled();
-                    help("Your character into the game beside this player, and play (F2 comes back).");
+                    help(NOX_TRC("editor.session.jump_in_help", "Your character into the game beside this player, and play (F2 comes back)."));
                 }
             }
             ImGui::PopID();
@@ -685,51 +719,54 @@ void MapEditor::sessionPanel()
 
     if (owner) {
         if (!session_->requests().empty()) {
-            ImGui::SeparatorText("Asking to edit");
+            ImGui::SeparatorText(NOX_TRC("editor.session.asking_to_edit", "Asking to edit"));
             // (A copy: an answer takes its request off the list at once, under the loop.)
             const auto requests = session_->requests();
             for (const auto& q : requests) {
                 ImGui::PushID(static_cast<int>(q.peer));
                 ImGui::TextWrapped("%s%s%s", q.name.c_str(), q.reason.empty() ? "" : ": ", q.reason.c_str());
-                if (ImGui::SmallButton("Approve")) session_->answer(q.peer, 1);
+                if (ImGui::SmallButton(NOX_TRI("editor.session.approve", "Approve"))) session_->answer(q.peer, 1);
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Always")) session_->answer(q.peer, 2);
-                help("Approve, and let this player edit whenever they join.");
+                if (ImGui::SmallButton(NOX_TRI("editor.session.always", "Always"))) session_->answer(q.peer, 2);
+                help(NOX_TRC("editor.session.always_tip", "Approve, and let this player edit whenever they join."));
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Deny")) session_->answer(q.peer, 0);
+                if (ImGui::SmallButton(NOX_TRI("editor.session.deny", "Deny"))) session_->answer(q.peer, 0);
                 ImGui::PopID();
             }
         }
-        ImGui::SeparatorText("Publish");
-        if (ImGui::Button("Publish (map change)")) sessionPublish();
+        ImGui::SeparatorText(NOX_TRC("editor.session.publish_heading", "Publish"));
+        if (ImGui::Button(NOX_TRI("editor.session.publish_map", "Publish (map change)"))) sessionPublish();
         ImGui::SameLine();
-        if (ImGui::Button("Objects only")) session_->publish(false);
-        help("Write the working objects for players who join later, without a map change (the game already has them).");
+        if (ImGui::Button(NOX_TRI("editor.session.publish_objects", "Objects only"))) session_->publish(false);
+        help(NOX_TRC("editor.session.publish_objects_tip",
+                     "Write the working objects for players who join later, without a map change (the game already has them)."));
 
-        ImGui::SeparatorText("Play-test round");
+        ImGui::SeparatorText(NOX_TRC("editor.session.round_heading", "Play-test round"));
         ImGui::SetNextItemWidth(160);
-        if (ImGui::BeginCombo("Mode", kSessionModes[playTestModeIndex_].name)) {
+        if (ImGui::BeginCombo(NOX_TRI("editor.session.round_mode", "Mode"), nox::l10n::trImGui(kSessionModes[playTestModeIndex_].name))) {
             for (int i = 0; i < static_cast<int>(std::size(kSessionModes)); ++i) {
-                if (ImGui::Selectable(kSessionModes[i].name, i == playTestModeIndex_)) playTestModeIndex_ = i;
+                if (ImGui::Selectable(nox::l10n::trImGui(kSessionModes[i].name), i == playTestModeIndex_)) playTestModeIndex_ = i;
             }
             ImGui::EndCombo();
         }
-        ImGui::Checkbox("Players can die", &playTestCanDie_);
+        ImGui::Checkbox(NOX_TRI("editor.session.players_can_die", "Players can die"), &playTestCanDie_);
         if (!session_->playTestRunning()) {
-            if (ImGui::Button("Start play-test")) session_->playTest(true, kSessionModes[playTestModeIndex_].bits, playTestCanDie_);
-            help("Publishes what's pending, then the map's real mode for everyone; editing waits till it ends.");
-        } else if (ImGui::Button("End play-test")) {
+            if (ImGui::Button(NOX_TRI("editor.session.start_round", "Start play-test"))) {
+                session_->playTest(true, kSessionModes[playTestModeIndex_].bits, playTestCanDie_);
+            }
+            help(NOX_TRC("editor.session.start_round_tip", "Publishes what's pending, then the map's real mode for everyone; editing waits till it ends."));
+        } else if (ImGui::Button(NOX_TRI("editor.session.end_round", "End play-test"))) {
             session_->playTest(false);
         }
 
-        ImGui::SeparatorText("Settings");
+        ImGui::SeparatorText(NOX_TRC("editor.session.settings", "Settings"));
         if (h) {
             std::uint8_t flags = static_cast<std::uint8_t>(h->flags & ~ss::kPlayTestRunning);
             bool changed = false;
             int m = h->editMode == ss::EditMode::Approve ? 1 : 0;
-            changed |= ImGui::RadioButton("Only me", &m, 0);
+            changed |= ImGui::RadioButton(NOX_TRI("editor.session.only_me", "Only me"), &m, 0);
             ImGui::SameLine();
-            changed |= ImGui::RadioButton("Others when I approve", &m, 1);
+            changed |= ImGui::RadioButton(NOX_TRI("editor.session.others_approve", "Others when I approve"), &m, 1);
             const auto flag = [&](const char* label, std::uint8_t bit) {
                 bool on = (flags & bit) != 0;
                 if (ImGui::Checkbox(label, &on)) {
@@ -737,37 +774,38 @@ void MapEditor::sessionPanel()
                     changed = true;
                 }
             };
-            flag("Players can't die", ss::kPlayersCantDie);
-            flag("Live view", ss::kLiveView);
+            flag(NOX_TRI("editor.session.players_cant_die", "Players can't die"), ss::kPlayersCantDie);
+            flag(NOX_TRI("editor.session.live_view", "Live view"), ss::kLiveView);
             ImGui::SameLine();
-            flag("Creatures too", ss::kLiveCreatures);
-            flag("Publish objects automatically", ss::kAutoPublish);
+            flag(NOX_TRI("editor.session.creatures_too", "Creatures too"), ss::kLiveCreatures);
+            flag(NOX_TRI("editor.session.auto_publish", "Publish objects automatically"), ss::kAutoPublish);
             if (changed) session_->settings(m ? ss::EditMode::Approve : ss::EditMode::HostOnly, flags);
         }
 
         if (!locks_.all().empty()) {
-            ImGui::SeparatorText("Locks");
+            ImGui::SeparatorText(NOX_TRC("editor.session.locks", "Locks"));
             for (const auto& [k, holder] : locks_.all()) {
                 ImGui::PushID(&k);
                 ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(peerColour(holder.peer))), "%s", session_->nameOf(holder.peer).c_str());
                 ImGui::SameLine();
-                ImGui::TextUnformatted(k.text().c_str());
+                ImGui::TextUnformatted(k.shownText().c_str());
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Force release")) session_->forceRelease(k);
+                if (ImGui::SmallButton(NOX_TRI("editor.session.force_release", "Force release"))) session_->forceRelease(k);
                 ImGui::PopID();
             }
         }
     }
 
     if (const auto& d = session_->lastDiag()) {
-        ImGui::SeparatorText("Script");
+        ImGui::SeparatorText(NOX_TRC("editor.session.script", "Script"));
         ImGui::TextWrapped("%s", d->summary.c_str());
         for (std::size_t i = 0; i < d->diagnostics.size() && i < 8; ++i) {
             const auto& x = d->diagnostics[i];
-            ImGui::TextColored(x.error ? tc.error : tc.warning, "line %u: %s", x.line, x.text.c_str());
+            ImGui::TextColored(x.error ? tc.error : tc.warning, "%s",
+                               nox::l10n::format(NOX_TR("editor.session.diag_line", "line {line}: {text}"), {{"line", x.line}, {"text", x.text}}).c_str());
         }
     }
-    ImGui::SeparatorText("Session log");
+    ImGui::SeparatorText(NOX_TRC("editor.session.log", "Session log"));
     const auto& lines = session_->logLines();
     const std::size_t from = lines.size() > 12 ? lines.size() - 12 : 0;
     for (std::size_t i = from; i < lines.size(); ++i) ImGui::TextWrapped("%s", lines[i].c_str());
@@ -787,21 +825,21 @@ void MapEditor::requestToast()
         const me::PeerId who = q.peer;
         ImGui::TextColored(editor::onPanel(ImGui::ColorConvertU32ToFloat4(peerColour(who))), "%s", q.name.c_str());
         ImGui::SameLine(0, 4);
-        ImGui::Text("asks to edit%s%s", q.reason.empty() ? "" : ": ", q.reason.c_str());
+        ImGui::TextUnformatted((NOX_TR("editor.session.asks_to_edit", "asks to edit") + (q.reason.empty() ? std::string() : ": " + q.reason)).c_str());
         const std::size_t more = session_->requests().size() - 1;
-        if (ImGui::Button("Approve")) session_->answer(who, 1);
+        if (ImGui::Button(NOX_TRI("editor.session.approve", "Approve"))) session_->answer(who, 1);
         ImGui::SameLine(0, 2);
         if (ImGui::ArrowButton("##more", ImGuiDir_Down)) ImGui::OpenPopup("##approveHow");
         if (ImGui::BeginPopup("##approveHow")) {
-            if (ImGui::Selectable("For this session")) session_->answer(who, 1);
-            if (ImGui::Selectable("Always for this player")) session_->answer(who, 2);
+            if (ImGui::Selectable(NOX_TRI("editor.session.approve_once", "For this session"))) session_->answer(who, 1);
+            if (ImGui::Selectable(NOX_TRI("editor.session.approve_always", "Always for this player"))) session_->answer(who, 2);
             ImGui::EndPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Deny")) session_->answer(who, 0);
+        if (ImGui::Button(NOX_TRI("editor.session.deny", "Deny"))) session_->answer(who, 0);
         if (more > 0) {
             ImGui::SameLine();
-            ImGui::TextDisabled("(+%zu more: Session panel)", more);
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.session.more_requests", "(+{n} more: Session panel)"), {{"n", more}}).c_str());
         }
     }
     ImGui::End();

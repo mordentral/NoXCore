@@ -2,6 +2,7 @@
 #include "content/game_files.hpp"
 
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
@@ -59,23 +60,23 @@ bool present(const fs::path& p)
 const char* fileKindLabel(FileKind kind)
 {
     switch (kind) {
-    case FileKind::Things: return "Things";
-    case FileKind::Modifiers: return "Weapons & armour";
-    case FileKind::GameData: return "Tuning";
-    case FileKind::Monsters: return "Monsters";
-    case FileKind::SoundSets: return "Sound sets";
-    case FileKind::Strings: return "Strings";
-    case FileKind::Images: return "Images / HD";
-    case FileKind::Audio: return "Audio";
-    case FileKind::Dialog: return "Dialog";
-    case FileKind::Windows: return "Windows (.wnd)";
-    case FileKind::Maps: return "Maps";
-    case FileKind::Rules: return "Rules (.rul)";
-    case FileKind::Characters: return "Characters";
-    case FileKind::Mods: return "Mods";
-    case FileKind::Text: return "Map cycle / MOTD";
-    case FileKind::Fonts: return "Fonts";
-    case FileKind::Palette: return "Palette";
+    case FileKind::Things: return NOX_TRC("content.section.things", "Things");
+    case FileKind::Modifiers: return NOX_TRC("content.section.modifiers", "Weapons & armour");
+    case FileKind::GameData: return NOX_TRC("content.section.game_data", "Tuning");
+    case FileKind::Monsters: return NOX_TRC("content.section.monsters", "Monsters");
+    case FileKind::SoundSets: return NOX_TRC("content.section.sound_sets", "Sound sets");
+    case FileKind::Strings: return NOX_TRC("content.section.strings", "Strings");
+    case FileKind::Images: return NOX_TRC("content.section.images", "Images / HD");
+    case FileKind::Audio: return NOX_TRC("content.section.audio", "Audio");
+    case FileKind::Dialog: return NOX_TRC("content.section.dialog", "Dialog");
+    case FileKind::Windows: return NOX_TRC("content.section.windows", "Windows (.wnd)");
+    case FileKind::Maps: return NOX_TRC("content.section.maps", "Maps");
+    case FileKind::Rules: return NOX_TRC("content.section.rules", "Rules (.rul)");
+    case FileKind::Characters: return NOX_TRC("content.section.characters", "Characters");
+    case FileKind::Mods: return NOX_TRC("content.section.mods", "Mods");
+    case FileKind::Text: return NOX_TRC("content.section.text", "Map cycle / MOTD");
+    case FileKind::Fonts: return NOX_TRC("content.section.fonts", "Fonts");
+    case FileKind::Palette: return NOX_TRC("content.section.palette", "Palette");
     }
     return "?";
 }
@@ -127,7 +128,7 @@ GameFiles GameFiles::load(const GameFileDirs& dirs)
         s.path = findNoCase(game, name);
         s.optional = optional;
         if (!present(s.path)) {
-            s.error = "not found";
+            s.error = NOX_TR("content.files.not_found", "not found");
         } else {
             try {
                 fn(s.path);

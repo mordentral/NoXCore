@@ -9,6 +9,7 @@
 #include "editor/theme.hpp"
 #include "editor/theme_colours.hpp"
 
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <imgui.h>
@@ -27,8 +28,6 @@ using content::RecordList;
 using content::RecordRef;
 
 namespace {
-
-constexpr SDL_DialogFileFilter kPackFilter[] = {{"Image pack", "nxp"}};
 
 fs::path exeDir()
 {
@@ -54,6 +53,22 @@ noxsdl::editor::Theme themeOf(const Settings& s)
     noxsdl::editor::Theme t = noxsdl::editor::Theme::Dark;
     noxsdl::editor::themeFromKey(s.theme, t);
     return t;
+}
+
+/// A panel's window title, in the editor's language (its window known by the English name: every
+/// Begin, dock and focus of it goes through here).
+const char* panelTitle(std::string_view name)
+{
+    if (name == panel::kContent) return NOX_TRI("content.panel.content", "Content");
+    if (name == panel::kRecord) return NOX_TRI("content.panel.record", "Record");
+    if (name == panel::kImages) return NOX_TRI("content.panel.images", "Images");
+    if (name == panel::kSprites) return NOX_TRI("content.panel.sprites", "Sprites");
+    if (name == panel::kPreview) return NOX_TRI("content.panel.preview", "Preview");
+    if (name == panel::kReferences) return NOX_TRI("content.panel.references", "References");
+    if (name == panel::kChanges) return NOX_TRI("content.panel.changes", "Changes");
+    if (name == panel::kProblems) return NOX_TRI("content.panel.problems", "Problems");
+    if (name == panel::kLog) return NOX_TRI("content.panel.log", "Log");
+    return "?";
 }
 
 /// "thing:GruntAxe" -> the list and the name.
@@ -217,8 +232,9 @@ void Shell::openGame()
             session_.log(std::format("{}: {}", utf8(s.path), s.error));
         }
     }
-    session_.setStatus(std::format("Opened {}: {} records{}", gameBuf_, ws_->index.recordCount(),
-                                   failed ? std::format(", {} files missing or broken (see Problems)", failed) : std::string()));
+    session_.setStatus(nox::l10n::format(NOX_TR("content.shell.opened", "Opened {folder}: {n} records"), {{"folder", gameBuf_}, {"n", ws_->index.recordCount()}}) +
+                       (failed ? nox::l10n::format(NOX_TR("content.shell.opened_failed", ", {n} files missing or broken (see Problems)"), {{"n", failed}})
+                               : std::string()));
 }
 
 void Shell::openPack(const fs::path& p)
@@ -274,8 +290,9 @@ bool Shell::mayQuit()
     if ((edits() == 0 && !packUnsaved) || quitConfirmed_) {
         return true;
     }
-    session_.confirm("Quit without saving?",
-                     packUnsaved ? std::string("The content pack's changes aren't saved. Quit anyway?") : std::format("{} edits aren't saved. Quit anyway?", edits()),
+    session_.confirm(NOX_TR("content.shell.quit_title", "Quit without saving?"),
+                     packUnsaved ? NOX_TR("content.shell.quit_pack", "The content pack's changes aren't saved. Quit anyway?")
+                                 : nox::l10n::format(NOX_TR("content.shell.quit_edits", "{n} edits aren't saved. Quit anyway?"), {{"n", edits()}}),
                      [this] { quitConfirmed_ = true; });
     return false;
 }
@@ -294,12 +311,14 @@ void Shell::openContentPack(const std::string& id)
     const fs::path dir = modsDir_ / id / "content";
     packProblems_.clear();
     for (const std::string& p : ws_->pack.openPack(dir, id)) {
-        session_.log("content pack " + id + ": " + p);
-        packProblems_.push_back("content pack " + id + ": " + p);
+        const std::string line = nox::l10n::format(NOX_TR("content.shell.pack_problem", "content pack {id}: {problem}"), {{"id", id}, {"problem", p}});
+        session_.log(line);
+        packProblems_.push_back(line);
     }
     ws_->syncNewThings(); // (its new types listed in Content now: --show finds them)
     settings_.packId = id;
-    session_.setStatus(std::format("Content pack {}: {} changes ({})", id, ws_->pack.changeCount(), utf8(dir)));
+    session_.setStatus(nox::l10n::format(NOX_TR("content.shell.pack_opened", "Content pack {id}: {n} changes ({folder})"),
+                                         {{"id", id}, {"n", ws_->pack.changeCount()}, {"folder", utf8(dir)}}));
 }
 
 void Shell::savePack()
@@ -311,10 +330,11 @@ void Shell::savePack()
     }
     try {
         ws_->pack.save();
-        session_.setStatus(std::format("Saved content pack {}: {} changes in {}", ws_->pack.packId(), ws_->pack.changeCount(), utf8(ws_->pack.contentDir())),
+        session_.setStatus(nox::l10n::format(NOX_TR("content.shell.pack_saved", "Saved content pack {id}: {n} changes in {folder}"),
+                                             {{"id", ws_->pack.packId()}, {"n", ws_->pack.changeCount()}, {"folder", utf8(ws_->pack.contentDir())}}),
                            ws_->pack.contentDir());
     } catch (const std::exception& ex) {
-        session_.error(std::string("Can't save the content pack: ") + ex.what());
+        session_.error(nox::l10n::format(NOX_TR("content.shell.cant_save_pack", "Can't save the content pack: {error}"), {{"error", ex.what()}}));
     }
 }
 
@@ -323,14 +343,14 @@ void Shell::exportFull(const fs::path& dir)
     // Never into the game's folder (or any holding GAME.EXE): whole files go to a folder of their own.
     const std::string refused = editor::checkSaveTarget(dir / "gamedata.bin", {}, {pathFromUtf8(gameBuf_)});
     if (!refused.empty()) {
-        session_.error("Not there: " + refused);
+        session_.error(nox::l10n::format(NOX_TR("content.common.not_there", "Not there: {why}"), {{"why", refused}}));
         return;
     }
     try {
         const auto written = ws_->pack.exportFull(dir);
-        session_.setStatus(std::format("Exported {} whole files to {}", written.size(), utf8(dir)), dir);
+        session_.setStatus(nox::l10n::format(NOX_TR("content.shell.exported", "Exported {n} whole files to {folder}"), {{"n", written.size()}, {"folder", utf8(dir)}}), dir);
     } catch (const std::exception& ex) {
-        session_.error(std::string("Can't export: ") + ex.what());
+        session_.error(nox::l10n::format(NOX_TR("content.shell.cant_export", "Can't export: {error}"), {{"error", ex.what()}}));
     }
 }
 
@@ -352,14 +372,14 @@ std::optional<RecordRef> Shell::recordOf(const content::FieldEdit& e) const
 void Shell::packPopups()
 {
     if (newPackOpen_) {
-        ImGui::OpenPopup("New content pack");
+        ImGui::OpenPopup(NOX_TRI("content.shell.new_pack_title", "New content pack"));
         newPackOpen_ = false;
         newPackBuf_[0] = 0;
     }
-    if (ImGui::BeginPopupModal("New content pack", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("A content pack is a folder in the mods folder:");
+    if (ImGui::BeginPopupModal(NOX_TRI("content.shell.new_pack_title", "New content pack"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(NOX_TRC("content.shell.new_pack_where", "A content pack is a folder in the mods folder:"));
         ImGui::TextDisabled("%s", utf8(modsDir_ / "<name>" / "content").c_str());
-        ImGui::TextUnformatted("Its name (letters, digits, - and _):");
+        ImGui::TextUnformatted(NOX_TRC("content.shell.new_pack_name", "Its name (letters, digits, - and _):"));
         if (ImGui::IsWindowAppearing()) {
             ImGui::SetKeyboardFocusHere();
         }
@@ -371,10 +391,11 @@ void Shell::packPopups()
         std::error_code ec;
         const bool exists = valid && fs::exists(modsDir_ / id, ec);
         if (exists) {
-            ImGui::TextColored(noxsdl::editor::themeColours().warning, "mods\\%s is there already: its pack is opened (its changes join yours).", id.c_str());
+            ImGui::TextColored(noxsdl::editor::themeColours().warning, "%s",
+                               nox::l10n::format(NOX_TR("content.shell.new_pack_exists", "mods\\{id} is there already: its pack is opened (its changes join yours)."), {{"id", id}}).c_str());
         }
         ImGui::BeginDisabled(!valid);
-        if (ImGui::Button(exists ? "Open" : "Make") || (enter && valid)) {
+        if (ImGui::Button(exists ? NOX_TRI("content.shell.new_pack_open", "Open") : NOX_TRI("content.shell.new_pack_make", "Make")) || (enter && valid)) {
             // The edits made so far go along into the pack.
             const auto carried = ws_->pack.edits();
             const auto carriedThings = ws_->pack.thingEdits();
@@ -401,7 +422,7 @@ void Shell::packPopups()
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
+        if (ImGui::Button(NOX_TRI("content.common.cancel", "Cancel"))) {
             saveAfterNewPack_ = false;
             ImGui::CloseCurrentPopup();
         }
@@ -414,12 +435,12 @@ void Shell::packBar()
     const float s = host_.scale();
     auto& pack = ws_->pack;
     ImGui::SameLine(0, 20 * s);
-    ImGui::TextUnformatted("Pack");
+    ImGui::TextUnformatted(NOX_TRC("content.shell.pack_label", "Pack"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(170 * s);
-    const std::string current = pack.packOpen() ? pack.packId() : std::string("(none)");
+    const std::string current = pack.packOpen() ? pack.packId() : NOX_TR("content.shell.pack_none", "(none)");
     if (ImGui::BeginCombo("##pack", current.c_str())) {
-        if (ImGui::Selectable("(none: no pack open)", !pack.packOpen())) {
+        if (ImGui::Selectable(NOX_TRI("content.shell.pack_none_item", "(none: no pack open)"), !pack.packOpen())) {
             openContentPack({});
         }
         for (const fs::path& m : ws_->files.mods()) {
@@ -429,15 +450,15 @@ void Shell::packBar()
             }
         }
         ImGui::Separator();
-        if (ImGui::Selectable("New pack...")) {
+        if (ImGui::Selectable(NOX_TRI("content.shell.pack_new_item", "New pack..."))) {
             newPackOpen_ = true;
         }
         ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("The content pack being edited: mods\\<name>\\content\\ (patch files of the changes; installed by hand, never downloaded)");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.shell.pack_tip", "The content pack being edited: mods\\<name>\\content\\ (patch files of the changes; installed by hand, never downloaded)"));
     ImGui::SameLine();
     ImGui::BeginDisabled(pack.changeCount() == 0 && !pack.dirty());
-    if (ImGui::Button(pack.dirty() ? "Save pack *" : "Save pack")) {
+    if (ImGui::Button(pack.dirty() ? NOX_TRI("content.shell.save_pack_dirty", "Save pack *") : NOX_TRI("content.shell.save_pack", "Save pack"))) {
         savePack();
     }
     ImGui::EndDisabled();
@@ -446,7 +467,8 @@ void Shell::packBar()
 void Shell::askThenOpenGame()
 {
     if (edits() || (ws_->pack.dirty() && ws_->pack.changeCount() > 0)) {
-        session_.confirm("Drop the edits?", "Opening a game folder drops the edits that aren't saved. Go on?", [this] { openGame(); });
+        session_.confirm(NOX_TR("content.shell.drop_edits_title", "Drop the edits?"),
+                         NOX_TR("content.shell.drop_edits", "Opening a game folder drops the edits that aren't saved. Go on?"), [this] { openGame(); });
     } else {
         openGame();
     }
@@ -468,59 +490,62 @@ void Shell::menuBar()
     auto* bag = session_.bag();
     auto* pack = session_.pack();
     const bool busy = session_.busy() || session_.inserting();
-    if (ImGui::BeginMenu("File")) {
-        if (ImGui::MenuItem("Open game folder...", nullptr, false, !busy)) {
+    if (ImGui::BeginMenu(NOX_TRI("content.menu.file", "File"))) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.open_game", "Open game folder..."), nullptr, false, !busy)) {
             session_.dialogs().request(kDialogGameDir, Dialogs::Folder, session_.window(), gameBuf_);
         }
-        if (ImGui::MenuItem("Reload game folder", nullptr, false, !busy)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.reload_game", "Reload game folder"), nullptr, false, !busy)) {
             askThenOpenGame();
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Open HD pack...", nullptr, false, !busy)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.open_hd_pack", "Open HD pack..."), nullptr, false, !busy)) {
             const std::string start = pack && !pack->path().empty() ? utf8(pack->path()) : settings_.packPath;
-            session_.dialogs().request(kDialogPack, Dialogs::Open, session_.window(), start, kPackFilter, 1);
+            session_.dialogs().request(kDialogPack, Dialogs::Open, session_.window(), start, packFileFilter(), 1);
         }
-        if (ImGui::MenuItem("New HD pack", nullptr, false, !busy && bag)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.new_hd_pack", "New HD pack"), nullptr, false, !busy && bag)) {
             session_.newPack();
             images_.refresh();
         }
-        if (ImGui::MenuItem("Close HD pack", nullptr, false, !busy && pack)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.close_hd_pack", "Close HD pack"), nullptr, false, !busy && pack)) {
             session_.closePack();
             images_.refresh();
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Save video.bag as...", nullptr, false, !busy && bag)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.save_bag_as", "Save video.bag as..."), nullptr, false, !busy && bag)) {
             session_.saveBagAs();
         }
-        if (ImGui::MenuItem("Save pack as...", nullptr, false, !busy && pack)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.save_pack_as", "Save pack as..."), nullptr, false, !busy && pack)) {
             session_.savePackAs();
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("New content pack...")) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.new_content_pack", "New content pack..."))) {
             newPackOpen_ = true;
         }
-        if (ImGui::MenuItem("Save content pack", "Ctrl+S", false, ws_->pack.changeCount() > 0 || ws_->pack.dirty())) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.save_content_pack", "Save content pack"), "Ctrl+S", false, ws_->pack.changeCount() > 0 || ws_->pack.dirty())) {
             savePack();
         }
-        if (ImGui::MenuItem("Export whole files...", nullptr, false, ws_->pack.changeCount() > 0)) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.export_whole", "Export whole files..."), nullptr, false, ws_->pack.changeCount() > 0)) {
             session_.dialogs().request(kDialogExportFull, Dialogs::Folder, session_.window(), settings_.saveDir);
         }
-        ImGui::SetItemTooltip("The changed files written whole, in the game's own format (encrypted), into a folder you pick: for use outside NoX Core.");
+        ImGui::SetItemTooltip("%s", NOX_TRC("content.menu.export_whole_tip", "The changed files written whole, in the game's own format (encrypted), into a folder you pick: for use outside NoX Core."));
         ImGui::Separator();
-        if (ImGui::MenuItem("Quit")) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.quit", "Quit"))) {
             SDL_Event e{};
             e.type = SDL_EVENT_QUIT;
             SDL_PushEvent(&e);
         }
         ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("Edit")) {
-        if (ImGui::MenuItem("Revert every pack change", nullptr, false, ws_->pack.changeCount() > 0)) {
-            session_.confirm("Revert the pack?", std::format("Drop all {} changes in the content pack (back to the game's own values)?", ws_->pack.changeCount()),
+    if (ImGui::BeginMenu(NOX_TRI("content.menu.edit", "Edit"))) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.revert_pack", "Revert every pack change"), nullptr, false, ws_->pack.changeCount() > 0)) {
+            session_.confirm(NOX_TR("content.menu.revert_pack_title", "Revert the pack?"),
+                             nox::l10n::format(NOX_TR("content.menu.revert_pack_ask", "Drop all {n} changes in the content pack (back to the game's own values)?"),
+                                               {{"n", ws_->pack.changeCount()}}),
                              [this] { ws_->pack.revertAll(); });
         }
-        if (ImGui::MenuItem("Revert every image edit", nullptr, false, edits() > 0)) {
-            session_.confirm("Revert everything?", std::format("Drop all {} image edits?", edits()), [this] {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.revert_images", "Revert every image edit"), nullptr, false, edits() > 0)) {
+            session_.confirm(NOX_TR("content.menu.revert_images_title", "Revert everything?"),
+                             nox::l10n::format(NOX_TR("content.menu.revert_images_ask", "Drop all {n} image edits?"), {{"n", edits()}}), [this] {
                 std::vector<std::int32_t> all;
                 if (auto* b = session_.bag()) {
                     for (const auto& [i, _] : b->bagEdits()) all.push_back(std::int32_t(i));
@@ -534,13 +559,13 @@ void Shell::menuBar()
         }
         ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("View")) {
+    if (ImGui::BeginMenu(NOX_TRI("content.menu.view", "View"))) {
         for (const char* name : {panel::kContent, panel::kRecord, panel::kImages, panel::kSprites, panel::kPreview, panel::kReferences,
                                  panel::kChanges, panel::kProblems, panel::kLog}) {
-            ImGui::MenuItem(name, nullptr, panels_->flag(name));
+            ImGui::MenuItem(panelTitle(name), nullptr, panels_->flag(name));
         }
         ImGui::Separator();
-        if (ImGui::BeginMenu("Theme")) {
+        if (ImGui::BeginMenu(NOX_TRI("content.menu.theme", "Theme"))) {
             for (const auto t : noxsdl::editor::kThemeMenuOrder) {
                 const bool on = themeOf(settings_) == t;
                 if (ImGui::MenuItem(noxsdl::editor::themeLabel(t), nullptr, on) && !on) {
@@ -550,7 +575,7 @@ void Shell::menuBar()
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Interface size")) {
+        if (ImGui::BeginMenu(NOX_TRI("content.menu.interface_size", "Interface size"))) {
             for (int pct : {75, 90, 100, 110, 125, 150, 175, 200}) {
                 if (ImGui::MenuItem(std::format("{}%", pct).c_str(), nullptr, settings_.uiScalePercent == pct)) {
                     settings_.uiScalePercent = pct;
@@ -559,21 +584,21 @@ void Shell::menuBar()
             }
             ImGui::EndMenu();
         }
-        if (ImGui::MenuItem("Floating panels", nullptr, settings_.floating, host_.floatingSupported())) {
+        if (ImGui::MenuItem(NOX_TRI("content.menu.floating", "Floating panels"), nullptr, settings_.floating, host_.floatingSupported())) {
             settings_.floating = !settings_.floating;
             host_.setFloating(settings_.floating);
         }
-        ImGui::SetItemTooltip("Panels dragged out of the window become windows of their own (onto another monitor).");
-        if (ImGui::MenuItem("Reset layout")) {
+        ImGui::SetItemTooltip("%s", NOX_TRC("content.menu.floating_tip", "Panels dragged out of the window become windows of their own (onto another monitor)."));
+        if (ImGui::MenuItem(NOX_TRI("content.menu.reset_layout", "Reset layout"))) {
             resetLayout_ = true;
         }
         ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("Help")) {
+    if (ImGui::BeginMenu(NOX_TRI("content.menu.help", "Help"))) {
         ImGui::TextDisabled("NoX Content Editor");
-        ImGui::TextDisabled("Opens the game's files: thing.bin, modifier.bin, gamedata.bin,");
+        ImGui::TextDisabled("%s", NOX_TRC("content.menu.help_opens", "Opens the game's files: thing.bin, modifier.bin, gamedata.bin,"));
         ImGui::TextDisabled("monster.bin, soundset.bin, nox.csf, video.bag, Audio.bag...");
-        ImGui::TextDisabled("Original files are never written: saves go to new files.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.menu.help_never_written", "Original files are never written: saves go to new files."));
         ImGui::EndMenu();
     }
     ImGui::EndMenuBar();
@@ -592,7 +617,8 @@ void Shell::topBar()
     if (const auto p = session_.dialogs().take(kDialogPack)) {
         const fs::path path = pathFromUtf8(*p);
         if (session_.pack() && session_.pack()->editCount()) {
-            session_.confirm("Drop the pack's edits?", "The open pack has edits that aren't saved. Open another anyway?", [this, path] { openPack(path); });
+            session_.confirm(NOX_TR("content.shell.drop_pack_title", "Drop the pack's edits?"),
+                             NOX_TR("content.shell.drop_pack_open", "The open pack has edits that aren't saved. Open another anyway?"), [this, path] { openPack(path); });
         } else {
             openPack(path);
         }
@@ -602,65 +628,69 @@ void Shell::topBar()
     const bool busy = session_.busy() || session_.inserting();
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().WindowPadding.x);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Game folder");
+    ImGui::TextUnformatted(NOX_TRC("content.shell.game_folder", "Game folder"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(280 * s);
     const bool enter = ImGui::InputText("##game", gameBuf_, sizeof gameBuf_, ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::BeginDisabled(busy);
-    if (ImGui::Button("Browse##game")) {
+    if (ImGui::Button(NOX_TRI("content.shell.browse_game", "Browse##game"))) {
         session_.dialogs().request(kDialogGameDir, Dialogs::Folder, session_.window(), gameBuf_);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Open##game") || (enter && !busy)) {
+    if (ImGui::Button(NOX_TRI("content.shell.open_game", "Open##game")) || (enter && !busy)) {
         askThenOpenGame();
     }
     ImGui::EndDisabled();
 
     ImGui::SameLine(0, 20 * s);
-    ImGui::TextUnformatted("HD pack");
+    ImGui::TextUnformatted(NOX_TRC("content.shell.hd_pack", "HD pack"));
     ImGui::SameLine();
     auto* pack = session_.pack();
-    const std::string packName = !pack ? "none" : pack->path().empty() ? "new (not saved yet)" : utf8(pack->path().filename());
+    const std::string packName = !pack                  ? NOX_TR("content.shell.hd_pack_none", "none")
+                                 : pack->path().empty() ? NOX_TR("content.shell.hd_pack_new", "new (not saved yet)")
+                                                        : utf8(pack->path().filename());
     ImGui::TextColored(pack ? theme.info : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), "%s", packName.c_str());
     if (pack && !pack->path().empty()) {
         ImGui::SetItemTooltip("%s", utf8(pack->path()).c_str());
     }
     if (pack && !session_.packMatchesBag()) {
         ImGui::SameLine();
-        ImGui::TextColored(theme.caution, "(made for another video.idx)");
-        ImGui::SetItemTooltip("NoX Core uses a pack only with the video.idx it was made for. Stamp it when you save it.");
+        ImGui::TextColored(theme.caution, "%s", NOX_TRC("content.shell.hd_pack_other_idx", "(made for another video.idx)"));
+        ImGui::SetItemTooltip("%s", NOX_TRC("content.shell.hd_pack_other_idx_tip", "NoX Core uses a pack only with the video.idx it was made for. Stamp it when you save it."));
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(busy);
-    if (ImGui::Button("Open...##pack")) {
+    if (ImGui::Button(NOX_TRI("content.shell.open_pack", "Open...##pack"))) {
         const std::string start = pack && !pack->path().empty() ? utf8(pack->path()) : settings_.packPath;
-        session_.dialogs().request(kDialogPack, Dialogs::Open, session_.window(), start, kPackFilter, 1);
+        session_.dialogs().request(kDialogPack, Dialogs::Open, session_.window(), start, packFileFilter(), 1);
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(!session_.bagOpen());
-    if (ImGui::Button("New##pack")) {
+    if (ImGui::Button(NOX_TRI("content.shell.new_pack", "New##pack"))) {
         const auto make = [this] {
             session_.newPack();
             images_.refresh();
         };
         if (pack && pack->editCount()) {
-            session_.confirm("Drop the pack's edits?", "The open pack has edits that aren't saved. Start a new one anyway?", make);
+            session_.confirm(NOX_TR("content.shell.drop_pack_title", "Drop the pack's edits?"),
+                             NOX_TR("content.shell.drop_pack_new", "The open pack has edits that aren't saved. Start a new one anyway?"), make);
         } else {
             make();
         }
     }
-    ImGui::SetItemTooltip("An empty pack for this video.bag, to add HD images to");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.shell.new_pack_tip", "An empty pack for this video.bag, to add HD images to"));
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(!pack);
-    if (ImGui::Button("Close##pack")) {
+    if (ImGui::Button(NOX_TRI("content.shell.close_pack", "Close##pack"))) {
         const auto close = [this] {
             session_.closePack();
             images_.refresh();
         };
         if (pack && pack->editCount()) {
-            session_.confirm("Drop the pack's edits?", "The open pack has edits that aren't saved. Close it anyway?", close);
+            session_.confirm(NOX_TR("content.shell.drop_pack_title", "Drop the pack's edits?"),
+                             NOX_TR("content.shell.drop_pack_close", "The open pack has edits that aren't saved. Close it anyway?"), close);
         } else {
             close();
         }
@@ -670,17 +700,21 @@ void Shell::topBar()
     ImGui::SameLine(0, 20 * s);
     auto* bag = session_.bag();
     ImGui::BeginDisabled(!bag);
-    if (ImGui::Button(std::format("Save video.bag as...{}###saveBag", bag && bag->editCount() ? std::format(" ({})", bag->editCount()) : "").c_str())) {
+    if (ImGui::Button(std::format("{}{}###saveBag", NOX_TR("content.shell.save_bag_as", "Save video.bag as..."),
+                                  bag && bag->editCount() ? std::format(" ({})", bag->editCount()) : "")
+                          .c_str())) {
         session_.saveBagAs();
     }
-    ImGui::SetItemTooltip("Writes a new video.bag and video.idx (never the game's own)");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.shell.save_bag_tip", "Writes a new video.bag and video.idx (never the game's own)"));
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(!pack);
-    if (ImGui::Button(std::format("Save pack as...{}###savePack", pack && pack->editCount() ? std::format(" ({})", pack->editCount()) : "").c_str())) {
+    if (ImGui::Button(std::format("{}{}###savePack", NOX_TR("content.shell.save_hd_pack_as", "Save pack as..."),
+                                  pack && pack->editCount() ? std::format(" ({})", pack->editCount()) : "")
+                          .c_str())) {
         session_.savePackAs();
     }
-    ImGui::SetItemTooltip("Writes a new .nxp (never over the open one)");
+    ImGui::SetItemTooltip("%s", NOX_TRC("content.shell.save_hd_pack_tip", "Writes a new .nxp (never over the open one)"));
     ImGui::EndDisabled();
     ImGui::EndDisabled();
 
@@ -688,14 +722,14 @@ void Shell::topBar()
 
     // The changes' reach: the strongest of them (image edits are seen only by those who install them).
     ImGui::SameLine(0, 20 * s);
-    ImGui::TextUnformatted("Reach:");
+    ImGui::TextUnformatted(NOX_TRC("content.shell.reach", "Reach:"));
     ImGui::SameLine();
     std::optional<content::Reach> reach = ws_->pack.reach();
     if (edits() > 0) {
         reach = reach ? content::stronger(*reach, content::Reach::ClientVisible) : content::Reach::ClientVisible;
     }
     if (!reach) {
-        ImGui::TextDisabled("no changes");
+        ImGui::TextDisabled("%s", NOX_TRC("content.shell.no_changes", "no changes"));
     } else {
         ImGui::TextColored(*reach == content::Reach::ClientVisible ? theme.ok : *reach == content::Reach::ServerOnly ? theme.info : theme.caution, "%s",
                            content::reachLabel(*reach));
@@ -712,7 +746,7 @@ void Shell::statusBar()
         const std::string overlay = std::format("{}  {} / {}  {}", job->label, p.done.load(), p.total.load(), p.current());
         ImGui::ProgressBar(float(p.done.load()) / float(total), ImVec2(-100 * host_.scale(), 0), overlay.c_str());
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(-FLT_MIN, 0))) {
+        if (ImGui::Button(NOX_TRI("content.common.cancel", "Cancel"), ImVec2(-FLT_MIN, 0))) {
             job->progress.cancel = true;
         }
         return;
@@ -723,7 +757,7 @@ void Shell::statusBar()
     ImGui::TextUnformatted(status.substr(0, nl).c_str());
     if (!session_.statusFolder().empty()) {
         ImGui::SameLine();
-        if (ImGui::SmallButton("Open folder")) {
+        if (ImGui::SmallButton(NOX_TRI("content.shell.open_folder", "Open folder"))) {
             SDL_OpenURL(("file:///" + utf8(session_.statusFolder().generic_u8string())).c_str());
         }
     }
@@ -736,42 +770,44 @@ void Shell::catalogToolbar()
     }
     const float s = host_.scale();
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Export to");
+    ImGui::TextUnformatted(NOX_TRC("content.shell.export_to", "Export to"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(300 * s);
     ImGui::InputText("##out", catalog_.outBuf(), catalog_.outBufSize());
     ImGui::SameLine();
-    if (ImGui::Button("Browse##out")) {
+    if (ImGui::Button(NOX_TRI("content.shell.browse_out", "Browse##out"))) {
         session_.dialogs().request(kDialogExportDir, Dialogs::Folder, session_.window(), catalog_.outBuf());
     }
     ImGui::SameLine();
-    if (ImGui::Button("Open##out")) {
+    if (ImGui::Button(NOX_TRI("content.shell.open_out", "Open##out"))) {
         std::error_code ec;
         fs::create_directories(pathFromUtf8(catalog_.outBuf()), ec);
         SDL_OpenURL(("file:///" + utf8(pathFromUtf8(catalog_.outBuf()).generic_u8string())).c_str());
     }
     ImGui::SameLine(0, 24 * s);
     ImGui::BeginDisabled(session_.busy() || !session_.bagOpen());
-    if (ImGui::Button("Export everything...")) {
-        ImGui::OpenPopup("Export everything");
+    if (ImGui::Button(NOX_TRI("content.shell.export_everything_button", "Export everything..."))) {
+        ImGui::OpenPopup(NOX_TRI("content.shell.export_everything_title", "Export everything"));
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    ImGui::TextDisabled("PNG frames + animation.json per animation, from video.bag as saved on disk");
-    if (ImGui::BeginPopupModal("Export everything", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::TextDisabled("%s", NOX_TRC("content.shell.export_everything_what", "PNG frames + animation.json per animation, from video.bag as saved on disk"));
+    if (ImGui::BeginPopupModal(NOX_TRI("content.shell.export_everything_title", "Export everything"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         std::size_t total = 0;
         for (const auto& c : catalog_.catalog().categories) {
             total += c.imageCount();
         }
-        ImGui::Text("Export every category (%zu images, counting images used more than once) to", total);
+        ImGui::TextUnformatted(
+            nox::l10n::format(NOX_TR("content.shell.export_everything_ask", "Export every category ({n} images, counting images used more than once) to"), {{"n", total}})
+                .c_str());
         ImGui::TextUnformatted(catalog_.outBuf());
-        ImGui::TextDisabled("This takes a few minutes and a few gigabytes.");
-        if (ImGui::Button("Export")) {
+        ImGui::TextDisabled("%s", NOX_TRC("content.shell.export_everything_cost", "This takes a few minutes and a few gigabytes."));
+        if (ImGui::Button(NOX_TRI("content.shell.export", "Export"))) {
             catalog_.exportEverything();
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
+        if (ImGui::Button(NOX_TRI("content.common.cancel", "Cancel"))) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -792,15 +828,15 @@ void Shell::buildDefaultLayout(unsigned int dockspace)
     ImGuiID left = ImGui::DockBuilderSplitNode(centre, ImGuiDir_Left, 0.22f, nullptr, &centre);
     ImGuiID right = ImGui::DockBuilderSplitNode(centre, ImGuiDir_Right, 0.28f, nullptr, &centre);
     ImGuiID rightLow = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.40f, nullptr, &right);
-    ImGui::DockBuilderDockWindow(panel::kContent, left);
-    ImGui::DockBuilderDockWindow(panel::kRecord, centre);
-    ImGui::DockBuilderDockWindow(panel::kImages, centre);
-    ImGui::DockBuilderDockWindow(panel::kSprites, centre);
-    ImGui::DockBuilderDockWindow(panel::kPreview, right);
-    ImGui::DockBuilderDockWindow(panel::kReferences, rightLow);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kContent), left);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kRecord), centre);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kImages), centre);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kSprites), centre);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kPreview), right);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kReferences), rightLow);
     ImGui::DockBuilderDockWindow("###Changes", bottom); // (their titles carry counts: known by their ids)
     ImGui::DockBuilderDockWindow("###Problems", bottom);
-    ImGui::DockBuilderDockWindow(panel::kLog, bottom);
+    ImGui::DockBuilderDockWindow(panelTitle(panel::kLog), bottom);
     ImGui::DockBuilderFinish(dockspace);
     // The tabs shown first, before any asked for already (they come after, so they win).
     wantFocus_.insert(wantFocus_.begin(), {panel::kRecord, panel::kChanges});
@@ -854,9 +890,10 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
         const content::StringEdit e = pack.stringEdits()[i];
         ChangeRow r;
         r.what = "nox.csf  " + e.label;
-        r.detail = e.variants.empty() ? std::string("removed")
+        r.detail = e.variants.empty() ? NOX_TR("content.changes.removed", "removed")
                                       : std::format("\"{}\"{}", nox::content::escapeStringsText(e.variants.front()).substr(0, 60),
-                                                    e.variants.size() > 1 ? std::format(" (+{} more)", e.variants.size() - 1) : std::string());
+                                                    e.variants.size() > 1 ? nox::l10n::format(NOX_TR("content.changes.more_variants", " (+{n} more)"), {{"n", e.variants.size() - 1}})
+                                                                          : std::string());
         r.reach = content::reachLabel(content::Reach::ServerShown); // (the host's own text lines; the rest each player's)
         r.revert = [this, e] {
             auto& p = ws_->pack;
@@ -878,7 +915,9 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
         const content::SoundEdit e = pack.soundEdits()[i];
         ChangeRow r;
         r.what = e.label();
-        r.detail = e.source.empty() ? std::string("taken out of the pack") : e.saved ? std::string("in the pack") : "from " + utf8(e.source);
+        r.detail = e.source.empty() ? NOX_TR("content.changes.sound_taken_out", "taken out of the pack")
+                   : e.saved      ? NOX_TR("content.changes.sound_in_pack", "in the pack")
+                                  : nox::l10n::format(NOX_TR("content.changes.sound_from", "from {file}"), {{"file", utf8(e.source)}});
         r.reach = content::reachLabel(content::Reach::ClientVisible);
         r.revert = [this, e] {
             auto& p = ws_->pack;
@@ -898,8 +937,8 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
     }
     for (const content::NewThing& n : pack.newThings()) {
         ChangeRow r;
-        r.what = "thing.bin  new type " + n.name;
-        r.detail = "made like " + n.like;
+        r.what = nox::l10n::format(NOX_TR("content.changes.new_type", "thing.bin  new type {name}"), {{"name", n.name}});
+        r.detail = nox::l10n::format(NOX_TR("content.changes.made_like", "made like {name}"), {{"name", n.like}});
         r.reach = content::reachLabel(content::Reach::Structural);
         r.revert = [this, name = n.name] {
             if (const std::string why = ws_->pack.removeNewThing(name); !why.empty()) {
@@ -917,13 +956,14 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
         const content::ThingEdit& e = pack.thingEdits()[i];
         ChangeRow r;
         r.what = "thing.bin  " + e.label();
-        std::string stock = pack.isNewThing(e.type) ? "(new type)" : "(none)";
+        std::string stock = pack.isNewThing(e.type) ? NOX_TR("content.changes.stock_new_type", "(new type)") : NOX_TR("content.changes.stock_none", "(none)");
         if (const auto* db = pack.baseThings()) {
             if (const auto* t = db->findThing(e.type)) {
-                stock = nox::content::thingValue(*t, e.key).value_or("(none)");
+                stock = nox::content::thingValue(*t, e.key).value_or(NOX_TR("content.changes.stock_none", "(none)"));
             }
         }
-        r.detail = e.value ? std::format("{} -> {}", stock, *e.value) : std::format("{} -> removed", stock);
+        r.detail = e.value ? std::format("{} -> {}", stock, *e.value)
+                           : nox::l10n::format(NOX_TR("content.changes.value_removed", "{stock} -> removed"), {{"stock", stock}});
         r.reach = content::reachLabel(pack.reachOf(e));
         const content::ThingEdit copy = e;
         r.revert = [this, copy] {
@@ -946,13 +986,14 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
         const content::FieldEdit& e = pack.edits()[i];
         ChangeRow r;
         r.what = std::string(nox::content::tableFileName(e.format)) + "  " + e.label();
-        std::string stock = "(none)";
+        std::string stock = NOX_TR("content.changes.stock_none", "(none)");
         if (const auto* b = pack.base(e.format)) {
             if (const auto rec = b->find(e.record, e.section)) {
-                stock = b->records()[*rec].effective(e.key, e.kind).value_or("(none)");
+                stock = b->records()[*rec].effective(e.key, e.kind).value_or(NOX_TR("content.changes.stock_none", "(none)"));
             }
         }
-        r.detail = e.value ? std::format("{} -> {}", stock, *e.value) : std::format("{} -> removed", stock);
+        r.detail = e.value ? std::format("{} -> {}", stock, *e.value)
+                           : nox::l10n::format(NOX_TR("content.changes.value_removed", "{stock} -> removed"), {{"stock", stock}});
         r.reach = content::reachLabel(content::PackEditor::reachOf(e));
         const content::FieldEdit copy = e;
         r.revert = [this, copy] {
@@ -977,8 +1018,8 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
             const std::int32_t i = std::int32_t(index);
             ChangeRow r;
             r.what = std::format("video.bag #{}  {}", i, index < images.size() ? images[index].name : std::string());
-            r.detail = "image replaced";
-            r.reach = "client-visible";
+            r.detail = NOX_TR("content.changes.image_replaced", "image replaced");
+            r.reach = content::reachLabel(content::Reach::ClientVisible);
             r.revert = [this, i] {
                 session_.revert({i});
                 images_.refresh();
@@ -994,9 +1035,9 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
         for (const auto& [index, edit] : hd->packEdits()) {
             const std::int32_t i = std::int32_t(index);
             ChangeRow r;
-            r.what = std::format("HD pack #{}  {}", i, hd->name(index));
-            r.detail = edit.encoded ? "HD image put in" : "HD image removed";
-            r.reach = "client-visible";
+            r.what = nox::l10n::format(NOX_TR("content.changes.hd_pack_image", "HD pack #{index}  {name}"), {{"index", i}, {"name", hd->name(index)}});
+            r.detail = edit.encoded ? NOX_TR("content.changes.hd_put_in", "HD image put in") : NOX_TR("content.changes.hd_removed", "HD image removed");
+            r.reach = content::reachLabel(content::Reach::ClientVisible);
             r.revert = [this, i] {
                 session_.revert({i});
                 images_.refresh();
@@ -1013,7 +1054,10 @@ void Shell::collectChanges(std::vector<ChangeRow>& out)
 void Shell::collectProblems(std::vector<ProblemRow>& out)
 {
     if (!session_.loadError().empty()) {
-        out.push_back({true, "Can't open the game's video.bag: " + session_.loadError() + " (set the game folder at the top and press Open)", {}});
+        out.push_back({true,
+                       nox::l10n::format(NOX_TR("content.problems.no_bag", "Can't open the game's video.bag: {error} (set the game folder at the top and press Open)"),
+                                         {{"error", session_.loadError()}}),
+                       {}});
     }
     for (const auto& s : ws_->files.status()) {
         if (!s.loaded && !s.optional) {
@@ -1028,13 +1072,14 @@ void Shell::collectProblems(std::vector<ProblemRow>& out)
     }
     // What thing.patch's loader would refuse (it would leave the whole file out).
     for (const std::string& p : ws_->pack.thingProblems()) {
-        out.push_back({true, "thing.patch: " + p + " (NoX Core would leave the whole file out)", {}});
+        out.push_back({true, nox::l10n::format(NOX_TR("content.problems.thing_patch", "thing.patch: {problem} (NoX Core would leave the whole file out)"), {{"problem", p}}), {}});
     }
     // A pack that adds types: who can play with it.
     if (!ws_->pack.newThings().empty()) {
-        out.push_back({false, std::format("The pack adds {} object types: a game hosted with it lets in only NoX Core games with the same pack "
-                                          "(stock players can't join it), and a game with it joins only hosts with the same pack or none that adds types",
-                                          ws_->pack.newThings().size()),
+        out.push_back({false,
+                       nox::l10n::format(NOX_TR("content.problems.new_types", "The pack adds {n} object types: a game hosted with it lets in only NoX Core games with the same pack "
+                                                                              "(stock players can't join it), and a game with it joins only hosts with the same pack or none that adds types"),
+                                         {{"n", ws_->pack.newThings().size()}}),
                        {}});
     }
     // The pack's values, checked against what the game reads.
@@ -1046,14 +1091,15 @@ void Shell::collectProblems(std::vector<ProblemRow>& out)
         };
         const bool fresh = ws_->pack.isNewThing(e.type);
         if (ws_->pack.baseThings() && !ws_->pack.baseThings()->findThing(e.type) && !fresh) {
-            out.push_back({true, "thing.bin has no type " + e.type + " (a new one is added with New type like this...)", show});
+            out.push_back({true, nox::l10n::format(NOX_TR("content.problems.no_type", "thing.bin has no type {name} (a new one is added with New type like this...)"), {{"name", e.type}}), show});
             continue;
         }
         const content::FieldSpec* spec = content::thingField(e.key);
         if (!spec) {
-            out.push_back({false, std::format("{}: NoX Core doesn't read this key", e.label()), show});
+            out.push_back({false, nox::l10n::format(NOX_TR("content.problems.key_unread", "{field}: NoX Core doesn't read this key"), {{"field", e.label()}}), show});
         } else if (spec->structural && !fresh) { // (a new type's warning is its own, below)
-            out.push_back({false, std::format("{}: every player needs this pack: {}", e.label(), std::string(spec->docs)), show});
+            out.push_back({false, nox::l10n::format(NOX_TR("content.problems.structural", "{field}: every player needs this pack: {docs}"), {{"field", e.label()}, {"docs", nox::l10n::tr(spec->docs)}}),
+                           show});
         }
         if (spec && e.value) {
             if (const std::string why = content::checkValue(*spec, *e.value); !why.empty()) {
@@ -1071,9 +1117,11 @@ void Shell::collectProblems(std::vector<ProblemRow>& out)
         if (!spec) {
             out.push_back({e.format != content::TableFormat::GameData,
                            e.format == content::TableFormat::GameData
-                               ? std::format("{}: nothing in the game reads this name (only a game-mode mod could)", e.label())
-                               : std::format("{}: {} has no such key{}", e.label(), nox::content::tableFileName(e.format),
-                                             e.format == content::TableFormat::SoundSet ? " (the game stops reading the file there)" : ""),
+                               ? nox::l10n::format(NOX_TR("content.problems.name_unread", "{field}: nothing in the game reads this name (only a game-mode mod could)"), {{"field", e.label()}})
+                           : e.format == content::TableFormat::SoundSet
+                               ? nox::l10n::format(NOX_TR("content.problems.no_such_key_stops", "{field}: {file} has no such key (the game stops reading the file there)"),
+                                                   {{"field", e.label()}, {"file", nox::content::tableFileName(e.format)}})
+                               : nox::l10n::format(NOX_TR("content.problems.no_such_key", "{field}: {file} has no such key"), {{"field", e.label()}, {"file", nox::content::tableFileName(e.format)}}),
                            show});
             continue;
         }
@@ -1084,7 +1132,7 @@ void Shell::collectProblems(std::vector<ProblemRow>& out)
         }
     }
     if (session_.pack() && !session_.packMatchesBag()) {
-        out.push_back({false, "The HD pack was made for another video.idx: NoX Core won't use it with this one until it's stamped for it (Save pack as...).",
+        out.push_back({false, NOX_TR("content.problems.pack_other_idx", "The HD pack was made for another video.idx: NoX Core won't use it with this one until it's stamped for it (Save pack as...)."),
                        [this] { focus(panel::kImages); }});
     }
 }
@@ -1096,32 +1144,33 @@ void Shell::drawPanels(double dt)
         ImGui::SetNextWindowSize(ImVec2(420, 360), ImGuiCond_FirstUseEver);
         return ImGui::Begin(name, open);
     };
+    const auto beginPanel = [&](const char* name, bool* open) { return begin(panelTitle(name), open); };
     const auto focused = [] { return ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows); };
     if (p.showContent) {
-        if (begin(panel::kContent, &p.showContent)) {
+        if (beginPanel(panel::kContent, &p.showContent)) {
             p.browser.draw();
         }
         ImGui::End();
     }
     if (p.showRecord) {
-        if (begin(panel::kRecord, &p.showRecord)) {
+        if (beginPanel(panel::kRecord, &p.showRecord)) {
             p.record.draw();
         }
         ImGui::End();
     }
     if (p.showImages) {
-        if (begin(panel::kImages, &p.showImages)) {
+        if (beginPanel(panel::kImages, &p.showImages)) {
             images_.setKeys(focused());
             if (session_.bagOpen()) {
                 images_.draw(ImGui::GetContentRegionAvail().y);
             } else {
-                ImGui::TextDisabled("No video.bag is open.");
+                ImGui::TextDisabled("%s", NOX_TRC("content.shell.no_bag_open", "No video.bag is open."));
             }
         }
         ImGui::End();
     }
     if (p.showSprites) {
-        if (begin(panel::kSprites, &p.showSprites)) {
+        if (beginPanel(panel::kSprites, &p.showSprites)) {
             catalog_.setKeys(focused());
             catalogToolbar();
             catalog_.draw(ImGui::GetContentRegionAvail().y, dt);
@@ -1129,13 +1178,13 @@ void Shell::drawPanels(double dt)
         ImGui::End();
     }
     if (p.showPreview) {
-        if (begin(panel::kPreview, &p.showPreview)) {
+        if (beginPanel(panel::kPreview, &p.showPreview)) {
             p.preview.draw(dt);
         }
         ImGui::End();
     }
     if (p.showReferences) {
-        if (begin(panel::kReferences, &p.showReferences)) {
+        if (beginPanel(panel::kReferences, &p.showReferences)) {
             p.references.draw();
         }
         ImGui::End();
@@ -1143,7 +1192,7 @@ void Shell::drawPanels(double dt)
     std::vector<ChangeRow> changes;
     collectChanges(changes);
     if (p.showChanges) {
-        if (begin(std::format("Changes ({})###{}", changes.size(), panel::kChanges).c_str(), &p.showChanges)) {
+        if (begin((nox::l10n::format(NOX_TR("content.panel.changes_count", "Changes ({n})"), {{"n", changes.size()}}) + "###" + panel::kChanges).c_str(), &p.showChanges)) {
             drawChanges(*ws_, changes);
         }
         ImGui::End();
@@ -1151,13 +1200,13 @@ void Shell::drawPanels(double dt)
     std::vector<ProblemRow> problems;
     collectProblems(problems);
     if (p.showProblems) {
-        if (begin(std::format("Problems ({})###{}", problems.size(), panel::kProblems).c_str(), &p.showProblems)) {
+        if (begin((nox::l10n::format(NOX_TR("content.panel.problems_count", "Problems ({n})"), {{"n", problems.size()}}) + "###" + panel::kProblems).c_str(), &p.showProblems)) {
             drawProblems(*ws_, problems);
         }
         ImGui::End();
     }
     if (p.showLog) {
-        if (begin(panel::kLog, &p.showLog)) {
+        if (beginPanel(panel::kLog, &p.showLog)) {
             drawLog(*ws_);
         }
         ImGui::End();
@@ -1176,7 +1225,7 @@ void Shell::frame(double dt)
     packPopups();
     for (const auto& name : wantFocus_) {
         // (Changes and Problems carry counts in their titles: their windows are known by their ids.)
-        const std::string id = name == panel::kChanges || name == panel::kProblems ? std::format("###{}", name) : name;
+        const std::string id = name == panel::kChanges || name == panel::kProblems ? std::format("###{}", name) : std::string(panelTitle(name));
         ImGui::SetWindowFocus(id.c_str());
     }
     wantFocus_.clear();

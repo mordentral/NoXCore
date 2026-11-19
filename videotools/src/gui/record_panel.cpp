@@ -4,6 +4,7 @@
 #include "editor/theme_colours.hpp"
 
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <imgui.h>
@@ -54,7 +55,7 @@ const fs::path* recordFile(const content::GameFiles& files, const content::Recor
 void RecordPanel::form(const std::vector<content::Field>& fields, bool fit)
 {
     if (fields.empty()) {
-        ImGui::TextDisabled("This record has no fields to show.");
+        ImGui::TextDisabled("%s", NOX_TRC("content.record_panel.no_fields", "This record has no fields to show."));
         return;
     }
     const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
@@ -63,8 +64,8 @@ void RecordPanel::form(const std::vector<content::Field>& fields, bool fit)
         return;
     }
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("MELEE_ATTACK_POISON_STRENGTH").x + 8);
-    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn(NOX_TRI("content.record_panel.col_field", "Field"), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("MELEE_ATTACK_POISON_STRENGTH").x + 8);
+    ImGui::TableSetupColumn(NOX_TRI("content.record_panel.col_value", "Value"), ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableHeadersRow();
     for (std::size_t i = 0; i < fields.size(); ++i) {
         const auto& f = fields[i];
@@ -79,7 +80,7 @@ void RecordPanel::form(const std::vector<content::Field>& fields, bool fit)
         ImGui::TableNextColumn();
         // Read only, but selectable: values can be copied. A sound gets Play beside it.
         const bool event = f.plays == content::Field::Plays::SoundEvent && !f.value.empty() && !nox::util::equalsNoCase(f.value, "NULL");
-        const float playW = ImGui::CalcTextSize("Play").x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x;
+        const float playW = ImGui::CalcTextSize(NOX_TRC("content.common.play", "Play")).x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x;
         ImGui::SetNextItemWidth(event ? -playW : -FLT_MIN);
         std::string v = f.value;
         ImGui::InputText("##v", v.data(), v.size() + 1, ImGuiInputTextFlags_ReadOnly);
@@ -88,17 +89,21 @@ void RecordPanel::form(const std::vector<content::Field>& fields, bool fit)
         }
         if (event) {
             ImGui::SameLine();
-            if (ImGui::SmallButton("Play")) {
+            if (ImGui::SmallButton(NOX_TRI("content.common.play", "Play"))) {
                 playSoundEvent(ws_, f.value);
             }
-            ImGui::SetItemTooltip("One of %s's files (the game picks one at random; this plays them in turn).", f.value.c_str());
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("content.record_panel.play_event_tip", "One of {name}'s files (the game picks one at random; this plays them in turn)."),
+                                                          {{"name", f.value}})
+                                            .c_str());
+            }
         }
         for (std::size_t s = 0; s < f.samples.size(); ++s) {
             ImGui::PushID(int(s));
             if (s > 0) {
                 ImGui::SameLine();
             }
-            if (ImGui::SmallButton(("Play " + f.samples[s]).c_str())) {
+            if (ImGui::SmallButton(nox::l10n::format(NOX_TR("content.record_panel.play_sample", "Play {name}"), {{"name", f.samples[s]}}).c_str())) {
                 playSample(ws_, f.samples[s]);
             }
             ImGui::PopID();
@@ -119,9 +124,9 @@ void RecordPanel::fileView(const content::Record& r)
     ImGui::TextDisabled("%s", utf8(*p).c_str());
     if (!ec) {
         ImGui::SameLine();
-        ImGui::TextDisabled("(%ju bytes)", static_cast<std::uintmax_t>(size));
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("content.record_panel.file_bytes", "({n} bytes)"), {{"n", static_cast<std::uintmax_t>(size)}}).c_str());
     }
-    if (ImGui::SmallButton("Show in folder")) {
+    if (ImGui::SmallButton(NOX_TRI("content.common.show_in_folder", "Show in folder"))) {
         SDL_OpenURL(("file:///" + utf8(p->parent_path().generic_u8string())).c_str());
     }
     if (!fileText_.empty()) {
@@ -133,7 +138,7 @@ void RecordPanel::draw()
 {
     const content::Record* r = ws_.selected ? ws_.index.find(*ws_.selected) : nullptr;
     if (!r) {
-        ImGui::TextDisabled("Pick a record in Content (or search for one).");
+        ImGui::TextDisabled("%s", NOX_TRC("content.record_panel.pick", "Pick a record in Content (or search for one)."));
         return;
     }
     if (shown_ != r->ref) {
@@ -147,7 +152,7 @@ void RecordPanel::draw()
                     const auto bytes = nox::readFileBytes(*p);
                     fileText_.assign(bytes.begin(), bytes.end());
                 } catch (const std::exception& ex) {
-                    fileText_ = std::string("(can't read it: ") + ex.what() + ")";
+                    fileText_ = nox::l10n::format(NOX_TR("content.record_panel.cant_read", "(can't read it: {error})"), {{"error", ex.what()}});
                 }
             }
         }
@@ -173,7 +178,7 @@ void RecordPanel::draw()
         return;
     }
     if (ImGui::BeginTabBar("recordTabs")) {
-        if (ImGui::BeginTabItem("Form")) {
+        if (ImGui::BeginTabItem(NOX_TRI("content.record_panel.tab_form", "Form"))) {
             if (!tableForm(*r) && !thingForm(*r) && !stringForm(*r) && !soundForm(*r)) {
                 form(fields_);
             }
@@ -184,7 +189,7 @@ void RecordPanel::draw()
         if (text.empty()) {
             text = text_;
         }
-        if (!text.empty() && ImGui::BeginTabItem("Text")) {
+        if (!text.empty() && ImGui::BeginTabItem(NOX_TRI("content.record_panel.tab_text", "Text"))) {
             ImGui::InputTextMultiline("##text", text.data(), text.size() + 1, ImVec2(-FLT_MIN, -FLT_MIN), ImGuiInputTextFlags_ReadOnly);
             ImGui::EndTabItem();
         }

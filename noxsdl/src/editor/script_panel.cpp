@@ -13,6 +13,7 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/mapedit/ops.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 #include "noxcore/mapedit/script_doc.hpp"
 #include "noxcore/mapedit/writer.hpp"
 #include "noxcore/script/builtin_docs.hpp"
@@ -20,6 +21,7 @@
 #include "noxcore/script/decompiler.hpp"
 #include "noxcore/script/opcodes.hpp"
 #include "noxcore/server/game_host.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/text.hpp"
 
@@ -39,6 +41,7 @@
 
 namespace fs = std::filesystem;
 namespace me = nox::mapedit;
+namespace ol = nox::mapedit::oplabels;
 namespace sc = nox::script;
 
 namespace noxsdl {
@@ -133,7 +136,7 @@ void docHeading(const char* text)
 /// The play-test's game modes: HostSettings::mode for a network game (solo and quest keyed by the
 /// game flags they set, 0x800 and 0x1000), with the MapInfo game-type bit that offers it, in the
 /// order the map's own is picked: the network modes first (as before solo and quest could be
-/// played), then solo, then quest.
+/// played), then solo, then quest. (`name`: a test step's; shown, modeLabel's.)
 struct Mode {
     std::uint32_t host;
     std::uint32_t mapBit;
@@ -158,12 +161,34 @@ const Mode& modeOf(std::uint32_t host)
     return kModes[0];
 }
 
-const char* modeName(std::uint32_t host)
+/// A mode's name as shown: as text, or (`label`) as a menu item's label.
+const char* modeLabel(const Mode& m, bool label = false)
 {
-    return modeOf(host).name;
+    switch (m.host) {
+    case 0x20: return label ? NOX_TRI("editor.script.mode.ctf", "Capture the Flag") : NOX_TRC("editor.script.mode.ctf", "Capture the Flag");
+    case 0x10: return label ? NOX_TRI("editor.script.mode.kotr", "King of the Realm") : NOX_TRC("editor.script.mode.kotr", "King of the Realm");
+    case 0x40: return label ? NOX_TRI("editor.script.mode.flagball", "Flag Ball") : NOX_TRC("editor.script.mode.flagball", "Flag Ball");
+    case 0x400: return label ? NOX_TRI("editor.script.mode.elimination", "Elimination") : NOX_TRC("editor.script.mode.elimination", "Elimination");
+    case kSoloMode: return label ? NOX_TRI("editor.script.mode.solo", "Solo") : NOX_TRC("editor.script.mode.solo", "Solo");
+    case kQuestMode: return label ? NOX_TRI("editor.script.mode.quest", "Quest") : NOX_TRC("editor.script.mode.quest", "Quest");
+    default: return label ? NOX_TRI("editor.script.mode.arena", "Arena") : NOX_TRC("editor.script.mode.arena", "Arena");
+    }
 }
 
-constexpr const char* kClassNames[] = {"Warrior", "Wizard", "Conjurer"};
+const char* modeName(std::uint32_t host)
+{
+    return modeLabel(modeOf(host));
+}
+
+/// A class's name as shown (0 warrior, 1 wizard, 2 conjurer): as text, or (`label`) a menu item's label.
+const char* classLabel(int c, bool label = false)
+{
+    switch (c) {
+    case 0: return label ? NOX_TRI("editor.script.class.warrior", "Warrior") : NOX_TRC("editor.script.class.warrior", "Warrior");
+    case 1: return label ? NOX_TRI("editor.script.class.wizard", "Wizard") : NOX_TRC("editor.script.class.wizard", "Wizard");
+    default: return label ? NOX_TRI("editor.script.class.conjurer", "Conjurer") : NOX_TRC("editor.script.class.conjurer", "Conjurer");
+    }
+}
 
 /// A solo map's class by its name, as the campaign names them (War / Wiz / Con + a digit); -1 for
 /// any other.
@@ -191,24 +216,28 @@ ScriptPanel::ScriptPanel(MapEditor& editor)
     code_.hoverText = [this](std::string_view w) -> std::string {
         if (const auto id = sc::findBuiltin(w)) {
             const sc::BuiltinDoc* d = sc::builtinDoc(*id);
-            return namedPrototype(*id) + "\n\n" + (d ? d->shortText + "\n\n" : std::string()) + "(builtin " + std::to_string(*id) +
-                   "; right-click it for Function Info)";
+            return namedPrototype(*id) + "\n\n" + (d ? d->shortText + "\n\n" : std::string()) +
+                   nox::l10n::format(NOX_TR("editor.script.hover.builtin", "(builtin {id}; right-click it for Function Info)"), {{"id", *id}});
         }
         if (good_) {
             if (const auto* f = good_->function(w)) {
-                return std::string(sc::typeName(f->returns)) + " " + f->name + "  line " + std::to_string(f->loc.line) +
-                       " (F12 / Ctrl+click to go there)";
+                return nox::l10n::format(NOX_TR("editor.script.hover.function", "{type} {name}  line {line} (F12 / Ctrl+click to go there)"),
+                                         {{"type", sc::typeName(f->returns)}, {"name", f->name}, {"line", f->loc.line}});
             }
             for (const auto& g : good_->globals) {
                 if (g.name == w && g.symbol >= 4) {
-                    return "global " + std::string(sc::typeName(g.type)) + (g.size > 1 ? "[" + std::to_string(g.size) + "]" : "") + " " + g.name +
-                           "  line " + std::to_string(g.loc.line);
+                    return nox::l10n::format(NOX_TR("editor.script.hover.global", "global {type} {name}  line {line}"),
+                                             {{"type", std::string(sc::typeName(g.type)) + (g.size > 1 ? "[" + std::to_string(g.size) + "]" : "")},
+                                              {"name", g.name},
+                                              {"line", g.loc.line}});
                 }
             }
             for (const auto& v : good_->objectVars) {
                 if (v.name == w && !v.name.empty()) {
-                    return "object variable " + std::string(sc::typeName(v.type)) + (v.size > 1 ? "[" + std::to_string(v.size) + "]" : "") +
-                           " object." + v.name + "  line " + std::to_string(v.loc.line) + " (each object's own; NoX Core only)";
+                    return nox::l10n::format(NOX_TR("editor.script.hover.object_var", "object variable {type} object.{name}  line {line} (each object's own; NoX Core only)"),
+                                             {{"type", std::string(sc::typeName(v.type)) + (v.size > 1 ? "[" + std::to_string(v.size) + "]" : "")},
+                                              {"name", v.name},
+                                              {"line", v.loc.line}});
                 }
             }
         }
@@ -243,95 +272,121 @@ void ScriptPanel::registerCommands()
     const auto playable = [this] { return ed_.ctx_.playTest.available(); };
     // (In a collaborative session the reloads go to the session's running game: the host's.)
     const auto testRunning = [this] { return (ed_.ctx_.playTest.running && ed_.ctx_.playTest.running()) || ed_.inSession(); };
-    add("window.script", "Script", "Window", "", "Shows or hides the Script panel.", [this] { show_ = !show_; }, {},
-        [this] { return show_; });
-    add("script.focus", "Go to Script Panel", "Script", "Ctrl+Shift+E", "Show the Script panel and put the keyboard in its source.", [this] {
+    const char* window = NOX_TRC("editor.category.window", "Window");
+    const char* script = NOX_TRC("editor.category.script", "Script");
+    const char* play = NOX_TRC("editor.category.play", "Play");
+    add("window.script", NOX_TRC("editor.cmd.window.script.label", "Script"), window, "",
+        NOX_TRC("editor.cmd.window.script.help", "Shows or hides the Script panel."), [this] { show_ = !show_; }, {}, [this] { return show_; });
+    add("script.focus", NOX_TRC("editor.cmd.script.focus.label", "Go to Script Panel"), script, "Ctrl+Shift+E",
+        NOX_TRC("editor.cmd.script.focus.help", "Show the Script panel and put the keyboard in its source."), [this] {
         show_ = true;
         focusWindow_ = 2;
         code_.focus();
     });
-    add("window.scriptReference", "Script Reference", "Window", "", "Shows or hides the builtins, functions and globals.",
+    add("window.scriptReference", NOX_TRC("editor.cmd.window.script_reference.label", "Script Reference"), window, "",
+        NOX_TRC("editor.cmd.window.script_reference.help", "Shows or hides the builtins, functions and globals."),
         [this] { showReference_ = !showReference_; }, {}, [this] { return showReference_; });
-    add("window.functionInfo", "Function Info", "Window", "",
-        "Shows or hides Function Info: a builtin's full description, parameters, edge cases and example (right-click a builtin).",
+    add("window.functionInfo", NOX_TRC("editor.cmd.window.function_info.label", "Function Info"), window, "",
+        NOX_TRC("editor.cmd.window.function_info.help",
+                "Shows or hides Function Info: a builtin's full description, parameters, edge cases and example (right-click a builtin)."),
         [this] { showInfo_ = !showInfo_; }, {}, [this] { return showInfo_; });
     const auto editable = [this] { return readOnlyReason() == nullptr; };
-    add("script.compile", "Compile Script", "Script", "Ctrl+B",
-        "Compile the source into the map's script (an undoable change); errors and warnings go to the Problems panel.",
+    add("script.compile", NOX_TRC("editor.cmd.script.compile.label", "Compile Script"), script, "Ctrl+B",
+        NOX_TRC("editor.cmd.script.compile.help",
+                "Compile the source into the map's script (an undoable change); errors and warnings go to the Problems panel."),
         [this] {
             commit();
             if (compileIntoMap()) {
-                ed_.status("Script compiled" + std::string(last_.diagnostics.empty() ? "" : " (" + std::to_string(last_.diagnostics.size()) + " warnings)"));
+                ed_.status(last_.diagnostics.empty() ? NOX_TR("editor.script.status.compiled", "Script compiled")
+                                                     : nox::l10n::format(NOX_TR("editor.script.status.compiled_warnings", "Script compiled ({n} warnings)"),
+                                                                         {{"n", last_.diagnostics.size()}}));
             }
         }, editable);
-    add("script.reload", "Hot Reload", "Script", "Ctrl+R",
-        "Compile and swap the new script into the running play-test, keeping the globals' values, timers and dialogs (matched by name).",
+    add("script.reload", NOX_TRC("editor.cmd.script.reload.label", "Hot Reload"), script, "Ctrl+R",
+        NOX_TRC("editor.cmd.script.reload.help",
+                "Compile and swap the new script into the running play-test, keeping the globals' values, timers and dialogs (matched by name)."),
         [this] { reload(Reload::Hot); }, [=] { return testRunning() && editable(); });
-    add("script.restartScripts", "Restart Scripts", "Script", "Ctrl+Shift+R",
-        "Compile, then run GLOBAL, MapInitialize and MapEntry again in the play-test (objects stay, timers are cleared).",
+    add("script.restartScripts", NOX_TRC("editor.cmd.script.restart_scripts.label", "Restart Scripts"), script, "Ctrl+Shift+R",
+        NOX_TRC("editor.cmd.script.restart_scripts.help",
+                "Compile, then run GLOBAL, MapInitialize and MapEntry again in the play-test (objects stay, timers are cleared)."),
         [this] { reload(Reload::RestartScripts); }, [=] { return testRunning() && editable(); });
-    add("script.restartMap", "Restart Map", "Script", "", "Restart the play-test on a fresh load of the edited map.",
+    add("script.restartMap", NOX_TRC("editor.cmd.script.restart_map.label", "Restart Map"), script, "",
+        NOX_TRC("editor.cmd.script.restart_map.help", "Restart the play-test on a fresh load of the edited map."),
         [this] { reload(Reload::RestartMap); }, testRunning);
-    add("script.runTests", "Run Script Tests", "Script", "Ctrl+T",
-        "Run the script's Test* functions headless in the server, each on a fresh load of the map; asserts that fail are listed in Problems.",
+    add("script.runTests", NOX_TRC("editor.cmd.script.run_tests.label", "Run Script Tests"), script, "Ctrl+T",
+        NOX_TRC("editor.cmd.script.run_tests.help",
+                "Run the script's Test* functions headless in the server, each on a fresh load of the map; asserts that fail are listed in Problems."),
         [this] { runTests(); });
-    add("script.decompile", "Decompile Map Script", "Script", "",
-        "Replace the source with the map's compiled script decompiled (undoable).", [this] {
+    add("script.decompile", NOX_TRC("editor.cmd.script.decompile.label", "Decompile Map Script"), script, "",
+        NOX_TRC("editor.cmd.script.decompile.help", "Replace the source with the map's compiled script decompiled (undoable)."), [this] {
             const auto d = me::decompileDocumentScript(ed_.doc_, good_ ? &*good_ : nullptr);
             if (d.source.empty()) {
-                ed_.status("The map has no compiled script to decompile");
+                ed_.status(NOX_TR("editor.script.status.nothing_to_decompile", "The map has no compiled script to decompile"));
                 return;
             }
             commit();
-            ed_.perform(me::Op{"Decompile script", {me::SetScriptSource{d.source}}});
+            ed_.perform(me::Op{me::opLabel(ol::kDecompileScript), {me::SetScriptSource{d.source}}});
             decompileNotes_ = d.notes;
         });
-    add("script.exportNs", "Export .ns", "Script", "", "Write the source beside the map as <name>.ns (the file the watch follows).",
+    add("script.exportNs", NOX_TRC("editor.cmd.script.export_ns.label", "Export .ns"), script, "",
+        NOX_TRC("editor.cmd.script.export_ns.help", "Write the source beside the map as <name>.ns (the file the watch follows)."),
         [this] { exportNs(); });
-    add("script.importObj", "Import nsc .obj...", "Script", "", "Replace the map's script with a compiled .obj (nsc's, or the game's nc.obj) and decompile it.",
+    add("script.importObj", NOX_TRC("editor.cmd.script.import_obj.label", "Import nsc .obj..."), script, "",
+        NOX_TRC("editor.cmd.script.import_obj.help", "Replace the map's script with a compiled .obj (nsc's, or the game's nc.obj) and decompile it."),
         [this] {
-            static const SDL_DialogFileFilter filters[] = {{"Compiled NoxScript", "obj"}, {"All files", "*"}};
+            static const SDL_DialogFileFilter filters[] = {{NOX_TRC("editor.script.filter.obj", "Compiled NoxScript"), "obj"},
+                                                           {NOX_TRC("editor.script.filter.all", "All files"), "*"}};
             editor::openFileDialog(filePick_, ed_.ctx_.window, filters, 2);
         });
-    add("script.reimportSave", "Re-import .obj and Save", "Script", "",
-        "Import the last imported .obj again (after compiling it outside) and save the map (the old editor's F10).",
+    add("script.reimportSave", NOX_TRC("editor.cmd.script.reimport_save.label", "Re-import .obj and Save"), script, "",
+        NOX_TRC("editor.cmd.script.reimport_save.help",
+                "Import the last imported .obj again (after compiling it outside) and save the map (the old editor's F10)."),
         [this] {
             if (lastObj_.empty()) {
-                ed_.status("No .obj imported yet");
+                ed_.status(NOX_TR("editor.script.status.no_obj", "No .obj imported yet"));
                 return;
             }
             importObj(lastObj_);
             ed_.save();
         }, [this] { return !lastObj_.empty(); });
-    add("script.exportObj", "Export .obj", "Script", "",
-        "Compile and write the map's script as <name>.obj beside the map (the ScriptObject's bytes, nsc's format).", [this] { exportObj(); });
-    add("script.fontBigger", "Script Font Bigger", "Script", "Ctrl+=", "A bigger font in the Script panel (also Ctrl+wheel there).",
+    add("script.exportObj", NOX_TRC("editor.cmd.script.export_obj.label", "Export .obj"), script, "",
+        NOX_TRC("editor.cmd.script.export_obj.help",
+                "Compile and write the map's script as <name>.obj beside the map (the ScriptObject's bytes, nsc's format)."),
+        [this] { exportObj(); });
+    add("script.fontBigger", NOX_TRC("editor.cmd.script.font_bigger.label", "Script Font Bigger"), script, "Ctrl+=",
+        NOX_TRC("editor.cmd.script.font_bigger.help", "A bigger font in the Script panel (also Ctrl+wheel there)."),
         [this] { setFontScale(ed_.settings_.scriptFontScale * 1.1f); });
-    add("script.fontSmaller", "Script Font Smaller", "Script", "Ctrl+-", "A smaller font in the Script panel (also Ctrl+wheel there).",
+    add("script.fontSmaller", NOX_TRC("editor.cmd.script.font_smaller.label", "Script Font Smaller"), script, "Ctrl+-",
+        NOX_TRC("editor.cmd.script.font_smaller.help", "A smaller font in the Script panel (also Ctrl+wheel there)."),
         [this] { setFontScale(ed_.settings_.scriptFontScale / 1.1f); });
-    add("script.fontReset", "Script Font Normal Size", "Script", "Ctrl+0", "The Script panel's font back to the panels' size.",
-        [this] { setFontScale(1.0f); });
-    add("script.watch", "Watch .ns File", "Script", "",
-        "Follow the .ns file beside the map: saving it in an outside editor updates the source and hot-reloads a running play-test.",
+    add("script.fontReset", NOX_TRC("editor.cmd.script.font_reset.label", "Script Font Normal Size"), script, "Ctrl+0",
+        NOX_TRC("editor.cmd.script.font_reset.help", "The Script panel's font back to the panels' size."), [this] { setFontScale(1.0f); });
+    add("script.watch", NOX_TRC("editor.cmd.script.watch.label", "Watch .ns File"), script, "",
+        NOX_TRC("editor.cmd.script.watch.help",
+                "Follow the .ns file beside the map: saving it in an outside editor updates the source and hot-reloads a running play-test."),
         [this] { setWatch(!watching_); }, {}, [this] { return watching_; });
-    add("play.start", "Play-Test", "Play", "F5",
-        "Host the edited map here in its game mode and play it in the Map panel (click it to play, Shift+F1 frees the mouse), or "
-        "over the whole window with Play in Full Window (F2 in the game comes back). While it runs: the keyboard and mouse back "
-        "to the game in the Map panel, or back to the game over the whole window.",
+    add("play.start", NOX_TRC("editor.cmd.play.start.label", "Play-Test"), play, "F5",
+        NOX_TRC("editor.cmd.play.start.help",
+                "Host the edited map here in its game mode and play it in the Map panel (click it to play, Shift+F1 frees the mouse), or "
+                "over the whole window with Play in Full Window (F2 in the game comes back). While it runs: the keyboard and mouse back "
+                "to the game in the Map panel, or back to the game over the whole window."),
         [this] { startPlayTest(); }, playable);
-    add("play.here", "Play From Here", "Play", "Ctrl+F5",
-        "Jump in at the cursor: the play-test starts with the player at the map point under the mouse (the view's centre when "
-        "the mouse isn't on the map). While a test runs, its player is put at the point under the mouse, on the editor's map "
-        "or on the game in the Map panel.",
+    add("play.here", NOX_TRC("editor.cmd.play.here.label", "Play From Here"), play, "Ctrl+F5",
+        NOX_TRC("editor.cmd.play.here.help",
+                "Jump in at the cursor: the play-test starts with the player at the map point under the mouse (the view's centre when "
+                "the mouse isn't on the map). While a test runs, its player is put at the point under the mouse, on the editor's map "
+                "or on the game in the Map panel."),
         [this] {
             if (const auto at = cursorPoint()) {
                 playFrom(*at);
             }
         },
         playable);
-    add("play.stop", "Stop Play-Test", "Play", "Shift+F5", "End the play-test.", [this] { stopPlayTest(); }, testRunning);
-    add("play.playersCanDie", "Players Can Die", "Play", "",
-        "For testing traps: players die as in the map's mode. Off (the sandbox's rule): their health stops at 1.",
+    add("play.stop", NOX_TRC("editor.cmd.play.stop.label", "Stop Play-Test"), play, "Shift+F5", NOX_TRC("editor.cmd.play.stop.help", "End the play-test."),
+        [this] { stopPlayTest(); }, testRunning);
+    add("play.playersCanDie", NOX_TRC("editor.cmd.play.players_can_die.label", "Players Can Die"), play, "",
+        NOX_TRC("editor.cmd.play.players_can_die.help",
+                "For testing traps: players die as in the map's mode. Off (the sandbox's rule): their health stops at 1."),
         [this] { playersCanDie_ = !playersCanDie_; }, {}, [this] { return playersCanDie_; });
 }
 
@@ -410,7 +465,11 @@ bool ScriptPanel::onShortcut(int chord)
     s.key = ImGui::GetKeyName(static_cast<ImGuiKey>(key));
     if (const editor::Command* c = ed_.commands_.match(s)) {
         const std::string& cat = c->category;
-        if (cat == "File" || cat == "Window" || cat == "Help" || cat == "Script" || cat == "Play" || c->id == "view.palette") {
+        // (A category as the registry holds it: in English, or in the language in use.)
+        const auto is = [&](std::string_view en, const std::string& shown) { return cat == en || cat == shown; };
+        if (is("File", NOX_TR("editor.category.file", "File")) || is("Window", NOX_TR("editor.category.window", "Window")) ||
+            is("Help", NOX_TR("editor.category.help", "Help")) || is("Script", NOX_TR("editor.category.script", "Script")) ||
+            is("Play", NOX_TR("editor.category.play", "Play")) || c->id == "view.palette") {
             ed_.commands_.run(c->id);
             return true;
         }
@@ -611,7 +670,7 @@ void ScriptPanel::commit()
         return;
     }
     synced_ = text;
-    ed_.perform(me::Op{"Edit script", {me::SetScriptSource{std::move(text)}}});
+    ed_.perform(me::Op{me::opLabel(ol::kEditScript), {me::SetScriptSource{std::move(text)}}});
     if (watching_) {
         // The watched file follows the editor's text (its own write isn't a change from outside).
         std::ofstream(watched_, std::ios::binary | std::ios::trunc) << *synced_;
@@ -659,7 +718,8 @@ void ScriptPanel::keepScriptLock(std::uint64_t now)
             typing_ = false;
             synced_ = ed_.doc_.scriptSource;
             code_.setText(synced_.value_or(std::string()));
-            ed_.status((who ? *who : std::string("Another editor")) + " has the script: your last unsent typing was dropped");
+            ed_.status(nox::l10n::format(NOX_TR("editor.script.status.lock_lost", "{name} has the script: your last unsent typing was dropped"),
+                                         {{"name", who ? *who : NOX_TR("editor.script.another_editor", "Another editor")}}));
         }
         return;
     }
@@ -696,13 +756,15 @@ void ScriptPanel::ensureSource()
         return;
     }
     if (!d.identical) {
-        decompileNotes_.insert(decompileNotes_.begin(), "the decompiled source doesn't compile back to the map's exact bytes");
+        decompileNotes_.insert(decompileNotes_.begin(),
+                               NOX_TR("editor.script.decompile_not_identical", "the decompiled source doesn't compile back to the map's exact bytes"));
     }
     ed_.doc_.scriptSource = d.source;
     synced_ = d.source;
     code_.setText(d.source, false);
     compileDueMs_ = SDL_GetTicks();
-    ed_.status("Decompiled the map's script" + std::string(d.identical ? " (it compiles back to the same bytes)" : ""));
+    ed_.status(d.identical ? NOX_TR("editor.script.status.decompiled_identical", "Decompiled the map's script (it compiles back to the same bytes)")
+                           : NOX_TR("editor.script.status.decompiled", "Decompiled the map's script"));
 }
 
 void ScriptPanel::compileNow()
@@ -731,19 +793,22 @@ void ScriptPanel::compileNow()
 bool ScriptPanel::compileIntoMap()
 {
     if (!ed_.doc_.scriptSource) {
-        ed_.status("No script source to compile");
+        ed_.status(NOX_TR("editor.script.status.no_source", "No script source to compile"));
         return false;
     }
     if (readOnlyReason()) {
         // (The map's script stays as it is: its object variables are never stripped.)
-        ed_.status("Not compiled: the script uses object variables (NoX Core-only), which Editor Settings doesn't allow");
+        ed_.status(NOX_TR("editor.script.status.object_vars_refused",
+                          "Not compiled: the script uses object variables (NoX Core-only), which Editor Settings doesn't allow"));
         return false;
     }
     compiled_ = false;
     compileNow();
     if (!last_.ok()) {
         const auto errors = std::ranges::count_if(last_.diagnostics, [](const auto& d) { return d.severity == sc::Diagnostic::Severity::Error; });
-        ed_.status("The script has " + std::to_string(errors) + (errors == 1 ? " error" : " errors") + ": not compiled (see Problems)");
+        ed_.status(nox::l10n::format(NOX_TRP("editor.script.status.not_compiled", "The script has {n} error: not compiled (see Problems)",
+                                             "The script has {n} errors: not compiled (see Problems)", errors),
+                                     {{"n", errors}}));
         ed_.showProblems_ = true;
         return false;
     }
@@ -790,19 +855,21 @@ void ScriptPanel::noxCoreBanner(const std::string* readOnly)
     }
     ImGui::PushStyleColor(ImGuiCol_Text, editor::themeColours().unknown);
     ImGui::TextWrapped("%s", readOnly ? readOnly->c_str()
-                                      : "The script uses object variables, a NoX Core-only feature: the original game crashes on them, "
-                                        "and a map with them needs a NoX Core server. They are off in Editor Settings, so the compiler "
-                                        "refuses them (see Problems).");
+                                      : NOX_TRC("editor.script.object_vars_banner",
+                                                "The script uses object variables, a NoX Core-only feature: the original game crashes on them, "
+                                                "and a map with them needs a NoX Core server. They are off in Editor Settings, so the compiler "
+                                                "refuses them (see Problems)."));
     ImGui::PopStyleColor();
-    if (ImGui::Button("Allow NoX Core-only script features")) {
+    if (ImGui::Button(NOX_TRI("editor.script.allow_noxcore", "Allow NoX Core-only script features"))) {
         ed_.settings_.allowNoxCoreScript = true;
         ed_.saveSettings();
         compiled_ = false;
         compileDueMs_ = SDL_GetTicks();
-        ed_.status("NoX Core-only script features allowed (Editor Settings): maps that use them need a NoX Core server");
+        ed_.status(NOX_TR("editor.script.status.noxcore_allowed", "NoX Core-only script features allowed (Editor Settings): maps that use them need a NoX Core server"));
     }
-    help("Turns on Editor Settings > \"Allow NoX Core-only script features (object variables)\". Maps that use them crash the "
-         "original game and need a NoX Core server.");
+    help(NOX_TRC("editor.script.allow_noxcore_help",
+                 "Turns on Editor Settings > \"Allow NoX Core-only script features (object variables)\". Maps that use them crash the "
+                 "original game and need a NoX Core server."));
 }
 
 void ScriptPanel::saveAndReload()
@@ -846,7 +913,7 @@ void ScriptPanel::tick()
     }
     if (playing_ && ed_.ctx_.playTest.running && !ed_.ctx_.playTest.running()) {
         playing_ = false; // (the test ended in the game: its quit menu, a failure)
-        ed_.status("The play-test ended");
+        ed_.status(NOX_TR("editor.script.status.playtest_ended", "The play-test ended"));
     }
     if (const auto picked = filePick_.take()) {
         importObj(fs::path(reinterpret_cast<const char8_t*>(picked->c_str())));
@@ -888,7 +955,7 @@ std::optional<SDL_FPoint> ScriptPanel::cursorPoint() const
                 return p;
             }
         }
-        ed_.status("Put the mouse on the game in the Map panel to jump there");
+        ed_.status(NOX_TR("editor.script.status.mouse_on_game", "Put the mouse on the game in the Map panel to jump there"));
         return std::nullopt;
     }
     if (const auto w = ed_.mouseWorld()) {
@@ -907,7 +974,7 @@ void ScriptPanel::playFrom(SDL_FPoint at)
     }
     auto& hooks = ed_.ctx_.playTest;
     if (!hooks.available()) {
-        ed_.status("Play-test isn't available here");
+        ed_.status(NOX_TR("editor.script.status.no_playtest", "Play-test isn't available here"));
         return;
     }
     char where[48];
@@ -915,7 +982,7 @@ void ScriptPanel::playFrom(SDL_FPoint at)
     if (hooks.running && hooks.running()) {
         if (hooks.jumpTo) {
             hooks.jumpTo(at);
-            ed_.status(std::string("Play-test: the player put at ") + where);
+            ed_.status(nox::l10n::format(NOX_TR("editor.script.status.player_put", "Play-test: the player put at {where}"), {{"where", where}}));
         }
         if (hooks.resume) hooks.resume();
         return;
@@ -936,12 +1003,12 @@ void ScriptPanel::startPlayTest(std::optional<SDL_FPoint> at)
 {
     auto& hooks = ed_.ctx_.playTest;
     if (!hooks.available()) {
-        ed_.status("Play-test isn't available here");
+        ed_.status(NOX_TR("editor.script.status.no_playtest", "Play-test isn't available here"));
         return;
     }
     const bool privateTest = ed_.inSession(); // (a session's play-test is a private local one)
     if (privateTest && !hooks.startPrivate) {
-        ed_.status("A private test isn't available here");
+        ed_.status(NOX_TR("editor.script.status.no_private_test", "A private test isn't available here"));
         return;
     }
     if (!privateTest && hooks.running && hooks.running()) {
@@ -959,7 +1026,7 @@ void ScriptPanel::startPlayTest(std::optional<SDL_FPoint> at)
         if (doc.scriptSource) {
             const auto r = me::compileForDocument(doc, *doc.scriptSource, ed_.settings_.allowNoxCoreScript);
             if (!r.ok() || !r.file) {
-                ed_.errorText_ = "The script doesn't compile: fix its errors (Problems) before the private test.";
+                ed_.errorText_ = NOX_TR("editor.script.err.private_compile", "The script doesn't compile: fix its errors (Problems) before the private test.");
                 return;
             }
             if (const me::Op op = me::compiledScriptOp(doc, *r.file); !op.empty()) {
@@ -969,7 +1036,7 @@ void ScriptPanel::startPlayTest(std::optional<SDL_FPoint> at)
     } else if (ed_.doc_.scriptSource) {
         if (!compileIntoMap()) {
             const std::string* why = readOnlyReason();
-            ed_.errorText_ = why ? *why : "The script doesn't compile: fix its errors (Problems) before the play-test.";
+            ed_.errorText_ = why ? *why : NOX_TR("editor.script.err.playtest_compile", "The script doesn't compile: fix its errors (Problems) before the play-test.");
             return;
         }
         doc = ed_.doc_;
@@ -987,13 +1054,13 @@ void ScriptPanel::startPlayTest(std::optional<SDL_FPoint> at)
         std::ofstream out(mapPath, std::ios::binary | std::ios::trunc);
         out.write(reinterpret_cast<const char*>(files.map.data()), static_cast<std::streamsize>(files.map.size()));
         if (!out) {
-            throw std::runtime_error("can't write " + pathText(mapPath));
+            throw std::runtime_error(nox::l10n::format(NOX_TR("editor.script.err.cant_write", "can't write {path}"), {{"path", pathText(mapPath)}}));
         }
         // (and its .nxz, as a saved map has: what the host loads for downloads at each map's load)
         std::ofstream(fs::path(mapPath).replace_extension(".nxz"), std::ios::binary | std::ios::trunc)
             .write(reinterpret_cast<const char*>(files.nxz.data()), static_cast<std::streamsize>(files.nxz.size()));
     } catch (const std::exception& ex) {
-        ed_.errorText_ = std::string("The play-test's map can't be written:\n") + ex.what();
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.script.err.map_write", "The play-test's map can't be written:\n{error}"), {{"error", ex.what()}});
         return;
     }
     editor::PlayTestRequest req;
@@ -1016,29 +1083,39 @@ void ScriptPanel::startPlayTest(std::optional<SDL_FPoint> at)
         req.playersCanDie = true; // (the map's real mode, as any game of it)
         const std::string error = hooks.startPrivate(req);
         if (!error.empty()) {
-            ed_.errorText_ = "The private test didn't start:\n" + error;
+            ed_.errorText_ = nox::l10n::format(NOX_TR("editor.script.err.private_start", "The private test didn't start:\n{error}"), {{"error", error}});
             return;
         }
-        ed_.status(std::string("Private test of the working copy: ") + modeName(req.mode) + ", in its own window (the session goes on here)");
+        ed_.status(nox::l10n::format(NOX_TR("editor.script.status.private_test", "Private test of the working copy: {mode}, in its own window (the session goes on here)"),
+                                     {{"mode", modeName(req.mode)}}));
         return;
     }
     const std::string error = hooks.start(req);
     if (!error.empty()) {
-        ed_.errorText_ = "The play-test didn't start:\n" + error;
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.script.err.playtest_start", "The play-test didn't start:\n{error}"), {{"error", error}});
         return;
     }
     playing_ = true;
     reloadNotes_.clear();
     reloadSummary_.clear();
-    std::string from;
-    if (at) {
-        char where[48];
-        std::snprintf(where, sizeof where, ", from %.0f, %.0f", at->x, at->y);
-        from = where;
+    // "Play-test: Arena, Wizard, players can't die, from 1000, 2000 (F2 in the game comes back)"
+    std::string s = nox::l10n::format(NOX_TR("editor.script.status.playing", "Play-test: {mode}"), {{"mode", modeLabel(mode)}});
+    if (req.playerClass >= 0) {
+        s = nox::l10n::format(NOX_TR("editor.script.status.playing_class", "{status}, {class}"), {{"status", s}, {"class", classLabel(req.playerClass)}});
     }
-    ed_.status(std::string("Play-test: ") + mode.name + (req.playerClass >= 0 ? std::string(", ") + kClassNames[req.playerClass] : std::string()) +
-               (playersCanDie_ ? "" : ", players can't die") + from +
-               (req.fullWindow ? " (F2 in the game comes back)" : " (" + ed_.commands_.shortcut("play.release").text() + " frees the mouse)"));
+    if (!playersCanDie_) {
+        s = nox::l10n::format(NOX_TR("editor.script.status.playing_cant_die", "{status}, players can't die"), {{"status", s}});
+    }
+    if (at) {
+        char x[24], y[24];
+        std::snprintf(x, sizeof x, "%.0f", at->x);
+        std::snprintf(y, sizeof y, "%.0f", at->y);
+        s = nox::l10n::format(NOX_TR("editor.script.status.playing_from", "{status}, from {x}, {y}"), {{"status", s}, {"x", x}, {"y", y}});
+    }
+    s = req.fullWindow ? nox::l10n::format(NOX_TR("editor.script.status.playing_full", "{status} (F2 in the game comes back)"), {{"status", s}})
+                       : nox::l10n::format(NOX_TR("editor.script.status.playing_panel", "{status} ({keys} frees the mouse)"),
+                                           {{"status", s}, {"keys", ed_.commands_.shortcut("play.release").text()}});
+    ed_.status(s);
 }
 
 void ScriptPanel::stopPlayTest()
@@ -1057,7 +1134,7 @@ void ScriptPanel::reload(Reload mode)
         // commits the bytecode and reloads the running game's script for every player.
         commit();
         if (mode == Reload::RestartMap) {
-            ed_.status("In a session the map restarts with a publish");
+            ed_.status(NOX_TR("editor.script.status.session_restart", "In a session the map restarts with a publish"));
             return;
         }
         ed_.sessionReloadScript(mode == Reload::Hot);
@@ -1065,7 +1142,7 @@ void ScriptPanel::reload(Reload mode)
     }
     auto& hooks = ed_.ctx_.playTest;
     if (!hooks.running || !hooks.running()) {
-        ed_.status("No play-test is running");
+        ed_.status(NOX_TR("editor.script.status.no_test_running", "No play-test is running"));
         return;
     }
     if (mode == Reload::RestartMap) {
@@ -1088,10 +1165,12 @@ void ScriptPanel::reload(Reload mode)
         running_ = debug;
     }
     reloadNotes_ = report.notes;
-    reloadSummary_ = mode == Reload::Hot ? "Hot reload: " + report.summary()
-                                         : "Restart scripts: " + (report.notes.empty() ? report.summary() : report.notes.back().message);
+    reloadSummary_ = mode == Reload::Hot
+                         ? nox::l10n::format(NOX_TR("editor.script.reload.hot", "Hot reload: {summary}"), {{"summary", report.summary()}})
+                         : nox::l10n::format(NOX_TR("editor.script.reload.restart", "Restart scripts: {summary}"),
+                                             {{"summary", report.notes.empty() ? report.summary() : report.notes.back().message}});
     if (!report.applied && !report.notes.empty()) {
-        reloadSummary_ = "Not reloaded: " + report.notes.front().message;
+        reloadSummary_ = nox::l10n::format(NOX_TR("editor.script.reload.not", "Not reloaded: {why}"), {{"why", report.notes.front().message}});
     }
     ed_.status(reloadSummary_);
     if (hooks.notify) {
@@ -1111,7 +1190,7 @@ void ScriptPanel::runTests()
         compiled_ = false;
         compileNow();
         if (!last_.ok()) {
-            ed_.status("The script has errors: no tests run");
+            ed_.status(NOX_TR("editor.script.status.tests_errors", "The script has errors: no tests run"));
             ed_.showProblems_ = true;
             return;
         }
@@ -1128,8 +1207,10 @@ void ScriptPanel::runTests()
         tests_->error = ex.what();
     }
     ed_.showProblems_ = true;
-    ed_.status(tests_->error.empty() ? "Script tests: " + std::to_string(tests_->passed()) + " passed, " + std::to_string(tests_->failed()) + " failed"
-                                     : "Script tests didn't run: " + tests_->error);
+    ed_.status(tests_->error.empty()
+                   ? nox::l10n::format(NOX_TR("editor.script.status.tests", "Script tests: {passed} passed, {failed} failed"),
+                                       {{"passed", tests_->passed()}, {"failed", tests_->failed()}})
+                   : nox::l10n::format(NOX_TR("editor.script.status.tests_failed", "Script tests didn't run: {error}"), {{"error", tests_->error}}));
 }
 
 // --- Files -----------------------------------------------------------------------------------------
@@ -1152,7 +1233,8 @@ void ScriptPanel::exportNs()
     fs::create_directories(path.parent_path(), ec);
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     out << ed_.doc_.scriptSource.value_or(std::string());
-    ed_.status(out ? "Exported " + pathText(path) : "Can't write " + pathText(path));
+    ed_.status(out ? nox::l10n::format(NOX_TR("editor.script.status.exported", "Exported {path}"), {{"path", pathText(path)}})
+                   : nox::l10n::format(NOX_TR("editor.script.status.cant_write", "Can't write {path}"), {{"path", pathText(path)}}));
 }
 
 void ScriptPanel::exportObj()
@@ -1164,7 +1246,7 @@ void ScriptPanel::exportObj()
         compiled_ = false;
         compileNow();
         if (!last_.ok()) {
-            ed_.status("The script has errors: not exported");
+            ed_.status(NOX_TR("editor.script.status.export_errors", "The script has errors: not exported"));
             return;
         }
         bytes = last_.file->serialize();
@@ -1174,7 +1256,8 @@ void ScriptPanel::exportObj()
     fs::create_directories(path.parent_path(), ec);
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    ed_.status(out ? "Exported " + pathText(path) : "Can't write " + pathText(path));
+    ed_.status(out ? nox::l10n::format(NOX_TR("editor.script.status.exported", "Exported {path}"), {{"path", pathText(path)}})
+                   : nox::l10n::format(NOX_TR("editor.script.status.cant_write", "Can't write {path}"), {{"path", pathText(path)}}));
 }
 
 void ScriptPanel::importObj(const fs::path& path)
@@ -1189,11 +1272,12 @@ void ScriptPanel::importObj(const fs::path& path)
         me::MapDocument probe = ed_.doc_;
         probe.script = so;
         const auto d = me::decompileDocumentScript(probe);
-        ed_.perform(me::Op{"Import script", {me::SetScript{so}, me::SetScriptSource{d.source}}});
+        ed_.perform(me::Op{me::opLabel(ol::kImportScript), {me::SetScript{so}, me::SetScriptSource{d.source}}});
         decompileNotes_ = d.notes;
-        ed_.status("Imported " + pathText(path) + " (" + std::to_string(file.functions.size()) + " functions)");
+        ed_.status(nox::l10n::format(NOX_TR("editor.script.status.imported", "Imported {path} ({n} functions)"),
+                                     {{"path", pathText(path)}, {"n", file.functions.size()}}));
     } catch (const std::exception& ex) {
-        ed_.errorText_ = "Can't import " + pathText(path) + ":\n" + ex.what();
+        ed_.errorText_ = nox::l10n::format(NOX_TR("editor.script.err.import", "Can't import {path}:\n{error}"), {{"path", pathText(path)}, {"error", ex.what()}});
     }
 }
 
@@ -1213,7 +1297,7 @@ void ScriptPanel::setWatch(bool on)
     watchedTime_ = fs::last_write_time(watched_, ec);
     watchedSize_ = fs::file_size(watched_, ec);
     watchSeenMs_ = 0;
-    ed_.status("Watching " + pathText(watched_));
+    ed_.status(nox::l10n::format(NOX_TR("editor.script.status.watching", "Watching {path}"), {{"path", pathText(watched_)}}));
 }
 
 void ScriptPanel::pollWatch()
@@ -1251,7 +1335,7 @@ void ScriptPanel::pollWatch()
         return;
     }
     typing_ = false;
-    ed_.perform(me::Op{"Script changed on disk", {me::SetScriptSource{text}}});
+    ed_.perform(me::Op{me::opLabel(ol::kScriptChangedOnDisk), {me::SetScriptSource{text}}});
     syncFromDocument();
     if (ed_.ctx_.playTest.running && ed_.ctx_.playTest.running()) {
         reload(Reload::Hot);
@@ -1309,10 +1393,10 @@ void ScriptPanel::gotoDefinition(std::string_view word)
         }
     }
     if (sc::findBuiltin(word)) {
-        ed_.status(prototype(*sc::findBuiltin(word)) + " is a builtin");
+        ed_.status(nox::l10n::format(NOX_TR("editor.script.status.is_builtin", "{prototype} is a builtin"), {{"prototype", prototype(*sc::findBuiltin(word))}}));
         return;
     }
-    ed_.status("No definition of " + std::string(word) + " (compile the script for its names)");
+    ed_.status(nox::l10n::format(NOX_TR("editor.script.status.no_definition", "No definition of {name} (compile the script for its names)"), {{"name", word}}));
 }
 
 std::vector<std::string> ScriptPanel::functionNames() const
@@ -1336,12 +1420,14 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
     bool changed = false;
     const auto names = functionNames();
     const bool known = function.empty() || std::ranges::find(names, function) != names.end();
-    const std::string preview = function.empty() ? "(none)" : known ? function : function + "  (not in the script)";
+    const std::string preview = function.empty() ? NOX_TR("editor.script.fn.none", "(none)")
+                                : known          ? function
+                                                 : nox::l10n::format(NOX_TR("editor.script.fn.not_in_script", "{name}  (not in the script)"), {{"name", function}});
     ImGui::PushID(label);
     if (!known) ImGui::PushStyleColor(ImGuiCol_Text, editor::themeColours().unknown);
     if (ImGui::BeginCombo("##fn", preview.c_str(), ImGuiComboFlags_HeightLarge)) {
         if (!known) ImGui::PopStyleColor();
-        if (ImGui::Selectable("(none)", function.empty())) {
+        if (ImGui::Selectable(NOX_TRI("editor.script.fn.none", "(none)"), function.empty())) {
             function.clear();
             changed = true;
         }
@@ -1352,7 +1438,7 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
             }
         }
         ImGui::Separator();
-        if (ImGui::Selectable("New function...")) {
+        if (ImGui::Selectable(NOX_TRI("editor.script.fn.new", "New function..."))) {
             // A name from the field's ("Enemy sighted" -> "OnEnemySighted").
             std::string suggestion = "On";
             bool upper = true;
@@ -1371,15 +1457,15 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
     } else if (!known) {
         ImGui::PopStyleColor();
     }
-    help("The script function this handler calls (from the compiled script). Right-click: go to it.");
+    help(NOX_TRC("editor.script.fn.help", "The script function this handler calls (from the compiled script). Right-click: go to it."));
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !function.empty()) {
         gotoDefinition(function);
     }
     if (std::exchange(newFnOpen_, false)) {
-        ImGui::OpenPopup("New function");
+        ImGui::OpenPopup(NOX_TRI("editor.script.fn.new_title", "New function"));
     }
-    if (ImGui::BeginPopup("New function")) {
-        ImGui::TextUnformatted("A new void function in the script, for this handler:");
+    if (ImGui::BeginPopup(NOX_TRI("editor.script.fn.new_title", "New function"))) {
+        ImGui::TextUnformatted(NOX_TRC("editor.script.fn.new_text", "A new void function in the script, for this handler:"));
         if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
         const bool enter = ImGui::InputText("##newfn", newFnBuf_, sizeof newFnBuf_, ImGuiInputTextFlags_EnterReturnsTrue);
         const std::string name = newFnBuf_;
@@ -1387,9 +1473,9 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
                            std::ranges::all_of(name, [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }) &&
                            !sc::findBuiltin(name);
         ImGui::BeginDisabled(!valid);
-        if (ImGui::Button("Create") || (enter && valid)) {
+        if (ImGui::Button(NOX_TRI("editor.script.fn.create", "Create")) || (enter && valid)) {
             if (readOnlyReason()) {
-                ed_.status("The script is read-only: it uses object variables, which Editor Settings doesn't allow");
+                ed_.status(NOX_TR("editor.script.status.read_only", "The script is read-only: it uses object variables, which Editor Settings doesn't allow"));
             } else {
                 bool have = good_ && good_->function(name);
                 if (!have) {
@@ -1400,7 +1486,8 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
                     src += "\nvoid " + name + "()\n{\n}\n";
                     // (Refused, as when another editor holds the script: the handler isn't pointed
                     // at a function that was never made.)
-                    have = ed_.perform(me::Op{"Add function " + name, {me::SetScriptSource{src}}});
+                    have = ed_.perform(me::Op{me::opLabel(ol::kAddFunction, {{"name", name}}),
+                                              {me::SetScriptSource{src}}});
                     syncFromDocument();
                     compiled_ = false;
                     compileNow();
@@ -1415,7 +1502,7 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(NOX_TRI("editor.common.cancel", "Cancel"))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
     ImGui::PopID();
@@ -1435,10 +1522,11 @@ void ScriptPanel::findBar()
         ImGui::SetKeyboardFocusHere();
         findFocus_ = false;
     }
-    const bool enter = ImGui::InputTextWithHint("##find", "Find (Enter: next, Shift+Enter: previous)", findBuf_, sizeof findBuf_,
-                                                ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool enter = ImGui::InputTextWithHint("##find", NOX_TRC("editor.script.find.hint", "Find (Enter: next, Shift+Enter: previous)"), findBuf_,
+                                                sizeof findBuf_, ImGuiInputTextFlags_EnterReturnsTrue);
     if (enter) {
-        if (!code_.find(findBuf_, !ImGui::GetIO().KeyShift, findCase_)) ed_.status(std::string("Not found: ") + findBuf_);
+        if (!code_.find(findBuf_, !ImGui::GetIO().KeyShift, findCase_))
+            ed_.status(nox::l10n::format(NOX_TR("editor.script.find.not_found", "Not found: {text}"), {{"text", findBuf_}}));
         findFocus_ = true; // (keep typing there)
     }
     if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -1447,15 +1535,15 @@ void ScriptPanel::findBar()
     }
     ImGui::SameLine();
     if (ImGui::ArrowButton("##prev", ImGuiDir_Up)) code_.find(findBuf_, false, findCase_);
-    help("Previous match (Shift+F3)");
+    help(NOX_TRC("editor.script.find.previous", "Previous match (Shift+F3)"));
     ImGui::SameLine();
     if (ImGui::ArrowButton("##next", ImGuiDir_Down)) code_.find(findBuf_, true, findCase_);
-    help("Next match (F3)");
+    help(NOX_TRC("editor.script.find.next", "Next match (F3)"));
     ImGui::SameLine();
-    ImGui::Checkbox("Match case", &findCase_);
+    ImGui::Checkbox(NOX_TRI("editor.script.find.match_case", "Match case"), &findCase_);
     ImGui::SameLine();
     code_.setHighlight(findBuf_, findCase_);
-    ImGui::TextDisabled("%d matches", code_.highlightCount());
+    ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.script.find.matches", "{n} matches"), {{"n", code_.highlightCount()}}).c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton("x")) {
         findOpen_ = false;
@@ -1474,7 +1562,7 @@ void ScriptPanel::draw()
             --focusWindow_; // (two frames: a docked window's tab is picked after its node is up)
             ImGui::SetNextWindowFocus();
         }
-        if (ImGui::Begin("Script", &show_)) {
+        if (ImGui::Begin(NOX_TRI("editor.window.script", "Script"), &show_)) {
             ensureSource();
             // The bar: compile state, reload, play, the function list.
             const auto errors = std::ranges::count_if(last_.diagnostics, [](const auto& d) { return d.severity == sc::Diagnostic::Severity::Error; });
@@ -1490,27 +1578,36 @@ void ScriptPanel::draw()
                 }
                 ImGui::SameLine();
             };
-            button("Compile", "script.compile");
+            button(NOX_TRI("editor.script.bar.compile", "Compile"), "script.compile");
             const bool running = ed_.ctx_.playTest.running && ed_.ctx_.playTest.running();
             // Running: in the Map panel F5 gives the game the keyboard and mouse (it's already in
             // view); over the whole window it goes back to the game behind the editor.
             const editor::PlayTestView pv = running && ed_.ctx_.playTest.view ? ed_.ctx_.playTest.view() : editor::PlayTestView{};
-            button(!running ? "Play" : pv.fullWindow ? "Back to Game" : pv.captured ? "Playing" : "Focus Game", "play.start");
-            button("Hot Reload", "script.reload");
-            button("Restart Scripts", "script.restartScripts");
-            button("Stop", "play.stop");
-            button("Tests", "script.runTests");
+            button(!running        ? NOX_TRI("editor.script.bar.play", "Play")
+                   : pv.fullWindow ? NOX_TRI("editor.script.bar.back_to_game", "Back to Game")
+                   : pv.captured   ? NOX_TRI("editor.script.bar.playing", "Playing")
+                                   : NOX_TRI("editor.script.bar.focus_game", "Focus Game"),
+                   "play.start");
+            button(NOX_TRI("editor.cmd.script.reload.label", "Hot Reload"), "script.reload");
+            button(NOX_TRI("editor.cmd.script.restart_scripts.label", "Restart Scripts"), "script.restartScripts");
+            button(NOX_TRI("editor.script.bar.stop", "Stop"), "play.stop");
+            button(NOX_TRI("editor.script.bar.tests", "Tests"), "script.runTests");
             if (!compiled_) {
-                ImGui::TextDisabled("not compiled yet");
+                ImGui::TextDisabled("%s", NOX_TRC("editor.script.bar.not_compiled", "not compiled yet"));
             } else if (errors > 0) {
-                ImGui::TextColored(editor::themeColours().error, "%td %s, %td warnings", errors, errors == 1 ? "error" : "errors", warnings);
+                ImGui::TextColored(editor::themeColours().error, "%s",
+                                   nox::l10n::format(NOX_TRP("editor.script.bar.errors", "{n} error, {warnings} warnings", "{n} errors, {warnings} warnings", errors),
+                                                     {{"n", errors}, {"warnings", warnings}})
+                                       .c_str());
             } else {
-                ImGui::TextColored(editor::themeColours().ok, warnings ? "compiles (%td warnings)" : "compiles", warnings);
+                ImGui::TextColored(editor::themeColours().ok, "%s",
+                                   warnings ? nox::l10n::format(NOX_TR("editor.script.bar.compiles_warnings", "compiles ({warnings} warnings)"), {{"warnings", warnings}}).c_str()
+                                            : NOX_TRC("editor.script.bar.compiles", "compiles"));
             }
             if (good_ && !good_->functions.empty()) {
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(std::max(120.0f, ImGui::GetContentRegionAvail().x));
-                if (ImGui::BeginCombo("##functions", "Go to function...", ImGuiComboFlags_HeightLarge)) {
+                if (ImGui::BeginCombo("##functions", NOX_TRC("editor.script.bar.goto_function", "Go to function..."), ImGuiComboFlags_HeightLarge)) {
                     std::vector<const sc::DebugFunction*> fs;
                     for (const auto& f : good_->functions) fs.push_back(&f);
                     std::ranges::sort(fs, [](auto* a, auto* b) { return a->loc.line < b->loc.line; });
@@ -1522,31 +1619,38 @@ void ScriptPanel::draw()
                 }
             }
             if (running) {
-                ImGui::TextColored(editor::themeColours().info, "Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.%s",
-                                   reloadSummary_.empty() ? "" : ("  Last: " + reloadSummary_).c_str());
+                ImGui::TextColored(editor::themeColours().info, "%s",
+                                   reloadSummary_.empty()
+                                       ? NOX_TRC("editor.script.bar.running", "Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.")
+                                       : nox::l10n::format(NOX_TR("editor.script.bar.running_last", "Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.  Last: {summary}"),
+                                                           {{"summary", reloadSummary_}})
+                                             .c_str());
             }
             if (const auto who = scriptHolder()) {
                 // A session's script, one editor at a time.
-                ImGui::TextColored(editor::themeColours().caution, "%s is editing the script: read-only till they pause.", who->c_str());
+                ImGui::TextColored(editor::themeColours().caution, "%s",
+                                   nox::l10n::format(NOX_TR("editor.script.bar.held", "{name} is editing the script: read-only till they pause."), {{"name", *who}})
+                                       .c_str());
                 if (ed_.session_->isOwner()) {
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Take Over")) {
+                    if (ImGui::SmallButton(NOX_TRI("editor.script.bar.take_over", "Take Over"))) {
                         ed_.takeOverPanel(me::ElementKey::script());
                         typedMs_ = SDL_GetTicks(); // (kept a while for the first key: keepScriptLock)
                     }
-                    help("Take the script from them now (what they typed and haven't sent yet is dropped).");
+                    help(NOX_TRC("editor.script.bar.take_over_help", "Take the script from them now (what they typed and haven't sent yet is dropped)."));
                 }
             }
             noxCoreBanner(readOnlyReason());
             findBar();
             if (gotoOpen_) {
-                ImGui::OpenPopup("Go to line");
+                ImGui::OpenPopup(NOX_TRI("editor.script.goto_line.title", "Go to line"));
                 gotoOpen_ = false;
                 gotoBuf_[0] = 0;
             }
-            if (ImGui::BeginPopup("Go to line")) {
+            if (ImGui::BeginPopup(NOX_TRI("editor.script.goto_line.title", "Go to line"))) {
                 ImGui::SetKeyboardFocusHere();
-                if (ImGui::InputText("Line", gotoBuf_, sizeof gotoBuf_, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue)) {
+                if (ImGui::InputText(NOX_TRI("editor.script.goto_line.line", "Line"), gotoBuf_, sizeof gotoBuf_,
+                                     ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue)) {
                     showLine(std::max(1, std::atoi(gotoBuf_)));
                     ImGui::CloseCurrentPopup();
                 }
@@ -1596,34 +1700,37 @@ void ScriptPanel::draw()
 void ScriptPanel::referencePanel()
 {
     ImGui::SetNextWindowSize(ImVec2(320, 420), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Script Reference", &showReference_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.script_reference", "Script Reference"), &showReference_)) {
         ImGui::End();
         return;
     }
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##refsearch", "Search", refSearch_, sizeof refSearch_);
+    ImGui::InputTextWithHint("##refsearch", NOX_TRC("editor.common.search", "Search"), refSearch_, sizeof refSearch_);
     const std::string q = lowered(refSearch_);
     if (ImGui::BeginTabBar("##ref")) {
-        if (ImGui::BeginTabItem("Builtins")) {
+        if (ImGui::BeginTabItem(NOX_TRI("editor.script.ref.builtins", "Builtins"))) {
             builtinsTab(q);
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Functions")) {
+        if (ImGui::BeginTabItem(NOX_TRI("editor.script.ref.functions", "Functions"))) {
             if (!good_) {
-                ImGui::TextDisabled("Compile the script for its functions.");
+                ImGui::TextDisabled("%s", NOX_TRC("editor.script.ref.compile_for_functions", "Compile the script for its functions."));
             } else {
                 ImGui::BeginChild("##fns");
                 for (const auto& f : good_->functions) {
                     if (!q.empty() && lowered(f.name).find(q) == std::string::npos) continue;
                     const std::string label = std::string(sc::typeName(f.returns)) + " " + f.name + "##f" + std::to_string(f.index);
                     if (ImGui::Selectable(label.c_str())) showLine(static_cast<int>(f.loc.line), static_cast<int>(f.loc.column));
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("line %u, function %u", f.loc.line, f.index);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                        ImGui::SetTooltip("%s", nox::l10n::format(NOX_TR("editor.script.ref.function_tip", "line {line}, function {index}"),
+                                                                  {{"line", f.loc.line}, {"index", f.index}})
+                                                    .c_str());
                 }
                 ImGui::EndChild();
             }
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Disassembly")) {
+        if (ImGui::BeginTabItem(NOX_TRI("editor.script.ref.disassembly", "Disassembly"))) {
             // The compiled code of the function the caret is in (read-only: the old editor's
             // line assembler view).
             const sc::DebugFunction* in = nullptr;
@@ -1634,9 +1741,10 @@ void ScriptPanel::referencePanel()
                 }
             }
             if (!in || !last_.file || !compiled_ || !last_.ok()) {
-                ImGui::TextDisabled("Compile the script and put the caret in a function.");
+                ImGui::TextDisabled("%s", NOX_TRC("editor.script.ref.disassembly_hint", "Compile the script and put the caret in a function."));
             } else if (in->index < last_.file->functions.size()) {
-                ImGui::Text("%s (function %u)", in->name.c_str(), in->index);
+                ImGui::TextUnformatted(
+                    nox::l10n::format(NOX_TR("editor.script.ref.disassembly_of", "{name} (function {index})"), {{"name", in->name}, {"index", in->index}}).c_str());
                 ImGui::BeginChild("##disasm", ImVec2(0, 0), ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
                 ImGui::PushFont(ed_.imgui_->monoFont(), 0.0f);
                 ImGui::TextUnformatted(sc::disassemble(*last_.file, in->index).c_str());
@@ -1645,9 +1753,9 @@ void ScriptPanel::referencePanel()
             }
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Globals")) {
+        if (ImGui::BeginTabItem(NOX_TRI("editor.script.ref.globals", "Globals"))) {
             if (!good_) {
-                ImGui::TextDisabled("Compile the script for its globals.");
+                ImGui::TextDisabled("%s", NOX_TRC("editor.script.ref.compile_for_globals", "Compile the script for its globals."));
             } else {
                 ImGui::BeginChild("##globals");
                 for (const auto& g : good_->globals) {
@@ -1679,15 +1787,17 @@ namespace {
 std::string usageText(const sc::BuiltinDoc& d, bool examples)
 {
     if (d.usageMaps == 0) {
-        return "Not used by any stock map.";
+        return NOX_TR("editor.script.usage.none", "Not used by any stock map.");
     }
-    std::string s = "Used in " + std::to_string(d.usageMaps) + " of the " + std::to_string(sc::builtinDocs().usageScripts) +
-                    " stock map scripts (" + std::to_string(d.usageCalls) + (d.usageCalls == 1 ? " call)" : " calls)");
+    std::string s = nox::l10n::format(NOX_TRP("editor.script.usage.used", "Used in {maps} of the {scripts} stock map scripts ({n} call)",
+                                              "Used in {maps} of the {scripts} stock map scripts ({n} calls)", d.usageCalls),
+                                      {{"maps", d.usageMaps}, {"scripts", sc::builtinDocs().usageScripts}, {"n", d.usageCalls}});
     if (examples && !d.usageExamples.empty()) {
-        s += ", e.g. ";
+        std::string list;
         for (std::size_t i = 0; i < d.usageExamples.size(); ++i) {
-            s += (i ? ", " : "") + d.usageExamples[i];
+            list += (i ? ", " : "") + d.usageExamples[i];
         }
+        s = nox::l10n::format(NOX_TR("editor.script.usage.examples", "{usage}, e.g. {maps}"), {{"usage", s}, {"maps", list}});
     }
     return s + ".";
 }
@@ -1724,7 +1834,10 @@ void ScriptPanel::setBuiltinPriority(std::uint32_t id, editor::BuiltinPriority p
 {
     editor::setPriority(ed_.settings_.builtinPriorities, sc::builtinSignature(id).name, p);
     ed_.saveSettings();
-    ed_.status(std::string(sc::builtinSignature(id).name) + ": " + (p == editor::BuiltinPriority::Favourite ? "a favourite" : "priority " + std::string(editor::builtinPriorityName(p))));
+    ed_.status(p == editor::BuiltinPriority::Favourite
+                   ? nox::l10n::format(NOX_TR("editor.script.status.favourite", "{name}: a favourite"), {{"name", sc::builtinSignature(id).name}})
+                   : nox::l10n::format(NOX_TR("editor.script.status.priority", "{name}: priority {priority}"),
+                                       {{"name", sc::builtinSignature(id).name}, {"priority", editor::builtinPriorityName(p)}}));
 }
 
 bool ScriptPanel::insertAtCaret(const std::string& text)
@@ -1762,9 +1875,11 @@ void ScriptPanel::builtinTooltip(std::uint32_t id) const
         ImGui::Spacing();
         ImGui::TextUnformatted(d->shortText.c_str());
         ImGui::Spacing();
-        ImGui::TextDisabled("%s, builtin %u. %s", d->category.c_str(), id, usageText(*d, false).c_str());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.script.builtin.tip_facts", "{category}, builtin {id}. {usage}"),
+                                                    {{"category", d->category}, {"id", id}, {"usage", usageText(*d, false)}})
+                                      .c_str());
     }
-    ImGui::TextDisabled("Click: insert at the caret. Right-click: Function Info, priority.");
+    ImGui::TextDisabled("%s", NOX_TRC("editor.script.builtin.tip_click", "Click: insert at the caret. Right-click: Function Info, priority."));
     ImGui::PopTextWrapPos();
     ImGui::EndTooltip();
 }
@@ -1775,29 +1890,31 @@ void ScriptPanel::builtinMenuItems(std::uint32_t id)
     const std::string name(sc::builtinSignature(id).name);
     ImGui::TextDisabled("%s", namedPrototype(id).c_str());
     ImGui::Separator();
-    if (ImGui::MenuItem("Function Info")) {
+    if (ImGui::MenuItem(NOX_TRI("editor.cmd.window.function_info.label", "Function Info"))) {
         openFunctionInfo(id);
     }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("The full description: parameters, return value, edge cases, related builtins and an example.");
-    if (ImGui::MenuItem("Insert", nullptr, false, readOnlyReason() == nullptr)) {
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", NOX_TRC("editor.script.builtin.info_help", "The full description: parameters, return value, edge cases, related builtins and an example."));
+    if (ImGui::MenuItem(NOX_TRI("editor.script.builtin.insert", "Insert"), nullptr, false, readOnlyReason() == nullptr)) {
         insertBuiltin(id);
     }
-    if (ImGui::MenuItem("Copy Name")) {
+    if (ImGui::MenuItem(NOX_TRI("editor.script.builtin.copy_name", "Copy Name"))) {
         ImGui::SetClipboardText(name.c_str());
     }
     ImGui::Separator();
     const BuiltinPriority p = builtinPriority(id);
-    if (ImGui::MenuItem(p == BuiltinPriority::Favourite ? "Remove from Favourites" : "Add to Favourites")) {
+    if (ImGui::MenuItem(p == BuiltinPriority::Favourite ? NOX_TRI("editor.script.builtin.unfavourite", "Remove from Favourites")
+                                                        : NOX_TRI("editor.script.builtin.favourite", "Add to Favourites"))) {
         setBuiltinPriority(id, p == BuiltinPriority::Favourite ? BuiltinPriority::Normal : BuiltinPriority::Favourite);
     }
-    if (ImGui::BeginMenu("Priority")) {
+    if (ImGui::BeginMenu(NOX_TRI("editor.script.builtin.priority", "Priority"))) {
         for (const BuiltinPriority level : {BuiltinPriority::Favourite, BuiltinPriority::High, BuiltinPriority::Normal, BuiltinPriority::Low}) {
             if (ImGui::MenuItem(editor::builtinPriorityName(level), nullptr, p == level)) {
                 setBuiltinPriority(id, level);
             }
         }
         ImGui::Separator();
-        ImGui::TextDisabled("Sort the list by Priority: favourites first, low last.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.script.builtin.priority_hint", "Sort the list by Priority: favourites first, low last."));
         ImGui::EndMenu();
     }
 }
@@ -1810,7 +1927,7 @@ void ScriptPanel::builtinsTab(const std::string& query)
     const auto sort = static_cast<BuiltinSort>(std::clamp(s.builtinSort, 0, editor::kBuiltinSortCount - 1));
     // The order and the filter.
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Sort");
+    ImGui::TextUnformatted(NOX_TRC("editor.script.builtins.sort", "Sort"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(std::min(ImGui::GetFontSize() * 9.5f, ImGui::GetContentRegionAvail().x * 0.5f));
     if (ImGui::BeginCombo("##bsort", editor::builtinSortName(sort))) {
@@ -1822,15 +1939,17 @@ void ScriptPanel::builtinsTab(const std::string& query)
         }
         ImGui::EndCombo();
     }
-    help("Priority: favourites first, then high, normal and low, each by name (right-click a builtin to set its priority). "
-         "Use in stock maps: the most called first.");
+    help(NOX_TRC("editor.script.builtins.sort_help",
+                 "Priority: favourites first, then high, normal and low, each by name (right-click a builtin to set its priority). "
+                 "Use in stock maps: the most called first."));
     ImGui::SameLine();
-    if (ImGui::Checkbox("Favourites only", &s.builtinFavouritesOnly)) {
+    if (ImGui::Checkbox(NOX_TRI("editor.script.builtins.favourites_only", "Favourites only"), &s.builtinFavouritesOnly)) {
         ed_.saveSettings();
     }
     const auto ids = editor::builtinListOrder(builtinRows(), s.builtinPriorities, sort, s.builtinFavouritesOnly, query);
     if (ids.empty()) {
-        ImGui::TextDisabled(s.builtinFavouritesOnly ? "No favourites here: right-click a builtin, Add to Favourites." : "No builtin matches.");
+        ImGui::TextDisabled("%s", s.builtinFavouritesOnly ? NOX_TRC("editor.script.builtins.no_favourites", "No favourites here: right-click a builtin, Add to Favourites.")
+                                                          : NOX_TRC("editor.script.builtins.no_match", "No builtin matches."));
     }
     ImGui::BeginChild("##builtins");
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1840,7 +1959,7 @@ void ScriptPanel::builtinsTab(const std::string& query)
         const editor::BuiltinRow& row = builtinRows()[id];
         const bool first = std::exchange(firstRow, false);
         if (sort == BuiltinSort::Category && (first || row.category != lastCategory)) {
-            ImGui::SeparatorText(row.category.empty() ? "(none)" : row.category.c_str());
+            ImGui::SeparatorText(row.category.empty() ? NOX_TRC("editor.script.fn.none", "(none)") : row.category.c_str());
             lastCategory = row.category;
         }
         const BuiltinPriority p = builtinPriority(id);
@@ -1905,7 +2024,7 @@ void ScriptPanel::functionInfoPanel()
         ImGui::SetNextWindowFocus();
         infoFocus_ = false;
     }
-    if (!ImGui::Begin("Function Info", &showInfo_)) {
+    if (!ImGui::Begin(NOX_TRI("editor.window.function_info", "Function Info"), &showInfo_)) {
         ImGui::End();
         return;
     }
@@ -1920,10 +2039,12 @@ void ScriptPanel::functionInfoPanel()
         infoBack_.pop_back();
     }
     ImGui::EndDisabled();
-    help("Back to the builtin shown before.");
+    help(NOX_TRC("editor.script.info.back_help", "Back to the builtin shown before."));
     ImGui::SameLine();
     const BuiltinPriority p = builtinPriority(id);
-    if (starButton("##fav", p == BuiltinPriority::Favourite, p == BuiltinPriority::Favourite ? "A favourite: click to take it out of the favourites." : "Add to the favourites.")) {
+    if (starButton("##fav", p == BuiltinPriority::Favourite,
+                   p == BuiltinPriority::Favourite ? NOX_TRC("editor.script.info.unstar_help", "A favourite: click to take it out of the favourites.")
+                                                   : NOX_TRC("editor.script.info.star_help", "Add to the favourites."))) {
         setBuiltinPriority(id, p == BuiltinPriority::Favourite ? BuiltinPriority::Normal : BuiltinPriority::Favourite);
     }
     ImGui::SameLine();
@@ -1940,34 +2061,37 @@ void ScriptPanel::functionInfoPanel()
         }
         ImGui::EndCombo();
     }
-    help("Its priority: sort Script Reference's Builtins by Priority for the favourites first.");
+    help(NOX_TRC("editor.script.info.priority_help", "Its priority: sort Script Reference's Builtins by Priority for the favourites first."));
     // The prototype and the facts.
     ImGui::PushFont(mono, 0.0f);
     ImGui::TextWrapped("%s", namedPrototype(id).c_str());
     ImGui::PopFont();
     ImGui::SameLine();
-    if (ImGui::SmallButton("Copy")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.script.info.copy", "Copy"))) {
         ImGui::SetClipboardText(namedPrototype(id).c_str());
     }
-    help("Copy the prototype.");
+    help(NOX_TRC("editor.script.info.copy_help", "Copy the prototype."));
     {
-        std::string facts = (d ? d->category + ", builtin " : std::string("builtin ")) + std::to_string(id);
-        if (const auto alias = sc::builtinAlias(id)) facts += " (the community tools' " + std::string(*alias) + ")";
+        std::string facts = d ? nox::l10n::format(NOX_TR("editor.script.info.facts", "{category}, builtin {id}"), {{"category", d->category}, {"id", id}})
+                              : nox::l10n::format(NOX_TR("editor.script.info.facts_bare", "builtin {id}"), {{"id", id}});
+        if (const auto alias = sc::builtinAlias(id))
+            facts = nox::l10n::format(NOX_TR("editor.script.info.alias", "{facts} (the community tools' {alias})"), {{"facts", facts}, {"alias", *alias}});
         ImGui::TextDisabled("%s", facts.c_str());
         const auto& args = sc::builtinSignature(id).args;
         bool hasValues = false;
         for (std::size_t i = 0; i < args.size(); ++i) hasValues = hasValues || sc::argValueSet(id, i).has_value();
         if (hasValues && d) {
             ImGui::SameLine();
-            if (ImGui::SmallButton("Values")) {
+            if (ImGui::SmallButton(NOX_TRI("editor.script.info.values", "Values"))) {
                 infoScrollValues_ = 3;
             }
-            help("Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space).");
+            help(NOX_TRC("editor.script.info.values_help",
+                         "Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space)."));
         }
     }
     if (!d) {
         ImGui::Separator();
-        ImGui::TextWrapped("No description for this builtin yet.");
+        ImGui::TextWrapped("%s", NOX_TRC("editor.script.info.no_doc", "No description for this builtin yet."));
         ImGui::End();
         return;
     }
@@ -1975,11 +2099,11 @@ void ScriptPanel::functionInfoPanel()
     ImGui::BeginChild(("##infobody" + std::to_string(id)).c_str()); // (a builtin of its own: scrolled from the top)
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextWrapped("%s", d->shortText.c_str());
-    docHeading("Description");
+    docHeading(NOX_TRC("editor.script.info.description", "Description"));
     docText(d->description);
-    docHeading("Parameters");
+    docHeading(NOX_TRC("editor.script.info.parameters", "Parameters"));
     if (d->params.empty()) {
-        ImGui::TextDisabled("None.");
+        ImGui::TextDisabled("%s", NOX_TRC("editor.script.info.no_params", "None."));
     }
     for (const auto& prm : d->params) {
         ImGui::PushFont(mono, 0.0f);
@@ -1990,14 +2114,14 @@ void ScriptPanel::functionInfoPanel()
         ImGui::Unindent();
     }
     valuesSection(id); // (the parameters' accepted values, from the game's data and the map)
-    docHeading("Returns");
+    docHeading(NOX_TRC("editor.script.info.returns", "Returns"));
     docText(d->returns);
     if (!d->edge.empty()) {
-        docHeading("Edge cases");
+        docHeading(NOX_TRC("editor.script.info.edge", "Edge cases"));
         docText(d->edge);
     }
     if (!d->related.empty()) {
-        docHeading("Related");
+        docHeading(NOX_TRC("editor.script.info.related", "Related"));
         const ImGuiStyle& style = ImGui::GetStyle();
         const float avail = ImGui::GetContentRegionAvail().x;
         float x = 0;
@@ -2017,15 +2141,15 @@ void ScriptPanel::functionInfoPanel()
             if (rid && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) builtinTooltip(*rid);
         }
     }
-    docHeading("Example");
+    docHeading(NOX_TRC("editor.script.info.example", "Example"));
     ImGui::BeginDisabled(readOnlyReason() != nullptr);
-    if (ImGui::SmallButton("Insert at Cursor")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.script.info.insert_example", "Insert at Cursor"))) {
         insertAtCaret(d->example + "\n");
     }
     ImGui::EndDisabled();
-    help("Type the example into the Script panel at the caret.");
+    help(NOX_TRC("editor.script.info.insert_example_help", "Type the example into the Script panel at the caret."));
     ImGui::SameLine();
-    if (ImGui::SmallButton("Copy Example")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.script.info.copy_example", "Copy Example"))) {
         ImGui::SetClipboardText(d->example.c_str());
     }
     {
@@ -2039,7 +2163,7 @@ void ScriptPanel::functionInfoPanel()
         ImGui::EndChild();
         ImGui::PopFont();
     }
-    docHeading("In the stock maps");
+    docHeading(NOX_TRC("editor.script.info.stock_maps", "In the stock maps"));
     ImGui::TextWrapped("%s", usageText(*d, true).c_str());
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
@@ -2089,7 +2213,8 @@ void ScriptPanel::openCompletion(bool explicitly)
     const std::string text = code_.text();
     const auto site = sc::argSiteAt(text, code_.offsetOf(code_.caret()), true);
     if (!site) {
-        ed_.status("No value list here: the caret isn't in an argument that takes names from a known set (an effect, a sound, a thing type...)");
+        ed_.status(NOX_TR("editor.script.status.no_values",
+                          "No value list here: the caret isn't in an argument that takes names from a known set (an effect, a sound, a thing type...)"));
         complete_.open = false;
         return;
     }
@@ -2241,12 +2366,17 @@ void ScriptPanel::drawCompletion()
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow()); // (over the Script window, which has the keyboard)
         complete_.hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
         const std::string_view title = sc::valueSetTitle(complete_.site.set);
-        ImGui::TextDisabled("%.*s  %d%s  (Enter/Tab insert, Esc close)", static_cast<int>(title.size()), title.data(), n, n >= 1000 ? "+" : "");
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.script.complete.header", "{title}  {n}{more}  (Enter/Tab insert, Esc close)"),
+                                                    {{"title", title}, {"n", n}, {"more", n >= 1000 ? "+" : ""}})
+                                      .c_str());
         ImGui::BeginChild("##rows", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoNav);
         if (!set || set->empty()) {
-            ImGui::TextDisabled(sc::isMapValueSet(complete_.site.set) ? "None on this map." : "Not available: the game's data isn't loaded.");
+            ImGui::TextDisabled("%s", sc::isMapValueSet(complete_.site.set) ? NOX_TRC("editor.script.complete.none_on_map", "None on this map.")
+                                                                            : NOX_TRC("editor.script.values.unavailable", "Not available: the game's data isn't loaded."));
         } else if (n == 0) {
-            ImGui::TextDisabled("No %s starts with or contains \"%s\".", std::string(sc::valueSetName(complete_.site.set)).c_str(), complete_.site.typed.c_str());
+            ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.script.complete.no_match", "No {kind} starts with or contains \"{typed}\"."),
+                                                        {{"kind", sc::valueSetName(complete_.site.set)}, {"typed", complete_.site.typed}})
+                                          .c_str());
         }
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const ImU32 noteCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
@@ -2306,7 +2436,8 @@ void ScriptPanel::valuesSection(std::uint32_t id)
     for (std::size_t i = 0; i < sig.args.size(); ++i) {
         const auto set = sc::argValueSet(id, i);
         if (!set) continue;
-        const std::string name = d && i < d->params.size() ? d->params[i].name : "argument " + std::to_string(i + 1);
+        const std::string name = d && i < d->params.size() ? d->params[i].name
+                                                           : nox::l10n::format(NOX_TR("editor.script.values.argument", "argument {n}"), {{"n", i + 1}});
         const auto it = std::ranges::find_if(sets, [&](const auto& s) { return s.first == *set; });
         if (it == sets.end()) {
             sets.emplace_back(*set, name);
@@ -2322,30 +2453,33 @@ void ScriptPanel::valuesSection(std::uint32_t id)
         valuesSearch_[0] = 0;
         valuesSelected_.clear();
     }
-    docHeading("Values");
+    docHeading(NOX_TRC("editor.script.info.values_heading", "Values"));
     if (infoScrollValues_ > 0) {
         ImGui::SetScrollHereY(0.0f); // (its "Values" button: a few frames, while the layout settles)
         --infoScrollValues_;
     }
-    ImGui::TextDisabled("Every value it accepts (the game's own data%s). Double-click one, or pick it and Insert at Cursor.",
-                        std::ranges::any_of(sets, [](const auto& s) { return sc::isMapValueSet(s.first); }) ? " and this map's names" : "");
+    ImGui::TextDisabled("%s", std::ranges::any_of(sets, [](const auto& s) { return sc::isMapValueSet(s.first); })
+                                  ? NOX_TRC("editor.script.values.about_map",
+                                            "Every value it accepts (the game's own data and this map's names). Double-click one, or pick it and Insert at Cursor.")
+                                  : NOX_TRC("editor.script.values.about", "Every value it accepts (the game's own data). Double-click one, or pick it and Insert at Cursor."));
     ImGui::SetNextItemWidth(std::min(ImGui::GetFontSize() * 16.0f, ImGui::GetContentRegionAvail().x));
-    ImGui::InputTextWithHint("##valsearch", "Search values and notes", valuesSearch_, sizeof valuesSearch_);
+    ImGui::InputTextWithHint("##valsearch", NOX_TRC("editor.script.values.search_hint", "Search values and notes"), valuesSearch_, sizeof valuesSearch_);
     ImGui::SameLine();
     const bool editable = readOnlyReason() == nullptr;
     ImGui::BeginDisabled(valuesSelected_.empty() || !editable);
-    if (ImGui::SmallButton("Insert at Cursor")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.script.info.insert_example", "Insert at Cursor"))) {
         insertValue(valuesSelectedSet_, valuesSelected_);
     }
     ImGui::EndDisabled();
-    help("Type the picked value into the Script panel at the caret: into the string the caret is in when it takes these values, else in quotes.");
+    help(NOX_TRC("editor.script.values.insert_help",
+                 "Type the picked value into the Script panel at the caret: into the string the caret is in when it takes these values, else in quotes."));
     ImGui::SameLine();
     ImGui::BeginDisabled(valuesSelected_.empty());
-    if (ImGui::SmallButton("Copy##value")) {
+    if (ImGui::SmallButton(NOX_TRI("editor.script.values.copy", "Copy##value"))) {
         ImGui::SetClipboardText(valuesSelected_.c_str());
     }
     ImGui::EndDisabled();
-    help("Copy the picked value.");
+    help(NOX_TRC("editor.script.values.copy_help", "Copy the picked value."));
     const ImGuiStyle& style = ImGui::GetStyle();
     for (const auto& [setId, params] : sets) {
         const sc::ValueSet* set = argValues().get(setId);
@@ -2357,12 +2491,13 @@ void ScriptPanel::valuesSection(std::uint32_t id)
         ImGui::SameLine();
         ImGui::TextUnformatted(title.data(), title.data() + title.size());
         if (!set || set->empty()) {
-            ImGui::TextDisabled(sc::isMapValueSet(setId) ? "None on this map yet." : "Not available: the game's data isn't loaded.");
+            ImGui::TextDisabled("%s", sc::isMapValueSet(setId) ? NOX_TRC("editor.script.values.none_on_map", "None on this map yet.")
+                                                               : NOX_TRC("editor.script.values.unavailable", "Not available: the game's data isn't loaded."));
             continue;
         }
         const auto rows = set->filter(valuesSearch_, SIZE_MAX);
         ImGui::SameLine();
-        ImGui::TextDisabled(" %zu of %zu", rows.size(), set->values().size());
+        ImGui::TextDisabled("%s", nox::l10n::format(NOX_TR("editor.script.values.count", " {n} of {total}"), {{"n", rows.size()}, {"total", set->values().size()}}).c_str());
         const bool icons = setId == sc::ValueSetId::ThingType || setId == sc::ValueSetId::ObjectName;
         const float lineH = ImGui::GetTextLineHeight();
         const float rowH = std::floor(icons ? lineH * 1.7f : lineH);
@@ -2413,7 +2548,7 @@ void ScriptPanel::valuesSection(std::uint32_t id)
 
 void ScriptPanel::menus()
 {
-    if (ImGui::BeginMenu("Script")) {
+    if (ImGui::BeginMenu(NOX_TRI("editor.menu.script", "Script"))) {
         for (const char* id : {"script.compile", "script.runTests"}) ed_.menuItem(id);
         ImGui::Separator();
         for (const char* id : {"script.reload", "script.restartScripts", "script.restartMap"}) ed_.menuItem(id);
@@ -2427,39 +2562,44 @@ void ScriptPanel::menus()
         for (const char* id : {"window.script", "window.scriptReference", "window.functionInfo"}) ed_.menuItem(id);
         ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("Play")) {
+    if (ImGui::BeginMenu(NOX_TRI("editor.menu.play", "Play"))) {
         ed_.menuItem("play.start");
         ed_.menuItem("play.here");
         ed_.menuItem("play.stop");
         ImGui::Separator();
         ed_.menuItem("play.playersCanDie");
-        if (ImGui::BeginMenu("Game Mode")) {
+        if (ImGui::BeginMenu(NOX_TRI("editor.script.play.game_mode", "Game Mode"))) {
             const std::uint32_t def = defaultMode();
-            if (ImGui::MenuItem((std::string("The map's own (") + modeName(def) + ")").c_str(), nullptr, playMode_ == 0)) playMode_ = 0;
+            if (ImGui::MenuItem(nox::l10n::format(NOX_TR("editor.script.play.map_own_mode", "The map's own ({mode})"), {{"mode", modeName(def)}}).c_str(), nullptr,
+                                playMode_ == 0))
+                playMode_ = 0;
             ImGui::Separator();
             for (const Mode& m : kModes) {
                 if (m.kind == editor::PlayKind::Solo) ImGui::Separator();
                 const bool offered = (ed_.doc_.info.gameFlags & m.mapBit) != 0;
-                if (ImGui::MenuItem(m.name, offered ? "map's" : nullptr, playMode_ == m.host)) playMode_ = m.host;
+                if (ImGui::MenuItem(modeLabel(m, true), offered ? NOX_TRC("editor.script.play.maps", "map's") : nullptr, playMode_ == m.host)) playMode_ = m.host;
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                     if (m.kind == editor::PlayKind::Solo) {
-                        ImGui::SetTooltip("The campaign's solo game: the map hosted as the main menu's Solo hosts one, a new character "
-                                          "of the class chosen below, its saves in the play-test's folder.");
+                        ImGui::SetTooltip("%s", NOX_TRC("editor.script.play.solo_help",
+                                                        "The campaign's solo game: the map hosted as the main menu's Solo hosts one, a new character "
+                                                        "of the class chosen below, its saves in the play-test's folder."));
                     } else if (m.kind == editor::PlayKind::Quest) {
-                        ImGui::SetTooltip("A quest, as Solo Quest plays one: the chat map, then OTQuest.rul begins the quest, whose "
-                                          "only map is this one (its saves in the play-test's folder).");
+                        ImGui::SetTooltip("%s", NOX_TRC("editor.script.play.quest_help",
+                                                        "A quest, as Solo Quest plays one: the chat map, then OTQuest.rul begins the quest, whose "
+                                                        "only map is this one (its saves in the play-test's folder)."));
                     }
                 }
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Character Class")) {
+        if (ImGui::BeginMenu(NOX_TRI("editor.script.play.class", "Character Class"))) {
             const int byName = classOfMapName(ed_.doc_.origin.name);
-            const std::string own = byName >= 0 ? std::string("The map's (") + kClassNames[byName] + ")" : std::string("The player's own");
+            const std::string own = byName >= 0 ? nox::l10n::format(NOX_TR("editor.script.play.map_class", "The map's ({class})"), {{"class", classLabel(byName)}})
+                                                : NOX_TR("editor.script.play.player_class", "The player's own");
             if (ImGui::MenuItem(own.c_str(), nullptr, playClass_ < 0)) playClass_ = -1;
             ImGui::Separator();
             for (int c = 0; c < 3; ++c) {
-                if (ImGui::MenuItem(kClassNames[c], nullptr, playClass_ == c)) playClass_ = c;
+                if (ImGui::MenuItem(classLabel(c, true), nullptr, playClass_ == c)) playClass_ = c;
             }
             ImGui::EndMenu();
         }
@@ -2473,19 +2613,20 @@ void ScriptPanel::problems()
     if (!any) {
         return;
     }
-    ImGui::SeparatorText("Script");
+    ImGui::SeparatorText(NOX_TRC("editor.script.problems.heading", "Script"));
     if (ImGui::BeginTable("##scriptissues", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable)) {
         const float s = ed_.imgui_->scale();
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60 * s);
-        ImGui::TableSetupColumn("Where", ImGuiTableColumnFlags_WidthFixed, 200 * s);
-        ImGui::TableSetupColumn("Problem", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(NOX_TRI("editor.script.problems.where", "Where"), ImGuiTableColumnFlags_WidthFixed, 200 * s);
+        ImGui::TableSetupColumn(NOX_TRI("editor.script.problems.problem", "Problem"), ImGuiTableColumnFlags_WidthStretch);
         int row = 0;
         const auto line = [&](int kind, const std::string& where, const std::string& message, int goLine, int goCol) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             const editor::ThemeColours& tc = editor::themeColours();
             const ImVec4 colours[] = {tc.error, tc.warning, tc.info, tc.ok};
-            static const char* names[] = {"Error", "Warning", "Info", "Pass"};
+            const char* names[] = {NOX_TRC("editor.script.problems.error", "Error"), NOX_TRC("editor.script.problems.warning", "Warning"),
+                                   NOX_TRC("editor.script.problems.info", "Info"), NOX_TRC("editor.script.problems.pass", "Pass")};
             ImGui::TextColored(colours[kind], "%s", names[kind]);
             ImGui::TableNextColumn();
             if (ImGui::Selectable((where + "##s" + std::to_string(row++)).c_str(), false, ImGuiSelectableFlags_SpanAllColumns) && goLine > 0) {
@@ -2496,29 +2637,32 @@ void ScriptPanel::problems()
         };
         for (const auto& d : last_.diagnostics) {
             const int kind = d.severity == sc::Diagnostic::Severity::Error ? 0 : 1;
-            line(kind, d.loc.line > 0 ? "script " + std::to_string(d.loc.line) + ":" + std::to_string(d.loc.column) : "script (the map)", d.message,
-                 static_cast<int>(d.loc.line), static_cast<int>(d.loc.column));
+            line(kind,
+                 d.loc.line > 0 ? nox::l10n::format(NOX_TR("editor.script.problems.at", "script {line}:{col}"), {{"line", d.loc.line}, {"col", d.loc.column}})
+                                : NOX_TR("editor.script.problems.map", "script (the map)"),
+                 d.message, static_cast<int>(d.loc.line), static_cast<int>(d.loc.column));
         }
         for (const auto& n : decompileNotes_) {
-            line(2, "decompiler", n, 0, 0);
+            line(2, NOX_TR("editor.script.problems.decompiler", "decompiler"), n, 0, 0);
         }
         for (const auto& n : reloadNotes_) {
-            line(n.severity == nox::server::dev::ReloadNote::Severity::Warning ? 1 : 2, "hot reload", n.message, static_cast<int>(n.loc.line),
-                 static_cast<int>(n.loc.column));
+            line(n.severity == nox::server::dev::ReloadNote::Severity::Warning ? 1 : 2, NOX_TR("editor.script.problems.hot_reload", "hot reload"), n.message,
+                 static_cast<int>(n.loc.line), static_cast<int>(n.loc.column));
         }
         if (tests_) {
-            if (!tests_->error.empty()) line(0, "tests", tests_->error, 0, 0);
-            for (const auto& f : tests_->startFailures) line(0, "tests: map start", f, 0, 0);
+            if (!tests_->error.empty()) line(0, NOX_TR("editor.script.problems.tests", "tests"), tests_->error, 0, 0);
+            for (const auto& f : tests_->startFailures) line(0, NOX_TR("editor.script.problems.tests_start", "tests: map start"), f, 0, 0);
             for (const auto& t : tests_->tests) {
                 const int defLine = good_ && good_->function(t.function) ? static_cast<int>(good_->function(t.function)->loc.line) : 0;
+                const std::string where = nox::l10n::format(NOX_TR("editor.script.problems.test", "test {name}"), {{"name", t.function}});
                 if (t.passed()) {
-                    line(3, "test " + t.function, "passed", defLine, 1);
+                    line(3, where, NOX_TR("editor.script.problems.passed", "passed"), defLine, 1);
                     continue;
                 }
-                if (t.stopped) line(0, "test " + t.function, "stopped: it ran too long (a loop that never ends?)", defLine, 1);
+                if (t.stopped) line(0, where, NOX_TR("editor.script.problems.stopped", "stopped: it ran too long (a loop that never ends?)"), defLine, 1);
                 for (const auto& f : t.failures) {
                     const int at = std::atoi(f.c_str() + (f.starts_with("line ") ? 5 : 0));
-                    line(0, "test " + t.function, f, at > 0 ? at : defLine, 1);
+                    line(0, where, f, at > 0 ? at : defLine, 1);
                 }
             }
         }

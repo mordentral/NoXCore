@@ -11,6 +11,7 @@
 #include "noxcore/mapedit/document.hpp"
 #include "noxcore/mapedit/ops.hpp"
 #include "noxcore/mapedit/placement.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <cstdint>
 #include <map>
@@ -64,12 +65,15 @@ struct Link {
     std::uint32_t target = 0; ///< the extent, or the waypoint id (never 0)
     const char* field = "";   ///< the link kind: "partner", "shaft", "elevator", "carries", "light target",
                               ///< "starts at", "heading for", "came from", "waypoint link", "member"
-    const char* label = "";   ///< the source field's label in the panel ("Leads to", "Shaft"...)
+    nox::l10n::Key label{"", ""}; ///< the source field's label in the panel ("Leads to", "Shaft"...: its key, shownText)
     bool operator==(const Link& o) const
     {
         return source == o.source && from == o.from && kind == o.kind && target == o.target && std::string_view(field) == o.field;
     }
 };
+/// A link kind (Link::field, English: its id) as shown, in the language in use. A lookup: for
+/// what is drawn.
+std::string linkFieldText(std::string_view field);
 /// The links one object's data holds (the non-zero ones), in field order.
 std::vector<Link> objectLinks(ObjId id, const DocObject& o);
 /// Every link in the map: the objects' (world objects and items, by id), the waypoints', then the

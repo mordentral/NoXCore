@@ -13,6 +13,7 @@
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/net/server_transport.hpp"
 #include "noxcore/player/player_file.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -225,8 +226,10 @@ public:
         if (state != reading_.toldState) {
             reading_.toldState = state;
             if (state.first > 0 && !app.cinematics->briefingShown()) {
-                centredMessage(app, "Waiting for " + std::to_string(state.first) + " of " + std::to_string(state.second) + " to finish the chapter screen" +
-                                        (coop_->guest() ? std::string(".") : std::string(" (type ?skip to go on)")));
+                centredMessage(app, nox::l10n::format(coop_->guest() ? NOX_TR("modes.coop.chapter.waiting", "Waiting for {n} of {of} to finish the chapter screen.")
+                                                                     : NOX_TR("modes.coop.chapter.waiting_host",
+                                                                              "Waiting for {n} of {of} to finish the chapter screen (type ?skip to go on)"),
+                                                      {{"n", state.first}, {"of", state.second}}));
             }
         }
         // Another player's talk (the host's, or a guest's): the NPC's line in the console as each comes.
@@ -273,10 +276,14 @@ public:
         const std::uint8_t refused = game->game.bannedClasses & 7u;
         for (std::uint8_t c = 0; c < 3; ++c) {
             if (refused == (7u & ~(1u << c))) {
-                return "This co-op campaign is for " + std::string(nox::coop::className(c)) + " characters only.";
+                // (nox::coop::className's, as shown)
+                const std::string& cls = c == 0   ? NOX_TR("modes.coop.class.warrior", "Warrior")
+                                         : c == 1 ? NOX_TR("modes.coop.class.wizard", "Wizard")
+                                                  : NOX_TR("modes.coop.class.conjurer", "Conjurer");
+                return nox::l10n::format(NOX_TR("modes.coop.join.class_only", "This co-op campaign is for {class} characters only."), {{"class", cls}});
             }
         }
-        return std::string("This co-op campaign doesn't take characters of your class.");
+        return NOX_TR("modes.coop.join.class_refused", "This co-op campaign doesn't take characters of your class.");
     }
 
 private:

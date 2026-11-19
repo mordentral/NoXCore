@@ -4,6 +4,7 @@
 
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include "irc.hpp"
 
@@ -113,7 +114,7 @@ void ServerBrowser::ping(const net::Endpoint& to, std::uint32_t nowMs, bool broa
         // pollUdp. A GAME.EXE host started from Westwood Online answers no ping, and so is sent
         // nothing of NoX Core's, as the 1.2b client sends it nothing before its join.)
     } catch (const std::exception& ex) {
-        log_.push_back("ping " + to.toString() + ": " + ex.what());
+        log_.push_back(l10n::format(NOX_TR("lobby.browser.ping_failed", "ping {to}: {error}"), {{"to", to.toString()}, {"error", ex.what()}}));
         // Not sent, nothing waits for its answer: "No response" now, as when its last try runs
         // out, whether it was the first try or a retry (a retry's failure left it on "Checking..."
         // for good).
@@ -155,7 +156,7 @@ void ServerBrowser::startRefresh(std::uint32_t nowMs, const std::vector<GameList
             udp_->enableBroadcast();
         }
     } catch (const std::exception& ex) {
-        log_.push_back(std::string("UDP: ") + ex.what());
+        log_.push_back(l10n::format(NOX_TR("lobby.browser.udp_error", "UDP: {error}"), {{"error", ex.what()}}));
         udp_.reset();
     }
 
@@ -188,14 +189,14 @@ void ServerBrowser::startRefresh(std::uint32_t nowMs, const std::vector<GameList
             e.sources = kFromList;
             e.unresolved = true;
             entries_.push_back(std::move(e));
-            log_.push_back("can't resolve " + s);
+            log_.push_back(l10n::format(NOX_TR("lobby.xwis.cant_resolve", "can't resolve {name}"), {{"name", s}}));
         }
     }
     // Network (LAN play) lists no XWIS: neither a login nor the games given.
     const bool xwis = listsXwis();
     if (xwis && xwisGames) {
         // Listed already (by a player's login, which XWIS won't let us repeat for a few seconds).
-        log_.push_back("XWIS: " + std::to_string(xwisGames->size()) + " game(s)");
+        log_.push_back(l10n::format(NOX_TR("lobby.browser.xwis_games", "XWIS: {n} game(s)"), {{"n", xwisGames->size()}}));
         for (const auto& g : *xwisGames) {
             ServerEntry& e = upsert(g.address, g.port);
             e.game = g;
@@ -223,7 +224,7 @@ void ServerBrowser::startRefresh(std::uint32_t nowMs, const std::vector<GameList
         // closed by the next poll, with its reason, the same on every system.
         xwis_.emplace(nick, options_.xwisPassword);
         xwisStartedAt_ = nowMs;
-        log_.push_back("XWIS: logging in as " + nick);
+        log_.push_back(l10n::format(NOX_TR("lobby.browser.xwis_logging_in", "XWIS: logging in as {nick}"), {{"nick", nick}}));
     }
 }
 
@@ -275,11 +276,11 @@ void ServerBrowser::pollXwis(std::uint32_t nowMs)
     }
     const auto state = xwisSocket_->state();
     if (state == net::TcpSocket::State::Failed) {
-        closeXwis("XWIS: " + xwisSocket_->error());
+        closeXwis(l10n::format(NOX_TR("lobby.browser.xwis_error", "XWIS: {error}"), {{"error", xwisSocket_->error()}}));
         return;
     }
     if (nowMs - xwisStartedAt_ > kXwisTimeoutMs) {
-        closeXwis("XWIS: timed out");
+        closeXwis(NOX_TR("lobby.browser.xwis_timed_out", "XWIS: timed out"));
         return;
     }
     if (state == net::TcpSocket::State::Connecting) {
@@ -293,7 +294,7 @@ void ServerBrowser::pollXwis(std::uint32_t nowMs)
     }
     const auto session = xwis_->state();
     if (session == XwisSession::State::Failed) {
-        closeXwis("XWIS: " + xwis_->error());
+        closeXwis(l10n::format(NOX_TR("lobby.browser.xwis_error", "XWIS: {error}"), {{"error", xwis_->error()}}));
         return;
     }
     if (session == XwisSession::State::Done) {
@@ -303,7 +304,7 @@ void ServerBrowser::pollXwis(std::uint32_t nowMs)
         }
         xwisSocket_->send(std::span(reinterpret_cast<const std::uint8_t*>(xwisSend_.data()), xwisSend_.size()));
         const auto games = xwis_->games();
-        closeXwis("XWIS: " + std::to_string(games.size()) + " game(s)");
+        closeXwis(l10n::format(NOX_TR("lobby.browser.xwis_games", "XWIS: {n} game(s)"), {{"n", games.size()}}));
         for (const auto& g : games) {
             ServerEntry& e = upsert(g.address, g.port);
             if (!e.answered) {
@@ -315,7 +316,7 @@ void ServerBrowser::pollXwis(std::uint32_t nowMs)
         return;
     }
     if (xwisSocket_->state() != net::TcpSocket::State::Connected) {
-        closeXwis("XWIS: the connection closed early");
+        closeXwis(NOX_TR("lobby.browser.xwis_closed_early", "XWIS: the connection closed early"));
     }
 }
 
@@ -332,7 +333,7 @@ void ServerBrowser::pollUdp(std::uint32_t nowMs)
         try {
             got = udp_->receive(buffer);
         } catch (const std::exception& ex) {
-            log_.push_back(std::string("UDP: ") + ex.what());
+            log_.push_back(l10n::format(NOX_TR("lobby.browser.udp_error", "UDP: {error}"), {{"error", ex.what()}}));
             break;
         }
         if (!got) {
@@ -367,7 +368,7 @@ void ServerBrowser::pollUdp(std::uint32_t nowMs)
             udp_->sendTo(got->from, encodeExtendedQuery(info.token));
             queried_.insert(info.token);
         } catch (const std::exception& ex) {
-            log_.push_back("ping " + got->from.toString() + ": " + ex.what());
+            log_.push_back(l10n::format(NOX_TR("lobby.browser.ping_failed", "ping {to}: {error}"), {{"to", got->from.toString()}, {"error", ex.what()}}));
         }
         ServerEntry& e = upsert(got->from.address, got->from.port);
         const unsigned sources = e.sources | (p->second.broadcast ? kFromLan : 0u);

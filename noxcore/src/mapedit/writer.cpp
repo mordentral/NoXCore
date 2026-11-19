@@ -429,10 +429,10 @@ EncodedFiles encodeFiles(const MapDocument& d, const things::ThingDb& things)
 SavedPaths saveDocument(const MapDocument& d, const things::ThingDb& things, const std::filesystem::path& mapsDir,
                         std::string_view name, const Sidecar* sidecar)
 {
-    if (const auto problem = mapNameProblem(name)) {
+    if (const auto problem = mapNameProblem(name, IssueText::English)) {
         throw FormatError("map editor: " + *problem);
     }
-    const auto issues = validate(d, things);
+    const auto issues = validate(d, things, IssueText::English);
     std::string errors;
     for (const auto& i : issues) {
         if (i.severity == Severity::Error) {

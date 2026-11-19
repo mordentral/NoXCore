@@ -1,0 +1,14 @@
+# The l10n lint's exceptions (noxsdl/l10n/l10n.py): English in the UI code that no player reads, so it
+# stays untranslated. Every lint_allow*.txt here is read.
+#
+#   file <glob>  # why          every literal in matching files (the developer console, the command line)
+#   <path>: "<literal>"          one literal, exactly as the lint prints it, in that file
+#
+# Leave out: log lines (SDL_Log & co. are skipped already), the developer console, command line
+# help, names the game's files use (thing, image and map names, nox.csf labels), and bytes a
+# protocol or file format fixes. Anything a player sees goes in NOX_TR instead.
+
+file noxsdl/src/console_commands.cpp   # the developer console's commands and replies
+file noxsdl/src/console.cpp            # the developer console
+file noxsdl/src/command_line.cpp       # command line switches and their help
+file noxsdl/src/log_output.cpp         # the log

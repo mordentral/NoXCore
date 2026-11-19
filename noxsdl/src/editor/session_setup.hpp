@@ -8,6 +8,7 @@
 
 #include "noxcore/mapedit/new_map.hpp"
 #include "noxcore/mapedit/session_proto.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -46,10 +47,13 @@ struct SessionSetup {
 /// name them (the setup dialog's and the Session panel's lists).
 struct SessionMode {
     std::uint32_t bits;
-    const char* name;
+    nox::l10n::Key name;
 };
-inline constexpr SessionMode kSessionModes[] = {
-    {0x100, "Arena"}, {0x400, "Elimination"}, {0x20, "Capture the Flag"}, {0x10, "King of the Realm"}, {0x40, "Flag Ball"}};
+inline constexpr SessionMode kSessionModes[] = {{0x100, NOX_TRK("editor.session.mode_arena", "Arena")},
+                                                {0x400, NOX_TRK("editor.session.mode_elimination", "Elimination")},
+                                                {0x20, NOX_TRK("editor.session.mode_ctf", "Capture the Flag")},
+                                                {0x10, NOX_TRK("editor.session.mode_kotr", "King of the Realm")},
+                                                {0x40, NOX_TRK("editor.session.mode_flagball", "Flag Ball")}};
 
 /// What the dialog says of where Host lists the session (online on XWIS only with the host
 /// logged in there; else the LAN only): main.cpp's host_listing.hpp words it. Empty: nothing said.

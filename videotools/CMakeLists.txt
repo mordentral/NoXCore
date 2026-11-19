@@ -115,3 +115,12 @@ target_link_libraries(noxcontent PRIVATE videotools_core videotools_content nox:
 # Its icon (res/noxcontent.ico, made from res/noxcontent.png; committed): the exe's resource and
 # version information on Windows, and the window's (app_main.cpp).
 nox_app_icon(noxcontent ICON "${CMAKE_CURRENT_SOURCE_DIR}/res/noxcontent.ico" DESCRIPTION "NoX Content Editor")
+# The language files beside it too (the client's: one set for both programs; packages ship it once,
+# beside both).
+add_custom_command(TARGET noxcontent POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/noxsdl/res/lang $<TARGET_FILE_DIR:noxcontent>/lang
+    # (and the Hangul face its panels merge in for Korean text: imgui_host.cpp)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/noxsdl/res/fonts/NotoSansKR-SemiBold-Hangul.ttf
+            $<TARGET_FILE_DIR:noxcontent>/fonts/NotoSansKR-SemiBold-Hangul.ttf
+    VERBATIM
+)

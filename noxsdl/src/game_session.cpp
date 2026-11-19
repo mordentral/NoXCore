@@ -7,6 +7,7 @@
 #include "noxcore/client/inform_text.hpp"
 #include "noxcore/client/solo_saves.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/field_guide.hpp"
 #include "noxcore/util/text.hpp"
 #include "noxcore/version.hpp"
@@ -41,7 +42,7 @@ void sendChat(App& app, const std::string& typed, bool team)
             }
         } else {
             app.editSession->requestEdit(text.size() > 6 ? text.substr(6) : std::string());
-            if (app.console) app.console->print("Asked the host for edit rights.", Yellow);
+            if (app.console) app.console->print(NOX_TR("game.edit_session.asked_rights", "Asked the host for edit rights."), Yellow);
         }
         return;
     }

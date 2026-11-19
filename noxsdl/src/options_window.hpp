@@ -38,6 +38,7 @@
 #include "options_trip.hpp"
 
 #include "noxcore/config/nox_config.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <array>
 #include <filesystem>
@@ -81,7 +82,10 @@ public:
         static constexpr int kCsfTextAuto = 0;
         static constexpr int kCsfTextLatin1 = 1;
         static constexpr int kCsfTextCp1251 = 2;
-        int gamma = 1;            ///< Insert / Delete's brightness, 1-10 (not on the panel)
+        /// Not shown here: NoX Core's own text's language (noxcore.cfg's Language = de; empty:
+        /// nox.csf's, else the system's: nox::l10n::chooseLanguage). Kept as it was when saved.
+        std::string language;
+        int gamma = 1;           ///< Insert / Delete's brightness, 1-10 (not on the panel)
         bool gpu = false;          ///< whether the GPU renderer's shaders are there (the last three need them)
         /// Win Mouse Accel: Windows' pointer speed and acceleration (Enhance Pointer Precision)
         /// on the mouse's raw movement. On by default; off it's the original's 1:1.
@@ -167,7 +171,7 @@ private:
         std::int32_t label;
         std::int32_t box;
         std::int32_t item;
-        std::span<const char* const> names;
+        std::span<const nox::l10n::Key> names;
         int Extras::*value;
     };
     /// The drop-downs, Smoothing, Display, then Weather Effects (on the More page).

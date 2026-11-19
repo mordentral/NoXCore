@@ -1,0 +1,65 @@
+# The l10n lint's exceptions in the map editor's script, mod, property, content browser and tool
+# panels (format: lint_allow.txt).
+
+# Names the code compares or looks up (kept English, shown through NOX_TR elsewhere): the content
+# browser's own folders, the command categories a shortcut is matched against, the play-test modes
+# a test step names, the mod reference's reader-made sections, the reward and light key lists' ids
+noxsdl/src/editor/content_browser.cpp: "Favourites"
+noxsdl/src/editor/content_browser.cpp: "Recently Used"
+noxsdl/src/editor/content_browser.cpp: "Prefabs"
+noxsdl/src/editor/content_browser.cpp: "Floors"
+noxsdl/src/editor/content_browser.cpp: "Walls"
+noxsdl/src/editor/content_browser.cpp: "Edges"
+noxsdl/src/editor/content_browser.cpp: "User Categories"
+noxsdl/src/editor/map_editor_tools.cpp: "Floors"
+noxsdl/src/editor/map_editor_tools.cpp: "Edges"
+noxsdl/src/editor/map_editor_tools.cpp: "Walls"
+noxsdl/src/editor/mod_defs.cpp: "Hooks"
+noxsdl/src/editor/mod_defs.cpp: "Globals"
+noxsdl/src/editor/mod_panel.cpp: "File"
+noxsdl/src/editor/mod_panel.cpp: "Window"
+noxsdl/src/editor/mod_panel.cpp: "Help"
+noxsdl/src/editor/mod_panel.cpp: "Play"
+noxsdl/src/editor/mod_panel.cpp: "Mod"
+noxsdl/src/editor/property_panel.cpp: "Intensity keys"
+noxsdl/src/editor/property_panel.cpp: "Cone keys"
+noxsdl/src/editor/script_panel.cpp: "Arena"
+noxsdl/src/editor/script_panel.cpp: "Capture the Flag"
+noxsdl/src/editor/script_panel.cpp: "King of the Realm"
+noxsdl/src/editor/script_panel.cpp: "Flag Ball"
+noxsdl/src/editor/script_panel.cpp: "Elimination"
+noxsdl/src/editor/script_panel.cpp: "Solo"
+noxsdl/src/editor/script_panel.cpp: "Quest"
+noxsdl/src/editor/script_panel.cpp: "File"
+noxsdl/src/editor/script_panel.cpp: "Window"
+noxsdl/src/editor/script_panel.cpp: "Help"
+noxsdl/src/editor/script_panel.cpp: "Script"
+noxsdl/src/editor/script_panel.cpp: "Play"
+
+# Code: a NoxScript keyword, Luau text, a new handler's function-name prefix, a mode command, the
+# Luau a new mod starts with (its files' content, comments and sample strings included) and its
+# mode.json's description, a CLASS pattern's example
+noxsdl/src/editor/code_lexer.cpp: "Wait"
+noxsdl/src/editor/content_browser.cpp: "MONSTER | NPC"
+noxsdl/src/editor/mod_panel.cpp: "mode reload keep"
+noxsdl/src/editor/mod_panel.cpp: "function mode."
+noxsdl/src/editor/mod_project.cpp: "A new game mode."
+noxsdl/src/editor/mod_project.cpp: "-- The server script: it runs on the host, in the game's frame. It returns a table of the hooks it\n-- wants (the Mod Reference panel lists them and the toolbox, nox.*).\nlocal mode = {}\n\n-- A player came in: { peer, name, identified }.\nfunction mode.onJoin(player)\n    nox.say(player.peer, \"Welcome, \" .. player.name .. \"!\")\nend\n\n-- A chat line: true takes it (it isn't shown to the others).\nfunction mode.onChat(player, text)\n    if text == \"hello\" then\n        nox.sayAll(player.name .. \" says hello.\")\n        return true\n    end\n    return false\nend\n\n-- What the mode's UI sent (nox.send there).\nfunction mode.onUiMessage(player, value)\n    nox.send(player.peer, { text = player.name .. \" clicked\" })\nend\n\nreturn mode\n"
+noxsdl/src/editor/mod_project.cpp: "-- The UI script: it runs on each NoX Core player's client (stock players get the views as text).\n-- It draws in its own windows, in the game's 640 x 480 units.\nlocal ui = { text = \"Hello\" }\n\nfunction ui.start()\n    nox.window(\"main\", { title = \"Hello\", x = 20, y = 60, w = 160, h = 40 })\nend\n\n-- What the server sent (nox.send there).\nfunction ui.onMessage(value)\n    if type(value) == \"table\" and value.text then\n        ui.text = tostring(value.text)\n    end\nend\n\nfunction ui.draw(window)\n    nox.box(0, 0, 160, 40, { 0, 0, 0, 160 })\n    nox.text(ui.text, 6, 14, \"gold\")\nend\n\nfunction ui.click(window, x, y)\n    nox.send({ clicked = window })\n    return true\nend\n\nreturn ui\n"
+noxsdl/src/editor/mod_project.cpp: "-- The editor's UI preview (never sent to players): test messages and views, each sent to the UI\n-- with a click in the Mod Preview panel. A message goes to ui.onMessage, a view to ui.onView (a UI\n-- without onView gets nothing: in a game, its player would get the view as text).\nreturn {\n    { name = \"A message\", message = { text = \"Hello from the preview\" } },\n    { name = \"A choice\", view = { kind = \"choice\", title = \"Pick a side\", options = { \"Red\", \"Blue\" } } },\n}\n"
+noxsdl/src/editor/script_panel.cpp: "On"
+
+# The game's map and file names
+noxsdl/src/editor/mod_panel.cpp: "Estate"
+noxsdl/src/editor/thing_thumbnails.cpp: "thumbs-%016llx.bin"
+
+# Test steps' (--editor-run) replies and the edits they make
+noxsdl/src/editor/map_editor_tools.cpp: "No floor "
+noxsdl/src/editor/mod_panel.cpp: "No mod "
+noxsdl/src/editor/mod_panel.cpp: "No mod is open for "
+noxsdl/src/editor/mod_panel.cpp: "No test message "
+noxsdl/src/editor/mod_panel.cpp: "No mod step "
+noxsdl/src/editor/property_panel.cpp: "No field "
+noxsdl/src/editor/property_panel.cpp: "No readable generator template there"
+noxsdl/src/editor/property_panel.cpp: "Click the partner"
+noxsdl/src/editor/script_panel.cpp: "No builtin "

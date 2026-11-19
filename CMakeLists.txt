@@ -78,6 +78,14 @@ if(NOX_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt"
     add_subdirectory(tests)
 endif()
 
+# The translations' check (noxsdl/l10n/l10n.py check: every language current with the English, no
+# new player-facing English outside NOX_TR), run by ctest here and in the public build.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/noxsdl/l10n/l10n.py")
+    enable_testing()
+    add_test(NAME l10n_check COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/noxsdl/l10n/l10n.py" check)
+endif()
+
 if(NOX_HAS_FUZZ AND NOX_BUILD_FUZZERS)
     enable_testing()
     add_subdirectory(fuzz)

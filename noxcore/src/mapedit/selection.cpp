@@ -1,9 +1,11 @@
 // The map editor's selection: geometry, picking, region selects, and delete / move / copy / paste.
 #include "noxcore/mapedit/selection.hpp"
+#include "noxcore/mapedit/op_label.hpp"
 #include "noxcore/mapedit/markers.hpp"
 
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/map/objects.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -472,7 +474,7 @@ Op deleteOp(const MapDocument& d, const Selection& s)
     }
     Op polygons = deletePolygonsOp(d, s.polygons);
     const std::size_t n = objects.ids.size() + walls.cells.size() + tiles.tiles.size() + gone.size() + (polygons.empty() ? 0 : s.polygons.size());
-    op.label = "Delete " + std::to_string(n) + (n == 1 ? " item" : " items");
+    op.label = opLabel(oplabels::kDelete, {{"n", n}});
     if (!objects.ids.empty()) op.parts.push_back(std::move(objects));
     if (!walls.cells.empty()) op.parts.push_back(std::move(walls));
     if (!tiles.tiles.empty()) op.parts.push_back(std::move(tiles));
@@ -614,7 +616,7 @@ Op moveOp(const MapDocument& d, const Selection& s, float dx, float dy, Selectio
     if (!tiles.tiles.empty()) op.parts.push_back(std::move(tiles));
     for (auto& p : polygons.parts) op.parts.push_back(std::move(p));
     const std::size_t n = s.size();
-    op.label = "Move " + std::to_string(n) + (n == 1 ? " item" : " items");
+    op.label = opLabel(oplabels::kMove, {{"n", n}});
     if (moved) {
         *moved = std::move(after);
     }
@@ -899,7 +901,7 @@ Op pasteOp(const MapDocument& d, const Clip& clip, Cell at, Selection* pasted)
     pasteMarkers(d, clip, wx, wy, placed, objects, waypoints);
 
     const std::size_t n = placed.size();
-    op.label = "Paste " + std::to_string(n) + (n == 1 ? " item" : " items");
+    op.label = opLabel(oplabels::kPaste, {{"n", n}});
     if (!walls.cells.empty()) op.parts.push_back(std::move(walls));
     if (!tiles.tiles.empty()) op.parts.push_back(std::move(tiles));
     if (!objects.objects.empty()) op.parts.push_back(std::move(objects));
@@ -918,7 +920,7 @@ Op pasteMarkersOp(const MapDocument& d, const Clip& clip, float dx, float dy, Se
     pasteMarkers(d, clip, dx, dy, placed, objects, waypoints);
     Op op;
     const std::size_t n = placed.size();
-    op.label = "Paste " + std::to_string(n) + (n == 1 ? " item" : " items");
+    op.label = opLabel(oplabels::kPaste, {{"n", n}});
     if (!objects.objects.empty()) op.parts.push_back(std::move(objects));
     if (!waypoints.waypoints.empty()) op.parts.push_back(std::move(waypoints));
     if (pasted) {

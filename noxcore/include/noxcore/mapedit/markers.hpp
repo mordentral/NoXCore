@@ -11,6 +11,7 @@
 #include "noxcore/mapedit/document.hpp"
 #include "noxcore/mapedit/ops.hpp"
 #include "noxcore/mapedit/selection.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -129,6 +130,8 @@ Op movePolygonsOp(const MapDocument& doc, const std::set<std::uint32_t>& keys, f
 /// The group kinds' names (Objects, Waypoints, Walls, Groups: kind 3 is a group of groups, its
 /// members other groups' ids, walked recursively by the scripts' for-each).
 const char* groupKindName(map::Group::Kind kind);
+/// The same as a key and its English (an op label's {kind}: op_label.hpp).
+const nox::l10n::Key& groupKindKey(map::Group::Kind kind);
 /// The longest group name the game's reader holds (its buffer, the NUL included in the 76).
 constexpr std::size_t kGroupNameMax = 75;
 /// An id no group has (the least above the others'). Scripts name groups by id (the name turns

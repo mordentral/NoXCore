@@ -3,6 +3,7 @@
 
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <variant>
@@ -84,6 +85,23 @@ std::string ElementKey::text() const
     case Kind::MapInfo: return "the map info";
     }
     return "element";
+}
+
+std::string ElementKey::shownText() const
+{
+    using l10n::format;
+    switch (kind) {
+    case Kind::Object: return format(NOX_TR("editor.element.object", "object {id}"), {{"id", a}});
+    case Kind::Wall: return format(NOX_TR("editor.element.wall", "wall {x},{y}"), {{"x", a}, {"y", b}});
+    case Kind::Tile: return format(NOX_TR("editor.element.tile", "tile {x},{y}"), {{"x", a}, {"y", b}});
+    case Kind::Waypoint: return format(NOX_TR("editor.element.waypoint", "waypoint {id}"), {{"id", a}});
+    case Kind::Polygon: return format(NOX_TR("editor.element.polygon", "polygon #{id}"), {{"id", a}});
+    case Kind::Group: return format(NOX_TR("editor.element.group", "group #{id}"), {{"id", a}});
+    case Kind::ScriptFunction:
+        return name == "*" ? NOX_TR("editor.element.script", "the script") : format(NOX_TR("editor.element.script_function", "script function {name}"), {{"name", name}});
+    case Kind::MapInfo: return NOX_TR("editor.element.map_info", "the map info");
+    }
+    return NOX_TR("editor.element.element", "element");
 }
 
 std::set<ElementKey> elementsOf(const MapDocument& d, const Selection& s)

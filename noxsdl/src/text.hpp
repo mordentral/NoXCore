@@ -154,7 +154,9 @@ private:
 
 /// The game text's faces, each loaded once on first use and kept with its atlas: the Nox-style
 /// fonts from `fontDir` (font_choice.hpp), Caudex Bold (or the game folder's default.ttf /
-/// default.otf in its place) and Noto Sans, those two compiled in.
+/// default.otf in its place) and Noto Sans, those two compiled in; last, for Hangul (an official
+/// Korean install's nox.csf, NoX Core's Korean text), Noto Sans KR's Hangul from `fontDir`.
+inline constexpr const char* kHangulFontFile = "NotoSansKR-SemiBold-Hangul.ttf";
 class GameFonts {
 public:
     GameFonts(SDL_Renderer* renderer, const std::filesystem::path& gameDir, std::filesystem::path fontDir);
@@ -183,6 +185,7 @@ private:
     std::array<Loaded, kNoxFaces> nox_{}; ///< by FontFace
     Loaded plain_;                        ///< Caudex Bold, or the game folder's default.ttf
     Loaded noto_;
+    Loaded hangul_; ///< the chain's last face, for Korean (fonts/kHangulFontFile; none without the file)
     std::array<int, 2> chosen_{-1, -1};   ///< by FontRole: the FontFace each Font has (-1 none yet)
 };
 

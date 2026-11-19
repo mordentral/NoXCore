@@ -134,10 +134,6 @@ struct CompileOptions {
     bool allowObjectVariables = false;
 };
 
-/// How to turn object variables on, as the compiler's error says it.
-constexpr std::string_view kObjectVariablesHowToEnable =
-    "in the map editor, Editor Settings > \"Allow NoX Core-only script features (object variables)\"; with noxscript, --allow-object-vars";
-
 /// The prefixes of the functions the game calls by name at a map's start and end
 /// (ScriptHost::runEntryPoints): MapInitialize, MapEntry, MapExit, MapShutdown, PlayerDeath.
 bool isEntryPointName(std::string_view name);

@@ -1,0 +1,328 @@
+# The l10n lint's exceptions in the game client and the map editor's session panels (see lint_allow.txt
+# for the format): English in their code that no player reads as NoX Core's text.
+
+# noxsdl/src/audio.cpp: nox.cfg setting names
+noxsdl/src/audio.cpp: "FXVolume"
+
+# noxsdl/src/bottle_slots.cpp: thing names
+noxsdl/src/bottle_slots.cpp: "Meat"
+
+# noxsdl/src/cinematics.cpp: nox.csf labels and the class names their labels are made from; thing names
+noxsdl/src/cinematics.cpp: "Warrior"
+noxsdl/src/cinematics.cpp: "Wizard"
+noxsdl/src/cinematics.cpp: "Conjurer"
+noxsdl/src/cinematics.cpp: "Nox:Credits"
+noxsdl/src/cinematics.cpp: "Briefing:%sChapterLoss%d"
+noxsdl/src/cinematics.cpp: "Briefing:%sChapterBegin%d"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash1"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash2a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash2b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash3a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash3b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash4a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash4b"
+noxsdl/src/cinematics.cpp: "Ankh"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash7a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash7b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash5a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash5b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash6a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash6b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash8a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash8b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash9a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash9b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash10a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash10b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash11a"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash11b"
+noxsdl/src/cinematics.cpp: "GeneralPrint:QuestSplash12"
+noxsdl/src/cinematics.cpp: "GeneralPrint:SecretsTotal"
+noxsdl/src/cinematics.cpp: "GeneralPrint:SecretsNoneFound"
+noxsdl/src/cinematics.cpp: "GeneralPrint:SecretsFound"
+noxsdl/src/cinematics.cpp: "GeneralPrint:SecretsNoneFoundByFriends"
+noxsdl/src/cinematics.cpp: "GeneralPrint:SecretsFoundByFriends"
+
+# noxsdl/src/command_line.hpp: map names
+noxsdl/src/command_line.hpp: "Estate"
+
+# noxsdl/src/editor/play_view.cpp: a command's category (the menus group commands by it) and its shortcut's key name
+noxsdl/src/editor/play_view.cpp: "Play"
+noxsdl/src/editor/play_view.cpp: "Pause"
+
+# noxsdl/src/editor/session_panel.cpp: the product's name; replies to the tests' session-* steps
+noxsdl/src/editor/session_panel.cpp: "  [NoX Core]"
+noxsdl/src/editor/session_panel.cpp: "Following "
+noxsdl/src/editor/session_panel.cpp: "No End the Session? prompt up: "
+noxsdl/src/editor/session_panel.cpp: "Would host "
+noxsdl/src/editor/session_panel.cpp: "Not in a session: "
+noxsdl/src/editor/session_panel.cpp: "No session step "
+noxsdl/src/editor/session_panel.cpp: "NoX Core"
+
+# noxsdl/src/editor_glue.cpp: a play-test game's server name (the hosted game's, never listed); the Save folder; map names
+noxsdl/src/editor_glue.cpp: "Play-test"
+noxsdl/src/editor_glue.cpp: "Save"
+noxsdl/src/editor_glue.cpp: "So_Druid"
+
+# noxsdl/src/effects.cpp: thing names
+noxsdl/src/effects.cpp: "Smoke"
+noxsdl/src/effects.cpp: "Puff"
+noxsdl/src/effects.cpp: "Spark"
+noxsdl/src/effects.cpp: "Particle"
+
+# noxsdl/src/effects_objects.cpp: thing names
+noxsdl/src/effects_objects.cpp: "Spark"
+
+# noxsdl/src/effects_puffs.cpp: thing names
+noxsdl/src/effects_puffs.cpp: "Smoke"
+
+# noxsdl/src/game_cursor.cpp: thing names
+noxsdl/src/game_cursor.cpp: "Mimic"
+
+# noxsdl/src/game_session.cpp: thing names; the Save folder
+noxsdl/src/game_session.cpp: "Bow"
+noxsdl/src/game_session.cpp: "Save"
+noxsdl/src/game_session.cpp: "Material1"
+noxsdl/src/game_session.cpp: "Replenishment1"
+
+# noxsdl/src/game_windows.cpp: map names
+noxsdl/src/game_windows.cpp: "So_Druid"
+
+# noxsdl/src/gui.cpp: image names
+noxsdl/src/gui.cpp: "UIScrollDnDis"
+noxsdl/src/gui.cpp: "UIScrollDnLit"
+noxsdl/src/gui.cpp: "UIScrollDn"
+
+# noxsdl/src/gui.hpp: image names
+noxsdl/src/gui.hpp: "UISlider"
+noxsdl/src/gui.hpp: "UISliderLit"
+
+# noxsdl/src/hd_video.cpp: the log (why an HD movie didn't open)
+noxsdl/src/hd_video.cpp: "no video stream"
+noxsdl/src/hd_video.cpp: "no decoder for "
+noxsdl/src/hd_video.cpp: "built without HD video"
+
+# noxsdl/src/host_listing.hpp: the log (hostListingLog: the host's log line)
+noxsdl/src/host_listing.hpp: "UDP port "
+noxsdl/src/host_listing.hpp: ": posting to XWIS as "
+noxsdl/src/host_listing.hpp: "'s_game, and answering LAN game lists ("
+noxsdl/src/host_listing.hpp: ": LAN only ("
+noxsdl/src/host_listing.hpp: "), not posted to XWIS: "
+noxsdl/src/host_listing.hpp: ": not listed (a local run, "
+noxsdl/src/host_listing.hpp: "; port 18590 was taken, so LAN game lists (which ask on 18590) won't find it: join by address"
+
+# noxsdl/src/hud.cpp: image names (the CTF icons' colours, the lit images' suffix)
+noxsdl/src/hud.cpp: "Red"
+noxsdl/src/hud.cpp: "Blue"
+noxsdl/src/hud.cpp: "Green"
+noxsdl/src/hud.cpp: "Yellow"
+noxsdl/src/hud.cpp: "Lit"
+
+# noxsdl/src/identify_wait.hpp: the log (the ping wait's steps)
+noxsdl/src/identify_wait.hpp: "no response"
+noxsdl/src/identify_wait.hpp: "gone from the list"
+noxsdl/src/identify_wait.hpp: "gave up"
+
+# noxsdl/src/input_config_window.cpp: nox.cfg values (the pickup button); nox.csf labels
+noxsdl/src/input_config_window.cpp: "Left"
+noxsdl/src/input_config_window.cpp: "Right"
+noxsdl/src/input_config_window.cpp: "Middle"
+noxsdl/src/input_config_window.cpp: "WindowDir:Back"
+
+# noxsdl/src/inventory.cpp: nox.csf labels and the class names their labels are made from; thing and image names
+noxsdl/src/inventory.cpp: "Warrior"
+noxsdl/src/inventory.cpp: "Wizard"
+noxsdl/src/inventory.cpp: "Conjurer"
+noxsdl/src/inventory.cpp: "modifier.db:FireProtectItemEnchantDesc"
+noxsdl/src/inventory.cpp: "modifier.db:PoisonProtectItemEnchantDesc"
+noxsdl/src/inventory.cpp: "modifier.db:LightningProtItemEnchantDesc"
+noxsdl/src/inventory.cpp: "modifier.db:BrillianceItemEnchantDesc"
+noxsdl/src/inventory.cpp: "modifier.db:SpeedItemEnchantDesc"
+noxsdl/src/inventory.cpp: "thing.db:LesserHeal"
+noxsdl/src/inventory.cpp: "GUIFist"
+noxsdl/src/inventory.cpp: "thing.db:AnkhGUI"
+noxsdl/src/inventory.cpp: "GeneralPrint:TooltipKeyIcon"
+noxsdl/src/inventory.cpp: "Gold"
+noxsdl/src/inventory.cpp: "Identify"
+noxsdl/src/inventory.cpp: "Journal:QuestLabel"
+noxsdl/src/inventory.cpp: "Journal:CompletedLabel"
+noxsdl/src/inventory.cpp: "Journal:HintLabel"
+noxsdl/src/inventory.cpp: "Journal:"
+noxsdl/src/inventory.cpp: "XPTable"
+noxsdl/src/inventory.cpp: "thing.db:IdentifyDescription"
+noxsdl/src/inventory.cpp: "Description"
+
+# noxsdl/src/live_scene.cpp: thing names
+noxsdl/src/live_scene.cpp: "Glyph"
+noxsdl/src/live_scene.cpp: "Flag"
+noxsdl/src/live_scene.cpp: "Bear"
+noxsdl/src/live_scene.cpp: "Fireball"
+noxsdl/src/live_scene.cpp: "Magic"
+noxsdl/src/live_scene.cpp: "Pixie"
+
+# noxsdl/src/live_session.cpp: the log (the join's packet trace)
+noxsdl/src/live_session.cpp: "in game"
+noxsdl/src/live_session.cpp: "CONNECT REFUSED"
+noxsdl/src/live_session.cpp: "NoX Core query/answer"
+noxsdl/src/live_session.cpp: "+%u ms got %zu bytes on the %s socket from %s: %s%s%s%s (%s)"
+noxsdl/src/live_session.cpp: "to %s from our lobby socket's port %u (the join) and game socket's port %u (the game); %s"
+noxsdl/src/live_session.cpp: "the NoX Core query twice from the game socket first"
+noxsdl/src/live_session.cpp: "nothing before the join (an XWIS game that answered no ping: a GAME.EXE host's join)"
+noxsdl/src/live_session.cpp: "nothing before the join (NOX_STOCK_STREAM)"
+noxsdl/src/live_session.cpp: "dropped: not the host's address"
+noxsdl/src/live_session.cpp: "dropped: not the host's address and port"
+noxsdl/src/live_session.cpp: "+%u ms sent %zu bytes (%s%s%02X %02X %02X) from the %s socket's port %u to %s"
+noxsdl/src/live_session.cpp: "ended after %u ms: heard %u datagram(s) on the lobby socket and %u on the game socket (%u of them not from the host), %u of our sends bounced (port unreachable)"
+
+# noxsdl/src/local_host.cpp: the Save folder
+noxsdl/src/local_host.cpp: "Save"
+
+# noxsdl/src/local_host.hpp: map names
+noxsdl/src/local_host.hpp: "Estate"
+
+# noxsdl/src/main.cpp: control names, map names, nox.cfg / noxcore.cfg setting names, the window's title (the product's name), a private test's server name, a server command, and the made-up XWIS games of a screenshot test
+noxsdl/src/main.cpp: "Chat"
+noxsdl/src/main.cpp: "So_Druid"
+noxsdl/src/main.cpp: "NoX Core"
+noxsdl/src/main.cpp: "FXVolume"
+noxsdl/src/main.cpp: "HDVideo"
+noxsdl/src/main.cpp: "Private test"
+noxsdl/src/main.cpp: "Hosted Here"
+noxsdl/src/main.cpp: "Kor] Newbies"
+noxsdl/src/main.cpp: "USA Midwest #1"
+noxsdl/src/main.cpp: "!TakRP"
+noxsdl/src/main.cpp: "User_Game"
+noxsdl/src/main.cpp: "Waystation"
+noxsdl/src/main.cpp: "Action"
+noxsdl/src/main.cpp: "execrul OTQuest.rul"
+
+# noxsdl/src/map_preload.cpp: the log
+noxsdl/src/map_preload.cpp: "players {}, carried things {} ({} types), named images {}, icons {}, interface {}"
+
+# noxsdl/src/menus.cpp: nox.csf labels and the class names their labels are made from; the Save folder; save failures' reasons, written to the log only (the dialog says Save failed)
+noxsdl/src/menus.cpp: "Warrior"
+noxsdl/src/menus.cpp: "Wizard"
+noxsdl/src/menus.cpp: "Conjurer"
+noxsdl/src/menus.cpp: "Save"
+noxsdl/src/menus.cpp: "Name"
+noxsdl/src/menus.cpp: "Ping"
+noxsdl/src/menus.cpp: "Quest"
+noxsdl/src/menus.cpp: "Highlander"
+noxsdl/src/menus.cpp: "Flagball"
+noxsdl/src/menus.cpp: "Chat"
+noxsdl/src/menus.cpp: "Arena"
+noxsdl/src/menus.cpp: "Stage"
+noxsdl/src/menus.cpp: "Map"
+noxsdl/src/menus.cpp: "Occupancy"
+noxsdl/src/menus.cpp: "Resolution"
+noxsdl/src/menus.cpp: "Multiplayer"
+noxsdl/src/menus.cpp: "Cannot write new solo character"
+noxsdl/src/menus.cpp: "No free character filename (all 100 slots used)"
+
+# noxsdl/src/menus_servers.cpp: image names
+noxsdl/src/menus_servers.cpp: "UIScrollUp"
+noxsdl/src/menus_servers.cpp: "UIScrollDn"
+noxsdl/src/menus_servers.cpp: "Lit"
+
+# noxsdl/src/menus_wolchat.cpp: showFakeChat's made-up lobby (a screenshot test)
+noxsdl/src/menus_wolchat.cpp: "Lob_37_"
+noxsdl/src/menus_wolchat.cpp: "Lob_37_0"
+noxsdl/src/menus_wolchat.cpp: "Wizard_of_Ix"
+noxsdl/src/menus_wolchat.cpp: "Conjurer42"
+noxsdl/src/menus_wolchat.cpp: "AVeryLongPlayerName"
+noxsdl/src/menus_wolchat.cpp: "Anyone up for an arena game on Estate?"
+noxsdl/src/menus_wolchat.cpp: "Sure, host it and I'll join. A long line to see how the messages wrap in the list's width here."
+
+# noxsdl/src/minimap.cpp: thing names
+noxsdl/src/minimap.cpp: "Crown"
+
+# noxsdl/src/mode_column.hpp: the product's name
+noxsdl/src/mode_column.hpp: "NoX Core "
+
+# noxsdl/src/mode_ui.cpp: the Save folder
+noxsdl/src/mode_ui.cpp: "Save"
+
+# noxsdl/src/mouse_handover.hpp: the log (where the pointer comes from)
+noxsdl/src/mouse_handover.hpp: "test point"
+noxsdl/src/mouse_handover.hpp: "the mouse"
+
+# noxsdl/src/options_window.cpp: nox.cfg setting names
+noxsdl/src/options_window.cpp: "FXVolume"
+
+# noxsdl/src/overlays.cpp: nox.csf labels; the frame-rate counter's units and readout (numbers for tuning, as fps counters show them)
+noxsdl/src/overlays.cpp: "%.0f fps  %.1f ms  delay %.0f ms  ahead %d"
+noxsdl/src/overlays.cpp: "%.0f fps  %.1f ms  delay %.0f ms"
+noxsdl/src/overlays.cpp: "%.0f fps  %.1f ms"
+noxsdl/src/overlays.cpp: "FB_Victory"
+noxsdl/src/overlays.cpp: "Team"
+noxsdl/src/overlays.cpp: "CTF_Tie"
+noxsdl/src/overlays.cpp: "CTF_Victory"
+noxsdl/src/overlays.cpp: "HL_Tie"
+noxsdl/src/overlays.cpp: "DM_Tie"
+noxsdl/src/overlays.cpp: "DM_FemaleVictory"
+noxsdl/src/overlays.cpp: "DM_MaleVictory"
+noxsdl/src/overlays.cpp: "DM_Loss"
+noxsdl/src/overlays.cpp: "HL_Header"
+noxsdl/src/overlays.cpp: "HL_Victory"
+noxsdl/src/overlays.cpp: "HL_You"
+noxsdl/src/overlays.cpp: "DM_TeamVictory"
+noxsdl/src/overlays.cpp: "HL_YourTeam"
+
+# noxsdl/src/port_mapper.cpp: the UPnP mapping's description (sent to the router); the log (a mapping made)
+noxsdl/src/port_mapper.cpp: "Nox (NoX Core)"
+noxsdl/src/port_mapper.cpp: " mapped to "
+
+# noxsdl/src/quest_windows.cpp: nox.csf labels
+noxsdl/src/quest_windows.cpp: "GeneralPrint:MiscQuestionQDeath"
+
+# noxsdl/src/quit_menu.cpp: nox.csf labels
+noxsdl/src/quit_menu.cpp: "Vote"
+
+# noxsdl/src/server_options.cpp: nox.csf labels (guiserv.c's game type names)
+noxsdl/src/server_options.cpp: "Arena"
+noxsdl/src/server_options.cpp: "Highlander"
+noxsdl/src/server_options.cpp: "Flagball"
+noxsdl/src/server_options.cpp: "Quest"
+noxsdl/src/server_options.cpp: "Notice"
+
+# noxsdl/src/spell_limits.cpp: thing names
+noxsdl/src/spell_limits.cpp: "Meteor"
+noxsdl/src/spell_limits.cpp: "Pixie"
+
+# noxsdl/src/spellbook.cpp: nox.csf labels; image names
+noxsdl/src/spellbook.cpp: "Small"
+noxsdl/src/spellbook.cpp: "Medium"
+noxsdl/src/spellbook.cpp: "Large"
+noxsdl/src/spellbook.cpp: "Size"
+noxsdl/src/spellbook.cpp: "Spellbook"
+
+# noxsdl/src/sprite_cache.cpp: the log
+noxsdl/src/sprite_cache.cpp: "{} MB: {} atlas pages, {} MB in textures of their own"
+noxsdl/src/sprite_cache.cpp: ", {} BC7 pages + {} material pages ({} MB, {} MB of it images; {} made in {:.1f} ms, worst {:.1f} ms; {} uploads, {} MB in {:.1f} ms)"
+
+# noxsdl/src/summon_window.cpp: nox.csf labels; image names
+noxsdl/src/summon_window.cpp: "ccs:BANISH"
+noxsdl/src/summon_window.cpp: "ccs:OBSERVE"
+noxsdl/src/summon_window.cpp: "ccs:IDLE"
+noxsdl/src/summon_window.cpp: "ccs:GUARD"
+noxsdl/src/summon_window.cpp: "ccs:ESCORT"
+noxsdl/src/summon_window.cpp: "ccs:HUNT"
+noxsdl/src/summon_window.cpp: "Lit"
+
+# noxsdl/src/test_drive.cpp: test drives (--test-* runs): made-up shop and dialog, thing names, console commands
+noxsdl/src/test_drive.cpp: "Test Shop"
+noxsdl/src/test_drive.cpp: "War03b:Shopkeeper"
+noxsdl/src/test_drive.cpp: "Longsword"
+noxsdl/src/test_drive.cpp: "Con01a:CaptainGreet"
+noxsdl/src/test_drive.cpp: "Airship Captain"
+noxsdl/src/test_drive.cpp: "nx goto "
+
+# noxsdl/src/text.cpp: the log (the fonts' names)
+noxsdl/src/text.cpp: "Caudex Bold (built in)"
+noxsdl/src/text.cpp: "Noto Sans SemiBold (built in)"
+
+# noxsdl/src/thing_art.cpp: thing names
+noxsdl/src/thing_art.cpp: "NPCDraw"
+
+# noxsdl/src/trade_screens.cpp: thing names
+noxsdl/src/trade_screens.cpp: "Shopkeeper"

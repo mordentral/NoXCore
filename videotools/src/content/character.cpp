@@ -3,6 +3,7 @@
 
 #include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
 #include <format>
@@ -205,20 +206,20 @@ void shadeMaterials(std::vector<std::uint8_t>& rgba, const std::vector<std::uint
 std::string checkSaveOutsideGame(const fs::path& target, const fs::path& source, const fs::path& gameDir)
 {
     if (target.empty() || !target.has_filename()) {
-        return "no file name given";
+        return NOX_TR("content.character.no_file_name", "no file name given");
     }
     std::error_code ec;
     if (!source.empty() && fs::exists(target, ec) && fs::equivalent(target, source, ec)) {
-        return "that's the file it was read from: save a new one";
+        return NOX_TR("content.character.same_file", "that's the file it was read from: save a new one");
     }
     // Not in a game install, nor anywhere under one (its Save folder included).
     for (fs::path dir = fs::weakly_canonical(fs::absolute(target, ec).parent_path(), ec); !dir.empty(); dir = dir.parent_path()) {
         if (!gameDir.empty() && fs::exists(gameDir, ec) && fs::equivalent(dir, gameDir, ec)) {
-            return "that's in the game's folder: save somewhere else (a copy of the game, say)";
+            return NOX_TR("content.character.in_game_folder", "that's in the game's folder: save somewhere else (a copy of the game, say)");
         }
         if (fs::exists(nox::findNoCase(dir, "GAME.EXE"), ec)) {
             const auto u8 = dir.u8string();
-            return std::string(u8.begin(), u8.end()) + " holds GAME.EXE (a game install): save somewhere else";
+            return nox::l10n::format(NOX_TR("content.character.game_install", "{folder} holds GAME.EXE (a game install): save somewhere else"), {{"folder", std::string(u8.begin(), u8.end())}});
         }
         if (dir == dir.parent_path()) {
             break;

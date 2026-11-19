@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <string>
 #include <vector>
 
 extern const unsigned char kEmbeddedFont[]; // Noto Sans SemiBold (embedded_font.cpp)
@@ -483,6 +484,18 @@ ImGuiHost::ImGuiHost(SDL_Window* window, SDL_Renderer* renderer, std::string ini
     ImFontConfig font;
     font.FontDataOwnedByAtlas = false; // (compiled into the program)
     io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(kEmbeddedFont), static_cast<int>(kEmbeddedFontSize), 0.0f, &font);
+    {
+        // Hangul (Korean text) merged in after it, from the fonts folder beside the program: only
+        // what Noto Sans lacks is taken from it.
+        const char* base = SDL_GetBasePath();
+        const std::string hangul = std::string(base ? base : "") + "fonts/NotoSansKR-SemiBold-Hangul.ttf";
+        if (ImFileHandle f = ImFileOpen(hangul.c_str(), "rb")) { // (UTF-8 paths, as ImGui opens it)
+            ImFileClose(f);
+            ImFontConfig merge;
+            merge.MergeMode = true;
+            io.Fonts->AddFontFromFileTTF(hangul.c_str(), 0.0f, &merge);
+        }
+    }
     mono_ = io.Fonts->AddFontDefaultVector(); // (the script panel's fixed-width source font)
     ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_);
     ImGui_ImplSDLRenderer3_Init(renderer_);

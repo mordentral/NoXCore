@@ -1,0 +1,77 @@
+# The l10n lint's exceptions in the map editor's model code (noxcore/src/mapedit, but properties,
+# content, document and object_edit), the script compiler (noxcore/src/script) and the lobby
+# (noxcore/src/lobby). Format: lint_allow.txt.
+
+# Bytes a file format or protocol fixes: the session protocol's and the op and lock tables' readers
+# (their names are only in a malformed message's error, for the log), the sidecar's JSON, the
+# script debug info's JSON, a mod folder's file errors (the edit server's: logged and sent to the
+# session's editors), the opcode and builtin names, the decompiler's output (generated source and its
+# comments, and the bytecode checks behind it) and the builtin docs file's checks (developer tests)
+file noxcore/src/mapedit/session_proto.cpp  # protocol messages' reader names
+file noxcore/src/mapedit/sidecar.cpp        # the .nxe sidecar's JSON reader and writer
+file noxcore/src/mapedit/mod_files.cpp      # the edit server's mod file errors (log, sent to editors)
+file noxcore/src/script/debug_info.cpp      # the debug info's JSON
+file noxcore/src/script/builtins.cpp        # builtin function names (script identifiers)
+file noxcore/src/script/opcodes.cpp         # opcode and builtin names; bytecode checks (logs, exceptions)
+file noxcore/src/script/decompiler.cpp      # decompiled source and its comments; bytecode-structure reasons
+file noxcore/src/script/builtin_docs.cpp    # builtin_docs.txt's checks (the tests) and the usage file it writes
+file noxcore/src/lobby/irc.hpp              # IRC protocol lines
+
+# Reader names and errors of malformed bytes (FormatError, for the log)
+noxcore/src/mapedit/locks.cpp: "lock table"
+noxcore/src/mapedit/locks.cpp: "not a lock table"
+noxcore/src/mapedit/locks.cpp: "unknown element kind"
+noxcore/src/mapedit/ops.cpp: "count past the end"
+noxcore/src/mapedit/ops.cpp: "unknown op part"
+noxcore/src/mapedit/ops.cpp: "map editor op"
+noxcore/src/mapedit/ops.cpp: "not an op"
+noxcore/src/mapedit/ops.cpp: "op format "
+noxcore/src/mapedit/session_doc.cpp: "session document"
+noxcore/src/mapedit/writer.cpp: "map editor"
+
+# ElementKey::text(): English, as the edit server sends it to editors ("wall 30,40 is being edited by
+# Bob"); this editor shows ElementKey::shownText()
+noxcore/src/mapedit/locks.cpp: "the script"
+noxcore/src/mapedit/locks.cpp: "script function "
+noxcore/src/mapedit/locks.cpp: "the map info"
+
+# Saved into the map or the sidecar, or a file's header: a new polygon's default name, the reason
+# kept in the .nxe ("needs NoX Core"), the prefab and clipboard formats' first lines
+noxcore/src/mapedit/markers.cpp: "Polygon "
+noxcore/src/mapedit/script_doc.cpp: "the script uses object variables, a NoX Core-only feature: the original game crashes when it runs, so the map needs a NoX Core server"
+noxcore/src/mapedit/script_doc.cpp: "needs a NoX Core server"
+noxcore/src/mapedit/prefab.cpp: "NoX Core prefab 1"
+noxcore/src/mapedit/selection.cpp: "NoX Core map clip 1\n"
+
+# pendingViewName: the console's and the log's (parsePendingView reads the console's and the command
+# line's words)
+noxcore/src/mapedit/pending.cpp: "Shaded"
+noxcore/src/mapedit/pending.cpp: "As final"
+noxcore/src/mapedit/pending.cpp: "Hidden"
+
+# Issue::where is parsed (MapEditor::locate finds "tile ", "WayPoints #" and the rest in it)
+noxcore/src/mapedit/validate.cpp: "tile pair "
+noxcore/src/mapedit/validate.cpp: "WayPoints #"
+
+# Builtin names (the argument value table's) and nox.csf's "Journal:" label prefix
+noxcore/src/script/arg_values.cpp: "Print"
+noxcore/src/script/arg_values.cpp: "Chat"
+noxcore/src/script/arg_values.cpp: "Enchant"
+noxcore/src/script/arg_values.cpp: "Object"
+noxcore/src/script/arg_values.cpp: "Unused5e"
+noxcore/src/script/arg_values.cpp: "Effect"
+noxcore/src/script/arg_values.cpp: "Waypoint"
+noxcore/src/script/arg_values.cpp: "Journal:"
+
+# Compiled into the script: a failed assert's PrintToAll text, which the test runner reads
+noxcore/src/script/compiler.cpp: "assertion failed"
+
+# Lobby: the WOL lobby channel prefix (protocol), and connection errors only logged (the menus show
+# the game's own nox.csf texts for them)
+noxcore/src/lobby/wol_chat.cpp: "Lob_"
+noxcore/src/lobby/wol_chat.cpp: "timed out"
+noxcore/src/lobby/wol_chat.cpp: "the connection closed"
+noxcore/src/lobby/wol_chat.cpp: "the connection closed early"
+noxcore/src/lobby/xwis_host.cpp: "timed out"
+noxcore/src/lobby/xwis_login.cpp: "timed out"
+noxcore/src/lobby/xwis_login.cpp: "the connection closed early"
