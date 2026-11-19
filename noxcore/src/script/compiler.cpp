@@ -1198,7 +1198,9 @@ public:
         legacyCallOrder_ = opts.legacyCallOrder;
         debug.embeddedSource = opts.embedSource;
         if (opts.embedSource) {
-            strings_.push_back(std::string(kEmbeddedSourcePrefix) + std::string(source));
+            // (The mark says its calls bind in source order; the old order's string 0 had none.)
+            strings_.push_back(std::string(kEmbeddedSourcePrefix) + std::string(opts.legacyCallOrder ? std::string_view() : kEmbeddedSourceMark) +
+                               std::string(source));
         }
         // The language's own globals, GLOBAL's first four symbols (language.hpp).
         for (std::uint32_t i = 0; i < 4; ++i) {
@@ -2879,6 +2881,8 @@ CompileResult compile(std::string_view source, const CompileOptions& options)
             ignoreObject = true;
         } else if (f.name == "raw_object_vars") {
             rawObjectVars = true;
+        } else if ("//@" + f.name + "\n" == kEmbeddedSourceMark) {
+            // (An embedded source's mark, kept by a reader that took all of string 0 after the prefix.)
         } else {
             result.diagnostics.push_back({Diagnostic::Severity::Warning, f.loc, l10n::format(NOX_TR("editor.script.compile.unknown_flag", "unknown compile flag //@{name}"), {{"name", f.name}})});
         }
@@ -3054,12 +3058,22 @@ bool isEntryPointName(std::string_view name)
     return false;
 }
 
-std::optional<std::string> embeddedSource(const ScriptFile& file)
+std::optional<std::string> embeddedSource(const ScriptFile& file, bool* marked)
 {
+    if (marked) {
+        *marked = false;
+    }
     if (file.strings.empty() || !file.strings.front().starts_with(kEmbeddedSourcePrefix)) {
         return std::nullopt;
     }
-    return file.strings.front().substr(kEmbeddedSourcePrefix.size());
+    std::string_view rest = std::string_view(file.strings.front()).substr(kEmbeddedSourcePrefix.size());
+    if (rest.starts_with(kEmbeddedSourceMark)) {
+        rest.remove_prefix(kEmbeddedSourceMark.size());
+        if (marked) {
+            *marked = true;
+        }
+    }
+    return std::string(rest);
 }
 
 bool usesObjectVariables(const ScriptFile& file)

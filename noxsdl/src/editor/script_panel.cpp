@@ -327,6 +327,7 @@ void ScriptPanel::registerCommands()
             commit();
             ed_.perform(me::Op{me::opLabel(ol::kDecompileScript), {me::SetScriptSource{d.source}}});
             decompileNotes_ = d.notes;
+            noteMigration(d.migration);
         });
     add("script.exportNs", NOX_TRC("editor.cmd.script.export_ns.label", "Export .ns"), script, "",
         NOX_TRC("editor.cmd.script.export_ns.help", "Write the source beside the map as <name>.ns (the file the watch follows)."),
@@ -637,12 +638,7 @@ void ScriptPanel::documentOpened()
         // (The saved source, not a change: one saved for the old argument order comes turned
         // round, the same bytes compiled; the next save writes it with the mark.)
         ed_.doc_.scriptSource = *src;
-        if (migration) {
-            sourceNotes_ = me::callOrderMigrationNotes(*migration);
-            if (std::ranges::any_of(sourceNotes_, [](const me::SourceNote& n) { return n.warning; })) {
-                ed_.showProblems_ = true;
-            }
-        }
+        noteMigration(migration);
     }
     good_ = me::sidecarScriptDebug(ed_.sidecar_);
     readOnlyRev_.reset();
@@ -765,6 +761,8 @@ void ScriptPanel::ensureSource()
     if (d.source.empty()) {
         return;
     }
+    // (Source an older --embed-source kept in the map for the old argument order: turned round.)
+    noteMigration(d.migration);
     if (!d.identical) {
         decompileNotes_.insert(decompileNotes_.begin(),
                                NOX_TR("editor.script.decompile_not_identical", "the decompiled source doesn't compile back to the map's exact bytes"));
@@ -775,6 +773,14 @@ void ScriptPanel::ensureSource()
     compileDueMs_ = SDL_GetTicks();
     ed_.status(d.identical ? NOX_TR("editor.script.status.decompiled_identical", "Decompiled the map's script (it compiles back to the same bytes)")
                            : NOX_TR("editor.script.status.decompiled", "Decompiled the map's script"));
+}
+
+void ScriptPanel::noteMigration(const std::optional<sc::CallOrderMigration>& migration)
+{
+    sourceNotes_ = migration ? me::callOrderMigrationNotes(*migration) : std::vector<me::SourceNote>{};
+    if (std::ranges::any_of(sourceNotes_, [](const me::SourceNote& n) { return n.warning; })) {
+        ed_.showProblems_ = true;
+    }
 }
 
 void ScriptPanel::compileNow()
@@ -1284,6 +1290,7 @@ void ScriptPanel::importObj(const fs::path& path)
         const auto d = me::decompileDocumentScript(probe);
         ed_.perform(me::Op{me::opLabel(ol::kImportScript), {me::SetScript{so}, me::SetScriptSource{d.source}}});
         decompileNotes_ = d.notes;
+        noteMigration(d.migration);
         ed_.status(nox::l10n::format(NOX_TR("editor.script.status.imported", "Imported {path} ({n} functions)"),
                                      {{"path", pathText(path)}, {"n", file.functions.size()}}));
     } catch (const std::exception& ex) {

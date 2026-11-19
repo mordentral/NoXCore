@@ -124,13 +124,17 @@ public:
     {
         DecompileResult res;
         if (opts_.useEmbeddedSource) {
-            if (auto src = embeddedSource(file_)) {
+            bool marked = false;
+            if (auto src = embeddedSource(file_, &marked)) {
                 res.source = *src;
                 res.fromEmbeddedSource = true;
                 // (Object variables allowed: the check is whether it compiles back, whoever reads it.)
                 const auto back = compile(res.source, {.embedSource = true, .allowObjectVariables = true});
                 res.compiles = back.ok();
-                res.identical = back.ok() && back.file->serialize() == file_.serialize();
+                res.identical = back.ok() && sameButSource(*back.file);
+                if (!marked && !res.identical) {
+                    migrateEmbedded(res);
+                }
                 return res;
             }
         }
@@ -222,6 +226,45 @@ public:
     }
 
 private:
+    // ---- embedded source ----
+
+    /// `back` (an embedded source compiled again) is the script, but for string 0: the kept
+    /// source, which has the mark now, or the text a migration turned round.
+    bool sameButSource(const ScriptFile& back) const
+    {
+        if (back.strings.empty() || file_.strings.empty()) {
+            return false;
+        }
+        ScriptFile same = back;
+        same.strings.front() = file_.strings.front();
+        return same.serialize() == file_.serialize();
+    }
+
+    /// An unmarked embedded source that doesn't compile back the same: if the old call order gives
+    /// the script's own bytes (an older NoX Core's embed), it is read through migrateCallOrder, as
+    /// an editor sidecar's source without its version mark is. nsc's, or one
+    /// the old order doesn't give either, is left as it is (not identical, as before).
+    void migrateEmbedded(DecompileResult& res) const
+    {
+        const auto old = compile(res.source, {.embedSource = true, .allowObjectVariables = true, .legacyCallOrder = true});
+        if (!old.ok() || old.file->serialize() != file_.serialize()) {
+            return;
+        }
+        CallOrderMigration m = migrateCallOrder(res.source);
+        using Outcome = CallOrderMigration::Outcome;
+        if (m.outcome == Outcome::Unchanged) {
+            return; // (never: the two orders differ only on such calls)
+        }
+        if (m.outcome != Outcome::Failed) {
+            // Same, or TypeErrors (the turned text shows a mixed-type call as the map runs it).
+            const auto now = compile(m.source, {.embedSource = true, .allowObjectVariables = true});
+            res.source = m.source;
+            res.compiles = now.ok();
+            res.identical = now.ok() && sameButSource(*now.file);
+        }
+        res.migration = std::move(m);
+    }
+
     // ---- instructions ----
 
     void prepare()

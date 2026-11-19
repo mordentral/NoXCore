@@ -95,6 +95,9 @@ private:
 
     void syncFromDocument();
     void ensureSource();
+    /// sourceNotes_ from what reading a saved source (the sidecar's, or one kept in the map's
+    /// string 0) through the call-order migration did; Problems shown when one is a warning.
+    void noteMigration(const std::optional<nox::script::CallOrderMigration>& migration);
     void compileNow();
     bool compileIntoMap();
     void saveAndReload();

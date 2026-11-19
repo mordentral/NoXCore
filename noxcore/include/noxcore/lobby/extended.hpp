@@ -163,7 +163,15 @@ struct ClientSecret {
 ///      in the host's convention, as a stock client. The client takes it so only from a host
 ///      that says it recodes (ServerFeature::RecodesText, unicodeTextWith); a Latin-1 host's
 ///      convention is the identity, so it reads either the same
-inline constexpr std::uint16_t kClientLevel = 12;
+///  13  script calls in source order (kSourceOrderCallsLevel): the script compiler binds a call of
+///      the map script's own function's first argument to its first parameter (a release below
+///      bound it to the last), and an edit session carries the script as plain text, so an edit
+///      session's host (setUpEditSession) lets in no NoX Core client below 13; every other game
+///      as before. (A client of 13 can tell an older host by the reply's clientLevel.)
+inline constexpr std::uint16_t kClientLevel = 13;
+/// The client level whose script calls bind in source order: an edit session's lowest (kClientLevel's
+/// list, 13).
+inline constexpr std::uint16_t kSourceOrderCallsLevel = 13;
 /// The client level whose game text goes as real Unicode both ways (kClientLevel's list, 12).
 inline constexpr std::uint16_t kUnicodeTextLevel = 12;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).

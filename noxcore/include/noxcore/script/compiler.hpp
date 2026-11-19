@@ -96,7 +96,8 @@ struct DebugInfo {
 };
 
 struct CompileOptions {
-    /// Keep the source in string 0, after kEmbeddedSourcePrefix, as nsc does.
+    /// Keep the source in string 0, after kEmbeddedSourcePrefix and kEmbeddedSourceMark, as nsc
+    /// does (nsc's has no mark).
     bool embedSource = false;
     /// Lint warnings (the editor's and the CLI's --lint; they never change the code):
     /// - a function that returns a value given to a timer or SetDialog, or named as an entry
@@ -134,7 +135,9 @@ struct CompileOptions {
     bool allowObjectVariables = false;
     /// A call of the script's own function pushes its arguments in source order, as NoX Core's
     /// compiler did before it bound them C's way (so the first argument went to the last
-    /// parameter). Only for reading a source saved before that (migrateCallOrder's check).
+    /// parameter). Only for reading a source saved before that (migrateCallOrder's check, and the
+    /// decompiler's of an embedded source). With embedSource, string 0 is as those builds wrote it
+    /// too: without kEmbeddedSourceMark.
     bool legacyCallOrder = false;
 };
 
@@ -163,6 +166,15 @@ struct CompileResult {
 
 /// nsc's marker in front of the source it keeps in string 0.
 constexpr std::string_view kEmbeddedSourcePrefix = "NOXSCRIPT3.0";
+/// What NoX Core's embedSource writes between kEmbeddedSourcePrefix and the source: the source's
+/// language version (2: a call of the script's own function binds its first argument to the first
+/// parameter, as the sidecar's "scriptSourceVersion": 2 says). A source line of its own, a compile
+/// flag the compiler knows and ignores, so a reader that takes all after the prefix still has
+/// source that compiles. Without it (nsc's, or an embed by a NoX Core build before the mark) the
+/// decompiler checks whether the old order gives the map's bytes, and if so reads it through
+/// migrateCallOrder, as an editor sidecar's source without its version mark is. embeddedSource()
+/// leaves it out.
+constexpr std::string_view kEmbeddedSourceMark = "//@source_version 2\n";
 
 /// Statements and expressions nested deeper than this are a compile error (and the parse stops
 /// there): each level is a call in the parser, the code generator and the syntax tree's
@@ -205,8 +217,9 @@ struct CallOrderMigration {
 /// bytes, it doesn't decide whether the map may have them.)
 CallOrderMigration migrateCallOrder(std::string_view oldSource);
 
-/// The source kept in string 0 (nsc's habit, or ours with embedSource), if there is one.
-std::optional<std::string> embeddedSource(const ScriptFile& file);
+/// The source kept in string 0 (nsc's habit, or ours with embedSource), if there is one, without
+/// kEmbeddedSourceMark; `marked`, when given, says whether it had the mark.
+std::optional<std::string> embeddedSource(const ScriptFile& file, bool* marked = nullptr);
 
 /// Whether a compiled script has object variables: function 0 lays out symbols past the loader's
 /// placeholder, or code reads or writes one (a LoadVar of a negative local). Such a script needs

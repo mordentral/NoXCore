@@ -433,7 +433,9 @@ private:
 
 /// The host's options for an edit session with `director` (which must outlive the host): the
 /// "[EDIT] <host>" name, the sandbox's mode and rules (no limits, no map cycle or vote, players
-/// can't die as the director says), its messages. Returns the map to host.
+/// can't die as the director says), its messages, and a lowest client level of at least
+/// lobby::kSourceOrderCallsLevel (a NoX Core client below it refused at its join; a higher one
+/// kept). Returns the map to host.
 std::filesystem::path setUpEditSession(EditSessionDirector& director, GameHost::Options& o, const std::string& hostName);
 
 } // namespace nox::server

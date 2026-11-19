@@ -397,6 +397,7 @@ DecompiledSource decompileDocumentScript(const MapDocument& doc, const script::D
         out.source = std::move(d.source);
         out.identical = d.identical;
         out.notes = std::move(d.notes);
+        out.migration = std::move(d.migration);
     } catch (const std::exception& ex) {
         out.notes.push_back(l10n::format(NOX_TR("editor.script.unreadable", "the map's script can't be read: {error}"), {{"error", ex.what()}}));
     }

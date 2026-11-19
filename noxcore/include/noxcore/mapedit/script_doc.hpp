@@ -73,6 +73,10 @@ struct DecompiledSource {
     std::string source;
     bool identical = false; ///< it compiles back to the map's own bytes
     std::vector<std::string> notes;
+    /// Source an older NoX Core's compiler kept in string 0 (CompileOptions::embedSource), written
+    /// for the old call order: what reading it through script::migrateCallOrder did (DecompileResult::migration;
+    /// callOrderMigrationNotes for the Problems list).
+    std::optional<script::CallOrderMigration> migration;
 };
 DecompiledSource decompileDocumentScript(const MapDocument& doc, const script::DebugInfo* names = nullptr);
 

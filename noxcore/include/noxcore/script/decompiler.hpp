@@ -31,9 +31,16 @@ struct DecompileResult {
     std::string source;
     bool fromEmbeddedSource = false;
     bool compiles = false; ///< the source compiles (object variables allowed: CompileOptions::allowObjectVariables)
-    bool identical = false; ///< ... to the same script, byte for byte
+    /// ... to the same script, byte for byte (an embedded source: kept in string 0 again, but for
+    /// what string 0 holds: the mark, or the text a migration turned round)
+    bool identical = false;
     std::vector<Form> forms; ///< per function, from 2 on
     std::vector<std::string> notes;
+    /// An embedded source without kEmbeddedSourceMark whose old call order (CompileOptions::
+    /// legacyCallOrder) gives the script's own bytes and today's doesn't: an older NoX Core's
+    /// embed (CompileOptions::embedSource). What migrateCallOrder did; `source` is its text (as kept when it
+    /// Failed). Nothing otherwise (a marked embed, nsc's, one the same both ways, a decompiled one).
+    std::optional<CallOrderMigration> migration;
 };
 
 DecompileResult decompile(const ScriptFile& file, const DecompileOptions& options = {});
