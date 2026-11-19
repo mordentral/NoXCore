@@ -2123,7 +2123,8 @@ The engine's logic is the exe's; these are where the output differs.
   - a game host (GameHost) never loads such a map: as its first map it throws `MapRefused` (noxsdl
     shows the notice); picked (Server Settings' Go, the console's load, a vote) or reached by an
     exit, the game stays on its map, loaded again as for a map that can't be read (a solo game's
-    from the copy its exit just saved), and everyone is told; such maps are left out of the Server
+    from the copy its exit just saved; with no copy, as after a saved game's load, afresh from its
+    file), and everyone is told; such maps are left out of the Server
     Settings' list, the map vote and the map cycle;
   - the server's script host never starts such a script (any other load: a bare Server);
   - the map editor shows it read-only, whatever its settings, and its validator warns.

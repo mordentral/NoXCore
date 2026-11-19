@@ -140,8 +140,12 @@ std::size_t renameExits(MapFile& map, const things::ThingDb& things,
         if (!to || *to == name) {
             continue;
         }
-        if (to->size() > kMaxExitMapName || to->find('\0') != std::string::npos) {
-            throw FormatError("map exits: the name " + *to + " is longer than " + std::to_string(kMaxExitMapName) + " bytes or holds a NUL");
+        // (The game reads the stored bytes, the NUL and anything after it too, into its 80-byte
+        // buffer: the name with what follows it must fit there.)
+        const std::size_t tail = x.mapName.size() - name.size();
+        if (to->size() > kMaxExitMapName || to->size() + tail > kMaxExitMapName + 1 || to->find('\0') != std::string::npos) {
+            throw FormatError("map exits: the name " + *to + " is longer than " + std::to_string(kMaxExitMapName) +
+                              " bytes with what the exit stores after its name, or holds a NUL");
         }
         const xfer::TypeInfo& info = t->second.first.info;
         const std::size_t extraOffset = e->obj.extraOffset();

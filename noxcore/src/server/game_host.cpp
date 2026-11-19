@@ -4038,6 +4038,14 @@ void GameHost::loadNextMap()
                     refused = false; // (that copy is what loads)
                 }
             }
+            if (refused) {
+                // The map it's on from its file: a first visit's start (GLOBAL, MapInitialize), not
+                // a saved copy's, which a saved game's load or an exit asked for the refused map
+                // (switch-to-solo), and its client reads the map, not that copy.
+                world.switchToSolo = false;
+                world.noMultiplayer = false;
+                world.soloPath.clear();
+            }
         }
     }
     mapPath_ = next;

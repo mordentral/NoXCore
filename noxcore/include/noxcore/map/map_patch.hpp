@@ -53,8 +53,9 @@ std::vector<MapExit> listExits(const MapFile& map, const things::ThingDb& things
 /// changed. Only ObjectData changes, and in it only those records' bytes, plus the alignment of
 /// the records after a record whose size changed (the stored leftover bytes in a pad whose length
 /// changes become zeros, as the game writes them). Throws FormatError for a new name longer than
-/// kMaxExitMapName or with a NUL in it, or an exit record that doesn't re-encode to its stored bytes (nothing is
-/// changed then).
+/// kMaxExitMapName, or longer than the game's buffer takes with the bytes the exit stores after its
+/// name (the NUL and anything past it: 80 bytes in all), or with a NUL in it, or an exit record
+/// that doesn't re-encode to its stored bytes (nothing is changed then).
 std::size_t renameExits(MapFile& map, const things::ThingDb& things,
                         const std::function<std::optional<std::string>(std::string_view)>& rename);
 

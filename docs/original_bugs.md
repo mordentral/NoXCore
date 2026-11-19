@@ -1797,7 +1797,8 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
 - **Ours:** not reproduced. NoX Core's interpreter runs builtins 0-210 and its own range
   1024-2047 as its own code; any other number is logged and does nothing, and no script can reach
   machine code or memory outside its own variables (`noxcore/src/script/vm.cpp`). Maps that
-  depend on this trick don't run in NoX Core.
+  depend on this trick don't run in NoX Core: a map whose script calls any such number is refused
+  at its load with a notice (vanilla_deviations.md, VD-78).
 
 ## Client
 
