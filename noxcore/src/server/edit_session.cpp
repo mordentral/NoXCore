@@ -1953,7 +1953,7 @@ std::filesystem::path setUpEditSession(EditSessionDirector& director, GameHost::
     // The session's script travels as plain text: a NoX Core client whose calls bind the other way
     // round is refused at its join (the client level gate's notice); stock clients as before.
     o.minClientLevel = std::max(o.minClientLevel, lobby::kSourceOrderCallsLevel);
-    o.prepareMap =[&director](const std::filesystem::path&, const World&) { director.mapLoading(); };
+    o.prepareMap = [&director](const std::filesystem::path&, const World&) { director.mapLoading(); };
     o.noxcppMessages[static_cast<std::uint8_t>(net::Op::NoxcppEdit)] = [&director](GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m) {
         director.onMessage(host, peer, m);
     };
