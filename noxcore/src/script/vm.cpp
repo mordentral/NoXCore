@@ -256,6 +256,11 @@ std::uint32_t Vm::read(std::size_t fn, bool global, std::int32_t offset) const
     if (!global && offset < 0) {
         return host_->objectVar(negated(offset));
     }
+    // (A file with no GLOBAL function has no globals: a global read gives 0, as loadVar's does, and
+    // write stores nothing.)
+    if (global && locals_.size() < 2) {
+        return 0;
+    }
     const auto& words = locals_[global ? 1 : fn];
     return offset >= 0 && static_cast<std::size_t>(offset) < words.size() ? words[static_cast<std::size_t>(offset)] : 0;
 }
