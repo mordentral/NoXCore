@@ -78,7 +78,8 @@ void writeEntry(ByteWriter& w, const PackEntry& e)
     w.u8(e.codec);
     w.u16(e.flags);
     w.u8(e.levels);
-    w.zeros(7);
+    w.u32(e.sourceKey);
+    w.zeros(3);
 }
 
 PackEntry readEntry(ByteReader& r)
@@ -102,7 +103,8 @@ PackEntry readEntry(ByteReader& r)
     e.codec = r.u8();
     e.flags = r.u16();
     e.levels = r.u8(); // 0 in packs before version 3 (reserved, written as zero)
-    r.skip(7);
+    e.sourceKey = r.u32(); // 0 in packs without kPackSourceKeys (reserved, written as zero)
+    r.skip(3);
     return e;
 }
 
@@ -409,6 +411,7 @@ ImagePackReader::ImagePackReader(const std::filesystem::path& path)
     const std::uint32_t namesSize = h.u32();
     sourceImages_ = h.u32();
     sourceIdxCrc_ = h.u32();
+    flags_ = h.u32();
 
     // (The names and the index checked against the file before their buffers are made: the
     // header's counts are a u32 and the offsets a u64 each.)
@@ -592,6 +595,30 @@ void ImagePackWriter::put(std::uint32_t index, const EncodedImage& image)
     putStored(index, image.entry, image.name, image.stored);
 }
 
+void ImagePackWriter::setSourceKey(std::uint32_t index, std::uint32_t key)
+{
+    if (index < entries_.size() && entries_[index].present()) {
+        entries_[index].sourceKey = key;
+    }
+}
+
+std::uint32_t bagSourceKey(std::string_view name, std::uint8_t type, std::uint32_t size16, std::uint32_t size8)
+{
+    std::uint32_t h = 2166136261u; // (FNV-1a)
+    const auto add = [&h](std::uint8_t b) { h = (h ^ b) * 16777619u; };
+    for (const char c : name) {
+        add(static_cast<std::uint8_t>(c));
+    }
+    add(0);
+    add(type);
+    for (const std::uint32_t v : {size16, size8}) {
+        for (int i = 0; i < 4; ++i) {
+            add(static_cast<std::uint8_t>(v >> (8 * i)));
+        }
+    }
+    return h != 0 ? h : 1;
+}
+
 // Appends the stored bytes at the end of the data and records the entry; names go to names_ until finish().
 void ImagePackWriter::putStored(std::uint32_t index, const PackEntry& entry, std::string_view name,
                                 std::span<const std::uint8_t> stored)
@@ -644,7 +671,8 @@ void ImagePackWriter::finish()
     h.u32(static_cast<std::uint32_t>(names_.size()));
     h.u32(sourceImages_);
     h.u32(sourceIdxCrc_);
-    h.u32(0); // flags
+    const bool keys = std::ranges::any_of(entries_, [](const PackEntry& e) { return e.sourceKey != 0; });
+    h.u32(keys ? kPackSourceKeys : 0); // flags
     h.zeros(kHeaderSize - h.size());
     file_.seekp(0);
     file_.write(reinterpret_cast<const char*>(h.data().data()), static_cast<std::streamsize>(h.size()));

@@ -616,6 +616,63 @@ void Gui::drawBorder(Window& w, Painter& p)
 
 // The stock look of a window that has no draw function of its own, by its type (the exe's
 // own draw functions for each kind of window), in layout pixels.
+const Window::TextFit& Gui::fitText(Window& w, Painter& p, int width, int height)
+{
+    using Mode = Window::TextFit::Mode;
+    Window::TextFit& f = w.fit;
+    Font* const big = p.font(w.largeFont);
+    Font* const small = p.font(false);
+    if (!big || !small) {
+        f.mode = Mode::AsDrawn;
+        return f;
+    }
+    const int bigSize = p.pixelSize(w.largeFont);
+    const int smallSize = p.pixelSize(false);
+    if (f.text == w.text && f.width == width && f.height == height && f.scale == p.scale() && f.large == w.largeFont &&
+        f.largeFace == big && f.smallFace == small && f.largeSet == big->facesSet() && f.smallSet == small->facesSet() &&
+        f.largeSize == bigSize && f.smallSize == smallSize) {
+        return f; // (as worked out last time: nothing changed)
+    }
+    f.text = w.text;
+    f.width = width;
+    f.height = height;
+    f.scale = p.scale();
+    f.large = w.largeFont;
+    f.largeFace = big;
+    f.smallFace = small;
+    f.largeSet = big->facesSet();
+    f.smallSet = small->facesSet();
+    f.largeSize = bigSize;
+    f.smallSize = smallSize;
+    f.lines.clear();
+    // As the game draws it when that fits: one line within the width, or (a box with room for
+    // more lines) its lines within the width and the height.
+    const int lineH = p.fontHeight(w.largeFont);
+    const int smallH = p.fontHeight(false);
+    if (w.text.empty() || p.textWidth(w.text, w.largeFont) <= width) {
+        f.mode = Mode::AsDrawn;
+        return f;
+    }
+    const int lines = p.textHeight(w.text, w.largeFont, width) / std::max(lineH, 1);
+    if (lines > 1 && lines * lineH <= height && p.wrappedWidth(w.text, w.largeFont, width) <= width) {
+        f.mode = Mode::AsDrawn;
+        return f;
+    }
+    // Else the small font: on one line when it fits; wrapped when the box has room for its lines;
+    // else the lines the box has room for.
+    if (w.largeFont && p.textWidth(w.text, false) <= width) {
+        f.mode = Mode::SmallLine;
+        return f;
+    }
+    f.lines = small->wrap(w.text, smallSize, static_cast<float>(width) * p.scale());
+    const auto rows = static_cast<std::size_t>(std::max(1, height / std::max(smallH, 1)));
+    f.mode = f.lines.size() <= rows ? Mode::SmallWrapped : Mode::SmallClipped;
+    if (f.lines.size() > rows) {
+        f.lines.resize(rows);
+    }
+    return f;
+}
+
 void Gui::drawByType(Window& w, Painter& p)
 {
     const SDL_Point pos = w.screenPos();
@@ -637,9 +694,31 @@ void Gui::drawByType(Window& w, Painter& p)
     const Color textColor = dim ? kDimText : w.textColor;
     const Color edgeColor = dim && !w.enabledColor.transparent ? kDimEdge : w.enabledColor; // (none stays none)
 
+    // (noxcpp) A text that doesn't fit its box as the game draws it (fitText): the small font on
+    // one line, or its lines, the block centred up and down in the box; from `left`, or centred in
+    // `across` units from it.
+    const auto fallbackText = [&](const Window::TextFit& f, int left, int across, bool centred) {
+        using Mode = Window::TextFit::Mode;
+        const int fh = p.fontHeight(false);
+        if (f.mode == Mode::SmallLine) {
+            const int tw = centred ? p.textWidth(w.text, false) : 0;
+            p.text(w.text, centred ? left + across / 2 - tw / 2 : left, y + height / 2 - fh / 2, false, textColor);
+            return;
+        }
+        int ty = y + std::max(0, (height - static_cast<int>(f.lines.size()) * fh) / 2);
+        for (const std::string& line : f.lines) {
+            const int tw = centred ? p.textWidth(line, false) : 0;
+            p.text(line, centred ? left + across / 2 - tw / 2 : left, ty, false, textColor);
+            ty += fh;
+        }
+    };
     // Text centred in the window (the buttons' wndButtonDrawNoImg), or in its first `across` units.
     const auto centredText = [&](int across) {
         if (w.text.empty()) {
+            return;
+        }
+        if (const auto& f = fitText(w, p, across, height); f.mode != Window::TextFit::Mode::AsDrawn) {
+            fallbackText(f, x, across, true);
             return;
         }
         const int tw = p.textWidth(w.text, w.largeFont);
@@ -734,13 +813,26 @@ void Gui::drawByType(Window& w, Painter& p)
         if (!w.text.empty()) {
             const int fh = p.fontHeight(w.largeFont);
             if (check) {
-                p.text(w.text, x + 20, y + height / 2 - fh / 2, w.largeFont, textColor, width);
+                // (noxcpp: one that doesn't fit the box as the game draws it, fitText's way)
+                if (const auto& f = fitText(w, p, width, height); f.mode != Window::TextFit::Mode::AsDrawn) {
+                    fallbackText(f, x + 20, width, false);
+                } else {
+                    p.text(w.text, x + 20, y + height / 2 - fh / 2, w.largeFont, textColor, width);
+                }
             } else if (w.radioValue == 0 && w.labelLeft > 0) {
                 const int room = width - w.labelLeft;
+                if (const auto& f = fitText(w, p, room, height); f.mode != Window::TextFit::Mode::AsDrawn) {
+                    fallbackText(f, x + w.labelLeft, room, true); // (noxcpp: as a check box's)
+                    return;
+                }
                 const int tw = std::min(p.textWidth(w.text, w.largeFont), room);
                 p.text(w.text, x + w.labelLeft + (room - tw) / 2, y + (height - fh) / 2, w.largeFont, textColor, room);
             } else if (w.radioValue == 0) {
-                p.text(w.text, x + 28, y + (height - fh) / 2, w.largeFont, textColor, width);
+                if (const auto& f = fitText(w, p, width, height); f.mode != Window::TextFit::Mode::AsDrawn) {
+                    fallbackText(f, x + 28, width, false); // (noxcpp: as a check box's)
+                } else {
+                    p.text(w.text, x + 28, y + (height - fh) / 2, w.largeFont, textColor, width);
+                }
             } else {
                 centredText(width);
             }
@@ -777,6 +869,11 @@ void Gui::drawByType(Window& w, Painter& p)
         // The wrapped block centred up and down.
         const bool centre = data && data->center;
         const bool glow = data && data->glow;
+        // (noxcpp: one that doesn't fit the box as the game draws it, fitText's way)
+        if (const auto& f = fitText(w, p, width, height); f.mode != Window::TextFit::Mode::AsDrawn) {
+            fallbackText(f, centre ? x : x + 2, width, centre);
+            return;
+        }
         const auto drawText = [&](const std::string& t, int tx, int ty) {
             if (glow && !dim) {
                 for (const auto& [dx, dy] : {std::pair{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}) {

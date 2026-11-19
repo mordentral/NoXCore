@@ -6,6 +6,7 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/map/xfer.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/thing_db.hpp"
 
@@ -30,23 +31,26 @@ void writeS8(ByteWriter& w, const std::string& s)
     w.rawString(s);
 }
 
-/// u8 character count, then UTF-16LE.
+/// u8 character count, then UTF-16LE (a name), read as Unicode: strings::fromWire, a Russian
+/// install's Windows-1251 bytes (what its game stores) as Cyrillic.
 std::u16string readW8(ByteReader& r)
 {
     std::u16string s(r.u8(), u'\0');
     for (auto& c : s) {
         c = static_cast<char16_t>(r.u16());
     }
+    strings::fromWireInPlace(s);
     return s;
 }
 
+/// The reverse: written as that install's game stores it (strings::toWire; as it is elsewhere).
 void writeW8(ByteWriter& w, const std::u16string& s)
 {
     if (s.size() > 0xFF) {
         throw FormatError(".plr: name too long");
     }
     w.u8(static_cast<std::uint8_t>(s.size()));
-    for (auto c : s) {
+    for (auto c : strings::toWire(s)) {
         w.u16(static_cast<std::uint16_t>(c));
     }
 }

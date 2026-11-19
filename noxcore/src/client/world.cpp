@@ -34,8 +34,9 @@ float f32At(std::span<const std::uint8_t> m, std::size_t off)
     return std::bit_cast<float>(u32At(m, off));
 }
 
-// A zero-terminated UTF-16LE string of at most `chars` characters, returned as UTF-8.
-std::string utf16At(std::span<const std::uint8_t> m, std::size_t off, std::size_t chars)
+// A zero-terminated UTF-16LE string of at most `chars` characters, returned as UTF-8 (as Unicode:
+// strings::fromWire, a Russian install's Windows-1251 bytes as Cyrillic).
+std::string utf16At(std::span<const std::uint8_t> m, std::size_t off, std::size_t chars, strings::LegacyText text)
 {
     std::u16string s;
     for (std::size_t i = 0; i < chars && off + 2 * i + 1 < m.size(); ++i) {
@@ -45,6 +46,19 @@ std::string utf16At(std::span<const std::uint8_t> m, std::size_t off, std::size_
         }
         s.push_back(c);
     }
+    strings::fromWireInPlace(s, text);
+    return strings::toUtf8(s);
+}
+
+// A zero-terminated 8-bit text of at most `n` bytes, each byte a character as the game widens it
+// (zero-extended, then strings::fromWire), returned as UTF-8.
+std::string narrowAt(std::span<const std::uint8_t> m, std::size_t off, std::size_t n, strings::LegacyText text)
+{
+    std::u16string s;
+    for (std::size_t i = 0; i < n && off + i < m.size() && m[off + i] != 0; ++i) {
+        s.push_back(static_cast<char16_t>(m[off + i]));
+    }
+    strings::fromWireInPlace(s, text);
     return strings::toUtf8(s);
 }
 
@@ -507,7 +521,7 @@ void World::team(std::span<const std::uint8_t> m)
         t.id = u32At(m, 2);
         t.score = u32At(m, 10);
         t.color = m[16];
-        t.name = utf16At(m, 18, m[15]);
+        t.name = utf16At(m, 18, m[15], linkText());
         break;
     }
     case 0x01: // add member
@@ -538,7 +552,7 @@ void World::team(std::span<const std::uint8_t> m)
         break;
     }
     case 0x04:
-        teams_[u32At(m, 2)].name = utf16At(m, 6, 20);
+        teams_[u32At(m, 2)].name = utf16At(m, 6, 20, linkText());
         break;
     case 0x05:
         teams_[u32At(m, 2)].members.clear();
@@ -628,7 +642,7 @@ void World::apply(std::span<const std::uint8_t> m, std::uint32_t frame)
     case Op::NewPlayer: {
         PlayerEntry& p = players_[u16At(m, 1)];
         p.netCode = u16At(m, 1);
-        p.name = utf16At(m, 3, 25);
+        p.name = utf16At(m, 3, 25, linkText());
         p.playerClass = m[69];
         p.female = m[70] != 0;
         std::memcpy(p.colors.data(), m.data() + 71, p.colors.size());
@@ -1468,13 +1482,14 @@ void World::chatText(std::span<const std::uint8_t> m, std::uint32_t frame)
         b.order = bubbleOrder_++;
     }
     const std::size_t size = m[8];
-    if (flags & (kNarrow | kStringId)) {
-        b.text = asciiAt(m, 11, size);
-        if (flags & kStringId) {
-            b.text = "[" + b.text + "]";
-        }
+    if (flags & kStringId) {
+        b.text = "[" + asciiAt(m, 11, size) + "]";
+    } else if (flags & kNarrow) {
+        // (Each byte a character, zero-extended as the game's "%S" has it: U+0080-U+00FF are
+        // Latin-1's, or a Russian install's Windows-1251 letters; not UTF-8.)
+        b.text = narrowAt(m, 11, size, linkText());
     } else {
-        b.text = utf16At(m, 11, size);
+        b.text = utf16At(m, 11, size, linkText());
     }
     b.x = u16At(m, 4);
     b.y = u16At(m, 6);
@@ -1516,7 +1531,7 @@ void World::tradeMessage(std::span<const std::uint8_t> m)
         t = TradeState{};
         t.kind = TradeState::Kind::Player;
         if (m[1] == 0x0C) {
-            t.partner = utf16At(m, 2, 25);
+            t.partner = utf16At(m, 2, 25, linkText());
         }
         break;
     case 0x08: // shop: add item (typeId, netCode, price, durability, modifiers)
@@ -1535,7 +1550,7 @@ void World::tradeMessage(std::span<const std::uint8_t> m)
         t.repairOfferCount = counts[2];
         t.kind = TradeState::Kind::Shop;
         t.shopkeeperType = u16At(m, 2);
-        t.partner = utf16At(m, 4, 25);
+        t.partner = utf16At(m, 4, 25, linkText());
         t.greeting = asciiAt(m, 54, 32);
         break;
     }
@@ -1562,7 +1577,7 @@ void World::dialogMessage(std::span<const std::uint8_t> m)
     if (m[1] == 0x03) { // open: textId, title, sound, portrait, flags
         dialog_.open = true;
         dialog_.textId = asciiAt(m, 2, 32);
-        dialog_.title = utf16At(m, 34, 32);
+        dialog_.title = utf16At(m, 34, 32, linkText());
         dialog_.sound = u32At(m, 98);
         dialog_.portrait = asciiAt(m, 102, 32);
         dialog_.flags = m[134];

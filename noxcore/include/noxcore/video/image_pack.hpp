@@ -25,7 +25,7 @@
 //     u32 namesSize
 //     u32 sourceImages     video.idx's image count when built (0 if unknown)
 //     u32 sourceIdxCrc     CRC-32 of the video.idx it was built from (0 if unknown)
-//     u32 flags            0
+//     u32 flags            kPackSourceKeys: the entries carry sourceKey; else 0
 //     u8[16] reserved
 //   image data: each image's stored bytes, anywhere after the header
 //   names, then the index (the writer streams the data and ends with these)
@@ -46,7 +46,15 @@
 //     u8  codec            kCodecStored, kCodecZstd, kCodecZstdGradient or kCodecBc7
 //     u16 flags            kEntryPresent
 //     u8  levels           kCodecBc7: the colour mip levels stored (level 0 included); else 0
-//     u8[7] reserved
+//     u32 sourceKey        with kPackSourceKeys: the video.idx entry the slot was made from
+//                          (bagSourceKey: its name, type and sizes), 0 if unknown; else 0
+//     u8[3] reserved
+//
+//   A pack whose sourceIdxCrc isn't the game's video.idx's (a mod's or a translation's changed
+//   images) is refused as a whole, unless it has source keys: then each slot whose key differs
+//   from the game's image there is drawn from video.bag and the rest from the pack (noxsdl's
+//   SpriteCache::setPack). The keys see a redraw by its sizes, which a picture redrawn with other
+//   words almost always changes; a floor tile (always the same size) can't be told.
 //
 //   raw bytes (pixelWidth x pixelHeight = n): planar, R[n] G[n] B[n] A[n] (straight alpha), then
 //   material[n] if kPlaneMaterial (0 plain colour, k = material slot k - 1: those pixels hold a
@@ -97,6 +105,11 @@ inline constexpr std::uint8_t kCodecZstd = 1;
 inline constexpr std::uint8_t kCodecZstdGradient = 2;
 inline constexpr std::uint8_t kCodecBc7 = 3;
 inline constexpr std::uint16_t kEntryPresent = 1;
+inline constexpr std::uint32_t kPackSourceKeys = 1; ///< header flag: the entries carry sourceKey
+
+/// A video.idx entry's fingerprint (FNV-1a over its name, type and the image's 16- and 8-bit
+/// sizes; never 0): what a slot's sourceKey holds.
+std::uint32_t bagSourceKey(std::string_view name, std::uint8_t type, std::uint32_t size16, std::uint32_t size8);
 
 /// One BC7 mip level: its size in pixels, padded to whole 4x4 blocks, and where its blocks start
 /// in the entry's raw bytes.
@@ -159,6 +172,7 @@ struct PackEntry {
     std::uint8_t codec = 0;
     std::uint16_t flags = 0;
     std::uint8_t levels = 0; ///< kCodecBc7: mip levels stored
+    std::uint32_t sourceKey = 0; ///< the video.idx entry it was made from (bagSourceKey), 0 unknown
 
     bool present() const { return (flags & kEntryPresent) != 0; }
 };
@@ -188,6 +202,8 @@ public:
     std::uint32_t size() const { return static_cast<std::uint32_t>(entries_.size()); }
     std::uint32_t sourceImages() const { return sourceImages_; }
     std::uint32_t sourceIdxCrc() const { return sourceIdxCrc_; }
+    /// Whether its entries carry sourceKey (kPackSourceKeys).
+    bool sourceKeys() const { return (flags_ & kPackSourceKeys) != 0; }
     const PackEntry& entry(std::size_t index) const { return entries_.at(index); }
     std::string_view name(std::size_t index) const;
 
@@ -215,6 +231,7 @@ private:
     std::unique_ptr<NameIndex> index_ = std::make_unique<NameIndex>(); ///< (find's)
     std::uint32_t sourceImages_ = 0;
     std::uint32_t sourceIdxCrc_ = 0;
+    std::uint32_t flags_ = 0;
 };
 
 /// Writes a pack: images in any order into their slots, then finish() writes the names and the
@@ -232,6 +249,9 @@ public:
     /// Copies a slot as stored: `entry` from another pack's index, `stored` its bytes.
     void putStored(std::uint32_t index, const PackEntry& entry, std::string_view name,
                    std::span<const std::uint8_t> stored);
+    /// A filled slot's sourceKey (bagSourceKey of the video.idx entry it was made from), after its
+    /// put (an empty slot's is ignored); any key set marks the pack kPackSourceKeys.
+    void setSourceKey(std::uint32_t index, std::uint32_t key);
 
     /// Writes the names and the index and closes the file. Throws std::system_error.
     void finish();

@@ -151,7 +151,14 @@ struct ClientSecret {
 ///      nox.thing's size, windows the size of the whole view and cover), a UI of it sent
 ///      only to a client of level 11 or above that named ModeUi and ModeUi2 (ui_proto.hpp's
 ///      kUiApi6Level); any other gets the views as text
-inline constexpr std::uint16_t kClientLevel = 11;
+///  12  the game's text as real Unicode (kUnicodeTextLevel): a host of level 12 or above sends a
+///      client of level 12 or above every name and line as it is (UTF-16), and reads that client's
+///      names and lines so, whatever either's install keeps for the original game (a Russian fan
+///      translation's Windows-1251 bytes: strings::LegacyText); any other client gets and is read
+///      in the host's convention, as a stock client
+inline constexpr std::uint16_t kClientLevel = 12;
+/// The client level whose game text goes as real Unicode both ways (kClientLevel's list, 12).
+inline constexpr std::uint16_t kUnicodeTextLevel = 12;
 /// The client level whose map downloads take the fast send (kClientLevel's list, 4).
 inline constexpr std::uint16_t kFastMapSendLevel = 4;
 /// What a client below a server's lowest level is told (the browser's prompt too), word for word.

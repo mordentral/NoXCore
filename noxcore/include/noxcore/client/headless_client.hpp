@@ -222,6 +222,13 @@ public:
     /// most every 8 ms), so the server's next frame takes the newest. One-off controls (attacks,
     /// jumps, spells) keep to the input frames, and walking to a point steers on them as before.
     void setFreshInput(bool on) { freshInput_ = on; }
+    /// noxcpp: the host is a NoX Core one of lobby::kUnicodeTextLevel (its extended reply said so,
+    /// before our join): our name and lines go to it as real Unicode and its come back so;
+    /// otherwise (a stock host, an older one) in our install's convention (strings::wireText).
+    void setUnicodeLink(bool on);
+    bool unicodeLink() const { return unicodeLink_; }
+    /// The convention text crosses our link in.
+    strings::LegacyText linkText() const;
 
     /// noxcpp's map vote (server/map_vote.hpp), as a noxcpp server last told us
     /// (MSG_NOXCPP_MAPVOTE 0xF3; a stock server never sends it).
@@ -563,6 +570,7 @@ private:
     Stage stage_ = Stage::Idle;
     net::AliasTable aliases_;
     World world_;
+    bool unicodeLink_ = false; ///< setUnicodeLink's
     std::uint32_t frame_ = 0;
     std::uint16_t netCode_ = 0;
     std::string mapName_;

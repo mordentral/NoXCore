@@ -613,6 +613,9 @@ void readAttrib(Load& L, ByteReader& r)
     for (auto& c : name) {
         c = static_cast<char16_t>(r.u16());
     }
+    // (noxcpp: as Unicode, both: the file's in the host's convention, a Russian install's
+    // Windows-1251; the info goes to each client as it takes text: GameHost::textFor)
+    strings::fromWireInPlace(name);
     p.name = name; // (the info's, and Player->name)
     std::fill_n(p.info.begin() + kName, 50, std::uint8_t{0});
     for (std::size_t i = 0; i < name.size(); ++i) {

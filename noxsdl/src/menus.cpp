@@ -2275,15 +2275,20 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
 
     // The file name: sprintf("%.6s%2.2d.plr") given the wide name, so its UTF-16 bytes up to
     // the first zero one (for most names, the first letter), then the first free number.
+    // (noxcpp: of the name as the game stores it, strings::toWire, and each byte back as the
+    // character it is there: a Russian install's "П" gives "П00.plr", as its game's does on a
+    // Russian Windows; elsewhere as before.)
     std::u16string stem;
+    const std::u16string stored = nox::strings::toWire(name);
     // The name's UTF-16 bytes, low then high, up to the first zero byte (6 at most).
-    for (std::size_t i = 0; i < name.size() * 2 && stem.size() < 6; ++i) {
-        const auto byte = static_cast<char16_t>(i % 2 == 0 ? name[i / 2] & 0xFF : name[i / 2] >> 8);
+    for (std::size_t i = 0; i < stored.size() * 2 && stem.size() < 6; ++i) {
+        const auto byte = static_cast<char16_t>(i % 2 == 0 ? stored[i / 2] & 0xFF : stored[i / 2] >> 8);
         if (byte == 0) {
             break;
         }
         stem.push_back(byte);
     }
+    nox::strings::fromWireInPlace(stem);
     std::error_code ec;
     std::filesystem::create_directories(saveDir_, ec);
     if (ec) {
@@ -2303,7 +2308,11 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
         characterSaveFailed(saveDir_, "No free character filename (all 100 slots used)");
         return std::nullopt;
     }
-    info.savePath = path.string();
+    // (A Russian install's path as its game's 8-bit text: path.string() would need Windows' own
+    // code page to hold the Cyrillic.)
+    info.savePath = nox::strings::wireCodepage() == nox::strings::LegacyCodepage::Cp1251
+                        ? nox::strings::utf8ToWire8(reinterpret_cast<const char*>(path.u8string().c_str()))
+                        : path.string();
 
     // The client sections, as the exe writes them for a new character: the spell bars (one of
     // the class's starting sets at random, the set picker with 0, from the class screen; for a

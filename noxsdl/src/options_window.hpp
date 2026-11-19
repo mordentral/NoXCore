@@ -74,8 +74,10 @@ public:
         /// Not shown here: how the game text's U+0080-U+00FF are drawn (noxcore.cfg's CsfText =
         /// auto, latin1 or cp1251; kCsfText*): auto as nox.csf's letters say
         /// (nox::strings::guessLegacyCodepage), cp1251 as the Russian fan translations' fonts draw
-        /// them, latin1 as themselves.
+        /// them, latin1 as themselves. `cp1251:N` also forces the letters' shift (0-63,
+        /// nox::strings::LegacyText::shift; csfShift, -1: as nox.csf's letters say).
         int csfText = kCsfTextAuto;
+        int csfShift = -1;
         static constexpr int kCsfTextAuto = 0;
         static constexpr int kCsfTextLatin1 = 1;
         static constexpr int kCsfTextCp1251 = 2;

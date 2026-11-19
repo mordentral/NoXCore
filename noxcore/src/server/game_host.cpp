@@ -67,19 +67,6 @@ void copyText(std::array<std::uint8_t, N>& to, std::string_view text)
     std::memcpy(to.data(), text.data(), std::min(text.size(), N - 1));
 }
 
-// A UTF-16LE name, up to its NUL, as ASCII (other letters as '?').
-std::string nameOf(std::span<const std::uint8_t> wide)
-{
-    std::string out;
-    for (std::size_t i = 0; i + 1 < wide.size(); i += 2) {
-        const char16_t c = static_cast<char16_t>(wide[i] | wide[i + 1] << 8);
-        if (c == 0) {
-            break;
-        }
-        out += c < 0x80 ? static_cast<char>(c) : '?';
-    }
-    return out;
-}
 
 // UTF-16LE bytes up to the first NUL.
 using util::utf16Until;
@@ -320,7 +307,7 @@ void GameHost::refreshServerInfo()
     info.videoFlags = access_.limitResolution ? 0x80 : 0;
     info.pingMin = static_cast<std::uint16_t>(access_.minPing ? *access_.minPing : 0xFFFF); // (a u16 field, as the transport's)
     info.pingMax = static_cast<std::uint16_t>(access_.maxPing ? *access_.maxPing : 0xFFFF);
-    const auto name = options_.serverName.substr(0, 15);
+    const auto name = strings::utf8ToWire8(strings::fitWire8(options_.serverName, 15)); // (the original's 8-bit text)
     info.serverName.assign(name.begin(), name.end());
     info.serverName.push_back(0);
     transport_.setServerInfo(info);
@@ -333,7 +320,7 @@ lobby::GameListing GameHost::listing()
     // Access settings (closed, private, the classes refused, the ping limits).
     World& world = server_.world();
     lobby::GameListing g;
-    g.name = options_.serverName.substr(0, 15);
+    g.name = strings::fitWire8(options_.serverName, 15); // (UTF-8; makeWolRecord writes its 8-bit form)
     g.map = std::filesystem::path(world.mapName).stem().string();
     g.players = static_cast<int>(players_.size());
     g.maxPlayers = options_.maxPlayers;
@@ -540,7 +527,8 @@ void GameHost::syncClasses()
         const auto bytes = bytesOf(told);
         for (const auto& [other, q] : players_) {
             if (other == peer || q.joined) {
-                transport_.sendReliable(other, bytes);
+                const auto text = textFor(other, bytes); // (noxcpp: its name as the client takes it)
+                transport_.sendReliable(other, text ? std::span<const std::uint8_t>(*text) : std::span<const std::uint8_t>(bytes));
             }
         }
     }
@@ -627,7 +615,11 @@ void GameHost::afterFrame()
             for (const auto& b : broadcasts) {
                 if (b.reliable && (b.to == p.extent || (b.to == 0 && p.joined))) {
                     auto other = forPeer ? options_.forPeer(*this, peer, b.bytes) : std::nullopt;
-                    p.pending.push_back({other ? std::move(*other) : b.bytes, false});
+                    std::vector<std::uint8_t> bytes = other ? std::move(*other) : b.bytes;
+                    if (auto text = textFor(peer, bytes)) {
+                        bytes = std::move(*text); // (noxcpp: its text as the client takes it)
+                    }
+                    p.pending.push_back({std::move(bytes), false});
                 }
             }
         }
@@ -679,7 +671,8 @@ void GameHost::afterFrame()
             // seconds before going on.
             for (const auto& b : broadcasts) {
                 if (!b.reliable && (b.to == 0 || b.to == p.extent)) {
-                    transport_.sendUnreliable(peer, b.bytes);
+                    const auto text = textFor(peer, b.bytes); // (noxcpp: its text as the client takes it)
+                    transport_.sendUnreliable(peer, text ? std::span<const std::uint8_t>(*text) : std::span<const std::uint8_t>(b.bytes));
                 }
             }
             transport_.sendUnreliable(peer, std::vector<std::uint8_t>{static_cast<std::uint8_t>(net::Op::Timestamp),
@@ -691,18 +684,21 @@ void GameHost::afterFrame()
             continue;
         }
         const auto send = [&](const World::Broadcast& b) {
+            // (noxcpp: its text as the client takes it, textFor)
+            const auto text = textFor(peer, b.bytes);
+            const std::span<const std::uint8_t> bytes = text ? std::span<const std::uint8_t>(*text) : std::span<const std::uint8_t>(b.bytes);
             if (b.reliable) {
                 bool queued = false;
-                if (auto other = forPeer ? options_.forPeer(*this, peer, b.bytes) : std::nullopt) {
+                if (auto other = forPeer ? options_.forPeer(*this, peer, bytes) : std::nullopt) {
                     queued = transport_.sendReliable(peer, std::move(*other));
                 } else {
-                    queued = transport_.sendReliable(peer, b.bytes);
+                    queued = transport_.sendReliable(peer, bytes);
                 }
                 if (b.to == p.extent) {
                     secondaryTellQueued(p, b.bytes, queued); // (noxcpp: a read's tell's packet)
                 }
             } else {
-                transport_.sendUnreliable(peer, b.bytes);
+                transport_.sendUnreliable(peer, bytes);
             }
         };
         releasePending(p); // (released at its CLIENT_READY already: what's left, none)
@@ -1608,7 +1604,7 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
             break;
         case net::Op::ServerCmd: // (0xBB) {cmd, u16 its code, u8 chars, UTF-16 text}
             if (m.size() >= 5) {
-                onServerCmd(peer, m[1], utf16Until(m.subspan(5)));
+                onServerCmd(peer, m[1], strings::fromWire(utf16Until(m.subspan(5)), peerText(peer))); // (noxcpp: as Unicode)
             }
             break;
         case net::Op::SysopPw: // (0xBC) the password, UTF-16
@@ -2289,6 +2285,7 @@ void GameHost::onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> se
         while (!text.empty() && text.front() == u' ') {
             text.erase(text.begin());
         }
+        strings::fromWireInPlace(text, peerText(peer)); // (noxcpp: read as Unicode)
         // (noxcpp, a mode's: an answer of its own taken, not relayed.)
         if (options_.onChat && !text.empty() && options_.onChat(*this, peer, text)) {
             return;
@@ -2301,8 +2298,20 @@ void GameHost::onTextMessage(std::uint8_t peer, std::span<const std::uint8_t> se
         }
     }
     World& world = server_.world();
+    // (noxcpp: on a host whose convention isn't Latin-1, each gets the line as it takes text: a
+    // stock client's line as it came to the other stock clients, in Unicode to NoX Core ones
+    // (textFromStock); a NoX Core one's in Unicode to them, recoded for stock ones (textFor).
+    // Elsewhere everyone gets it as it came.)
+    const bool fromStock = !unicodePeer(peer);
+    const auto unicodeLine = fromStock ? World::textFromStock(m, strings::wireText()) : std::nullopt;
     const auto relay = [&](std::uint8_t to) {
-        transport_.sendUnreliable(to, m);
+        std::optional<std::vector<std::uint8_t>> recoded;
+        if (unicodePeer(to)) {
+            recoded = unicodeLine;
+        } else if (!fromStock) {
+            recoded = textFor(to, m);
+        }
+        transport_.sendUnreliable(to, recoded ? std::span<const std::uint8_t>(*recoded) : m);
         transport_.flushUnreliable(to);
     };
     const ServerObject* sender = world.byExtent(players_[peer].extent);
@@ -2366,7 +2375,9 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     }
     // Kicked by a vote: not back for its 15 minutes; banned from the console: not back (the ban
     // list, by name).
-    if (const auto ban = bans_.find(utf16Until(accept.playerName)); ban != bans_.end()) {
+    // (noxcpp: its name as Unicode, read as its client sends it: GameHost::peerText)
+    const std::u16string joinName = strings::fromWire(utf16Until(accept.playerName), peerText(peer));
+    if (const auto ban = bans_.find(joinName); ban != bans_.end()) {
         if (ban->second == 0xFFFFFFFFu || static_cast<std::int32_t>(ban->second - nowMs_) > 0) {
             transport_.close(peer);
             return;
@@ -2401,7 +2412,15 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     if (forced) {
         p.info[0x42] = *forced;
     }
-    p.name = nameOf(accept.playerName);
+    // (noxcpp: its name kept as Unicode, in the info too, which goes to each client as it takes
+    // text: textFor; in UTF-8 for the console, the logs and the ban list)
+    p.wideName = joinName;
+    p.name = strings::toUtf8(joinName);
+    for (std::size_t i = 0; i < 25; ++i) {
+        const char16_t c = i < joinName.size() && i < 24 ? joinName[i] : u'\0';
+        p.info[2 * i] = static_cast<std::uint8_t>(c);
+        p.info[2 * i + 1] = static_cast<std::uint8_t>(c >> 8);
+    }
     p.slot = options_.solo ? std::uint8_t{0x1F} : static_cast<std::uint8_t>((peer - 1) & 31); // (a solo game's player the host's)
     if (options_.solo && options_.soloGuests > 0 && !awaitingHost_) {
         // (noxcpp: a solo game's guest, Options::soloGuests: the lowest slot no player has, below
@@ -2441,7 +2460,7 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     unit.player->viewHalfWidth = p.viewHalfWidth;
     unit.player->viewHalfHeight = p.viewHalfHeight;
     unit.player->index = p.slot;
-    unit.player->name = utf16Until(accept.playerName);
+    unit.player->name = joinName; // (noxcpp: as Unicode)
     unit.player->info = p.info; // (the join's PlayerInfo, the .plr's Attrib)
     unit.player->ownClass = ownClass;
     // noxcpp: a mode's multiclass, a noxsdl player's alone (its client asked the extended
@@ -2519,7 +2538,10 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     newPlayer.playerInfo = p.info;
     newPlayer.accountName = accept.account;
     const auto announce = bytesOf(newPlayer);
-    append(first, announce);
+    {
+        const auto text = textFor(peer, announce); // (noxcpp: its name as its client takes it)
+        append(first, text ? *text : announce);
+    }
     transport_.sendReliable(peer, first);
     transport_.sendReliable(peer, useMapBytes(frame, soloGuest(p)));
 
@@ -3016,11 +3038,11 @@ void GameHost::onVote(std::uint8_t peer, std::span<const std::uint8_t> m)
     if (sub > 3 || m.size() < 0x34) {  // (+2: the name, 25 UTF-16 letters; 0x34 = 2 + 50)
         return;
     }
-    const std::u16string name = utf16Until(m.subspan(2, 50));
+    const std::u16string name = strings::fromWire(utf16Until(m.subspan(2, 50)), peerText(peer)); // (noxcpp: as Unicode)
     // The player of that name (_wcscmp), not itself.
     HostedPlayer* target = nullptr;
     for (auto& [other, p] : players_) {
-        if (utf16Until(p.accept.playerName) == name) {
+        if (p.wideName == name) {
             target = &p;
             break;
         }
@@ -3131,7 +3153,7 @@ void GameHost::updateVotes()
             questSaveAndKick(f, *unit);
             for (auto& [peer, p] : players_) {
                 if (p.extent == v.target) {
-                    bans_[utf16Until(p.accept.playerName)] = nowMs_ + 15u * 60000u; // (banned for 15 minutes)
+                    bans_[p.wideName] = nowMs_ + 15u * 60000u; // (banned for 15 minutes)
                     syncAccess();
                 }
             }
@@ -3160,7 +3182,7 @@ void GameHost::updateVotes()
                 }
                 for (auto& [peer, p] : players_) {
                     if (p.extent == target) {
-                        bans_[utf16Until(p.accept.playerName)] = nowMs_ + 15u * 60000u; // (banned for 15 minutes)
+                        bans_[p.wideName] = nowMs_ + 15u * 60000u; // (banned for 15 minutes)
                         syncAccess();
                         const std::uint8_t kicked = peer;
                         disconnect(kicked, 4); // (Plr_DisconnectByIndex, reason 4)
@@ -3350,7 +3372,7 @@ bool sameIgnoringCase(const S& a, const S& b)
 void GameHost::setServerName(const std::string& name)
 {
     // gameSetServername: 15 letters at most; the same but for case, kept as it was.
-    const std::string n = name.substr(0, 15);
+    const std::string n = strings::fitWire8(name, 15); // (15 bytes as the wire carries them)
     if (!n.empty() && !sameIgnoringCase(n, options_.serverName)) {
         options_.serverName = n;
         settingsChanged_ = true;
@@ -4037,8 +4059,32 @@ void GameHost::loadNextMap()
     server_.world().removed().clear();
 }
 
+bool GameHost::unicodePeer(std::uint8_t peer) const
+{
+    return transport_.clientLevel(peer) >= lobby::kUnicodeTextLevel;
+}
+
+strings::LegacyText GameHost::peerText(std::uint8_t peer) const
+{
+    return unicodePeer(peer) ? strings::LegacyText{} : strings::wireText();
+}
+
+std::optional<std::vector<std::uint8_t>> GameHost::textFor(std::uint8_t peer, std::span<const std::uint8_t> m) const
+{
+    // (noxcpp: the messages are made in Unicode; only a host whose convention isn't Latin-1 has
+    // anything to change, for a client that isn't a NoX Core one of kUnicodeTextLevel.)
+    const strings::LegacyText text = strings::wireText();
+    if (text.plain() || unicodePeer(peer)) {
+        return std::nullopt;
+    }
+    return World::textForStock(m, text);
+}
+
 void GameHost::sendImportant(std::uint8_t peer, std::vector<std::uint8_t> bytes, bool onlyJoined)
 {
+    if (auto t = textFor(peer, bytes)) {
+        bytes = std::move(*t); // (noxcpp: its text as the client takes it)
+    }
     // (netImportant returns at once for a player without status 0x10: its
     // messages stay queued, oldest first, till its CLIENT_READY's frame; an onlyJoined one is
     // dropped then for a player not in the game.)
@@ -4061,12 +4107,14 @@ void GameHost::sendImportantToAll(std::span<const std::uint8_t> bytes, bool only
         if (except && peer == *except) {
             continue;
         }
+        const auto text = textFor(peer, bytes); // (noxcpp: its text as the client takes it)
+        const std::span<const std::uint8_t> m = text ? std::span<const std::uint8_t>(*text) : bytes;
         if (p.ready) {
             if (!onlyJoined || p.joined) {
-                transport_.sendReliable(peer, bytes);
+                transport_.sendReliable(peer, m);
             }
         } else if (p.joined) {
-            p.pending.push_back({std::vector<std::uint8_t>(bytes.begin(), bytes.end()), onlyJoined});
+            p.pending.push_back({std::vector<std::uint8_t>(m.begin(), m.end()), onlyJoined});
         }
     }
 }
@@ -4223,9 +4271,13 @@ void strncpyAt(GameHost::SettingsRecord& r, std::size_t at, std::string_view s, 
     }
 }
 
-/// "%S" of a wide field: its letters as bytes (the C locale's: past 0x7F, '?').
+/// "%S" of a wide field: its letters as bytes (the C locale's: past 0x7F, '?'). (noxcpp: a Russian
+/// install's Cyrillic as its Windows-1251 bytes, as that install's game has them.)
 std::string narrow(std::string_view utf8)
 {
+    if (strings::wireCodepage() != strings::LegacyCodepage::Latin1) {
+        return strings::utf8ToWire8(utf8);
+    }
     std::string out;
     for (const char16_t c : strings::fromUtf8(std::string(utf8))) {
         out += c < 0x80 ? static_cast<char>(c) : '?';
@@ -4365,7 +4417,7 @@ void GameHost::refreshSettingsSlot0(bool allOn)
     if (const auto time = static_cast<std::uint8_t>(world.timeLimits[mode]); s[0x38] != time) {
         s[0x38] = time;
     }
-    const std::string name = options_.serverName;
+    const std::string name = strings::utf8ToWire8(options_.serverName); // (the original's 8-bit text)
     if (cStringAt(s, 9).substr(0, 15) != name) {
         strncpyAt(s, 9, name, 15);
     }

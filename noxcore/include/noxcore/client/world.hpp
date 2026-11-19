@@ -10,6 +10,7 @@
 #include "noxcore/client/sight.hpp"
 #include "noxcore/net/fx.hpp"
 #include "noxcore/net/update_stream.hpp"
+#include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
 #include <array>
@@ -558,6 +559,9 @@ public:
     const GameState& game() const noexcept { return game_; }
     const TradeState& trade() const noexcept { return trade_; }
     const DialogState& dialog() const noexcept { return dialog_; }
+    /// noxcpp: names and lines come as real Unicode (HeadlessClient::setUnicodeLink); otherwise in
+    /// our install's convention (strings::wireText), read as Unicode as they come.
+    void setUnicodeLink(bool on) noexcept { unicodeLink_ = on; }
     /// Chat bubbles by speaker net code. Expired ones linger until the next line arrives; check
     /// `expires` against the frame.
     const std::map<std::uint16_t, ChatBubble>& chatBubbles() const noexcept { return bubbles_; }
@@ -670,6 +674,9 @@ private:
     std::array<std::uint32_t, 2> settings2Extra_{};
     std::uint32_t rng_ = 0x4E6F78;    ///< the client's visual random numbers
     std::map<std::uint16_t, ChatBubble> bubbles_;
+    bool unicodeLink_ = false; ///< setUnicodeLink's
+    /// The convention names and lines come in: Unicode's (plain) on a Unicode link, else ours.
+    strings::LegacyText linkText() const { return unicodeLink_ ? strings::LegacyText{} : strings::wireText(); }
     std::vector<HealthFloater> floaters_;
     std::uint32_t bubbleOrder_ = 0; ///< the next new bubble's ChatBubble::order
 };

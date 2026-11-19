@@ -1675,6 +1675,16 @@ public:
     /// counts the end too).
     static std::vector<std::uint8_t> textMessage(std::u16string_view text, std::uint8_t flags);
     static constexpr std::size_t kMaxTextMessage = 254;
+    /// noxcpp: the text a message carries for the players, recoded for a stock client of a host
+    /// whose text convention isn't Latin-1 (a Russian fan translation's install: `text`; messages
+    /// are made in Unicode, and NoX Core clients of kUnicodeTextLevel take them so): MSG_TEXT_MESSAGE's
+    /// (but a string id's: 8-bit, then, when every unit fits a byte, else UTF-16), MSG_NEW_PLAYER's
+    /// name, MSG_TEAM_MSG 0's and 4's team name, MSG_TRADE 0x0C's and 0x0D's partner and
+    /// MSG_DIALOG 3's title (strings::toWire). nullopt: no text in it, or nothing to change.
+    static std::optional<std::vector<std::uint8_t>> textForStock(std::span<const std::uint8_t> m, strings::LegacyText text);
+    /// The reverse for a stock client's MSG_TEXT_MESSAGE (strings::fromWire), for those that take
+    /// Unicode. nullopt: nothing to change.
+    static std::optional<std::vector<std::uint8_t>> textFromStock(std::span<const std::uint8_t> m, strings::LegacyText text);
     /// `unit` says `text` to everyone (SrvNet_BroadcastUnitSay: MSG_TEXT_MESSAGE 0xA8
     /// with its net code, where it is and how long; a bubble over it).
     void unitSay(const ServerObject& unit, std::u16string_view text, std::uint16_t duration);

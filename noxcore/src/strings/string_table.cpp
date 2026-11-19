@@ -8,7 +8,10 @@
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
+#include <cmath>
+#include <limits>
 
 namespace nox::strings {
 
@@ -197,13 +200,15 @@ CodepageGuess guessLegacyCodepage(const StringTable& table)
         g.reason = "the header's language has the game's multibyte fonts";
         return g;
     }
+    std::array<std::size_t, 64> high{}; // (U+00C0-U+00FF, each: the shift's)
     for (const StringEntry& e : table.entries()) {
         for (const StringVariant& v : e.variants) {
             for (const char16_t c : v.text) {
                 if ((c >= u'A' && c <= u'Z') || (c >= u'a' && c <= u'z')) {
                     ++g.asciiLetters;
-                } else if (c >= 0xC0 && c <= 0xFF && c != 0xD7 && c != 0xF7) {
-                    ++g.highLetters;
+                } else if (c >= 0xC0 && c <= 0xFF) {
+                    ++high[c - 0xC0];
+                    g.highLetters += c != 0xD7 && c != 0xF7 ? 1 : 0;
                 } else if (c >= 0x400 && c <= 0x4FF) {
                     ++g.cyrillic;
                 }
@@ -211,6 +216,9 @@ CodepageGuess guessLegacyCodepage(const StringTable& table)
         }
     }
     const std::size_t letters = g.asciiLetters + g.highLetters;
+    if (g.highLetters >= kCp1251MinLetters) {
+        g.shift = cp1251Shift(high);
+    }
     if (g.cyrillic > 0) {
         g.reason = "it has real Cyrillic (Unicode)";
     } else if (g.highLetters >= kCp1251MinLetters && g.highLetters * 100 >= letters * kCp1251Percent) {
@@ -222,18 +230,283 @@ CodepageGuess guessLegacyCodepage(const StringTable& table)
     return g;
 }
 
+std::uint8_t cp1251Shift(const std::array<std::size_t, 64>& counts)
+{
+    // Russian letters' frequencies (per thousand of running text, А-Я order; Ё apart: it isn't in
+    // the block), and the share of small letters (Russian text is mostly small letters).
+    static constexpr double kPerMille[32] = {80.1, 15.9, 45.4, 17.0, 29.8, 84.5, 9.4, 16.5, 73.5, 12.1, 34.9,
+                                             44.0, 32.1, 67.0, 109.7, 28.1, 47.3, 54.7, 62.6, 26.2, 2.6, 9.7,
+                                             4.8, 14.4, 7.3, 3.6, 0.4, 19.0, 17.4, 3.2, 6.4, 20.1};
+    static const auto kScore = [] {
+        std::array<double, 64> s{};
+        for (std::size_t i = 0; i < 64; ++i) {
+            s[i] = std::log(kPerMille[i % 32] / 1000.0) + std::log(i < 32 ? 0.1 : 0.9);
+        }
+        return s;
+    }();
+    std::uint8_t best = 0;
+    double bestScore = -std::numeric_limits<double>::infinity();
+    for (std::uint8_t k = 0; k < 64; ++k) {
+        double score = 0;
+        for (std::size_t v = 0; v < 64; ++v) {
+            score += static_cast<double>(counts[v]) * kScore[(v + 64 - k) % 64];
+        }
+        if (score > bestScore) {
+            bestScore = score;
+            best = k;
+        }
+    }
+    return best;
+}
+
+namespace {
+
+// Windows-1251's 0x80-0xBF; 0xC0-0xFF are А-я in order.
+constexpr char16_t kCp1251High[64] = {
+    0x0402, 0x0403, 0x201A, 0x0453, 0x201E, 0x2026, 0x2020, 0x2021, 0x20AC, 0x2030, 0x0409, 0x2039, 0x040A, 0x040C, 0x040B, 0x040F,
+    0x0452, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x0098, 0x2122, 0x0459, 0x203A, 0x045A, 0x045C, 0x045B, 0x045F,
+    0x00A0, 0x040E, 0x045E, 0x0408, 0x00A4, 0x0490, 0x00A6, 0x00A7, 0x0401, 0x00A9, 0x0404, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x0407,
+    0x00B0, 0x00B1, 0x0406, 0x0456, 0x0491, 0x00B5, 0x00B6, 0x00B7, 0x0451, 0x2116, 0x0454, 0x00BB, 0x0458, 0x0405, 0x0455, 0x0457};
+
+// U+00C0-U+00FF's plain letters (toWire's for the Latin-1 letters Windows-1251 lacks): the
+// multiplication and division signs as 'x' and '/', thorn as '?'.
+constexpr char kLatin1Plain[] = "AAAAAAACEEEEIIIIDNOOOOOxOUUUUY?saaaaaaaceeeeiiiidnooooo/ouuuuy?y";
+static_assert(sizeof(kLatin1Plain) == 0x40 + 1);
+
+/// The program's convention: the codepage in the low byte, the shift above it.
+std::atomic<std::uint16_t> g_wireText{0};
+
+/// A byte moved `by` places on within its block of 64 (0x80-0xBF or 0xC0-0xFF), wrapping round.
+constexpr std::uint8_t rotated(std::uint8_t byte, int by)
+{
+    const int base = byte & 0xC0;
+    return static_cast<std::uint8_t>(base + (((byte - base + by) % 64) + 64) % 64);
+}
+
+} // namespace
+
 char16_t cp1251Char(std::uint8_t byte)
 {
-    // 0x80-0xBF; 0xC0-0xFF are А-я in order.
-    static constexpr char16_t kHigh[64] = {
-        0x0402, 0x0403, 0x201A, 0x0453, 0x201E, 0x2026, 0x2020, 0x2021, 0x20AC, 0x2030, 0x0409, 0x2039, 0x040A, 0x040C, 0x040B, 0x040F,
-        0x0452, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x0098, 0x2122, 0x0459, 0x203A, 0x045A, 0x045C, 0x045B, 0x045F,
-        0x00A0, 0x040E, 0x045E, 0x0408, 0x00A4, 0x0490, 0x00A6, 0x00A7, 0x0401, 0x00A9, 0x0404, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x0407,
-        0x00B0, 0x00B1, 0x0406, 0x0456, 0x0491, 0x00B5, 0x00B6, 0x00B7, 0x0451, 0x2116, 0x0454, 0x00BB, 0x0458, 0x0405, 0x0455, 0x0457};
     if (byte < 0x80) {
         return byte;
     }
-    return byte < 0xC0 ? kHigh[byte - 0x80] : static_cast<char16_t>(0x0410 + (byte - 0xC0));
+    return byte < 0xC0 ? kCp1251High[byte - 0x80] : static_cast<char16_t>(0x0410 + (byte - 0xC0));
+}
+
+int cp1251Byte(char32_t c)
+{
+    if (c < 0x80) {
+        return static_cast<int>(c);
+    }
+    if (c >= 0x0410 && c <= 0x044F) {
+        return static_cast<int>(0xC0 + (c - 0x0410));
+    }
+    for (int i = 0; i < 64; ++i) {
+        if (kCp1251High[i] == c) {
+            return 0x80 + i;
+        }
+    }
+    return -1;
+}
+
+void setWireText(LegacyText text)
+{
+    g_wireText.store(static_cast<std::uint16_t>(static_cast<unsigned>(text.codepage) | (text.shift & 63u) << 8), std::memory_order_relaxed);
+}
+
+LegacyText wireText()
+{
+    const std::uint16_t v = g_wireText.load(std::memory_order_relaxed);
+    return {static_cast<LegacyCodepage>(v & 0xFF), static_cast<std::uint8_t>(v >> 8)};
+}
+
+void setWireCodepage(LegacyCodepage codepage)
+{
+    setWireText({codepage, 0});
+}
+
+LegacyCodepage wireCodepage()
+{
+    return wireText().codepage;
+}
+
+char16_t fromWire(char16_t c, LegacyText text)
+{
+    if (text.codepage != LegacyCodepage::Cp1251 || c < 0x80 || c > 0xFF) {
+        return c;
+    }
+    return cp1251Char(rotated(static_cast<std::uint8_t>(c), -text.shift));
+}
+
+std::u16string fromWire(std::u16string_view s)
+{
+    return fromWire(s, wireText());
+}
+
+std::u16string fromWire(std::u16string_view s, LegacyText text)
+{
+    std::u16string out(s);
+    fromWireInPlace(out, text);
+    return out;
+}
+
+void fromWireInPlace(std::u16string& s)
+{
+    fromWireInPlace(s, wireText());
+}
+
+void fromWireInPlace(std::u16string& s, LegacyText text)
+{
+    if (text.plain()) {
+        return;
+    }
+    for (char16_t& c : s) {
+        c = fromWire(c, text);
+    }
+}
+
+char16_t toWire(char16_t c, LegacyText text)
+{
+    if (text.codepage == LegacyCodepage::Latin1 || c < 0x80) {
+        return c;
+    }
+    if (const int b = cp1251Byte(c); b >= 0x80) {
+        return rotated(static_cast<std::uint8_t>(b), text.shift);
+    }
+    if (c >= 0xC0 && c <= 0xFF) {
+        return static_cast<char16_t>(kLatin1Plain[c - 0xC0]);
+    }
+    return c <= 0xFF ? u'?' : c;
+}
+
+std::u16string toWire(std::u16string_view s)
+{
+    return toWire(s, wireText());
+}
+
+std::u16string toWire(std::u16string_view s, LegacyText text)
+{
+    std::u16string out(s);
+    if (!text.plain()) {
+        for (char16_t& c : out) {
+            c = toWire(c, text);
+        }
+    }
+    return out;
+}
+
+namespace {
+
+/// Whether `s` is well-formed UTF-8 (overlong forms and surrogates refused).
+bool isUtf8(std::string_view s)
+{
+    for (std::size_t i = 0; i < s.size();) {
+        const auto b = static_cast<unsigned char>(s[i]);
+        std::size_t n = 0;
+        char32_t c = 0;
+        if (b < 0x80) {
+            ++i;
+            continue;
+        }
+        if (b >= 0xC2 && b <= 0xDF) {
+            n = 1;
+            c = b & 0x1Fu;
+        } else if (b >= 0xE0 && b <= 0xEF) {
+            n = 2;
+            c = b & 0x0Fu;
+        } else if (b >= 0xF0 && b <= 0xF4) {
+            n = 3;
+            c = b & 0x07u;
+        } else {
+            return false;
+        }
+        if (i + n >= s.size()) {
+            return false;
+        }
+        for (std::size_t k = 1; k <= n; ++k) {
+            const auto t = static_cast<unsigned char>(s[i + k]);
+            if ((t & 0xC0) != 0x80) {
+                return false;
+            }
+            c = (c << 6) | (t & 0x3Fu);
+        }
+        if ((n == 2 && c < 0x800) || (n == 3 && (c < 0x10000 || c > 0x10FFFF)) || (c >= 0xD800 && c <= 0xDFFF)) {
+            return false;
+        }
+        i += n + 1;
+    }
+    return true;
+}
+
+} // namespace
+
+std::string wire8ToUtf8(std::string_view bytes)
+{
+    if (isUtf8(bytes)) {
+        return std::string(bytes); // (ASCII, or a NoX Core peer's UTF-8)
+    }
+    std::u16string wide;
+    wide.reserve(bytes.size());
+    for (const char b : bytes) {
+        wide.push_back(static_cast<char16_t>(static_cast<unsigned char>(b)));
+    }
+    fromWireInPlace(wide);
+    return toUtf8(wide);
+}
+
+std::string utf8ToWire8(std::string_view utf8)
+{
+    const LegacyText text = wireText();
+    if (text.plain()) {
+        return std::string(utf8);
+    }
+    std::string out;
+    for (const char16_t c : fromUtf8(utf8)) {
+        const char16_t w = toWire(c, text);
+        out.push_back(w <= 0xFF ? static_cast<char>(w) : '?');
+    }
+    return out;
+}
+
+std::string fitWire8(std::string_view utf8, std::size_t bytes)
+{
+    if (wireCodepage() == LegacyCodepage::Latin1) {
+        return std::string(utf8.substr(0, bytes));
+    }
+    const std::u16string wide = fromUtf8(utf8);
+    std::size_t n = std::min(wide.size(), bytes);
+    if (n > 0 && n < wide.size() && wide[n - 1] >= 0xD800 && wide[n - 1] <= 0xDBFF) {
+        --n; // (never half a surrogate pair)
+    }
+    return toUtf8(std::u16string_view(wide).substr(0, n));
+}
+
+void StringTable::decodeLegacy(LegacyText text)
+{
+    if (text.plain()) {
+        return;
+    }
+    for (StringEntry& e : entries_) {
+        for (StringVariant& v : e.variants) {
+            for (char16_t& c : v.text) {
+                c = fromWire(c, text);
+            }
+        }
+    }
+}
+
+LegacyText adoptLegacyCodepage(StringTable* table, const CodepageGuess& guess, std::optional<LegacyCodepage> forced,
+                               std::optional<std::uint8_t> forcedShift)
+{
+    LegacyText text{forced.value_or(guess.codepage), 0};
+    if (!text.plain()) {
+        text.shift = static_cast<std::uint8_t>(forcedShift.value_or(guess.shift) & 63u);
+    }
+    if (table) {
+        table->decodeLegacy(text);
+    }
+    setWireText(text);
+    return text;
 }
 
 std::string toUtf8(std::u16string_view s)

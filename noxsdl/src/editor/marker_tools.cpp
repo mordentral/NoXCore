@@ -224,6 +224,7 @@ MarkerTools::MarkerTools(MapEditor& editor)
     if (!ed_.ctx_.gameDir.empty()) {
         try {
             strings_ = std::make_unique<nox::strings::StringTable>(nox::strings::StringTable::load(ed_.ctx_.gameDir / "nox.csf"));
+            strings_->decodeLegacy(nox::strings::wireText()); // (as the program's own table: real Cyrillic)
         } catch (const std::exception&) {
             // (no string table: the readable's preview and Game Texts are blank)
         }

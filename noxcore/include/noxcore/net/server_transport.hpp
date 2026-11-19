@@ -325,6 +325,9 @@ private:
     /// query from that address (and port, `exact`) named that level or above. A refusal is logged
     /// with why.
     bool levelLetIn(const Endpoint& from, bool exact, std::uint32_t nowMs);
+    /// noxcpp: a join's name as Unicode, as the access lists keep names (strings::fromWire in the
+    /// host's convention, but a NoX Core game's of lobby::kUnicodeTextLevel, which sends it so).
+    std::u16string joinName(const Endpoint& from, std::span<const std::uint8_t> wide, std::uint32_t nowMs) const;
     /// A refusal's line in the host's log: an address's at most once a minute (a refused game
     /// asks again and again).
     void logRefusal(const Endpoint& from, std::uint32_t nowMs, const std::string& line);

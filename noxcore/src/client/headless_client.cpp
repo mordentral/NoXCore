@@ -198,7 +198,7 @@ void HeadlessClient::start(std::uint32_t nowMs)
 void HeadlessClient::sendTryJoin(std::uint32_t nowMs)
 {
     msg::ServerTryJoin join;
-    putUtf16(join.playerName, fromUtf8(profile_.name));
+    putUtf16(join.playerName, strings::toWire(fromUtf8(profile_.name), linkText())); // (as our link carries it)
     join.playerClass = profile_.playerClass;
     putAscii(join.serial, profile_.serial);
     putAscii(join.account, profile_.account);
@@ -292,7 +292,7 @@ void HeadlessClient::tick(std::uint32_t nowMs)
         switch (conn_.state()) {
         case CS::JoinOk: {
             msg::ClientAccept accept;
-            putUtf16(accept.playerName, fromUtf8(profile_.name));
+            putUtf16(accept.playerName, strings::toWire(fromUtf8(profile_.name), linkText())); // (as our link carries it)
             accept.classId = profile_.playerClass;
             accept.isFemale = profile_.female ? 1 : 0;
             accept.colors = profile_.colors;
@@ -450,13 +450,28 @@ std::vector<ClientEvent> HeadlessClient::takeEvents()
 
 // -------------------------------------------------------------------------------- actions
 
+void HeadlessClient::setUnicodeLink(bool on)
+{
+    unicodeLink_ = on;
+    world_.setUnicodeLink(on);
+}
+
+strings::LegacyText HeadlessClient::linkText() const
+{
+    return unicodeLink_ ? strings::LegacyText{} : strings::wireText();
+}
+
 void HeadlessClient::say(std::string_view utf8, bool teamOnly)
 {
-    std::u16string text = fromUtf8(utf8);
+    // (As the wire carries it, strings::toWire: a Russian install's Cyrillic as its Windows-1251
+    // bytes, then 8-bit as that install's game sends them, every character under 0x100:
+    // cliCanTalkMB's test. Elsewhere 8-bit only when it's all ASCII, as before.)
+    std::u16string text = strings::toWire(fromUtf8(utf8), linkText());
     if (text.size() > 200) {
         text.resize(200);
     }
-    const bool narrow = std::all_of(text.begin(), text.end(), [](char16_t c) { return c < 0x80; });
+    const char16_t narrowBelow = !linkText().plain() ? 0x100 : 0x80;
+    const bool narrow = std::all_of(text.begin(), text.end(), [&](char16_t c) { return c < narrowBelow; });
     // CliNet_SendChatText: 2 = 8-bit text, 4 = UTF-16, | 1 = team only.
     std::vector<std::uint8_t> m = {static_cast<std::uint8_t>(Op::TextMessage), static_cast<std::uint8_t>(netCode_),
                                    static_cast<std::uint8_t>(netCode_ >> 8),
@@ -889,7 +904,10 @@ void HeadlessClient::social(Social kind)
 void HeadlessClient::voteKick(std::u16string_view name, bool withdraw)
 {
     std::vector<std::uint8_t> m = {static_cast<std::uint8_t>(Op::Vote), static_cast<std::uint8_t>(withdraw ? 2 : 0)};
-    // The name field: 25 UTF-16 characters, at most 24 of them text (a terminator kept).
+    // The name field: 25 UTF-16 characters, at most 24 of them text (a terminator kept), as the
+    // wire carries it (the server compares it with the join's).
+    const std::u16string wire = strings::toWire(name, linkText());
+    name = wire;
     for (std::size_t i = 0; i < 25; ++i) {
         const char16_t c = i < name.size() && i < 24 ? name[i] : u'\0';
         m.push_back(static_cast<std::uint8_t>(c));
@@ -1246,7 +1264,7 @@ void HeadlessClient::handleMessage(std::span<const std::uint8_t> m, std::uint32_
         break;
     case Op::NewPlayer: {
         const std::uint16_t nc = u16At(m, 1);
-        const std::string name = strings::toUtf8(utf16Until(m.subspan(3, 50)));
+        const std::string name = strings::toUtf8(strings::fromWire(utf16Until(m.subspan(3, 50)), linkText())); // (as Unicode)
         const bool isNew = players_.find(nc) == players_.end();
         players_[nc] = name;
         if (isNew) {
@@ -1859,9 +1877,9 @@ void HeadlessClient::onText(std::span<const std::uint8_t> m)
             }
             wide.push_back(static_cast<char16_t>(b));
         }
-        text = strings::toUtf8(wide);
+        text = strings::toUtf8(strings::fromWire(wide, linkText())); // (as Unicode: a Russian install's bytes as Cyrillic)
     } else {
-        text = strings::toUtf8(utf16Until(body));
+        text = strings::toUtf8(strings::fromWire(utf16Until(body), linkText()));
     }
     // The speaker: a player we've been told of, else one the world knows. The server relays a
     // line with whatever speaker its sender's client put on it (SrvNet_OnPacket 0xA8): someone

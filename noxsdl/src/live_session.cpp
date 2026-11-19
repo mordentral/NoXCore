@@ -161,7 +161,11 @@ LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProf
         game_.sendTo(server_, query);
         // (A host the game list saw as stock, or any host when only our level is new: the join
         // at once, never slower than before: joinWaits.)
-        if (joinWaits(types != 0, identifyFirst, knownStock)) {
+        // (On an install whose text isn't Latin-1's, a Russian fan translation's, the join waits
+        // too: our names and lines go to a host of kUnicodeTextLevel as Unicode, to any other in
+        // our convention, and which it is must be known before the join carries our name. A stock
+        // host never answers: then it goes after kWaitMs, in our convention.)
+        if (joinWaits(types != 0, identifyFirst, knownStock) || (!knownStock && !nox::strings::wireText().plain())) {
             typesQuery_ = query; // (the join waits for its answer: update)
             wait_.begin(nowMs());
             return;
@@ -222,6 +226,11 @@ void LiveSession::update()
                 }
                 extended_ = reply->server;
                 client_.setFreshInput(true); // (our facing and moves as they change: its next frame has them)
+                // Our text as real Unicode both ways with a host that takes it, told before our
+                // join (one answered after it takes us for a stock client, as the host does).
+                if (!started_) {
+                    client_.setUnicodeLink(reply->server.clientLevel >= nox::lobby::kUnicodeTextLevel);
+                }
                 // A host with a client key realm our query had no secret for: the query again with
                 // it, before our connect (at a listed one the join waits for this answer).
                 if (reply->server.realm != 0 && reply->server.realm != keyedRealm_ && !SDL_getenv("NOX_STOCK_STREAM")) {

@@ -347,10 +347,8 @@ void CoopDirector::mirrorDialog(const server::ServerObject& talker, const std::s
             tell(m, bytes);
         } else if (opening && npc) {
             // A stock player: who talks to whom, once as it opens.
-            std::string name;
-            for (const char16_t c : talker.player->name) {
-                name += c < 0x80 ? static_cast<char>(c) : '?';
-            }
+            const std::string name = strings::toUtf8(talker.player->name);
+
             notice(m, coopmsg::Notice::Info, name + " is talking to " + server::detail::spacedName(npc->typeName) + ".");
         }
     }

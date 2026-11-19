@@ -134,7 +134,7 @@ void Menus::setupChat()
     }
     // The message of the day: in no lobby yet.
     for (const auto& line : nox::lobby::wolMotdLines(wolMotd_)) {
-        chatLine(line, kSystemColor);
+        chatLine(nox::strings::wire8ToUtf8(line), kSystemColor); // (its 8-bit text as UTF-8)
     }
     wolLists_.clearLobbies();
     wolLists_.clearUsers();

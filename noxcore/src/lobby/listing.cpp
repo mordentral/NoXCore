@@ -2,6 +2,7 @@
 // see listing.hpp for the record's layout.
 #include "noxcore/lobby/listing.hpp"
 
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
@@ -47,8 +48,10 @@ std::array<std::uint8_t, kWolRecordSize> makeWolRecord(const GameListing& game, 
     for (std::size_t i = 0; i < 8 && i < game.map.size(); ++i) { // (strcpy: 8 letters and its 0)
         r[11 + i] = static_cast<std::uint8_t>(game.map[i]);
     }
-    for (std::size_t i = 0; i < 15 && i < game.name.size(); ++i) { // (strncpy 15: no 0 when full)
-        r[20 + i] = static_cast<std::uint8_t>(game.name[i]);
+    // (noxcpp: the name's 8-bit form, strings::utf8ToWire8: as it is but on a Russian install)
+    const std::string name = strings::utf8ToWire8(game.name);
+    for (std::size_t i = 0; i < 15 && i < name.size(); ++i) { // (strncpy 15: no 0 when full)
+        r[20 + i] = static_cast<std::uint8_t>(name[i]);
     }
     std::fill(r.begin() + 35, r.begin() + 63, std::uint8_t{0xFF});
     put16(63, static_cast<int>(game.gameFlags));
@@ -111,7 +114,7 @@ std::optional<GameListing> parseWolRecord(std::span<const std::uint8_t> r)
         g.port = kDefaultGamePort;
     }
     g.map = textAt(r, 11, 9);
-    g.name = textAt(r, 20, 15);
+    g.name = strings::wire8ToUtf8(textAt(r, 20, 15)); // (noxcpp: as UTF-8)
     g.gameFlags = u16At(r, 63);
     if (g.gameFlags & 0x1000) {
         g.questStage = u16At(r, 65);
@@ -133,7 +136,7 @@ GameListing listingFromServerInfo(const net::msg::ServerInfo& info, std::uint32_
     g.players = info.players;
     g.maxPlayers = info.maxPlayers;
     g.map = textAt(info.mapName, 0, info.mapName.size());
-    g.name = textAt(info.serverName, 0, info.serverName.size());
+    g.name = strings::wire8ToUtf8(textAt(info.serverName, 0, info.serverName.size())); // (noxcpp: as UTF-8)
     g.gameFlags = info.gameFlags;
     // serverFlags: banned classes in the low 3 bits, 0x10 closed, 0x20 password.
     g.bannedClasses = info.serverFlags & 0x07;

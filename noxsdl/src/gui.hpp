@@ -194,6 +194,24 @@ public:
     /// make): a disabled window draws as the exe's does, often no different from an enabled one.
     bool dimDisabled = false;
 
+    /// (noxcpp) How its text fits its box (Gui::fitText): worked out when the text, the box, the
+    /// fonts or the scale change, kept till then. AsDrawn: as the game draws it (it fits: one line,
+    /// or wrapped within the box); else the small font on one line, the small font wrapped (the box
+    /// has room for its lines), or the small font's lines that fit, the rest left out.
+    struct TextFit {
+        enum class Mode : std::uint8_t { AsDrawn, SmallLine, SmallWrapped, SmallClipped };
+        std::string text;
+        int width = -1, height = -1, largeSize = 0, smallSize = 0;
+        float scale = 0;
+        const void* largeFace = nullptr;
+        const void* smallFace = nullptr;
+        std::uint32_t largeSet = 0, smallSet = 0; ///< (the fonts' Font::facesSet)
+        bool large = false;
+        Mode mode = Mode::AsDrawn;
+        std::vector<std::string> lines; ///< the small font's lines (SmallWrapped, SmallClipped)
+    };
+    TextFit fit;
+
     Window* parent = nullptr;
     std::vector<std::unique_ptr<Window>> children; ///< file order
     Proc proc;
@@ -421,6 +439,9 @@ public:
 
 private:
     void drawWindow(Window& w, Painter& p);
+    /// (noxcpp) How w's text fits a box width x height (Window::TextFit), worked out again only
+    /// when the text, the box, the fonts or the scale changed.
+    const Window::TextFit& fitText(Window& w, Painter& p, int width, int height);
     void drawByType(Window& w, Painter& p);
     void drawBorder(Window& w, Painter& p);
     /// The window at (x, y); `press`: only ENABLED ones (a click's), else any (the hover's).

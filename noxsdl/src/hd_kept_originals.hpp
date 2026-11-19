@@ -2,10 +2,12 @@
 // redraws that don't keep their original's layout where windows are placed on that layout, so the
 // original's pixels are what lines up with them. Listed by the bad redraw itself (its slot's CRC),
 // not by name: a pack with the redraw fixed draws it in HD, while the packs players already have,
-// with the bad one, keep the original.
+// with the bad one, keep the original. Also the slots whose game image isn't the one the HD art was
+// made from (hdChangedSourceSlots: a translation's redrawn pictures).
 #pragma once
 
 #include "noxcore/video/image_pack.hpp"
+#include "noxcore/video/video_bag.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -50,6 +52,33 @@ inline std::vector<std::int32_t> hdKeptOriginalSlots(const nox::video::ImagePack
             std::find(slots.begin(), slots.end(), s) == slots.end()) {
             slots.push_back(s);
         }
+    }
+    return slots;
+}
+
+/// The filled slots whose source key (image_pack.hpp: the video.idx entry the slot was made from)
+/// isn't the game's entry there: a mod's or a translation's changed image (a redrawn menu title
+/// almost always has other sizes), drawn from video.bag. Slots without a key, and past the game's
+/// images, aren't checked. `checked`: how many were.
+inline std::vector<std::int32_t> hdChangedSourceSlots(const nox::video::ImagePackReader& pack,
+                                                      std::span<const nox::video::BagImage> images,
+                                                      std::size_t* checked = nullptr)
+{
+    std::vector<std::int32_t> slots;
+    std::size_t n = 0;
+    for (std::size_t i = 0; i < std::min<std::size_t>(pack.size(), images.size()); ++i) {
+        const auto& e = pack.entry(i);
+        if (!e.present() || e.sourceKey == 0) {
+            continue;
+        }
+        ++n;
+        const auto& b = images[i];
+        if (e.sourceKey != nox::video::bagSourceKey(b.name, b.type, b.size16, b.size8)) {
+            slots.push_back(static_cast<std::int32_t>(i));
+        }
+    }
+    if (checked) {
+        *checked = n;
     }
     return slots;
 }

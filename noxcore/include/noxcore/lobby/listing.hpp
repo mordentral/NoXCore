@@ -22,6 +22,7 @@ inline constexpr std::uint16_t kDefaultGamePort = 18590;
 enum class GameAccess : std::uint8_t { Open, Closed, Password };
 
 struct GameListing {
+    /// UTF-8 (the record's 8-bit text through strings::wire8ToUtf8 / utf8ToWire8).
     std::string name;
     std::string map;
     std::uint32_t address = 0; ///< IPv4, host byte order

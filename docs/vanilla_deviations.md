@@ -406,16 +406,44 @@ Options switch unless noted.
   NoX Core's Nox-style fonts (fonts/ beside the program: the game's letters on its 9- and 15-row
   grid, drawn smooth with Use HD Images), off Caudex Bold, with Noto Sans for the characters a face
   lacks (text.hpp, font_choice.hpp). Revert: none (the game's bitmap fonts aren't drawn).
-- **Russian fan translations draw in Cyrillic:** their nox.csf stores each letter's Windows-1251
-  byte as the code point (U+00C0-U+00FF) and their .fnt files draw Cyrillic there; the game reads the
-  text as stored. NoX Core keeps the text as stored (a hosted game sends it on as the game does, for
-  stock clients with those fonts), and its fonts draw U+0080-U+00FF as Windows-1251 when nox.csf's
-  letters say so: at least 50 letters in U+00C0-U+00FF making 25% or more of its letters, no real
-  Cyrillic, and not the header's multibyte languages 6 and 8 (nox::strings::guessLegacyCodepage,
-  Font::setLegacyCodepage; logged at start). That covers every text the fonts draw, the server's
-  lines and stock players' names included, as the translation's fonts did. The official Latin-1
-  files (French, German, Italian, Spanish, Polish) have a few percent; noxcore.cfg's
-  `CsfText = latin1` or `cp1251` overrides the guess (`auto` by default).
+- **Russian fan translations are read as real Cyrillic:** their nox.csf stores each letter's
+  Windows-1251 byte as the code point (U+00C0-U+00FF) and their .fnt files draw Cyrillic there; the
+  game reads and sends the text as stored, and a Russian player's name, chat, .plr name and lobby
+  text carry the same bytes. One translation's fonts draw each letter one place on (А at 0xC1, я at
+  0xC0), its file stored so. NoX Core tells such a file by its letters (at least 50 in
+  U+00C0-U+00FF making 25% or more of its letters, no real Cyrillic, not the header's multibyte
+  languages 6 and 8) and finds the shift as the rotation whose letters read most like Russian
+  (letter frequencies and case; nox::strings::guessLegacyCodepage, cp1251Shift; logged at start;
+  noxcore.cfg's `CsfText = latin1`, `cp1251` or `cp1251:N` overrides it, `auto` by default, taken
+  at start). The table is decoded to real Cyrillic once at load, and the program then holds Unicode
+  everywhere (its TrueType fonts draw it; wrapping, measuring, mods' text and logs see Cyrillic).
+  Where text crosses to the original game it converts, once per message or file
+  (strings::fromWire / toWire, with the shift): to and from stock clients the names, chat lines, the
+  server's lines, team, shop and NPC dialog names (World::textForStock / textFromStock, chosen per
+  client: GameHost::textFor); .plr names (read and written); XWIS lobby chat, game names and the
+  MOTD; and the map editor's 8-bit map texts (Windows-1251 there instead of 1252). Between NoX Core
+  programs of client level 12 (lobby::kUnicodeTextLevel) the text goes as real Unicode both ways,
+  whatever either install keeps: a host recodes a stock client's chat line for them, and theirs for
+  the stock clients. A Russian install's game waits for a host's answer to its query before its
+  join (up to 3 s; a stock host never answers), so its name goes the right way. Latin-1 letters of our own or a mod's text ("Café") go to stock clients as
+  their plain letters ("Cafe"), since Windows-1251 has none and their fonts would draw Cyrillic
+  there. A new character's file name is its name's first letter as the game makes it ("П00.plr").
+  Every other install (Latin-1) sends and stores everything as before, byte for byte. Revert:
+  CsfText = latin1.
+- **A host's player names are kept whole** (game_host.cpp): the console, its logs, kick and ban
+  by name, the kick dialog's ban and co-op's notices use the name as the player has it (UTF-8),
+  where NoX Core kept only its ASCII letters ('?' for any other, so a name with one could not be
+  banned from the kick dialog). The ban list and kick votes key by the name as Unicode.
+- **Labels that don't fit their box are fitted** (noxsdl gui.cpp, Gui::fitText): a check box's,
+  radio button's, static text's or button's text that the game would draw past its box (wider
+  than the box on one line, or wrapped onto more lines than the box holds, over the next row) is
+  drawn in the small font on one line when that fits, else wrapped in the small font when the box
+  has room for its lines, else the small font's lines the box holds. Worked out once per text,
+  box, font and scale, kept on the window. A text that fits is drawn as the game draws it.
+- **8-bit text from the original game shows its accents** (noxcore client/world.cpp, the lobby's
+  game names and MOTD): a narrow chat line's bytes past 0x7F are Latin-1 letters (or a Russian
+  install's Windows-1251), as the game widens them, where NoX Core showed U+FFFD; a game name in
+  UTF-8 (a NoX Core host's) still reads as UTF-8. Display only: nothing sent changes.
 - **nox.csf stored without its tags' inversion is read the other way round:** when most of its
   strings decode to nothing but U+F800 and up (plain UTF-16 under the inverted tags, or the reverse,
   as a re-encoding tool can leave it), every string is read the other way round

@@ -2688,6 +2688,104 @@ std::vector<std::uint8_t> World::textMessage(std::u16string_view text, std::uint
     return m;
 }
 
+namespace {
+
+/// A message's text fields (World::textForStock's), each recoded by recode; a text line's width
+/// chosen again. nullopt: none, or nothing changed.
+template <class Recode>
+std::optional<std::vector<std::uint8_t>> recodeText(std::span<const std::uint8_t> m, Recode recode)
+{
+    // A fixed field of up to chars UTF-16 units from at, up to its NUL.
+    const auto field = [&](std::size_t at, std::size_t chars) -> std::optional<std::vector<std::uint8_t>> {
+        std::optional<std::vector<std::uint8_t>> out;
+        for (std::size_t i = 0; i < chars && at + 2 * i + 1 < m.size(); ++i) {
+            const auto c = static_cast<char16_t>(m[at + 2 * i] | m[at + 2 * i + 1] << 8);
+            if (c == 0) {
+                break;
+            }
+            if (const char16_t r = recode(c); r != c) {
+                if (!out) {
+                    out.emplace(m.begin(), m.end());
+                }
+                (*out)[at + 2 * i] = static_cast<std::uint8_t>(r);
+                (*out)[at + 2 * i + 1] = static_cast<std::uint8_t>(r >> 8);
+            }
+        }
+        return out;
+    };
+    if (m.empty()) {
+        return std::nullopt;
+    }
+    switch (m[0]) {
+    case 0xA8: { // MSG_TEXT_MESSAGE: +3 flags (2 8-bit, 4 UTF-16, 8 a string id), +8 length, +11 the text
+        if (m.size() <= 11 || (m[3] & 8)) {
+            return std::nullopt;
+        }
+        const bool narrow = (m[3] & 2) != 0;
+        const std::size_t width = narrow ? 1 : 2;
+        // (its units as its length byte counts them, the end among them; what follows, another
+        // message's, kept as it is)
+        const std::size_t tail = std::min(m.size(), 11 + std::size_t{m[8]} * width);
+        std::u16string text;
+        for (std::size_t at = 11; at + width <= tail; at += width) {
+            const auto c = static_cast<char16_t>(narrow ? m[at] : m[at] | m[at + 1] << 8);
+            if (c == 0) {
+                break;
+            }
+            text.push_back(c);
+        }
+        std::u16string recoded = text;
+        for (char16_t& c : recoded) {
+            c = recode(c);
+        }
+        const bool narrowNow = std::ranges::all_of(recoded, [](char16_t c) { return c < 0x100; });
+        if (recoded == text && narrowNow == narrow) {
+            return std::nullopt;
+        }
+        std::vector<std::uint8_t> out(m.begin(), m.begin() + 11);
+        out[3] = static_cast<std::uint8_t>((m[3] & ~0x06u) | (narrowNow ? 2u : 4u));
+        out[8] = static_cast<std::uint8_t>(recoded.size() + 1);
+        util::appendText(out, recoded, narrowNow);
+        out.insert(out.end(), m.begin() + static_cast<std::ptrdiff_t>(tail), m.end());
+        return out;
+    }
+    case 0x2D: // MSG_NEW_PLAYER: +3 the name, 25 units
+        return field(3, 25);
+    case 0xC4: // MSG_TEAM_MSG: 0 create (+15 its length, the name from +18), 4 renamed (+6, 20 units)
+        if (m.size() > 15 && m[1] == 0x00) {
+            return field(18, m[15]);
+        }
+        return m.size() > 1 && m[1] == 0x04 ? field(6, 20) : std::nullopt;
+    case 0xC9: // MSG_TRADE: 0x0C a player's (+2), 0x0D a shop's (+4), 25 units
+        if (m.size() > 1 && (m[1] == 0x0C || m[1] == 0x0D)) {
+            return field(m[1] == 0x0C ? 2 : 4, 25);
+        }
+        return std::nullopt;
+    case 0xD0: // MSG_DIALOG 3: +0x22 the title, 31 units
+        return m.size() > 1 && m[1] == 0x03 ? field(0x22, 31) : std::nullopt;
+    default:
+        return std::nullopt;
+    }
+}
+
+} // namespace
+
+std::optional<std::vector<std::uint8_t>> World::textForStock(std::span<const std::uint8_t> m, strings::LegacyText text)
+{
+    if (text.plain()) {
+        return std::nullopt;
+    }
+    return recodeText(m, [text](char16_t c) { return strings::toWire(c, text); });
+}
+
+std::optional<std::vector<std::uint8_t>> World::textFromStock(std::span<const std::uint8_t> m, strings::LegacyText text)
+{
+    if (text.plain() || m.empty() || m[0] != 0xA8) {
+        return std::nullopt;
+    }
+    return recodeText(m, [text](char16_t c) { return strings::fromWire(c, text); });
+}
+
 void World::textToAll(std::u16string_view text, std::uint8_t flags)
 {
     // SrvNet_BroadcastTextMessage.

@@ -153,6 +153,11 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
             std::string v = line.substr(eq + 1);
             std::erase_if(v, [](char c) { return c == ' ' || c == '\t' || c == '\r'; });
             v = nox::util::lowered(v);
+            // ("cp1251:N": the letters' shift forced too)
+            if (const auto colon = v.find(':'); colon != std::string::npos && v.substr(0, colon) == "cp1251") {
+                e.csfShift = std::clamp(std::atoi(v.c_str() + colon + 1), 0, 63);
+                v.resize(colon);
+            }
             e.csfText = v == "cp1251" ? OptionsWindow::Extras::kCsfTextCp1251
                         : v == "latin1" ? OptionsWindow::Extras::kCsfTextLatin1
                                         : OptionsWindow::Extras::kCsfTextAuto;
@@ -205,9 +210,9 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
         << "\nVSync = " << e.vsync << "\nServerUpdateRate = " << e.serverUpdateRate
         << "\nServerMapVote = " << e.serverMapVote << "\nExactMaths = " << e.exactMaths << "\nPendingChanges = " << e.pendingView
         << "\nWeatherEffects = " << e.weather << "\nCsfText = "
-        << (e.csfText == OptionsWindow::Extras::kCsfTextCp1251   ? "cp1251"
-            : e.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? "latin1"
-                                                                 : "auto")
+        << (e.csfText == OptionsWindow::Extras::kCsfTextCp1251   ? (e.csfShift >= 0 ? "cp1251:" + std::to_string(e.csfShift) : std::string("cp1251"))
+            : e.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? std::string("latin1")
+                                                                 : std::string("auto"))
         << "\n";
     for (std::size_t i = 0; i < e.modAbilityKeys.size(); ++i) {
         out << "ModAbilityKey" << (i + 1) << " = " << e.modAbilityKeys[i] << "\n";
@@ -231,6 +236,7 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.hdAvailable = !app.imagePack.empty();
     e.originalFonts = app.originalFonts;
     e.csfText = app.csfText;
+    e.csfShift = app.csfShift;
     e.gamma = app.gamma;
     e.gpu = app.shaders != nullptr && app.white != nullptr;
     e.mouseAccel = app.mouseAccel;
@@ -464,8 +470,9 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     // Use HD Images: the pack's images (upscaled ones and the originals), or video.bag's.
     if (app.sprites && e.hdImages != app.sprites->usingPack()) {
         if (e.hdImages && !app.imagePack.empty()) {
-            if (auto pack = SpriteCache::openPack(app.imagePack, app.gameDir / "video.idx")) {
-                app.sprites->setPack(std::move(pack), app.hdDecodeSync ? fs::path() : app.imagePack);
+            bool checkSources = false; // (another video.idx's pack with source keys: setPack checks each slot)
+            if (auto pack = SpriteCache::openPack(app.imagePack, app.gameDir / "video.idx", &checkSources)) {
+                app.sprites->setPack(std::move(pack), app.hdDecodeSync ? fs::path() : app.imagePack, checkSources);
                 preloadSession(app);
                 preloadMap(app, app.viewMap);
             }
@@ -477,8 +484,8 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     // Original Style Fonts, and the HD Nox-style fonts with the HD images.
     app.originalFonts = e.originalFonts;
     applyFonts(app);
-    app.csfText = e.csfText;
-    applyTextCodepage(app);
+    app.csfText = e.csfText; // (taken at start, with nox.csf: applyTextCodepage)
+    app.csfShift = e.csfShift;
     if (!app.shaders || !app.white) {
         return;
     }
@@ -508,22 +515,31 @@ void applyFonts(App& app)
     }
 }
 
-/// The game text's U+0080-U+00FF onto the fonts: noxcore.cfg's CsfText, or with auto what nox.csf's
-/// letters said at load (App::csfGuess). Nothing before both fonts are made.
+/// The program's text convention, once at start with nox.csf loaded (or not there): noxcore.cfg's
+/// CsfText, or with auto what nox.csf's letters said (App::csfGuess). Under Windows-1251 the table is
+/// decoded to real Cyrillic here, and the wire, .plr files and the lobby's text convert at their
+/// edges (nox::strings::toWire / fromWire). A changed CsfText takes effect at the next start.
 void applyTextCodepage(App& app)
 {
-    if (!app.font || !app.largeFont) {
-        return;
-    }
     using nox::strings::LegacyCodepage;
-    const LegacyCodepage cp = app.csfText == OptionsWindow::Extras::kCsfTextCp1251   ? LegacyCodepage::Cp1251
-                              : app.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? LegacyCodepage::Latin1
-                                                                                     : app.csfGuess.codepage;
-    if (cp != app.font->legacyCodepage()) {
-        SDL_Log("text: U+0080-U+00FF drawn as %s", cp == LegacyCodepage::Cp1251 ? "Windows-1251 (Cyrillic)" : "Latin-1");
+    std::optional<LegacyCodepage> forced;
+    if (app.csfText == OptionsWindow::Extras::kCsfTextCp1251) {
+        forced = LegacyCodepage::Cp1251;
+    } else if (app.csfText == OptionsWindow::Extras::kCsfTextLatin1) {
+        forced = LegacyCodepage::Latin1;
     }
-    app.font->setLegacyCodepage(cp);
-    app.largeFont->setLegacyCodepage(cp);
+    std::optional<std::uint8_t> shift;
+    if (app.csfShift >= 0) {
+        shift = static_cast<std::uint8_t>(app.csfShift);
+    }
+    const auto text = nox::strings::adoptLegacyCodepage(app.strings.get(), app.csfGuess, forced, shift);
+    if (text.plain()) {
+        SDL_Log("text: Latin-1 (as stored)");
+    } else {
+        SDL_Log("text: Windows-1251 (Cyrillic), letters shifted %d: nox.csf decoded; names, chat, .plr and lobby text "
+                "converted where they meet the original game",
+                text.shift);
+    }
 }
 
 /// Opens the Options window on the current settings (in a game the resolution stays).

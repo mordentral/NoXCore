@@ -886,7 +886,7 @@ void ServerOptions::go()
     // Then Go's: the name (15 letters), the limits typed (an empty field
     // keeps its value; the time a byte), and "Form a new game" for the chat map.
     if (gui::Window* name = window_->find(kName)) {
-        settings_.name = nox::strings::toUtf8(name->entry).substr(0, 15);
+        settings_.name = nox::strings::fitWire8(nox::strings::toUtf8(name->entry), 15);
     }
     if (gui::Window* w = window_->find(kLessonLimit); w && !w->entry.empty()) {
         settings_.lessonLimit = std::clamp(number(w), 0, 0xFFFF);
@@ -934,7 +934,7 @@ void ServerOptions::commitName()
     if (!w || w->entry.empty()) {
         return;
     }
-    settings_.name = nox::strings::toUtf8(w->entry).substr(0, 15);
+    settings_.name = nox::strings::fitWire8(nox::strings::toUtf8(w->entry), 15);
     if (callbacks_.editSettings && !campaign_) {
         SettingsEdit e; // (strcpy'd into the current slot's + 9, and the game's: GameHost::editSettings)
         e.name = settings_.name;

@@ -6,6 +6,7 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/net/framing.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/util/bytes.hpp"
 #include "noxcore/util/text.hpp"
 #include "noxcore/util/random.hpp"
@@ -358,8 +359,9 @@ void ServerTransport::tryJoin(const Endpoint& from, std::uint8_t seq, std::span<
     // Closed (the access settings' flag 0x10): only those on the allowed list, by name (list
     // 4); else the banned list: an entry with a serial by it, else by
     // the name (5).
-    // The name arrives as UTF-16LE bytes; keep it up to the first NUL.
-    const std::u16string name = utf16Until(join.playerName);
+    // The name arrives as UTF-16LE bytes; keep it up to the first NUL. (noxcpp: as Unicode, as the
+    // lists keep names: joinName.)
+    const std::u16string name = joinName(from, join.playerName, nowMs);
     const std::string serial(reinterpret_cast<const char*>(join.serial.data()),
                              strnlen(reinterpret_cast<const char*>(join.serial.data()), join.serial.size()));
     // (The names and the serials both compared without the case of A-Z: sameFolded.)
@@ -413,6 +415,25 @@ bool ServerTransport::sameTypes(const Endpoint& from, bool exact, std::uint32_t 
                        ": only NoX Core games with the same packs can join");
     }
     return same;
+}
+
+std::u16string ServerTransport::joinName(const Endpoint& from, std::span<const std::uint8_t> wide, std::uint32_t nowMs) const
+{
+    // A NoX Core game of kUnicodeTextLevel (its query from that address, its game socket's) sends
+    // it as it is; any other in the host's convention (a Russian install's: strings::wireText).
+    std::u16string name = utf16Until(wide);
+    const strings::LegacyText text = strings::wireText();
+    if (text.plain()) {
+        return name;
+    }
+    for (const auto& [at, level] : identifyingLevels_) {
+        const auto q = identifying_.find(at);
+        if (at.address == from.address && level >= lobby::kUnicodeTextLevel && q != identifying_.end() &&
+            nowMs - q->second <= kIdentifyKeepMs) {
+            return name;
+        }
+    }
+    return strings::fromWire(name, text);
 }
 
 bool ServerTransport::levelLetIn(const Endpoint& from, bool exact, std::uint32_t nowMs)

@@ -3,6 +3,7 @@
 #include "noxcore/lobby/wol_chat.hpp"
 
 #include "noxcore/net/udp_socket.hpp" // (net::Endpoint)
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/util/text.hpp"
 
 #include "irc.hpp"
@@ -88,6 +89,10 @@ std::string wolEncodeText(std::u16string_view text)
     // cliCanTalkMB: every character's high byte zero, the text as bytes ("%S");
     // else 0xF0 and the UTF-16 text with its terminator packed ((n + 1) * 16 bits),
     // copied as a C string (a last byte of 0 isn't).
+    // (noxcpp: the text as the wire carries it first, strings::toWire: a Russian install's Cyrillic
+    // as its Windows-1251 bytes.)
+    const std::u16string wide = strings::toWire(text);
+    text = wide;
     const bool narrow = std::all_of(text.begin(), text.end(), [](char16_t c) { return c < 0x100; });
     std::string out;
     if (narrow) {
@@ -123,12 +128,14 @@ std::u16string wolDecodeText(std::string_view wire)
         wire.remove_prefix(1);
         const auto raw = unpackSevenBit(std::span(reinterpret_cast<const std::uint8_t*>(wire.data()), wire.size()),
                                         wire.size() * 7 / 8);
-        return util::utf16Until(raw);
+        return strings::fromWire(util::utf16Until(raw)); // (noxcpp: as Unicode)
     }
-    // "%S": the bytes as the ANSI code page's characters (Latin-1 here).
+    // "%S": each byte zero-extended (the exe never sets a C locale), then (noxcpp) as Unicode:
+    // strings::fromWire, a Russian install's Windows-1251 bytes as Cyrillic.
     for (const char c : wire) {
         out.push_back(static_cast<char16_t>(static_cast<std::uint8_t>(c)));
     }
+    strings::fromWireInPlace(out);
     return out;
 }
 

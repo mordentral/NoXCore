@@ -1087,7 +1087,7 @@ int SpriteCache::hdTileScale(std::int32_t imageIndex) const
     }
     const auto& e = pack_->entry(static_cast<std::size_t>(imageIndex));
     if (!e.present() || e.width <= 0 || static_cast<std::int32_t>(e.pixelWidth) <= e.width ||
-        e.pixelWidth % static_cast<std::uint32_t>(e.width) != 0) {
+        e.pixelWidth % static_cast<std::uint32_t>(e.width) != 0 || keptOriginal(imageIndex)) {
         return 1;
     }
     return static_cast<int>(e.pixelWidth / static_cast<std::uint32_t>(e.width));
@@ -1139,14 +1139,37 @@ bool SpriteCache::hdTilePending(std::int32_t imageIndex)
     return true;
 }
 
-void SpriteCache::setPack(std::unique_ptr<nox::video::ImagePackReader> pack, const std::filesystem::path& path)
+void SpriteCache::setPack(std::unique_ptr<nox::video::ImagePackReader> pack, const std::filesystem::path& path,
+                          bool checkSources)
 {
     decoder_.reset(); // (the workers stopped before anything they'd finish for goes)
     clear();
     atlas_.reset();
     pack_ = std::move(pack);
     packNamed_.clear();
-    keptOriginal_ = pack_ ? hdKeptOriginalSlots(*pack_) : std::vector<std::int32_t>{};
+    keptOriginal_.clear();
+    sourcesDiffering_ = 0;
+    if (pack_) {
+        for (const std::int32_t slot : hdKeptOriginalSlots(*pack_)) {
+            keptOriginal_.resize(std::max<std::size_t>(keptOriginal_.size(), static_cast<std::size_t>(slot) + 1));
+            keptOriginal_[static_cast<std::size_t>(slot)] = true;
+        }
+    }
+    if (pack_ && checkSources) {
+        // Another video.idx's pack (a mod's or a translation's images): each filled slot's source
+        // key against the game's entry there (name, type, sizes: nothing read from video.bag);
+        // where they differ the game's own image is drawn. Once, here.
+        const auto start = SDL_GetTicksNS();
+        std::size_t checked = 0;
+        for (const std::int32_t slot : hdChangedSourceSlots(*pack_, bag_.images(), &checked)) {
+            keptOriginal_.resize(std::max<std::size_t>(keptOriginal_.size(), static_cast<std::size_t>(slot) + 1));
+            keptOriginal_[static_cast<std::size_t>(slot)] = true;
+            ++sourcesDiffering_;
+        }
+        SDL_Log("image pack: made from another video.idx: %zu of its %zu images differ from the game's and are drawn "
+                "from video.bag (checked in %.2f ms)",
+                sourcesDiffering_, checked, static_cast<double>(SDL_GetTicksNS() - start) / 1e6);
+    }
     if (pack_) {
         // BC7 images to the GPU as they are, when the renderer's device takes them.
         bool bc7 = false;
@@ -1181,19 +1204,25 @@ const Sprite* SpriteCache::packNamed(const std::string& name)
 }
 
 std::unique_ptr<nox::video::ImagePackReader> SpriteCache::openPack(const std::filesystem::path& pack,
-                                                                   const std::filesystem::path& videoIdx)
+                                                                   const std::filesystem::path& videoIdx, bool* checkSources)
 {
+    if (checkSources) {
+        *checkSources = false;
+    }
     try {
         auto reader = std::make_unique<nox::video::ImagePackReader>(pack);
         // Its slots are video.idx's images: a pack made from another version's would put the
-        // wrong pictures on things.
+        // wrong pictures on things. With source keys each slot is checked instead (setPack).
         if (reader->sourceIdxCrc() != 0) {
             const auto idx = nox::readFileBytes(videoIdx);
             const std::uint32_t crc = nox::video::packCrc(idx);
             if (crc != reader->sourceIdxCrc()) {
-                SDL_Log("image pack %s: made from another video.idx (CRC %08X, the game's is %08X); not used",
-                        nox::pathUtf8(pack).c_str(), reader->sourceIdxCrc(), crc);
-                return nullptr;
+                if (!reader->sourceKeys() || !checkSources) {
+                    SDL_Log("image pack %s: made from another video.idx (CRC %08X, the game's is %08X); not used",
+                            nox::pathUtf8(pack).c_str(), reader->sourceIdxCrc(), crc);
+                    return nullptr;
+                }
+                *checkSources = true;
             }
         }
         std::uint32_t upscaled = 0;
@@ -1245,7 +1274,7 @@ const nox::video::PackEntry* SpriteCache::hdEntry(std::int32_t index) const
     // (Floor tiles and edges stay at their size: the floor is composited in world units. The
     // redraws kept out are drawn from video.bag: hd_kept_originals.hpp.)
     const bool hd = e.present() && static_cast<std::int32_t>(e.pixelWidth) > e.width && e.type != 0 && e.type != 1;
-    return hd && std::find(keptOriginal_.begin(), keptOriginal_.end(), index) == keptOriginal_.end() ? &e : nullptr;
+    return hd && !keptOriginal(index) ? &e : nullptr;
 }
 
 // A video.bag segment's decompressed bytes, from a short most-recently-used list (kSegmentCache).

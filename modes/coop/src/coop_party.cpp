@@ -91,12 +91,8 @@ constexpr float kTrapNear = 2.0f;
 
 std::string CoopDirector::nameOf(const server::ServerObject& unit) const
 {
-    std::string name;
-    if (unit.player) {
-        for (const char16_t c : unit.player->name) {
-            name += c < 0x80 ? static_cast<char>(c) : '?';
-        }
-    }
+    const std::string name = unit.player ? strings::toUtf8(unit.player->name) : std::string();
+
     return name.empty() ? std::string("A player") : name;
 }
 

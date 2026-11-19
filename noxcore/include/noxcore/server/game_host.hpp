@@ -26,6 +26,7 @@
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/update_writer.hpp"
 #include "noxcore/server/xfer.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/game_data.hpp"
 
 #include <array>
@@ -167,8 +168,11 @@ struct HostedPlayer {
     /// (a peer, its record's address and a unit's number are all used again). Not on the wire.
     std::uint32_t joinSerial = 0;
     net::msg::ClientAccept accept;
-    std::array<std::uint8_t, 97> info{}; ///< the PlayerInfo block
-    std::string name;
+    /// the PlayerInfo block (noxcpp: its name as Unicode, GameHost::join; sent to each client as
+    /// it takes text: GameHost::textFor)
+    std::array<std::uint8_t, 97> info{};
+    std::string name;        ///< its name, UTF-8 (the console's, logs', bans')
+    std::u16string wideName; ///< the same, UTF-16 (the ban list's key, a kick vote's)
     bool ready = false;            ///< sent CLIENT_READY
     /// Sent INCOMING_CLIENT (its bit in g_playersInGameMask, kept through map changes): important
     /// messages to everyone wait for its CLIENT_READY (frees a node only once each
@@ -1115,6 +1119,14 @@ private:
     /// g_playersInGameMask), so a player in but not ready gets it at its CLIENT_READY; one not in
     /// yet (no INCOMING_CLIENT) doesn't.
     void sendImportantToAll(std::span<const std::uint8_t> bytes, bool onlyJoined = false, std::optional<std::uint8_t> except = std::nullopt);
+    /// noxcpp: whether `peer` takes the game's text as real Unicode (a NoX Core client of
+    /// lobby::kUnicodeTextLevel); the rest get it in the host's convention (strings::wireText).
+    bool unicodePeer(std::uint8_t peer) const;
+    /// The convention text from `peer` comes in (and goes to it in): Unicode's (plain) or the host's.
+    strings::LegacyText peerText(std::uint8_t peer) const;
+    /// A message as `peer` takes it (World::textForStock): its text in the host's convention for a
+    /// stock client of a host whose convention isn't Latin-1; nullopt: as it is.
+    std::optional<std::vector<std::uint8_t>> textFor(std::uint8_t peer, std::span<const std::uint8_t> m) const;
     /// A player's CLIENT_READY: what waited for it goes first (the important queue's oldest first).
     void releasePending(HostedPlayer& p);
     /// GAME.EXE's player 0x1F (the host's own: setHostPeer's, or a solo game's).

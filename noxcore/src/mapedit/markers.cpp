@@ -1,5 +1,6 @@
 // The map editor's waypoints, polygons and groups (markers.hpp).
 #include "noxcore/mapedit/markers.hpp"
+#include "noxcore/strings/string_table.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -864,6 +865,8 @@ std::string toMapText(std::string_view s, bool* lossy)
 {
     std::string out;
     bool lost = false;
+    const strings::LegacyText text = strings::wireText();
+    const bool cp1251 = !text.plain();
     for (std::size_t i = 0; i < s.size();) {
         const auto b = static_cast<unsigned char>(s[i]);
         char32_t c = 0;
@@ -887,6 +890,13 @@ std::string toMapText(std::string_view s, bool* lossy)
             lost = true; // (a NUL would end the text early)
             continue;
         }
+        if (cp1251 && c >= 0x80) {
+            // (A Russian install's maps: Windows-1251, as its game's fonts draw them.)
+            const int b = c <= 0xFFFF ? strings::cp1251Byte(c) : -1;
+            out += b >= 0 ? static_cast<char>(strings::toWire(static_cast<char16_t>(c), text)) : '?';
+            lost = lost || b < 0;
+            continue;
+        }
         if (c < 0x80 || (c >= 0xA0 && c <= 0xFF)) {
             out += static_cast<char>(c);
             continue;
@@ -906,10 +916,14 @@ std::string toMapText(std::string_view s, bool* lossy)
 std::string fromMapText(std::string_view s)
 {
     std::string out;
+    const strings::LegacyText text = strings::wireText();
+    const bool cp1251 = !text.plain();
     for (const char ch : s) {
         const auto b = static_cast<unsigned char>(ch);
         if (b < 0x80) {
             out += ch;
+        } else if (cp1251) {
+            appendUtf8(out, strings::fromWire(static_cast<char16_t>(b), text)); // (a Russian install's maps: Windows-1251)
         } else if (b < 0xA0) {
             const char16_t c = kCp1252High[b - 0x80];
             appendUtf8(out, c ? c : 0xFFFD);

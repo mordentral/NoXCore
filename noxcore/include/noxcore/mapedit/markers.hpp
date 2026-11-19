@@ -160,10 +160,11 @@ std::vector<std::string> groupProblems(const MapDocument& doc, std::size_t index
 
 // --- Map info ------------------------------------------------------------------------------------
 
-/// Text as the map stores it (the game's 8-bit Windows-1252 text) from UTF-8: characters it can't
-/// hold become '?' (and `lossy` is set).
+/// Text as the map stores it (the game's 8-bit Windows-1252 text; Windows-1251 on a Russian fan
+/// translation's install, strings::wireCodepage) from UTF-8: characters it can't hold become '?'
+/// (and `lossy` is set).
 std::string toMapText(std::string_view utf8, bool* lossy = nullptr);
-/// The map's 8-bit text as UTF-8.
+/// The map's 8-bit text as UTF-8 (as toMapText's codepage reads it).
 std::string fromMapText(std::string_view text);
 /// UTF-8 text as the map stores it, cut to at most `maxBytes` bytes. `lossy`: characters became
 /// '?'; `cut`: it was longer.

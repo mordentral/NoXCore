@@ -922,16 +922,16 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             SDL_Log("nox.csf: %s (menus show string ids)", ex.what());
         }
         if (app->strings) {
-            // Which way its U+0080-U+00FF are meant, once (the fonts take it: applyTextCodepage).
+            // Which way its U+0080-U+00FF are meant, once (applyTextCodepage takes it).
             app->csfGuess = nox::strings::guessLegacyCodepage(*app->strings);
-            SDL_Log("nox.csf: language %u, %s: %zu letters A-Z, %zu in U+00C0-U+00FF, %zu Cyrillic: auto reads %s%s",
+            SDL_Log("nox.csf: language %u, %s: %zu letters A-Z, %zu in U+00C0-U+00FF (shifted %d), %zu Cyrillic: auto reads %s%s",
                     app->strings->language(), app->csfGuess.reason, app->csfGuess.asciiLetters, app->csfGuess.highLetters,
-                    app->csfGuess.cyrillic,
+                    app->csfGuess.shift, app->csfGuess.cyrillic,
                     app->csfGuess.codepage == nox::strings::LegacyCodepage::Cp1251 ? "Windows-1251" : "Latin-1",
                     app->strings->tagsSwapped() ? " (its text was stored without its tags' inversion: read the other way round)"
                                                 : "");
-            applyTextCodepage(*app);
         }
+        applyTextCodepage(*app); // (CsfText = cp1251 holds without a nox.csf too)
         app->hud->setStrings(app->strings.get()); // tooltips
         app->itemNames = std::make_unique<ItemNames>(app->things, *app->art, app->modifiers, app->strings.get());
         const gui::Resources res = guiResources(*app);

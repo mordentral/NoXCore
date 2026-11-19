@@ -456,7 +456,7 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
             return;
         }
         const std::string name = p->name;
-        bans_[utf16Until(p->accept.playerName)] = 0xFFFFFFFFu;
+        bans_[p->wideName] = 0xFFFFFFFFu;
         syncAccess();
         if (server_.world().quest()) {
             // (In a quest as the kick: its save to its client, out once the client

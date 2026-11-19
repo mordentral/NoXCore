@@ -86,6 +86,7 @@
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/player/player_file.hpp"
 #include "noxcore/server/play_from_here.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/game_data.hpp"
 #include "noxcore/things/modifier.hpp"
 #include "noxcore/things/thing_db.hpp"
@@ -681,8 +682,9 @@ struct App {
     /// Options' Original Style Fonts (noxcore.cfg's OriginalFonts): the Nox-style fonts, else Caudex.
     bool originalFonts = true;
     /// noxcore.cfg's CsfText (OptionsWindow::Extras::kCsfText*), and what nox.csf's letters said
-    /// at load (auto's answer): applyTextCodepage puts the result on both fonts.
+    /// at load (auto's answer): applyTextCodepage makes the result the program's, once at start.
     int csfText = OptionsWindow::Extras::kCsfTextAuto;
+    int csfShift = -1; ///< CsfText = cp1251:N's N (-1: the guess's)
     nox::strings::CodepageGuess csfGuess;
     bool namePlates = true; ///< N toggles
     std::uint32_t joinTeam = 0; ///< --team: asked for once we're in the game

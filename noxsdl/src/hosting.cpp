@@ -213,7 +213,7 @@ void hostSettingsFromConfig(const App& app, HostSettings& s)
         return std::nullopt;
     };
     if (const auto v = c.setting("ServerName"); v && !v->empty()) {
-        s.name = v->substr(0, 15);
+        s.name = nox::strings::fitWire8(*v, 15);
     }
     if (const auto v = number("MaxPlayers"); v && *v > 0) {
         s.maxPlayers = std::clamp(*v, 1, 32);
