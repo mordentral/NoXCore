@@ -150,6 +150,12 @@ bool isEntryPointName(std::string_view name);
 constexpr std::string_view kTestPrefix = "Test";
 /// The text an assert that fails prints (with PrintToAll), before "line N: message".
 constexpr std::string_view kAssertPrefix = "ASSERT ";
+/// The bit casts: `int __bits(float)` and `float __bitsf(int)` keep the value's 32 bits and change
+/// only its static type, with no code (the VM's words have no type). The decompiler writes them
+/// where code uses a value as the other type. Written unquoted, the name is always the cast.
+constexpr std::string_view kBitCastToInt = "__bits";
+constexpr std::string_view kBitCastToFloat = "__bitsf";
+constexpr bool isBitCastName(std::string_view name) { return name == kBitCastToInt || name == kBitCastToFloat; }
 
 struct CompileResult {
     std::optional<ScriptFile> file; ///< nothing on an error
@@ -218,7 +224,9 @@ struct CallOrderMigration {
 CallOrderMigration migrateCallOrder(std::string_view oldSource);
 
 /// The source kept in string 0 (nsc's habit, or ours with embedSource), if there is one, without
-/// kEmbeddedSourceMark; `marked`, when given, says whether it had the mark.
+/// kEmbeddedSourceMark; `marked`, when given, says whether it had the mark. A string 0 that is
+/// kEmbeddedSourcePrefix and nothing more, in a script with functions past the two GLOBALs, is a
+/// compiler's tag, not a source: nothing (the decompiler reads the code).
 std::optional<std::string> embeddedSource(const ScriptFile& file, bool* marked = nullptr);
 
 /// Whether a compiled script has object variables: function 0 lays out symbols past the loader's

@@ -1574,6 +1574,33 @@ private:
         return Type::Void;
     }
 
+    // ---- bit casts (NoX Core's) ----------------------------------------
+
+    /// `__bits(float)` is an int and `__bitsf(int)` a float with the same 32 bits: no code, only
+    /// the static type changes (the VM's words have no type). A call written unquoted is always the
+    /// cast; a script's own function of that name is called by its quoted name.
+    Type bitCast(Expr& e)
+    {
+        const bool toFloat = e.text == kBitCastToFloat;
+        const Type from = toFloat ? Type::Int : Type::Float;
+        if (e.args.size() != 1) {
+            error(e.loc, l10n::format(NOX_TRP("editor.script.compile.arg_count", "{name} takes {n} argument, not {got}", "{name} takes {n} arguments, not {got}", 1),
+                                      {{"name", e.text}, {"n", 1}, {"got", e.args.size()}}));
+            return Type::Void;
+        }
+        const Type t = expr(*e.args[0], from);
+        if (t == Type::Void) {
+            return Type::Void;
+        }
+        // (An object is an int to the VM: its id's bits as a float too.)
+        if (t != from && !(toFloat && t == Type::Object)) {
+            error(e.args[0]->loc, l10n::format(NOX_TR("editor.script.compile.arg_type", "{name}'s argument {n} is a {type}, not a {other}"),
+                                               {{"name", e.text}, {"n", 1}, {"type", typeName(from)}, {"other", typeName(t)}}));
+            return Type::Void;
+        }
+        return toFloat ? Type::Float : Type::Int;
+    }
+
     // ---- Wait (NoX Core's, test-only) ----------------------------------
 
     /// `Wait` is the intrinsic unless the script defines a function of that name (as for assert).
@@ -2722,6 +2749,9 @@ private:
         if (e.text == "Wait" && !e.quoted && waitIsIntrinsic()) {
             return waitCall(e, statement);
         }
+        if (!e.quoted && isBitCastName(e.text)) {
+            return bitCast(e);
+        }
         std::vector<Type> want;
         Type returns = Type::Void;
         std::uint32_t callOp = 0;
@@ -3064,6 +3094,11 @@ std::optional<std::string> embeddedSource(const ScriptFile& file, bool* marked)
         *marked = false;
     }
     if (file.strings.empty() || !file.strings.front().starts_with(kEmbeddedSourcePrefix)) {
+        return std::nullopt;
+    }
+    // The prefix alone, in a script with functions of its own, is a compiler's tag, not a source:
+    // its code is the script. (With none, it is an empty source as an older NoX Core kept it.)
+    if (file.strings.front().size() == kEmbeddedSourcePrefix.size() && file.functions.size() > 2) {
         return std::nullopt;
     }
     std::string_view rest = std::string_view(file.strings.front()).substr(kEmbeddedSourcePrefix.size());

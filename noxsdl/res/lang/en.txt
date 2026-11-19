@@ -8966,17 +8966,17 @@ editor.script.class.warrior = Warrior
 # noxsdl/src/editor/script_panel.cpp:188, noxsdl/src/editor/script_panel.cpp:188
 #@ 42181c2a: Wizard
 editor.script.class.wizard = Wizard
-# noxcore/src/script/compiler.cpp:2770
+# noxcore/src/script/compiler.cpp:1587, noxcore/src/script/compiler.cpp:2800
 #@ a6cc4de1: {name} takes {n} argument, not {got} | {name} takes {n} arguments, not {got}
 editor.script.compile.arg_count[one] = {name} takes {n} argument, not {got}
 editor.script.compile.arg_count[other] = {name} takes {n} arguments, not {got}
-# noxcore/src/script/compiler.cpp:2773
+# noxcore/src/script/compiler.cpp:2803
 #@ 53d7c464: {name} takes {min} to {n} arguments, not {got}
 editor.script.compile.arg_count_range = {name} takes {min} to {n} arguments, not {got}
-# noxcore/src/script/compiler.cpp:2803
+# noxcore/src/script/compiler.cpp:1597, noxcore/src/script/compiler.cpp:2833
 #@ 64fed792: {name}'s argument {n} is a {type}, not a {other}
 editor.script.compile.arg_type = {name}'s argument {n} is a {type}, not a {other}
-# noxcore/src/script/compiler.cpp:2802
+# noxcore/src/script/compiler.cpp:2832
 #@ 8b21f615: {name}'s argument {n} is a {type} (a function's name), not a {other}
 editor.script.compile.arg_type_function = {name}'s argument {n} is a {type} (a function's name), not a {other}
 # noxcore/src/script/compiler.cpp:670, noxcore/src/script/compiler.cpp:814
@@ -8988,7 +8988,7 @@ editor.script.compile.array_length_min = an array's length must be more than 1
 # noxcore/src/script/compiler.cpp:693
 #@ 0d3b467f: an array's length must be a number
 editor.script.compile.array_length_number = an array's length must be a number
-# noxcore/src/script/compiler.cpp:2407, noxcore/src/script/compiler.cpp:2422, noxcore/src/script/compiler.cpp:2562 ...
+# noxcore/src/script/compiler.cpp:2434, noxcore/src/script/compiler.cpp:2449, noxcore/src/script/compiler.cpp:2589 ...
 #@ e18b55c1: the array {name} must be indexed
 editor.script.compile.array_unindexed = the array {name} must be indexed
 # noxcore/src/script/compiler.cpp:1552
@@ -9000,31 +9000,31 @@ editor.script.compile.assert_message = assert's message must be a string literal
 # noxcore/src/script/compiler.cpp:1560
 #@ 3c62ee76: assert is a statement, not a value
 editor.script.compile.assert_value = assert is a statement, not a value
-# noxcore/src/script/compiler.cpp:2566
+# noxcore/src/script/compiler.cpp:2593
 #@ 3b9774b5: can't assign to {name}
 editor.script.compile.assign_read_only = can't assign to {name}
-# noxcore/src/script/compiler.cpp:2598
+# noxcore/src/script/compiler.cpp:2625
 #@ bd0d57dd: can only assign to a variable or an array element
 editor.script.compile.assign_target = can only assign to a variable or an array element
-# noxcore/src/script/compiler.cpp:2607
+# noxcore/src/script/compiler.cpp:2634
 #@ c8a3579f: can't assign a {other} to the {type} {name}
 editor.script.compile.assign_type = can't assign a {other} to the {type} {name}
-# noxcore/src/script/compiler.cpp:2162
+# noxcore/src/script/compiler.cpp:2189
 #@ 1299be75: break outside a loop or switch
 editor.script.compile.break_outside = break outside a loop or switch
 # noxcore/src/script/compiler.cpp:1537
 #@ 9da15d50: a built string kept in {what}: the game drops it at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
 editor.script.compile.built_string_global = a built string kept in {what}: the game drops it at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
-# noxcore/src/script/compiler.cpp:1756
+# noxcore/src/script/compiler.cpp:1783
 #@ 9d72da79: the local {name} in {function} is given a built string and can be read before this call sets it: locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
 editor.script.compile.built_string_local = the local {name} in {function} is given a built string and can be read before this call sets it: locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
-# noxcore/src/script/compiler.cpp:1751
+# noxcore/src/script/compiler.cpp:1778
 #@ f63a8501: the local {name} in {function} is given a built string and can be read before this call sets it (a Wait ends the call): locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
 editor.script.compile.built_string_local_wait = the local {name} in {function} is given a built string and can be read before this call sets it (a Wait ends the call): locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
-# noxcore/src/script/compiler.cpp:2403
+# noxcore/src/script/compiler.cpp:2430
 #@ 6da1888d: the builtin {name} needs ( ) to be called
 editor.script.compile.builtin_needs_call = the builtin {name} needs ( ) to be called
-# noxcore/src/script/compiler.cpp:2658
+# noxcore/src/script/compiler.cpp:2685
 #@ 6cf85b95: the function {name} returns a value: the game calls a timer's or a dialog's function without taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); declare it void
 editor.script.compile.callback_returns = the function {name} returns a value: the game calls a timer's or a dialog's function without taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); declare it void
 # noxcore/src/script/compiler.cpp:1347
@@ -9033,16 +9033,16 @@ editor.script.compile.caller_builtin = {builtin} calls {name}
 # noxcore/src/script/compiler.cpp:1341
 #@ 140dfa0f: the game calls the entry point {name}
 editor.script.compile.caller_entry_point = the game calls the entry point {name}
-# noxcore/src/script/compiler.cpp:2149
+# noxcore/src/script/compiler.cpp:2176
 #@ c992be4e: {label} outside a switch's own block
 editor.script.compile.case_outside_switch = {label} outside a switch's own block
-# noxcore/src/script/compiler.cpp:2276
+# noxcore/src/script/compiler.cpp:2303
 #@ d1f894d0: the case is a {type}, the switch's value a {other}
 editor.script.compile.case_type = the case is a {type}, the switch's value a {other}
-# noxcore/src/script/compiler.cpp:2326
+# noxcore/src/script/compiler.cpp:2353
 #@ 0a4b32ce: {what}'s condition must be an int, not a {type}
 editor.script.compile.condition_type = {what}'s condition must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:2162
+# noxcore/src/script/compiler.cpp:2189
 #@ 8e84dc1e: continue outside a loop
 editor.script.compile.continue_outside = continue outside a loop
 # noxcore/src/script/compiler.cpp:1236
@@ -9099,31 +9099,31 @@ editor.script.compile.found_number = the number {text}
 # noxcore/src/script/compiler.cpp:529
 #@ fcbbb8a5: a string
 editor.script.compile.found_string = a string
-# noxcore/src/script/compiler.cpp:2400
+# noxcore/src/script/compiler.cpp:2427
 #@ 9a5bf55c: the function {name} is used as a value (only a builtin's function argument takes one)
 editor.script.compile.function_as_value = the function {name} is used as a value (only a builtin's function argument takes one)
-# noxcore/src/script/compiler.cpp:1833
+# noxcore/src/script/compiler.cpp:1860
 #@ a6312c6e: GLOBAL is the name of the script's own first two functions
 editor.script.compile.function_global = GLOBAL is the name of the script's own first two functions
-# noxcore/src/script/compiler.cpp:1821
+# noxcore/src/script/compiler.cpp:1848
 #@ 38abd7c0: the function {name} doesn't match its earlier declaration
 editor.script.compile.function_mismatch = the function {name} doesn't match its earlier declaration
-# noxcore/src/script/compiler.cpp:1837
+# noxcore/src/script/compiler.cpp:1864
 #@ 92344246: a function's name must be 1 to 1023 bytes
 editor.script.compile.function_name_length = a function's name must be 1 to 1023 bytes
 # noxcore/src/script/compiler.cpp:640
 #@ d0191a21: a function can't be named object.{name}
 editor.script.compile.function_object_name = a function can't be named object.{name}
-# noxcore/src/script/compiler.cpp:1825
+# noxcore/src/script/compiler.cpp:1852
 #@ 8d79625e: the function {name} is defined twice
 editor.script.compile.function_twice = the function {name} is defined twice
 # noxcore/src/script/compiler.cpp:1358
 #@ bfbb1474: the function {name} is never called, given to a builtin or named by the map
 editor.script.compile.function_unused = the function {name} is never called, given to a builtin or named by the map
-# noxcore/src/script/compiler.cpp:1865
+# noxcore/src/script/compiler.cpp:1892
 #@ 5daed38b: the global {name} is declared again with another type
 editor.script.compile.global_redeclared = the global {name} is declared again with another type
-# noxcore/src/script/compiler.cpp:1872
+# noxcore/src/script/compiler.cpp:1899
 #@ 4aad9026: the global {name} has two initialisers
 editor.script.compile.global_two_inits = the global {name} has two initialisers
 # noxcore/src/script/compiler.cpp:1321
@@ -9135,64 +9135,64 @@ editor.script.compile.hex_no_digits = a hex number needs digits after 0x
 # noxcore/src/script/compiler.cpp:181
 #@ 420ea997: the number is too big for 32 bits
 editor.script.compile.hex_too_big = the number is too big for 32 bits
-# noxcore/src/script/compiler.cpp:2432
+# noxcore/src/script/compiler.cpp:2459
 #@ ce3b223d: only an array variable can be indexed
 editor.script.compile.index_non_array = only an array variable can be indexed
-# noxcore/src/script/compiler.cpp:2504
+# noxcore/src/script/compiler.cpp:2531
 #@ 4021bbe3: an array index must be an int, not a {type}
 editor.script.compile.index_type = an array index must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:1899, noxcore/src/script/compiler.cpp:2071
+# noxcore/src/script/compiler.cpp:1926, noxcore/src/script/compiler.cpp:2098
 #@ fd5f319e: can't initialise the {type} {name} with a {other}
 editor.script.compile.init_type = can't initialise the {type} {name} with a {other}
 # noxcore/src/script/compiler.cpp:1274
 #@ e00e8f75: internal: the code made doesn't check: {why}
 editor.script.compile.internal_check = internal: the code made doesn't check: {why}
-# noxcore/src/script/compiler.cpp:2199
+# noxcore/src/script/compiler.cpp:2226
 #@ 2e635fff: the label {label} is defined twice
 editor.script.compile.label_twice = the label {label} is defined twice
-# noxcore/src/script/compiler.cpp:1997
+# noxcore/src/script/compiler.cpp:2024
 #@ 7e13a7b9: the label {label} is never used
 editor.script.compile.label_unused = the label {label} is never used
-# noxcore/src/script/compiler.cpp:2008
+# noxcore/src/script/compiler.cpp:2035
 #@ 5072e33b: the local {name} in {function} is never read
 editor.script.compile.local_unread = the local {name} in {function} is never read
 # noxcore/src/script/compiler.cpp:1247
 #@ 1a04ebad: {n} string constants leave few of the game's 1024 strings for the ones made while it runs
 editor.script.compile.many_strings = {n} string constants leave few of the game's 1024 strings for the ones made while it runs
-# noxcore/src/script/compiler.cpp:2180
+# noxcore/src/script/compiler.cpp:2207
 #@ 340d1e41: the function {name} must return a {type}
 editor.script.compile.must_return = the function {name} must return a {type}
-# noxcore/src/script/compiler.cpp:1787, noxcore/src/script/compiler.cpp:1841
+# noxcore/src/script/compiler.cpp:1814, noxcore/src/script/compiler.cpp:1868
 #@ 04da9a65: '{name}' is a builtin's name
 editor.script.compile.name_builtin = '{name}' is a builtin's name
-# noxcore/src/script/compiler.cpp:1791
+# noxcore/src/script/compiler.cpp:1818
 #@ f87ba73a: '{name}' is a function's name
 editor.script.compile.name_function = '{name}' is a function's name
-# noxcore/src/script/compiler.cpp:1795
+# noxcore/src/script/compiler.cpp:1822
 #@ 242e043a: '{name}' is already a global variable
 editor.script.compile.name_global = '{name}' is already a global variable
-# noxcore/src/script/compiler.cpp:1783, noxcore/src/script/compiler.cpp:1841
+# noxcore/src/script/compiler.cpp:1810, noxcore/src/script/compiler.cpp:1868
 #@ b13701e4: '{name}' is a keyword
 editor.script.compile.name_keyword = '{name}' is a keyword
-# noxcore/src/script/compiler.cpp:1795
+# noxcore/src/script/compiler.cpp:1822
 #@ 0b033742: '{name}' is a name of the language
 editor.script.compile.name_language = '{name}' is a name of the language
-# noxcore/src/script/compiler.cpp:1801
+# noxcore/src/script/compiler.cpp:1828
 #@ 08eb2369: '{name}' is already declared in this function
 editor.script.compile.name_local = '{name}' is already declared in this function
-# noxcore/src/script/compiler.cpp:2482
+# noxcore/src/script/compiler.cpp:2509
 #@ a4c38a95: can't negate a {type}
 editor.script.compile.negate_type = can't negate a {type}
-# noxcore/src/script/compiler.cpp:2001
+# noxcore/src/script/compiler.cpp:2028
 #@ a775c822: the function {name} never returns a value
 editor.script.compile.never_returns = the function {name} never returns a value
-# noxcore/src/script/compiler.cpp:2763
+# noxcore/src/script/compiler.cpp:2793
 #@ a2cee878: no function named {name}
 editor.script.compile.no_function = no function named {name}
-# noxcore/src/script/compiler.cpp:2382
+# noxcore/src/script/compiler.cpp:2409
 #@ 6a2d25e6: no function named "{name}"
 editor.script.compile.no_function_quoted = no function named "{name}"
-# noxcore/src/script/compiler.cpp:1990
+# noxcore/src/script/compiler.cpp:2017
 #@ 44691701: no label {label} in {function}
 editor.script.compile.no_label = no label {label} in {function}
 # noxcore/src/script/compiler.cpp:1387
@@ -9201,19 +9201,19 @@ editor.script.compile.no_object = {function} uses object.{used}, but {caller} wi
 # noxcore/src/script/compiler.cpp:1463
 #@ 773b8a8a: no object variable object.{name} (declare it at the top level: int object.{name};)
 editor.script.compile.no_object_var = no object variable object.{name} (declare it at the top level: int object.{name};)
-# noxcore/src/script/compiler.cpp:2814
+# noxcore/src/script/compiler.cpp:2844
 #@ db30c192: {name} doesn't return a value
 editor.script.compile.no_value = {name} doesn't return a value
-# noxcore/src/script/compiler.cpp:2440, noxcore/src/script/compiler.cpp:2558, noxcore/src/script/compiler.cpp:2590
+# noxcore/src/script/compiler.cpp:2467, noxcore/src/script/compiler.cpp:2585, noxcore/src/script/compiler.cpp:2617
 #@ 72670360: no variable named {name}
 editor.script.compile.no_variable = no variable named {name}
-# noxcore/src/script/compiler.cpp:2403
+# noxcore/src/script/compiler.cpp:2430
 #@ a41ad695: no variable or function named {name}
 editor.script.compile.no_variable_or_function = no variable or function named {name}
-# noxcore/src/script/compiler.cpp:2440, noxcore/src/script/compiler.cpp:2590
+# noxcore/src/script/compiler.cpp:2467, noxcore/src/script/compiler.cpp:2617
 #@ 4800cb01: {name} isn't an array
 editor.script.compile.not_array = {name} isn't an array
-# noxcore/src/script/compiler.cpp:2746
+# noxcore/src/script/compiler.cpp:2776
 #@ d795758b: {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
 editor.script.compile.nox_builtin = {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
 # noxcore/src/script/compiler.cpp:252
@@ -9258,40 +9258,40 @@ editor.script.compile.object_vars_off_first = object.{name}: object variables ar
 # noxcore/src/script/compiler.cpp:234
 #@ 657ee1d2: bad digit in the octal number {text}
 editor.script.compile.octal_digit = bad digit in the octal number {text}
-# noxcore/src/script/compiler.cpp:2518
+# noxcore/src/script/compiler.cpp:2545
 #@ 21821c02: the operands of '{op}' are a {left} and a {right}
 editor.script.compile.operand_types = the operands of '{op}' are a {left} and a {right}
-# noxcore/src/script/compiler.cpp:2520, noxcore/src/script/compiler.cpp:2619
+# noxcore/src/script/compiler.cpp:2547, noxcore/src/script/compiler.cpp:2646
 #@ 48e22fa9: '{op}' doesn't work on {type}s
 editor.script.compile.operator_type = '{op}' doesn't work on {type}s
 # noxcore/src/script/compiler.cpp:730
 #@ 0fc854e7: a parameter can't be an array
 editor.script.compile.param_array = a parameter can't be an array
-# noxcore/src/script/compiler.cpp:2455
+# noxcore/src/script/compiler.cpp:2482
 #@ 5a3c29c7: reading an element of {name} with //@raw_object_vars: the VM's IndexInt reads below the object's variables there, so this reads 0 (drop the flag to read it)
 editor.script.compile.raw_object_index = reading an element of {name} with //@raw_object_vars: the VM's IndexInt reads below the object's variables there, so this reads 0 (drop the flag to read it)
-# noxcore/src/script/compiler.cpp:2176
+# noxcore/src/script/compiler.cpp:2203
 #@ 28e1e1f3: the function {name} returns {type}, not {other}
 editor.script.compile.return_type = the function {name} returns {type}, not {other}
 # noxcore/src/script/compiler.cpp:884
 #@ 95303f29: a switch needs a { block }
 editor.script.compile.switch_block = a switch needs a { block }
-# noxcore/src/script/compiler.cpp:2261
+# noxcore/src/script/compiler.cpp:2288
 #@ 1545ef18: a switch with two defaults
 editor.script.compile.switch_two_defaults = a switch with two defaults
-# noxcore/src/script/compiler.cpp:2247
+# noxcore/src/script/compiler.cpp:2274
 #@ 62c4ce0b: a switch's value must be an int, not a {type}
 editor.script.compile.switch_type = a switch's value must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:2678
+# noxcore/src/script/compiler.cpp:2705
 #@ a8b4acea: {builtin} gives {name} an argument, but {name} takes none: the game passes a timer's argument only to a function that has one, so the value is lost (use {plain}, or give {name} a parameter)
 editor.script.compile.timer_arg_lost = {builtin} gives {name} an argument, but {name} takes none: the game passes a timer's argument only to a function that has one, so the value is lost (use {plain}, or give {name} a parameter)
-# noxcore/src/script/compiler.cpp:2685
+# noxcore/src/script/compiler.cpp:2712
 #@ 17ea5406: {name} takes {n} arguments, but {builtin} gives it none: {param} reads 0 and the rest whatever is on the stack (use {builtin}WithArg)
 editor.script.compile.timer_no_arg_many = {name} takes {n} arguments, but {builtin} gives it none: {param} reads 0 and the rest whatever is on the stack (use {builtin}WithArg)
-# noxcore/src/script/compiler.cpp:2683
+# noxcore/src/script/compiler.cpp:2710
 #@ 4b54b81c: {name} takes an argument, but {builtin} gives it none: {param} reads 0 (use {builtin}WithArg)
 editor.script.compile.timer_no_arg_one = {name} takes an argument, but {builtin} gives it none: {param} reads 0 (use {builtin}WithArg)
-# noxcore/src/script/compiler.cpp:2690
+# noxcore/src/script/compiler.cpp:2717
 #@ 5074a116: {name} takes {n} arguments, but {builtin} gives it one: the rest read whatever is on the stack
 editor.script.compile.timer_one_arg = {name} takes {n} arguments, but {builtin} gives it one: the rest read whatever is on the stack
 # noxcore/src/script/compiler.cpp:461
@@ -9300,16 +9300,16 @@ editor.script.compile.too_deep = nested too deeply (more than {n} levels of stat
 # noxcore/src/script/compiler.cpp:1245
 #@ 4bd118d4: {n} string constants: the game's string table holds 1024
 editor.script.compile.too_many_strings = {n} string constants: the game's string table holds 1024
-# noxcore/src/script/compiler.cpp:2472
+# noxcore/src/script/compiler.cpp:2499
 #@ 9a0da3b2: unary + needs an int or a float
 editor.script.compile.unary_plus = unary + needs an int or a float
-# noxcore/src/script/compiler.cpp:2487
+# noxcore/src/script/compiler.cpp:2514
 #@ c1eaaa3f: '{op}' needs an int, not a {type}
 editor.script.compile.unary_type = '{op}' needs an int, not a {type}
 # noxcore/src/script/compiler.cpp:362
 #@ 844e7472: unexpected character '{c}'
 editor.script.compile.unexpected_char = unexpected character '{c}'
-# noxcore/src/script/compiler.cpp:2887
+# noxcore/src/script/compiler.cpp:2917
 #@ 07b0c6c1: unknown compile flag //@{name}
 editor.script.compile.unknown_flag = unknown compile flag //@{name}
 # noxcore/src/script/compiler.cpp:153
@@ -9318,25 +9318,25 @@ editor.script.compile.unterminated_comment = unterminated /* comment
 # noxcore/src/script/compiler.cpp:265, noxcore/src/script/compiler.cpp:281
 #@ 0403602c: unterminated string
 editor.script.compile.unterminated_string = unterminated string
-# noxcore/src/script/compiler.cpp:2763
+# noxcore/src/script/compiler.cpp:2793
 #@ 72892cdb: {name} is a variable, not a function
 editor.script.compile.variable_not_function = {name} is a variable, not a function
-# noxcore/src/script/compiler.cpp:2174
+# noxcore/src/script/compiler.cpp:2201
 #@ d6ecbf62: the void function {name} can't return a value
 editor.script.compile.void_returns = the void function {name} can't return a value
 # noxcore/src/script/compiler.cpp:658, noxcore/src/script/compiler.cpp:795
 #@ 65aa094c: a variable can't be void
 editor.script.compile.void_variable = a variable can't be void
-# noxcore/src/script/compiler.cpp:1625
+# noxcore/src/script/compiler.cpp:1652
 #@ aeaf55a9: Wait takes one argument: the frames to wait (an int)
 editor.script.compile.wait_args = Wait takes one argument: the frames to wait (an int)
-# noxcore/src/script/compiler.cpp:1618
+# noxcore/src/script/compiler.cpp:1645
 #@ daba6157: Wait(frames) works only in a test: a void function named {prefix}* with no arguments (the test runner calls it again after the frames)
 editor.script.compile.wait_not_test = Wait(frames) works only in a test: a void function named {prefix}* with no arguments (the test runner calls it again after the frames)
-# noxcore/src/script/compiler.cpp:1636
+# noxcore/src/script/compiler.cpp:1663
 #@ 9113fd8e: Wait's frames must be an int, not a {type}
 editor.script.compile.wait_type = Wait's frames must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:1629
+# noxcore/src/script/compiler.cpp:1656
 #@ cb2b78d1: Wait is a statement, not a value
 editor.script.compile.wait_value = Wait is a statement, not a value
 # noxcore/src/script/compiler.cpp:1536
@@ -9354,13 +9354,13 @@ editor.script.complete.no_match = No {kind} starts with or contains "{typed}".
 # noxsdl/src/editor/script_panel.cpp:2403
 #@ 43042a08: None on this map.
 editor.script.complete.none_on_map = None on this map.
-# noxcore/src/script/decompiler.cpp:194
+# noxcore/src/script/decompiler.cpp:196
 #@ 5a2e2bbe: the function count differs
 editor.script.decompile.count_differs = the function count differs
-# noxcore/src/script/decompiler.cpp:181
+# noxcore/src/script/decompiler.cpp:183
 #@ 0dfcf00a: doesn't compile: {error}
 editor.script.decompile.no_compile = doesn't compile: {error}
-# noxcore/src/script/decompiler.cpp:191
+# noxcore/src/script/decompiler.cpp:193
 #@ fad28654: the string constants differ
 editor.script.decompile.strings_differ = the string constants differ
 # noxsdl/src/editor/script_panel.cpp:768

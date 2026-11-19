@@ -36,7 +36,7 @@ set(NOX_SAVE_DIR "" CACHE PATH "Save directory with .plr and saved-map fixtures 
 # A mod library kept outside this tree: a folder with mods/<id>/ (copied into the mods folder beside
 # noxsdl, as mods/ is) and, optionally, tests/modes/*.cpp (built into noxcore_tests when the tests
 # are). Empty by default: none, and the build is as without it.
-set(NOX_MODS_LIBRARY "" CACHE PATH "Mod library outside this tree: its mods/ copied beside noxsdl, its tests/modes/*.cpp in noxcore_tests (empty: none)")
+set(NOX_MODS_LIBRARY "" CACHE PATH "Mod library outside this tree: its mods/ copied beside noxsdl, its tests/modes/*.cpp in noxcore_tests, its tools/<name>/*.cpp as executables beside the tests (empty: none)")
 set(NOX_MODS_LIBRARY_DIR "")
 if(NOX_MODS_LIBRARY)
     get_filename_component(nox_mods_library_abs "${NOX_MODS_LIBRARY}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")

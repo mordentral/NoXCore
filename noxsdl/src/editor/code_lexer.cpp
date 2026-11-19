@@ -17,7 +17,7 @@ bool isNoxKeyword(std::string_view w)
     static constexpr std::array<std::string_view, 22> k{"if", "else", "while", "for", "switch", "case", "default", "break", "continue",
                                                         "return", "goto", "true", "false", "self", "other", "TRUE", "FALSE", "SELF",
                                                         "OTHER", "assert", "Wait", "__goto_if"};
-    return std::ranges::find(k, w) != k.end() || w == "__goto_ifnot";
+    return std::ranges::find(k, w) != k.end() || w == "__goto_ifnot" || w == "__bits" || w == "__bitsf";
 }
 
 bool isNoxType(std::string_view w)

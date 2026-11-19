@@ -50,6 +50,7 @@ add_library(noxcore
     src/io/wol_login.cpp
     src/io/zip.cpp
     src/map/map_file.cpp
+    src/map/map_patch.cpp
     src/map/map_save.cpp
     src/map/objects.cpp
     src/map/sections_geometry.cpp

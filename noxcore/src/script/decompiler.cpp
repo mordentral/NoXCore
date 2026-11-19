@@ -4,7 +4,9 @@
 //    says what its operands are (LoadVarFloat a float, StoreString a string, a builtin's
 //    arguments their declared types...), and unifying them gives each one a type. Waypoints and
 //    groups are `object`; a script that mixes them with ints is written with
-//    //@ignore_object_type.
+//    //@ignore_object_type. A value the code uses as the other of int and float (a float's
+//    bits stored in an int, an int given where a float goes) is written in a bit cast,
+//    __bits(f) or __bitsf(i), which makes no code.
 // 2. Expressions: a stack of trees over each straight run of code. There is no pop
 //    instruction, so values left on the stack (a store's, a call's unused result) are the
 //    expression statements. A call of the script's own function is written with its arguments
@@ -388,7 +390,14 @@ private:
             padded_ = false;
             typeAll(false);
         }
-        if (conflicts_ > 0 && objectConflictsOnly_) {
+        if (castConflicts_ > 0) {
+            // A value used as an int and as a float: each variable takes its own loads' and
+            // stores' type first, and the values that flow in as the other are written as bit
+            // casts (__bits / __bitsf) where they are used.
+            restrictsFirst_ = true;
+            typeAll(false);
+        }
+        if (objectConflicts_ > 0 && otherConflicts_ == 0) {
             typeAll(true);
         }
         rawObjects_ = !padded_ && f0.symbolSizes.size() >= 2;
@@ -431,7 +440,8 @@ private:
             }
         }
         static const std::set<std::string_view> kw(std::begin(detail::kKeywords), std::end(detail::kKeywords));
-        return !kw.contains(s) && s != "GLOBAL" && !findBuiltin(s);
+        // (A bit cast's name, unquoted, is always the cast.)
+        return !kw.contains(s) && s != "GLOBAL" && !findBuiltin(s) && !isBitCastName(s);
     }
 
     // ---- types ----
@@ -442,8 +452,12 @@ private:
     std::vector<std::vector<int>> lv_;
     std::vector<int> rv_;
     int conflicts_ = 0;
-    bool objectConflictsOnly_ = true;
+    int objectConflicts_ = 0; ///< ones //@ignore_object_type takes away (objects as ints)
+    int castConflicts_ = 0;   ///< a float against an int or object: written as a bit cast
+    int otherConflicts_ = 0;  ///< neither
     bool ignoreObject_ = false;
+    bool restrictsFirst_ = false; ///< type every variable by its own code before joining values (typeAll)
+    bool noUnify_ = false;        ///< (typeAll's first pass then)
 
     int fresh(std::uint8_t m)
     {
@@ -471,8 +485,11 @@ private:
         }
         mask_[static_cast<std::size_t>(x)] = both;
     }
-    void unify(int a, int b)
+    void unify(int a, int b, bool always = false)
     {
+        if (noUnify_ && !always) {
+            return;
+        }
         a = find(a);
         b = find(b);
         if (a == b) {
@@ -491,9 +508,20 @@ private:
         ++conflicts_;
         // Would it go away with objects as ints?
         const auto io = [](std::uint8_t m) { return (m & kO) ? static_cast<std::uint8_t>(m | kI) : m; };
-        if (!(io(a) & io(b))) {
-            objectConflictsOnly_ = false;
+        if (io(a) & io(b)) {
+            ++objectConflicts_;
+            return;
         }
+        // A float against an int or an object: a bit cast where the value is used (an object's
+        // needs objects as ints too, since the cast gives an int).
+        if (((a & kF) && (b & (kI | kO))) || ((b & kF) && (a & (kI | kO)))) {
+            ++castConflicts_;
+            if (!((a & kF ? b : a) & kI)) {
+                ++objectConflicts_;
+            }
+            return;
+        }
+        ++otherConflicts_;
     }
     // A type the debug info names, where the code allows it.
     Type chosen(int x, std::optional<Type> hint)
@@ -529,8 +557,8 @@ private:
         ignoreObject_ = ignoreObject;
         parent_.clear();
         mask_.clear();
-        conflicts_ = 0;
-        objectConflictsOnly_ = true;
+        const auto resetConflicts = [this] { conflicts_ = objectConflicts_ = castConflicts_ = otherConflicts_ = 0; };
+        resetConflicts();
         const auto& fns = file_.functions;
         gv_.clear();
         for (std::size_t s = 0; s < fns[1].symbolSizes.size(); ++s) {
@@ -548,6 +576,18 @@ private:
                 lv_[f].push_back(fresh(kAll));
             }
             rv_[f] = fresh(fns[f].returns ? kAll : kI);
+        }
+        if (restrictsFirst_) {
+            // Every instruction's own constraints first, no values joined but a function's returns
+            // with its result: a variable then has its loads' and stores' type, and a result its
+            // returned values', before a value of the other type flows in from a call or a store
+            // elsewhere. (With no conflicts this ends the same as one pass.)
+            noUnify_ = true;
+            for (std::size_t f = 1; f < fns.size(); ++f) {
+                typeFunction(f);
+            }
+            noUnify_ = false;
+            resetConflicts(); // (each comes again below)
         }
         for (std::size_t f = 1; f < fns.size(); ++f) {
             typeFunction(f);
@@ -686,7 +726,9 @@ private:
                     }
                 }
                 if (callee.returns) {
-                    st.push_back({rv_[in.a]});
+                    // (typeAll's first pass: a result takes its type from the callee's returns,
+                    // not from what the caller does with it.)
+                    st.push_back({noUnify_ ? fresh(kAll) : rv_[in.a]});
                 }
                 break;
             }
@@ -694,7 +736,7 @@ private:
                 if (fn.returns && f >= 2) {
                     const TEntry e = pop();
                     if (!e.addr) {
-                        unify(e.tv, rv_[f]);
+                        unify(e.tv, rv_[f], true); // (its own returns: in the first pass too)
                     }
                 }
                 st.clear();
@@ -1615,6 +1657,62 @@ private:
         return isObject(global, sym) ? "object." + oname_[objectIndex(sym)] : global ? gname_[sym] : lname_[f_][sym];
     }
 
+    // ---- bit casts ----
+
+    /// The type a node has as the source writes it: a variable's declared type, a call's result,
+    /// an operator's.
+    Type nodeType(const Node& n) const
+    {
+        switch (n.k) {
+        case Node::K::Int: return Type::Int;
+        case Node::K::Float: return Type::Float;
+        case Node::K::Str: return Type::String;
+        case Node::K::Var:
+        case Node::K::Elem:
+        case Node::K::Addr: return varType(f_, n.global, n.sym);
+        case Node::K::Assign: return varType(f_, n.kids[0]->global, n.kids[0]->sym);
+        case Node::K::Call: return n.script ? rtype_[n.v] : builtinSignature(n.v).returns;
+        case Node::K::Unary: return static_cast<Op>(n.v) == Op::FloatNeg ? Type::Float : Type::Int;
+        case Node::K::Binary: return binaryResult(static_cast<Op>(n.v));
+        }
+        return Type::Int;
+    }
+    /// What a binary operator's code takes (operands) and gives.
+    static Type binaryOperands(Op o)
+    {
+        switch (o) {
+        case Op::FloatAdd: case Op::FloatSub: case Op::FloatMul: case Op::FloatDiv:
+        case Op::FloatEq: case Op::FloatNeq: case Op::FloatLt: case Op::FloatGt: case Op::FloatLte: case Op::FloatGte:
+            return Type::Float;
+        case Op::StringAdd:
+        case Op::StringEq: case Op::StringNeq: case Op::StringLt: case Op::StringGt: case Op::StringLte: case Op::StringGte:
+            return Type::String;
+        default:
+            return Type::Int;
+        }
+    }
+    static Type binaryResult(Op o)
+    {
+        return o == Op::FloatAdd || o == Op::FloatSub || o == Op::FloatMul || o == Op::FloatDiv ? Type::Float
+               : o == Op::StringAdd                                                               ? Type::String
+                                                                                                  : Type::Int;
+    }
+    /// A value used as an int where it is a float, or the other way round: its bits, cast.
+    bool needsCast(const Node& n, Type want) const
+    {
+        const Type have = nodeType(n);
+        const auto number = [](Type t) { return t == Type::Int || t == Type::Float || t == Type::Object; };
+        return number(have) && number(want) && (have == Type::Float) != (want == Type::Float);
+    }
+    /// A value where code takes it as `want`: as it is, or in a bit cast.
+    std::string val(const Node& n, Type want, int minPrec = 0) const
+    {
+        if (needsCast(n, want)) {
+            return std::string(nodeType(n) == Type::Float ? kBitCastToInt : kBitCastToFloat) + "(" + expr(n) + ")";
+        }
+        return expr(n, minPrec);
+    }
+
     std::string expr(const Node& n, int minPrec = 0) const
     {
         switch (n.k) {
@@ -1625,9 +1723,9 @@ private:
         case Node::K::Var:
             return varName(n.global, n.sym);
         case Node::K::Elem:
-            return varName(n.global, n.sym) + "[" + expr(*n.kids[0]) + "]";
+            return varName(n.global, n.sym) + "[" + val(*n.kids[0], Type::Int) + "]";
         case Node::K::Addr:
-            return varName(n.global, n.sym) + (n.elem ? "[" + expr(*n.kids[0]) + "]" : "");
+            return varName(n.global, n.sym) + (n.elem ? "[" + val(*n.kids[0], Type::Int) + "]" : "");
         case Node::K::Call: {
             std::string out = n.script ? fnName(n.v) : std::string(builtinSignature(n.v).name);
             // A renamed builtin whose new name is one of the script's functions: its old name.
@@ -1657,7 +1755,11 @@ private:
                     out += fnName(a.v);
                     continue;
                 }
-                out += expr(a);
+                if (!n.script && builtinSignature(n.v).takesAny(i)) {
+                    out += expr(a); // (any type: its word as it is)
+                    continue;
+                }
+                out += val(a, n.script ? ltype_[n.v][i] : builtinSignature(n.v).args[i]);
             }
             return out + ")";
         }
@@ -1665,14 +1767,17 @@ private:
             const Op o = static_cast<Op>(n.v);
             const std::string op = o == Op::BoolNot ? "!" : o == Op::IntNot ? "~" : "-";
             const Node& x = *n.kids[0];
+            const Type want = o == Op::FloatNeg ? Type::Float : Type::Int;
             const bool plain = x.k == Node::K::Int || x.k == Node::K::Float || x.k == Node::K::Var || x.k == Node::K::Elem ||
-                               x.k == Node::K::Call || x.k == Node::K::Str;
-            return op + (plain ? expr(x) : "(" + expr(x) + ")");
+                               x.k == Node::K::Call || x.k == Node::K::Str || needsCast(x, want);
+            return op + (plain ? val(x, want) : "(" + expr(x) + ")");
         }
         case Node::K::Binary: {
-            const std::string_view op = binaryText(static_cast<Op>(n.v));
+            const Op o = static_cast<Op>(n.v);
+            const std::string_view op = binaryText(o);
             const int p = precedence(op);
-            std::string s = expr(*n.kids[0], p) + " " + std::string(op) + " " + expr(*n.kids[1], p + 1);
+            const Type want = binaryOperands(o);
+            std::string s = val(*n.kids[0], want, p) + " " + std::string(op) + " " + val(*n.kids[1], want, p + 1);
             return p < minPrec ? "(" + s + ")" : s;
         }
         case Node::K::Assign:
@@ -1683,7 +1788,7 @@ private:
 
     std::string assignText(const Node& n) const
     {
-        return expr(*n.kids[0]) + " " + std::string(storeText(static_cast<Op>(n.v))) + " " + expr(*n.kids[1]);
+        return expr(*n.kids[0]) + " " + std::string(storeText(static_cast<Op>(n.v))) + " " + val(*n.kids[1], nodeType(*n.kids[0]));
     }
 
     // Inside an expression an assignment needs parentheses; at the top of a statement it doesn't.
@@ -1694,7 +1799,6 @@ private:
         }
         return n.k == Node::K::Assign ? assignText(n) : expr(n);
     }
-    std::string sub(const Node& n) const { return expr(n); }
 
     std::set<std::uint32_t> gotoTargets_;
 
@@ -1754,7 +1858,7 @@ private:
                 out += pad + quoteString(file_.strings[s.addr]) + "; // (a string constant no code uses)\n";
                 break;
             case DStmt::K::If: {
-                out += pad + "if (" + expr(*s.e) + ") {\n";
+                out += pad + "if (" + val(*s.e, Type::Int) + ") {\n";
                 print(s.a, depth + 1, out);
                 const DStmt* els = s.hasElse ? &s : nullptr;
                 while (els) {
@@ -1766,7 +1870,7 @@ private:
                         }
                     }
                     if (shown.size() == 1 && shown[0]->k == DStmt::K::If) {
-                        out += pad + "} else if (" + expr(*shown[0]->e) + ") {\n";
+                        out += pad + "} else if (" + val(*shown[0]->e, Type::Int) + ") {\n";
                         print(shown[0]->a, depth + 1, out);
                         els = shown[0]->hasElse ? shown[0] : nullptr;
                         continue;
@@ -1783,7 +1887,7 @@ private:
                 break;
             case DStmt::K::Switch: {
                 const bool hidden = implicitTemps_;
-                out += pad + "switch (" + (hidden ? expr(*s.e) : varName(s.temp.global, s.temp.sym) + " = " + expr(*s.e)) + ") {\n";
+                out += pad + "switch (" + (hidden ? val(*s.e, Type::Int) : varName(s.temp.global, s.temp.sym) + " = " + val(*s.e, varType(f_, s.temp.global, s.temp.sym))) + ") {\n";
                 print(s.a, depth + 1, out);
                 out += pad + "}\n";
                 break;
@@ -1801,16 +1905,16 @@ private:
                 out += pad + "continue;\n";
                 break;
             case DStmt::K::Return:
-                out += pad + (s.e ? "return " + expr(*s.e) + ";\n" : "return;\n");
+                out += pad + (s.e ? "return " + val(*s.e, rtype_[f_]) + ";\n" : "return;\n");
                 break;
             case DStmt::K::Goto:
                 out += pad + "goto " + label(s.addr) + ";\n";
                 break;
             case DStmt::K::GotoIf:
-                out += pad + "__goto_if(" + expr(*s.e) + ", " + label(s.addr) + ");\n";
+                out += pad + "__goto_if(" + val(*s.e, Type::Int) + ", " + label(s.addr) + ");\n";
                 break;
             case DStmt::K::GotoIfNot:
-                out += pad + "__goto_ifnot(" + expr(*s.e) + ", " + label(s.addr) + ");\n";
+                out += pad + "__goto_ifnot(" + val(*s.e, Type::Int) + ", " + label(s.addr) + ");\n";
                 break;
             case DStmt::K::Marker:
                 out += std::string(static_cast<std::size_t>(std::max(0, depth - 1)) * 4, ' ') + label(s.addr) + ":\n";
@@ -1842,7 +1946,7 @@ private:
             if (init) {
                 out += pad + exprStmt(*init->e) + ";\n";
             }
-            out += pad + (s.e ? "while (" + expr(*s.e) + ") {\n" : "for (;;) {\n");
+            out += pad + (s.e ? "while (" + val(*s.e, Type::Int) + ") {\n" : "for (;;) {\n");
             print(s.a, depth + 1, out);
             out += pad + "}\n";
             return;
@@ -1855,7 +1959,7 @@ private:
         for (std::size_t k = last + 1; k < s.a.size(); ++k) {
             body.push_back(s.a[k]); // (unprinted markers)
         }
-        out += pad + "for (" + (init ? exprStmt(*init->e) : std::string()) + "; " + (s.e ? expr(*s.e) : std::string()) + "; " +
+        out += pad + "for (" + (init ? exprStmt(*init->e) : std::string()) + "; " + (s.e ? val(*s.e, Type::Int) : std::string()) + "; " +
                exprStmt(*s.a[last].e) + ") {\n";
         print(body, depth + 1, out);
         out += pad + "}\n";
@@ -2066,7 +2170,7 @@ private:
         const auto decl = [&](std::uint32_t s, const Node* init) {
             out += typeText(gtype_[s]) + " " + gname_[s] + (sizes[s] > 1 ? "[" + std::to_string(sizes[s]) + "]" : "");
             if (init) {
-                out += " = " + sub(*init);
+                out += " = " + val(*init, gtype_[s]);
             }
             out += ";\n";
         };
