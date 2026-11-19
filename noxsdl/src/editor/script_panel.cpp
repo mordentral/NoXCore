@@ -631,8 +631,18 @@ void ScriptPanel::documentOpened()
     if (playing_) {
         stopPlayTest();
     }
-    if (const auto src = me::sidecarScriptSource(ed_.sidecar_); src && !ed_.doc_.scriptSource) {
-        ed_.doc_.scriptSource = *src; // (the saved source: not a change)
+    sourceNotes_.clear();
+    std::optional<sc::CallOrderMigration> migration;
+    if (const auto src = me::sidecarScriptSource(ed_.sidecar_, &migration); src && !ed_.doc_.scriptSource) {
+        // (The saved source, not a change: one saved for the old argument order comes turned
+        // round, the same bytes compiled; the next save writes it with the mark.)
+        ed_.doc_.scriptSource = *src;
+        if (migration) {
+            sourceNotes_ = me::callOrderMigrationNotes(*migration);
+            if (std::ranges::any_of(sourceNotes_, [](const me::SourceNote& n) { return n.warning; })) {
+                ed_.showProblems_ = true;
+            }
+        }
     }
     good_ = me::sidecarScriptDebug(ed_.sidecar_);
     readOnlyRev_.reset();
@@ -2611,7 +2621,8 @@ void ScriptPanel::menus()
 
 void ScriptPanel::problems()
 {
-    const bool any = !last_.diagnostics.empty() || !reloadNotes_.empty() || !decompileNotes_.empty() || (tests_ && (!tests_->tests.empty() || !tests_->error.empty()));
+    const bool any = !last_.diagnostics.empty() || !reloadNotes_.empty() || !decompileNotes_.empty() || !sourceNotes_.empty() ||
+                     (tests_ && (!tests_->tests.empty() || !tests_->error.empty()));
     if (!any) {
         return;
     }
@@ -2646,6 +2657,9 @@ void ScriptPanel::problems()
         }
         for (const auto& n : decompileNotes_) {
             line(2, NOX_TR("editor.script.problems.decompiler", "decompiler"), n, 0, 0);
+        }
+        for (const auto& n : sourceNotes_) {
+            line(n.warning ? 1 : 2, NOX_TR("editor.script.problems.saved_source", "saved source"), n.text, 0, 0);
         }
         for (const auto& n : reloadNotes_) {
             line(n.severity == nox::server::dev::ReloadNote::Severity::Warning ? 1 : 2, NOX_TR("editor.script.problems.hot_reload", "hot reload"), n.message,

@@ -8,6 +8,7 @@
 #include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdio>
 #include <map>
 #include <set>
@@ -189,10 +190,99 @@ std::string stripNul(std::string s)
 
 } // namespace
 
-std::optional<std::string> sidecarScriptSource(const Sidecar& side)
+std::optional<std::string> sidecarScriptSource(const Sidecar& side, std::optional<script::CallOrderMigration>* migration)
 {
+    if (migration) {
+        migration->reset();
+    }
     const auto it = side.other.find(std::string(kSidecarScriptSource));
-    return it == side.other.end() ? std::nullopt : jsonUnquote(it->second);
+    if (it == side.other.end()) {
+        return std::nullopt;
+    }
+    auto source = jsonUnquote(it->second);
+    if (!source) {
+        return std::nullopt;
+    }
+    int version = 1;
+    if (const auto v = side.other.find(std::string(kSidecarScriptSourceVersion)); v != side.other.end()) {
+        const std::string& raw = v->second;
+        if (std::from_chars(raw.data(), raw.data() + raw.size(), version).ec != std::errc{}) {
+            version = 1;
+        }
+    }
+    if (version >= kScriptSourceVersion) {
+        return source;
+    }
+    auto m = script::migrateCallOrder(*source);
+    source = m.source;
+    if (migration) {
+        *migration = std::move(m);
+    }
+    return source;
+}
+
+std::vector<SourceNote> callOrderMigrationNotes(const script::CallOrderMigration& m)
+{
+    using Outcome = script::CallOrderMigration::Outcome;
+    std::vector<SourceNote> out;
+    switch (m.outcome) {
+    case Outcome::Unchanged:
+        break;
+    case Outcome::Same:
+        out.push_back({false, l10n::format(NOX_TRP("editor.script.migrated.same",
+                                                   "the saved source was written for the old argument order (a call's first argument went to the "
+                                                   "function's last parameter): {n} call of the script's own functions now has its arguments "
+                                                   "turned round to read in parameter order; it compiles to the same bytes",
+                                                   "the saved source was written for the old argument order (a call's first argument went to the "
+                                                   "function's last parameter): {n} calls of the script's own functions now have their arguments "
+                                                   "turned round to read in parameter order; they compile to the same bytes",
+                                                   m.calls),
+                                           {{"n", m.calls}})});
+        break;
+    case Outcome::Unchecked:
+        out.push_back({true, l10n::format(NOX_TRP("editor.script.migrated.unchecked",
+                                                  "the saved source was written for the old argument order (a call's first argument went to the "
+                                                  "function's last parameter) and doesn't compile, so the change can't be checked: {n} call of "
+                                                  "the script's own functions now has its arguments turned round to read in parameter order; "
+                                                  "look it over",
+                                                  "the saved source was written for the old argument order (a call's first argument went to the "
+                                                  "function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of "
+                                                  "the script's own functions now have their arguments turned round to read in parameter order; "
+                                                  "look them over",
+                                                  m.calls),
+                                          {{"n", m.calls}})});
+        break;
+    case Outcome::TypeErrors:
+        out.push_back({true, l10n::format(NOX_TRP("editor.script.migrated.type_errors",
+                                                  "the saved source was written for the old argument order (a call's first argument went to the "
+                                                  "function's last parameter): {n} call of the script's own functions now has its arguments "
+                                                  "turned round to read as the map runs it, and it doesn't compile: the old order put a value into "
+                                                  "a parameter of another type. Fix it (see the errors); until then the map's script stays as it is",
+                                                  "the saved source was written for the old argument order (a call's first argument went to the "
+                                                  "function's last parameter): {n} calls of the script's own functions now have their arguments "
+                                                  "turned round to read as the map runs them, and some don't compile: the old order put a value into "
+                                                  "a parameter of another type. Fix them (see the errors); until then the map's script stays as it is",
+                                                  m.calls),
+                                          {{"n", m.calls}})});
+        break;
+    case Outcome::Failed:
+        out.push_back({true, NOX_TR("editor.script.migrated.failed",
+                                    "the saved source was written for the old argument order (a call's first argument went to the "
+                                    "function's last parameter), and it couldn't be turned round to give the same compiled script: it "
+                                    "is shown as saved, so its calls of the script's own functions with two or more arguments now bind "
+                                    "the other way round; check them before compiling")});
+        break;
+    }
+    if (m.skipped > 0) {
+        out.push_back({true, l10n::format(NOX_TRP("editor.script.migrated.skipped",
+                                                  "{n} call of the script's own functions with two or more arguments, in code that doesn't "
+                                                  "parse, was left as it was saved (for the old argument order): it now binds the other way round",
+                                                  "{n} calls of the script's own functions with two or more arguments, in code that doesn't "
+                                                  "parse, were left as they were saved (for the old argument order): they now bind the other way round",
+                                                  m.skipped),
+                                          {{"n", m.skipped}})});
+    }
+    return out;
 }
 
 std::optional<script::DebugInfo> sidecarScriptDebug(const Sidecar& side)
@@ -205,8 +295,10 @@ void storeScriptInSidecar(Sidecar& side, const std::optional<std::string>& sourc
 {
     if (source) {
         side.other[std::string(kSidecarScriptSource)] = jsonQuote(*source);
+        side.other[std::string(kSidecarScriptSourceVersion)] = std::to_string(kScriptSourceVersion);
     } else {
         side.other.erase(std::string(kSidecarScriptSource));
+        side.other.erase(std::string(kSidecarScriptSourceVersion));
     }
     if (debug) {
         side.other[std::string(kSidecarScriptDebug)] = debug->toJson();

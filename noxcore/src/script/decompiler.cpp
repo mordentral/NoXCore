@@ -7,7 +7,9 @@
 //    //@ignore_object_type.
 // 2. Expressions: a stack of trees over each straight run of code. There is no pop
 //    instruction, so values left on the stack (a store's, a call's unused result) are the
-//    expression statements.
+//    expression statements. A call of the script's own function is written with its arguments
+//    in the reverse of push order (the compiler pushes them last first), so each reads in its
+//    parameter's place; a builtin's as pushed.
 // 3. Statements: the shapes compiler.cpp makes (and the game's compiler made) are recognised
 //    region by region: a JumpIfNot over a block is an if (with a Jump over an else block, an
 //    if / else), a Jump back to a condition's start a while or for, a temporary compared with
@@ -632,8 +634,9 @@ private:
                 break;
             }
             case Op::CallScript: {
+                // By the run-time word: the last pushed is the first parameter's (word 0).
                 const auto& callee = file_.functions[in.a];
-                for (std::size_t i = callee.args; i-- > 0;) {
+                for (std::size_t i = 0; i < callee.args; ++i) {
                     const TEntry e = pop();
                     if (!e.addr) {
                         unify(e.tv, lv_[in.a][i]);
@@ -1003,11 +1006,13 @@ private:
             n->script = script;
             n->v = in.a;
             n->kids.resize(argc);
-            for (std::size_t i = argc; i-- > 0;) {
-                n->kids[i] = popValue(st);
+            // In source order: a builtin's as pushed; a script function's in the reverse of push
+            // order (the compiler pushes them last first: the last pushed is parameter 0).
+            for (std::size_t k = argc; k-- > 0;) {
+                n->kids[script ? argc - 1 - k : k] = popValue(st);
             }
             if (argc) {
-                n->start = n->kids[0]->start;
+                n->start = (script ? n->kids.back() : n->kids.front())->start; // (the first pushed)
             }
             const bool returns = script ? file_.functions[in.a].returns != 0 : builtinSignature(in.a).returns != Type::Void;
             if (!returns) {

@@ -3476,7 +3476,7 @@ editor.cmd.script.reimport_save.label = Re-import .obj and Save
 # noxsdl/src/editor/script_panel.cpp:306
 #@ be42c83f: Compile and swap the new script into the running play-test, keeping the globals' values, timers and dialogs (matched by name).
 editor.cmd.script.reload.help = Compile and swap the new script into the running play-test, keeping the globals' values, timers and dialogs (matched by name).
-# noxsdl/src/editor/script_panel.cpp:305, noxsdl/src/editor/script_panel.cpp:1591
+# noxsdl/src/editor/script_panel.cpp:305, noxsdl/src/editor/script_panel.cpp:1601
 #@ aa004da1: Hot Reload
 editor.cmd.script.reload.label = Hot Reload
 # noxsdl/src/editor/script_panel.cpp:314
@@ -3488,7 +3488,7 @@ editor.cmd.script.restart_map.label = Restart Map
 # noxsdl/src/editor/script_panel.cpp:310
 #@ b4542945: Compile, then run GLOBAL, MapInitialize and MapEntry again in the play-test (objects stay, timers are cleared).
 editor.cmd.script.restart_scripts.help = Compile, then run GLOBAL, MapInitialize and MapEntry again in the play-test (objects stay, timers are cleared).
-# noxsdl/src/editor/script_panel.cpp:309, noxsdl/src/editor/script_panel.cpp:1592
+# noxsdl/src/editor/script_panel.cpp:309, noxsdl/src/editor/script_panel.cpp:1602
 #@ 2be24644: Restart Scripts
 editor.cmd.script.restart_scripts.label = Restart Scripts
 # noxsdl/src/editor/script_panel.cpp:317
@@ -3776,7 +3776,7 @@ editor.cmd.window.edge_rules.label = Edge Rules...
 # noxsdl/src/editor/script_panel.cpp:290
 #@ 9e95ecfd: Shows or hides Function Info: a builtin's full description, parameters, edge cases and example (right-click a builtin).
 editor.cmd.window.function_info.help = Shows or hides Function Info: a builtin's full description, parameters, edge cases and example (right-click a builtin).
-# noxsdl/src/editor/script_panel.cpp:289, noxsdl/src/editor/script_panel.cpp:1895
+# noxsdl/src/editor/script_panel.cpp:289, noxsdl/src/editor/script_panel.cpp:1905
 #@ d623f80f: Function Info
 editor.cmd.window.function_info.label = Function Info
 # noxsdl/src/editor/marker_tools.cpp:265
@@ -3953,7 +3953,7 @@ editor.common.rename = Rename
 # noxsdl/src/editor/map_editor_ui.cpp:390, noxsdl/src/editor/map_editor_ui.cpp:1067, noxsdl/src/editor/map_editor_ui.cpp:1092 ...
 #@ 4d2d5d68: Save
 editor.common.save = Save
-# noxsdl/src/editor/mod_panel.cpp:1550, noxsdl/src/editor/script_panel.cpp:1708
+# noxsdl/src/editor/mod_panel.cpp:1550, noxsdl/src/editor/script_panel.cpp:1718
 #@ c646a2c9: Search
 editor.common.search = Search
 # noxsdl/src/editor/map_editor_ui.cpp:947
@@ -5252,13 +5252,13 @@ editor.menu.open_recent = Open Recent
 # noxsdl/src/editor/map_editor_ui.cpp:259
 #@ ff67caf5: Pending Changes
 editor.menu.pending_changes = Pending Changes
-# noxsdl/src/editor/play_view.cpp:320, noxsdl/src/editor/script_panel.cpp:2567
+# noxsdl/src/editor/play_view.cpp:320, noxsdl/src/editor/script_panel.cpp:2577
 #@ 29ab6f83: Play
 editor.menu.play = Play
 # noxsdl/src/editor/map_editor_ui.cpp:301
 #@ 0a857a0e: Save Layout
 editor.menu.save_layout = Save Layout
-# noxsdl/src/editor/script_panel.cpp:2553
+# noxsdl/src/editor/script_panel.cpp:2563
 #@ 6651e9ca: Script
 editor.menu.script = Script
 # noxsdl/src/editor/map_editor_ui.cpp:327
@@ -8622,13 +8622,13 @@ editor.props.upgrade_help = The record is an older version: the fields newer ver
 # noxsdl/src/editor/property_panel.cpp:855
 #@ 73abebff: Use the browser's: {type}
 editor.props.use_browser_type = Use the browser's: {type}
-# noxsdl/src/editor/script_panel.cpp:863
+# noxsdl/src/editor/script_panel.cpp:873
 #@ aed55da5: Allow NoX Core-only script features
 editor.script.allow_noxcore = Allow NoX Core-only script features
-# noxsdl/src/editor/script_panel.cpp:870
+# noxsdl/src/editor/script_panel.cpp:880
 #@ cd3dd408: Turns on Editor Settings > "Allow NoX Core-only script features (object variables)". Maps that use them crash the original game and need a NoX Core server.
 editor.script.allow_noxcore_help = Turns on Editor Settings > "Allow NoX Core-only script features (object variables)". Maps that use them crash the original game and need a NoX Core server.
-# noxsdl/src/editor/script_panel.cpp:722
+# noxsdl/src/editor/script_panel.cpp:732
 #@ 6524b655: Another editor
 editor.script.another_editor = Another editor
 # noxcore/src/script/arg_values.cpp:232
@@ -8863,98 +8863,98 @@ editor.script.args.subclass_bit = {what} subclass, bit {bit}
 # noxcore/src/script/arg_values.cpp:297
 #@ 63dcef9c: ({n} variants)
 editor.script.args.variants = ({n} variants)
-# noxsdl/src/editor/script_panel.cpp:1587
+# noxsdl/src/editor/script_panel.cpp:1597
 #@ 1b8a7f6b: Back to Game
 editor.script.bar.back_to_game = Back to Game
-# noxsdl/src/editor/script_panel.cpp:1581
+# noxsdl/src/editor/script_panel.cpp:1591
 #@ 52fafc3e: Compile
 editor.script.bar.compile = Compile
-# noxsdl/src/editor/script_panel.cpp:1605
+# noxsdl/src/editor/script_panel.cpp:1615
 #@ c80ac417: compiles
 editor.script.bar.compiles = compiles
-# noxsdl/src/editor/script_panel.cpp:1604
+# noxsdl/src/editor/script_panel.cpp:1614
 #@ ac986fd0: compiles ({warnings} warnings)
 editor.script.bar.compiles_warnings = compiles ({warnings} warnings)
-# noxsdl/src/editor/script_panel.cpp:1599
+# noxsdl/src/editor/script_panel.cpp:1609
 #@ 9b4b8dd1: {n} error, {warnings} warnings | {n} errors, {warnings} warnings
 editor.script.bar.errors[one] = {n} error, {warnings} warnings
 editor.script.bar.errors[other] = {n} errors, {warnings} warnings
-# noxsdl/src/editor/script_panel.cpp:1589
+# noxsdl/src/editor/script_panel.cpp:1599
 #@ 7eed4fc3: Focus Game
 editor.script.bar.focus_game = Focus Game
-# noxsdl/src/editor/script_panel.cpp:1610
+# noxsdl/src/editor/script_panel.cpp:1620
 #@ 0f4a3dfe: Go to function...
 editor.script.bar.goto_function = Go to function...
-# noxsdl/src/editor/script_panel.cpp:1632
+# noxsdl/src/editor/script_panel.cpp:1642
 #@ 4ac78bf2: {name} is editing the script: read-only till they pause.
 editor.script.bar.held = {name} is editing the script: read-only till they pause.
-# noxsdl/src/editor/script_panel.cpp:1596
+# noxsdl/src/editor/script_panel.cpp:1606
 #@ 4565bb4f: not compiled yet
 editor.script.bar.not_compiled = not compiled yet
-# noxsdl/src/editor/script_panel.cpp:1586
+# noxsdl/src/editor/script_panel.cpp:1596
 #@ 29ab6f83: Play
 editor.script.bar.play = Play
-# noxsdl/src/editor/script_panel.cpp:1588
+# noxsdl/src/editor/script_panel.cpp:1598
 #@ df450ad5: Playing
 editor.script.bar.playing = Playing
-# noxsdl/src/editor/script_panel.cpp:1624
+# noxsdl/src/editor/script_panel.cpp:1634
 #@ fa3e686e: Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.
 editor.script.bar.running = Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.
-# noxsdl/src/editor/script_panel.cpp:1625
+# noxsdl/src/editor/script_panel.cpp:1635
 #@ edcde1ee: Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.  Last: {summary}
 editor.script.bar.running_last = Play-test running: Ctrl+S or Ctrl+R hot-reloads into it.  Last: {summary}
-# noxsdl/src/editor/script_panel.cpp:1593
+# noxsdl/src/editor/script_panel.cpp:1603
 #@ 4b7f7705: Stop
 editor.script.bar.stop = Stop
-# noxsdl/src/editor/script_panel.cpp:1636
+# noxsdl/src/editor/script_panel.cpp:1646
 #@ 69d69370: Take Over
 editor.script.bar.take_over = Take Over
-# noxsdl/src/editor/script_panel.cpp:1640
+# noxsdl/src/editor/script_panel.cpp:1650
 #@ 0caf5a2d: Take the script from them now (what they typed and haven't sent yet is dropped).
 editor.script.bar.take_over_help = Take the script from them now (what they typed and haven't sent yet is dropped).
-# noxsdl/src/editor/script_panel.cpp:1594
+# noxsdl/src/editor/script_panel.cpp:1604
 #@ 00dfd3c2: Tests
 editor.script.bar.tests = Tests
-# noxsdl/src/editor/script_panel.cpp:1903
+# noxsdl/src/editor/script_panel.cpp:1913
 #@ 7c2d8767: Copy Name
 editor.script.builtin.copy_name = Copy Name
-# noxsdl/src/editor/script_panel.cpp:1909
+# noxsdl/src/editor/script_panel.cpp:1919
 #@ b9762fcb: Add to Favourites
 editor.script.builtin.favourite = Add to Favourites
-# noxsdl/src/editor/script_panel.cpp:1899
+# noxsdl/src/editor/script_panel.cpp:1909
 #@ de076ca3: The full description: parameters, return value, edge cases, related builtins and an example.
 editor.script.builtin.info_help = The full description: parameters, return value, edge cases, related builtins and an example.
-# noxsdl/src/editor/script_panel.cpp:1900
+# noxsdl/src/editor/script_panel.cpp:1910
 #@ 0f317948: Insert
 editor.script.builtin.insert = Insert
-# noxsdl/src/editor/script_panel.cpp:1912
+# noxsdl/src/editor/script_panel.cpp:1922
 #@ e68d9f29: Priority
 editor.script.builtin.priority = Priority
-# noxsdl/src/editor/script_panel.cpp:1919
+# noxsdl/src/editor/script_panel.cpp:1929
 #@ a938ee7b: Sort the list by Priority: favourites first, low last.
 editor.script.builtin.priority_hint = Sort the list by Priority: favourites first, low last.
-# noxsdl/src/editor/script_panel.cpp:1884
+# noxsdl/src/editor/script_panel.cpp:1894
 #@ a121e6da: Click: insert at the caret. Right-click: Function Info, priority.
 editor.script.builtin.tip_click = Click: insert at the caret. Right-click: Function Info, priority.
-# noxsdl/src/editor/script_panel.cpp:1880
+# noxsdl/src/editor/script_panel.cpp:1890
 #@ 5ae84254: {category}, builtin {id}. {usage}
 editor.script.builtin.tip_facts = {category}, builtin {id}. {usage}
-# noxsdl/src/editor/script_panel.cpp:1908
+# noxsdl/src/editor/script_panel.cpp:1918
 #@ ce6b49f1: Remove from Favourites
 editor.script.builtin.unfavourite = Remove from Favourites
-# noxsdl/src/editor/script_panel.cpp:1948
+# noxsdl/src/editor/script_panel.cpp:1958
 #@ ba150111: Favourites only
 editor.script.builtins.favourites_only = Favourites only
-# noxsdl/src/editor/script_panel.cpp:1953
+# noxsdl/src/editor/script_panel.cpp:1963
 #@ 1f8321db: No favourites here: right-click a builtin, Add to Favourites.
 editor.script.builtins.no_favourites = No favourites here: right-click a builtin, Add to Favourites.
-# noxsdl/src/editor/script_panel.cpp:1954
+# noxsdl/src/editor/script_panel.cpp:1964
 #@ 070bd712: No builtin matches.
 editor.script.builtins.no_match = No builtin matches.
-# noxsdl/src/editor/script_panel.cpp:1932
+# noxsdl/src/editor/script_panel.cpp:1942
 #@ 8459a7f1: Sort
 editor.script.builtins.sort = Sort
-# noxsdl/src/editor/script_panel.cpp:1944
+# noxsdl/src/editor/script_panel.cpp:1954
 #@ d5efe1c4: Priority: favourites first, then high, normal and low, each by name (right-click a builtin to set its priority). Use in stock maps: the most called first.
 editor.script.builtins.sort_help = Priority: favourites first, then high, normal and low, each by name (right-click a builtin to set its priority). Use in stock maps: the most called first.
 # noxsdl/src/editor/script_panel.cpp:189, noxsdl/src/editor/script_panel.cpp:189
@@ -8966,425 +8966,425 @@ editor.script.class.warrior = Warrior
 # noxsdl/src/editor/script_panel.cpp:188, noxsdl/src/editor/script_panel.cpp:188
 #@ 42181c2a: Wizard
 editor.script.class.wizard = Wizard
-# noxcore/src/script/compiler.cpp:2750
+# noxcore/src/script/compiler.cpp:2768
 #@ a6cc4de1: {name} takes {n} argument, not {got} | {name} takes {n} arguments, not {got}
 editor.script.compile.arg_count[one] = {name} takes {n} argument, not {got}
 editor.script.compile.arg_count[other] = {name} takes {n} arguments, not {got}
-# noxcore/src/script/compiler.cpp:2753
+# noxcore/src/script/compiler.cpp:2771
 #@ 53d7c464: {name} takes {min} to {n} arguments, not {got}
 editor.script.compile.arg_count_range = {name} takes {min} to {n} arguments, not {got}
-# noxcore/src/script/compiler.cpp:2778
+# noxcore/src/script/compiler.cpp:2801
 #@ 64fed792: {name}'s argument {n} is a {type}, not a {other}
 editor.script.compile.arg_type = {name}'s argument {n} is a {type}, not a {other}
-# noxcore/src/script/compiler.cpp:2777
+# noxcore/src/script/compiler.cpp:2800
 #@ 8b21f615: {name}'s argument {n} is a {type} (a function's name), not a {other}
 editor.script.compile.arg_type_function = {name}'s argument {n} is a {type} (a function's name), not a {other}
-# noxcore/src/script/compiler.cpp:660, noxcore/src/script/compiler.cpp:804
+# noxcore/src/script/compiler.cpp:670, noxcore/src/script/compiler.cpp:814
 #@ 879cef94: an array can't have an initialiser
 editor.script.compile.array_init = an array can't have an initialiser
-# noxcore/src/script/compiler.cpp:689
+# noxcore/src/script/compiler.cpp:699
 #@ b6c6eede: an array's length must be more than 1
 editor.script.compile.array_length_min = an array's length must be more than 1
-# noxcore/src/script/compiler.cpp:683
+# noxcore/src/script/compiler.cpp:693
 #@ 0d3b467f: an array's length must be a number
 editor.script.compile.array_length_number = an array's length must be a number
-# noxcore/src/script/compiler.cpp:2387, noxcore/src/script/compiler.cpp:2402, noxcore/src/script/compiler.cpp:2542 ...
+# noxcore/src/script/compiler.cpp:2405, noxcore/src/script/compiler.cpp:2420, noxcore/src/script/compiler.cpp:2560 ...
 #@ e18b55c1: the array {name} must be indexed
 editor.script.compile.array_unindexed = the array {name} must be indexed
-# noxcore/src/script/compiler.cpp:1532
+# noxcore/src/script/compiler.cpp:1550
 #@ e77501e1: assert takes a condition and, optionally, a message (a string literal)
 editor.script.compile.assert_args = assert takes a condition and, optionally, a message (a string literal)
-# noxcore/src/script/compiler.cpp:1536
+# noxcore/src/script/compiler.cpp:1554
 #@ b69067f3: assert's message must be a string literal
 editor.script.compile.assert_message = assert's message must be a string literal
-# noxcore/src/script/compiler.cpp:1540
+# noxcore/src/script/compiler.cpp:1558
 #@ 3c62ee76: assert is a statement, not a value
 editor.script.compile.assert_value = assert is a statement, not a value
-# noxcore/src/script/compiler.cpp:2546
+# noxcore/src/script/compiler.cpp:2564
 #@ 3b9774b5: can't assign to {name}
 editor.script.compile.assign_read_only = can't assign to {name}
-# noxcore/src/script/compiler.cpp:2578
+# noxcore/src/script/compiler.cpp:2596
 #@ bd0d57dd: can only assign to a variable or an array element
 editor.script.compile.assign_target = can only assign to a variable or an array element
-# noxcore/src/script/compiler.cpp:2587
+# noxcore/src/script/compiler.cpp:2605
 #@ c8a3579f: can't assign a {other} to the {type} {name}
 editor.script.compile.assign_type = can't assign a {other} to the {type} {name}
-# noxcore/src/script/compiler.cpp:2142
+# noxcore/src/script/compiler.cpp:2160
 #@ 1299be75: break outside a loop or switch
 editor.script.compile.break_outside = break outside a loop or switch
-# noxcore/src/script/compiler.cpp:1517
+# noxcore/src/script/compiler.cpp:1535
 #@ 9da15d50: a built string kept in {what}: the game drops it at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
 editor.script.compile.built_string_global = a built string kept in {what}: the game drops it at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
-# noxcore/src/script/compiler.cpp:1736
+# noxcore/src/script/compiler.cpp:1754
 #@ 9d72da79: the local {name} in {function} is given a built string and can be read before this call sets it: locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
 editor.script.compile.built_string_local = the local {name} in {function} is given a built string and can be read before this call sets it: locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
-# noxcore/src/script/compiler.cpp:1731
+# noxcore/src/script/compiler.cpp:1749
 #@ f63a8501: the local {name} in {function} is given a built string and can be read before this call sets it (a Wait ends the call): locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
 editor.script.compile.built_string_local_wait = the local {name} in {function} is given a built string and can be read before this call sets it (a Wait ends the call): locals keep their values between calls, and the game drops a built string at the end of the next handler and gives its id to the next string made, so {name} then reads another string (OB-201)
-# noxcore/src/script/compiler.cpp:2383
+# noxcore/src/script/compiler.cpp:2401
 #@ 6da1888d: the builtin {name} needs ( ) to be called
 editor.script.compile.builtin_needs_call = the builtin {name} needs ( ) to be called
-# noxcore/src/script/compiler.cpp:2638
+# noxcore/src/script/compiler.cpp:2656
 #@ 6cf85b95: the function {name} returns a value: the game calls a timer's or a dialog's function without taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); declare it void
 editor.script.compile.callback_returns = the function {name} returns a value: the game calls a timer's or a dialog's function without taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); declare it void
-# noxcore/src/script/compiler.cpp:1327
+# noxcore/src/script/compiler.cpp:1345
 #@ 7cfe478a: {builtin} calls {name}
 editor.script.compile.caller_builtin = {builtin} calls {name}
-# noxcore/src/script/compiler.cpp:1321
+# noxcore/src/script/compiler.cpp:1339
 #@ 140dfa0f: the game calls the entry point {name}
 editor.script.compile.caller_entry_point = the game calls the entry point {name}
-# noxcore/src/script/compiler.cpp:2129
+# noxcore/src/script/compiler.cpp:2147
 #@ c992be4e: {label} outside a switch's own block
 editor.script.compile.case_outside_switch = {label} outside a switch's own block
-# noxcore/src/script/compiler.cpp:2256
+# noxcore/src/script/compiler.cpp:2274
 #@ d1f894d0: the case is a {type}, the switch's value a {other}
 editor.script.compile.case_type = the case is a {type}, the switch's value a {other}
-# noxcore/src/script/compiler.cpp:2306
+# noxcore/src/script/compiler.cpp:2324
 #@ 0a4b32ce: {what}'s condition must be an int, not a {type}
 editor.script.compile.condition_type = {what}'s condition must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:2142
+# noxcore/src/script/compiler.cpp:2160
 #@ 8e84dc1e: continue outside a loop
 editor.script.compile.continue_outside = continue outside a loop
-# noxcore/src/script/compiler.cpp:1216
+# noxcore/src/script/compiler.cpp:1234
 #@ 3c0de26f: the function {name} is declared but never defined
 editor.script.compile.declared_not_defined = the function {name} is declared but never defined
-# noxcore/src/script/compiler.cpp:934
+# noxcore/src/script/compiler.cpp:944
 #@ aab19876: do ... while isn't part of the language (use while)
 editor.script.compile.do_while = do ... while isn't part of the language (use while)
-# noxcore/src/script/compiler.cpp:929
+# noxcore/src/script/compiler.cpp:939
 #@ a66d3312: 'else' without an 'if'
 editor.script.compile.else_without_if = 'else' without an 'if'
-# noxcore/src/script/compiler.cpp:1312
+# noxcore/src/script/compiler.cpp:1330
 #@ ab108b5a: the entry point {name} returns a value: the game calls it without taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); declare it void
 editor.script.compile.entry_returns = the entry point {name} returns a value: the game calls it without taking the value, which on a stock server stays on the stack and holds up every handler after it (OB-204; NoX Core drops it); declare it void
-# noxcore/src/script/compiler.cpp:317
+# noxcore/src/script/compiler.cpp:323
 #@ 51b0d9b5: octal escape out of range
 editor.script.compile.escape_octal_range = octal escape out of range
-# noxcore/src/script/compiler.cpp:321
+# noxcore/src/script/compiler.cpp:327
 #@ 7fc76b09: unknown escape \\{c}
 editor.script.compile.escape_unknown = unknown escape \\{c}
-# noxcore/src/script/compiler.cpp:302
+# noxcore/src/script/compiler.cpp:308
 #@ 814ef4f5: \\x needs hex digits
 editor.script.compile.escape_x_digits = \\x needs hex digits
-# noxcore/src/script/compiler.cpp:641
+# noxcore/src/script/compiler.cpp:651
 #@ 80399856: expected '{' or ';' after the function's parameters but found {found}
 editor.script.compile.expected_body = expected '{' or ';' after the function's parameters but found {found}
-# noxcore/src/script/compiler.cpp:612
+# noxcore/src/script/compiler.cpp:622
 #@ 3060ce37: expected a declaration (a type: int, float, string, object or void) but found {found}
 editor.script.compile.expected_declaration = expected a declaration (a type: int, float, string, object or void) but found {found}
-# noxcore/src/script/compiler.cpp:1127
+# noxcore/src/script/compiler.cpp:1143
 #@ 8cf5285b: expected an expression but found {found}
 editor.script.compile.expected_expression = expected an expression but found {found}
-# noxcore/src/script/compiler.cpp:574
+# noxcore/src/script/compiler.cpp:584
 #@ 470af9ac: expected a name but found {found}
 editor.script.compile.expected_name = expected a name but found {found}
-# noxcore/src/script/compiler.cpp:710
+# noxcore/src/script/compiler.cpp:720
 #@ 738286a0: expected a parameter's type but found {found}
 editor.script.compile.expected_param_type = expected a parameter's type but found {found}
-# noxcore/src/script/compiler.cpp:528
+# noxcore/src/script/compiler.cpp:538
 #@ 91b57586: expected '{what}' but found {found}
 editor.script.compile.expected_punct = expected '{what}' but found {found}
-# noxcore/src/script/compiler.cpp:217
+# noxcore/src/script/compiler.cpp:223
 #@ 9591897b: the float {text} is out of range
 editor.script.compile.float_range = the float {text} is out of range
-# noxcore/src/script/compiler.cpp:851
+# noxcore/src/script/compiler.cpp:861
 #@ d66dea61: no declarations in a for's first part (declare the variable before the loop)
 editor.script.compile.for_declaration = no declarations in a for's first part (declare the variable before the loop)
-# noxcore/src/script/compiler.cpp:515
+# noxcore/src/script/compiler.cpp:525
 #@ a8639c55: the end of the file
 editor.script.compile.found_end = the end of the file
-# noxcore/src/script/compiler.cpp:518
+# noxcore/src/script/compiler.cpp:528
 #@ 54f598e2: the number {text}
 editor.script.compile.found_number = the number {text}
-# noxcore/src/script/compiler.cpp:519
+# noxcore/src/script/compiler.cpp:529
 #@ fcbbb8a5: a string
 editor.script.compile.found_string = a string
-# noxcore/src/script/compiler.cpp:2380
+# noxcore/src/script/compiler.cpp:2398
 #@ 9a5bf55c: the function {name} is used as a value (only a builtin's function argument takes one)
 editor.script.compile.function_as_value = the function {name} is used as a value (only a builtin's function argument takes one)
-# noxcore/src/script/compiler.cpp:1813
+# noxcore/src/script/compiler.cpp:1831
 #@ a6312c6e: GLOBAL is the name of the script's own first two functions
 editor.script.compile.function_global = GLOBAL is the name of the script's own first two functions
-# noxcore/src/script/compiler.cpp:1801
+# noxcore/src/script/compiler.cpp:1819
 #@ 38abd7c0: the function {name} doesn't match its earlier declaration
 editor.script.compile.function_mismatch = the function {name} doesn't match its earlier declaration
-# noxcore/src/script/compiler.cpp:1817
+# noxcore/src/script/compiler.cpp:1835
 #@ 92344246: a function's name must be 1 to 1023 bytes
 editor.script.compile.function_name_length = a function's name must be 1 to 1023 bytes
-# noxcore/src/script/compiler.cpp:630
+# noxcore/src/script/compiler.cpp:640
 #@ d0191a21: a function can't be named object.{name}
 editor.script.compile.function_object_name = a function can't be named object.{name}
-# noxcore/src/script/compiler.cpp:1805
+# noxcore/src/script/compiler.cpp:1823
 #@ 8d79625e: the function {name} is defined twice
 editor.script.compile.function_twice = the function {name} is defined twice
-# noxcore/src/script/compiler.cpp:1338
+# noxcore/src/script/compiler.cpp:1356
 #@ bfbb1474: the function {name} is never called, given to a builtin or named by the map
 editor.script.compile.function_unused = the function {name} is never called, given to a builtin or named by the map
-# noxcore/src/script/compiler.cpp:1845
+# noxcore/src/script/compiler.cpp:1863
 #@ 5daed38b: the global {name} is declared again with another type
 editor.script.compile.global_redeclared = the global {name} is declared again with another type
-# noxcore/src/script/compiler.cpp:1852
+# noxcore/src/script/compiler.cpp:1870
 #@ 4aad9026: the global {name} has two initialisers
 editor.script.compile.global_two_inits = the global {name} has two initialisers
-# noxcore/src/script/compiler.cpp:1301
+# noxcore/src/script/compiler.cpp:1319
 #@ ec3149ce: the global {name} is never read
 editor.script.compile.global_unread = the global {name} is never read
-# noxcore/src/script/compiler.cpp:173
+# noxcore/src/script/compiler.cpp:179
 #@ cbd6670b: a hex number needs digits after 0x
 editor.script.compile.hex_no_digits = a hex number needs digits after 0x
-# noxcore/src/script/compiler.cpp:175
+# noxcore/src/script/compiler.cpp:181
 #@ 420ea997: the number is too big for 32 bits
 editor.script.compile.hex_too_big = the number is too big for 32 bits
-# noxcore/src/script/compiler.cpp:2412
+# noxcore/src/script/compiler.cpp:2430
 #@ ce3b223d: only an array variable can be indexed
 editor.script.compile.index_non_array = only an array variable can be indexed
-# noxcore/src/script/compiler.cpp:2484
+# noxcore/src/script/compiler.cpp:2502
 #@ 4021bbe3: an array index must be an int, not a {type}
 editor.script.compile.index_type = an array index must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:1879, noxcore/src/script/compiler.cpp:2051
+# noxcore/src/script/compiler.cpp:1897, noxcore/src/script/compiler.cpp:2069
 #@ fd5f319e: can't initialise the {type} {name} with a {other}
 editor.script.compile.init_type = can't initialise the {type} {name} with a {other}
-# noxcore/src/script/compiler.cpp:1254
+# noxcore/src/script/compiler.cpp:1272
 #@ e00e8f75: internal: the code made doesn't check: {why}
 editor.script.compile.internal_check = internal: the code made doesn't check: {why}
-# noxcore/src/script/compiler.cpp:2179
+# noxcore/src/script/compiler.cpp:2197
 #@ 2e635fff: the label {label} is defined twice
 editor.script.compile.label_twice = the label {label} is defined twice
-# noxcore/src/script/compiler.cpp:1977
+# noxcore/src/script/compiler.cpp:1995
 #@ 7e13a7b9: the label {label} is never used
 editor.script.compile.label_unused = the label {label} is never used
-# noxcore/src/script/compiler.cpp:1988
+# noxcore/src/script/compiler.cpp:2006
 #@ 5072e33b: the local {name} in {function} is never read
 editor.script.compile.local_unread = the local {name} in {function} is never read
-# noxcore/src/script/compiler.cpp:1227
+# noxcore/src/script/compiler.cpp:1245
 #@ 1a04ebad: {n} string constants leave few of the game's 1024 strings for the ones made while it runs
 editor.script.compile.many_strings = {n} string constants leave few of the game's 1024 strings for the ones made while it runs
-# noxcore/src/script/compiler.cpp:2160
+# noxcore/src/script/compiler.cpp:2178
 #@ 340d1e41: the function {name} must return a {type}
 editor.script.compile.must_return = the function {name} must return a {type}
-# noxcore/src/script/compiler.cpp:1767, noxcore/src/script/compiler.cpp:1821
+# noxcore/src/script/compiler.cpp:1785, noxcore/src/script/compiler.cpp:1839
 #@ 04da9a65: '{name}' is a builtin's name
 editor.script.compile.name_builtin = '{name}' is a builtin's name
-# noxcore/src/script/compiler.cpp:1771
+# noxcore/src/script/compiler.cpp:1789
 #@ f87ba73a: '{name}' is a function's name
 editor.script.compile.name_function = '{name}' is a function's name
-# noxcore/src/script/compiler.cpp:1775
+# noxcore/src/script/compiler.cpp:1793
 #@ 242e043a: '{name}' is already a global variable
 editor.script.compile.name_global = '{name}' is already a global variable
-# noxcore/src/script/compiler.cpp:1763, noxcore/src/script/compiler.cpp:1821
+# noxcore/src/script/compiler.cpp:1781, noxcore/src/script/compiler.cpp:1839
 #@ b13701e4: '{name}' is a keyword
 editor.script.compile.name_keyword = '{name}' is a keyword
-# noxcore/src/script/compiler.cpp:1775
+# noxcore/src/script/compiler.cpp:1793
 #@ 0b033742: '{name}' is a name of the language
 editor.script.compile.name_language = '{name}' is a name of the language
-# noxcore/src/script/compiler.cpp:1781
+# noxcore/src/script/compiler.cpp:1799
 #@ 08eb2369: '{name}' is already declared in this function
 editor.script.compile.name_local = '{name}' is already declared in this function
-# noxcore/src/script/compiler.cpp:2462
+# noxcore/src/script/compiler.cpp:2480
 #@ a4c38a95: can't negate a {type}
 editor.script.compile.negate_type = can't negate a {type}
-# noxcore/src/script/compiler.cpp:1981
+# noxcore/src/script/compiler.cpp:1999
 #@ a775c822: the function {name} never returns a value
 editor.script.compile.never_returns = the function {name} never returns a value
-# noxcore/src/script/compiler.cpp:2743
+# noxcore/src/script/compiler.cpp:2761
 #@ a2cee878: no function named {name}
 editor.script.compile.no_function = no function named {name}
-# noxcore/src/script/compiler.cpp:2362
+# noxcore/src/script/compiler.cpp:2380
 #@ 6a2d25e6: no function named "{name}"
 editor.script.compile.no_function_quoted = no function named "{name}"
-# noxcore/src/script/compiler.cpp:1970
+# noxcore/src/script/compiler.cpp:1988
 #@ 44691701: no label {label} in {function}
 editor.script.compile.no_label = no label {label} in {function}
-# noxcore/src/script/compiler.cpp:1367
+# noxcore/src/script/compiler.cpp:1385
 #@ 3e97c775: {function} uses object.{used}, but {caller} with no object (self): there object variables read 0 and their stores are lost, and GAME.EXE crashes
 editor.script.compile.no_object = {function} uses object.{used}, but {caller} with no object (self): there object variables read 0 and their stores are lost, and GAME.EXE crashes
-# noxcore/src/script/compiler.cpp:1443
+# noxcore/src/script/compiler.cpp:1461
 #@ 773b8a8a: no object variable object.{name} (declare it at the top level: int object.{name};)
 editor.script.compile.no_object_var = no object variable object.{name} (declare it at the top level: int object.{name};)
-# noxcore/src/script/compiler.cpp:2789
+# noxcore/src/script/compiler.cpp:2812
 #@ db30c192: {name} doesn't return a value
 editor.script.compile.no_value = {name} doesn't return a value
-# noxcore/src/script/compiler.cpp:2420, noxcore/src/script/compiler.cpp:2538, noxcore/src/script/compiler.cpp:2570
+# noxcore/src/script/compiler.cpp:2438, noxcore/src/script/compiler.cpp:2556, noxcore/src/script/compiler.cpp:2588
 #@ 72670360: no variable named {name}
 editor.script.compile.no_variable = no variable named {name}
-# noxcore/src/script/compiler.cpp:2383
+# noxcore/src/script/compiler.cpp:2401
 #@ a41ad695: no variable or function named {name}
 editor.script.compile.no_variable_or_function = no variable or function named {name}
-# noxcore/src/script/compiler.cpp:2420, noxcore/src/script/compiler.cpp:2570
+# noxcore/src/script/compiler.cpp:2438, noxcore/src/script/compiler.cpp:2588
 #@ 4800cb01: {name} isn't an array
 editor.script.compile.not_array = {name} isn't an array
-# noxcore/src/script/compiler.cpp:2726
+# noxcore/src/script/compiler.cpp:2744
 #@ d795758b: {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
 editor.script.compile.nox_builtin = {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
-# noxcore/src/script/compiler.cpp:246
+# noxcore/src/script/compiler.cpp:252
 #@ 2485478f: bad suffix on the number {text}
 editor.script.compile.number_suffix = bad suffix on the number {text}
-# noxcore/src/script/compiler.cpp:235
+# noxcore/src/script/compiler.cpp:241
 #@ 57be2906: the number {text} is too big for 32 bits
 editor.script.compile.number_too_big = the number {text} is too big for 32 bits
-# noxcore/src/script/compiler.cpp:1468
+# noxcore/src/script/compiler.cpp:1486
 #@ bf489119: a store to {name} goes to the function's own first local, not the object: it is at offset 0 of the object's variables and the VM negates that offset to 0 (declare it after another, or drop //@raw_object_vars)
 editor.script.compile.object_offset_zero = a store to {name} goes to the function's own first local, not the object: it is at offset 0 of the object's variables and the VM negates that offset to 0 (declare it after another, or drop //@raw_object_vars)
-# noxcore/src/script/compiler.cpp:1356
+# noxcore/src/script/compiler.cpp:1374
 #@ 43eee554: {name} (in {function})
 editor.script.compile.object_use_in = {name} (in {function})
-# noxcore/src/script/compiler.cpp:795
+# noxcore/src/script/compiler.cpp:805
 #@ 10f4d8e6: object variables are declared at the top level, outside functions
 editor.script.compile.object_var_in_function = object variables are declared at the top level, outside functions
-# noxcore/src/script/compiler.cpp:1447
+# noxcore/src/script/compiler.cpp:1465
 #@ 84b1270a: object.{name} in a global's initialiser: GLOBAL runs with no object
 editor.script.compile.object_var_in_global = object.{name} in a global's initialiser: GLOBAL runs with no object
-# noxcore/src/script/compiler.cpp:658
+# noxcore/src/script/compiler.cpp:668
 #@ 1a7a6a47: an object variable can't have an initialiser: every object's start at 0
 editor.script.compile.object_var_init = an object variable can't have an initialiser: every object's start at 0
-# noxcore/src/script/compiler.cpp:1406
+# noxcore/src/script/compiler.cpp:1424
 #@ 395a92b7: object.{name} is declared twice
 editor.script.compile.object_var_twice = object.{name} is declared twice
-# noxcore/src/script/compiler.cpp:1306
+# noxcore/src/script/compiler.cpp:1324
 #@ f6602d01: the object variable object.{name} is never read
 editor.script.compile.object_var_unread = the object variable object.{name} is never read
-# noxcore/src/script/compiler.cpp:1415
+# noxcore/src/script/compiler.cpp:1433
 #@ 79581aa8: object variables work only in NoX Core: GAME.EXE never gives objects their storage, so a script that reads or writes one crashes the game there (docs/original_bugs.md)
 editor.script.compile.object_vars_core_only = object variables work only in NoX Core: GAME.EXE never gives objects their storage, so a script that reads or writes one crashes the game there (docs/original_bugs.md)
-# noxcore/src/script/compiler.cpp:1392
+# noxcore/src/script/compiler.cpp:1410
 #@ b074d2c2: in the map editor, Editor Settings > "Allow NoX Core-only script features (object variables)"; with noxscript, --allow-object-vars
 editor.script.compile.object_vars_how = in the map editor, Editor Settings > "Allow NoX Core-only script features (object variables)"; with noxscript, --allow-object-vars
-# noxcore/src/script/compiler.cpp:1397
+# noxcore/src/script/compiler.cpp:1415
 #@ d0b56eaf: object.{name}: object variables are off (a NoX Core-only feature; the first error says how to allow them)
 editor.script.compile.object_vars_off = object.{name}: object variables are off (a NoX Core-only feature; the first error says how to allow them)
-# noxcore/src/script/compiler.cpp:1387
+# noxcore/src/script/compiler.cpp:1405
 #@ 19b5164c: object.{name}: object variables are a NoX Core-only feature and are off. The original game never gives objects their storage and crashes on a script that uses them, so a map with them needs a NoX Core server. To allow them: {how}
 editor.script.compile.object_vars_off_first = object.{name}: object variables are a NoX Core-only feature and are off. The original game never gives objects their storage and crashes on a script that uses them, so a map with them needs a NoX Core server. To allow them: {how}
-# noxcore/src/script/compiler.cpp:228
+# noxcore/src/script/compiler.cpp:234
 #@ 657ee1d2: bad digit in the octal number {text}
 editor.script.compile.octal_digit = bad digit in the octal number {text}
-# noxcore/src/script/compiler.cpp:2498
+# noxcore/src/script/compiler.cpp:2516
 #@ 21821c02: the operands of '{op}' are a {left} and a {right}
 editor.script.compile.operand_types = the operands of '{op}' are a {left} and a {right}
-# noxcore/src/script/compiler.cpp:2500, noxcore/src/script/compiler.cpp:2599
+# noxcore/src/script/compiler.cpp:2518, noxcore/src/script/compiler.cpp:2617
 #@ 48e22fa9: '{op}' doesn't work on {type}s
 editor.script.compile.operator_type = '{op}' doesn't work on {type}s
-# noxcore/src/script/compiler.cpp:720
+# noxcore/src/script/compiler.cpp:730
 #@ 0fc854e7: a parameter can't be an array
 editor.script.compile.param_array = a parameter can't be an array
-# noxcore/src/script/compiler.cpp:2435
+# noxcore/src/script/compiler.cpp:2453
 #@ 5a3c29c7: reading an element of {name} with //@raw_object_vars: the VM's IndexInt reads below the object's variables there, so this reads 0 (drop the flag to read it)
 editor.script.compile.raw_object_index = reading an element of {name} with //@raw_object_vars: the VM's IndexInt reads below the object's variables there, so this reads 0 (drop the flag to read it)
-# noxcore/src/script/compiler.cpp:2156
+# noxcore/src/script/compiler.cpp:2174
 #@ 28e1e1f3: the function {name} returns {type}, not {other}
 editor.script.compile.return_type = the function {name} returns {type}, not {other}
-# noxcore/src/script/compiler.cpp:874
+# noxcore/src/script/compiler.cpp:884
 #@ 95303f29: a switch needs a { block }
 editor.script.compile.switch_block = a switch needs a { block }
-# noxcore/src/script/compiler.cpp:2241
+# noxcore/src/script/compiler.cpp:2259
 #@ 1545ef18: a switch with two defaults
 editor.script.compile.switch_two_defaults = a switch with two defaults
-# noxcore/src/script/compiler.cpp:2227
+# noxcore/src/script/compiler.cpp:2245
 #@ 62c4ce0b: a switch's value must be an int, not a {type}
 editor.script.compile.switch_type = a switch's value must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:2658
+# noxcore/src/script/compiler.cpp:2676
 #@ a8b4acea: {builtin} gives {name} an argument, but {name} takes none: the game passes a timer's argument only to a function that has one, so the value is lost (use {plain}, or give {name} a parameter)
 editor.script.compile.timer_arg_lost = {builtin} gives {name} an argument, but {name} takes none: the game passes a timer's argument only to a function that has one, so the value is lost (use {plain}, or give {name} a parameter)
-# noxcore/src/script/compiler.cpp:2665
+# noxcore/src/script/compiler.cpp:2683
 #@ 17ea5406: {name} takes {n} arguments, but {builtin} gives it none: {param} reads 0 and the rest whatever is on the stack (use {builtin}WithArg)
 editor.script.compile.timer_no_arg_many = {name} takes {n} arguments, but {builtin} gives it none: {param} reads 0 and the rest whatever is on the stack (use {builtin}WithArg)
-# noxcore/src/script/compiler.cpp:2663
+# noxcore/src/script/compiler.cpp:2681
 #@ 4b54b81c: {name} takes an argument, but {builtin} gives it none: {param} reads 0 (use {builtin}WithArg)
 editor.script.compile.timer_no_arg_one = {name} takes an argument, but {builtin} gives it none: {param} reads 0 (use {builtin}WithArg)
-# noxcore/src/script/compiler.cpp:2670
+# noxcore/src/script/compiler.cpp:2688
 #@ 5074a116: {name} takes {n} arguments, but {builtin} gives it one: the rest read whatever is on the stack
 editor.script.compile.timer_one_arg = {name} takes {n} arguments, but {builtin} gives it one: the rest read whatever is on the stack
-# noxcore/src/script/compiler.cpp:452
+# noxcore/src/script/compiler.cpp:461
 #@ 26088714: nested too deeply (more than {n} levels of statements and expressions)
 editor.script.compile.too_deep = nested too deeply (more than {n} levels of statements and expressions)
-# noxcore/src/script/compiler.cpp:1225
+# noxcore/src/script/compiler.cpp:1243
 #@ 4bd118d4: {n} string constants: the game's string table holds 1024
 editor.script.compile.too_many_strings = {n} string constants: the game's string table holds 1024
-# noxcore/src/script/compiler.cpp:2452
+# noxcore/src/script/compiler.cpp:2470
 #@ 9a0da3b2: unary + needs an int or a float
 editor.script.compile.unary_plus = unary + needs an int or a float
-# noxcore/src/script/compiler.cpp:2467
+# noxcore/src/script/compiler.cpp:2485
 #@ c1eaaa3f: '{op}' needs an int, not a {type}
 editor.script.compile.unary_type = '{op}' needs an int, not a {type}
-# noxcore/src/script/compiler.cpp:356
+# noxcore/src/script/compiler.cpp:362
 #@ 844e7472: unexpected character '{c}'
 editor.script.compile.unexpected_char = unexpected character '{c}'
-# noxcore/src/script/compiler.cpp:2859
+# noxcore/src/script/compiler.cpp:2883
 #@ 07b0c6c1: unknown compile flag //@{name}
 editor.script.compile.unknown_flag = unknown compile flag //@{name}
-# noxcore/src/script/compiler.cpp:147
+# noxcore/src/script/compiler.cpp:153
 #@ 083f7d15: unterminated /* comment
 editor.script.compile.unterminated_comment = unterminated /* comment
-# noxcore/src/script/compiler.cpp:259, noxcore/src/script/compiler.cpp:275
+# noxcore/src/script/compiler.cpp:265, noxcore/src/script/compiler.cpp:281
 #@ 0403602c: unterminated string
 editor.script.compile.unterminated_string = unterminated string
-# noxcore/src/script/compiler.cpp:2743
+# noxcore/src/script/compiler.cpp:2761
 #@ 72892cdb: {name} is a variable, not a function
 editor.script.compile.variable_not_function = {name} is a variable, not a function
-# noxcore/src/script/compiler.cpp:2154
+# noxcore/src/script/compiler.cpp:2172
 #@ d6ecbf62: the void function {name} can't return a value
 editor.script.compile.void_returns = the void function {name} can't return a value
-# noxcore/src/script/compiler.cpp:648, noxcore/src/script/compiler.cpp:785
+# noxcore/src/script/compiler.cpp:658, noxcore/src/script/compiler.cpp:795
 #@ 65aa094c: a variable can't be void
 editor.script.compile.void_variable = a variable can't be void
-# noxcore/src/script/compiler.cpp:1605
+# noxcore/src/script/compiler.cpp:1623
 #@ aeaf55a9: Wait takes one argument: the frames to wait (an int)
 editor.script.compile.wait_args = Wait takes one argument: the frames to wait (an int)
-# noxcore/src/script/compiler.cpp:1598
+# noxcore/src/script/compiler.cpp:1616
 #@ daba6157: Wait(frames) works only in a test: a void function named {prefix}* with no arguments (the test runner calls it again after the frames)
 editor.script.compile.wait_not_test = Wait(frames) works only in a test: a void function named {prefix}* with no arguments (the test runner calls it again after the frames)
-# noxcore/src/script/compiler.cpp:1616
+# noxcore/src/script/compiler.cpp:1634
 #@ 9113fd8e: Wait's frames must be an int, not a {type}
 editor.script.compile.wait_type = Wait's frames must be an int, not a {type}
-# noxcore/src/script/compiler.cpp:1609
+# noxcore/src/script/compiler.cpp:1627
 #@ cb2b78d1: Wait is a statement, not a value
 editor.script.compile.wait_value = Wait is a statement, not a value
-# noxcore/src/script/compiler.cpp:1516
+# noxcore/src/script/compiler.cpp:1534
 #@ ffebc090: the global {name}
 editor.script.compile.what_global = the global {name}
-# noxcore/src/script/compiler.cpp:1515
+# noxcore/src/script/compiler.cpp:1533
 #@ eb46c652: the object variable {name}
 editor.script.compile.what_object_var = the object variable {name}
-# noxsdl/src/editor/script_panel.cpp:2371
+# noxsdl/src/editor/script_panel.cpp:2381
 #@ ee6354e5: {title}  {n}{more}  (Enter/Tab insert, Esc close)
 editor.script.complete.header = {title}  {n}{more}  (Enter/Tab insert, Esc close)
-# noxsdl/src/editor/script_panel.cpp:2379
+# noxsdl/src/editor/script_panel.cpp:2389
 #@ f0620eeb: No {kind} starts with or contains "{typed}".
 editor.script.complete.no_match = No {kind} starts with or contains "{typed}".
-# noxsdl/src/editor/script_panel.cpp:2376
+# noxsdl/src/editor/script_panel.cpp:2386
 #@ 43042a08: None on this map.
 editor.script.complete.none_on_map = None on this map.
-# noxcore/src/script/decompiler.cpp:188
+# noxcore/src/script/decompiler.cpp:190
 #@ 5a2e2bbe: the function count differs
 editor.script.decompile.count_differs = the function count differs
-# noxcore/src/script/decompiler.cpp:175
+# noxcore/src/script/decompiler.cpp:177
 #@ 0dfcf00a: doesn't compile: {error}
 editor.script.decompile.no_compile = doesn't compile: {error}
-# noxcore/src/script/decompiler.cpp:185
+# noxcore/src/script/decompiler.cpp:187
 #@ fad28654: the string constants differ
 editor.script.decompile.strings_differ = the string constants differ
-# noxsdl/src/editor/script_panel.cpp:760
+# noxsdl/src/editor/script_panel.cpp:770
 #@ fd719bd9: the decompiled source doesn't compile back to the map's exact bytes
 editor.script.decompile_not_identical = the decompiled source doesn't compile back to the map's exact bytes
-# noxsdl/src/editor/script_panel.cpp:1057
+# noxsdl/src/editor/script_panel.cpp:1067
 #@ c08456aa: can't write {path}
 editor.script.err.cant_write = can't write {path}
-# noxsdl/src/editor/script_panel.cpp:1280
+# noxsdl/src/editor/script_panel.cpp:1290
 #@ 002eb3a8: Can't import {path}:\n{error}
 editor.script.err.import = Can't import {path}:\n{error}
-# noxsdl/src/editor/script_panel.cpp:1063
+# noxsdl/src/editor/script_panel.cpp:1073
 #@ ddef208a: The play-test's map can't be written:\n{error}
 editor.script.err.map_write = The play-test's map can't be written:\n{error}
-# noxsdl/src/editor/script_panel.cpp:1039
+# noxsdl/src/editor/script_panel.cpp:1049
 #@ a86d90e0: The script doesn't compile: fix its errors (Problems) before the play-test.
 editor.script.err.playtest_compile = The script doesn't compile: fix its errors (Problems) before the play-test.
-# noxsdl/src/editor/script_panel.cpp:1095
+# noxsdl/src/editor/script_panel.cpp:1105
 #@ 0cf25317: The play-test didn't start:\n{error}
 editor.script.err.playtest_start = The play-test didn't start:\n{error}
-# noxsdl/src/editor/script_panel.cpp:1029
+# noxsdl/src/editor/script_panel.cpp:1039
 #@ 3be6523e: The script doesn't compile: fix its errors (Problems) before the private test.
 editor.script.err.private_compile = The script doesn't compile: fix its errors (Problems) before the private test.
-# noxsdl/src/editor/script_panel.cpp:1086
+# noxsdl/src/editor/script_panel.cpp:1096
 #@ a5c15e53: The private test didn't start:\n{error}
 editor.script.err.private_start = The private test didn't start:\n{error}
 # noxsdl/src/editor/script_panel.cpp:338
@@ -9393,118 +9393,118 @@ editor.script.filter.all = All files
 # noxsdl/src/editor/script_panel.cpp:337
 #@ 5c89f474: Compiled NoxScript
 editor.script.filter.obj = Compiled NoxScript
-# noxsdl/src/editor/script_panel.cpp:1525
+# noxsdl/src/editor/script_panel.cpp:1535
 #@ b9a39b7e: Find (Enter: next, Shift+Enter: previous)
 editor.script.find.hint = Find (Enter: next, Shift+Enter: previous)
-# noxsdl/src/editor/script_panel.cpp:1543
+# noxsdl/src/editor/script_panel.cpp:1553
 #@ 2034fd8e: Match case
 editor.script.find.match_case = Match case
-# noxsdl/src/editor/script_panel.cpp:1546
+# noxsdl/src/editor/script_panel.cpp:1556
 #@ 03609452: {n} matches
 editor.script.find.matches = {n} matches
-# noxsdl/src/editor/script_panel.cpp:1541
+# noxsdl/src/editor/script_panel.cpp:1551
 #@ 522c7d09: Next match (F3)
 editor.script.find.next = Next match (F3)
-# noxsdl/src/editor/script_panel.cpp:1529
+# noxsdl/src/editor/script_panel.cpp:1539
 #@ 0bd1b75d: Not found: {text}
 editor.script.find.not_found = Not found: {text}
-# noxsdl/src/editor/script_panel.cpp:1538
+# noxsdl/src/editor/script_panel.cpp:1548
 #@ 1b369196: Previous match (Shift+F3)
 editor.script.find.previous = Previous match (Shift+F3)
-# noxsdl/src/editor/script_panel.cpp:1476
+# noxsdl/src/editor/script_panel.cpp:1486
 #@ 990de47d: Create
 editor.script.fn.create = Create
-# noxsdl/src/editor/script_panel.cpp:1460
+# noxsdl/src/editor/script_panel.cpp:1470
 #@ 1637aeb1: The script function this handler calls (from the compiled script). Right-click: go to it.
 editor.script.fn.help = The script function this handler calls (from the compiled script). Right-click: go to it.
-# noxsdl/src/editor/script_panel.cpp:1441
+# noxsdl/src/editor/script_panel.cpp:1451
 #@ ea62a68f: New function...
 editor.script.fn.new = New function...
-# noxsdl/src/editor/script_panel.cpp:1468
+# noxsdl/src/editor/script_panel.cpp:1478
 #@ 5d68ace4: A new void function in the script, for this handler:
 editor.script.fn.new_text = A new void function in the script, for this handler:
-# noxsdl/src/editor/script_panel.cpp:1465, noxsdl/src/editor/script_panel.cpp:1467
+# noxsdl/src/editor/script_panel.cpp:1475, noxsdl/src/editor/script_panel.cpp:1477
 #@ c1256cc3: New function
 editor.script.fn.new_title = New function
-# noxsdl/src/editor/script_panel.cpp:1423, noxsdl/src/editor/script_panel.cpp:1430, noxsdl/src/editor/script_panel.cpp:1964
+# noxsdl/src/editor/script_panel.cpp:1433, noxsdl/src/editor/script_panel.cpp:1440, noxsdl/src/editor/script_panel.cpp:1974
 #@ 90458a20: (none)
 editor.script.fn.none = (none)
-# noxsdl/src/editor/script_panel.cpp:1425
+# noxsdl/src/editor/script_panel.cpp:1435
 #@ e1e55d51: {name}  (not in the script)
 editor.script.fn.not_in_script = {name}  (not in the script)
-# noxsdl/src/editor/script_panel.cpp:1652
+# noxsdl/src/editor/script_panel.cpp:1662
 #@ 9808f547: Line
 editor.script.goto_line.line = Line
-# noxsdl/src/editor/script_panel.cpp:1646, noxsdl/src/editor/script_panel.cpp:1650
+# noxsdl/src/editor/script_panel.cpp:1656, noxsdl/src/editor/script_panel.cpp:1660
 #@ 7431b26a: Go to line
 editor.script.goto_line.title = Go to line
-# noxcore/src/mapedit/script_doc.cpp:150
+# noxcore/src/mapedit/script_doc.cpp:151
 #@ 38403769: Change focus
 editor.script.handler.change_focus = Change focus
-# noxcore/src/mapedit/script_doc.cpp:175
+# noxcore/src/mapedit/script_doc.cpp:176
 #@ f663163d: Collide
 editor.script.handler.collide = Collide
-# noxcore/src/mapedit/script_doc.cpp:165
+# noxcore/src/mapedit/script_doc.cpp:166
 #@ 36fc2e1b: Collided
 editor.script.handler.collided = Collided
-# noxcore/src/mapedit/script_doc.cpp:153
+# noxcore/src/mapedit/script_doc.cpp:154
 #@ 9bfdbd2f: Collision
 editor.script.handler.collision = Collision
-# noxcore/src/mapedit/script_doc.cpp:148
+# noxcore/src/mapedit/script_doc.cpp:149
 #@ 919f3bed: Death
 editor.script.handler.death = Death
-# noxcore/src/mapedit/script_doc.cpp:174
+# noxcore/src/mapedit/script_doc.cpp:175
 #@ 3d692a71: Die
 editor.script.handler.die = Die
-# noxcore/src/mapedit/script_doc.cpp:155
+# noxcore/src/mapedit/script_doc.cpp:156
 #@ 2cbf5102: End of waypoint
 editor.script.handler.end_of_waypoint = End of waypoint
-# noxcore/src/mapedit/script_doc.cpp:147
+# noxcore/src/mapedit/script_doc.cpp:148
 #@ 01163863: Enemy sighted
 editor.script.handler.enemy_sighted = Enemy sighted
-# noxcore/src/mapedit/script_doc.cpp:256
+# noxcore/src/mapedit/script_doc.cpp:348
 #@ aff863ad: Enter
 editor.script.handler.enter = Enter
-# noxcore/src/mapedit/script_doc.cpp:154
+# noxcore/src/mapedit/script_doc.cpp:155
 #@ 1b224ddd: Hear enemy
 editor.script.handler.hear_enemy = Hear enemy
-# noxcore/src/mapedit/script_doc.cpp:173
+# noxcore/src/mapedit/script_doc.cpp:174
 #@ e2ea49d8: Hurt
 editor.script.handler.hurt = Hurt
-# noxcore/src/mapedit/script_doc.cpp:151
+# noxcore/src/mapedit/script_doc.cpp:152
 #@ a0296670: Is hit
 editor.script.handler.is_hit = Is hit
-# noxcore/src/mapedit/script_doc.cpp:257
+# noxcore/src/mapedit/script_doc.cpp:349
 #@ fa2f3260: Leave
 editor.script.handler.leave = Leave
-# noxcore/src/mapedit/script_doc.cpp:149
+# noxcore/src/mapedit/script_doc.cpp:150
 #@ 26b5377d: Looking for enemy
 editor.script.handler.looking_for_enemy = Looking for enemy
-# noxcore/src/mapedit/script_doc.cpp:156
+# noxcore/src/mapedit/script_doc.cpp:157
 #@ dc237eff: Lost enemy
 editor.script.handler.lost_enemy = Lost enemy
-# noxcore/src/mapedit/script_doc.cpp:144
+# noxcore/src/mapedit/script_doc.cpp:145
 #@ 856f3aa5: Pickup
 editor.script.handler.pickup = Pickup
-# noxcore/src/mapedit/script_doc.cpp:162
+# noxcore/src/mapedit/script_doc.cpp:163
 #@ 705293c5: Pressed
 editor.script.handler.pressed = Pressed
-# noxcore/src/mapedit/script_doc.cpp:163
+# noxcore/src/mapedit/script_doc.cpp:164
 #@ 412ec10e: Released
 editor.script.handler.released = Released
-# noxcore/src/mapedit/script_doc.cpp:152
+# noxcore/src/mapedit/script_doc.cpp:153
 #@ 60fb0bb0: Retreat
 editor.script.handler.retreat = Retreat
-# noxcore/src/mapedit/script_doc.cpp:176
+# noxcore/src/mapedit/script_doc.cpp:177
 #@ c6929d38: Spawn
 editor.script.handler.spawn = Spawn
-# noxcore/src/mapedit/script_doc.cpp:168
+# noxcore/src/mapedit/script_doc.cpp:169
 #@ 4f5f2e25: Stepped on
 editor.script.handler.stepped_on = Stepped on
-# noxcore/src/mapedit/script_doc.cpp:471
+# noxcore/src/mapedit/script_doc.cpp:563
 #@ 39cd6c3c: {where} names the function {name}, which the script doesn't define
 editor.script.handler_undefined = {where} names the function {name}, which the script doesn't define
-# noxcore/src/mapedit/script_doc.cpp:468
+# noxcore/src/mapedit/script_doc.cpp:560
 #@ 4c711d36: {where} names the function {name}, which the script doesn't define (and {n} more handlers)
 editor.script.handler_undefined_more = {where} names the function {name}, which the script doesn't define (and {n} more handlers)
 # noxsdl/src/editor/script_panel.cpp:220
@@ -9519,78 +9519,97 @@ editor.script.hover.global = global {type} {name}  line {line}
 # noxsdl/src/editor/script_panel.cpp:237
 #@ 5ce2ab74: object variable {type} object.{name}  line {line} (each object's own; NoX Core only)
 editor.script.hover.object_var = object variable {type} object.{name}  line {line} (each object's own; NoX Core only)
-# noxsdl/src/editor/script_panel.cpp:2080
+# noxsdl/src/editor/script_panel.cpp:2090
 #@ 3a6bc423: {facts} (the community tools' {alias})
 editor.script.info.alias = {facts} (the community tools' {alias})
-# noxsdl/src/editor/script_panel.cpp:2044
+# noxsdl/src/editor/script_panel.cpp:2054
 #@ 388a2e01: Back to the builtin shown before.
 editor.script.info.back_help = Back to the builtin shown before.
-# noxsdl/src/editor/script_panel.cpp:2072
+# noxsdl/src/editor/script_panel.cpp:2082
 #@ 658f3664: Copy
 editor.script.info.copy = Copy
-# noxsdl/src/editor/script_panel.cpp:2154
+# noxsdl/src/editor/script_panel.cpp:2164
 #@ fce9dce2: Copy Example
 editor.script.info.copy_example = Copy Example
-# noxsdl/src/editor/script_panel.cpp:2075
+# noxsdl/src/editor/script_panel.cpp:2085
 #@ 352366dd: Copy the prototype.
 editor.script.info.copy_help = Copy the prototype.
-# noxsdl/src/editor/script_panel.cpp:2104
+# noxsdl/src/editor/script_panel.cpp:2114
 #@ 66de7a09: Description
 editor.script.info.description = Description
-# noxsdl/src/editor/script_panel.cpp:2122
+# noxsdl/src/editor/script_panel.cpp:2132
 #@ 5510b101: Edge cases
 editor.script.info.edge = Edge cases
-# noxsdl/src/editor/script_panel.cpp:2146
+# noxsdl/src/editor/script_panel.cpp:2156
 #@ 12931341: Example
 editor.script.info.example = Example
-# noxsdl/src/editor/script_panel.cpp:2077
+# noxsdl/src/editor/script_panel.cpp:2087
 #@ 4b433c6f: {category}, builtin {id}
 editor.script.info.facts = {category}, builtin {id}
-# noxsdl/src/editor/script_panel.cpp:2078
+# noxsdl/src/editor/script_panel.cpp:2088
 #@ c1abb68b: builtin {id}
 editor.script.info.facts_bare = builtin {id}
-# noxsdl/src/editor/script_panel.cpp:2148, noxsdl/src/editor/script_panel.cpp:2472
+# noxsdl/src/editor/script_panel.cpp:2158, noxsdl/src/editor/script_panel.cpp:2482
 #@ 65fbc8d5: Insert at Cursor
 editor.script.info.insert_example = Insert at Cursor
-# noxsdl/src/editor/script_panel.cpp:2152
+# noxsdl/src/editor/script_panel.cpp:2162
 #@ 54cd08a7: Type the example into the Script panel at the caret.
 editor.script.info.insert_example_help = Type the example into the Script panel at the caret.
-# noxsdl/src/editor/script_panel.cpp:2096
+# noxsdl/src/editor/script_panel.cpp:2106
 #@ f2029d8e: No description for this builtin yet.
 editor.script.info.no_doc = No description for this builtin yet.
-# noxsdl/src/editor/script_panel.cpp:2108
+# noxsdl/src/editor/script_panel.cpp:2118
 #@ e2e3244f: None.
 editor.script.info.no_params = None.
-# noxsdl/src/editor/script_panel.cpp:2106
+# noxsdl/src/editor/script_panel.cpp:2116
 #@ fd7f93f9: Parameters
 editor.script.info.parameters = Parameters
-# noxsdl/src/editor/script_panel.cpp:2066
+# noxsdl/src/editor/script_panel.cpp:2076
 #@ 1dd9b122: Its priority: sort Script Reference's Builtins by Priority for the favourites first.
 editor.script.info.priority_help = Its priority: sort Script Reference's Builtins by Priority for the favourites first.
-# noxsdl/src/editor/script_panel.cpp:2126
+# noxsdl/src/editor/script_panel.cpp:2136
 #@ 4b2466d8: Related
 editor.script.info.related = Related
-# noxsdl/src/editor/script_panel.cpp:2119
+# noxsdl/src/editor/script_panel.cpp:2129
 #@ d2aab1c4: Returns
 editor.script.info.returns = Returns
-# noxsdl/src/editor/script_panel.cpp:2049
+# noxsdl/src/editor/script_panel.cpp:2059
 #@ 744ee904: Add to the favourites.
 editor.script.info.star_help = Add to the favourites.
-# noxsdl/src/editor/script_panel.cpp:2168
+# noxsdl/src/editor/script_panel.cpp:2178
 #@ 9298de86: In the stock maps
 editor.script.info.stock_maps = In the stock maps
-# noxsdl/src/editor/script_panel.cpp:2048
+# noxsdl/src/editor/script_panel.cpp:2058
 #@ a835c2a4: A favourite: click to take it out of the favourites.
 editor.script.info.unstar_help = A favourite: click to take it out of the favourites.
-# noxsdl/src/editor/script_panel.cpp:2087
+# noxsdl/src/editor/script_panel.cpp:2097
 #@ 8d4d225b: Values
 editor.script.info.values = Values
-# noxsdl/src/editor/script_panel.cpp:2458
+# noxsdl/src/editor/script_panel.cpp:2468
 #@ 8d4d225b: Values
 editor.script.info.values_heading = Values
-# noxsdl/src/editor/script_panel.cpp:2090
+# noxsdl/src/editor/script_panel.cpp:2100
 #@ 66888ba5: Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space).
 editor.script.info.values_help = Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space).
+# noxcore/src/mapedit/script_doc.cpp:269
+#@ bd471e0b: the saved source was written for the old argument order (a call's first argument went to the function's last parameter), and it couldn't be turned round to give the same compiled script: it is shown as saved, so its calls of the script's own functions with two or more arguments now bind the other way round; check them before compiling
+editor.script.migrated.failed = the saved source was written for the old argument order (a call's first argument went to the function's last parameter), and it couldn't be turned round to give the same compiled script: it is shown as saved, so its calls of the script's own functions with two or more arguments now bind the other way round; check them before compiling
+# noxcore/src/mapedit/script_doc.cpp:232
+#@ ffd74351: the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} call of the script's own functions now has its arguments turned round to read in parameter order; it compiles to the same bytes | the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} calls of the script's own functions now have their arguments turned round to read in parameter order; they compile to the same bytes
+editor.script.migrated.same[one] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} call of the script's own functions now has its arguments turned round to read in parameter order; it compiles to the same bytes
+editor.script.migrated.same[other] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} calls of the script's own functions now have their arguments turned round to read in parameter order; they compile to the same bytes
+# noxcore/src/mapedit/script_doc.cpp:277
+#@ d6ea9404: {n} call of the script's own functions with two or more arguments, in code that doesn't parse, was left as it was saved (for the old argument order): it now binds the other way round | {n} calls of the script's own functions with two or more arguments, in code that doesn't parse, were left as they were saved (for the old argument order): they now bind the other way round
+editor.script.migrated.skipped[one] = {n} call of the script's own functions with two or more arguments, in code that doesn't parse, was left as it was saved (for the old argument order): it now binds the other way round
+editor.script.migrated.skipped[other] = {n} calls of the script's own functions with two or more arguments, in code that doesn't parse, were left as they were saved (for the old argument order): they now bind the other way round
+# noxcore/src/mapedit/script_doc.cpp:256
+#@ 5f4a622e: the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} call of the script's own functions now has its arguments turned round to read as the map runs it, and it doesn't compile: the old order put a value into a parameter of another type. Fix it (see the errors); until then the map's script stays as it is | the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} calls of the script's own functions now have their arguments turned round to read as the map runs them, and some don't compile: the old order put a value into a parameter of another type. Fix them (see the errors); until then the map's script stays as it is
+editor.script.migrated.type_errors[one] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} call of the script's own functions now has its arguments turned round to read as the map runs it, and it doesn't compile: the old order put a value into a parameter of another type. Fix it (see the errors); until then the map's script stays as it is
+editor.script.migrated.type_errors[other] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} calls of the script's own functions now have their arguments turned round to read as the map runs them, and some don't compile: the old order put a value into a parameter of another type. Fix them (see the errors); until then the map's script stays as it is
+# noxcore/src/mapedit/script_doc.cpp:243
+#@ 7587fba6: the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} call of the script's own functions now has its arguments turned round to read in parameter order; look it over | the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of the script's own functions now have their arguments turned round to read in parameter order; look them over
+editor.script.migrated.unchecked[one] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} call of the script's own functions now has its arguments turned round to read in parameter order; look it over
+editor.script.migrated.unchecked[other] = the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of the script's own functions now have their arguments turned round to read in parameter order; look them over
 # noxsdl/src/editor/script_panel.cpp:174, noxsdl/src/editor/script_panel.cpp:174
 #@ f22a6288: Arena
 editor.script.mode.arena = Arena
@@ -9612,7 +9631,7 @@ editor.script.mode.quest = Quest
 # noxsdl/src/editor/script_panel.cpp:172, noxsdl/src/editor/script_panel.cpp:172
 #@ 698f976a: Solo
 editor.script.mode.solo = Solo
-# noxsdl/src/editor/script_panel.cpp:858
+# noxsdl/src/editor/script_panel.cpp:868
 #@ e2da00ad: The script uses object variables, a NoX Core-only feature: the original game crashes on them, and a map with them needs a NoX Core server. They are off in Editor Settings, so the compiler refuses them (see Problems).
 editor.script.object_vars_banner = The script uses object variables, a NoX Core-only feature: the original game crashes on them, and a map with them needs a NoX Core server. They are off in Editor Settings, so the compiler refuses them (see Problems).
 # noxcore/include/noxcore/mapedit/op_label.hpp:217
@@ -9630,118 +9649,121 @@ editor.script.op.edit = Edit script
 # noxcore/include/noxcore/mapedit/op_label.hpp:215
 #@ 515582c7: Import script
 editor.script.op.import = Import script
-# noxsdl/src/editor/script_panel.cpp:2597
+# noxsdl/src/editor/script_panel.cpp:2607
 #@ be9de848: Character Class
 editor.script.play.class = Character Class
-# noxsdl/src/editor/script_panel.cpp:2573
+# noxsdl/src/editor/script_panel.cpp:2583
 #@ d2ff6f72: Game Mode
 editor.script.play.game_mode = Game Mode
-# noxsdl/src/editor/script_panel.cpp:2599
+# noxsdl/src/editor/script_panel.cpp:2609
 #@ fc4805d5: The map's ({class})
 editor.script.play.map_class = The map's ({class})
-# noxsdl/src/editor/script_panel.cpp:2575
+# noxsdl/src/editor/script_panel.cpp:2585
 #@ f4eabc4c: The map's own ({mode})
 editor.script.play.map_own_mode = The map's own ({mode})
-# noxsdl/src/editor/script_panel.cpp:2582
+# noxsdl/src/editor/script_panel.cpp:2592
 #@ b22e0a83: map's
 editor.script.play.maps = map's
-# noxsdl/src/editor/script_panel.cpp:2600
+# noxsdl/src/editor/script_panel.cpp:2610
 #@ 864fe8cb: The player's own
 editor.script.play.player_class = The player's own
-# noxsdl/src/editor/script_panel.cpp:2589
+# noxsdl/src/editor/script_panel.cpp:2599
 #@ 730a5d69: A quest, as Solo Quest plays one: the chat map, then OTQuest.rul begins the quest, whose only map is this one (its saves in the play-test's folder).
 editor.script.play.quest_help = A quest, as Solo Quest plays one: the chat map, then OTQuest.rul begins the quest, whose only map is this one (its saves in the play-test's folder).
-# noxsdl/src/editor/script_panel.cpp:2585
+# noxsdl/src/editor/script_panel.cpp:2595
 #@ 82c665d4: The campaign's solo game: the map hosted as the main menu's Solo hosts one, a new character of the class chosen below, its saves in the play-test's folder.
 editor.script.play.solo_help = The campaign's solo game: the map hosted as the main menu's Solo hosts one, a new character of the class chosen below, its saves in the play-test's folder.
-# noxsdl/src/editor/script_panel.cpp:2643
+# noxsdl/src/editor/script_panel.cpp:2654
 #@ 1582d50e: script {line}:{col}
 editor.script.problems.at = script {line}:{col}
-# noxsdl/src/editor/script_panel.cpp:2648
+# noxsdl/src/editor/script_panel.cpp:2659
 #@ abaa4d9b: decompiler
 editor.script.problems.decompiler = decompiler
-# noxsdl/src/editor/script_panel.cpp:2630
+# noxsdl/src/editor/script_panel.cpp:2641
 #@ f38d9cf1: Error
 editor.script.problems.error = Error
-# noxsdl/src/editor/script_panel.cpp:2618
+# noxsdl/src/editor/script_panel.cpp:2629
 #@ 6651e9ca: Script
 editor.script.problems.heading = Script
-# noxsdl/src/editor/script_panel.cpp:2651
+# noxsdl/src/editor/script_panel.cpp:2665
 #@ 059661a1: hot reload
 editor.script.problems.hot_reload = hot reload
-# noxsdl/src/editor/script_panel.cpp:2631
+# noxsdl/src/editor/script_panel.cpp:2642
 #@ 8fe1e625: Info
 editor.script.problems.info = Info
-# noxsdl/src/editor/script_panel.cpp:2644
+# noxsdl/src/editor/script_panel.cpp:2655
 #@ b396d87e: script (the map)
 editor.script.problems.map = script (the map)
-# noxsdl/src/editor/script_panel.cpp:2631
+# noxsdl/src/editor/script_panel.cpp:2642
 #@ e25b9d38: Pass
 editor.script.problems.pass = Pass
-# noxsdl/src/editor/script_panel.cpp:2661
+# noxsdl/src/editor/script_panel.cpp:2675
 #@ 513cb799: passed
 editor.script.problems.passed = passed
-# noxsdl/src/editor/script_panel.cpp:2623
+# noxsdl/src/editor/script_panel.cpp:2634
 #@ 448c5c7c: Problem
 editor.script.problems.problem = Problem
-# noxsdl/src/editor/script_panel.cpp:2664
+# noxsdl/src/editor/script_panel.cpp:2662
+#@ 770870b9: saved source
+editor.script.problems.saved_source = saved source
+# noxsdl/src/editor/script_panel.cpp:2678
 #@ 2d1941f0: stopped: it ran too long (a loop that never ends?)
 editor.script.problems.stopped = stopped: it ran too long (a loop that never ends?)
-# noxsdl/src/editor/script_panel.cpp:2659
+# noxsdl/src/editor/script_panel.cpp:2673
 #@ bc44162e: test {name}
 editor.script.problems.test = test {name}
-# noxsdl/src/editor/script_panel.cpp:2655
+# noxsdl/src/editor/script_panel.cpp:2669
 #@ 5b22cf22: tests
 editor.script.problems.tests = tests
-# noxsdl/src/editor/script_panel.cpp:2656
+# noxsdl/src/editor/script_panel.cpp:2670
 #@ 327d1272: tests: map start
 editor.script.problems.tests_start = tests: map start
-# noxsdl/src/editor/script_panel.cpp:2630
+# noxsdl/src/editor/script_panel.cpp:2641
 #@ 37c4fc8f: Warning
 editor.script.problems.warning = Warning
-# noxsdl/src/editor/script_panel.cpp:2622
+# noxsdl/src/editor/script_panel.cpp:2633
 #@ 91dad0f8: Where
 editor.script.problems.where = Where
-# noxcore/src/mapedit/script_doc.cpp:345
+# noxcore/src/mapedit/script_doc.cpp:437
 #@ 4793750e: This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is kept as it is. Turn on "Allow NoX Core-only script features (object variables)" to edit and compile it.
 editor.script.read_only_object_vars = This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is kept as it is. Turn on "Allow NoX Core-only script features (object variables)" to edit and compile it.
-# noxsdl/src/editor/script_panel.cpp:1711
+# noxsdl/src/editor/script_panel.cpp:1721
 #@ 471deba9: Builtins
 editor.script.ref.builtins = Builtins
-# noxsdl/src/editor/script_panel.cpp:1717
+# noxsdl/src/editor/script_panel.cpp:1727
 #@ 3ec8f5ae: Compile the script for its functions.
 editor.script.ref.compile_for_functions = Compile the script for its functions.
-# noxsdl/src/editor/script_panel.cpp:1758
+# noxsdl/src/editor/script_panel.cpp:1768
 #@ 7c3b9dd1: Compile the script for its globals.
 editor.script.ref.compile_for_globals = Compile the script for its globals.
-# noxsdl/src/editor/script_panel.cpp:1733
+# noxsdl/src/editor/script_panel.cpp:1743
 #@ 34d2ac4b: Disassembly
 editor.script.ref.disassembly = Disassembly
-# noxsdl/src/editor/script_panel.cpp:1744
+# noxsdl/src/editor/script_panel.cpp:1754
 #@ 9d2aaf0e: Compile the script and put the caret in a function.
 editor.script.ref.disassembly_hint = Compile the script and put the caret in a function.
-# noxsdl/src/editor/script_panel.cpp:1747
+# noxsdl/src/editor/script_panel.cpp:1757
 #@ d5fa9201: {name} (function {index})
 editor.script.ref.disassembly_of = {name} (function {index})
-# noxsdl/src/editor/script_panel.cpp:1725
+# noxsdl/src/editor/script_panel.cpp:1735
 #@ 8f61066d: line {line}, function {index}
 editor.script.ref.function_tip = line {line}, function {index}
-# noxsdl/src/editor/script_panel.cpp:1715
+# noxsdl/src/editor/script_panel.cpp:1725
 #@ 69d796ee: Functions
 editor.script.ref.functions = Functions
-# noxsdl/src/editor/script_panel.cpp:1756
+# noxsdl/src/editor/script_panel.cpp:1766
 #@ 4620a987: Globals
 editor.script.ref.globals = Globals
-# noxsdl/src/editor/script_panel.cpp:1169
+# noxsdl/src/editor/script_panel.cpp:1179
 #@ f39b08b7: Hot reload: {summary}
 editor.script.reload.hot = Hot reload: {summary}
-# noxsdl/src/editor/script_panel.cpp:1173
+# noxsdl/src/editor/script_panel.cpp:1183
 #@ 66afd540: Not reloaded: {why}
 editor.script.reload.not = Not reloaded: {why}
-# noxsdl/src/editor/script_panel.cpp:1170
+# noxsdl/src/editor/script_panel.cpp:1180
 #@ 863a72fc: Restart scripts: {summary}
 editor.script.reload.restart = Restart scripts: {summary}
-# noxsdl/src/editor/script_panel.cpp:1237, noxsdl/src/editor/script_panel.cpp:1260
+# noxsdl/src/editor/script_panel.cpp:1247, noxsdl/src/editor/script_panel.cpp:1270
 #@ aa1677ca: Can't write {path}
 editor.script.status.cant_write = Can't write {path}
 # noxsdl/src/editor/script_panel.cpp:300
@@ -9750,196 +9772,196 @@ editor.script.status.compiled = Script compiled
 # noxsdl/src/editor/script_panel.cpp:301
 #@ 13052ae7: Script compiled ({n} warnings)
 editor.script.status.compiled_warnings = Script compiled ({n} warnings)
-# noxsdl/src/editor/script_panel.cpp:767
+# noxsdl/src/editor/script_panel.cpp:777
 #@ 89340aa5: Decompiled the map's script
 editor.script.status.decompiled = Decompiled the map's script
-# noxsdl/src/editor/script_panel.cpp:766
+# noxsdl/src/editor/script_panel.cpp:776
 #@ 70c1a915: Decompiled the map's script (it compiles back to the same bytes)
 editor.script.status.decompiled_identical = Decompiled the map's script (it compiles back to the same bytes)
-# noxsdl/src/editor/script_panel.cpp:1249
+# noxsdl/src/editor/script_panel.cpp:1259
 #@ c2e95a08: The script has errors: not exported
 editor.script.status.export_errors = The script has errors: not exported
-# noxsdl/src/editor/script_panel.cpp:1236, noxsdl/src/editor/script_panel.cpp:1259
+# noxsdl/src/editor/script_panel.cpp:1246, noxsdl/src/editor/script_panel.cpp:1269
 #@ 21672767: Exported {path}
 editor.script.status.exported = Exported {path}
-# noxsdl/src/editor/script_panel.cpp:1840
+# noxsdl/src/editor/script_panel.cpp:1850
 #@ fcd42772: {name}: a favourite
 editor.script.status.favourite = {name}: a favourite
-# noxsdl/src/editor/script_panel.cpp:1277
+# noxsdl/src/editor/script_panel.cpp:1287
 #@ b30ffb6a: Imported {path} ({n} functions)
 editor.script.status.imported = Imported {path} ({n} functions)
-# noxsdl/src/editor/script_panel.cpp:1396
+# noxsdl/src/editor/script_panel.cpp:1406
 #@ f96020b1: {prototype} is a builtin
 editor.script.status.is_builtin = {prototype} is a builtin
-# noxsdl/src/editor/script_panel.cpp:721
+# noxsdl/src/editor/script_panel.cpp:731
 #@ c85e7286: {name} has the script: your last unsent typing was dropped
 editor.script.status.lock_lost = {name} has the script: your last unsent typing was dropped
-# noxsdl/src/editor/script_panel.cpp:958
+# noxsdl/src/editor/script_panel.cpp:968
 #@ 1f4cb833: Put the mouse on the game in the Map panel to jump there
 editor.script.status.mouse_on_game = Put the mouse on the game in the Map panel to jump there
-# noxsdl/src/editor/script_panel.cpp:1399
+# noxsdl/src/editor/script_panel.cpp:1409
 #@ 9db1a724: No definition of {name} (compile the script for its names)
 editor.script.status.no_definition = No definition of {name} (compile the script for its names)
 # noxsdl/src/editor/script_panel.cpp:346
 #@ 9cdda40d: No .obj imported yet
 editor.script.status.no_obj = No .obj imported yet
-# noxsdl/src/editor/script_panel.cpp:977, noxsdl/src/editor/script_panel.cpp:1006
+# noxsdl/src/editor/script_panel.cpp:987, noxsdl/src/editor/script_panel.cpp:1016
 #@ f35ab0f6: Play-test isn't available here
 editor.script.status.no_playtest = Play-test isn't available here
-# noxsdl/src/editor/script_panel.cpp:1011
+# noxsdl/src/editor/script_panel.cpp:1021
 #@ 1b00c423: A private test isn't available here
 editor.script.status.no_private_test = A private test isn't available here
-# noxsdl/src/editor/script_panel.cpp:796
+# noxsdl/src/editor/script_panel.cpp:806
 #@ ea05ed02: No script source to compile
 editor.script.status.no_source = No script source to compile
-# noxsdl/src/editor/script_panel.cpp:1145
+# noxsdl/src/editor/script_panel.cpp:1155
 #@ 5dee0dba: No play-test is running
 editor.script.status.no_test_running = No play-test is running
-# noxsdl/src/editor/script_panel.cpp:2218
+# noxsdl/src/editor/script_panel.cpp:2228
 #@ eb51564e: No value list here: the caret isn't in an argument that takes names from a known set (an effect, a sound, a thing type...)
 editor.script.status.no_values = No value list here: the caret isn't in an argument that takes names from a known set (an effect, a sound, a thing type...)
-# noxsdl/src/editor/script_panel.cpp:809
+# noxsdl/src/editor/script_panel.cpp:819
 #@ 5a2d11af: The script has {n} error: not compiled (see Problems) | The script has {n} errors: not compiled (see Problems)
 editor.script.status.not_compiled[one] = The script has {n} error: not compiled (see Problems)
 editor.script.status.not_compiled[other] = The script has {n} errors: not compiled (see Problems)
 # noxsdl/src/editor/script_panel.cpp:324
 #@ f3cddb1c: The map has no compiled script to decompile
 editor.script.status.nothing_to_decompile = The map has no compiled script to decompile
-# noxsdl/src/editor/script_panel.cpp:868
+# noxsdl/src/editor/script_panel.cpp:878
 #@ 05b14be8: NoX Core-only script features allowed (Editor Settings): maps that use them need a NoX Core server
 editor.script.status.noxcore_allowed = NoX Core-only script features allowed (Editor Settings): maps that use them need a NoX Core server
-# noxsdl/src/editor/script_panel.cpp:801
+# noxsdl/src/editor/script_panel.cpp:811
 #@ 405f0c55: Not compiled: the script uses object variables (NoX Core-only), which Editor Settings doesn't allow
 editor.script.status.object_vars_refused = Not compiled: the script uses object variables (NoX Core-only), which Editor Settings doesn't allow
-# noxsdl/src/editor/script_panel.cpp:985
+# noxsdl/src/editor/script_panel.cpp:995
 #@ 0a2a2a99: Play-test: the player put at {where}
 editor.script.status.player_put = Play-test: the player put at {where}
-# noxsdl/src/editor/script_panel.cpp:1102
+# noxsdl/src/editor/script_panel.cpp:1112
 #@ cf5fcb69: Play-test: {mode}
 editor.script.status.playing = Play-test: {mode}
-# noxsdl/src/editor/script_panel.cpp:1107
+# noxsdl/src/editor/script_panel.cpp:1117
 #@ 80d91f8c: {status}, players can't die
 editor.script.status.playing_cant_die = {status}, players can't die
-# noxsdl/src/editor/script_panel.cpp:1104
+# noxsdl/src/editor/script_panel.cpp:1114
 #@ 42b5f2bb: {status}, {class}
 editor.script.status.playing_class = {status}, {class}
-# noxsdl/src/editor/script_panel.cpp:1113
+# noxsdl/src/editor/script_panel.cpp:1123
 #@ 9ed82f08: {status}, from {x}, {y}
 editor.script.status.playing_from = {status}, from {x}, {y}
-# noxsdl/src/editor/script_panel.cpp:1115
+# noxsdl/src/editor/script_panel.cpp:1125
 #@ 20613cda: {status} (F2 in the game comes back)
 editor.script.status.playing_full = {status} (F2 in the game comes back)
-# noxsdl/src/editor/script_panel.cpp:1116
+# noxsdl/src/editor/script_panel.cpp:1126
 #@ 836f9b0f: {status} ({keys} frees the mouse)
 editor.script.status.playing_panel = {status} ({keys} frees the mouse)
-# noxsdl/src/editor/script_panel.cpp:916
+# noxsdl/src/editor/script_panel.cpp:926
 #@ 53dd1ea1: The play-test ended
 editor.script.status.playtest_ended = The play-test ended
-# noxsdl/src/editor/script_panel.cpp:1841
+# noxsdl/src/editor/script_panel.cpp:1851
 #@ 105f7656: {name}: priority {priority}
 editor.script.status.priority = {name}: priority {priority}
-# noxsdl/src/editor/script_panel.cpp:1089
+# noxsdl/src/editor/script_panel.cpp:1099
 #@ 82608a65: Private test of the working copy: {mode}, in its own window (the session goes on here)
 editor.script.status.private_test = Private test of the working copy: {mode}, in its own window (the session goes on here)
-# noxsdl/src/editor/script_panel.cpp:1478
+# noxsdl/src/editor/script_panel.cpp:1488
 #@ 0ed287bb: The script is read-only: it uses object variables, which Editor Settings doesn't allow
 editor.script.status.read_only = The script is read-only: it uses object variables, which Editor Settings doesn't allow
-# noxsdl/src/editor/script_panel.cpp:1137
+# noxsdl/src/editor/script_panel.cpp:1147
 #@ 72304a64: In a session the map restarts with a publish
 editor.script.status.session_restart = In a session the map restarts with a publish
-# noxsdl/src/editor/script_panel.cpp:1211
+# noxsdl/src/editor/script_panel.cpp:1221
 #@ 22773a91: Script tests: {passed} passed, {failed} failed
 editor.script.status.tests = Script tests: {passed} passed, {failed} failed
-# noxsdl/src/editor/script_panel.cpp:1193
+# noxsdl/src/editor/script_panel.cpp:1203
 #@ 5115e1cf: The script has errors: no tests run
 editor.script.status.tests_errors = The script has errors: no tests run
-# noxsdl/src/editor/script_panel.cpp:1213
+# noxsdl/src/editor/script_panel.cpp:1223
 #@ 37f64a2c: Script tests didn't run: {error}
 editor.script.status.tests_failed = Script tests didn't run: {error}
-# noxsdl/src/editor/script_panel.cpp:1300
+# noxsdl/src/editor/script_panel.cpp:1310
 #@ 9c1a4225: Watching {path}
 editor.script.status.watching = Watching {path}
-# noxcore/src/mapedit/script_doc.cpp:301
+# noxcore/src/mapedit/script_doc.cpp:393
 #@ 91017d7d: the map's script can't be read: {error}
 editor.script.unreadable = the map's script can't be read: {error}
-# noxsdl/src/editor/script_panel.cpp:1800
+# noxsdl/src/editor/script_panel.cpp:1810
 #@ ce05833b: {usage}, e.g. {maps}
 editor.script.usage.examples = {usage}, e.g. {maps}
-# noxsdl/src/editor/script_panel.cpp:1790
+# noxsdl/src/editor/script_panel.cpp:1800
 #@ 4fa2e7a4: Not used by any stock map.
 editor.script.usage.none = Not used by any stock map.
-# noxsdl/src/editor/script_panel.cpp:1792
+# noxsdl/src/editor/script_panel.cpp:1802
 #@ 273cefbf: Used in {maps} of the {scripts} stock map scripts ({n} call) | Used in {maps} of the {scripts} stock map scripts ({n} calls)
 editor.script.usage.used[one] = Used in {maps} of the {scripts} stock map scripts ({n} call)
 editor.script.usage.used[other] = Used in {maps} of the {scripts} stock map scripts ({n} calls)
-# noxsdl/src/editor/script_panel.cpp:2466
+# noxsdl/src/editor/script_panel.cpp:2476
 #@ 9565eda3: Every value it accepts (the game's own data). Double-click one, or pick it and Insert at Cursor.
 editor.script.values.about = Every value it accepts (the game's own data). Double-click one, or pick it and Insert at Cursor.
-# noxsdl/src/editor/script_panel.cpp:2464
+# noxsdl/src/editor/script_panel.cpp:2474
 #@ a2db2f6e: Every value it accepts (the game's own data and this map's names). Double-click one, or pick it and Insert at Cursor.
 editor.script.values.about_map = Every value it accepts (the game's own data and this map's names). Double-click one, or pick it and Insert at Cursor.
-# noxsdl/src/editor/script_panel.cpp:2442
+# noxsdl/src/editor/script_panel.cpp:2452
 #@ 56672496: argument {n}
 editor.script.values.argument = argument {n}
-# noxsdl/src/editor/script_panel.cpp:2480
+# noxsdl/src/editor/script_panel.cpp:2490
 #@ b9f2687b: Copy##value
 editor.script.values.copy = Copy##value
-# noxsdl/src/editor/script_panel.cpp:2484
+# noxsdl/src/editor/script_panel.cpp:2494
 #@ 4335db9a: Copy the picked value.
 editor.script.values.copy_help = Copy the picked value.
-# noxsdl/src/editor/script_panel.cpp:2502
+# noxsdl/src/editor/script_panel.cpp:2512
 #@ eaf89cc2: \s{n} of {total}
 editor.script.values.count = \s{n} of {total}
-# noxcore/src/mapedit/script_doc.cpp:420
+# noxcore/src/mapedit/script_doc.cpp:512
 #@ 11c43051: {n} group | {n} groups
 editor.script.values.groups[one] = {n} group
 editor.script.values.groups[other] = {n} groups
-# noxcore/src/mapedit/script_doc.cpp:428, noxcore/src/mapedit/script_doc.cpp:429, noxcore/src/mapedit/script_doc.cpp:430
+# noxcore/src/mapedit/script_doc.cpp:520, noxcore/src/mapedit/script_doc.cpp:521, noxcore/src/mapedit/script_doc.cpp:522
 #@ 2f277676: {n} groups have this name
 editor.script.values.groups_share_name = {n} groups have this name
-# noxsdl/src/editor/script_panel.cpp:2476
+# noxsdl/src/editor/script_panel.cpp:2486
 #@ efe7cff8: Type the picked value into the Script panel at the caret: into the string the caret is in when it takes these values, else in quotes.
 editor.script.values.insert_help = Type the picked value into the Script panel at the caret: into the string the caret is in when it takes these values, else in quotes.
-# noxsdl/src/editor/script_panel.cpp:2496
+# noxsdl/src/editor/script_panel.cpp:2506
 #@ 61d21012: None on this map yet.
 editor.script.values.none_on_map = None on this map yet.
-# noxcore/src/mapedit/script_doc.cpp:421
+# noxcore/src/mapedit/script_doc.cpp:513
 #@ 44c3dd8d: {n} object | {n} objects
 editor.script.values.objects[one] = {n} object
 editor.script.values.objects[other] = {n} objects
-# noxcore/src/mapedit/script_doc.cpp:426
+# noxcore/src/mapedit/script_doc.cpp:518
 #@ 2b2fb014: {n} objects have this name
 editor.script.values.objects_share_name = {n} objects have this name
-# noxsdl/src/editor/script_panel.cpp:2468
+# noxsdl/src/editor/script_panel.cpp:2478
 #@ f71f5491: Search values and notes
 editor.script.values.search_hint = Search values and notes
-# noxsdl/src/editor/script_panel.cpp:2377, noxsdl/src/editor/script_panel.cpp:2497
+# noxsdl/src/editor/script_panel.cpp:2387, noxsdl/src/editor/script_panel.cpp:2507
 #@ f1ea1eb2: Not available: the game's data isn't loaded.
 editor.script.values.unavailable = Not available: the game's data isn't loaded.
-# noxcore/src/mapedit/script_doc.cpp:418
+# noxcore/src/mapedit/script_doc.cpp:510
 #@ 45cbc723: {n} wall | {n} walls
 editor.script.values.walls[one] = {n} wall
 editor.script.values.walls[other] = {n} walls
-# noxcore/src/mapedit/script_doc.cpp:408
+# noxcore/src/mapedit/script_doc.cpp:500
 #@ 296b242b: waypoint {id} at {x}, {y}
 editor.script.values.waypoint_at = waypoint {id} at {x}, {y}
-# noxcore/src/mapedit/script_doc.cpp:419
+# noxcore/src/mapedit/script_doc.cpp:511
 #@ 62b037b9: {n} waypoint | {n} waypoints
 editor.script.values.waypoints[one] = {n} waypoint
 editor.script.values.waypoints[other] = {n} waypoints
-# noxcore/src/mapedit/script_doc.cpp:427
+# noxcore/src/mapedit/script_doc.cpp:519
 #@ 5caf63bc: {n} waypoints have this name
 editor.script.values.waypoints_share_name = {n} waypoints have this name
-# noxcore/src/mapedit/script_doc.cpp:229
+# noxcore/src/mapedit/script_doc.cpp:321
 #@ 449b4c02: {type} (extent {extent}): {field}
 editor.script.where.object = {type} (extent {extent}): {field}
-# noxcore/src/mapedit/script_doc.cpp:227
+# noxcore/src/mapedit/script_doc.cpp:319
 #@ ce866ea2: object: {field}
 editor.script.where.object_gone = object: {field}
-# noxcore/src/mapedit/script_doc.cpp:222
+# noxcore/src/mapedit/script_doc.cpp:314
 #@ f9e44c3f: polygon {n}: {field}
 editor.script.where.polygon = polygon {n}: {field}
-# noxcore/src/mapedit/script_doc.cpp:223
+# noxcore/src/mapedit/script_doc.cpp:315
 #@ b9e48739: polygon {n} ({name}): {field}
 editor.script.where.polygon_named = polygon {n} ({name}): {field}
 # noxsdl/src/editor/map_editor_ui.cpp:790
@@ -12131,7 +12153,7 @@ editor.window.edge_rules = Edge Rules
 # noxsdl/src/editor/map_editor_ui.cpp:1296
 #@ 27decad5: Editor Settings
 editor.window.editor_settings = Editor Settings
-# noxsdl/src/editor/script_panel.cpp:2029
+# noxsdl/src/editor/script_panel.cpp:2039
 #@ d623f80f: Function Info
 editor.window.function_info = Function Info
 # noxsdl/src/editor/map_editor_ui.cpp:178, noxsdl/src/editor/marker_tools.cpp:2665
@@ -12188,10 +12210,10 @@ editor.window.properties = Properties
 # noxsdl/src/editor/marker_tools.cpp:2323
 #@ 0056a2a4: Quest Pictures
 editor.window.quest_pictures = Quest Pictures
-# noxsdl/src/editor/map_editor_ui.cpp:170, noxsdl/src/editor/script_panel.cpp:1565
+# noxsdl/src/editor/map_editor_ui.cpp:170, noxsdl/src/editor/script_panel.cpp:1575
 #@ 6651e9ca: Script
 editor.window.script = Script
-# noxsdl/src/editor/map_editor_ui.cpp:171, noxsdl/src/editor/script_panel.cpp:1703
+# noxsdl/src/editor/map_editor_ui.cpp:171, noxsdl/src/editor/script_panel.cpp:1713
 #@ b63657eb: Script Reference
 editor.window.script_reference = Script Reference
 # noxsdl/src/editor/chat_panel.cpp:57, noxsdl/src/editor/map_editor_ui.cpp:179, noxsdl/src/editor/session_panel.cpp:364 ...

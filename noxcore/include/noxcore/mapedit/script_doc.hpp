@@ -22,10 +22,28 @@ namespace nox::mapedit {
 /// last compile (DebugInfo::toJson).
 constexpr std::string_view kSidecarScriptSource = "scriptSource";
 constexpr std::string_view kSidecarScriptDebug = "scriptDebug";
+/// The sidecar's mark beside the source (a JSON number): the language version it was saved in.
+/// kScriptSourceVersion: a call of the script's own function binds its first argument to the
+/// first parameter. Without the mark (version 1: every sidecar saved before) a call bound its
+/// first argument to the last parameter, so such a source is read through
+/// script::migrateCallOrder once (sidecarScriptSource) and saved again with the mark.
+constexpr std::string_view kSidecarScriptSourceVersion = "scriptSourceVersion";
+constexpr int kScriptSourceVersion = 2;
 
-std::optional<std::string> sidecarScriptSource(const Sidecar& side);
+/// The sidecar's source, in today's language: one saved without the mark comes through
+/// script::migrateCallOrder (`migration`, when given, is set to what it did; left empty for a
+/// marked source).
+std::optional<std::string> sidecarScriptSource(const Sidecar& side, std::optional<script::CallOrderMigration>* migration = nullptr);
+/// What a migration did, for the Script panel's Problems: each note a warning (the user should
+/// look over those calls) or information; none when it changed nothing.
+struct SourceNote {
+    bool warning = false;
+    std::string text;
+};
+std::vector<SourceNote> callOrderMigrationNotes(const script::CallOrderMigration& migration);
 std::optional<script::DebugInfo> sidecarScriptDebug(const Sidecar& side);
-/// Stores the source (none: the key removed) and the debug info (null: removed).
+/// Stores the source (none: the key removed) with the mark (kSidecarScriptSourceVersion), and
+/// the debug info (null: removed).
 void storeScriptInSidecar(Sidecar& side, const std::optional<std::string>& source, const script::DebugInfo* debug);
 
 /// One script handler field on the map (an object's or a polygon's), and the function it names.

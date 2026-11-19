@@ -132,6 +132,10 @@ struct CompileOptions {
     /// Settings, or the script compiler's --allow-object-vars); on, they compile with one warning that the
     /// original game crashes on them. The decompiler's own check compiles with them on.
     bool allowObjectVariables = false;
+    /// A call of the script's own function pushes its arguments in source order, as NoX Core's
+    /// compiler did before it bound them C's way (so the first argument went to the last
+    /// parameter). Only for reading a source saved before that (migrateCallOrder's check).
+    bool legacyCallOrder = false;
 };
 
 /// The prefixes of the functions the game calls by name at a map's start and end
@@ -170,6 +174,32 @@ constexpr std::string_view kEmbeddedSourcePrefix = "NOXSCRIPT3.0";
 inline constexpr int kMaxNesting = 256;
 
 CompileResult compile(std::string_view source, const CompileOptions& options = {});
+
+/// A source written for the old call order (CompileOptions::legacyCallOrder) made into one for
+/// today's: each call of the script's own function with two or more arguments has them written
+/// the other way round (the text of each argument moved whole, comments with it; the commas and
+/// the space between them stay), so it reads in parameter order and compiles to the same bytes.
+struct CallOrderMigration {
+    enum class Outcome : std::uint8_t {
+        Unchanged, ///< no such call: the source as it was
+        Same,      ///< turned round; the old source compiled (the old order) and the new one compiles to the same bytes
+        Unchecked, ///< turned round, but the old source doesn't compile: no bytes to compare
+        /// Turned round, and the new source doesn't compile: the old compiler checked each
+        /// argument against the parameter of its place in the text, so a call of a function whose
+        /// parameters differ in type put a value into a parameter of another type at run time
+        /// (an int read as a float...). The new source shows those calls as the map runs them, and
+        /// each is a type error to fix (until it is, nothing compiles into the map).
+        TypeErrors,
+        Failed, ///< the new source compiles to other bytes (never expected): the source left as it was
+    };
+    Outcome outcome = Outcome::Unchanged;
+    std::string source;      ///< the source to use (the old one unless turned round)
+    std::size_t calls = 0;   ///< the calls turned round
+    std::size_t skipped = 0; ///< such calls in code that doesn't parse, left as they are
+};
+/// (The check compiles with object variables allowed, whatever the editor's setting: it compares
+/// bytes, it doesn't decide whether the map may have them.)
+CallOrderMigration migrateCallOrder(std::string_view oldSource);
 
 /// The source kept in string 0 (nsc's habit, or ours with embedSource), if there is one.
 std::optional<std::string> embeddedSource(const ScriptFile& file);

@@ -25,6 +25,7 @@
 #include "editor/play_test.hpp"
 
 #include "noxcore/mapedit/document.hpp"
+#include "noxcore/mapedit/script_doc.hpp"
 #include "noxcore/mapedit/sidecar.hpp"
 #include "noxcore/script/arg_values.hpp"
 #include "noxcore/script/compiler.hpp"
@@ -217,6 +218,7 @@ private:
     std::uint64_t typedMs_ = 0;
     bool decompileTried_ = false;
     std::vector<std::string> decompileNotes_;
+    std::vector<nox::mapedit::SourceNote> sourceNotes_; ///< what reading the sidecar's source did (its call-order migration)
     // The last compile.
     nox::script::CompileResult last_;
     std::optional<nox::script::DebugInfo> good_; ///< the last good compile's names (navigation)

@@ -10,7 +10,10 @@
 //   then Jump default (or end); the temporary is a local taken when the switch closes;
 // - `return` is Return0 (its value left on top), the function's end Return;
 // - SELF, OTHER, TRUE and FALSE are GLOBAL's first four symbols, read as variables;
-// - each string literal is a new string constant, numbered in the order the source has them;
+// - a call of the script's own function pushes its arguments last first (the VM pops the last
+//   pushed into the first parameter's word); a builtin's go in source order;
+// - each string literal is a new string constant, numbered in the order the code has them (the
+//   source's, but for a script call's arguments, which go last first);
 // - a function's index is its first declaration's place (a prototype or its definition).
 //
 // Object variables (`int object.hp;` at the top level, `object.hp` in code: NoX Core's syntax)
@@ -52,6 +55,7 @@ struct Token {
     std::uint32_t ival = 0;
     float fval = 0;
     SourceLoc loc;
+    std::uint32_t begin = 0, end = 0; ///< its bytes in the source, [begin, end)
 };
 
 struct Flag {
@@ -70,6 +74,7 @@ public:
             skipSpace(flags);
             Token t;
             t.loc = here();
+            t.begin = t.end = static_cast<std::uint32_t>(at_);
             if (at_ >= src_.size()) {
                 out.push_back(t);
                 return out;
@@ -89,6 +94,7 @@ public:
             } else {
                 punct(t);
             }
+            t.end = static_cast<std::uint32_t>(at_);
             out.push_back(std::move(t));
         }
     }
@@ -379,6 +385,9 @@ struct Expr {
     bool paren = false;  ///< written in parentheses
     bool quoted = false; ///< a Call by a function name written as a string literal
     std::vector<std::unique_ptr<Expr>> args; ///< operands / call arguments / [array, index]
+    /// A Call's arguments' bytes in the source, [begin, end) each (migrateCallOrder's); empty
+    /// when the argument list had a syntax error.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> argSpans;
 };
 using ExprP = std::unique_ptr<Expr>;
 
@@ -503,6 +512,7 @@ private:
     }
     void error(SourceLoc loc, std::string msg)
     {
+        ++errorsSeen_;
         // One error per place: a cascade at the same spot says nothing new.
         if (!diags_.empty() && diags_.back().loc == loc) {
             return;
@@ -1098,14 +1108,20 @@ private:
             if (accept("(")) {
                 e->k = Expr::K::Call;
                 if (!accept(")")) {
+                    const std::size_t errorsBefore = errorsSeen_;
                     for (;;) {
+                        const std::size_t first = p_;
                         e->args.push_back(expression());
+                        e->argSpans.emplace_back(t_[first].begin, p_ > first ? t_[p_ - 1].end : t_[first].begin);
                         if (accept(")")) {
                             break;
                         }
                         if (!expect(",")) {
                             break;
                         }
+                    }
+                    if (errorsSeen_ != errorsBefore) {
+                        e->argSpans.clear();
                     }
                 }
             }
@@ -1134,6 +1150,7 @@ private:
     std::vector<Diagnostic>& diags_;
     int depth_ = 0;        ///< levels open now (kMaxNesting)
     bool tooDeep_ = false; ///< past kMaxNesting: the error said, the parse over
+    std::size_t errorsSeen_ = 0; ///< the errors found, each counted (those not said again too)
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -1178,6 +1195,7 @@ public:
         lint_ = opts.lint;
         argValues_ = opts.lint ? opts.argValues : nullptr;
         allowObject_ = opts.allowObjectVariables;
+        legacyCallOrder_ = opts.legacyCallOrder;
         debug.embeddedSource = opts.embedSource;
         if (opts.embedSource) {
             strings_.push_back(std::string(kEmbeddedSourcePrefix) + std::string(source));
@@ -2760,7 +2778,12 @@ private:
         }
         bool ok = true;
         const auto outerBuiltin = std::exchange(currentBuiltin_, builtin);
-        for (std::size_t i = 0; i < e.args.size(); ++i) {
+        // A script's own function: its arguments pushed last first. The VM pops the last pushed
+        // into word 0, so argument i is parameter i's (C's binding, the game's compiler's as the
+        // stock scripts show it). A builtin's in source order: the host pops its last argument first.
+        const bool lastFirst = !builtin && !legacyCallOrder_;
+        for (std::size_t k = 0; k < e.args.size(); ++k) {
+            const std::size_t i = lastFirst ? e.args.size() - 1 - k : k;
             currentBuiltin_ = builtin; // (an argument's own calls set theirs)
             // An argument that takes any type: whatever value it is, its word pushed as it is.
             const bool any = sig && sig->takesAny(i);
@@ -2811,6 +2834,7 @@ private:
     // Object variables: function 0's symbols (its loader's placeholder first).
     bool rawObject_ = false; ///< //@raw_object_vars: no pad, element reads as IndexInt / IndexFloat
     bool allowObject_ = false;   ///< CompileOptions::allowObjectVariables
+    bool legacyCallOrder_ = false; ///< CompileOptions::legacyCallOrder
     bool refusedObject_ = false; ///< one was refused (CompileResult::objectVariablesRefused)
     std::map<std::string, ObjectVar> objectVars_;
     std::vector<std::uint32_t> objectSizes_{0};
@@ -2871,6 +2895,151 @@ CompileResult compile(std::string_view source, const CompileOptions& options)
         return a.loc.line != b.loc.line ? a.loc.line < b.loc.line : a.loc.column < b.loc.column;
     });
     return result;
+}
+
+namespace {
+
+/// migrateCallOrder's calls: those of the script's own functions with two or more arguments, as
+/// Generator::call resolves a name (a builtin's name is the builtin, unless it is a name NoX Core
+/// gave a builtin and the script has a function of that name; assert and Wait are the script's
+/// own when it defines them).
+class OwnCalls {
+public:
+    explicit OwnCalls(const std::vector<TopItem>& items)
+    {
+        for (const TopItem& it : items) {
+            if (it.k != TopItem::K::Global) {
+                functions_.insert(it.name);
+            }
+        }
+        for (const TopItem& it : items) {
+            if (it.init) {
+                expr(*it.init);
+            }
+            if (it.body) {
+                stmt(*it.body);
+            }
+        }
+    }
+
+    std::vector<const Expr*> calls; ///< (each with its arguments' spans)
+    std::size_t skipped = 0;        ///< such calls whose argument list had a syntax error
+
+private:
+    bool own(const Expr& e) const
+    {
+        return functions_.contains(e.text) && (e.quoted || isNewBuiltinName(e.text) || !findBuiltin(e.text));
+    }
+    void expr(const Expr& e)
+    {
+        if (e.k == Expr::K::Call && e.args.size() >= 2 && own(e)) {
+            if (e.argSpans.size() == e.args.size()) {
+                calls.push_back(&e);
+            } else {
+                ++skipped;
+            }
+        }
+        for (const auto& a : e.args) {
+            if (a) {
+                expr(*a);
+            }
+        }
+    }
+    void stmt(const Stmt& s)
+    {
+        if (s.e) {
+            expr(*s.e);
+        }
+        for (const auto& b : s.body) {
+            if (b) {
+                stmt(*b);
+            }
+        }
+        for (const Stmt* k : {s.s1.get(), s.s2.get(), s.s3.get()}) {
+            if (k) {
+                stmt(*k);
+            }
+        }
+    }
+
+    std::set<std::string> functions_;
+};
+
+/// The source with each call's arguments written the other way round: each argument's text (its
+/// own such calls turned too) moved whole; what lies between them (the commas, spaces, comments)
+/// stays where it is. `calls` sorted by where their first argument begins.
+class TurnRound {
+public:
+    TurnRound(std::string_view src, const std::vector<const Expr*>& calls) : src_(src), calls_(calls) {}
+
+    std::string run() { return render(0, static_cast<std::uint32_t>(src_.size())); }
+
+private:
+    std::string render(std::uint32_t begin, std::uint32_t end)
+    {
+        std::string out;
+        std::uint32_t at = begin;
+        // (Calls nest: one whose first argument begins in [begin, end) ends there too.)
+        while (next_ < calls_.size() && calls_[next_]->argSpans.front().first < end) {
+            const auto& spans = calls_[next_++]->argSpans;
+            out.append(src_.substr(at, spans.front().first - at));
+            std::vector<std::string> args;
+            args.reserve(spans.size());
+            for (const auto& [b, e] : spans) {
+                args.push_back(render(b, e));
+            }
+            for (std::size_t i = 0; i < spans.size(); ++i) {
+                if (i) {
+                    out.append(src_.substr(spans[i - 1].second, spans[i].first - spans[i - 1].second));
+                }
+                out += args[spans.size() - 1 - i];
+            }
+            at = spans.back().second;
+        }
+        out.append(src_.substr(at, end - at));
+        return out;
+    }
+
+    std::string_view src_;
+    const std::vector<const Expr*>& calls_;
+    std::size_t next_ = 0;
+};
+
+} // namespace
+
+CallOrderMigration migrateCallOrder(std::string_view oldSource)
+{
+    CallOrderMigration out;
+    out.source = std::string(oldSource);
+    std::vector<Diagnostic> diags;
+    std::vector<Flag> flags;
+    const auto items = Parser(Lexer(oldSource, diags).run(flags), diags).program();
+    OwnCalls found(items);
+    out.skipped = found.skipped;
+    if (found.calls.empty()) {
+        return out;
+    }
+    std::ranges::sort(found.calls, {}, [](const Expr* e) { return e->argSpans.front().first; });
+    std::string turned = TurnRound(oldSource, found.calls).run();
+    // The check: what the old compiler made of the old source, what today's makes of the new.
+    const auto before = compile(oldSource, {.allowObjectVariables = true, .legacyCallOrder = true});
+    if (!before.ok()) {
+        out.outcome = CallOrderMigration::Outcome::Unchecked;
+        out.source = std::move(turned);
+        out.calls = found.calls.size();
+        return out;
+    }
+    const auto after = compile(turned, {.allowObjectVariables = true});
+    if (after.ok() && after.file->serialize() != before.file->serialize()) {
+        out.outcome = CallOrderMigration::Outcome::Failed;
+        return out;
+    }
+    // (Not compiling, it can only be the types: the text is the old one's, its calls' arguments
+    // moved. Nothing compiles into the map until they are fixed.)
+    out.outcome = after.ok() ? CallOrderMigration::Outcome::Same : CallOrderMigration::Outcome::TypeErrors;
+    out.source = std::move(turned);
+    out.calls = found.calls.size();
+    return out;
 }
 
 bool isEntryPointName(std::string_view name)

@@ -6378,6 +6378,16 @@ editor.script.info.values = 값
 editor.script.info.values_heading = 값
 #@ 66888ba5 mt: Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space).
 editor.script.info.values_help = 매개변수가 받는 모든 값의 목록으로 이동합니다(인수를 입력할 때나 Ctrl+Space로도 제시됨).
+#@ bd471e0b mt: the saved source was written for the old argument order (a call's first argument went to the function's last parameter), and it couldn't be turned round to give the same compiled script: it is shown as saved, so its calls of the script's own functions with two or more arguments now bind the other way round; check them before compiling
+editor.script.migrated.failed = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었고, 같은 컴파일 결과가 나오도록 뒤집을 수 없었습니다: 저장된 그대로 표시되므로 인수가 둘 이상인 스크립트 자체 함수 호출은 이제 반대로 연결됩니다. 컴파일하기 전에 확인하세요
+#@ ffd74351 mt: the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} call of the script's own functions now has its arguments turned round to read in parameter order; it compiles to the same bytes | the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} calls of the script's own functions now have their arguments turned round to read in parameter order; they compile to the same bytes
+editor.script.migrated.same[other] = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었습니다: 스크립트 자체 함수 호출 {n}개의 인수를 매개변수 순서대로 읽히도록 뒤집었습니다. 같은 바이트로 컴파일됩니다
+#@ d6ea9404 mt: {n} call of the script's own functions with two or more arguments, in code that doesn't parse, was left as it was saved (for the old argument order): it now binds the other way round | {n} calls of the script's own functions with two or more arguments, in code that doesn't parse, were left as they were saved (for the old argument order): they now bind the other way round
+editor.script.migrated.skipped[other] = 구문 분석되지 않는 코드에 있는, 인수가 둘 이상인 스크립트 자체 함수 호출 {n}개는 저장된 그대로(예전 인수 순서) 두었습니다: 이제 반대로 연결됩니다
+#@ 5f4a622e mt: the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} call of the script's own functions now has its arguments turned round to read as the map runs it, and it doesn't compile: the old order put a value into a parameter of another type. Fix it (see the errors); until then the map's script stays as it is | the saved source was written for the old argument order (a call's first argument went to the function's last parameter): {n} calls of the script's own functions now have their arguments turned round to read as the map runs them, and some don't compile: the old order put a value into a parameter of another type. Fix them (see the errors); until then the map's script stays as it is
+editor.script.migrated.type_errors[other] = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었습니다: 스크립트 자체 함수 호출 {n}개의 인수를 맵이 실행하는 대로 읽히도록 뒤집었고, 일부는 컴파일되지 않습니다: 예전 순서가 값을 다른 타입의 매개변수에 넣었습니다. 수정하세요(오류 참고). 그때까지 맵의 스크립트는 그대로 유지됩니다
+#@ 7587fba6 mt: the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} call of the script's own functions now has its arguments turned round to read in parameter order; look it over | the saved source was written for the old argument order (a call's first argument went to the function's last parameter) and doesn't compile, so the change can't be checked: {n} calls of the script's own functions now have their arguments turned round to read in parameter order; look them over
+editor.script.migrated.unchecked[other] = 저장된 소스는 예전 인수 순서(호출의 첫 인수가 함수의 마지막 매개변수로 감)로 작성되었고 컴파일되지 않아 변경을 확인할 수 없습니다: 스크립트 자체 함수 호출 {n}개의 인수를 매개변수 순서대로 읽히도록 뒤집었습니다. 살펴보세요
 #@ f22a6288 mt: Arena
 editor.script.mode.arena = 아레나
 #@ 01741f9c mt: Capture the Flag
@@ -6440,6 +6450,8 @@ editor.script.problems.pass = 통과
 editor.script.problems.passed = 통과함
 #@ 448c5c7c mt: Problem
 editor.script.problems.problem = 문제
+#@ 770870b9 mt: saved source
+editor.script.problems.saved_source = 저장된 소스
 #@ 2d1941f0 mt: stopped: it ran too long (a loop that never ends?)
 editor.script.problems.stopped = 중지됨: 너무 오래 실행되었습니다(끝나지 않는 반복문?)
 #@ bc44162e mt: test {name}
