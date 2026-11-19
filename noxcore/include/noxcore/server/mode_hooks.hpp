@@ -15,6 +15,7 @@
 // objects that opted in (ServerObject::modeEvents), so a mode pays only for what it watches.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -87,6 +88,15 @@ inline constexpr std::uint8_t Drop = 0x10;      ///< dropped told (an item put d
 inline constexpr std::uint8_t Use = 0x20;       ///< mayUse asked (an item used)
 inline constexpr std::uint8_t Equip = 0x40;     ///< equipped told (an item put on or taken off)
 } // namespace ModeEvent
+
+/// A map script's call of its mod (NoX Core's LuauCall / LuauCallReturn builtins: ModeHooks::mapCall).
+struct MapCall {
+    std::string_view name;               ///< the handler's name (the script's string)
+    std::array<std::uint32_t, 4> args{}; ///< the four values as the script pushed them (0: left out)
+    std::uint32_t caller = 0;            ///< the script's caller and trigger now (extents; 0: none)
+    std::uint32_t trigger = 0;
+    bool wantsResult = false;            ///< LuauCallReturn's (its result is pushed)
+};
 
 struct ModeHooks {
     virtual ~ModeHooks() = default;
@@ -373,6 +383,17 @@ struct ModeHooks {
         (void)function;
         (void)caller;
         (void)trigger;
+        return std::nullopt;
+    }
+    /// Asked, at once (inside the map script's call, as a builtin runs): a map script's LuauCall or
+    /// LuauCallReturn (NoX Core's builtins: script_host.cpp pops their arguments and pushes the
+    /// result, so a mode never touches the VM's stack). The handler's result (0 for none, or for
+    /// a handler that failed), or nullopt: the mode has no handler of that name (the host logs it
+    /// and gives 0). Never asked for the game's own builtins.
+    virtual std::optional<std::uint32_t> mapCall(ScriptHost& host, const MapCall& call)
+    {
+        (void)host;
+        (void)call;
         return std::nullopt;
     }
 };

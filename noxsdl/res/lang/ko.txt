@@ -5964,6 +5964,8 @@ editor.script.class.warrior = 전사
 editor.script.class.wizard = 마법사
 #@ a6cc4de1 mt: {name} takes {n} argument, not {got} | {name} takes {n} arguments, not {got}
 editor.script.compile.arg_count[other] = {name}은(는) 인수 {n}개를 받습니다({got}개가 아님)
+#@ 53d7c464 mt: {name} takes {min} to {n} arguments, not {got}
+editor.script.compile.arg_count_range = {name}은(는) 인수를 {min}~{n}개 받습니다({got}개가 아님)
 #@ 64fed792 mt: {name}'s argument {n} is a {type}, not a {other}
 editor.script.compile.arg_type = {name}의 인수 {n}은(는) {other}이(가) 아니라 {type}입니다
 #@ 8b21f615 mt: {name}'s argument {n} is a {type} (a function's name), not a {other}
@@ -6124,6 +6126,8 @@ editor.script.compile.no_variable = {name}(이)라는 변수가 없습니다
 editor.script.compile.no_variable_or_function = {name}(이)라는 변수나 함수가 없습니다
 #@ 4800cb01 mt: {name} isn't an array
 editor.script.compile.not_array = {name}은(는) 배열이 아닙니다
+#@ d795758b mt: {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
+editor.script.compile.nox_builtin = {name}은(는) NoX Core 내장 함수입니다: 게임을 호스팅하는 Luau 모드(nox.onMapCall)를 호출하며, NoX Core 모드용으로 만든 맵을 위한 것입니다. 원본 게임은 이 함수에서 충돌합니다
 #@ 2485478f mt: bad suffix on the number {text}
 editor.script.compile.number_suffix = 숫자 {text}의 접미사가 잘못되었습니다
 #@ 57be2906 mt: the number {text} is too big for 32 bits

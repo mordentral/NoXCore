@@ -1,13 +1,16 @@
 // The builtins' source-language signatures (builtins.hpp). Argument counts and results are the
 // server host's table's; the types are each builtin's pops in GAME.EXE's builtins table (int,
 // float or string id), with waypoints, groups and walls as `object` and script function indices
-// as `function`, checked against every shipped map's calls.
+// as `function`, checked against every shipped map's calls. NoX Core's own builtins (opcodes.hpp's
+// range from 1024) follow, in a table of their own.
 #include "noxcore/script/builtins.hpp"
 
 #include "noxcore/script/opcodes.hpp"
 
 #include <array>
 #include <map>
+#include <stdexcept>
+#include <string>
 
 namespace nox::script {
 
@@ -234,6 +237,13 @@ const std::array<BuiltinSignature, kBuiltinCount> kTable{{    {"Wall", O, {I, I}
     {"GetScore", I, {I}}, // 210
 }};
 
+// NoX Core's own (opcodes.hpp's kNoxBuiltinIds, in that order): the name a string, then four
+// values of any type as their words; all but the name may be left out (0 each).
+const std::array<BuiltinSignature, kNoxBuiltinCount> kNoxTable{{
+    {"LuauCall", V, {S, I, I, I, I}, 1, 1},       // kLuauCall
+    {"LuauCallReturn", I, {S, I, I, I, I}, 1, 1}, // kLuauCallReturn
+}};
+
 } // namespace
 
 std::string_view typeName(Type t)
@@ -251,7 +261,14 @@ std::string_view typeName(Type t)
 
 const BuiltinSignature& builtinSignature(std::uint32_t id)
 {
-    return kTable.at(id);
+    if (id < kBuiltinCount) {
+        return kTable[id];
+    }
+    const std::uint32_t place = builtinPlace(id);
+    if (place >= kAllBuiltinCount) {
+        throw std::out_of_range("no builtin " + std::to_string(id));
+    }
+    return kNoxTable[place - kBuiltinCount];
 }
 
 namespace {
@@ -272,6 +289,9 @@ std::optional<std::uint32_t> findBuiltin(std::string_view name)
         std::map<std::string_view, std::uint32_t, std::less<>> m;
         for (std::uint32_t i = 0; i < kBuiltinCount; ++i) {
             m.emplace(kTable[i].name, i);
+        }
+        for (std::uint32_t i = 0; i < kNoxBuiltinCount; ++i) {
+            m.emplace(kNoxTable[i].name, kNoxBuiltinIds[i]);
         }
         for (const Renamed& r : kRenamed) {
             m.emplace(r.oldName, r.id);
@@ -299,13 +319,19 @@ bool isNewBuiltinName(std::string_view name)
             return true;
         }
     }
+    for (const BuiltinSignature& b : kNoxTable) {
+        if (b.name == name) {
+            return true;
+        }
+    }
     return false;
 }
 
 std::string builtinPrototypes()
 {
     std::string out;
-    for (const auto& b : kTable) {
+    for (std::uint32_t place = 0; place < kAllBuiltinCount; ++place) {
+        const BuiltinSignature& b = builtinSignature(builtinIdAt(place));
         out += std::string(typeName(b.returns)) + " " + std::string(b.name) + "(";
         for (std::size_t i = 0; i < b.args.size(); ++i) {
             out += (i ? ", " : "") + std::string(typeName(b.args[i]));

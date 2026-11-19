@@ -3776,7 +3776,7 @@ editor.cmd.window.edge_rules.label = Edge Rules...
 # noxsdl/src/editor/script_panel.cpp:290
 #@ 9e95ecfd: Shows or hides Function Info: a builtin's full description, parameters, edge cases and example (right-click a builtin).
 editor.cmd.window.function_info.help = Shows or hides Function Info: a builtin's full description, parameters, edge cases and example (right-click a builtin).
-# noxsdl/src/editor/script_panel.cpp:289, noxsdl/src/editor/script_panel.cpp:1893
+# noxsdl/src/editor/script_panel.cpp:289, noxsdl/src/editor/script_panel.cpp:1895
 #@ d623f80f: Function Info
 editor.cmd.window.function_info.label = Function Info
 # noxsdl/src/editor/marker_tools.cpp:265
@@ -5252,13 +5252,13 @@ editor.menu.open_recent = Open Recent
 # noxsdl/src/editor/map_editor_ui.cpp:259
 #@ ff67caf5: Pending Changes
 editor.menu.pending_changes = Pending Changes
-# noxsdl/src/editor/play_view.cpp:320, noxsdl/src/editor/script_panel.cpp:2565
+# noxsdl/src/editor/play_view.cpp:320, noxsdl/src/editor/script_panel.cpp:2567
 #@ 29ab6f83: Play
 editor.menu.play = Play
 # noxsdl/src/editor/map_editor_ui.cpp:301
 #@ 0a857a0e: Save Layout
 editor.menu.save_layout = Save Layout
-# noxsdl/src/editor/script_panel.cpp:2551
+# noxsdl/src/editor/script_panel.cpp:2553
 #@ 6651e9ca: Script
 editor.menu.script = Script
 # noxsdl/src/editor/map_editor_ui.cpp:327
@@ -8915,46 +8915,46 @@ editor.script.bar.take_over_help = Take the script from them now (what they type
 # noxsdl/src/editor/script_panel.cpp:1594
 #@ 00dfd3c2: Tests
 editor.script.bar.tests = Tests
-# noxsdl/src/editor/script_panel.cpp:1901
+# noxsdl/src/editor/script_panel.cpp:1903
 #@ 7c2d8767: Copy Name
 editor.script.builtin.copy_name = Copy Name
-# noxsdl/src/editor/script_panel.cpp:1907
+# noxsdl/src/editor/script_panel.cpp:1909
 #@ b9762fcb: Add to Favourites
 editor.script.builtin.favourite = Add to Favourites
-# noxsdl/src/editor/script_panel.cpp:1897
+# noxsdl/src/editor/script_panel.cpp:1899
 #@ de076ca3: The full description: parameters, return value, edge cases, related builtins and an example.
 editor.script.builtin.info_help = The full description: parameters, return value, edge cases, related builtins and an example.
-# noxsdl/src/editor/script_panel.cpp:1898
+# noxsdl/src/editor/script_panel.cpp:1900
 #@ 0f317948: Insert
 editor.script.builtin.insert = Insert
-# noxsdl/src/editor/script_panel.cpp:1910
+# noxsdl/src/editor/script_panel.cpp:1912
 #@ e68d9f29: Priority
 editor.script.builtin.priority = Priority
-# noxsdl/src/editor/script_panel.cpp:1917
+# noxsdl/src/editor/script_panel.cpp:1919
 #@ a938ee7b: Sort the list by Priority: favourites first, low last.
 editor.script.builtin.priority_hint = Sort the list by Priority: favourites first, low last.
-# noxsdl/src/editor/script_panel.cpp:1882
+# noxsdl/src/editor/script_panel.cpp:1884
 #@ a121e6da: Click: insert at the caret. Right-click: Function Info, priority.
 editor.script.builtin.tip_click = Click: insert at the caret. Right-click: Function Info, priority.
-# noxsdl/src/editor/script_panel.cpp:1878
+# noxsdl/src/editor/script_panel.cpp:1880
 #@ 5ae84254: {category}, builtin {id}. {usage}
 editor.script.builtin.tip_facts = {category}, builtin {id}. {usage}
-# noxsdl/src/editor/script_panel.cpp:1906
+# noxsdl/src/editor/script_panel.cpp:1908
 #@ ce6b49f1: Remove from Favourites
 editor.script.builtin.unfavourite = Remove from Favourites
-# noxsdl/src/editor/script_panel.cpp:1946
+# noxsdl/src/editor/script_panel.cpp:1948
 #@ ba150111: Favourites only
 editor.script.builtins.favourites_only = Favourites only
-# noxsdl/src/editor/script_panel.cpp:1951
+# noxsdl/src/editor/script_panel.cpp:1953
 #@ 1f8321db: No favourites here: right-click a builtin, Add to Favourites.
 editor.script.builtins.no_favourites = No favourites here: right-click a builtin, Add to Favourites.
-# noxsdl/src/editor/script_panel.cpp:1952
+# noxsdl/src/editor/script_panel.cpp:1954
 #@ 070bd712: No builtin matches.
 editor.script.builtins.no_match = No builtin matches.
-# noxsdl/src/editor/script_panel.cpp:1930
+# noxsdl/src/editor/script_panel.cpp:1932
 #@ 8459a7f1: Sort
 editor.script.builtins.sort = Sort
-# noxsdl/src/editor/script_panel.cpp:1942
+# noxsdl/src/editor/script_panel.cpp:1944
 #@ d5efe1c4: Priority: favourites first, then high, normal and low, each by name (right-click a builtin to set its priority). Use in stock maps: the most called first.
 editor.script.builtins.sort_help = Priority: favourites first, then high, normal and low, each by name (right-click a builtin to set its priority). Use in stock maps: the most called first.
 # noxsdl/src/editor/script_panel.cpp:189, noxsdl/src/editor/script_panel.cpp:189
@@ -8966,14 +8966,17 @@ editor.script.class.warrior = Warrior
 # noxsdl/src/editor/script_panel.cpp:188, noxsdl/src/editor/script_panel.cpp:188
 #@ 42181c2a: Wizard
 editor.script.class.wizard = Wizard
-# noxcore/src/script/compiler.cpp:2737
+# noxcore/src/script/compiler.cpp:2750
 #@ a6cc4de1: {name} takes {n} argument, not {got} | {name} takes {n} arguments, not {got}
 editor.script.compile.arg_count[one] = {name} takes {n} argument, not {got}
 editor.script.compile.arg_count[other] = {name} takes {n} arguments, not {got}
-# noxcore/src/script/compiler.cpp:2756
+# noxcore/src/script/compiler.cpp:2753
+#@ 53d7c464: {name} takes {min} to {n} arguments, not {got}
+editor.script.compile.arg_count_range = {name} takes {min} to {n} arguments, not {got}
+# noxcore/src/script/compiler.cpp:2778
 #@ 64fed792: {name}'s argument {n} is a {type}, not a {other}
 editor.script.compile.arg_type = {name}'s argument {n} is a {type}, not a {other}
-# noxcore/src/script/compiler.cpp:2755
+# noxcore/src/script/compiler.cpp:2777
 #@ 8b21f615: {name}'s argument {n} is a {type} (a function's name), not a {other}
 editor.script.compile.arg_type_function = {name}'s argument {n} is a {type} (a function's name), not a {other}
 # noxcore/src/script/compiler.cpp:660, noxcore/src/script/compiler.cpp:804
@@ -9183,7 +9186,7 @@ editor.script.compile.negate_type = can't negate a {type}
 # noxcore/src/script/compiler.cpp:1981
 #@ a775c822: the function {name} never returns a value
 editor.script.compile.never_returns = the function {name} never returns a value
-# noxcore/src/script/compiler.cpp:2733
+# noxcore/src/script/compiler.cpp:2743
 #@ a2cee878: no function named {name}
 editor.script.compile.no_function = no function named {name}
 # noxcore/src/script/compiler.cpp:2362
@@ -9198,7 +9201,7 @@ editor.script.compile.no_object = {function} uses object.{used}, but {caller} wi
 # noxcore/src/script/compiler.cpp:1443
 #@ 773b8a8a: no object variable object.{name} (declare it at the top level: int object.{name};)
 editor.script.compile.no_object_var = no object variable object.{name} (declare it at the top level: int object.{name};)
-# noxcore/src/script/compiler.cpp:2764
+# noxcore/src/script/compiler.cpp:2789
 #@ db30c192: {name} doesn't return a value
 editor.script.compile.no_value = {name} doesn't return a value
 # noxcore/src/script/compiler.cpp:2420, noxcore/src/script/compiler.cpp:2538, noxcore/src/script/compiler.cpp:2570
@@ -9210,6 +9213,9 @@ editor.script.compile.no_variable_or_function = no variable or function named {n
 # noxcore/src/script/compiler.cpp:2420, noxcore/src/script/compiler.cpp:2570
 #@ 4800cb01: {name} isn't an array
 editor.script.compile.not_array = {name} isn't an array
+# noxcore/src/script/compiler.cpp:2726
+#@ d795758b: {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
+editor.script.compile.nox_builtin = {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
 # noxcore/src/script/compiler.cpp:246
 #@ 2485478f: bad suffix on the number {text}
 editor.script.compile.number_suffix = bad suffix on the number {text}
@@ -9303,7 +9309,7 @@ editor.script.compile.unary_type = '{op}' needs an int, not a {type}
 # noxcore/src/script/compiler.cpp:356
 #@ 844e7472: unexpected character '{c}'
 editor.script.compile.unexpected_char = unexpected character '{c}'
-# noxcore/src/script/compiler.cpp:2833
+# noxcore/src/script/compiler.cpp:2859
 #@ 07b0c6c1: unknown compile flag //@{name}
 editor.script.compile.unknown_flag = unknown compile flag //@{name}
 # noxcore/src/script/compiler.cpp:147
@@ -9312,7 +9318,7 @@ editor.script.compile.unterminated_comment = unterminated /* comment
 # noxcore/src/script/compiler.cpp:259, noxcore/src/script/compiler.cpp:275
 #@ 0403602c: unterminated string
 editor.script.compile.unterminated_string = unterminated string
-# noxcore/src/script/compiler.cpp:2733
+# noxcore/src/script/compiler.cpp:2743
 #@ 72892cdb: {name} is a variable, not a function
 editor.script.compile.variable_not_function = {name} is a variable, not a function
 # noxcore/src/script/compiler.cpp:2154
@@ -9339,13 +9345,13 @@ editor.script.compile.what_global = the global {name}
 # noxcore/src/script/compiler.cpp:1515
 #@ eb46c652: the object variable {name}
 editor.script.compile.what_object_var = the object variable {name}
-# noxsdl/src/editor/script_panel.cpp:2369
+# noxsdl/src/editor/script_panel.cpp:2371
 #@ ee6354e5: {title}  {n}{more}  (Enter/Tab insert, Esc close)
 editor.script.complete.header = {title}  {n}{more}  (Enter/Tab insert, Esc close)
-# noxsdl/src/editor/script_panel.cpp:2377
+# noxsdl/src/editor/script_panel.cpp:2379
 #@ f0620eeb: No {kind} starts with or contains "{typed}".
 editor.script.complete.no_match = No {kind} starts with or contains "{typed}".
-# noxsdl/src/editor/script_panel.cpp:2374
+# noxsdl/src/editor/script_panel.cpp:2376
 #@ 43042a08: None on this map.
 editor.script.complete.none_on_map = None on this map.
 # noxcore/src/script/decompiler.cpp:188
@@ -9420,7 +9426,7 @@ editor.script.fn.new_text = A new void function in the script, for this handler:
 # noxsdl/src/editor/script_panel.cpp:1465, noxsdl/src/editor/script_panel.cpp:1467
 #@ c1256cc3: New function
 editor.script.fn.new_title = New function
-# noxsdl/src/editor/script_panel.cpp:1423, noxsdl/src/editor/script_panel.cpp:1430, noxsdl/src/editor/script_panel.cpp:1962
+# noxsdl/src/editor/script_panel.cpp:1423, noxsdl/src/editor/script_panel.cpp:1430, noxsdl/src/editor/script_panel.cpp:1964
 #@ 90458a20: (none)
 editor.script.fn.none = (none)
 # noxsdl/src/editor/script_panel.cpp:1425
@@ -9513,76 +9519,76 @@ editor.script.hover.global = global {type} {name}  line {line}
 # noxsdl/src/editor/script_panel.cpp:237
 #@ 5ce2ab74: object variable {type} object.{name}  line {line} (each object's own; NoX Core only)
 editor.script.hover.object_var = object variable {type} object.{name}  line {line} (each object's own; NoX Core only)
-# noxsdl/src/editor/script_panel.cpp:2078
+# noxsdl/src/editor/script_panel.cpp:2080
 #@ 3a6bc423: {facts} (the community tools' {alias})
 editor.script.info.alias = {facts} (the community tools' {alias})
-# noxsdl/src/editor/script_panel.cpp:2042
+# noxsdl/src/editor/script_panel.cpp:2044
 #@ 388a2e01: Back to the builtin shown before.
 editor.script.info.back_help = Back to the builtin shown before.
-# noxsdl/src/editor/script_panel.cpp:2070
+# noxsdl/src/editor/script_panel.cpp:2072
 #@ 658f3664: Copy
 editor.script.info.copy = Copy
-# noxsdl/src/editor/script_panel.cpp:2152
+# noxsdl/src/editor/script_panel.cpp:2154
 #@ fce9dce2: Copy Example
 editor.script.info.copy_example = Copy Example
-# noxsdl/src/editor/script_panel.cpp:2073
+# noxsdl/src/editor/script_panel.cpp:2075
 #@ 352366dd: Copy the prototype.
 editor.script.info.copy_help = Copy the prototype.
-# noxsdl/src/editor/script_panel.cpp:2102
+# noxsdl/src/editor/script_panel.cpp:2104
 #@ 66de7a09: Description
 editor.script.info.description = Description
-# noxsdl/src/editor/script_panel.cpp:2120
+# noxsdl/src/editor/script_panel.cpp:2122
 #@ 5510b101: Edge cases
 editor.script.info.edge = Edge cases
-# noxsdl/src/editor/script_panel.cpp:2144
+# noxsdl/src/editor/script_panel.cpp:2146
 #@ 12931341: Example
 editor.script.info.example = Example
-# noxsdl/src/editor/script_panel.cpp:2075
+# noxsdl/src/editor/script_panel.cpp:2077
 #@ 4b433c6f: {category}, builtin {id}
 editor.script.info.facts = {category}, builtin {id}
-# noxsdl/src/editor/script_panel.cpp:2076
+# noxsdl/src/editor/script_panel.cpp:2078
 #@ c1abb68b: builtin {id}
 editor.script.info.facts_bare = builtin {id}
-# noxsdl/src/editor/script_panel.cpp:2146, noxsdl/src/editor/script_panel.cpp:2470
+# noxsdl/src/editor/script_panel.cpp:2148, noxsdl/src/editor/script_panel.cpp:2472
 #@ 65fbc8d5: Insert at Cursor
 editor.script.info.insert_example = Insert at Cursor
-# noxsdl/src/editor/script_panel.cpp:2150
+# noxsdl/src/editor/script_panel.cpp:2152
 #@ 54cd08a7: Type the example into the Script panel at the caret.
 editor.script.info.insert_example_help = Type the example into the Script panel at the caret.
-# noxsdl/src/editor/script_panel.cpp:2094
+# noxsdl/src/editor/script_panel.cpp:2096
 #@ f2029d8e: No description for this builtin yet.
 editor.script.info.no_doc = No description for this builtin yet.
-# noxsdl/src/editor/script_panel.cpp:2106
+# noxsdl/src/editor/script_panel.cpp:2108
 #@ e2e3244f: None.
 editor.script.info.no_params = None.
-# noxsdl/src/editor/script_panel.cpp:2104
+# noxsdl/src/editor/script_panel.cpp:2106
 #@ fd7f93f9: Parameters
 editor.script.info.parameters = Parameters
-# noxsdl/src/editor/script_panel.cpp:2064
+# noxsdl/src/editor/script_panel.cpp:2066
 #@ 1dd9b122: Its priority: sort Script Reference's Builtins by Priority for the favourites first.
 editor.script.info.priority_help = Its priority: sort Script Reference's Builtins by Priority for the favourites first.
-# noxsdl/src/editor/script_panel.cpp:2124
+# noxsdl/src/editor/script_panel.cpp:2126
 #@ 4b2466d8: Related
 editor.script.info.related = Related
-# noxsdl/src/editor/script_panel.cpp:2117
+# noxsdl/src/editor/script_panel.cpp:2119
 #@ d2aab1c4: Returns
 editor.script.info.returns = Returns
-# noxsdl/src/editor/script_panel.cpp:2047
+# noxsdl/src/editor/script_panel.cpp:2049
 #@ 744ee904: Add to the favourites.
 editor.script.info.star_help = Add to the favourites.
-# noxsdl/src/editor/script_panel.cpp:2166
+# noxsdl/src/editor/script_panel.cpp:2168
 #@ 9298de86: In the stock maps
 editor.script.info.stock_maps = In the stock maps
-# noxsdl/src/editor/script_panel.cpp:2046
+# noxsdl/src/editor/script_panel.cpp:2048
 #@ a835c2a4: A favourite: click to take it out of the favourites.
 editor.script.info.unstar_help = A favourite: click to take it out of the favourites.
-# noxsdl/src/editor/script_panel.cpp:2085
+# noxsdl/src/editor/script_panel.cpp:2087
 #@ 8d4d225b: Values
 editor.script.info.values = Values
-# noxsdl/src/editor/script_panel.cpp:2456
+# noxsdl/src/editor/script_panel.cpp:2458
 #@ 8d4d225b: Values
 editor.script.info.values_heading = Values
-# noxsdl/src/editor/script_panel.cpp:2088
+# noxsdl/src/editor/script_panel.cpp:2090
 #@ 66888ba5: Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space).
 editor.script.info.values_help = Go to the list of every value its parameters accept (also offered as you type the argument, or with Ctrl+Space).
 # noxsdl/src/editor/script_panel.cpp:174, noxsdl/src/editor/script_panel.cpp:174
@@ -9624,76 +9630,76 @@ editor.script.op.edit = Edit script
 # noxcore/include/noxcore/mapedit/op_label.hpp:215
 #@ 515582c7: Import script
 editor.script.op.import = Import script
-# noxsdl/src/editor/script_panel.cpp:2595
+# noxsdl/src/editor/script_panel.cpp:2597
 #@ be9de848: Character Class
 editor.script.play.class = Character Class
-# noxsdl/src/editor/script_panel.cpp:2571
+# noxsdl/src/editor/script_panel.cpp:2573
 #@ d2ff6f72: Game Mode
 editor.script.play.game_mode = Game Mode
-# noxsdl/src/editor/script_panel.cpp:2597
+# noxsdl/src/editor/script_panel.cpp:2599
 #@ fc4805d5: The map's ({class})
 editor.script.play.map_class = The map's ({class})
-# noxsdl/src/editor/script_panel.cpp:2573
+# noxsdl/src/editor/script_panel.cpp:2575
 #@ f4eabc4c: The map's own ({mode})
 editor.script.play.map_own_mode = The map's own ({mode})
-# noxsdl/src/editor/script_panel.cpp:2580
+# noxsdl/src/editor/script_panel.cpp:2582
 #@ b22e0a83: map's
 editor.script.play.maps = map's
-# noxsdl/src/editor/script_panel.cpp:2598
+# noxsdl/src/editor/script_panel.cpp:2600
 #@ 864fe8cb: The player's own
 editor.script.play.player_class = The player's own
-# noxsdl/src/editor/script_panel.cpp:2587
+# noxsdl/src/editor/script_panel.cpp:2589
 #@ 730a5d69: A quest, as Solo Quest plays one: the chat map, then OTQuest.rul begins the quest, whose only map is this one (its saves in the play-test's folder).
 editor.script.play.quest_help = A quest, as Solo Quest plays one: the chat map, then OTQuest.rul begins the quest, whose only map is this one (its saves in the play-test's folder).
-# noxsdl/src/editor/script_panel.cpp:2583
+# noxsdl/src/editor/script_panel.cpp:2585
 #@ 82c665d4: The campaign's solo game: the map hosted as the main menu's Solo hosts one, a new character of the class chosen below, its saves in the play-test's folder.
 editor.script.play.solo_help = The campaign's solo game: the map hosted as the main menu's Solo hosts one, a new character of the class chosen below, its saves in the play-test's folder.
-# noxsdl/src/editor/script_panel.cpp:2641
+# noxsdl/src/editor/script_panel.cpp:2643
 #@ 1582d50e: script {line}:{col}
 editor.script.problems.at = script {line}:{col}
-# noxsdl/src/editor/script_panel.cpp:2646
+# noxsdl/src/editor/script_panel.cpp:2648
 #@ abaa4d9b: decompiler
 editor.script.problems.decompiler = decompiler
-# noxsdl/src/editor/script_panel.cpp:2628
+# noxsdl/src/editor/script_panel.cpp:2630
 #@ f38d9cf1: Error
 editor.script.problems.error = Error
-# noxsdl/src/editor/script_panel.cpp:2616
+# noxsdl/src/editor/script_panel.cpp:2618
 #@ 6651e9ca: Script
 editor.script.problems.heading = Script
-# noxsdl/src/editor/script_panel.cpp:2649
+# noxsdl/src/editor/script_panel.cpp:2651
 #@ 059661a1: hot reload
 editor.script.problems.hot_reload = hot reload
-# noxsdl/src/editor/script_panel.cpp:2629
+# noxsdl/src/editor/script_panel.cpp:2631
 #@ 8fe1e625: Info
 editor.script.problems.info = Info
-# noxsdl/src/editor/script_panel.cpp:2642
+# noxsdl/src/editor/script_panel.cpp:2644
 #@ b396d87e: script (the map)
 editor.script.problems.map = script (the map)
-# noxsdl/src/editor/script_panel.cpp:2629
+# noxsdl/src/editor/script_panel.cpp:2631
 #@ e25b9d38: Pass
 editor.script.problems.pass = Pass
-# noxsdl/src/editor/script_panel.cpp:2659
+# noxsdl/src/editor/script_panel.cpp:2661
 #@ 513cb799: passed
 editor.script.problems.passed = passed
-# noxsdl/src/editor/script_panel.cpp:2621
+# noxsdl/src/editor/script_panel.cpp:2623
 #@ 448c5c7c: Problem
 editor.script.problems.problem = Problem
-# noxsdl/src/editor/script_panel.cpp:2662
+# noxsdl/src/editor/script_panel.cpp:2664
 #@ 2d1941f0: stopped: it ran too long (a loop that never ends?)
 editor.script.problems.stopped = stopped: it ran too long (a loop that never ends?)
-# noxsdl/src/editor/script_panel.cpp:2657
+# noxsdl/src/editor/script_panel.cpp:2659
 #@ bc44162e: test {name}
 editor.script.problems.test = test {name}
-# noxsdl/src/editor/script_panel.cpp:2653
+# noxsdl/src/editor/script_panel.cpp:2655
 #@ 5b22cf22: tests
 editor.script.problems.tests = tests
-# noxsdl/src/editor/script_panel.cpp:2654
+# noxsdl/src/editor/script_panel.cpp:2656
 #@ 327d1272: tests: map start
 editor.script.problems.tests_start = tests: map start
-# noxsdl/src/editor/script_panel.cpp:2628
+# noxsdl/src/editor/script_panel.cpp:2630
 #@ 37c4fc8f: Warning
 editor.script.problems.warning = Warning
-# noxsdl/src/editor/script_panel.cpp:2620
+# noxsdl/src/editor/script_panel.cpp:2622
 #@ 91dad0f8: Where
 editor.script.problems.where = Where
 # noxcore/src/mapedit/script_doc.cpp:345
@@ -9756,7 +9762,7 @@ editor.script.status.export_errors = The script has errors: not exported
 # noxsdl/src/editor/script_panel.cpp:1236, noxsdl/src/editor/script_panel.cpp:1259
 #@ 21672767: Exported {path}
 editor.script.status.exported = Exported {path}
-# noxsdl/src/editor/script_panel.cpp:1838
+# noxsdl/src/editor/script_panel.cpp:1840
 #@ fcd42772: {name}: a favourite
 editor.script.status.favourite = {name}: a favourite
 # noxsdl/src/editor/script_panel.cpp:1277
@@ -9789,7 +9795,7 @@ editor.script.status.no_source = No script source to compile
 # noxsdl/src/editor/script_panel.cpp:1145
 #@ 5dee0dba: No play-test is running
 editor.script.status.no_test_running = No play-test is running
-# noxsdl/src/editor/script_panel.cpp:2216
+# noxsdl/src/editor/script_panel.cpp:2218
 #@ eb51564e: No value list here: the caret isn't in an argument that takes names from a known set (an effect, a sound, a thing type...)
 editor.script.status.no_values = No value list here: the caret isn't in an argument that takes names from a known set (an effect, a sound, a thing type...)
 # noxsdl/src/editor/script_panel.cpp:809
@@ -9829,7 +9835,7 @@ editor.script.status.playing_panel = {status} ({keys} frees the mouse)
 # noxsdl/src/editor/script_panel.cpp:916
 #@ 53dd1ea1: The play-test ended
 editor.script.status.playtest_ended = The play-test ended
-# noxsdl/src/editor/script_panel.cpp:1839
+# noxsdl/src/editor/script_panel.cpp:1841
 #@ 105f7656: {name}: priority {priority}
 editor.script.status.priority = {name}: priority {priority}
 # noxsdl/src/editor/script_panel.cpp:1089
@@ -9866,22 +9872,22 @@ editor.script.usage.none = Not used by any stock map.
 #@ 273cefbf: Used in {maps} of the {scripts} stock map scripts ({n} call) | Used in {maps} of the {scripts} stock map scripts ({n} calls)
 editor.script.usage.used[one] = Used in {maps} of the {scripts} stock map scripts ({n} call)
 editor.script.usage.used[other] = Used in {maps} of the {scripts} stock map scripts ({n} calls)
-# noxsdl/src/editor/script_panel.cpp:2464
+# noxsdl/src/editor/script_panel.cpp:2466
 #@ 9565eda3: Every value it accepts (the game's own data). Double-click one, or pick it and Insert at Cursor.
 editor.script.values.about = Every value it accepts (the game's own data). Double-click one, or pick it and Insert at Cursor.
-# noxsdl/src/editor/script_panel.cpp:2462
+# noxsdl/src/editor/script_panel.cpp:2464
 #@ a2db2f6e: Every value it accepts (the game's own data and this map's names). Double-click one, or pick it and Insert at Cursor.
 editor.script.values.about_map = Every value it accepts (the game's own data and this map's names). Double-click one, or pick it and Insert at Cursor.
-# noxsdl/src/editor/script_panel.cpp:2440
+# noxsdl/src/editor/script_panel.cpp:2442
 #@ 56672496: argument {n}
 editor.script.values.argument = argument {n}
-# noxsdl/src/editor/script_panel.cpp:2478
+# noxsdl/src/editor/script_panel.cpp:2480
 #@ b9f2687b: Copy##value
 editor.script.values.copy = Copy##value
-# noxsdl/src/editor/script_panel.cpp:2482
+# noxsdl/src/editor/script_panel.cpp:2484
 #@ 4335db9a: Copy the picked value.
 editor.script.values.copy_help = Copy the picked value.
-# noxsdl/src/editor/script_panel.cpp:2500
+# noxsdl/src/editor/script_panel.cpp:2502
 #@ eaf89cc2: \s{n} of {total}
 editor.script.values.count = \s{n} of {total}
 # noxcore/src/mapedit/script_doc.cpp:420
@@ -9891,10 +9897,10 @@ editor.script.values.groups[other] = {n} groups
 # noxcore/src/mapedit/script_doc.cpp:428, noxcore/src/mapedit/script_doc.cpp:429, noxcore/src/mapedit/script_doc.cpp:430
 #@ 2f277676: {n} groups have this name
 editor.script.values.groups_share_name = {n} groups have this name
-# noxsdl/src/editor/script_panel.cpp:2474
+# noxsdl/src/editor/script_panel.cpp:2476
 #@ efe7cff8: Type the picked value into the Script panel at the caret: into the string the caret is in when it takes these values, else in quotes.
 editor.script.values.insert_help = Type the picked value into the Script panel at the caret: into the string the caret is in when it takes these values, else in quotes.
-# noxsdl/src/editor/script_panel.cpp:2494
+# noxsdl/src/editor/script_panel.cpp:2496
 #@ 61d21012: None on this map yet.
 editor.script.values.none_on_map = None on this map yet.
 # noxcore/src/mapedit/script_doc.cpp:421
@@ -9904,10 +9910,10 @@ editor.script.values.objects[other] = {n} objects
 # noxcore/src/mapedit/script_doc.cpp:426
 #@ 2b2fb014: {n} objects have this name
 editor.script.values.objects_share_name = {n} objects have this name
-# noxsdl/src/editor/script_panel.cpp:2466
+# noxsdl/src/editor/script_panel.cpp:2468
 #@ f71f5491: Search values and notes
 editor.script.values.search_hint = Search values and notes
-# noxsdl/src/editor/script_panel.cpp:2375, noxsdl/src/editor/script_panel.cpp:2495
+# noxsdl/src/editor/script_panel.cpp:2377, noxsdl/src/editor/script_panel.cpp:2497
 #@ f1ea1eb2: Not available: the game's data isn't loaded.
 editor.script.values.unavailable = Not available: the game's data isn't loaded.
 # noxcore/src/mapedit/script_doc.cpp:418
@@ -12125,7 +12131,7 @@ editor.window.edge_rules = Edge Rules
 # noxsdl/src/editor/map_editor_ui.cpp:1296
 #@ 27decad5: Editor Settings
 editor.window.editor_settings = Editor Settings
-# noxsdl/src/editor/script_panel.cpp:2027
+# noxsdl/src/editor/script_panel.cpp:2029
 #@ d623f80f: Function Info
 editor.window.function_info = Function Info
 # noxsdl/src/editor/map_editor_ui.cpp:178, noxsdl/src/editor/marker_tools.cpp:2665

@@ -28,10 +28,10 @@ namespace nox::script {
 
 namespace {
 
-constexpr std::array<std::string_view, 23> kCategories{
+constexpr std::array<std::string_view, 24> kCategories{
     "walls",  "timers",   "objects", "waypoints", "groups",   "movement", "creatures", "inventory",
     "combat", "health",   "spells",  "enchants",  "owners",   "sound",    "messages",  "dialog",
-    "quest",  "players",  "triggers", "math",     "strings",  "game",     "unused"};
+    "quest",  "players",  "triggers", "math",     "strings",  "game",     "unused",    "mods"};
 
 using util::trim;
 
@@ -186,7 +186,7 @@ std::string builtinTypePrototype(std::uint32_t id)
 BuiltinDocSet parseBuiltinDocs(std::string_view docsText, std::string_view usageText)
 {
     BuiltinDocSet set;
-    set.docs.resize(kBuiltinCount);
+    set.docs.resize(kAllBuiltinCount);
     const auto error = [&](std::size_t line, const std::string& what) {
         set.errors.push_back("builtin_docs.txt:" + std::to_string(line) + ": " + what);
     };
@@ -243,7 +243,7 @@ BuiltinDocSet parseBuiltinDocs(std::string_view docsText, std::string_view usage
             error(r.line, "no builtin " + r.name);
             continue;
         }
-        BuiltinDoc& d = set.docs[*id];
+        BuiltinDoc& d = set.docs[builtinPlace(*id)];
         if (!d.name.empty()) {
             error(r.line, r.name + " documented twice");
             continue;
@@ -320,9 +320,9 @@ BuiltinDocSet parseBuiltinDocs(std::string_view docsText, std::string_view usage
             if (!rid || builtinSignature(*rid).name != rel || *rid == *id) error(r.line, r.name + ": related " + rel + " isn't another builtin");
         }
     }
-    for (std::uint32_t id = 0; id < kBuiltinCount; ++id) {
-        if (set.docs[id].name.empty()) {
-            set.errors.push_back("builtin_docs.txt: no entry for " + std::string(builtinSignature(id).name));
+    for (std::uint32_t place = 0; place < kAllBuiltinCount; ++place) {
+        if (set.docs[place].name.empty()) {
+            set.errors.push_back("builtin_docs.txt: no entry for " + std::string(builtinSignature(builtinIdAt(place)).name));
         }
     }
 
@@ -351,7 +351,7 @@ BuiltinDocSet parseBuiltinDocs(std::string_view docsText, std::string_view usage
             set.errors.push_back("builtin_usage.txt:" + std::to_string(i + 1) + ": bad line");
             continue;
         }
-        BuiltinDoc& d = set.docs[*id];
+        BuiltinDoc& d = set.docs[builtinPlace(*id)];
         d.usageMaps = std::atoi(cols[1].c_str());
         d.usageCalls = std::atoi(cols[2].c_str());
         d.usageExamples = cols.size() >= 4 ? splitList(cols[3], ',') : std::vector<std::string>{};
@@ -378,7 +378,8 @@ const BuiltinDocSet& builtinDocs()
 const BuiltinDoc* builtinDoc(std::uint32_t id)
 {
     const auto& docs = builtinDocs().docs;
-    return id < docs.size() && !docs[id].name.empty() ? &docs[id] : nullptr;
+    const std::uint32_t place = builtinPlace(id);
+    return place < docs.size() && !docs[place].name.empty() ? &docs[place] : nullptr;
 }
 
 // --- The usage report --------------------------------------------------------------------------

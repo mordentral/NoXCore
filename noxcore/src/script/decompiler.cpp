@@ -318,7 +318,7 @@ private:
                 if (in.o() == Op::CallScript && (in.a < 2 || in.a >= fns.size())) {
                     throw Failure(fns[f].name + ": a call to function " + std::to_string(in.a));
                 }
-                if (in.o() == Op::CallBuiltin && in.a >= kBuiltinCount) {
+                if (in.o() == Op::CallBuiltin && !isKnownBuiltin(in.a)) {
                     throw Failure(fns[f].name + ": no builtin " + std::to_string(in.a));
                 }
                 if (in.o() == Op::PushString && in.a >= file_.strings.size()) {
@@ -621,7 +621,8 @@ private:
                 const auto& sig = builtinSignature(in.a);
                 for (std::size_t i = sig.args.size(); i-- > 0;) {
                     const TEntry e = pop();
-                    if (!e.addr && sig.args[i] != Type::Function) {
+                    // (An argument that takes any type tells nothing of its value's.)
+                    if (!e.addr && sig.args[i] != Type::Function && !sig.takesAny(i)) {
                         restrict(e.tv, maskOf(sig.args[i]));
                     }
                 }
@@ -1586,7 +1587,16 @@ private:
                 out = std::string(*builtinAlias(n.v));
             }
             out += "(";
-            for (std::size_t i = 0; i < n.kids.size(); ++i) {
+            // A NoX Core builtin's trailing 0s are the arguments left out (the compiler pushes
+            // them): left out again.
+            std::size_t shown = n.kids.size();
+            if (!n.script) {
+                const auto& sig = builtinSignature(n.v);
+                while (shown > sig.requiredArgs() && n.kids[shown - 1]->k == Node::K::Int && n.kids[shown - 1]->v == 0) {
+                    --shown;
+                }
+            }
+            for (std::size_t i = 0; i < shown; ++i) {
                 if (i) {
                     out += ", ";
                 }

@@ -23,18 +23,30 @@ struct BuiltinSignature {
     std::string_view name;
     Type returns = Type::Void;
     std::vector<Type> args; ///< in source order (the first pushed first)
+    /// (NoX Core's builtins) The arguments a call must give: the compiler pushes a 0 for each one
+    /// left out after them (kAllArgs: every one must be given, as for all the game's).
+    static constexpr std::uint8_t kAllArgs = 0xFF;
+    std::uint8_t required = kAllArgs;
+    /// (NoX Core's builtins) The arguments from this one on take a value of any type (int, float,
+    /// string, object), pushed as its word as it is (kAllArgs: none; each takes its own type).
+    std::uint8_t anyFrom = kAllArgs;
+
+    std::size_t requiredArgs() const noexcept { return required == kAllArgs ? args.size() : required; }
+    bool takesAny(std::size_t arg) const noexcept { return anyFrom != kAllArgs && arg >= anyFrom; }
 };
 
-/// Builtin `id`'s signature (id < kBuiltinCount).
+/// Builtin `id`'s signature (isKnownBuiltin(id): the game's, or NoX Core's own). Throws
+/// std::out_of_range for any other id.
 const BuiltinSignature& builtinSignature(std::uint32_t id);
 /// A builtin's id by its source name, or by the old name of one NoX Core renamed (the
 /// community tools' "Unknownb8" for IsFriendly, say: community scripts keep compiling).
 std::optional<std::uint32_t> findBuiltin(std::string_view name);
 /// The old name of a builtin NoX Core renamed (Unknownb8, Unknownb9, Unknownc4), if it has one.
 std::optional<std::string_view> builtinAlias(std::uint32_t id);
-/// A name NoX Core gave a builtin the community tools had no name for: a script's own function
-/// or variable of that name is allowed and wins over the builtin (scripts written before the
-/// name existed keep compiling); the builtin stays reachable by its old name.
+/// A name NoX Core gave a builtin the community tools had no name for, or one of NoX Core's own
+/// builtins (LuauCall...): a script's own function or variable of that name is allowed and wins
+/// over the builtin (scripts written before the name existed keep compiling); a renamed builtin
+/// stays reachable by its old name.
 bool isNewBuiltinName(std::string_view name);
 /// Every builtin as a prototype line ("int Object(string)"), for the editor's reference.
 std::string builtinPrototypes();

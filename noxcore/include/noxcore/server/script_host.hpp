@@ -18,6 +18,8 @@
 #include <map>
 #include <optional>
 #include <random>
+#include <set>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -62,7 +64,8 @@ struct ScriptTimer {
 };
 
 /// Builtin `id`'s argument count and whether it pushes a result, as the host's table has them
-/// (the compiler's builtin signatures are checked against it).
+/// (the compiler's builtin signatures are checked against it); for an id in NoX Core's range, what
+/// the id says (opcodes.hpp); none for any other.
 struct BuiltinArity {
     int args = 0;
     bool returns = false;
@@ -102,8 +105,44 @@ public:
     std::uint32_t frame() const noexcept { return frame_; }
 
     /// A builtin call: a NoX Core mode's answer when it has one (World::modeHooks: ModeHooks::builtin),
-    /// else the game's own (gameBuiltin).
+    /// else the game's own (gameBuiltin). An id in NoX Core's range is noxBuiltin's (never the
+    /// mode's builtin hook: LuauCall asks ModeHooks::mapCall).
     int builtin(std::uint32_t id, script::Vm& vm) override;
+    /// A call of a builtin no one has (outside the game's table and NoX Core's range): logged in
+    /// notices() once per function and id on this map; nothing done, nothing popped.
+    void unknownBuiltin(std::uint32_t id, std::size_t function) override;
+
+    // ---- NoX Core's own builtins, and a mod's calls of the map's functions (maps made for a NoX
+    // Core mod: ids kNoxBuiltinFirst to kNoxBuiltinEnd, script/opcodes.hpp)
+
+    /// LuauCalls nested at most this deep (a mod handler that calls a map function, callFunction,
+    /// that calls LuauCall again...): the one past it isn't made (0 given, logged).
+    static constexpr int kMaxMapCallDepth = 8;
+    /// The LuauCall handlers running now (0: none).
+    int mapCallDepth() const noexcept { return mapCallDepth_; }
+    /// What callFunction did.
+    struct FunctionCall {
+        bool ran = false;                    ///< it ran to its end
+        std::optional<std::uint32_t> result; ///< what it returned (none: it returns nothing, or didn't end)
+        std::string error;                   ///< why it was refused (empty: it ran, or the VM's budget stopped it)
+    };
+    /// A mod's call of the map's function `name` (nox.callMapFunction) with `args`, value i into
+    /// parameter i (at most the function's parameters, the rest 0; a script's own call of a
+    /// function of two or more binds them the other way round, the first parameter getting the
+    /// last argument, as its words are pushed in source order). Refused (`error`) for a name the
+    /// script hasn't (or GLOBAL) and too many arguments. Made while the script runs (from a
+    /// LuauCall's handler, say) it's a nested call on the running call's budgets with its caller
+    /// and trigger; made with none running, it's a call of its own with none (as a timer's), the
+    /// stack emptied and its strings dropped after it as a handler's are (callBlock).
+    FunctionCall callFunction(std::string_view name, std::span<const std::uint32_t> args);
+    /// The thing a script value names (-1 the caller, -2 the trigger, else a script id), as the
+    /// builtins find it; null: none.
+    ServerObject* scriptObject(std::int32_t value) { return object(value); }
+    /// The lines logged about NoX Core's builtins (no mod, no handler, nested too deep, one this
+    /// server doesn't have) and calls of builtins no one has, each also to setScriptLog's sink:
+    /// once per map for each name (or function and id) and reason, at most kMaxNotices.
+    const std::vector<std::string>& notices() const noexcept { return notices_; }
+    static constexpr std::size_t kMaxNotices = 64;
     /// The game's own builtin `id` (what builtin() runs with no mode's answer).
     int gameBuiltin(std::uint32_t id, script::Vm& vm);
     /// The cinematic builtins (script_builtins_screen.cpp: UnBlind, Blind, WideScreen,
@@ -265,6 +304,15 @@ private:
     std::vector<std::uint8_t> stopLogged_; ///< by function: a bit per script::Vm::Stop already logged
     /// A top-level call that the budget stopped: logged once per function and reason.
     void logStop(std::uint32_t function);
+    /// A NoX Core builtin's call (its arguments popped, its result pushed as its id says).
+    int noxBuiltin(std::uint32_t id, script::Vm& vm);
+    /// LuauCall's work: the mod's handler asked (ModeHooks::mapCall), its result (0 when none).
+    std::uint32_t luauCall(bool wantsResult, std::span<const std::uint32_t, 5> args);
+    /// A line for notices() and the log, unless `key` was logged already on this map.
+    void notice(const std::string& key, const std::string& what);
+    int mapCallDepth_ = 0;
+    std::vector<std::string> notices_;
+    std::set<std::string, std::less<>> noticed_;
     /// call()'s run, the stack as the function leaves it (callBlock reads what it returns).
     bool run(std::uint32_t function, std::uint32_t caller, std::uint32_t trigger);
     /// Whether callBlock would run `block` now rather than refuse it (run once, no function).

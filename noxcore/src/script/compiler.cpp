@@ -2707,17 +2707,27 @@ private:
         std::uint32_t callOp = 0;
         std::uint32_t operand = 0;
         std::optional<std::uint32_t> builtin;
+        const BuiltinSignature* sig = nullptr;
         // (A name NoX Core gave a builtin yields to a function of the script's own of that name.)
         const bool ownFunction = isNewBuiltinName(e.text) && functions_.contains(e.text);
         if (const auto b = e.quoted || ownFunction ? std::nullopt : findBuiltin(e.text)) {
             builtin = b;
-            const auto& sig = builtinSignature(*b);
-            for (const Type t : sig.args) {
+            sig = &builtinSignature(*b);
+            for (const Type t : sig->args) {
                 want.push_back(norm(t));
             }
-            returns = norm(sig.returns);
+            returns = norm(sig->returns);
             callOp = w(Op::CallBuiltin);
             operand = *b;
+            // NoX Core's own builtins: said once a script, as object variables are (the game's
+            // table ends at 210, and the game faults on such a call).
+            if (isNoxBuiltin(*b) && !noxBuiltinWarned_) {
+                noxBuiltinWarned_ = true;
+                warning(e.loc, l10n::format(NOX_TR("editor.script.compile.nox_builtin",
+                                                   "{name} is a NoX Core builtin: it calls the Luau mod that hosts the game "
+                                                   "(nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it"),
+                                            {{"name", e.text}}));
+            }
         } else if (const auto f = functions_.find(e.text); f != functions_.end()) {
             for (const Param& p : f->second.params) {
                 want.push_back(norm(p.type));
@@ -2733,9 +2743,16 @@ private:
             error(e.loc, lookup(e.text).found ? l10n::format(NOX_TR("editor.script.compile.variable_not_function", "{name} is a variable, not a function"), {{"name", e.text}}) : l10n::format(NOX_TR("editor.script.compile.no_function", "no function named {name}"), {{"name", e.text}}));
             return Type::Void;
         }
-        if (e.args.size() != want.size()) {
-            error(e.loc, l10n::format(NOX_TRP("editor.script.compile.arg_count", "{name} takes {n} argument, not {got}", "{name} takes {n} arguments, not {got}", want.size()),
-                                      {{"name", e.text}, {"n", want.size()}, {"got", e.args.size()}}));
+        // (NoX Core's builtins: the trailing arguments may be left out, a 0 pushed for each.)
+        const std::size_t required = sig ? sig->requiredArgs() : want.size();
+        if (e.args.size() < required || e.args.size() > want.size()) {
+            if (required == want.size()) {
+                error(e.loc, l10n::format(NOX_TRP("editor.script.compile.arg_count", "{name} takes {n} argument, not {got}", "{name} takes {n} arguments, not {got}", want.size()),
+                                          {{"name", e.text}, {"n", want.size()}, {"got", e.args.size()}}));
+            } else {
+                error(e.loc, l10n::format(NOX_TR("editor.script.compile.arg_count_range", "{name} takes {min} to {n} arguments, not {got}"),
+                                          {{"name", e.text}, {"min", required}, {"n", want.size()}, {"got", e.args.size()}}));
+            }
             return Type::Void;
         }
         if (builtin && argValues_) {
@@ -2743,11 +2760,16 @@ private:
         }
         bool ok = true;
         const auto outerBuiltin = std::exchange(currentBuiltin_, builtin);
-        for (std::size_t i = 0; i < want.size(); ++i) {
+        for (std::size_t i = 0; i < e.args.size(); ++i) {
             currentBuiltin_ = builtin; // (an argument's own calls set theirs)
-            const Type t = expr(*e.args[i], want[i]);
+            // An argument that takes any type: whatever value it is, its word pushed as it is.
+            const bool any = sig && sig->takesAny(i);
+            const Type t = expr(*e.args[i], any ? Type::Int : want[i]);
             if (t == Type::Void) {
                 ok = false;
+                continue;
+            }
+            if (any) {
                 continue;
             }
             if (t != want[i]) {
@@ -2759,6 +2781,9 @@ private:
             }
         }
         currentBuiltin_ = outerBuiltin;
+        for (std::size_t i = e.args.size(); i < want.size(); ++i) {
+            emit(w(Op::PushInt), 0u); // (an argument left out)
+        }
         emit(callOp, operand);
         if (returns == Type::Void && !statement) {
             error(e.loc, l10n::format(NOX_TR("editor.script.compile.no_value", "{name} doesn't return a value"), {{"name", e.text}}));
@@ -2768,6 +2793,7 @@ private:
     }
 
     std::vector<Diagnostic>& diags_;
+    bool noxBuiltinWarned_ = false; ///< (a NoX Core builtin's warning given: once a script)
     bool ignoreObject_ = false;
     DebugInfo* debug_ = nullptr;
     std::vector<std::string> strings_;

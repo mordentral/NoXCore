@@ -6022,6 +6022,8 @@ editor.script.class.wizard = Маг
 editor.script.compile.arg_count[one] = {name} принимает {n} аргумент, а не {got}
 editor.script.compile.arg_count[few] = {name} принимает {n} аргумента, а не {got}
 editor.script.compile.arg_count[many] = {name} принимает {n} аргументов, а не {got}
+#@ 53d7c464 mt: {name} takes {min} to {n} arguments, not {got}
+editor.script.compile.arg_count_range = {name} принимает от {min} до {n} аргументов, а не {got}
 #@ 64fed792 mt: {name}'s argument {n} is a {type}, not a {other}
 editor.script.compile.arg_type = аргумент {n} функции {name} имеет тип {type}, а не {other}
 #@ 8b21f615 mt: {name}'s argument {n} is a {type} (a function's name), not a {other}
@@ -6182,6 +6184,8 @@ editor.script.compile.no_variable = нет переменной с именем 
 editor.script.compile.no_variable_or_function = нет переменной или функции с именем {name}
 #@ 4800cb01 mt: {name} isn't an array
 editor.script.compile.not_array = {name} — не массив
+#@ d795758b mt: {name} is a NoX Core builtin: it calls the Luau mod that hosts the game (nox.onMapCall), for maps made for a NoX Core mod; the original game crashes on it
+editor.script.compile.nox_builtin = {name} — встроенная функция NoX Core: она вызывает Luau-мод, на котором запущена игра (nox.onMapCall), для карт, сделанных для мода NoX Core; оригинальная игра на ней падает
 #@ 2485478f mt: bad suffix on the number {text}
 editor.script.compile.number_suffix = неверный суффикс у числа {text}
 #@ 57be2906 mt: the number {text} is too big for 32 bits

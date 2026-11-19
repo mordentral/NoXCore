@@ -1807,7 +1807,9 @@ std::string usageText(const sc::BuiltinDoc& d, bool examples)
 const std::vector<editor::BuiltinRow>& ScriptPanel::builtinRows()
 {
     if (builtinRows_.empty()) {
-        for (std::uint32_t id = 0; id < sc::kBuiltinCount; ++id) {
+        // (By place: the game's builtins, then NoX Core's own; a row's id is its builtin id.)
+        for (std::uint32_t place = 0; place < sc::kAllBuiltinCount; ++place) {
+            const std::uint32_t id = sc::builtinIdAt(place);
             editor::BuiltinRow r;
             r.id = id;
             r.name = std::string(sc::builtinSignature(id).name);
@@ -1956,7 +1958,7 @@ void ScriptPanel::builtinsTab(const std::string& query)
     std::string lastCategory;
     bool firstRow = true;
     for (const std::uint32_t id : ids) {
-        const editor::BuiltinRow& row = builtinRows()[id];
+        const editor::BuiltinRow& row = builtinRows()[sc::builtinPlace(id)];
         const bool first = std::exchange(firstRow, false);
         if (sort == BuiltinSort::Category && (first || row.category != lastCategory)) {
             ImGui::SeparatorText(row.category.empty() ? NOX_TRC("editor.script.fn.none", "(none)") : row.category.c_str());
@@ -2000,7 +2002,7 @@ void ScriptPanel::builtinsTab(const std::string& query)
 
 void ScriptPanel::openFunctionInfo(std::uint32_t id, bool back)
 {
-    if (id >= sc::kBuiltinCount) {
+    if (!sc::isKnownBuiltin(id)) {
         return;
     }
     if (!back) {
@@ -2028,7 +2030,7 @@ void ScriptPanel::functionInfoPanel()
         ImGui::End();
         return;
     }
-    const std::uint32_t id = std::min(infoId_, sc::kBuiltinCount - 1);
+    const std::uint32_t id = sc::isKnownBuiltin(infoId_) ? infoId_ : sc::kBuiltinCount - 1;
     const sc::BuiltinDoc* d = sc::builtinDoc(id);
     ImFont* mono = ed_.imgui_->monoFont();
 

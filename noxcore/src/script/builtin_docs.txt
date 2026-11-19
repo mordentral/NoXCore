@@ -11,7 +11,7 @@
 #   category: <category>            walls timers objects waypoints groups movement creatures
 #                                   inventory combat health spells enchants owners sound
 #                                   messages dialog quest players triggers math strings game
-#                                   unused
+#                                   unused mods (NoX Core's own builtins, after the game's)
 #   related: A, B, C                other builtins worth a look
 #   short: <one or two sentences>   the tooltip: what it does and what it returns
 #   [description]                   what it does (paragraphs; a blank line between them,
@@ -5486,4 +5486,63 @@ void PrizeChestOpened()
         UnlockDoor(Object("PrizeVault"));
     else
         Print("Con02a:BeginMission");
+}
+
+== LuauCall
+proto: void LuauCall(string name, int a, int b, int c, int d)
+category: mods
+related: LuauCallReturn
+short: NoX Core only: runs the hosting Luau mod's handler for name (nox.onMapCall) with up to four values; nothing comes back. Without a mod or a handler, nothing happens.
+[description]
+A NoX Core builtin for maps made for a NoX Core mod (a map shipped inside a mod): it hands a call to the mod's server script. The mod registers a handler for the name with nox.onMapCall(name, fn); the handler gets a call table with the four values, the script's caller and trigger (the objects self and other are now), and helpers to read each value as an int, a float, an object or a string.
+
+The values after the name may be of any type (int, float, string, object): each goes as its 32-bit word, and the handler says how to read it. Those left out are 0, so LuauCall("OpenVault") and LuauCall("SpawnWave", 3) are both fine.
+
+The handler runs at once, inside this call, as a builtin does. It may call back into the map's own functions (nox.callMapFunction); such calls nest at most 8 deep.
+
+Mods run in hosted games (Host Custom), not the solo campaign: there no mod hosts the game and the call does nothing.
+[params]
+- name: the handler's name, as the mod registered it.
+- a: the first value (any type; 0 when left out).
+- b: the second value.
+- c: the third value.
+- d: the fourth value.
+[returns]
+Nothing.
+[edge]
+- No mod hosting the game, no handler of that name, a handler that fails (a Luau error), or calls nested more than 8 deep: nothing happens, and the server logs it once per name on the map.
+- The original game crashes on this call (its table of builtins ends at 210): only for maps played on NoX Core with their mod. The compiler warns once a script.
+[example]
+void VaultLeverPulled()
+{
+    // The mod's server script: nox.onMapCall("OpenVault", function(call) ... end)
+    LuauCall("OpenVault", other, Waypoint("VaultCentre"));
+}
+
+== LuauCallReturn
+proto: int LuauCallReturn(string name, int a, int b, int c, int d)
+category: mods
+related: LuauCall
+short: NoX Core only: runs the hosting Luau mod's handler for name (nox.onMapCall) with up to four values and returns what it returns (a number, a thing, true or false); 0 without a mod or a handler.
+[description]
+LuauCall with a result: the mod's handler returns a number (its whole part, as a 32-bit int), true or false (1 or 0), or a thing given with nox.mapObject(id) (the map's handle for it, so the result works as an object here). Nothing, or anything else, is 0.
+
+The values after the name may be of any type and may be left out (0 each), as LuauCall's.
+[params]
+- name: the handler's name, as the mod registered it.
+- a: the first value (any type; 0 when left out).
+- b: the second value.
+- c: the third value.
+- d: the fourth value.
+[returns]
+What the handler returns, or 0 when there's no mod, no handler of that name, the handler fails, or calls nest more than 8 deep.
+[edge]
+- Each failure is logged once per name on the map; the map script goes on with 0.
+- The original game crashes on this call: only for maps played on NoX Core with their mod.
+[example]
+void ShrineTouched()
+{
+    int boon = LuauCallReturn("PickBoon", other, GetQuestStatus("Level"));
+    if (boon > 0)
+        Print("Shrine:BoonGranted");
 }

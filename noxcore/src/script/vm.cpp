@@ -554,7 +554,14 @@ bool Vm::run(std::size_t index, int depth, std::size_t begin, std::size_t end)
                     context_.y = fn.prefab->y;
                 }
             }
-            const int r = id < kBuiltinCount ? host_->builtin(id, *this) : 0;
+            // (An id outside the game's table and NoX Core's range: nothing done, as ever; the
+            // host says so. NoX Core's range pops and pushes as its id says, known or not.)
+            int r = 0;
+            if (id < kBuiltinCount || inNoxBuiltinRange(id)) {
+                r = host_->builtin(id, *this);
+            } else {
+                host_->unknownBuiltin(id, index);
+            }
             context_ = {};
             // 1: the builtin ended the script function (StopScript and the like).
             if (r == 1) {

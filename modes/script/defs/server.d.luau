@@ -38,6 +38,13 @@ type NoxMonsterInfo = { experience: number, health: number, questHealth: number,
 type NoxSpellInfo = { flags: number, onceOnly: boolean, manaCost: number, trapCost: number }
 type NoxTeam = { id: number, name: string, score: number, colour: number, players: number }
 type NoxStream = { next: (self: NoxStream) -> number }
+-- A map script's LuauCall(name, a, b, c, d) as its handler gets it: call[1] to call[4] the four values as signed 32-bit ints (0: left out),
+-- caller and trigger the script's caller and trigger now (ids; nil: none); its methods read value n (1-4) as an int, a float (its bits),
+-- a thing (the map's handle: -1 caller, -2 trigger, else a script id; its id, nil none) or a string (the map's string of that id; nil none).
+-- object and string only while the handler runs.
+type NoxMapCall = { name: string, caller: number?, trigger: number?, [number]: number,
+    int: (self: NoxMapCall, n: number) -> number, float: (self: NoxMapCall, n: number) -> number,
+    object: (self: NoxMapCall, n: number) -> number?, string: (self: NoxMapCall, n: number) -> string? }
 
 declare nox: {
     --- # Players and messages
@@ -421,6 +428,13 @@ declare nox: {
     store: NoxStore?,
     --- The mode's records on a host that keeps them (rows of at most 16 named numbers or texts, stamped with the time they were put; nil when this host keeps none).
     records: NoxRecords?,
+    --- # The map's script (NoX Core maps a mod ships)
+    --- Runs fn(call) for the map script's LuauCall(name, ...) and LuauCallReturn(name, ...), at once inside the map's call (what fn returns, a number, true or false, or nox.mapObject's, is LuauCallReturn's result; else 0); nil takes it away. Register at the script's top level: a reload's code registers its own.
+    onMapCall: (name: string, fn: ((call: NoxMapCall) -> any)?) -> (),
+    --- Calls the map script's own function by name with whole numbers, the first for its first parameter (true and false: 1 and 0; those left out 0); what it returns as an int, nil when it returns nothing. Inside a LuauCall's handler it runs nested with that call's caller and trigger (8 LuauCalls deep at most); else as a timer's, with none. An error for a name the map hasn't, too many values, or inside an asked hook.
+    callMapFunction: (name: string, ...(number | boolean)) -> number?,
+    --- A thing as the map script names it (its script id, what Object("name") gives there): for a LuauCallReturn's result or a map function's value; nil when it's gone.
+    mapObject: (id: number) -> number?,
     --- # Generated maps
     --- Builds one of the mod's own maps: ahead (default) on a worker, onGenerated tells; or now, its result back.
     generate: (request: NoxGenerate) -> (boolean, any),

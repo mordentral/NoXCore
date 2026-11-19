@@ -17,6 +17,7 @@
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/quest.hpp"
 #include "noxcore/server/rewards.hpp"
+#include "noxcore/server/script_host.hpp"
 #include "noxcore/server/server.hpp"
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/spells.hpp"
@@ -237,6 +238,22 @@ struct ScriptedMode::Impl {
     Parts parts;
     /// The owner's functions (the script's `owner` table), by name.
     std::map<std::string, std::function<int(lua_State*)>, std::less<>> ownerFns;
+    /// nox.onMapCall's handlers: the map script's LuauCall names, each its function's ref (set by
+    /// the script as it loads; a reload's code sets its own).
+    std::map<std::string, int, std::less<>> mapHandlers;
+    void dropMapHandlers(std::map<std::string, int, std::less<>>& handlers)
+    {
+        for (const auto& [name, ref] : handlers) {
+            lua_unref(vm->thread(), ref);
+        }
+        handlers.clear();
+    }
+    /// The map script whose LuauCall handlers run now (null: none), and how many run: a call
+    /// table's object and string read only while one does (its values are the VM's now).
+    server::ScriptHost* mapCallHost = nullptr;
+    int mapCallsRunning = 0;
+    /// A LuauCall's handler run (EngineHooks::mapCall): its result for the map script.
+    std::uint32_t runMapCall(server::ScriptHost& script, int ref, const server::MapCall& call);
     /// Rules looked up once (ScriptedMode::rule): their functions' refs, again at each load.
     struct RuleRef {
         std::string name;
@@ -1737,6 +1754,164 @@ int noxMt19937(lua_State* L)
 int mtNext(lua_State* L)
 {
     lua_pushnumber(L, static_cast<double>(mtArg(L, 1)()));
+    return 1;
+}
+
+// ---- the map's script: its LuauCalls' handlers (nox.onMapCall), its functions called
+// (nox.callMapFunction), a thing as its handle (nox.mapObject)
+
+/// A LuauCall's call table: { name, caller, trigger, [1..4] = the values as signed 32-bit ints },
+/// with the methods int, float, object and string (kMapCallMethods) by this metatable.
+constexpr const char* kMapCallType = "nox.mapcall";
+
+/// A whole number as a script's 32-bit word (its whole part, wrapped), or a boolean (1, 0).
+std::optional<std::uint32_t> scriptWord(lua_State* L, int idx)
+{
+    if (lua_isboolean(L, idx)) {
+        return lua_toboolean(L, idx) ? 1u : 0u;
+    }
+    if (lua_type(L, idx) != LUA_TNUMBER) {
+        return std::nullopt;
+    }
+    const double v = lua_tonumber(L, idx);
+    if (!std::isfinite(v) || std::fabs(v) > 9.0e15) {
+        return std::nullopt;
+    }
+    return static_cast<std::uint32_t>(static_cast<std::int64_t>(std::trunc(v)));
+}
+
+/// call:<method>(n)'s value n (1-4), as the script pushed it.
+std::uint32_t mapCallValue(lua_State* L)
+{
+    luaL_checktype(L, 1, LUA_TTABLE);
+    const int n = luaL_checkinteger(L, 2);
+    luaL_argcheck(L, n >= 1 && n <= 4, 2, "a value's place, 1 to 4");
+    lua_rawgeti(L, 1, n);
+    const auto word = scriptWord(L, -1);
+    lua_pop(L, 1);
+    return word.value_or(0);
+}
+
+/// The map script whose LuauCall's handler runs now: a call's object and string only then.
+server::ScriptHost& runningMapCall(lua_State* L, const char* what)
+{
+    Impl& impl = implOf(L);
+    if (impl.mapCallsRunning == 0 || !impl.mapCallHost) {
+        luaL_error(L, "call:%s reads the map script's values: only while a LuauCall's handler runs", what);
+    }
+    return *impl.mapCallHost;
+}
+
+int mapCallInt(lua_State* L)
+{
+    lua_pushnumber(L, static_cast<std::int32_t>(mapCallValue(L)));
+    return 1;
+}
+
+int mapCallFloat(lua_State* L)
+{
+    lua_pushnumber(L, std::bit_cast<float>(mapCallValue(L)));
+    return 1;
+}
+
+int mapCallObject(lua_State* L)
+{
+    // The thing the value names as the map's builtins find it (a script id; -1 the caller, -2 the
+    // trigger): its id, nil for none.
+    const std::uint32_t word = mapCallValue(L);
+    server::ScriptHost& mapScript = runningMapCall(L, "object");
+    const server::ServerObject* o = mapScript.scriptObject(static_cast<std::int32_t>(word));
+    if (!o || o->gone() || implOf(L).hidden(*o)) {
+        lua_pushnil(L);
+    } else {
+        lua_pushnumber(L, o->extent);
+    }
+    return 1;
+}
+
+int mapCallString(lua_State* L)
+{
+    // The script's string of that id (a constant, or one made at run time); nil for an id with none.
+    const std::uint32_t word = mapCallValue(L);
+    const nox::script::Vm& vm = runningMapCall(L, "string").vm();
+    if (word >= vm.stringCount()) {
+        lua_pushnil(L);
+    } else {
+        const std::string& s = vm.string(word);
+        lua_pushlstring(L, s.data(), s.size());
+    }
+    return 1;
+}
+
+int noxOnMapCall(lua_State* L)
+{
+    // nox.onMapCall(name, fn): fn(call) runs for the map script's LuauCall(name, ...) (and
+    // LuauCallReturn's: what it returns goes back); nil takes the handler away.
+    Impl& impl = implOf(L);
+    size_t n = 0;
+    const char* s = luaL_checklstring(L, 1, &n);
+    luaL_argcheck(L, n > 0 && n <= 255, 1, "a handler's name, 1 to 255 bytes");
+    luaL_argcheck(L, lua_isfunction(L, 2) || lua_isnoneornil(L, 2), 2, "a function, or nil to take the handler away");
+    const std::string name(s, n);
+    if (const auto it = impl.mapHandlers.find(name); it != impl.mapHandlers.end()) {
+        lua_unref(L, it->second);
+        impl.mapHandlers.erase(it);
+    }
+    if (lua_isfunction(L, 2)) {
+        lua_pushvalue(L, 2);
+        impl.mapHandlers.emplace(name, lua_ref(L, -1));
+        lua_pop(L, 1);
+    }
+    return 0;
+}
+
+int noxCallMapFunction(lua_State* L)
+{
+    // nox.callMapFunction(name, ...): the map's own function of that name called with the numbers
+    // given (whole numbers, as its int parameters; true and false as 1 and 0; those left out 0):
+    // what it returns as a signed int, nil when it returns nothing (or the VM's budget stopped it).
+    Impl& impl = implOf(L);
+    toolbox::refuseInsideAsked(L, "callMapFunction");
+    const std::string name = luaL_checkstring(L, 1);
+    server::ScriptHost* mapScript = impl.host ? impl.host->server().script() : nullptr;
+    if (!mapScript) {
+        luaL_error(L, "callMapFunction: no map script yet (the game's map is there from start on)");
+    }
+    const int top = lua_gettop(L);
+    if (top > 65) {
+        luaL_error(L, "callMapFunction: at most 64 values");
+    }
+    std::vector<std::uint32_t> args;
+    args.reserve(static_cast<std::size_t>(top - 1));
+    for (int i = 2; i <= top; ++i) {
+        const auto word = scriptWord(L, i);
+        luaL_argcheck(L, word.has_value(), i, "a number (its whole part) or a boolean");
+        args.push_back(*word);
+    }
+    const server::ScriptHost::FunctionCall r = mapScript->callFunction(name, args);
+    if (!r.error.empty()) {
+        luaL_error(L, "callMapFunction: %s", r.error.c_str());
+    }
+    if (r.result) {
+        lua_pushnumber(L, static_cast<std::int32_t>(*r.result));
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
+int noxMapObject(lua_State* L)
+{
+    // nox.mapObject(id): the map script's handle for a thing (its script id, what Object("name")
+    // gives there), for a LuauCallReturn's result or a map function's argument; nil when it's gone.
+    const double id = luaL_checknumber(L, 1);
+    server::World& world = worldOf(L);
+    const server::ServerObject* o = id >= 1 && id <= 4294967295.0 ? world.byExtent(static_cast<std::uint32_t>(id)) : nullptr;
+    if (!o || o->gone() || o->scriptId == 0 || implOf(L).hidden(*o)) {
+        lua_pushnil(L);
+    } else {
+        lua_pushnumber(L, o->scriptId);
+    }
     return 1;
 }
 
@@ -4217,6 +4392,8 @@ void Impl::installToolbox()
         // (the stock protocol)
         {"inform", noxInform}, {"informString", noxInformString}, {"flagStatus", noxFlagStatus}, {"timer", noxTimer},
         {"endMatch", noxEndMatch}, {"gameOver", noxGameOver},
+        // (the map's script)
+        {"onMapCall", noxOnMapCall}, {"callMapFunction", noxCallMapFunction}, {"mapObject", noxMapObject},
     };
     // A stream's methods (nox.mt19937's): stream:next().
     if (luaL_newmetatable(L, kMtType)) {
@@ -4226,6 +4403,22 @@ void Impl::installToolbox()
         lua_setreadonly(L, -1, 1);
         lua_setfield(L, -2, "__index");
         lua_pushstring(L, "the stream's own");
+        lua_setfield(L, -2, "__metatable");
+        lua_setreadonly(L, -1, 1);
+    }
+    lua_pop(L, 1);
+    // A LuauCall's call table's methods: call:int(n), call:float(n), call:object(n), call:string(n).
+    if (luaL_newmetatable(L, kMapCallType)) {
+        lua_createtable(L, 0, 4);
+        static constexpr std::pair<const char*, lua_CFunction> kMapCallMethods[] = {
+            {"int", mapCallInt}, {"float", mapCallFloat}, {"object", mapCallObject}, {"string", mapCallString}};
+        for (const auto& [name, fn] : kMapCallMethods) {
+            lua_pushcfunction(L, fn, name);
+            lua_setfield(L, -2, name);
+        }
+        lua_setreadonly(L, -1, 1);
+        lua_setfield(L, -2, "__index");
+        lua_pushstring(L, "the call's own");
         lua_setfield(L, -2, "__metatable");
         lua_setreadonly(L, -1, 1);
     }
@@ -4317,12 +4510,16 @@ bool Impl::load(std::string& error)
     requiredRef = lua_ref(L, -1);
     lua_pop(L, 1);
     // (The old code's weather set aside while the new code runs: back if it fails; else none to
-    // whoever had it, before anything the new code sets.)
+    // whoever had it, before anything the new code sets. Its map handlers likewise: the new code
+    // registers its own as it runs.)
     Weather oldWeather = std::exchange(parts.weather, Weather{});
+    auto oldHandlers = std::exchange(mapHandlers, {});
     if (!vm->run(package->manifest.serverScript, *source, 1, error)) {
         lua_unref(L, requiredRef);
         requiredRef = oldRequired;
         parts.weather = std::move(oldWeather);
+        dropMapHandlers(mapHandlers);
+        mapHandlers = std::move(oldHandlers);
         return false;
     }
     if (!lua_istable(L, -1)) {
@@ -4331,8 +4528,11 @@ bool Impl::load(std::string& error)
         requiredRef = oldRequired;
         error = package->manifest.serverScript + " must return its mode's table";
         parts.weather = std::move(oldWeather);
+        dropMapHandlers(mapHandlers);
+        mapHandlers = std::move(oldHandlers);
         return false;
     }
+    dropMapHandlers(oldHandlers);
     oldWeather.reset(host);
     if (modeRef) {
         lua_unref(L, modeRef);
@@ -4511,13 +4711,72 @@ bool Impl::onChat(std::uint8_t peer, std::u16string_view text)
     return taken;
 }
 
+std::uint32_t Impl::runMapCall(server::ScriptHost& mapScript, int ref, const server::MapCall& call)
+{
+    // handler(call): the call table (kMapCallType's), its result back as a script word.
+    lua_State* L = vm->thread();
+    lua_getref(L, ref);
+    lua_createtable(L, 4, 3);
+    for (int i = 0; i < 4; ++i) {
+        lua_pushnumber(L, static_cast<std::int32_t>(call.args[static_cast<std::size_t>(i)]));
+        lua_rawseti(L, -2, i + 1);
+    }
+    lua_pushlstring(L, call.name.data(), call.name.size());
+    lua_setfield(L, -2, "name");
+    const auto thing = [&](std::uint32_t extent, const char* field) {
+        const server::ServerObject* o = extent && host ? host->server().world().byExtent(extent) : nullptr;
+        if (o && !o->gone() && !hidden(*o)) {
+            lua_pushnumber(L, o->extent);
+            lua_setfield(L, -2, field);
+        }
+    };
+    thing(call.caller, "caller");
+    thing(call.trigger, "trigger");
+    luaL_getmetatable(L, kMapCallType);
+    lua_setmetatable(L, -2);
+    // While it runs: its call's objects and strings readable; inside the map script's call, as a
+    // builtin, so not an asked hook's (an asked hook's own refusals don't reach into it).
+    struct Running {
+        Impl& impl;
+        server::ScriptHost* outerHost;
+        const char* outerAsked;
+        Running(Impl& i, server::ScriptHost& s)
+            : impl(i), outerHost(std::exchange(i.mapCallHost, &s)), outerAsked(std::exchange(i.parts.asked, nullptr))
+        {
+            ++impl.mapCallsRunning;
+        }
+        ~Running()
+        {
+            --impl.mapCallsRunning;
+            impl.mapCallHost = outerHost;
+            impl.parts.asked = outerAsked;
+        }
+        Running(const Running&) = delete;
+        Running& operator=(const Running&) = delete;
+    } running(*this, mapScript);
+    const std::string what = "onMapCall " + std::string(call.name);
+    std::uint32_t result = 0;
+    if (finish(what.c_str(), 1, 1)) {
+        if (call.wantsResult && !lua_isnil(L, -1)) {
+            if (const auto word = scriptWord(L, -1)) {
+                result = *word;
+            } else {
+                report(what + ": returned a " + luaL_typename(L, -1) + " (0 given: a LuauCallReturn's handler returns a number, true or "
+                       "false, a thing as nox.mapObject gives it, or nil)");
+            }
+        }
+        lua_pop(L, 1);
+    }
+    return result;
+}
+
 // ------------------------------------------------------------------------- the engine's hooks
 
 /// The engine's hooks inside the frame, each the script's: onKill(victim, killer, assist) after
 /// a player's death (unit ids; nil none), respawnPoint(unit) -> x, y (nil: the game's start),
 /// collide(thing, other) for a thing it watches (nox.watchCollide), mapLoaded(name) at each map's
-/// load (the map's name; a script that takes none ignores it). The rest stay the game's
-/// (ModeHooks' defaults).
+/// load (the map's name; a script that takes none ignores it), the map script's LuauCalls (the
+/// handlers nox.onMapCall registered). The rest stay the game's (ModeHooks' defaults).
 class ScriptedMode::Impl::EngineHooks final : public server::ModeHooks {
 public:
     explicit EngineHooks(Impl& impl) : impl_(impl) {}
@@ -4683,6 +4942,18 @@ public:
         bool go = true;
         impl_.guarded("onExit", [&] { go = impl_.parts.events.exitTouched(impl_.vm->thread(), exit, player); });
         return go;
+    }
+
+    // ---- The map script's LuauCall (nox.onMapCall's handlers): none of that name, nullopt (the
+    // script host logs it); a handler that fails, 0 (its error reported as any hook's).
+    std::optional<std::uint32_t> mapCall(server::ScriptHost& host, const server::MapCall& call) override
+    {
+        const auto it = impl_.mapHandlers.find(call.name);
+        if (it == impl_.mapHandlers.end() || !impl_.vm) {
+            return std::nullopt;
+        }
+        const int ref = it->second;
+        return impl_.guarded("onMapCall", [&] { return impl_.runMapCall(host, ref, call); });
     }
 
 private:

@@ -95,11 +95,61 @@ constexpr std::uint32_t kOpCount = 0x4A;
 /// Builtins in the game's table.
 constexpr std::uint32_t kBuiltinCount = 211;
 
+// ---- NoX Core's own builtins (maps made for a NoX Core mod; GAME.EXE's table ends at 210 and the
+// game faults on any id past it). They have a range of their own, [kNoxBuiltinFirst,
+// kNoxBuiltinEnd): far past the game's table, past the ids the Unused builtins and any fan build
+// might take, and kept apart from them. Each id there says what it pops and pushes: bit 0 set when
+// it pushes a result, bits 1-3 its argument count, the rest (from bit 4) which builtin it is. So a
+// server that doesn't know one (a map made for a newer NoX Core) still pops its arguments and
+// pushes a 0 for its result, the stack as the map expects it.
+constexpr std::uint32_t kNoxBuiltinFirst = 1024;
+constexpr std::uint32_t kNoxBuiltinEnd = 2048;
+/// NoX Core builtin `n` (0-63) taking `args` (0-7) arguments, with a result or not.
+constexpr std::uint32_t noxBuiltinId(std::uint32_t n, std::uint32_t args, bool returns) noexcept
+{
+    return kNoxBuiltinFirst + n * 16 + args * 2 + (returns ? 1u : 0u);
+}
+/// Whether `id` is in NoX Core's range (one this build has or not).
+constexpr bool inNoxBuiltinRange(std::uint32_t id) noexcept { return id >= kNoxBuiltinFirst && id < kNoxBuiltinEnd; }
+/// A NoX Core range id's argument count, and whether it pushes a result.
+constexpr int noxBuiltinArgs(std::uint32_t id) noexcept { return static_cast<int>((id >> 1) & 7u); }
+constexpr bool noxBuiltinReturns(std::uint32_t id) noexcept { return (id & 1u) != 0; }
+/// LuauCall(string name, int a, int b, int c, int d): the hosting mod's handler for `name`
+/// (nox.onMapCall), its result dropped. LuauCallReturn: the same, its result pushed.
+constexpr std::uint32_t kLuauCall = noxBuiltinId(0, 5, false);      // 1034
+constexpr std::uint32_t kLuauCallReturn = noxBuiltinId(1, 5, true); // 1051
+/// NoX Core's builtins this build has, in order.
+constexpr std::uint32_t kNoxBuiltinCount = 2;
+constexpr std::uint32_t kNoxBuiltinIds[kNoxBuiltinCount] = {kLuauCall, kLuauCallReturn};
+/// Whether `id` is one of NoX Core's builtins this build has.
+constexpr bool isNoxBuiltin(std::uint32_t id) noexcept { return id == kLuauCall || id == kLuauCallReturn; }
+/// Whether `id` is a builtin this build has: the game's or NoX Core's.
+constexpr bool isKnownBuiltin(std::uint32_t id) noexcept { return id < kBuiltinCount || isNoxBuiltin(id); }
+/// Every builtin this build has in one run (for lists: the game's 0-210, then NoX Core's), by
+/// place: a builtin's id by its place, and its place by its id (kAllBuiltinCount: none).
+constexpr std::uint32_t kAllBuiltinCount = kBuiltinCount + kNoxBuiltinCount;
+constexpr std::uint32_t builtinIdAt(std::uint32_t place) noexcept
+{
+    return place < kBuiltinCount ? place : kNoxBuiltinIds[place - kBuiltinCount];
+}
+constexpr std::uint32_t builtinPlace(std::uint32_t id) noexcept
+{
+    if (id < kBuiltinCount) {
+        return id;
+    }
+    for (std::uint32_t i = 0; i < kNoxBuiltinCount; ++i) {
+        if (kNoxBuiltinIds[i] == id) {
+            return kBuiltinCount + i;
+        }
+    }
+    return kAllBuiltinCount;
+}
+
 /// An opcode's name, or nothing for one the interpreter doesn't know (it returns there).
 std::optional<std::string_view> opName(std::uint32_t op);
 /// Operand words after the opcode.
 std::uint32_t operandCount(std::uint32_t op);
-/// A builtin's name ("Builtin" + the index for one past the table).
+/// A builtin's name ("Builtin" + the id for one this build doesn't have).
 std::string builtinName(std::uint32_t id);
 
 /// One function's code as text, an instruction a line: "  12  Jump 30". Strings and builtins by
@@ -107,7 +157,8 @@ std::string builtinName(std::uint32_t id);
 std::string disassemble(const ScriptFile& file, std::size_t function);
 
 /// What's wrong with a function's code, if anything: an unknown opcode, a jump outside it, a
-/// call to a function or builtin that isn't there, a string that isn't, or code cut short.
+/// call to a function or builtin that isn't there (NoX Core's own are there), a string that isn't,
+/// or code cut short.
 std::optional<std::string> check(const ScriptFile& file, std::size_t function);
 
 } // namespace nox::script

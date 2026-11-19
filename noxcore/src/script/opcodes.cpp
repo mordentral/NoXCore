@@ -120,6 +120,12 @@ std::uint32_t operandCount(std::uint32_t op)
 
 std::string builtinName(std::uint32_t id)
 {
+    if (id == kLuauCall) {
+        return "LuauCall";
+    }
+    if (id == kLuauCallReturn) {
+        return "LuauCallReturn";
+    }
     return id < kBuiltinCount ? std::string(kBuiltinNames[id]) : "Builtin" + std::to_string(id);
 }
 
@@ -224,7 +230,7 @@ std::optional<std::string> check(const ScriptFile& file, std::size_t function)
             }
             break;
         case Op::CallBuiltin:
-            if (arg(0) >= kBuiltinCount) {
+            if (!isKnownBuiltin(arg(0))) {
                 return where(at, "no builtin " + std::to_string(arg(0)));
             }
             break;

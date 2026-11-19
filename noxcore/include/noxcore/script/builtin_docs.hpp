@@ -37,7 +37,9 @@ struct BuiltinDoc {
 };
 
 struct BuiltinDocSet {
-    std::vector<BuiltinDoc> docs;     ///< by builtin id; an id without an entry has an empty name
+    /// By builtin place (opcodes.hpp's builtinPlace: the game's id, then NoX Core's builtins); one
+    /// without an entry has an empty name.
+    std::vector<BuiltinDoc> docs;
     std::vector<std::string> errors;  ///< what's wrong with the text (tests: none)
     int usageScripts = 0;             ///< how many stock map scripts the usage counted
 };
