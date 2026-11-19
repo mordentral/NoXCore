@@ -1779,7 +1779,38 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   `noxcore/src/server/server.cpp`). A single-player game, and any game with one player in it, is
   unchanged, as are the arena modes.
 
+### OB-434: A map's script can run any machine code: the script's builtin numbers aren't checked
+- **Where:** the map script interpreter's builtin call takes the builtin's number from the script
+  and calls whatever the game's builtin table holds at that place, with no check that the number is
+  one of the game's 211 builtins. A larger number reads past the table into other game data; the
+  right number lands on the interpreter's own value stack, which the script can fill with machine
+  code just before the call. The offsets of the script's variable stores aren't checked either, so a
+  script can also write past its own variables.
+- **Effect:** any map with a script can run machine code, with the player's own Windows
+  permissions, on the computer that runs the map's script: the host of a game, and anyone playing it
+  alone (single player and solo host a game on the player's own computer). From there it can read
+  and write any memory, patch the game and call Windows functions. A player who only joins a game
+  doesn't run its script (but see OB-435), but the downloaded map stays in their maps folder and
+  runs if they later host it. Community map libraries have used this since at least 2019 to give
+  scripts raw memory reads and writes; the maps examined (a large campaign mod, 2024) do nothing
+  outside the game, but a hostile map could do anything a program can.
+- **Ours:** not reproduced. NoX Core's interpreter runs builtins 0-210 and its own range
+  1024-2047 as its own code; any other number is logged and does nothing, and no script can reach
+  machine code or memory outside its own variables (`noxcore/src/script/vm.cpp`). Maps that
+  depend on this trick don't run in NoX Core.
+
 ## Client
+
+### OB-435: A client reading a map's script trusts its lengths and counts
+- **Where:** when a client loads a map, including a map it downloaded to join a game, it reads the
+  map's compiled script (writing it out as `nc.obj` and parsing that) without checking the
+  strings' lengths, the number of strings against its fixed table, or the functions' and symbols'
+  counts, and multiplies counts into sizes without overflow checks. It doesn't run the script.
+- **Effect:** a crafted map could corrupt the memory of a client that merely joins a game hosted
+  with it, before any script runs. None has been seen; the community maps examined parse cleanly.
+- **Ours:** not reproduced. NoX Core's script reader checks every length and count against the
+  data and caps the functions' variables, and refuses a script that doesn't fit
+  (`ScriptFile::parse` in `noxcore/src/script/script_file.cpp`).
 
 ### OB-428: MSG_INFORM, MSG_TEAM_MSG or MSG_DIALOG with a sub the client has no case for hangs it
 - **Where:** CliNet_OnPacket goes on from where each case leaves the read; a case that leaves it
