@@ -2416,10 +2416,14 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
     // text: textFor; in UTF-8 for the console, the logs and the ban list)
     p.wideName = joinName;
     p.name = strings::toUtf8(joinName);
-    for (std::size_t i = 0; i < 25; ++i) {
-        const char16_t c = i < joinName.size() && i < 24 ? joinName[i] : u'\0';
-        p.info[2 * i] = static_cast<std::uint8_t>(c);
-        p.info[2 * i + 1] = static_cast<std::uint8_t>(c >> 8);
+    // (Only a name the reading changed is written again: else the info goes on byte for byte as
+    // the client sent it, what follows its end too, as GAME.EXE passes it on.)
+    if (joinName != utf16Until(accept.playerName)) {
+        for (std::size_t i = 0; i < 25; ++i) {
+            const char16_t c = i < joinName.size() && i < 24 ? joinName[i] : u'\0';
+            p.info[2 * i] = static_cast<std::uint8_t>(c);
+            p.info[2 * i + 1] = static_cast<std::uint8_t>(c >> 8);
+        }
     }
     p.slot = options_.solo ? std::uint8_t{0x1F} : static_cast<std::uint8_t>((peer - 1) & 31); // (a solo game's player the host's)
     if (options_.solo && options_.soloGuests > 0 && !awaitingHost_) {
@@ -4835,7 +4839,8 @@ std::uint32_t GameHost::extendedFeatures() const
     return lobby::ServerFeature::HighRate | options_.features |
            (options_.noxcppMessages.contains(static_cast<std::uint8_t>(net::Op::NoxcppEdit)) ? lobby::ServerFeature::EditSession : 0u) |
            (options_.stockRefusal ? lobby::ServerFeature::NoxCoreOnly : 0u) | // (noxsdl's browser marks it NoX Core only)
-           (options_.pickupAnyClass ? lobby::ServerFeature::PickupAnyClass : 0u); // (World::pickupAnyClass: noxsdl's cursor no Caution then)
+           (options_.pickupAnyClass ? lobby::ServerFeature::PickupAnyClass : 0u) | // (World::pickupAnyClass: noxsdl's cursor no Caution then)
+           (strings::wireText().plain() ? 0u : lobby::ServerFeature::RecodesText); // (textFor: Unicode clients get real Unicode here)
 }
 
 lobby::ExtendedServer GameHost::extendedServer() const

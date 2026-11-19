@@ -2742,6 +2742,11 @@ std::optional<std::vector<std::uint8_t>> recodeText(std::span<const std::uint8_t
         if (recoded == text && narrowNow == narrow) {
             return std::nullopt;
         }
+        // (At most textMessage's 254 and its end: a sender's 255 units without one would wrap the
+        // length byte to 0, and the client would read the text as messages of the sender's making.)
+        if (recoded.size() > World::kMaxTextMessage) {
+            recoded.resize(World::kMaxTextMessage);
+        }
         std::vector<std::uint8_t> out(m.begin(), m.begin() + 11);
         out[3] = static_cast<std::uint8_t>((m[3] & ~0x06u) | (narrowNow ? 2u : 4u));
         out[8] = static_cast<std::uint8_t>(recoded.size() + 1);

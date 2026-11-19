@@ -104,6 +104,21 @@ function store.keyFor(player: any): string
 	return "char/" .. account .. "/" .. (player.class or "warrior") .. "/" .. s.keyOf(player.name)
 end
 
+-- A name as builds before whole names gave it to the mod: each UTF-16 unit past ASCII a '?'. A
+-- character kept then is under it (store.olderKeyFor, roster's fallback): played from there.
+function store.olderName(name: string): string
+	local out = {}
+	for _, c in utf8.codes(name) do
+		table.insert(out, if c < 0x80 then string.char(c) elseif c >= 0x10000 then "??" else "?")
+	end
+	return table.concat(out)
+end
+
+-- keyFor's key as those builds made it (the same unless the name has a letter past ASCII).
+function store.olderKeyFor(player: any): string
+	return store.keyFor({ account = player.account, class = player.class, name = store.olderName(tostring(player.name)) })
+end
+
 -- A server character's key (roster.luau): "srv/<account id>/<class>/<name>", the account the
 -- server's own (accounts.luau), never what the client named.
 function store.serverKey(account: string, class: string, name: string): string

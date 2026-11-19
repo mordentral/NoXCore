@@ -421,11 +421,15 @@ Options switch unless noted.
   (strings::fromWire / toWire, with the shift): to and from stock clients the names, chat lines, the
   server's lines, team, shop and NPC dialog names (World::textForStock / textFromStock, chosen per
   client: GameHost::textFor); .plr names (read and written); XWIS lobby chat, game names and the
-  MOTD; and the map editor's 8-bit map texts (Windows-1251 there instead of 1252). Between NoX Core
-  programs of client level 12 (lobby::kUnicodeTextLevel) the text goes as real Unicode both ways,
-  whatever either install keeps: a host recodes a stock client's chat line for them, and theirs for
-  the stock clients. A Russian install's game waits for a host's answer to its query before its
-  join (up to 3 s; a stock host never answers), so its name goes the right way. Latin-1 letters of our own or a mod's text ("Café") go to stock clients as
+  MOTD; and the map editor's 8-bit map texts (Windows-1251 there instead of 1252). Between a NoX
+  Core host whose own text is Windows-1251 (it says so: lobby::ServerFeature::RecodesText) and NoX
+  Core clients of level 12 (lobby::kUnicodeTextLevel) the text goes as real Unicode both ways,
+  whatever the client's install keeps: the host recodes a stock client's chat line for them, and
+  theirs for the stock clients (lobby::unicodeTextWith). A Latin-1 host passes everything on as it
+  came, as GAME.EXE does, so a Russian install's NoX Core game there sends and reads its own
+  convention, as a stock Russian game there does: its stock Russian players read it and it reads
+  them. A Russian install's game waits for a host's answer to its query before its join (up to
+  3 s; a stock host never answers), so its name goes the right way. Latin-1 letters of our own or a mod's text ("Café") go to stock clients as
   their plain letters ("Cafe"), since Windows-1251 has none and their fonts would draw Cyrillic
   there. A new character's file name is its name's first letter as the game makes it ("П00.plr").
   Every other install (Latin-1) sends and stores everything as before, byte for byte. Revert:
@@ -433,7 +437,11 @@ Options switch unless noted.
 - **A host's player names are kept whole** (game_host.cpp): the console, its logs, kick and ban
   by name, the kick dialog's ban and co-op's notices use the name as the player has it (UTF-8),
   where NoX Core kept only its ASCII letters ('?' for any other, so a name with one could not be
-  banned from the kick dialog). The ban list and kick votes key by the name as Unicode.
+  banned from the kick dialog). The ban list and kick votes key by the name as Unicode. Modes see
+  it whole too; what they kept by the old form stays found: a co-op campaign's runner and a Deep
+  Delve character saved under the '?' form are read from there (coop::olderRunnerKey,
+  store.olderName). The name in the PlayerInfo the other clients get is the client's bytes as
+  sent (GAME.EXE copies it whole); only a Windows-1251 host's reading writes it again.
 - **Labels that don't fit their box are fitted** (noxsdl gui.cpp, Gui::fitText): a check box's,
   radio button's, static text's or button's text that the game would draw past its box (wider
   than the box on one line, or wrapped onto more lines than the box holds, over the next row) is

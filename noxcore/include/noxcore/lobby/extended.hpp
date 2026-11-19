@@ -69,6 +69,11 @@ inline constexpr std::uint32_t NoxCoreOnly = 32;  ///< stock clients are turned 
 /// never worn): noxsdl's cursor shows the pickup hand over them, not Caution. A client before it
 /// ignores the bit and shows Caution as before; a stock client never asks.
 inline constexpr std::uint32_t PickupAnyClass = 64;
+/// The host's text convention isn't Latin-1 (strings::wireText: a Russian fan translation's
+/// install), so it recodes its stock clients' names and lines for a client of kUnicodeTextLevel
+/// (unicodeTextWith). A host without it passes them on as they came, as GAME.EXE does: a client
+/// there keeps its own install's convention, as a stock client of that install would.
+inline constexpr std::uint32_t RecodesText = 128;
 } // namespace ServerFeature
 
 /// What a client says it takes (a version 2 query's): a server sends what needs a feature only to
@@ -155,7 +160,9 @@ struct ClientSecret {
 ///      client of level 12 or above every name and line as it is (UTF-16), and reads that client's
 ///      names and lines so, whatever either's install keeps for the original game (a Russian fan
 ///      translation's Windows-1251 bytes: strings::LegacyText); any other client gets and is read
-///      in the host's convention, as a stock client
+///      in the host's convention, as a stock client. The client takes it so only from a host
+///      that says it recodes (ServerFeature::RecodesText, unicodeTextWith); a Latin-1 host's
+///      convention is the identity, so it reads either the same
 inline constexpr std::uint16_t kClientLevel = 12;
 /// The client level whose game text goes as real Unicode both ways (kClientLevel's list, 12).
 inline constexpr std::uint16_t kUnicodeTextLevel = 12;
@@ -179,6 +186,16 @@ struct ExtendedServer {
     std::string modeName;
     bool operator==(const ExtendedServer&) const = default;
 };
+
+/// Whether a client's names and lines go to and come from `host` as real Unicode (kUnicodeTextLevel):
+/// a host of that level that recodes its stock clients' text (ServerFeature::RecodesText). At a
+/// Latin-1 host they go in the client's own convention, so a Russian install's stock players there
+/// read it and it reads them, as before; the host takes either the same way (its convention is the
+/// identity). A Latin-1 install's client sends the same either way.
+inline bool unicodeTextWith(const ExtendedServer& host) noexcept
+{
+    return host.clientLevel >= kUnicodeTextLevel && (host.features & ServerFeature::RecodesText) != 0;
+}
 
 /// The query; with client features, version 2's (none: version 1's, as before); with an added
 /// object types' hash, version 3's; with a client level above 0, version 4's; with a secret,

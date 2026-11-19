@@ -524,6 +524,17 @@ function hero.join(p: any, chosen: any?)
 		record, older = chosen.record, chosen.older
 	elseif key then
 		record, why, older = store.load(key)
+		if record == nil and why == "none" then
+			-- (a character kept before whole names, its name past ASCII: under its older key, still
+			-- played and kept there)
+			local was = store.olderKeyFor(p)
+			if was ~= key then
+				local kept, keptWhy, keptOlder = store.load(was)
+				if kept ~= nil then
+					key, record, why, older = was, kept, keptWhy, keptOlder
+				end
+			end
+		end
 		if record == nil and why ~= "none" then
 			nox.log("deep_delve: " .. key .. " not read (" .. tostring(why) .. "); a new character")
 		end

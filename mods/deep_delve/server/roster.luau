@@ -214,6 +214,16 @@ local function fallback(s: any)
 	end
 	local key = store.serverKey(s.account, s.class, s.name)
 	local rec, _, older = store.load(key)
+	if not rec then
+		-- (one kept before whole names, its name past ASCII: under the name's older form)
+		local was = store.serverKey(s.account, s.class, store.olderName(tostring(s.name)))
+		if was ~= key then
+			local kept, _, keptOlder = store.load(was)
+			if kept then
+				key, rec, older = was, kept, keptOlder
+			end
+		end
+	end
 	local ok, why
 	if rec then
 		ok, why = choose(s, key, rec, false, older)

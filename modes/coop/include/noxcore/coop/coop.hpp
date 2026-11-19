@@ -75,6 +75,9 @@ std::string listedName(std::uint8_t playerClass);
 /// A player's key from game to game: its account and name ("account/name"; no account: the
 /// name), as the Undead Tide keys its runners.
 std::string runnerKey(const server::HostedPlayer& p);
+/// The same as a build before whole names kept it (each UTF-16 unit past ASCII a '?'): a campaign
+/// saved then knows its runners so (CoopDirector::joined takes it while there's no whole one).
+std::string olderRunnerKey(const server::HostedPlayer& p);
 
 class CoopDirector;
 

@@ -760,7 +760,12 @@ bool BotSquad::startSeat(Seat& s, std::uint32_t nowMs)
             }
             try {
                 while (const auto got = s.game.receive(buffer)) {
-                    s.typesAnswered = s.typesAnswered || (got->from == options_.server && lobby::decodeExtendedReply(std::span(buffer, got->size)));
+                    if (const auto reply = got->from == options_.server ? lobby::decodeExtendedReply(std::span(buffer, got->size)) : std::nullopt) {
+                        s.typesAnswered = true;
+                        // (our text as the host then takes it from us, as noxsdl's: real Unicode at a
+                        // recoding host, lobby::unicodeTextWith)
+                        c.setUnicodeLink(lobby::unicodeTextWith(reply->server));
+                    }
                 }
             } catch (const std::exception& ex) {
                 log("[" + s.name + "] network error: " + ex.what());
