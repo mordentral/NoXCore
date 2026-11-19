@@ -122,8 +122,9 @@ public:
     // server shares the client's table from its own thread, and keeps reading the file's texts, as
     // a separate server would). A copy of the table carries no overlay.
 
-    /// `label`'s text over the file's (a label already set: replaced).
-    void setOverlay(std::string_view label, std::u16string text);
+    /// `label`'s text over the file's (a label already set: replaced). False, nothing set: a new
+    /// label with `most` set already, or another thread's overlay set.
+    bool setOverlay(std::string_view label, std::u16string text, std::size_t most = SIZE_MAX);
     /// The overlay's texts whose labels start with `prefix` (without case) gone; "" every one.
     void clearOverlay(std::string_view prefix = {});
     /// How many overlay texts the calling thread sees.

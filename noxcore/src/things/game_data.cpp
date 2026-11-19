@@ -87,6 +87,17 @@ std::size_t pickOf(std::uint32_t gameFlags)
     return ((gameFlags & (0x800u | 0x200000u)) != 0 ? 1u : 0u) | ((gameFlags & 0x2000u) != 0 ? 2u : 0u);
 }
 
+/// Which lines a game with these kinds reads: an online game (0x2000) the ARENA ones and not the
+/// SOLO ones, whatever else it is; a solo one (0x800 or 0x200000) that isn't online the SOLO ones
+/// and not the ARENA ones. (The game reads gamedata.bin once, as the main menu's choice starts a
+/// game: Solo sets 0x800 and clears 0x2000, Multiplayer and Quest set 0x2000 and clear 0x800. An
+/// online game that loads a solo map, which turns 0x800 on beside 0x2000, keeps the ARENA table
+/// it was started with.)
+bool skips(GameData::Section s, bool solo, bool online)
+{
+    return online ? s == GameData::Section::Solo : solo && s == GameData::Section::Arena;
+}
+
 std::atomic<std::uint32_t> nextSerial{1};
 
 } // namespace
@@ -103,16 +114,15 @@ void GameData::reindex()
         }
         it->second.entries.push_back(static_cast<std::uint32_t>(i));
     }
-    // Each kind of game's answer: the last line standing (a solo game skips the ARENA lines, an
-    // online one the SOLO ones).
+    // Each kind of game's answer: the last line standing (skips: an online game skips the SOLO
+    // lines, a solo one that isn't online the ARENA ones).
     for (const auto& [name, named] : byName) {
         for (std::size_t pick = 0; pick < 4; ++pick) {
             const bool solo = (pick & 1u) != 0;
             const bool online = (pick & 2u) != 0;
             std::int32_t found = -1;
             for (auto i = named.entries.rbegin(); i != named.entries.rend() && found < 0; ++i) {
-                const Section s = entries[*i].section;
-                if (!((solo && s == Section::Arena) || (online && s == Section::Solo))) {
+                if (!skips(entries[*i].section, solo, online)) {
                     found = static_cast<std::int32_t>(*i);
                 }
             }
@@ -165,7 +175,7 @@ const std::vector<float>* GameData::find(std::string_view name, std::uint32_t ga
         }
         for (auto i = it->second.entries.rbegin(); i != it->second.entries.rend(); ++i) {
             const Entry& e = entries[*i];
-            if (!((solo && e.section == Section::Arena) || (online && e.section == Section::Solo))) {
+            if (!skips(e.section, solo, online)) {
                 return &e.values;
             }
         }
@@ -173,7 +183,7 @@ const std::vector<float>* GameData::find(std::string_view name, std::uint32_t ga
     }
     const std::vector<float>* found = nullptr;
     for (const auto& e : entries) {
-        if (!sameName(e.name, name) || (solo && e.section == Section::Arena) || (online && e.section == Section::Solo)) {
+        if (!sameName(e.name, name) || skips(e.section, solo, online)) {
             continue;
         }
         found = &e.values;

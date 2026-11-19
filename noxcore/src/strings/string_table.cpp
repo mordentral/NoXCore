@@ -196,13 +196,16 @@ const StringEntry* StringTable::Overlay::find(std::string_view label) const
     return it == entries.end() ? nullptr : &it->second;
 }
 
-void StringTable::setOverlay(std::string_view label, std::u16string text)
+bool StringTable::setOverlay(std::string_view label, std::u16string text, std::size_t most)
 {
     if (!overlay_.on.load(std::memory_order_relaxed)) {
         overlay_.entries.clear();
         overlay_.thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
     } else if (overlay_.thread.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
-        return; // (another thread's overlay: never two writers)
+        return false; // (another thread's overlay: never two writers)
+    }
+    if (overlay_.entries.size() >= most && overlay_.entries.find(label) == overlay_.entries.end()) {
+        return false;
     }
     StringEntry e;
     e.label = std::string(label);
@@ -210,6 +213,7 @@ void StringTable::setOverlay(std::string_view label, std::u16string text)
     std::string key = e.label;
     overlay_.entries.insert_or_assign(std::move(key), std::move(e));
     overlay_.on.store(true, std::memory_order_release);
+    return true;
 }
 
 void StringTable::clearOverlay(std::string_view prefix)

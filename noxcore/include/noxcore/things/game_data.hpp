@@ -5,7 +5,9 @@
 //   # comment
 //   [SOLO | ARENA] Name = v1, v2 ...;    up to 255 numbers, split on spaces, commas and tabs
 // A line prefixed SOLO is only for the solo game (engine flag 0x800 or 0x200000), one prefixed
-// ARENA only for the arena (game flag 0x2000); a line with neither is for both.
+// ARENA only for the arena (game flag 0x2000); a line with neither is for both. A game with both
+// (an online game on a solo map) reads the arena's: the game reads the file once, when its main
+// menu starts the game, and an online game's start clears 0x800.
 #pragma once
 
 #include <array>
@@ -80,9 +82,9 @@ struct GameData {
     const std::vector<float>* arena(std::string_view name) const;
     /// One value of an arena table (gamedataGetFloatTable: 0 past its end).
     float arena(std::string_view name, std::size_t index) const;
-    /// The values for `name` as a game with `gameFlags` reads the file: a solo
-    /// game (0x800 or 0x200000) skips the ARENA lines, a network game (0x2000) the SOLO ones;
-    /// the last line standing wins. nullptr if none.
+    /// The values for `name` as a game with `gameFlags` reads the file: a network game (0x2000)
+    /// skips the SOLO lines, a solo game (0x800 or 0x200000) that isn't one the ARENA ones; the
+    /// last line standing wins. nullptr if none.
     const std::vector<float>* find(std::string_view name, std::uint32_t gameFlags) const;
     /// The same by a key.
     const std::vector<float>* find(const GameDataKey& key, std::uint32_t gameFlags) const;

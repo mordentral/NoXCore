@@ -707,6 +707,9 @@ inline constexpr std::uint16_t kTextsLevel = 14;
 inline constexpr std::size_t kMaxTextKeyBytes = 64;      ///< a key's bytes at most
 inline constexpr std::size_t kMaxTextValueBytes = 4096;  ///< a whole text's bytes at most (a client cuts past it)
 inline constexpr std::size_t kTextPieceBytes = 800;      ///< a kTextSet's piece's bytes at most
+/// The most keys a mode's overlay holds (nox.setText's limit); a client keeps no more (a new key
+/// past them is let go: only a host that isn't ours sends one).
+inline constexpr std::size_t kMaxTextKeys = 512;
 inline constexpr std::uint8_t kTextMore = 1;
 struct TextPiece {
     std::string key;

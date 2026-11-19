@@ -282,7 +282,8 @@ struct ScriptUiClient::Impl {
             return;
         }
         if (overlayTable) {
-            overlayTable->setOverlay(textKey, strings::fromUtf8(textSoFar));
+            // (kMaxTextKeys at most: a host that isn't ours sending endless new keys is let go.)
+            overlayTable->setOverlay(textKey, strings::fromUtf8(textSoFar), uimsg::kMaxTextKeys);
         }
         textKey.clear();
         textSoFar.clear();

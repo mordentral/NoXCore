@@ -23,6 +23,8 @@
 
 namespace nox::modes::script {
 
+static_assert(Texts::kMaxKeys == uimsg::kMaxTextKeys, "a client keeps as many keys as a mode may set");
+
 namespace {
 
 std::string folded(std::string_view key)
