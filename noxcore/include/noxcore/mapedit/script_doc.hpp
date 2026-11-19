@@ -109,7 +109,12 @@ std::optional<std::string> sidecarNeedsNoxCore(const Sidecar& side);
 /// Sets or clears the sidecar's record from the map's compiled script (documentNeedsNoxCore).
 void markNoxCoreNeeds(Sidecar& side, const MapDocument& doc);
 
-/// Why the Script panel shows this map's source read-only: the map's compiled script already uses
+/// The builtin that shows the map's compiled script uses memory tricks of the original game
+/// (script::memoryTrickBuiltin), if one does: NoX Core never runs it.
+std::optional<std::uint32_t> documentMemoryTricks(const MapDocument& doc);
+
+/// Why the Script panel shows this map's source read-only: the map's compiled script uses memory
+/// tricks of the original game (documentMemoryTricks: whatever the setting), or it already uses
 /// object variables (a custom map's) and the editor's setting doesn't allow them, so it can't be
 /// compiled again; the map's script stays as it is (never stripped). Nothing when editable.
 std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool allowObjectVariables);

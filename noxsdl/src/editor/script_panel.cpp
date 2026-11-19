@@ -812,6 +812,10 @@ bool ScriptPanel::compileIntoMap()
         ed_.status(NOX_TR("editor.script.status.no_source", "No script source to compile"));
         return false;
     }
+    if (const std::string* why = readOnlyReason(); why && readOnlyTricks_) {
+        ed_.status(*why); // (the map's script stays as it is)
+        return false;
+    }
     if (readOnlyReason()) {
         // (The map's script stays as it is: its object variables are never stripped.)
         ed_.status(NOX_TR("editor.script.status.object_vars_refused",
@@ -860,6 +864,7 @@ const std::string* ScriptPanel::readOnlyReason()
         readOnlyRev_ = rev;
         readOnlyAllow_ = allow;
         readOnly_ = me::scriptReadOnlyReason(ed_.doc_, allow);
+        readOnlyTricks_ = readOnly_ && me::documentMemoryTricks(ed_.doc_).has_value();
     }
     return readOnly_ ? &*readOnly_ : nullptr;
 }
@@ -876,6 +881,9 @@ void ScriptPanel::noxCoreBanner(const std::string* readOnly)
                                                 "and a map with them needs a NoX Core server. They are off in Editor Settings, so the compiler "
                                                 "refuses them (see Problems)."));
     ImGui::PopStyleColor();
+    if (readOnly && readOnlyTricks_) {
+        return; // (no setting lets NoX Core run it)
+    }
     if (ImGui::Button(NOX_TRI("editor.script.allow_noxcore", "Allow NoX Core-only script features"))) {
         ed_.settings_.allowNoxCoreScript = true;
         ed_.saveSettings();
@@ -1491,7 +1499,9 @@ bool ScriptPanel::functionPicker(const char* label, std::string& function)
                            !sc::findBuiltin(name);
         ImGui::BeginDisabled(!valid);
         if (ImGui::Button(NOX_TRI("editor.script.fn.create", "Create")) || (enter && valid)) {
-            if (readOnlyReason()) {
+            if (const std::string* why = readOnlyReason(); why && readOnlyTricks_) {
+                ed_.status(*why);
+            } else if (why) {
                 ed_.status(NOX_TR("editor.script.status.read_only", "The script is read-only: it uses object variables, which Editor Settings doesn't allow"));
             } else {
                 bool have = good_ && good_->function(name);

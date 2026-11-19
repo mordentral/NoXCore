@@ -373,6 +373,16 @@ void Menus::tooOldNotice()
     dialog(gui_.text("Noxworld.c:Notification"), NOX_TR("menus.dialog.client_too_old", "Your NoX Core is too out of date for this game."), 0x21, {});
 }
 
+void Menus::memoryTricksNotice(const std::string& map)
+{
+    // (The server's own words, script::memoryTricksNotice, are English: it tells stock clients too.)
+    dialog(gui_.text("Noxworld.c:Notification"),
+           nox::l10n::format(NOX_TR("script.memory_tricks",
+                                    "{map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it."),
+                             {{"map", map}}),
+           0x21, {});
+}
+
 void Menus::enable(gui::Window* top, std::int32_t id, bool on)
 {
     if (gui::Window* w = top ? top->find(id) : nullptr) {

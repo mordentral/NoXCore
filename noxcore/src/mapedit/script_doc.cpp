@@ -438,8 +438,26 @@ void markNoxCoreNeeds(Sidecar& side, const MapDocument& doc)
     }
 }
 
+std::optional<std::uint32_t> documentMemoryTricks(const MapDocument& doc)
+{
+    if (doc.script.code.empty()) {
+        return std::nullopt;
+    }
+    try {
+        return script::memoryTrickBuiltin(script::ScriptFile::parse(doc.script.code));
+    } catch (const std::exception&) {
+        return std::nullopt; // (the validator says it can't be parsed)
+    }
+}
+
 std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool allowObjectVariables)
 {
+    if (const auto trick = documentMemoryTricks(doc)) {
+        return l10n::format(NOX_TR("editor.script.read_only_memory_tricks",
+                                   "This map's script uses memory tricks of the original game that NoX Core does not run (it calls builtin "
+                                   "{id}). The source is shown read-only and the map's script is kept as it is."),
+                            {{"id", *trick}});
+    }
     if (allowObjectVariables || !documentNeedsNoxCore(doc)) {
         return std::nullopt;
     }

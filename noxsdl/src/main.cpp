@@ -73,6 +73,7 @@
 #include "noxcore/modes/builtin.hpp"
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/modes/script/script_ui.hpp"
+#include "noxcore/server/game_host.hpp"
 #include "noxcore/server/solo.hpp"
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/object_class.hpp"
@@ -456,6 +457,10 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
                     startXwisPost(*app, *app->menus->hostLogin());
                 }
                 SDL_Log("%s", hostListingLog(menusHostListing(*app, hostGame), "hosting", app->host->port()).c_str());
+            } catch (const nox::server::MapRefused& ex) {
+                SDL_Log("hosting failed: %s", ex.what());
+                app->menus->memoryTricksNotice(ex.map); // (noxcpp: told why, not only logged)
+                return;
             } catch (const std::exception& ex) {
                 SDL_Log("hosting failed: %s", ex.what());
                 return;
@@ -511,6 +516,9 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         } catch (const std::exception& ex) {
             SDL_Log("solo: %s", ex.what());
             app->menus->showMainMenu();
+            if (const auto* refused = dynamic_cast<const nox::server::MapRefused*>(&ex)) {
+                app->menus->memoryTricksNotice(refused->map); // (noxcpp: told why instead of a hang)
+            }
             return;
         }
         app->soloFromMenus = true;
@@ -566,6 +574,9 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
             SDL_Log("%s: %s", how.logTag.c_str(), ex.what());
             endSoloScreensHost(*app);
             app->menus->showGameBrowser();
+            if (const auto* refused = dynamic_cast<const nox::server::MapRefused*>(&ex)) {
+                app->menus->memoryTricksNotice(refused->map);
+            }
             return;
         }
         // (Its end back to the game list it was hosted from, as the other hosted modes'.)

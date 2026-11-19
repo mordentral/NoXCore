@@ -8,6 +8,7 @@
 #include "noxcore/mapedit/object_edit.hpp"
 #include "noxcore/mapedit/writer.hpp"
 #include "noxcore/script/compiler.hpp"
+#include "noxcore/script/opcodes.hpp"
 #include "noxcore/script/script_file.hpp"
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
@@ -319,6 +320,12 @@ private:
         if (!listed(map::ScriptObject::kName) || d_.script.code.empty()) return;
         try {
             const auto file = script::ScriptFile::parse(d_.script.code);
+            if (const auto trick = script::memoryTrickBuiltin(file)) {
+                warn(std::string(map::ScriptObject::kName),
+                     format(say(NOX_TRK("editor.validate.script_memory_tricks",
+                                        "NoX Core doesn't run this map: its script uses memory tricks of the original game (it calls builtin {id})")),
+                            {{"id", *trick}}));
+            }
             if (script::usesObjectVariables(file)) {
                 warn(std::string(map::ScriptObject::kName),
                      say(NOX_TRK("editor.validate.script_object_vars",

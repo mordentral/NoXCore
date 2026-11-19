@@ -39,6 +39,7 @@
 #include <optional>
 #include <set>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -215,6 +216,14 @@ struct HostedPlayer {
         std::uint32_t since = 0; ///< the frame it began, or the tell queued (a stop: kSecondaryTellFrames)
     };
     SecondaryTell secondaryTell;
+};
+
+/// A map the host won't load: its script uses memory tricks of the original game that NoX Core
+/// does not run (script::memoryTrickBuiltin). what() is script::memoryTricksNotice's text.
+struct MapRefused : std::runtime_error {
+    MapRefused(std::string mapName, std::uint32_t id);
+    std::string map;          ///< the map's name (its file's, less ".map")
+    std::uint32_t builtin = 0; ///< the builtin id that gave it away
 };
 
 // The hosted game. The owner feeds it datagrams (receive) and the time (tick) and sends what
@@ -492,6 +501,9 @@ public:
         std::uint32_t modes = 0;
         int minPlayers = 2;
         int maxPlayers = 16;
+        /// Its script uses memory tricks of the original game (the builtin that gave it away): never
+        /// listed, voted on or cycled to (MapRefused).
+        std::optional<std::uint32_t> memoryTricks;
     };
     /// What the window edits: the game's name, the mode chosen, the map and that mode's limits.
     struct ServerSettings {

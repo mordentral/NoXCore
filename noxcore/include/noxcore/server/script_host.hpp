@@ -76,6 +76,8 @@ BuiltinArity builtinArity(std::uint32_t id);
 /// log (a dedicated server's stderr, noxsdl's SDL_Log). None set: they're only kept in each host. Set it
 /// once at start-up, before any server runs.
 void setScriptLog(std::function<void(const std::string&)> sink);
+/// A line to that log (a map refused for its script: GameHost).
+void scriptLog(const std::string& line);
 
 class ScriptHost : public script::Host {
     /// (host_links.hpp: its timers' links, the map's.)
@@ -83,9 +85,13 @@ class ScriptHost : public script::Host {
     friend struct Links;
 
 public:
+    /// A script that relies on the original game's memory tricks (script::memoryTrickBuiltin) isn't
+    /// started: the host runs none in its place, and says so in notices() with the builtin's id.
     ScriptHost(World& world, const things::ThingDb& things, const script::ScriptFile& file, std::uint32_t seed = 1);
 
     script::Vm& vm() noexcept { return vm_; }
+    /// The builtin that kept the map's script from starting (its memory tricks), if one did.
+    std::optional<std::uint32_t> refusedBuiltin() const noexcept { return refused_; }
 
     /// scriptRunFirst (map load): globals 0-3 are -2, -1, 1, 0 (the language's
     /// trigger, self, true and false), then GLOBAL (function 1) runs its initialisers.
@@ -288,6 +294,7 @@ private:
 
     World& world_;
     const things::ThingDb& things_;
+    std::optional<std::uint32_t> refused_; ///< (before vm_: it picks the file vm_ runs)
     script::Vm vm_;
     std::uint32_t frame_ = 0;
     std::list<ScriptTimer> timers_;

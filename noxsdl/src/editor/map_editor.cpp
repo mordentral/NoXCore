@@ -19,6 +19,7 @@
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/mapedit/writer.hpp"
 #include "noxcore/mapedit/op_label.hpp"
+#include "noxcore/mapedit/script_doc.hpp"
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/text.hpp"
@@ -269,6 +270,12 @@ bool MapEditor::open(const fs::path& path)
                   : saveNeedsName() ? NOX_TR("editor.status.opened_rename", "Opened {path} (its name doesn't fit the game's 8 characters: Save asks for a new one)")
                                     : NOX_TR("editor.status.opened", "Opened {path}"),
                   {{"path", pathText(path)}}));
+    if (me::documentMemoryTricks(doc_)) {
+        // (noxcpp's) Said at once; the Script panel keeps its source read-only (scriptReadOnlyReason).
+        errorText_ = format(NOX_TR("script.memory_tricks",
+                                   "{map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it."),
+                            {{"map", path.stem().string()}});
+    }
     return true;
 }
 

@@ -161,4 +161,15 @@ std::string disassemble(const ScriptFile& file, std::size_t function);
 /// or code cut short.
 std::optional<std::string> check(const ScriptFile& file, std::size_t function);
 
+/// The first builtin id a script calls that is neither the game's (0-210) nor in NoX Core's range
+/// (kNoxBuiltinFirst to kNoxBuiltinEnd), if any: a script made for the original game's memory
+/// tricks (an id far past the table to run its own code, extra builtins to read and write raw
+/// memory). NoX Core never runs such a script: it would hang or run on garbage here, as nothing is
+/// popped for such an id. One walk of the code, made once at a map's load.
+std::optional<std::uint32_t> memoryTrickBuiltin(const ScriptFile& file);
+inline bool usesMemoryTricks(const ScriptFile& file) { return memoryTrickBuiltin(file).has_value(); }
+/// The refusal's words for map `map` (English: the server sends them to stock clients too; noxsdl
+/// shows its own translation, "script.memory_tricks").
+std::string memoryTricksNotice(std::string_view map);
+
 } // namespace nox::script

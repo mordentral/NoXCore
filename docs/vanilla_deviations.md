@@ -2110,6 +2110,28 @@ The engine's logic is the exe's; these are where the output differs.
   crashes there instead, so there is no faithful behaviour to restore); leave the compiler option
   off.
 
+### VD-78: Scripts built on the original game's memory tricks are refused, clearly
+
+- **Vanilla:** the interpreter never range-checks a CallBuiltin's id. Some community maps use that:
+  a call of an id far past the table (973229) jumps into the interpreter's own stack and runs the
+  map's machine code, which installs extra builtins (211-218) that read and write raw memory. The
+  original game runs them.
+- **Ours:** NoX Core never runs map-supplied machine code or raw memory access. Until now such a
+  map hung or half-ran (an unknown id pops nothing, the stack drifts, a loop spins till the step
+  budget). Now a script calling any builtin id from 211 up outside NoX Core's own range
+  (1024-2047) is refused (`script::memoryTrickBuiltin`, one walk of the code at load):
+  - a game host (GameHost) never loads such a map: as its first map it throws `MapRefused` (noxsdl
+    shows the notice); picked (Server Settings' Go, the console's load, a vote) or reached by an
+    exit, the game stays on its map, loaded again as for a map that can't be read (a solo game's
+    from the copy its exit just saved), and everyone is told; such maps are left out of the Server
+    Settings' list, the map vote and the map cycle;
+  - the server's script host never starts such a script (any other load: a bare Server);
+  - the map editor shows it read-only, whatever its settings, and its validator warns.
+
+  The words: "<Map> uses memory tricks of the original game that NoX Core does not run. Look for a
+  NoX Core version of it." No stock map calls such an id.
+- **Revert:** none wanted (the owner's decision: NoX Core never runs these scripts).
+
 ### VD-33: A host's goodbye and a client's leave wait in the background
 
 - **Vanilla:** a host quitting with other players sends them MSG_SERVER_QUIT and sits in a modal

@@ -232,6 +232,8 @@ private:
     std::optional<std::string> readOnly_;
     std::optional<std::uint64_t> readOnlyRev_; ///< the history revision it was worked out at
     bool readOnlyAllow_ = false;
+    /// The reason is the script's memory tricks (me::documentMemoryTricks): no setting changes it.
+    bool readOnlyTricks_ = false;
     std::uint64_t compileDueMs_ = 0;
     // Find.
     bool findOpen_ = false, findFocus_ = false, findCase_ = false;

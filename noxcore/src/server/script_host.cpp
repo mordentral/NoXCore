@@ -137,12 +137,24 @@ BuiltinArity builtinArity(std::uint32_t id)
     return id < kSignatures.size() ? BuiltinArity{kSignatures[id].args, kSignatures[id].returns} : BuiltinArity{};
 }
 
+namespace {
+const script::ScriptFile kNoScript{}; // (what a refused map's host runs: nothing)
+} // namespace
+
 ScriptHost::ScriptHost(World& world, const things::ThingDb& things, const script::ScriptFile& file, std::uint32_t seed)
     : world_(world)
     , things_(things)
-    , vm_(file, *this)
+    , refused_(script::memoryTrickBuiltin(file))
+    , vm_(refused_ ? kNoScript : file, *this)
     , rng_(seed)
 {
+    if (refused_) {
+        // (A map host's GameHost refuses such a map before it loads; this keeps any other load,
+        // a bare Server's, from running it.)
+        notice("memory tricks", "its script calls builtin " + std::to_string(*refused_) +
+                                    " (past the game's 211 and outside NoX Core's own range): it uses memory tricks of the original game "
+                                    "that NoX Core does not run, so its script isn't started");
+    }
 }
 
 void ScriptHost::setLanguageGlobals()
@@ -213,6 +225,14 @@ void setScriptLog(std::function<void(const std::string&)> sink)
 {
     const std::lock_guard lock(g_scriptLogMutex);
     g_scriptLog = std::move(sink);
+}
+
+void scriptLog(const std::string& line)
+{
+    const std::lock_guard lock(g_scriptLogMutex);
+    if (g_scriptLog) {
+        g_scriptLog(line);
+    }
 }
 
 void ScriptHost::logStop(std::uint32_t function)

@@ -13,6 +13,8 @@
 #include "noxcore/net/framing.hpp"
 #include "noxcore/net/player_input.hpp"
 #include "noxcore/player/player_file.hpp"
+#include "noxcore/script/opcodes.hpp"
+#include "noxcore/script/script_file.hpp"
 #include "noxcore/server/collide.hpp"
 #include "noxcore/server/dialog.hpp"
 #include "noxcore/server/enchant.hpp"
@@ -27,6 +29,7 @@
 #include "noxcore/server/player_save.hpp"
 #include "noxcore/server/profile.hpp"
 #include "noxcore/server/quest.hpp"
+#include "noxcore/server/script_host.hpp"
 #include "noxcore/server/solo_save.hpp"
 #include "noxcore/server/teleport.hpp"
 #include "noxcore/server/trade.hpp"
@@ -101,6 +104,27 @@ std::vector<std::uint8_t> heightReport(const ServerObject& o)
             static_cast<std::uint8_t>(static_cast<int>(below ? -o.z : o.z))};
 }
 
+/// The builtin that makes `file`'s script one NoX Core refuses (script::memoryTrickBuiltin), if
+/// any. (A script that doesn't parse: none here; the load says so as ever.)
+std::optional<std::uint32_t> memoryTricksOf(const map::MapFile& file)
+{
+    if (!file.find(map::ScriptObject::kName)) {
+        return std::nullopt;
+    }
+    try {
+        return script::memoryTrickBuiltin(script::ScriptFile::parse(map::decodeSection<map::ScriptObject>(file).code));
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+/// The log's line for a refused map.
+void logRefusedMap(const std::string& map, std::uint32_t id, std::string_view what)
+{
+    scriptLog("script: map " + map + ": refused (" + std::string(what) + "): its script calls builtin " + std::to_string(id) +
+              ", past the game's 211 and outside NoX Core's own range: memory tricks of the original game that NoX Core does not run");
+}
+
 /// A game's numbers come from the install's gamedata.bin alone (nothing is built in), so a host
 /// made without it is the calling program's mistake: noxsdl and the dedicated servers load
 /// the file at start-up, as they load thing.bin.
@@ -122,6 +146,13 @@ bool withinReach(const ServerObject& unit, const ServerObject& thing)
     return dx * dx + dy * dy <= kReach * kReach;
 }
 } // namespace
+
+MapRefused::MapRefused(std::string mapName, std::uint32_t id)
+    : std::runtime_error(script::memoryTricksNotice(mapName))
+    , map(std::move(mapName))
+    , builtin(id)
+{
+}
 
 // Builds the server and loads the first map, then sets up the settings records, the rules, the
 // map's copy for downloads and the lobby's checks.
@@ -193,6 +224,12 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
         });
     }
     const auto file = map::loadMapFile(mapPath);
+    if (const auto trick = memoryTricksOf(file)) {
+        // (noxcpp's) A script made for the original game's memory tricks: no game on it (the
+        // caller shows what() to whoever hosted it).
+        logRefusedMap(mapPath.stem().string(), *trick, "the game's first map");
+        throw MapRefused(mapPath.stem().string(), *trick);
+    }
     mapPath_ = mapPath;
     mapFile_ = mapPath.filename().string();
     mapCrc_ = file.crc;
@@ -3260,6 +3297,10 @@ std::uint32_t GameHost::mapModesOf(const std::string& name)
         if (fs::exists(resolveNoCase(path))) { // (in any case: maps/Fortress/fortress.map)
             const auto file = map::loadMapFile(path);
             modes = file.find(map::MapInfo::kName) ? mapToGameFlags(map::decodeSection<map::MapInfo>(file).gameFlags) : 0;
+            if (const auto trick = modes != 0 ? memoryTricksOf(file) : std::nullopt) {
+                logRefusedMap(name, *trick, "left out of the map cycle");
+                modes = 0; // (noxcpp's: never cycled to)
+            }
         }
     } catch (const std::exception&) {
         modes = 0;
@@ -3297,7 +3338,7 @@ std::vector<GameHost::MapChoice> GameHost::mapChoices()
     std::vector<MapChoice> out;
     for (const auto& name : names) {
         if (const auto it = mapChoices_.find(name); it != mapChoices_.end()) {
-            if (it->second.modes != 0) {
+            if (it->second.modes != 0 && !it->second.memoryTricks) {
                 out.push_back(it->second);
             }
             continue;
@@ -3315,6 +3356,10 @@ std::vector<GameHost::MapChoice> GameHost::mapChoices()
                         c.modes = mapToGameFlags(info.gameFlags);
                         c.minPlayers = info.minPlayers;
                         c.maxPlayers = info.maxPlayers;
+                        // (noxcpp's) Marked from this one read of it, never listed or voted on.
+                        if ((c.memoryTricks = memoryTricksOf(file))) {
+                            logRefusedMap(name, *c.memoryTricks, "left out of the map list and the map vote");
+                        }
                     }
                 }
             }
@@ -3322,7 +3367,7 @@ std::vector<GameHost::MapChoice> GameHost::mapChoices()
             c.modes = 0;
         }
         mapChoices_[name] = c;
-        if (c.modes != 0) {
+        if (c.modes != 0 && !c.memoryTricks) {
             out.push_back(c);
         }
     }
@@ -3970,6 +4015,31 @@ void GameHost::loadNextMap()
         next = mapPath_;
         file = map::loadMapFile(next);
     }
+    // (noxcpp's) A map whose script uses the original game's memory tricks isn't loaded: the game
+    // stays on the map it's on, loaded again as for a map that can't be read (a solo game's from the
+    // copy its exit just saved: the player at the exit's way out), and everyone is told why. (The
+    // map it's on was checked as it loaded.)
+    bool refused = false;
+    if (next != mapPath_) {
+        if (const auto trick = memoryTricksOf(file)) {
+            const std::string name = next.stem().string();
+            logRefusedMap(name, *trick, "not loaded; the game stays on " + mapPath_.stem().string());
+            announce(strings::fromUtf8(script::memoryTricksNotice(name)));
+            refused = true;
+            next = mapPath_;
+            file = map::loadMapFile(next);
+            waypoint.clear();
+            World& world = server_.world();
+            if (exitTo && !options_.saveDir.empty()) {
+                if (const auto copy = savedMapCopy(options_.saveDir, mapPath_.filename().string())) {
+                    world.switchToSolo = true;
+                    world.noMultiplayer = true;
+                    world.soloPath = copy->string();
+                    refused = false; // (that copy is what loads)
+                }
+            }
+        }
+    }
     mapPath_ = next;
     mapFile_ = next.filename().string();
     mapCrc_ = file.crc;
@@ -3979,7 +4049,7 @@ void GameHost::loadNextMap()
     // Map_SetCrc of the file read). The clients are told the map's name with that CRC; a solo
     // game's one client is the host's own, which reads the copy too (gameChangeMap
     // while gameIsNotMultiplayer: HeadlessClient::setSoloMap).
-    if (exitTo && server_.world().switchToSolo && !server_.world().soloPath.empty()) {
+    if (exitTo && !refused && server_.world().switchToSolo && !server_.world().soloPath.empty()) {
         file = map::loadMapFile(fs::path(server_.world().soloPath));
         mapCrc_ = file.crc;
     }

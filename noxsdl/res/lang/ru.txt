@@ -6532,6 +6532,8 @@ editor.script.problems.tests_start = тесты: запуск карты
 editor.script.problems.warning = Предупреждение
 #@ 91dad0f8 mt: Where
 editor.script.problems.where = Где
+#@ 089487d7 mt: This map's script uses memory tricks of the original game that NoX Core does not run (it calls builtin {id}). The source is shown read-only and the map's script is kept as it is.
+editor.script.read_only_memory_tricks = Скрипт этой карты использует трюки с памятью оригинальной игры, которые NoX Core не выполняет (он вызывает встроенную функцию {id}). Исходный код показан только для чтения, а скрипт карты сохраняется как есть.
 #@ 4793750e mt: This map's script uses object variables, a NoX Core-only feature: the original game crashes on them, and the map needs a NoX Core server. They are off in Editor Settings, so the source is shown read-only and the map's script is kept as it is. Turn on "Allow NoX Core-only script features (object variables)" to edit and compile it.
 editor.script.read_only_object_vars = Скрипт этой карты использует переменные объектов — возможность только NoX Core: оригинальная игра на них падает, и карте нужен сервер NoX Core. В «Настройках редактора» они выключены, поэтому исходный код показан только для чтения, а скрипт карты сохраняется как есть. Включите «Разрешить возможности скриптов только для NoX Core (переменные объектов)», чтобы править и компилировать его.
 #@ 471deba9 mt: Builtins
@@ -7960,6 +7962,8 @@ editor.validate.polygon_corner = угол {id} — не точка
 editor.validate.quest_picture = картинка вступления квеста длиннее 31 байта
 #@ a8b3e88b mt: the quest intro's title is longer than 31 bytes
 editor.validate.quest_title = заголовок вступления квеста длиннее 31 байта
+#@ c6acc588 mt: NoX Core doesn't run this map: its script uses memory tricks of the original game (it calls builtin {id})
+editor.validate.script_memory_tricks = NoX Core не запускает эту карту: ее скрипт использует трюки с памятью оригинальной игры (он вызывает встроенную функцию {id})
 #@ 122a92af mt: this map needs a NoX Core server: its script uses object variables, a NoX Core-only feature the original game crashes on (OB-210)
 editor.validate.script_object_vars = этой карте нужен сервер NoX Core: ее скрипт использует переменные объектов — возможность только NoX Core, на которой оригинальная игра падает (OB-210)
 #@ 435e8ca5 mt: the game can't parse it: {error}
@@ -8854,6 +8858,9 @@ options.weather.off = Выкл.
 options.weather.on = Вкл.
 #@ 8dc6c6d9 mt: Reduced
 options.weather.reduced = Ослаблено
+
+#@ db79a3a6 mt: {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
+script.memory_tricks = {map} использует трюки с памятью оригинальной игры, которые NoX Core не выполняет. Поищите версию этой карты для NoX Core.
 
 #@ 5d1d1713 mt: All Leave
 server.bots.all_leave = Все уходят
