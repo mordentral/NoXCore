@@ -21,6 +21,7 @@
 #include "noxcore/server/world.hpp"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -40,10 +41,14 @@ void storyPic(ServerObject& npc, std::string_view picture);
 /// +0x62, the portrait at +0x66 ("ShopKeeperPic" for none), the type at +0x86. The strings are
 /// copied as the game copies it, unbounded: a long text id runs on under what's written after it, a
 /// portrait of 32 letters or more over the type (an original bug, kept).
-std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId);
+/// (noxcpp: `name`, a script mode's nox.tellStory's speaker, in place of the NPC's string-table
+/// name; null: the NPC's, as TellStory has it.)
+std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId,
+                                           const std::u16string* name = nullptr);
 /// SrvNet_OpenNpcDialog (TellStory): a player talks to `npc` (DialogWith), sent MSG_DIALOG 3 and
-/// frozen (monsters.hpp's freezeUnit, lock 0).
-void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::uint32_t sound, std::string_view textId);
+/// frozen (monsters.hpp's freezeUnit, lock 0). (`name` as npcDialogMessage's.)
+void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::uint32_t sound, std::string_view textId,
+                   const std::u16string* name = nullptr);
 /// SrvNet_OnDialogStart (MSG_DIALOG 1, StartDialog): a player not dead nor gone, a monster with
 /// xStatus 0x10 and both functions: its start function runs (caller the player, trigger the NPC).
 void dialogStart(Fight& fight, ServerObject& player, ServerObject& npc);

@@ -10,6 +10,9 @@
 //          [version 4: then u16 its client level (kClientLevel); the hash 0 when none]
 //          [version 5: then u64 a host's client key realm, 32 bytes: the client's secret for it
 //           (ClientSecret: only to a host whose reply named that realm)]
+//          [version 7: then u8 n, n bytes: the client's UI language ("en", "ru", "ko": lower-case
+//           letters, kMaxLanguageBytes at most), after version 5's tail (its realm 0 and 32 zeros
+//           when it has no secret); version 6 is the reply's alone]
 //   reply  00 00 F0 "NXSV" u16 version, u32 token,         (noxcpp server -> browser)
 //          u8 max substeps a frame (1-4: 30-120 Hz), u32 feature bits
 //          [version 3: then u64 the host's added object types' hash, u8 n, n bytes: the ids
@@ -94,6 +97,10 @@ inline constexpr std::uint16_t kExtendedRealmVersion = 5;
 inline constexpr std::uint16_t kExtendedModeNameVersion = 6;
 /// The most of a mode's name a reply carries (bytes of UTF-8).
 inline constexpr std::size_t kModeNameBytes = 64;
+/// The version whose tail carries the client's language (the query only).
+inline constexpr std::uint16_t kExtendedLanguageVersion = 7;
+/// The most of a language's code a query carries ("en", "pt-br").
+inline constexpr std::size_t kMaxLanguageBytes = 16;
 
 /// A NoX Core client's secret for one host realm (a mode's "clientKeys"): random, made by the client
 /// the first time it meets the realm and kept in its own folder; the host keeps only a key made
@@ -168,7 +175,13 @@ struct ClientSecret {
 ///      bound it to the last), and an edit session carries the script as plain text, so an edit
 ///      session's host (setUpEditSession) lets in no NoX Core client below 13; every other game
 ///      as before. (A client of 13 can tell an older host by the reply's clientLevel.)
-inline constexpr std::uint16_t kClientLevel = 13;
+///  14  the client's UI language in its query (version 7's tail: the server's
+///      ServerTransport::clientLanguage, a script mode's nox.player(peer).language), and a script
+///      mode's text overlay (nox.setText: MSG_NOXCPP_MODEUI's kTextSet and kTextClear, texts the
+///      client's string lookups find before nox.csf's, each in that client's language), sent only to
+///      a client of level 14 or above that named ModeUi (ui_proto.hpp's kTextsLevel); any other is
+///      sent nothing and keeps its own nox.csf's texts
+inline constexpr std::uint16_t kClientLevel = 14;
 /// The client level whose script calls bind in source order: an edit session's lowest (kClientLevel's
 /// list, 13).
 inline constexpr std::uint16_t kSourceOrderCallsLevel = 13;
@@ -207,9 +220,17 @@ inline bool unicodeTextWith(const ExtendedServer& host) noexcept
 
 /// The query; with client features, version 2's (none: version 1's, as before); with an added
 /// object types' hash, version 3's; with a client level above 0, version 4's; with a secret,
-/// version 5's.
+/// version 5's; with a language (kept to kMaxLanguageBytes; one that isn't a language's code,
+/// languageCode's: none), version 7's.
 std::vector<std::uint8_t> encodeExtendedQuery(std::uint32_t token, std::uint32_t clientFeatures = 0, std::uint64_t typesHash = 0,
-                                              std::uint16_t clientLevel = 0, const std::optional<ClientSecret>& secret = std::nullopt);
+                                              std::uint16_t clientLevel = 0, const std::optional<ClientSecret>& secret = std::nullopt,
+                                              std::string_view language = {});
+/// `text` as a language's code: 1 to kMaxLanguageBytes of a-z, 0-9 and '-' (A-Z made small, '_'
+/// a '-'), a letter first; empty when it isn't one.
+std::string languageCode(std::string_view text);
+/// The language a query names (version 7's, languageCode's; "" in an older one, or one whose
+/// bytes aren't a code), if `datagram` is one: nullopt too for a version 7 one too short for it.
+std::optional<std::string> extendedQueryLanguage(std::span<const std::uint8_t> datagram);
 /// The secret a query carries (version 5's), if `datagram` is one with it (nullopt: none, too
 /// short, or realm 0).
 std::optional<ClientSecret> extendedQuerySecret(std::span<const std::uint8_t> datagram);

@@ -25,12 +25,14 @@
 #include "noxcore/util/text.hpp"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -112,7 +114,39 @@ public:
     /// nothing.
     void decodeLegacy(LegacyText text);
 
+    // ---- the text overlay (a script mode's nox.setText: ui_proto.hpp's kTextSet and kTextClear)
+    //
+    // Texts set over the file's by label, which find() and text() give before the file's own (one
+    // variant, the text as given). The file's entries are untouched and entries() never lists them.
+    // The overlay is the thread's that sets it: only that thread's lookups see it (a listen host's
+    // server shares the client's table from its own thread, and keeps reading the file's texts, as
+    // a separate server would). A copy of the table carries no overlay.
+
+    /// `label`'s text over the file's (a label already set: replaced).
+    void setOverlay(std::string_view label, std::u16string text);
+    /// The overlay's texts whose labels start with `prefix` (without case) gone; "" every one.
+    void clearOverlay(std::string_view prefix = {});
+    /// How many overlay texts the calling thread sees.
+    std::size_t overlaySize() const;
+
 private:
+    /// The overlay (above); copied as none.
+    struct Overlay {
+        std::unordered_map<std::string, StringEntry, util::NoCaseHash, util::NoCaseEqual> entries;
+        std::atomic<std::thread::id> thread; ///< the thread that set it
+        std::atomic<bool> on = false;        ///< it has entries (the thread written before it)
+        Overlay() = default;
+        Overlay(const Overlay&) noexcept {}
+        Overlay& operator=(const Overlay&) noexcept
+        {
+            entries.clear();
+            on.store(false);
+            return *this;
+        }
+        /// The entries, when the calling thread's (else null).
+        const StringEntry* find(std::string_view label) const;
+    };
+    Overlay overlay_;
     std::uint32_t version_ = 0;
     std::uint32_t language_ = 0;
     bool tagsSwapped_ = false;

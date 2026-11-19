@@ -188,6 +188,10 @@ namespace nox::things {
 struct ThingDb;
 }
 
+namespace nox::strings {
+class StringTable;
+}
+
 namespace nox::modes::script {
 
 struct UiColor {
@@ -421,6 +425,12 @@ public:
 
     /// How wide the program draws `text` (in the 640 x 480 units); unset: 6 a letter.
     void setTextWidth(std::function<int(std::string_view)> measure);
+    /// (Client level 14) The table the server's text overlay goes over (ui_proto.hpp's kTextSet and
+    /// kTextClear: nox.setText; StringTable::setOverlay, from the thread that runs the client): the
+    /// program's nox.csf, whose lookups then find the mode's texts first. Null: kept nowhere. A
+    /// table let go (another, or null) has its overlay cleared; the program sets null before its
+    /// table or this game goes.
+    void setStrings(strings::StringTable* table);
     /// Once a frame: the draw scales looked after (drawScales; a UI running or not), then (API 4)
     /// ui.tick, what the server sent handed to the UI, and each window drawn (windows()).
     void frame(std::uint64_t nowMs);

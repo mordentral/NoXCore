@@ -257,6 +257,13 @@ void ServerTransport::lobby(const Endpoint& from, std::span<const std::uint8_t> 
             std::erase_if(identifyingFeatures_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
             std::erase_if(identifyingLevels_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
             std::erase_if(identifyingKeys_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
+            std::erase_if(identifyingLanguages_, [this](const auto& kv) { return !identifying_.contains(kv.first); });
+            // (Its UI language, version 7's: taken at its connect from here, as its level is.)
+            if (std::string language = lobby::extendedQueryLanguage(d).value_or(std::string()); !language.empty()) {
+                identifyingLanguages_[from] = std::move(language);
+            } else {
+                identifyingLanguages_.erase(from);
+            }
             // (A client's secret for this host's realm: its key, taken at its connect from here; a
             // secret for another realm is no key. Only an unconnected address's query reaches here.)
             if (clientKeyRealm_ != 0) {
@@ -522,6 +529,12 @@ void ServerTransport::connect(const Endpoint& from, std::span<const std::uint8_t
             p.clientKey = std::move(k->second);
         }
         identifyingKeys_.erase(k);
+    }
+    if (const auto l = identifyingLanguages_.find(from); l != identifyingLanguages_.end()) {
+        if (p.identified) {
+            p.clientLanguage = std::move(l->second);
+        }
+        identifyingLanguages_.erase(l);
     }
     std::optional<std::uint8_t> ack;
     p.stream.acceptDatagram(d, ack); // the connect is its reliable seq 0: expect 1 next

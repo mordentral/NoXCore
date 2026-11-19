@@ -552,6 +552,9 @@ public:
     /// The client level an identified client named (lobby::kClientLevel: a feature keyed "level N
     /// or above" goes only to one at N or above); 0 for any other.
     std::uint16_t clientLevel(std::uint8_t peer) const { return transport_.clientLevel(peer); }
+    /// The UI language an identified client named (its query's: "en", "ru", "ko"...; client level
+    /// 14); empty for any other.
+    const std::string& clientLanguage(std::uint8_t peer) const { return transport_.clientLanguage(peer); }
     /// (Options::clientKeyRealm) The key `peer`'s client proved for this host's realm: 32 hex
     /// digits, the same for that PC every time; empty for any other.
     const std::string& clientKey(std::uint8_t peer) const { return transport_.clientKey(peer); }

@@ -433,6 +433,12 @@ struct ScriptedMode::Impl {
                 lua_pushlstring(L, key.data(), key.size());
                 lua_setfield(L, -2, "clientKey");
             }
+            {
+                // Its UI language: its client's (client level 14), else the host's (mod_texts.hpp).
+                const std::string language = Texts::languageOf(*host, peer);
+                lua_pushlstring(L, language.data(), language.size());
+                lua_setfield(L, -2, "language");
+            }
             if (const auto it = host->players().find(peer); it != host->players().end() && sees(peer)) {
                 addPlayerFacts(L, it->second, host->server().world().byExtent(it->second.extent)); // (account, class, level...)
             }
@@ -4682,6 +4688,7 @@ void Impl::onLeave(std::uint8_t peer)
     parts.weather.left(peer);
     parts.drawScales.left(peer);
     parts.abilities.left(peer);
+    parts.texts.left(peer);
     if (has.onLeave && begin("onLeave")) {
         pushPlayer(vm->thread(), peer);
         finish("onLeave", 1, 0);
@@ -5222,6 +5229,7 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
         impl.clientReady(peer);
         impl.parts.weather.ready(h, peer); // (its join, or a map's load: its weather again, when the mode has any)
         cameraReady(h, peer);              // (one nox.observe holds: unseen again after the ready's invulnerability)
+        impl.parts.texts.ready(h, peer);   // (nox.setText's set, its first ready: before playerReady's own)
         // A mode's book (configure's bookIsTheMod, World::modeOwnsBook): its NoX Core client told
         // (kBook: a client of level 2 or above that named ModeUi), before the script's playerReady
         // grants. In a quest: not told (a quest's book lists only what was granted anyway).
@@ -5387,6 +5395,7 @@ void ScriptedMode::detach(server::GameHost& host)
         parts.store->unlockAll(parts.storeOwner);
     }
     parts.weather.reset(&host); // (none to every player it was sent to)
+    parts.texts.reset(&host);   // (the overlay cleared on every client that had it)
     parts.drawScales.reset();   // (the things keep theirs; nothing owed is sent)
     parts.leaps.reset(&host.server().world()); // (each unit let go where it is)
     parts.abilities.reset();

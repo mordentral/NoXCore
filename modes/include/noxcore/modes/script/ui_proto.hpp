@@ -84,6 +84,12 @@
 //   kToBars       u8 kind (0 a spell, 1 an ability), u8 its id (a spell 1-136, an ability 1-5)
 //                 (2 bytes; in the first empty slot, only where no slot holds it: no book, no
 //                 sound, no sparks, no slot moved, the set shown unchanged)
+// and, only to a client at client level 14 or above (kTextsLevel) that named ModeUi, a script
+// mode's text overlay (nox.setText, nox.clearText: texts its string lookups find before nox.csf's,
+// each in that client's language; the whole set to a client at its first ready):
+//   kTextSet      str key, u8 flags (kTextMore: the text goes on in the next kTextSet), str text
+//                 (UTF-8; a long one in pieces, one after another)
+//   kTextClear    str prefix (the keys that start with it gone; "": every one)
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -137,6 +143,8 @@ enum Sub : std::uint8_t {
     kSpin = 24,
     kAnim = 25,
     kToBars = 26,
+    kTextSet = 27,
+    kTextClear = 28,
 };
 
 /// The most UI source a server sends, and a client takes (section 10.3's cap).
@@ -688,6 +696,92 @@ inline std::optional<AbilityUse> decodeAbilityUse(std::span<const std::uint8_t> 
     }
     u.release = phase == 1;
     return u;
+}
+
+/// (Client level 14) A script mode's text overlay (nox.setText, nox.clearText): texts the client's
+/// string lookups find before its nox.csf's (strings::StringTable::setOverlay), each already in
+/// that client's language. kTextSet's payload: str the key, u8 flags (kTextMore: the text goes on in
+/// the next kTextSet, of the same key, which comes right after it), str the text's piece (UTF-8, at
+/// most kTextPieceBytes); kTextClear's: str a prefix (the keys starting with it gone; "": every one).
+inline constexpr std::uint16_t kTextsLevel = 14;
+inline constexpr std::size_t kMaxTextKeyBytes = 64;      ///< a key's bytes at most
+inline constexpr std::size_t kMaxTextValueBytes = 4096;  ///< a whole text's bytes at most (a client cuts past it)
+inline constexpr std::size_t kTextPieceBytes = 800;      ///< a kTextSet's piece's bytes at most
+inline constexpr std::uint8_t kTextMore = 1;
+struct TextPiece {
+    std::string key;
+    bool more = false;
+    std::string text; ///< UTF-8
+    bool operator==(const TextPiece&) const = default;
+};
+
+/// The kTextSet messages of one key's text: one, or a piece of up to kTextPieceBytes each (cut
+/// between UTF-8 characters), all but the last kTextMore. The key cut to kMaxTextKeyBytes, the
+/// text to kMaxTextValueBytes (between characters).
+inline std::vector<std::vector<std::uint8_t>> textSetMessages(std::string_view key, std::string_view text)
+{
+    const auto cutAt = [](std::string_view s, std::size_t most) {
+        std::size_t n = std::min(s.size(), most);
+        if (n < s.size()) {
+            while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) {
+                --n;
+            }
+        }
+        return n;
+    };
+    key = key.substr(0, kMaxTextKeyBytes);
+    text = text.substr(0, cutAt(text, kMaxTextValueBytes));
+    std::vector<std::vector<std::uint8_t>> out;
+    do {
+        const std::size_t n = cutAt(text, kTextPieceBytes);
+        const bool more = n < text.size();
+        Writer w;
+        w.str(key);
+        w.u8(more ? kTextMore : 0);
+        w.str(text.substr(0, n));
+        out.push_back(message(kTextSet, w.out));
+        text.remove_prefix(n);
+        if (!more) {
+            break;
+        }
+    } while (true);
+    return out;
+}
+
+/// A kTextSet payload read (bytes past the text left for later versions); none: cut short, or no
+/// key. A key past kMaxTextKeyBytes is cut to it, a piece past kTextPieceBytes too.
+inline std::optional<TextPiece> decodeTextSet(std::span<const std::uint8_t> payload)
+{
+    Reader r{payload};
+    TextPiece t;
+    t.key = r.str();
+    t.more = (r.u8() & kTextMore) != 0;
+    t.text = r.str();
+    if (!r.ok || t.key.empty()) {
+        return std::nullopt;
+    }
+    t.key.resize(std::min(t.key.size(), kMaxTextKeyBytes));
+    t.text.resize(std::min(t.text.size(), kTextPieceBytes));
+    return t;
+}
+
+inline std::vector<std::uint8_t> textClearMessage(std::string_view prefix)
+{
+    Writer w;
+    w.str(prefix.substr(0, kMaxTextKeyBytes));
+    return message(kTextClear, w.out);
+}
+
+/// A kTextClear payload read: its prefix ("" every key); none: cut short.
+inline std::optional<std::string> decodeTextClear(std::span<const std::uint8_t> payload)
+{
+    Reader r{payload};
+    std::string prefix = r.str();
+    if (!r.ok) {
+        return std::nullopt;
+    }
+    prefix.resize(std::min(prefix.size(), kMaxTextKeyBytes));
+    return prefix;
 }
 
 } // namespace nox::modes::script::uimsg

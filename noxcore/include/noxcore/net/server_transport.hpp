@@ -222,6 +222,15 @@ public:
         const auto it = peers_.find(peer);
         return it != peers_.end() && it->second.identified ? it->second.clientKey : kNone;
     }
+    /// The UI language an identified peer's query named (lobby::extendedQueryLanguage: "en", "ru",
+    /// "ko"...; a NoX Core client of client level 14 or above names it); empty: none (a stock
+    /// client, an older one, or not identified).
+    const std::string& clientLanguage(std::uint8_t peer) const
+    {
+        static const std::string kNone;
+        const auto it = peers_.find(peer);
+        return it != peers_.end() && it->second.identified ? it->second.clientLanguage : kNone;
+    }
     /// A peer's unacknowledged reliable packets, all of them (0: no peer).
     std::size_t queuedReliable(std::uint8_t peer) const
     {
@@ -282,6 +291,7 @@ private:
         std::uint32_t clientFeatures = 0; ///< (what that query said it takes: lobby::ClientFeature)
         std::uint16_t clientLevel = 0;    ///< (and its client level: lobby::kClientLevel)
         std::string clientKey;            ///< (and its client key: setClientKeyRealm)
+        std::string clientLanguage;       ///< (and its UI language: clientLanguage)
         Stream stream{0x800};
         std::uint8_t key = 0;
         bool timerStarted = false;
@@ -369,6 +379,7 @@ private:
     std::map<Endpoint, std::uint32_t> identifyingFeatures_; ///< those queries' client features (lobby::ClientFeature), when any
     std::map<Endpoint, std::uint16_t> identifyingLevels_;   ///< and their client levels, when above 0
     std::map<Endpoint, std::string> identifyingKeys_;       ///< and their client keys, when they proved one
+    std::map<Endpoint, std::string> identifyingLanguages_;  ///< and their UI languages, when they named one
     /// Queries' added object types' hashes and client levels, and when (ms), for the join's gates
     /// (kept only by a host with added types or a lowest level): kept apart from identifying_ for
     /// kAskedKeepMs, over a password prompt too, till the connect from there takes it.

@@ -10,6 +10,7 @@
 #include "mod_leap.hpp"
 #include "mod_scheduler.hpp"
 #include "mod_store.hpp"
+#include "mod_texts.hpp"
 #include "mod_weather.hpp"
 
 #include "noxcore/server/game_host.hpp"
@@ -39,6 +40,8 @@ struct Parts {
     Anims anims;
     /// nox.defineAbility's and nox.grantAbility's: each player's strip (by peer).
     ModAbilities abilities;
+    /// nox.setText's overlay: nothing kept or sent till the mode first calls it.
+    Texts texts;
     /// nox.store's (opened at the first call; none while the host keeps no store).
     std::shared_ptr<ModStore> store;
     /// This game's locks' token (nox.store.lock).

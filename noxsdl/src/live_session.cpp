@@ -5,6 +5,7 @@
 #include "noxcore/content/content_pack.hpp"
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/net/transport.hpp"
+#include "noxcore/strings/l10n.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -179,14 +180,15 @@ LiveSession::LiveSession(const std::string& hostAndPort, nox::client::PlayerProf
 std::vector<std::uint8_t> LiveSession::query(std::uint64_t realm)
 {
     // Our script mode UI's features (API 2 with its assets too), our content packs' added object
-    // types, our client level, and our secret for the host's client key realm (made the first time
-    // we meet it: client_keys.hpp).
+    // types, our client level, our secret for the host's client key realm (made the first time
+    // we meet it: client_keys.hpp), and our UI language (a script mode's texts come in it).
     const auto secret = keyring_.secretFor(realm);
     if (secret) {
         keyedRealm_ = realm;
     }
     return nox::lobby::encodeExtendedQuery(nowMs(), nox::lobby::ClientFeature::ModeUi | nox::lobby::ClientFeature::ModeUi2,
-                                           nox::content::newThingTypes().hash, nox::lobby::kClientLevel, secret);
+                                           nox::content::newThingTypes().hash, nox::lobby::kClientLevel, secret,
+                                           nox::l10n::language());
 }
 
 void LiveSession::update()

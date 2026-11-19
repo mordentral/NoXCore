@@ -3,7 +3,8 @@
 -- editor's Luau diagnostics and its Mod Reference panel. Each function: one "--- " doc line, then
 -- its declaration on one line.
 
-type NoxPlayer = { peer: number, name: string, unit: number, identified: boolean, clientKey: string?, account: string?, class: string?, level: number?, experience: number? }
+-- language: its client's UI language ("en", "ru", "ko"...: a NoX Core client of level 14), else the host's own.
+type NoxPlayer = { peer: number, name: string, unit: number, identified: boolean, clientKey: string?, language: string, account: string?, class: string?, level: number?, experience: number? }
 type NoxItemSpec = { effectiveness: string?, material: string?, primary: string?, secondary: string?, durability: number?, charges: number? }
 type NoxItemFacts = { type: string, effectiveness: string?, material: string?, primary: string?, secondary: string?, durability: number, maxDurability: number, charges: number, maxCharges: number, worn: boolean, holder: number? }
 -- text and identify: desc's and IDENTIFYDESC's words from the string table (none without nox.csf); effects: each effect's number by its function's name.
@@ -50,9 +51,9 @@ declare nox: {
     --- # Players and messages
     --- Writes a line to the host's log.
     log: (text: string) -> (),
-    --- The players in the game now, as { peer, name, unit, identified } tables.
+    --- The players in the game now, as { peer, name, unit, identified, language } tables.
     players: () -> { NoxPlayer },
-    --- One player by its peer as { peer, name, unit, identified }; nil when no such player is in.
+    --- One player by its peer as { peer, name, unit, identified, language }; nil when no such player is in.
     player: (peer: number) -> NoxPlayer?,
     --- A mode option's value as text (mode.json's options, as the host set them); nil when unset.
     option: (key: string) -> string?,
@@ -68,6 +69,13 @@ declare nox: {
     tell: (unit: number, text: string, colour: { [any]: number }?) -> (),
     --- A text line to everyone as the engine broadcasts one (250 characters at most); colour as nox.tell's.
     textToAll: (text: string, colour: { [any]: number }?) -> (),
+    --- # The text overlay
+    --- A string-table key's text ("Journal:<name>", "thing.db:<name>PrettyName", an ability's title, a key of the mode's own), one for everyone or { en = , ru = , ko = ... } each NoX Core client of level 14 gets in its language (English, else the first, for one it hasn't): its journal, story dialogs, item names and descriptions, ability titles and tooltips show it in place of nox.csf's, in order with the game's messages; nil takes it away. Stock and older clients keep nox.csf's. 64 bytes a key, 4096 a text; false when 512 keys or 64 KB are kept already.
+    setText: (key: string, text: (string | { [string]: string })?) -> boolean,
+    --- The overlay's keys starting with prefix (no case) gone, nox.csf's shown again; nil or "": every one.
+    clearText: (prefix: string?) -> (),
+    --- A story dialog as the map's TellStory opens one, from npc (a creature) to a player's unit, its text a key (31 bytes; nox.setText's or nox.csf's), the speaker's name given (nil: the NPC's own); false, nothing told, when the key is nox.setText's and the player's client can't show it (stock, or below level 14: tell it a line instead).
+    tellStory: (unit: number, npc: number, key: string, speaker: string?) -> boolean,
     --- # Views (say, choice, table)
     --- Says a line to one player: a say view to its UI, else a text line.
     say: (peer: number, text: string) -> (),

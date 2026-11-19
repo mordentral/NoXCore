@@ -52,6 +52,7 @@ target_sources(noxmodes PRIVATE
     script/src/mod_records.cpp
     script/src/mod_scheduler.cpp
     script/src/mod_store.cpp
+    script/src/mod_texts.cpp
     script/src/mod_weather.cpp
     script/src/mods.cpp
     script/src/script_data.cpp

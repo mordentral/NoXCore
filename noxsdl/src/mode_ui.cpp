@@ -57,6 +57,11 @@ void bindModeClients(App& app)
         ui->bind(side);
         if (auto* script = dynamic_cast<nox::modes::script::ScriptUiClient*>(side)) {
             app.scriptUi = script; // (its weather, for the drawing: weather.hpp)
+            // (Client level 14: a script mode's texts, nox.setText's, over nox.csf for this game.)
+            if (app.strings) {
+                app.strings->clearOverlay();
+            }
+            script->setStrings(app.strings.get());
         }
     }
 }
@@ -65,6 +70,9 @@ void unbindModeClients(App& app)
 {
     for (auto& [id, ui] : app.modeUis) {
         ui->bind(nullptr);
+    }
+    if (app.scriptUi) {
+        app.scriptUi->setStrings(nullptr); // (the game's texts gone from nox.csf's lookups)
     }
     app.scriptUi = nullptr;
 }

@@ -57,14 +57,17 @@ std::uint64_t get64(std::span<const std::uint8_t> d, std::size_t at)
 } // namespace
 
 std::vector<std::uint8_t> encodeExtendedQuery(std::uint32_t token, std::uint32_t clientFeatures, std::uint64_t typesHash,
-                                              std::uint16_t clientLevel, const std::optional<ClientSecret>& secret)
+                                              std::uint16_t clientLevel, const std::optional<ClientSecret>& secret,
+                                              std::string_view language)
 {
     std::vector<std::uint8_t> out;
-    if (clientFeatures == 0 && typesHash == 0 && clientLevel == 0 && !secret) {
+    const std::string code = languageCode(language);
+    if (clientFeatures == 0 && typesHash == 0 && clientLevel == 0 && !secret && code.empty()) {
         header(out, kQueryMagic, kExtendedVersion, token); // (version 1's, byte for byte)
         return out;
     }
-    const std::uint16_t version = secret             ? kExtendedRealmVersion
+    const std::uint16_t version = !code.empty()      ? kExtendedLanguageVersion
+                                  : secret           ? kExtendedRealmVersion
                                   : clientLevel != 0 ? kExtendedLevelVersion
                                   : typesHash != 0   ? kExtendedTypesVersion
                                                      : 2;
@@ -77,10 +80,53 @@ std::vector<std::uint8_t> encodeExtendedQuery(std::uint32_t token, std::uint32_t
         put16(out, clientLevel);
     }
     if (version >= kExtendedRealmVersion) {
-        put64(out, secret->realm);
-        out.insert(out.end(), secret->secret.begin(), secret->secret.end());
+        // (A version 7 one without a secret: realm 0 and zeros, which name none.)
+        put64(out, secret ? secret->realm : 0);
+        if (secret) {
+            out.insert(out.end(), secret->secret.begin(), secret->secret.end());
+        } else {
+            out.insert(out.end(), kClientSecretBytes, std::uint8_t{0});
+        }
+    }
+    if (version >= kExtendedLanguageVersion) {
+        out.push_back(static_cast<std::uint8_t>(code.size()));
+        out.insert(out.end(), code.begin(), code.end());
     }
     return out;
+}
+
+std::string languageCode(std::string_view text)
+{
+    if (text.empty() || text.size() > kMaxLanguageBytes) {
+        return {};
+    }
+    std::string code;
+    for (const char c0 : text) {
+        char c = c0 >= 'A' && c0 <= 'Z' ? static_cast<char>(c0 - 'A' + 'a') : c0 == '_' ? '-' : c0;
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) {
+            return {};
+        }
+        code += c;
+    }
+    return code.front() >= 'a' && code.front() <= 'z' ? code : std::string();
+}
+
+std::optional<std::string> extendedQueryLanguage(std::span<const std::uint8_t> datagram)
+{
+    std::size_t at = 0;
+    const auto h = readHeader(datagram, kQueryMagic, at);
+    if (!h) {
+        return std::nullopt;
+    }
+    if (h->first < kExtendedLanguageVersion) {
+        return std::string();
+    }
+    at += 4 + 8 + 2 + 8 + kClientSecretBytes;
+    if (datagram.size() < at + 1 || datagram.size() < at + 1 + datagram[at]) {
+        return std::nullopt; // (a version 7 query without its tail: garbled)
+    }
+    const std::size_t n = datagram[at];
+    return languageCode(std::string_view(reinterpret_cast<const char*>(datagram.data() + at + 1), n));
 }
 
 std::optional<ClientSecret> extendedQuerySecret(std::span<const std::uint8_t> datagram)

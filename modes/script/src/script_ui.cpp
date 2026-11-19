@@ -6,6 +6,7 @@
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/modes/script/ui_proto.hpp"
 #include "noxcore/modes/script/weather.hpp"
+#include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
@@ -260,8 +261,32 @@ struct ScriptUiClient::Impl {
     // came in (another load since: none, till the server tells it again).
     wx::Told told;
     std::uint32_t toldAtLoad = 0;
+    // (Client level 14) The text overlay's table (setStrings: the program's nox.csf; null: the
+    // texts kept nowhere), and a long text's pieces so far (kTextMore).
+    strings::StringTable* overlayTable = nullptr;
+    std::string textKey, textSoFar;
 
     Impl(client::HeadlessClient* c, LuauVm::Limits l) : client(c), limits(l) {}
+
+    /// A kTextSet's piece: a whole text (its last piece) set over the table's.
+    void textPiece(uimsg::TextPiece&& t)
+    {
+        if (t.key != textKey) {
+            textSoFar.clear(); // (pieces of another key's text: a new text begins)
+        }
+        textKey = std::move(t.key);
+        if (textSoFar.size() + t.text.size() <= uimsg::kMaxTextValueBytes) {
+            textSoFar += t.text;
+        }
+        if (t.more) {
+            return;
+        }
+        if (overlayTable) {
+            overlayTable->setOverlay(textKey, strings::fromUtf8(textSoFar));
+        }
+        textKey.clear();
+        textSoFar.clear();
+    }
 
     /// The weather now: none once a map has loaded since it was told.
     const wx::Told& weatherNow()
@@ -1891,6 +1916,18 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             toBars.push_back(*b);
         }
         break;
+    case uimsg::kTextSet:
+        // (Client level 14; whatever the UI's state: a mode with no UI sends them too.) Set at
+        // once, so a message after it that names the key finds it.
+        if (auto t = uimsg::decodeTextSet(rest)) {
+            textPiece(std::move(*t));
+        }
+        break;
+    case uimsg::kTextClear:
+        if (const auto prefix = uimsg::decodeTextClear(rest); prefix && overlayTable) {
+            overlayTable->clearOverlay(*prefix);
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -1927,6 +1964,16 @@ LuauVm::Limits ScriptUiClient::defaultLimits()
 void ScriptUiClient::setTextWidth(std::function<int(std::string_view)> measure)
 {
     impl_->textWidth = std::move(measure);
+}
+
+void ScriptUiClient::setStrings(strings::StringTable* table)
+{
+    if (impl_->overlayTable && impl_->overlayTable != table) {
+        impl_->overlayTable->clearOverlay(); // (the last table's texts were this game's)
+    }
+    impl_->overlayTable = table;
+    impl_->textKey.clear();
+    impl_->textSoFar.clear();
 }
 
 void ScriptUiClient::frame(std::uint64_t nowMs)

@@ -179,8 +179,61 @@ StringTable StringTable::load(const std::filesystem::path& path)
 
 const StringEntry* StringTable::find(std::string_view label) const
 {
+    if (const StringEntry* over = overlay_.find(label)) {
+        return over;
+    }
     const auto it = byLabel_.find(label);
     return it == byLabel_.end() ? nullptr : &entries_[it->second];
+}
+
+const StringEntry* StringTable::Overlay::find(std::string_view label) const
+{
+    // (Another thread's lookup never touches the entries: `on` is read first, the thread after it.)
+    if (!on.load(std::memory_order_acquire) || thread.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
+        return nullptr;
+    }
+    const auto it = entries.find(label);
+    return it == entries.end() ? nullptr : &it->second;
+}
+
+void StringTable::setOverlay(std::string_view label, std::u16string text)
+{
+    if (!overlay_.on.load(std::memory_order_relaxed)) {
+        overlay_.entries.clear();
+        overlay_.thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
+    } else if (overlay_.thread.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
+        return; // (another thread's overlay: never two writers)
+    }
+    StringEntry e;
+    e.label = std::string(label);
+    e.variants.push_back(StringVariant{std::move(text), {}});
+    std::string key = e.label;
+    overlay_.entries.insert_or_assign(std::move(key), std::move(e));
+    overlay_.on.store(true, std::memory_order_release);
+}
+
+void StringTable::clearOverlay(std::string_view prefix)
+{
+    if (!overlay_.on.load(std::memory_order_relaxed) || overlay_.thread.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
+        return;
+    }
+    if (prefix.empty()) {
+        overlay_.entries.clear();
+    } else {
+        std::erase_if(overlay_.entries, [&](const auto& kv) {
+            return kv.first.size() >= prefix.size() && util::equalsNoCase(std::string_view(kv.first).substr(0, prefix.size()), prefix);
+        });
+    }
+    if (overlay_.entries.empty()) {
+        overlay_.on.store(false, std::memory_order_release);
+    }
+}
+
+std::size_t StringTable::overlaySize() const
+{
+    return overlay_.on.load(std::memory_order_acquire) && overlay_.thread.load(std::memory_order_relaxed) == std::this_thread::get_id()
+               ? overlay_.entries.size()
+               : 0;
 }
 
 std::optional<std::u16string_view> StringTable::text(std::string_view label) const

@@ -82,7 +82,8 @@ void storyPic(ServerObject& npc, std::string_view picture)
     }
 }
 
-std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId)
+std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId,
+                                           const std::u16string* speaker)
 {
     // SrvNet_OpenNpcDialog's 135 bytes on its stack, written in its order; what runs past the
     // message's end is the exe's stack and isn't sent.
@@ -104,7 +105,7 @@ std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObjec
     m[1] = 3;
     strcpyAt(2, textId);
     // The name: (wcsncpy) of 31 letters, the rest of them zeros; then 0 at +0x60.
-    const std::u16string name = npcName(world, npc);
+    const std::u16string name = speaker ? *speaker : npcName(world, npc);
     bool ended = false;
     for (std::size_t i = 0; i < 31; ++i) {
         const char16_t c = !ended && i < name.size() ? name[i] : u'\0';
@@ -124,7 +125,8 @@ std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObjec
     return m;
 }
 
-void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::uint32_t sound, std::string_view textId)
+void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::uint32_t sound, std::string_view textId,
+                   const std::u16string* name)
 {
     // (Without an NPC the exe reads through null and fails, an original bug: nothing here.)
     if (!npc || !player || !(player->classes & oc::Player) || !player->player) {
@@ -132,7 +134,7 @@ void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::u
     }
     World& world = fight.world;
     player->player->dialogWith = npc->extent;
-    world.broadcasts().push_back({npcDialogMessage(world, *npc, sound, textId), true, player->extent});
+    world.broadcasts().push_back({npcDialogMessage(world, *npc, sound, textId, name), true, player->extent});
     freezeUnit(fight, *player, 0);
 }
 
