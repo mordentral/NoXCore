@@ -12,6 +12,7 @@
 #include "noxcore/map/objects.hpp"
 #include "noxcore/map/sections.hpp"
 #include "noxcore/modes/registry.hpp"
+#include "noxcore/crypto/sha256.hpp"
 #include "noxcore/io/zip.hpp"
 #include "noxcore/net/framing.hpp"
 #include "noxcore/net/game_data_proto.hpp"
@@ -1437,8 +1438,6 @@ void HeadlessClient::drainSeqImportant(std::uint32_t& datagramFrame)
     }
 }
 
-// USE_MAP: our copy of the map whose header CRC matches (the solo path, the maps folder, the
-// download cache), else the server is asked for it.
 namespace {
 
 /// Where a downloaded data file is kept: <cache>\gamedata\<name>-<CRC, 8 hex>.<bin or patch>.
@@ -1451,16 +1450,23 @@ std::filesystem::path gameDataCachePath(const std::filesystem::path& mapCache, t
     return mapCache / "gamedata" / (std::string(file.substr(0, dot)) + "-" + hex + std::string(file.substr(dot)));
 }
 
-/// The file at `path` if it's `size` bytes whose CRC is `crc`; none otherwise (missing, other).
-std::optional<std::vector<std::uint8_t>> cachedFile(const std::filesystem::path& path, std::uint32_t size, std::uint32_t crc)
+/// Whether `bytes` are the file the set told: its size, CRC and SHA-256 (another host's file
+/// made to the same CRC, kept in the cache under that name, isn't).
+bool isToldFile(std::span<const std::uint8_t> bytes, const net::gamedata::SetEntry& e)
+{
+    return bytes.size() == e.size && io::crc32(bytes) == e.crc && crypto::sha256(bytes) == e.digest;
+}
+
+/// The file at `path` if it's the one told (isToldFile); none otherwise (missing, other).
+std::optional<std::vector<std::uint8_t>> cachedFile(const std::filesystem::path& path, const net::gamedata::SetEntry& e)
 {
     std::error_code ec;
-    if (path.empty() || !std::filesystem::is_regular_file(path, ec) || std::filesystem::file_size(path, ec) != size || ec) {
+    if (path.empty() || !std::filesystem::is_regular_file(path, ec) || std::filesystem::file_size(path, ec) != e.size || ec) {
         return std::nullopt;
     }
     try {
         auto bytes = readFileBytes(path);
-        if (bytes.size() == size && io::crc32(bytes) == crc) {
+        if (isToldFile(bytes, e)) {
             return bytes;
         }
     } catch (const std::exception&) {
@@ -1513,16 +1519,17 @@ void HeadlessClient::onGameData(std::span<const std::uint8_t> m)
             f.kind = e.kind;
             f.crc = e.crc;
             f.merged = e.merged;
+            f.digest = e.digest;
             in.total += e.size;
             std::optional<std::vector<std::uint8_t>> have;
             if (hostGameData_) {
                 have = hostGameData_(e.kind, e.crc);
-                if (have && (have->size() != e.size || io::crc32(*have) != e.crc)) {
+                if (have && !isToldFile(*have, e)) {
                     have.reset();
                 }
             }
             if (!have && !mapCache_.empty()) {
-                have = cachedFile(gameDataCachePath(mapCache_, e.kind, e.crc), e.size, e.crc);
+                have = cachedFile(gameDataCachePath(mapCache_, e.kind, e.crc), e); // (another file of that CRC there: downloaded over it)
             }
             if (have) {
                 f.bytes = std::move(*have);
@@ -1561,8 +1568,8 @@ void HeadlessClient::onGameData(std::span<const std::uint8_t> m)
         return; // (more to come)
     }
     const std::string name(things::dataFileName(f.kind));
-    if (io::crc32(f.bytes) != f.crc) {
-        failGameData("this mod's " + name + " came damaged (not the CRC the server told)");
+    if (io::crc32(f.bytes) != f.crc || crypto::sha256(f.bytes) != f.digest) {
+        failGameData("this mod's " + name + " came damaged (not the CRC and SHA-256 the server told)");
         return;
     }
     if (const std::string bad = things::checkDataFile(f.kind, f.bytes); !bad.empty()) {
@@ -1608,11 +1615,26 @@ void HeadlessClient::finishGameData()
     }
     gameDataHash_ = hash;
     event(ClientEvent::Kind::Log, "this game's mod's own game data read (" + std::to_string(files.size()) + " files)");
+    // What we read from modifier.bin by name before the handler swapped it (a modifier's id is
+    // its place in the file: a mod's modifier.bin, or a record its override adds, moves the
+    // ones after it), read again from the game's own.
+    if (modifiers_) {
+        if (const auto* userColor1 = modifiers_->findModifier("UserColor1")) {
+            world_.setUserColorBase(userColor1->id);
+        }
+        const auto id = [this](std::string_view name) {
+            const auto* m = modifiers_->findModifier(name);
+            return m ? static_cast<std::uint8_t>(m->id) : std::uint8_t{0xFF};
+        };
+        world_.setOutfitModifiers(id("ArmorQuality1"), id("Material1"), id("Replenishment1"));
+    }
     if (!held.empty()) {
         onUseMap(held);
     }
 }
 
+// USE_MAP: our copy of the map whose header CRC matches (the solo path, the maps folder, the
+// download cache), else the server is asked for it.
 void HeadlessClient::onUseMap(std::span<const std::uint8_t> m)
 {
     const auto useMap = decode<msg::UseMap>(m);

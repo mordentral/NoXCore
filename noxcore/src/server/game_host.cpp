@@ -2052,7 +2052,7 @@ void GameHost::sendDataSet(std::uint8_t peer)
         if (things::clientReadsDataFile(f.kind)) {
             const std::uint32_t merged =
                 things::isDataPatch(f.kind) ? options_.modeDataMerged[static_cast<std::size_t>(things::dataTableOf(f.kind))] : 0u;
-            set.files.push_back({f.kind, static_cast<std::uint32_t>(f.bytes.size()), f.crc, merged});
+            set.files.push_back({f.kind, static_cast<std::uint32_t>(f.bytes.size()), f.crc, merged, f.digest});
         }
     }
     // (The joining player isn't among players_ yet: straight to the transport, as its USE_MAP.)

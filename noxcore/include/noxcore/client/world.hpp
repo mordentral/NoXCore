@@ -587,6 +587,9 @@ public:
     {
         outfitModifiers_ = {armorQuality1, material1, replenishment1};
     }
+    /// (The two above as set.)
+    std::optional<std::uint8_t> userColorBase() const noexcept { return userColorBase_; }
+    std::array<std::uint8_t, 3> outfitModifiers() const noexcept { return outfitModifiers_; }
 
     /// FX messages received since the last call, oldest first. Only the newest kMaxEffects are
     /// kept, so a client that never takes them (a headless bot) doesn't grow without bound.

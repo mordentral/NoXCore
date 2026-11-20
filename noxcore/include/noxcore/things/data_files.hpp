@@ -77,13 +77,16 @@ inline constexpr std::size_t kMaxDataFilesBytes = 12u << 20;
 bool clientReadsDataFile(DataFile file) noexcept;
 
 /// One file of a set, as it is on disk (a whole file encrypted, an override plain text), with its
-/// CRC-32 (io::crc32); an override's `merged`, when known, is the check of the table it gives
-/// over the install's file (mergedCheck): a client compares its own merge with the host's.
+/// CRC-32 (io::crc32) and SHA-256 (`digest`: what a copy a client already has must match, a
+/// CRC-32 being easy to make collide); an override's `merged`, when known, is the check of the
+/// table it gives over the install's file (mergedCheck): a client compares its own merge with the
+/// host's.
 struct DataFileBytes {
     DataFile kind = DataFile::Things;
     std::vector<std::uint8_t> bytes;
     std::uint32_t crc = 0;
     std::uint32_t merged = 0;
+    std::array<std::uint8_t, 32> digest{};
 };
 
 /// "" when `bytes` (as on disk) can stand for `file`, else why not ("not whole cipher blocks", the
@@ -113,5 +116,11 @@ struct DataTables {
 /// std::runtime_error "<file>: <why>" for the first that won't read or apply.
 DataTables readDataTables(std::span<const DataFileBytes> files, bool solo, const std::filesystem::path& installDir,
                           bool clientOnly = false);
+/// A game that reads `tables`: when they have a thing.bin (whole or patched), its added types are
+/// the process's (setAddedTypeBases: a thing.patch's NEW types; none for a whole file, which is
+/// read as GAME.EXE reads it, so no content pack's added type answers for a type of it by name);
+/// without one, as they were (the install's thing.bin, the content packs' types). Set before the
+/// game's tables are used; the program sets the content packs' again once the game is left.
+void useAddedTypeBases(const DataTables& tables);
 
 } // namespace nox::things

@@ -507,7 +507,6 @@ void endPlayTest(App& app)
     unbindModeClients(app); // (the modes' UIs let go of their client sides, before the client that has them goes)
     app.live.reset();
     app.view.reset();
-    useInstallData(app); // (a mod's own game data: the install's tables again)
     if (app.sprites) {
         app.sprites->beginMap({});
         app.sprites->setHolding(false);
@@ -528,6 +527,7 @@ void endPlayTest(App& app)
         PortMapper::retire(std::move(app.portMapper)); // (a listed session's router port, removed off this thread)
     }
     LocalHost::retire(std::move(app.host)); // (a session's players told it ended: MSG_SERVER_QUIT, SERVER_CLOSE)
+    useInstallData(app); // (a mod's own game data: the install's tables and added types again, its host let go first)
     if (app.playTest || app.sessionHosting) {
         app.mapCache = app.playTestSavedCache; // (the cache the test or our edit session swapped in)
     }

@@ -3,6 +3,7 @@
 #include "local_host.hpp"
 #include "mods_folder.hpp"
 
+#include "noxcore/content/content_pack.hpp"
 #include "noxcore/io/file.hpp"
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/server/host_client.hpp"
@@ -250,8 +251,21 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
         SDL_Log("hosting: the mod's own game data (%zu files, %zu bytes) in place of the install's", modeData_->files().size(),
                 modeData_->bytes());
     }
-    if (modTables && !modTables->addedBases.empty()) {
-        nox::things::setAddedTypeBases(modTables->addedBases); // (the mod's new types' stock types: its game's, till it's left)
+    // The mod's new types' stock types (a whole thing.bin's: none): its game's, till it's left
+    // (game_data_swap.hpp's useInstallData); a game that isn't made after all gives the content
+    // packs' back at once, before anything else reads them.
+    struct BasesBack {
+        bool armed = false;
+        ~BasesBack()
+        {
+            if (armed) {
+                nox::things::setAddedTypeBases(nox::content::newThingTypes().bases);
+            }
+        }
+    } basesBack;
+    if (modTables && modTables->things) {
+        nox::things::useAddedTypeBases(*modTables);
+        basesBack.armed = true;
     }
     const nox::things::ThingDb& things = ownThings_ ? *ownThings_ : installThings;
     const nox::things::ModifierDb* modifiers = ownModifiers_ ? &*ownModifiers_ : installModifiers;
@@ -408,6 +422,7 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
     publishView(); // (its views at once: the thread pumps from the first frame)
     thread_ = std::thread([this] { run(); });
     serverId_ = thread_.get_id(); // (read by the thread only after the first beginFrame)
+    basesBack.armed = false; // (made: the mod's till its game is left)
 }
 
 namespace {

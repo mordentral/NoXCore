@@ -330,4 +330,11 @@ DataTables readDataTables(std::span<const DataFileBytes> files, bool solo, const
     return out;
 }
 
+void useAddedTypeBases(const DataTables& tables)
+{
+    if (tables.things) {
+        setAddedTypeBases(tables.addedBases);
+    }
+}
+
 } // namespace nox::things

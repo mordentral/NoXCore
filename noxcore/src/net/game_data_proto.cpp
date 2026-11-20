@@ -59,6 +59,7 @@ std::vector<std::uint8_t> encodeSet(const Set& set)
         put32(body, f.size);
         put32(body, f.crc);
         put32(body, f.merged);
+        body.insert(body.end(), f.digest.begin(), f.digest.end());
     }
     return frame(kSet, body);
 }
@@ -103,18 +104,20 @@ std::optional<Set> decodeSet(std::span<const std::uint8_t> rest)
     Set s;
     s.hash = get32(rest, 0);
     const std::size_t count = rest[4];
-    if (count == 0 || count > things::kDataFileCount || rest.size() != 5 + 13 * count) {
+    constexpr std::size_t kEntry = 13 + 32; // (kind, size, CRC, merged, SHA-256)
+    if (count == 0 || count > things::kDataFileCount || rest.size() != 5 + kEntry * count) {
         return std::nullopt;
     }
     std::size_t total = 0;
     for (std::size_t i = 0; i < count; ++i) {
-        const std::size_t at = 5 + 13 * i;
+        const std::size_t at = 5 + kEntry * i;
         const auto kind = kindOf(rest[at]);
         // (Each table once: a whole file or its override, never both.)
         if (!kind || std::ranges::any_of(s.files, [&](const SetEntry& e) { return things::dataTableOf(e.kind) == things::dataTableOf(*kind); })) {
             return std::nullopt;
         }
-        SetEntry e{*kind, get32(rest, at + 1), get32(rest, at + 5), get32(rest, at + 9)};
+        SetEntry e{*kind, get32(rest, at + 1), get32(rest, at + 5), get32(rest, at + 9), {}};
+        std::copy_n(rest.begin() + static_cast<std::ptrdiff_t>(at + 13), e.digest.size(), e.digest.begin());
         if (e.size == 0 || e.size > things::dataFileMaxBytes(e.kind)) {
             return std::nullopt;
         }

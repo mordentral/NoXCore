@@ -4,12 +4,14 @@
 // (a stock client is never sent one: the transport refuses it).
 //
 //   1 kSet   (S->C, once, at the join, before its first USE_MAP): u32 the set's hash, u8 count,
-//            then per file {u8 kind (DataFile), u32 size, u32 CRC-32, u32 merged}: the client's
-//            files of the set (thing, modifier and gamedata, whole or override; the server keeps
-//            monster's and soundset's to itself); "merged", an override's check of the table it
-//            gives over the host's install (0 for a whole file), which the client's own merge must
-//            give. The client loads the map only once it has them all.
-//   2 kWant  (C->S): u8 count, then count kinds: the files it has no copy of (by CRC).
+//            then per file {u8 kind (DataFile), u32 size, u32 CRC-32, u32 merged, 32 bytes
+//            SHA-256}: the client's files of the set (thing, modifier and gamedata, whole or
+//            override; the server keeps monster's and soundset's to itself); "merged", an
+//            override's check of the table it gives over the host's install (0 for a whole file),
+//            which the client's own merge must give; the SHA-256, what a copy the client already
+//            has (its cache's, its host's) must match: a CRC-32 any host can match at will. The
+//            client loads the map only once it has them all.
+//   2 kWant  (C->S): u8 count, then count kinds: the files it has no copy of (by size, CRC and SHA-256).
 //   3 kChunk (S->C): u8 kind, u32 offset, then up to kChunkBytes of the file, in order.
 //
 // A client below lobby::kGameDataLevel never joins such a game (its join is refused with the
@@ -18,6 +20,7 @@
 
 #include "noxcore/things/data_files.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -38,6 +41,7 @@ struct SetEntry {
     std::uint32_t size = 0;
     std::uint32_t crc = 0;
     std::uint32_t merged = 0; ///< (an override's: the merged table's check; 0 a whole file)
+    std::array<std::uint8_t, 32> digest{}; ///< the file's SHA-256
     bool operator==(const SetEntry&) const = default;
 };
 struct Set {

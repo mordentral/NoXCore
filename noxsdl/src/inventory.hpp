@@ -108,6 +108,13 @@ public:
     std::vector<std::uint16_t> cellOrder() const { return grid_.order(); }
     /// The meters' bottle slots (health, mana, cure poison): their types and counts for the HUD.
     const BottleSlots& bottles() const { return bottles_; }
+    /// The bottle slots' types found again by name in thing.bin as it now is (a game's own
+    /// thing.bin swapped in before its first map: game_data_swap.hpp), then re-picked.
+    void retypeBottles()
+    {
+        bottles_ = BottleSlots(BottleSlots::typesIn(things_));
+        bottles_.pick(grid_);
+    }
     /// The item a bottle slot's key or click uses now (BottleSlots::item), if any.
     std::optional<std::uint16_t> bottleItem(int slot) const { return bottles_.item(grid_, slot); }
     /// Snd_PlaySound, for the panel's own sounds (taking an item, setting it down).

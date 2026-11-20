@@ -492,12 +492,15 @@ public:
     /// (noxcpp) A game whose mod ships its own game data (server/mode_data.hpp): the server tells
     /// the files at the join, before USE_MAP (MSG_NOXCPP_GAMEDATA: net/game_data_proto.hpp). Each
     /// is taken from the host (setHostGameData), else our cache (<map cache>\gamedata\<file>-<CRC>.bin,
-    /// written as each arrives), else asked for and checked (size, CRC, things::checkDataFile) as it
-    /// comes. With them all, `handler` gets them (the set's hash and the files): it reads them
+    /// written as each arrives), each only when its size, CRC and SHA-256 are the ones told, else
+    /// asked for and checked (size, CRC, SHA-256, things::checkDataFile) as it comes. With them
+    /// all, `handler` gets them (the set's hash and the files): it reads them
     /// (things::readDataTables) and makes them this connection's game's (setThings, setModifiers,
-    /// its own tables), saying "" when it did or why not; only then is the map loaded. A refusal,
-    /// a bad file, or no handler at all: we leave ("can't read this mod's game data"). A game
-    /// without them sends nothing: nothing here runs.
+    /// its own tables), saying "" when it did or why not; only then is the map loaded, and what we
+    /// took from modifier.bin by name (setUserColorBase's UserColor1, setOutfitModifiers' three) is
+    /// read again from the modifiers we're given then. A refusal, a bad file, or no handler at
+    /// all: we leave ("can't read this mod's game data"). A game without them sends nothing:
+    /// nothing here runs.
     using GameDataHandler = std::function<std::string(std::uint32_t hash, const std::vector<things::DataFileBytes>& files)>;
     void setGameDataHandler(GameDataHandler handler) { gameDataHandler_ = std::move(handler); }
     /// The host's own client: the host's file of a kind with that CRC (none: not the host's).

@@ -6,6 +6,7 @@
 #include "spell_chant.hpp"
 
 #include "noxcore/audio/sound_names.hpp"
+#include "noxcore/bot/bot.hpp"
 #include "noxcore/content/content_pack.hpp"
 #include "noxcore/strings/l10n.hpp"
 
@@ -41,6 +42,36 @@ void remakeFromTables(App& app)
             }
         }
     }
+    if (app.inventory) {
+        app.inventory->retypeBottles(); // (the meters' potions and food by name: a whole thing.bin's numbers may differ)
+    }
+    if (!app.localBots.squad) {
+        app.localBots.kinds.reset(); // (the bots' item kinds by type id: made again from these when bots are next asked for)
+    }
+}
+
+/// The install's tables back in the app's place, if a mod's are there (`bases`: and the content
+/// packs' added types again, whenever they aren't the process's).
+void restoreInstall(App& app, bool bases)
+{
+    const bool basesOff = bases && nox::things::addedTypeBases() != nox::content::newThingTypes().bases;
+    if (!app.installTables && !basesOff) {
+        return;
+    }
+    LocalHost::finishRetired(0); // (a host that left its game may read the app's tables, and the added types, still)
+    if (bases) {
+        nox::things::setAddedTypeBases(nox::content::newThingTypes().bases); // (the content packs' again, as at start-up)
+    }
+    if (!app.installTables) {
+        return;
+    }
+    app.things = std::move(app.installTables->things);
+    app.modifiers = std::move(app.installTables->modifiers);
+    app.gameData = std::move(app.installTables->gameData);
+    app.installTables.reset();
+    app.gameDataHash = 0;
+    remakeFromTables(app);
+    SDL_Log("game data: the install's again");
 }
 
 } // namespace
@@ -60,7 +91,7 @@ std::string useGameData(App& app, std::uint32_t hash, const std::vector<nox::thi
         return NOX_TR("game.data.hosting_other", "another game is hosted here"); // (its server reads the app's tables)
     }
     LocalHost::finishRetired(0); // (a host that left its game may read the app's tables still)
-    useInstallData(app);
+    restoreInstall(app, false); // (the added types: this set's, below; a game we host has them already)
     auto install = std::make_unique<App::InstallTables>();
     install->things = std::move(app.things);
     install->modifiers = std::move(app.modifiers);
@@ -71,9 +102,7 @@ std::string useGameData(App& app, std::uint32_t hash, const std::vector<nox::thi
     app.gameData = tables.gameData ? std::move(*tables.gameData) : install->gameData;
     app.installTables = std::move(install);
     app.gameDataHash = hash;
-    if (!tables.addedBases.empty()) {
-        nox::things::setAddedTypeBases(tables.addedBases); // (the mod's new types' stock types, for this game)
-    }
+    nox::things::useAddedTypeBases(tables); // (the mod's new types' stock types, for this game; a whole thing.bin's: none)
     remakeFromTables(app);
     SDL_Log("game data: this game's mod's own (%zu files) in place of the install's", files.size());
     return {};
@@ -81,18 +110,7 @@ std::string useGameData(App& app, std::uint32_t hash, const std::vector<nox::thi
 
 void useInstallData(App& app)
 {
-    if (!app.installTables) {
-        return;
-    }
-    LocalHost::finishRetired(0);
-    app.things = std::move(app.installTables->things);
-    app.modifiers = std::move(app.installTables->modifiers);
-    app.gameData = std::move(app.installTables->gameData);
-    app.installTables.reset();
-    app.gameDataHash = 0;
-    nox::things::setAddedTypeBases(nox::content::newThingTypes().bases); // (the content packs' again, as at start-up)
-    remakeFromTables(app);
-    SDL_Log("game data: the install's again");
+    restoreInstall(app, true);
 }
 
 } // namespace noxsdl

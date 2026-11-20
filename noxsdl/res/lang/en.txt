@@ -12238,7 +12238,7 @@ editor.window.waypoints = Waypoints
 # noxsdl/src/app.cpp:113
 #@ 2329c92c: Team
 game.chat.team = Team
-# noxsdl/src/game_data_swap.cpp:60
+# noxsdl/src/game_data_swap.cpp:91
 #@ 7007f0e1: another game is hosted here
 game.data.hosting_other = another game is hosted here
 # noxsdl/src/game_session.cpp:47

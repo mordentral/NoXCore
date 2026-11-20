@@ -1,10 +1,12 @@
 // A mode's own game data (mode_data.hpp).
 #include "noxcore/server/mode_data.hpp"
 
+#include "noxcore/crypto/sha256.hpp"
 #include "noxcore/io/file.hpp"
 #include "noxcore/io/zip.hpp"
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <system_error>
 
@@ -37,7 +39,7 @@ bool resolvesInside(const fs::path& p, const fs::path& root)
     return r == root.end() && real != root;
 }
 
-/// FNV-1a over each file's kind, size and CRC (never 0).
+/// FNV-1a over each file's kind, size, CRC and SHA-256 (never 0).
 std::uint32_t setHash(const std::vector<things::DataFileBytes>& files)
 {
     std::uint32_t h = 2166136261u;
@@ -50,6 +52,9 @@ std::uint32_t setHash(const std::vector<things::DataFileBytes>& files)
         mix(static_cast<std::uint32_t>(f.kind));
         mix(static_cast<std::uint32_t>(f.bytes.size()));
         mix(f.crc);
+        for (const std::uint8_t b : f.digest) {
+            h = (h ^ b) * 16777619u;
+        }
     }
     return h == 0 ? 1u : h;
 }
@@ -61,19 +66,24 @@ std::shared_ptr<const ModeData> ModeData::fromFiles(std::vector<things::DataFile
     why.clear();
     std::ranges::sort(files, {}, &things::DataFileBytes::kind);
     std::size_t total = 0;
-    for (std::size_t i = 0; i < files.size(); ++i) {
-        auto& f = files[i];
+    // Each table once, whichever form: a whole file's kind and its override's aren't neighbours
+    // once sorted (thing.bin 0, modifier.bin 1 ... thing.patch 5), so each table's first is kept.
+    std::array<const things::DataFileBytes*, things::kDataTableCount> table{};
+    for (auto& f : files) {
         const std::string name(things::dataFileName(f.kind));
-        if (i > 0 && things::dataTableOf(files[i - 1].kind) == things::dataTableOf(f.kind)) {
-            why = "data\\" + name + ": " + std::string(things::dataFileName(files[i - 1].kind)) + " is there too (a file's whole form or its override, not both)";
+        const things::DataFileBytes*& first = table[static_cast<std::size_t>(things::dataTableOf(f.kind))];
+        if (first) {
+            why = "data\\" + name + ": " + std::string(things::dataFileName(first->kind)) + " is there too (a file's whole form or its override, not both)";
             return nullptr;
         }
+        first = &f;
         if (std::string bad = things::checkDataFile(f.kind, f.bytes); !bad.empty()) {
             why = "data\\" + name + ": " + bad;
             return nullptr;
         }
         total += f.bytes.size();
         f.crc = io::crc32(f.bytes);
+        f.digest = crypto::sha256(f.bytes);
     }
     if (total > things::kMaxDataFilesBytes) {
         why = "data\\: over " + std::to_string(things::kMaxDataFilesBytes >> 20) + " MB of files";
