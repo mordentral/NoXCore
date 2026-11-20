@@ -14,6 +14,7 @@
 
 #include <array>
 #include <optional>
+#include <utility>
 
 namespace nox::server {
 
@@ -104,6 +105,15 @@ void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name)
     }
 }
 
+std::u16string fitDialogTitle(std::u16string name)
+{
+    // (31 letters, the title's; the 31st a pair's first half: the 30 before it.)
+    if (name.size() > 31) {
+        name.resize(name[30] >= 0xD800 && name[30] <= 0xDBFF ? 30 : 31);
+    }
+    return name;
+}
+
 std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId,
                                            const std::u16string* speaker)
 {
@@ -154,6 +164,7 @@ void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::u
     if (!name && world.modeHooks) {
         modeName = world.modeHooks->playerText(world, *player, npcNameLabel(*npc));
         if (modeName) {
+            *modeName = fitDialogTitle(std::move(*modeName));
             name = &*modeName;
         }
     }

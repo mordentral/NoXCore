@@ -418,9 +418,12 @@ void CoopDirector::showSceneDialog(const server::ServerObject& host, std::size_t
     const std::vector<std::uint8_t> bytes = *opened;
     sceneTalker_ = host.extent;
     // (A mod's own text for the NPC's name, each player's: World::modeHooks' playerText, as the
-    // host's own window had it. No mode, the host's bytes as they are.)
+    // host's own window had it. No mode, the host's bytes as they are. The host's title the mode's
+    // text (the map's TellStory gives no speaker): a player the mode has none for, a held-out one or
+    // one of others = "own", the string table's, as its own talk would have it.)
     server::ModeHooks* const hooks = world().modeHooks;
     const std::string label = hooks ? server::npcNameLabel(*npc) : std::string();
+    const bool hostsOwn = hooks && hooks->playerText(world(), host, label).has_value();
     for (const Member& m : party_) {
         if (m.host) {
             continue;
@@ -429,8 +432,10 @@ void CoopDirector::showSceneDialog(const server::ServerObject& host, std::size_t
             sceneViewers_.emplace(u->extent);
             std::vector<std::uint8_t> theirs = bytes;
             if (hooks) {
-                if (const std::optional<std::u16string> own = hooks->playerText(world(), *u, label)) {
-                    server::putDialogTitle(theirs, *own);
+                if (std::optional<std::u16string> own = hooks->playerText(world(), *u, label)) {
+                    server::putDialogTitle(theirs, server::fitDialogTitle(std::move(*own)));
+                } else if (hostsOwn) {
+                    server::putDialogTitle(theirs, world().text(label));
                 }
             }
             tell(m, std::move(theirs));
