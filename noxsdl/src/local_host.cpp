@@ -361,6 +361,7 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
         serverMode_->setServerPort(port_); // (a mode's own bots join here: a boss, say)
     }
     gameDir_ = gameDir;
+    modeMaps_ = o.modeMaps;
     game_ = std::make_unique<nox::server::GameHost>(things, path, o);
     if (serverMode_) {
         serverMode_->attach(*game_);

@@ -1,6 +1,7 @@
 // The mods a host has: each folder under `mods` beside the program (noxcore.exe, a dedicated server) with a
 // mode.json, registered as a script mode (script/scripted_mode.hpp). Mods are never downloaded:
-// a mod is there because someone put it there.
+// a mod is there because someone put it there. A mod's maps\<Name>\<Name>.map are its games' own
+// (server/mode_maps.hpp): a guest gets them through the map download, as any map it lacks.
 #pragma once
 
 #include "noxcore/modes/registry.hpp"
@@ -21,6 +22,8 @@ struct ModsReport {
         std::string why;
     };
     std::vector<Broken> broken;
+    /// What a loaded mod's folder holds that it doesn't take (a map left out of its maps\, and why).
+    std::vector<Broken> notes;
 };
 
 /// `mods` beside the program in `programDir`.
@@ -33,7 +36,8 @@ ModsReport loadMods(const std::filesystem::path& modsDir, Registry& registry);
 /// taken out of `registry`, then loadMods.
 ModsReport reloadMods(const std::filesystem::path& modsDir, Registry& registry, const ModsReport& previous);
 
-/// The report's lines for a log: "mods: <id> loaded", "mods: <folder>: <why>".
+/// The report's lines for a log: "mods: <id> loaded", "mods: <folder>: <why>" (the broken, then
+/// the notes).
 std::vector<std::string> modsReportLines(const ModsReport& report);
 
 } // namespace nox::modes

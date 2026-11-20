@@ -480,7 +480,7 @@ void CoopDirector::readPristine(server::Server& server)
     if (mapsDir.empty() || w.mapName.empty()) {
         return;
     }
-    const std::filesystem::path own = resolveNoCase(mapsDir / w.mapName / (w.mapName + ".map"));
+    const std::filesystem::path own = resolveNoCase(host_->findMap(w.mapName)); // (a mode's own map, else the maps folder's)
     std::error_code ec;
     if (!std::filesystem::exists(own, ec)) {
         return;
@@ -565,6 +565,20 @@ void CoopDirector::clientReady(server::GameHost& host, std::uint8_t peer)
     const auto it = std::ranges::find_if(party_, [&](const Member& m) { return m.peer == peer; });
     if (it == party_.end()) {
         return;
+    }
+    // A guest that downloaded the map went watching as it asked for it, out of its team (the game's
+    // map request): a solo game has no way back for it, so it's back in play now, in the party's
+    // team by the host, as its join put it.
+    if (server::ServerObject* u = it->host ? nullptr : host.unitOf(peer); u && u->player && u->player->observing) {
+        server::Fight f = host.server().fight();
+        server::leaveObserver(f, *u);
+        u->player->cameraFollow = 0;
+        u->player->freeCam = false;
+        intoTeam(*u);
+        if (const server::ServerObject* h = server::hostPlayer(world())) {
+            const auto [x, y] = server::clearPointNear(world(), rng_, h->x, h->y, 50.0f);
+            server::setPosition(world(), *u, x, y, host.server().clock().frame());
+        }
     }
     tellTeam(*it);
     if (it->host) {

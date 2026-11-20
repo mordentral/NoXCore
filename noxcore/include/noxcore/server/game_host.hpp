@@ -21,6 +21,7 @@
 #include "noxcore/net/update_stream.hpp"
 #include "noxcore/server/map_cycle.hpp"
 #include "noxcore/server/map_vote.hpp"
+#include "noxcore/server/mode_maps.hpp"
 #include "noxcore/server/rules.hpp"
 #include "noxcore/server/server.hpp"
 #include "noxcore/server/sound.hpp"
@@ -374,6 +375,10 @@ public:
         /// names are found in (empty: the hosted map's folder's).
         std::filesystem::path mapCycle;
         std::filesystem::path mapsDir;
+        /// (noxcpp: a NoX Core mode's) The maps its mode ships (a mod's maps\ folder, indexed once
+        /// when the mod was read: mode_maps.hpp), found by name before the maps folder's in every
+        /// lookup of this game (findMap). Null, as every game but such a mode's: the maps folder alone.
+        std::shared_ptr<const ModeMaps> modeMaps;
         /// The game's folder, where execrul finds its .rul files (OTQuest.rul); empty: the maps
         /// folder's parent, as it is in every game but the map editor's quest play-test (whose
         /// maps folder is its own).
@@ -488,6 +493,14 @@ public:
     const Options& options() const noexcept { return options_; }
     /// Where the game's maps are (Options::mapsDir; none: the map's folder's parent).
     std::filesystem::path mapsDir() const;
+    /// (noxcpp) The .map file the map `name` (a folder's name, no extension) is for this game: its
+    /// mode's own (Options::modeMaps) when it ships one of that name, else
+    /// <mapsDir>\<name>\<name>.map as it always was (whether or not it's there). Every load, list,
+    /// cycle, vote, download and CRC of the game finds its maps through this.
+    std::filesystem::path findMap(std::string_view name) const;
+    /// The same before a host is made (a mode's configure naming its first map): `o.mapsDir` as
+    /// given.
+    static std::filesystem::path findMap(const Options& o, std::string_view name);
     /// The game as XWIS lists it (the WOL record GAME.EXE posts: lobby::makeWolRecord): the name,
     /// the map, the mode, the players and their limit, the quest's stage, the Access settings
     /// (closed, password, the classes refused, the ping limits). The port is the caller's.
@@ -1294,6 +1307,14 @@ private:
     void mapSendNextBlock(std::uint8_t peer, MapSender& s); ///< SrvNet_MapSendNextBlock
     void mapSendAbortAll(std::uint8_t reason); ///< (SrvNet_MapSendAbort each)
     bool mapSendLoadMap();                 ///< SrvNet_MapSendLoadMap
+    /// (noxcpp) The .nxz a download of the map `stem` sends: <mapsDir>\<stem>\<stem>.nxz, or the
+    /// one its mode ships beside its own map (none: empty).
+    std::filesystem::path mapSendFile(const std::string& stem) const;
+    /// (noxcpp) A solo game with guests (Options::soloGuests) loads nothing for downloads as its
+    /// maps load, as the exe's solo game doesn't: a guest's request reads the map's .nxz then, or
+    /// makes it from the .map when none is shipped (the campaign's maps have none). Whether there's
+    /// a map to send.
+    bool mapSendLoadForGuests();
     /// A mapsend.c line (Str_GetString(label), its %s / %S / %d filled in order) to the console.
     void mapSendPrint(std::string_view label, std::initializer_list<std::string_view> values = {});
     /// A quest's saved players (quest.hpp's questMapStart, the player update's game over): the

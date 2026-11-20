@@ -3,6 +3,7 @@
 target_sources(noxmodes PRIVATE
     "${NOX_MODE_DIR}/src/coop.cpp"
     "${NOX_MODE_DIR}/src/coop_balance.cpp"
+    "${NOX_MODE_DIR}/src/coop_campaign.cpp"
     "${NOX_MODE_DIR}/src/coop_cine.cpp"
     "${NOX_MODE_DIR}/src/coop_client.cpp"
     "${NOX_MODE_DIR}/src/coop_proto.cpp"

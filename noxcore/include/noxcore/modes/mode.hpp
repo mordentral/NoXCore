@@ -22,6 +22,9 @@ struct ThingDb;
 namespace nox::client {
 class HeadlessClient;
 }
+namespace nox::server {
+class ModeMaps;
+}
 
 namespace nox::modes {
 
@@ -53,6 +56,18 @@ inline std::optional<std::string_view> option(const OptionValues& values, std::s
     return it != values.end() ? std::optional<std::string_view>(it->second) : std::nullopt;
 }
 
+/// A story campaign a mod declares (mode.json's "campaign"): its maps played as the co-op campaign
+/// plays the game's own, the mod's server script beside it. Read at set-up only.
+struct CampaignInfo {
+    std::string title;    ///< the name it's listed by ("Nox Hardcore (Warrior)"); the mode's name when not given
+    std::string firstMap; ///< a new campaign's first map (a map's name: "HW01A")
+    /// The classes it may be played as (bit 0 warrior, 1 wizard, 2 conjurer): the class screen offers
+    /// these alone; the party is the host's class, as the game's own co-op campaign is.
+    std::uint8_t classes = 0;
+    /// Its maps' names, the first map among them (none listed: the maps its mod ships).
+    std::vector<std::string> maps;
+};
+
 /// What a mode is, as the lists and the hosts see it.
 struct ModeInfo {
     std::string id;          ///< "example": the dedicated server's --mode, the log tag ("[example N]"), records' key
@@ -81,6 +96,12 @@ struct ModeInfo {
     bool playerHost = false;
     /// Loaded from the mods folder (mods.hpp's loadMods), not built into the program.
     bool fromMods = false;
+    /// The story campaign it declares (a mod's mode.json "campaign"): the lists show it as a campaign
+    /// of a mode that runs campaigns (runsCampaigns), not as a row of its own. None: it's no campaign.
+    std::optional<CampaignInfo> campaign;
+    /// It plays the campaigns modes declare beside its own (the co-op campaign): its row's Campaign
+    /// choice lists them, and it's hosted with the option "campaign" = the campaign's mode id.
+    bool runsCampaigns = false;
 };
 
 /// What a host gives a mode it makes.
@@ -169,6 +190,10 @@ struct Mode {
     /// Its records store for the game folder `gameDir`, for a host that shares one between its
     /// games (ServerContext::records); none: it keeps none.
     std::function<std::shared_ptr<void>(const std::filesystem::path& gameDir)> openRecords;
+    /// The maps it ships (a mod's maps\: server/mode_maps.hpp, its script mode's package's index),
+    /// for a program that finds one before hosting (the menus' first map of a mod's campaign); null:
+    /// none. Its games get them through their own configure (GameHost::Options::modeMaps).
+    std::shared_ptr<const server::ModeMaps> maps;
 };
 
 /// A host's set-up of the mode's server side it made (every host's, so each mode and mod gets

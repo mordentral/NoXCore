@@ -71,6 +71,7 @@
 #include "noxcore/io/png.hpp"
 #include "noxcore/lobby/listing.hpp"
 #include "noxcore/modes/builtin.hpp"
+#include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/modes/script/script_ui.hpp"
 #include "noxcore/server/game_host.hpp"
@@ -548,7 +549,14 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         settings.solo = true;
         settings.updateRate = app->serverUpdateRate; // (noxcore.cfg's)
         settings.map = start.map.string();
-        beginSoloScreensHost(*app, modeId, start.profile.playerClass, settings);
+        // (A mod's campaign, the row's Campaign choice: its saves its own, under the mode's.)
+        std::string campaign;
+        if (app->menus) {
+            if (const auto c = nox::modes::option(app->menus->pendingModeOptions(), "campaign")) {
+                campaign = std::string(*c);
+            }
+        }
+        beginSoloScreensHost(*app, modeId, start.profile.playerClass, settings, campaign);
         if (app->menus) {
             // (Host Custom's row's settings for it, the class the screens chose kept.)
             for (const auto& [key, value] : app->menus->pendingModeOptions()) {
@@ -580,7 +588,11 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
             return;
         }
         // (Its end back to the game list it was hosted from, as the other hosted modes'.)
-        SDL_Log("%s: hosting %s at %s%s", how.logTag.c_str(), how.what ? how.what(start.profile.playerClass).c_str() : modeId.c_str(),
+        const nox::modes::Mode* campaignMode = campaign.empty() ? nullptr : nox::modes::registry().find(campaign);
+        const std::string what = campaignMode && campaignMode->info.campaign ? campaignMode->info.campaign->title
+                                 : how.what                                 ? how.what(start.profile.playerClass)
+                                                                            : modeId;
+        SDL_Log("%s: hosting %s at %s%s", how.logTag.c_str(), what.c_str(),
                 settings.map.c_str(), start.continueSlot.empty() ? "" : (", continuing " + start.continueSlot).c_str());
         SDL_Log("%s", hostListingLog(menusHostListing(*app, !app->hostLoopback), how.logTag, app->host->port()).c_str());
         startLive(*app, app->host->address());

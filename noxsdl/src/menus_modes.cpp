@@ -237,6 +237,13 @@ void Menus::modeList(ModeListFor list)
                 break;
             default:
                 pendingModeOptions_ = modeSettings_[r.id]; // (its row's settings: the difficulty...)
+                // (Its Campaign choice as the mod it names: the option "campaign" is a mode's id,
+                // none for the mode's own.)
+                if (const std::string campaign = chosenCampaign(r, pendingModeOptions_); !campaign.empty()) {
+                    pendingModeOptions_["campaign"] = campaign;
+                } else {
+                    pendingModeOptions_.erase("campaign");
+                }
                 if (hosting && r.soloScreens) {
                     onSoloScreensMode(r.id); // (its own start: the class and character screens)
                 } else {

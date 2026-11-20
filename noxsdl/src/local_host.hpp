@@ -249,6 +249,9 @@ public:
     std::optional<std::filesystem::path> soloPath() const;
     /// The client read it (gameChangeMap's map read): the server's "not multiplayer" lowered.
     void soloPathRead();
+    /// The maps the game's mode ships (GameHost::Options::modeMaps, fixed as the game began); null:
+    /// none, the maps folder alone.
+    std::shared_ptr<const nox::server::ModeMaps> modeMaps() const noexcept { return modeMaps_; }
 
     /// The server's thread's last error, taken (it logs and runs on, as the loop's pump did).
     std::optional<std::string> takeError();
@@ -427,6 +430,7 @@ private:
     mutable std::mutex viewMutex_;
     bool noMultiplayer_ = false;
     std::string soloPath_;
+    std::shared_ptr<const nox::server::ModeMaps> modeMaps_;
 
     /// Held by the closures that may outlive us (a fade's `done` wrapped for the server's side).
     std::shared_ptr<int> alive_ = std::make_shared<int>(0);

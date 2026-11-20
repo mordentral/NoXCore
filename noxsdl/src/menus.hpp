@@ -341,8 +341,17 @@ private:
     /// noxcpp's Host Custom > a mode started through the solo screens (a campaign mode): the solo
     /// screens on the mode's own saves.
     void onSoloScreensMode(const std::string& modeId);
-    /// The saves the solo screens list and write: the mode's while soloScreensMode_, else the solo game's.
+    /// The saves the solo screens list and write: the mode's while soloScreensMode_ (a mod's campaign's
+    /// own under it), else the solo game's.
     std::filesystem::path soloRoot() const;
+    /// The mod's campaign the solo screens host (the row's Campaign choice: its mode id, pending
+    /// ModeOptions' "campaign"); empty: the mode's own, or the solo game.
+    std::string soloCampaign() const;
+    /// Its declaration (null: none).
+    const nox::modes::CampaignInfo* soloCampaignInfo() const;
+    /// Whether the class screen offers class `playerClass` (0-2): every class but for a mod's
+    /// campaign, whose own classes alone.
+    bool classOffered(int playerClass) const;
     /// The solo screens' game started: the mode hosted (callbacks_.soloScreensMode) or a solo game.
     void startSolo(const SoloStart& start);
     void onCredits();

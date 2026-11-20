@@ -1455,6 +1455,19 @@ void HeadlessClient::onUseMap(std::span<const std::uint8_t> m)
         event(ClientEvent::Kind::Disconnected, "the server's map name isn't a file name: " + mapName_);
         return;
     }
+    // (noxcpp) The host's own client: the map its game's mode ships, first (setHostMaps).
+    if (hostMaps_) {
+        if (const auto path = hostMaps_(stem)) {
+            try {
+                if (const auto file = map::loadMapFile(*path); file.crc == useMap.crc) {
+                    mapPath_ = *path;
+                    mapReady(file);
+                    return;
+                }
+            } catch (const std::exception&) {
+            }
+        }
+    }
     std::string problem;
     for (const auto& dir : {mapsDir_, mapCache_}) {
         if (dir.empty()) {

@@ -47,9 +47,10 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     // mods folder's in the same order, then the folders that didn't load.
     std::vector<ModeListRow> rows;
     std::vector<ModeListRow> mods;
-    for (const nox::modes::Mode* m : registry.all()) {
-        if (!m->makeServer || (list == ModeListFor::GameModes && m->info.playerHost)) {
-            continue;
+    const std::vector<const nox::modes::Mode*> all = registry.all();
+    for (const nox::modes::Mode* m : all) {
+        if (!m->makeServer || (list == ModeListFor::GameModes && m->info.playerHost) || m->info.campaign) {
+            continue; // (a campaign: its mode's Campaign choice lists it, below)
         }
         ModeListRow r;
         r.fromMods = m->info.fromMods;
@@ -75,6 +76,24 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
                 for (auto& c : s.choices) {
                     c = builtInText(c);
                 }
+            }
+        }
+        // A mode that runs campaigns: the mods' campaigns beside its own, its first setting (none
+        // installed: no choice, the row as it always was).
+        if (m->info.runsCampaigns) {
+            nox::modes::OptionSpec choice{.key = "campaign", .label = NOX_TR("modes.coop.campaign", "Campaign"), .kind = nox::modes::OptionSpec::Kind::Choice};
+            for (const nox::modes::Mode* c : all) {
+                if (c->info.campaign && c->makeServer) {
+                    if (r.campaigns.empty()) {
+                        r.campaigns.emplace_back();
+                        choice.choices.push_back(NOX_TR("menus.modes.campaign_own", "The game's own"));
+                    }
+                    r.campaigns.push_back(c->info.id);
+                    choice.choices.push_back(c->info.campaign->title);
+                }
+            }
+            if (!r.campaigns.empty()) {
+                r.options.insert(r.options.begin(), std::move(choice));
             }
         }
         r.soloScreens = soloScreens && soloScreens(m->info.id);
@@ -112,6 +131,15 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     rows.push_back(std::move(editor));
     rows.insert(rows.end(), std::make_move_iterator(mods.begin()), std::make_move_iterator(mods.end()));
     return rows;
+}
+
+std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set)
+{
+    if (row.campaigns.empty() || row.options.empty() || row.options.front().key != "campaign") {
+        return {};
+    }
+    const int v = modeOptionValue(set, row.options.front());
+    return v >= 0 && v < static_cast<int>(row.campaigns.size()) ? row.campaigns[static_cast<std::size_t>(v)] : std::string();
 }
 
 std::string modeListKey(const ModeListRow& row)

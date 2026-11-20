@@ -510,8 +510,25 @@ void Menus::enter(State s)
             }
         }
         // Back from Options: the class picked as it was (the game's has none picked again).
-        if (const auto kept = kept_.take<optionstrip::SelClassKept>(); kept && kept->chosen >= 0) {
+        if (const auto kept = kept_.take<optionstrip::SelClassKept>(); kept && kept->chosen >= 0 && classOffered(kept->chosen - kClassFirst)) {
             pickClass(kept->chosen);
+        }
+        // (noxcpp) A mod's campaign is played as its classes alone: the others' portraits off, and
+        // its one class picked when it has one.
+        if (soloCampaignInfo()) {
+            int offered = 0;
+            std::int32_t only = -1;
+            for (std::int32_t id = kClassFirst; id <= kClassLast; ++id) {
+                if (classOffered(id - kClassFirst)) {
+                    ++offered;
+                    only = id;
+                } else {
+                    enable(screen_, id, false);
+                }
+            }
+            if (offered == 1 && chosenClass_ < 0) {
+                pickClass(only);
+            }
         }
         optsBack_->show(true);
         break;
@@ -790,7 +807,26 @@ void Menus::onSoloScreensMode(const std::string& modeId)
 
 std::filesystem::path Menus::soloRoot() const
 {
-    return soloScreensMode_.empty() ? saveRoot_ : modeSaveRoot(saveRoot_, soloScreensMode_);
+    return soloScreensMode_.empty() ? saveRoot_ : modeSaveRoot(saveRoot_, soloScreensMode_, soloCampaign());
+}
+
+std::string Menus::soloCampaign() const
+{
+    if (soloScreensMode_.empty()) {
+        return {};
+    }
+    const auto c = nox::modes::option(pendingModeOptions_, "campaign");
+    return c ? std::string(*c) : std::string();
+}
+
+const nox::modes::CampaignInfo* Menus::soloCampaignInfo() const
+{
+    const std::string id = soloCampaign();
+    if (id.empty()) {
+        return nullptr;
+    }
+    const nox::modes::Mode* m = nox::modes::registry().find(id);
+    return m && m->info.campaign ? &*m->info.campaign : nullptr;
 }
 
 void Menus::startSolo(const SoloStart& start)
@@ -931,6 +967,9 @@ bool Menus::onSoloSelChar(gui::Window& from)
         // (Map_SetCurrentPath of the class's first map, then of "%s.map" of the listed record's
         // map, as it is: an empty one is ".map".)
         start.map = menu::continueMap(soloRoot(), gameDir_, slot.info.mapName);
+        if (std::error_code ec; soloCampaignInfo() && !std::filesystem::exists(nox::resolveNoCase(start.map), ec)) {
+            start.map = campaignMapPath(gameDir_, soloCampaign(), slot.info.mapName); // (noxcpp: no saved copy: the mod's map)
+        }
         characterFile_ = slot.plr;
         showLoading(true);
         leave([this, start] { startSolo(start); });
@@ -1962,7 +2001,7 @@ bool Menus::onSelClass(int message, gui::Window& from)
     // The class screen: pointing at a portrait picks its class and shows its description; clicking
     // one does nothing more. Accept goes on to the looks.
     if (message == gui::Hover) {
-        if (from.id >= kClassFirst && from.id <= kClassLast) {
+        if (from.id >= kClassFirst && from.id <= kClassLast && classOffered(from.id - kClassFirst)) {
             pickClass(from.id);
         }
         return true;
@@ -1974,6 +2013,12 @@ bool Menus::onSelClass(int message, gui::Window& from)
         leave([this] { enter(State::SelColor); });
     }
     return true;
+}
+
+bool Menus::classOffered(int playerClass) const
+{
+    const nox::modes::CampaignInfo* campaign = soloCampaignInfo();
+    return !campaign || (playerClass >= 0 && playerClass < 3 && (campaign->classes & (1u << playerClass)));
 }
 
 void Menus::pickClass(std::int32_t id)
@@ -2227,7 +2272,9 @@ void Menus::startNewSolo()
     namespace menu = nox::client::solo_menu;
     std::u16string name;
     const nox::player::FileInfo held = madeCharacter(name);
-    const std::string map(menu::firstMap(newClass_));
+    // (noxcpp: a mod's campaign begins at its own first map, whatever the class.)
+    const nox::modes::CampaignInfo* campaign = soloCampaignInfo();
+    const std::string map = campaign ? campaign->firstMap : std::string(menu::firstMap(newClass_));
     nox::player::Music music;
     music.solo = 1;
     if (callbacks_.music) {
@@ -2246,7 +2293,7 @@ void Menus::startNewSolo()
     start.info = nox::client::solo_saves::readPlr(plr).info; // (as the section writer left it)
     start.profile = profileOf(held);
     start.characterFile = plr;
-    start.map = gameDir_ / "maps" / map / (map + ".map");
+    start.map = campaign ? campaignMapPath(gameDir_, soloCampaign(), map) : gameDir_ / "maps" / map / (map + ".map");
     showLoading(true);
     leave([this, start] { startSolo(start); });
 }

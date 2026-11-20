@@ -6,6 +6,7 @@
 
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/script_ui.hpp"
+#include "noxcore/server/mode_maps.hpp"
 
 #include <algorithm>
 #include <string>
@@ -82,27 +83,45 @@ bool isModeFakeFlag(std::string_view flag)
     return std::ranges::any_of(modeUiEntries(), [&](const ModeUiEntry& e) { return std::ranges::find(e.fakeFlags, flag) != e.fakeFlags.end(); });
 }
 
-std::filesystem::path modeSaveRoot(const std::filesystem::path& soloRoot, std::string_view modeId)
+std::filesystem::path modeSaveRoot(const std::filesystem::path& soloRoot, std::string_view modeId, std::string_view campaign)
 {
     const ModeUiEntry* e = modeUiEntry(modeId);
     if (!e || !e->soloScreens) {
         return soloRoot;
     }
-    const std::filesystem::path root = soloRoot / e->soloScreens->saves;
+    std::filesystem::path root = soloRoot / e->soloScreens->saves;
+    if (!campaign.empty()) {
+        root /= std::filesystem::path("Mods") / std::string(campaign); // (beside the mode's Save\: never one of its slots)
+    }
     std::error_code ec;
     std::filesystem::create_directories(root / "Save", ec);
     return root;
 }
 
-void beginSoloScreensHost(App& app, std::string_view modeId, std::uint8_t playerClass, HostSettings& settings)
+void beginSoloScreensHost(App& app, std::string_view modeId, std::uint8_t playerClass, HostSettings& settings, std::string_view campaign)
 {
     if (app.modeKeptRoot.empty()) {
         app.modeKeptRoot = app.saveRoot;
-        app.saveRoot = modeSaveRoot(app.saveRoot, modeId);
+        app.saveRoot = modeSaveRoot(app.saveRoot, modeId, campaign);
     }
     settings.saveRoot = app.saveRoot;
     settings.modeId = std::string(modeId);
     settings.modeOptions["class"] = std::to_string(playerClass);
+    if (!campaign.empty()) {
+        settings.modeOptions["campaign"] = std::string(campaign);
+    }
+}
+
+std::filesystem::path campaignMapPath(const std::filesystem::path& gameDir, std::string_view campaign, const std::string& name)
+{
+    // (The maps the mod ships, as its games find them: its package's index, GameHost::findMap's.)
+    const nox::modes::Mode* mode = campaign.empty() ? nullptr : nox::modes::registry().find(campaign);
+    if (mode && mode->maps) {
+        if (const nox::server::ModeMaps::Entry* e = mode->maps->find(name)) {
+            return e->map;
+        }
+    }
+    return gameDir / "maps" / name / (name + ".map");
 }
 
 void endSoloScreensHost(App& app)

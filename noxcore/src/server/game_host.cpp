@@ -238,7 +238,7 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
         // (noxcpp: a saved game's copy hosted with room for guests: they're told the map's own file)
         const std::string stem = mapPath.stem().string();
         std::error_code ec;
-        if (const std::filesystem::path own = resolveNoCase(mapsDir() / stem / (stem + ".map")); std::filesystem::exists(own, ec)) {
+        if (const std::filesystem::path own = resolveNoCase(findMap(stem)); std::filesystem::exists(own, ec)) {
             try {
                 pristineCrc_ = map::loadMapFile(own).crc;
             } catch (const std::exception&) {
@@ -3290,8 +3290,7 @@ std::uint32_t GameHost::mapModesOf(const std::string& name)
     if (const auto it = mapModes_.find(name); it != mapModes_.end()) {
         return it->second;
     }
-    const fs::path mapsDir = !options_.mapsDir.empty() ? options_.mapsDir : mapPath_.parent_path().parent_path();
-    const fs::path path = mapsDir / name / (name + ".map");
+    const fs::path path = findMap(name);
     std::uint32_t modes = 0;
     try {
         if (fs::exists(resolveNoCase(path))) { // (in any case: maps/Fortress/fortress.map)
@@ -3322,6 +3321,24 @@ GameHost::ServerSettings GameHost::serverSettings()
     return s;
 }
 
+namespace {
+
+/// (noxcpp) A mode's own maps (Options::modeMaps) among the maps folder's `names`, each once (a
+/// name the folder has too is the mode's map in its game: findMap).
+void addModeMapNames(std::vector<std::string>& names, const ModeMaps* own)
+{
+    if (!own) {
+        return;
+    }
+    for (const ModeMaps::Entry& e : own->entries()) {
+        if (std::ranges::none_of(names, [&](const std::string& n) { return util::equalsNoCase(n, e.name); })) {
+            names.push_back(e.name);
+        }
+    }
+}
+
+} // namespace
+
 std::vector<GameHost::MapChoice> GameHost::mapChoices()
 {
     namespace fs = std::filesystem;
@@ -3334,6 +3351,7 @@ std::vector<GameHost::MapChoice> GameHost::mapChoices()
             names.push_back(e.path().filename().string());
         }
     }
+    addModeMapNames(names, options_.modeMaps.get());
     std::ranges::sort(names);
     std::vector<MapChoice> out;
     for (const auto& name : names) {
@@ -3346,7 +3364,7 @@ std::vector<GameHost::MapChoice> GameHost::mapChoices()
         MapChoice c;
         c.name = name;
         try {
-            const fs::path path = mapsDir / name / (name + ".map");
+            const fs::path path = findMap(name);
             if (fs::exists(resolveNoCase(path))) {
                 const auto file = map::loadMapFile(path);
                 if (file.find(map::MapInfo::kName)) {
@@ -3654,6 +3672,28 @@ std::filesystem::path GameHost::mapsDir() const
     return !options_.mapsDir.empty() ? options_.mapsDir : mapPath_.parent_path().parent_path();
 }
 
+std::filesystem::path GameHost::findMap(std::string_view name) const
+{
+    if (options_.modeMaps) {
+        if (const ModeMaps::Entry* own = options_.modeMaps->find(name)) {
+            return own->map;
+        }
+    }
+    const std::string n(name);
+    return mapsDir() / n / (n + ".map");
+}
+
+std::filesystem::path GameHost::findMap(const Options& o, std::string_view name)
+{
+    if (o.modeMaps) {
+        if (const ModeMaps::Entry* own = o.modeMaps->find(name)) {
+            return own->map;
+        }
+    }
+    const std::string n(name);
+    return o.mapsDir / n / (n + ".map");
+}
+
 void GameHost::loadRules()
 {
     // The map's load, after server_loadMapFile (a network game's, not a chat game's):
@@ -3926,6 +3966,21 @@ void GameHost::scanMaps()
             names.push_back(std::move(name));
         }
     }
+    if (options_.modeMaps) {
+        // (noxcpp) Its mode's own maps too, by the same rules (a name the folder has is the mode's).
+        std::vector<std::string> own;
+        addModeMapNames(own, options_.modeMaps.get());
+        for (std::string& name : own) {
+            const bool solo = name.size() > 3 && '0' <= name[3] && name[3] <= '9' &&
+                              (util::equalsNoCase(name.substr(0, 3), "wiz") || util::equalsNoCase(name.substr(0, 3), "war") ||
+                               util::equalsNoCase(name.substr(0, 3), "con"));
+            name = name.substr(0, 8);
+            if (!solo && mapModesOf(name) != 0 &&
+                std::ranges::none_of(names, [&](const std::string& n) { return util::equalsNoCase(n, name); })) {
+                names.push_back(std::move(name));
+            }
+        }
+    }
     std::ranges::sort(names); // (maplist_add: strcmp order)
     std::vector<std::pair<std::string, std::uint32_t>> list;
     if (!options_.questMapsOnly.empty()) {
@@ -3974,8 +4029,7 @@ void GameHost::loadNextMap()
         }
     }
     namespace fs = std::filesystem;
-    const fs::path mapsDir = !options_.mapsDir.empty() ? options_.mapsDir : mapPath_.parent_path().parent_path();
-    const auto pathOf = [&](const std::string& name) { return mapsDir / name / (name + ".map"); };
+    const auto pathOf = [&](const std::string& name) { return findMap(name); };
     fs::path next = mapPath_;
     std::string waypoint; // (mapLoad: "map:waypoint", the players put there)
     if (exitTo) {
@@ -4082,6 +4136,11 @@ void GameHost::loadNextMap()
     fastMapRequests_.clear(); // (noxcpp's fast map send: each client's first requests of this map)
     if (!(server_.world().gameFlags & GameFlag::Solo)) {
         mapSendLoadMap(); // (and, not in a solo game, its .nxz for downloads)
+    } else if (options_.soloGuests > 0) {
+        // (noxcpp) A solo game with guests: the last map's download gone, this one's read when a
+        // guest asks for it (mapSendLoadForGuests; the load aborted every send: nextMap).
+        mapSendData_.clear();
+        mapSendName_.clear();
     }
     // What the load tells the players goes through the important queue, and the load tick began
     // with every player's status 0x10 cleared (before): each gets it at

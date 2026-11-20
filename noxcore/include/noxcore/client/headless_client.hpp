@@ -481,6 +481,13 @@ public:
         std::function<void()> read;                                 ///< the flag lowered
     };
     void setSoloMap(SoloMap soloMap) { soloMap_ = std::move(soloMap); }
+    /// (noxcpp) The host's own client of a game whose mode ships maps (GameHost::Options::modeMaps):
+    /// the file the host has for a map's name (none: not the mode's), looked at before the maps
+    /// folder and checked against USE_MAP's CRC as they are. So the host never downloads its own.
+    void setHostMaps(std::function<std::optional<std::filesystem::path>(std::string_view name)> hostMaps)
+    {
+        hostMaps_ = std::move(hostMaps);
+    }
     /// What a game frame's input said (movement prediction replays them): moving (MoveForward),
     /// the facing sent (Orientation), the Action control, and the cursor the server has (MSG_MOUSE,
     /// world units).
@@ -553,6 +560,7 @@ private:
     std::filesystem::path mapCache_;
     std::filesystem::path mapPath_;
     SoloMap soloMap_;
+    std::function<std::optional<std::filesystem::path>(std::string_view)> hostMaps_;
     struct Download {
         std::string name;               ///< map name without extension
         std::uint32_t expectedCrc = 0;  ///< from USE_MAP

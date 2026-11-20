@@ -37,6 +37,9 @@ struct ModeListRow {
     bool soloScreens = false; ///< started through the solo screens (a campaign mode)
     bool fromMods = false;    ///< the mods folder's (ModeInfo::fromMods, or a folder that didn't load)
     std::vector<nox::modes::OptionSpec> options; ///< the settings shown under it
+    /// A mode that runs campaigns (ModeInfo::runsCampaigns) with a mod's installed: the Campaign
+    /// choice's (options' "campaign", first) mode ids by its value, "" the mode's own. Empty: none.
+    std::vector<std::string> campaigns;
     /// Built into the program (the lists put these first and mark them): Quest, the Map Editor and
     /// the modes registerBuiltinModes adds.
     bool builtIn() const { return !fromMods; }
@@ -45,9 +48,15 @@ struct ModeListRow {
 /// The list's rows: the modes built into the program that have a server side (Game Modes: those a
 /// player's own game alone doesn't host) by their order, Quest and the Map Editor; then the mods
 /// folder's modes the same way; then each folder `report` says didn't load. `soloScreens` says
-/// whether a mode starts through the solo screens (mode_ui.hpp; none: never).
+/// whether a mode starts through the solo screens (mode_ui.hpp; none: never). A mod's campaign
+/// (ModeInfo::campaign) is no row of its own: each mode that runs campaigns lists them in its
+/// Campaign choice, its first setting (with none installed, no such choice).
 std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Registry& registry, const nox::modes::ModsReport& report,
                                       const std::function<bool(std::string_view)>& soloScreens = {});
+
+/// The campaign `set` (a row's settings) chooses on `row` (its Campaign choice): its mode id; empty
+/// for the row's own campaign, or a row without the choice.
+std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set);
 
 /// The key a row is chosen again by, next time the list opens: a mode's id, "@quest", "@editor";
 /// empty for a broken folder (never kept).

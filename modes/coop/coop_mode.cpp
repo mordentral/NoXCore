@@ -5,11 +5,13 @@
 // as the option "class".
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/coop/coop.hpp"
+#include "noxcore/coop/coop_campaign.hpp"
 #include "noxcore/coop/coop_client.hpp"
 
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 namespace nox::modes {
@@ -34,7 +36,10 @@ void registerMode_coop(Registry& registry)
         {.key = "difficulty", .label = "Difficulty", .kind = OptionSpec::Kind::Choice, .choices = {"Easy", "Normal", "Hard", "Nightmare"},
          .defaultValue = 1, .legacyFlag = {}},
     };
-    m.makeServer = [](const ServerContext& ctx) {
+    // A mod's campaign (mode.json's "campaign") beside the game's own: Host Custom's row offers each
+    // as its Campaign choice, hosted with the option "campaign" naming the mod.
+    m.info.runsCampaigns = true;
+    m.makeServer = [](const ServerContext& ctx) -> std::unique_ptr<ServerMode> {
         coop::CoopDirector::Options o;
         if (const auto c = option(ctx.options, "class")) {
             o.campaignClass = static_cast<std::uint8_t>(std::clamp(std::atoi(std::string(*c).c_str()), 0, 2));
@@ -43,6 +48,13 @@ void registerMode_coop(Registry& registry)
             o.difficulty = std::clamp(std::atoi(std::string(*d).c_str()), 0, 3);
         }
         o.seed = ctx.seed;
+        if (const auto c = option(ctx.options, "campaign"); c && !c->empty()) {
+            const Mode* mod = nox::modes::registry().find(*c); // (the process's: the mods loaded)
+            if (!mod || !mod->info.campaign) {
+                throw std::runtime_error("no campaign \"" + std::string(*c) + "\" among the mods");
+            }
+            return std::make_unique<coop::CoopCampaign>(*mod, ctx, coop::campaignOptions(*mod->info.campaign, mod->info.maxPlayers, o));
+        }
         return std::make_unique<coop::CoopDirector>(o);
     };
     m.makeClient = [](client::HeadlessClient& c) { return std::make_unique<coop::CoopClient>(c); };

@@ -176,11 +176,16 @@ std::vector<ModeUiEntry>& modeUiEntries();
 const ModeUiEntry* modeUiEntry(std::string_view modeId);
 
 /// A solo-screens mode's saves' root under the solo one (made as it's asked for: a new game's
-/// character is written under its Save\ at once); the solo root itself for any other.
-std::filesystem::path modeSaveRoot(const std::filesystem::path& soloRoot, std::string_view modeId);
-/// About to host solo-screens mode `modeId` for class `playerClass`: the app's save root the
-/// mode's (the in-game save and load menus on its saves), the solo one kept; `settings` hosting it.
-void beginSoloScreensHost(App& app, std::string_view modeId, std::uint8_t playerClass, HostSettings& settings);
+/// character is written under its Save\ at once); the solo root itself for any other. A mod's
+/// campaign (`campaign`: its mode id) has its own under the mode's: <the mode's>\Mods\<id>.
+std::filesystem::path modeSaveRoot(const std::filesystem::path& soloRoot, std::string_view modeId, std::string_view campaign = {});
+/// About to host solo-screens mode `modeId` for class `playerClass` (`campaign`: a mod's campaign's
+/// mode id, empty the mode's own): the app's save root the mode's (the in-game save and load menus on
+/// its saves), the solo one kept; `settings` hosting it.
+void beginSoloScreensHost(App& app, std::string_view modeId, std::uint8_t playerClass, HostSettings& settings, std::string_view campaign = {});
+/// Where mod `campaign`'s map `name` is: the one it ships (its maps\<name>\<name>.map: the index its
+/// games find maps by, Mode::maps), else the game's maps folder's.
+std::filesystem::path campaignMapPath(const std::filesystem::path& gameDir, std::string_view campaign, const std::string& name);
 /// The game left, or its hosting failed: the solo saves' root back.
 void endSoloScreensHost(App& app);
 /// The game we host is a solo-screens mode's (a campaign mode hosted for guests, the co-op

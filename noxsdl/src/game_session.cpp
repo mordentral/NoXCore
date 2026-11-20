@@ -495,6 +495,14 @@ void startCinematics(App& app)
                     }
                 },
             });
+            // A mode's own maps (GameHost::Options::modeMaps): the host's client reads the host's
+            // files, never downloads them from itself. (The index is fixed: read from either thread.)
+            if (auto maps = app.host ? app.host->modeMaps() : nullptr) {
+                app.live->client().setHostMaps([maps = std::move(maps)](std::string_view name) -> std::optional<fs::path> {
+                    const nox::server::ModeMaps::Entry* e = maps->find(name);
+                    return e ? std::optional<fs::path>(e->map) : std::nullopt;
+                });
+            }
         }
 
         hooks.requestSave = [&app](const std::string& name) {

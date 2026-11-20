@@ -131,6 +131,7 @@ add_library(noxcore
     src/server/map_send.cpp
     src/server/map_vote.cpp
     src/server/map_state.cpp
+    src/server/mode_maps.cpp
     src/server/modes.cpp
     src/server/monsters.cpp
     src/server/name.cpp

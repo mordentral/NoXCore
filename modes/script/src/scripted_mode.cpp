@@ -5153,6 +5153,10 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
         impl.report(error);
         throw std::runtime_error(impl.package->manifest.info.id + ": " + error);
     }
+    // The maps it ships (its folder's maps\): this game's, found before the maps folder's.
+    if (impl.package->maps && !impl.package->maps->empty()) {
+        o.modeMaps = impl.package->maps;
+    }
     // Its generated maps (mode.json's mapPrefix): named by its slot, the last game's swept.
     Generation& gen = impl.parts.generation;
     gen.setUp(impl.package->manifest.info.mapPrefix, impl.ctx.slot, o.mapsDir, impl.ctx.things);
@@ -5186,7 +5190,7 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
                     lua_pop(L, 2);
                     throw std::runtime_error(impl.package->manifest.info.id + ": configure's map is a map's name (\"Estate\")");
                 }
-                map = o.mapsDir / name / (name + ".map");
+                map = server::GameHost::findMap(o, name); // (its own map of that name first)
             }
             lua_pop(L, 1);
             lua_rawgetfield(L, -1, "maxPlayers");

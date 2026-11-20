@@ -6,6 +6,7 @@
 #pragma once
 
 #include "noxcore/coop/coop.hpp"
+#include "noxcore/coop/coop_campaign.hpp"
 #include "noxcore/server/object_links.hpp"
 
 namespace nox::server {
@@ -34,6 +35,14 @@ struct Links<coop::CoopDirector::PartyCreature> {
 };
 
 template <>
+struct Links<coop::CoopCampaign> {
+    using S = coop::CoopCampaign;
+    static constexpr std::string_view name = "CoopCampaign";
+    // (Its director's own, carried by the director as for the game's own campaign: its carryLinks.)
+    static constexpr auto fields = std::tuple{NOX_LINK(S, director_, Nested)};
+};
+
+template <>
 struct Links<coop::CoopDirector> {
     using S = coop::CoopDirector;
     static constexpr std::string_view name = "CoopDirector";
@@ -53,7 +62,8 @@ struct Links<coop::CoopDirector> {
         NOX_LINK(S, partyCreatures_, Keep),
     };
     /// Every struct of the co-op's with a table (the test walks them).
-    using structs = LinkStructs<coop::CoopDirector::Member, coop::CoopDirector::Gather, coop::CoopDirector::PartyCreature, coop::CoopDirector>;
+    using structs = LinkStructs<coop::CoopDirector::Member, coop::CoopDirector::Gather, coop::CoopDirector::PartyCreature, coop::CoopDirector,
+                                coop::CoopCampaign>;
 };
 
 namespace detail {

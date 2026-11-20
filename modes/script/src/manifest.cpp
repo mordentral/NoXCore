@@ -100,6 +100,79 @@ OptionSpec optionOf(const json::Value& o, std::size_t index)
     return s;
 }
 
+/// Whether `name` may be a campaign map's: 1-31 of A-Z, a-z, 0-9, '_' and '-' (a maps folder's
+/// name, as an exit names it).
+bool validMapName(std::string_view name)
+{
+    return !name.empty() && name.size() <= 31 && std::ranges::all_of(name, [](char ch) {
+        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-';
+    });
+}
+
+bool sameNoCase(std::string_view a, std::string_view b)
+{
+    return a.size() == b.size() && std::ranges::equal(a, b, [](char x, char y) {
+               const auto low = [](char ch) { return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch + 32) : ch; };
+               return low(x) == low(y);
+           });
+}
+
+/// mode.json's "campaign": {"title", "firstMap", "classes", "maps"}.
+CampaignInfo campaignOf(const json::Value& c, const std::string& modeName)
+{
+    if (!c.isObject()) {
+        throw Bad{"\"campaign\" must be an object of \"title\", \"firstMap\", \"classes\" and \"maps\""};
+    }
+    for (const auto& [key, v] : *c.object) {
+        (void)v;
+        if (key != "title" && key != "firstMap" && key != "classes" && key != "maps") {
+            throw Bad{"\"campaign\": \"" + key + "\" isn't one (\"title\", \"firstMap\", \"classes\" or \"maps\")"};
+        }
+    }
+    CampaignInfo k;
+    k.title = text(c, "title", modeName, 32);
+    if (k.title.empty()) {
+        throw Bad{"\"campaign\": \"title\" is 1-32 letters"};
+    }
+    k.firstMap = text(c, "firstMap", "", 31);
+    if (!validMapName(k.firstMap)) {
+        throw Bad{"\"campaign\": \"firstMap\" is a map's name (1-31 of letters, digits, _ and -)"};
+    }
+    const json::Value* classes = field(c, "classes");
+    if (!classes || !classes->isArray() || classes->array->empty() || classes->array->size() > 3) {
+        throw Bad{"\"campaign\": \"classes\" lists 1-3 of \"warrior\", \"wizard\" and \"conjurer\""};
+    }
+    for (const json::Value& v : *classes->array) {
+        const std::uint8_t bit = !v.isString()              ? 0
+                                 : v.string == "warrior"   ? 1
+                                 : v.string == "wizard"    ? 2
+                                 : v.string == "conjurer"  ? 4
+                                                           : 0;
+        if (bit == 0 || (k.classes & bit)) {
+            throw Bad{"\"campaign\": \"classes\" lists 1-3 of \"warrior\", \"wizard\" and \"conjurer\", each once"};
+        }
+        k.classes |= bit;
+    }
+    if (const json::Value* maps = field(c, "maps")) {
+        if (!maps->isArray() || maps->array->size() > 256) {
+            throw Bad{"\"campaign\": \"maps\" is a list of at most 256 maps' names"};
+        }
+        for (const json::Value& v : *maps->array) {
+            if (!v.isString() || !validMapName(v.string)) {
+                throw Bad{"\"campaign\": each of \"maps\" is a map's name (1-31 of letters, digits, _ and -)"};
+            }
+            if (std::ranges::any_of(k.maps, [&](const std::string& n) { return sameNoCase(n, v.string); })) {
+                throw Bad{"\"campaign\": the map " + v.string + " is in \"maps\" twice"};
+            }
+            k.maps.push_back(v.string);
+        }
+        if (!k.maps.empty() && std::ranges::none_of(k.maps, [&](const std::string& n) { return sameNoCase(n, k.firstMap); })) {
+            throw Bad{"\"campaign\": \"firstMap\" " + k.firstMap + " isn't one of its \"maps\""};
+        }
+    }
+    return k;
+}
+
 } // namespace
 
 bool validModeId(std::string_view id)
@@ -218,6 +291,9 @@ ManifestResult readManifest(std::string_view text_)
                 }
                 (key == "anyClass" ? m.pickupAnyClass : m.pickupDuplicates) = v.boolean;
             }
+        }
+        if (const json::Value* c = field(doc, "campaign")) {
+            m.info.campaign = campaignOf(*c, m.info.name);
         }
         if (const json::Value* opts = field(doc, "options")) {
             if (!opts->isArray() || opts->array->size() > 32) {

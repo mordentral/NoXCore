@@ -538,8 +538,7 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         if (name.size() > 4 && equalsNoCase(std::string_view(name).substr(name.size() - 4), ".map")) {
             name.resize(name.size() - 4);
         }
-        const fs::path mapsDir = !options_.mapsDir.empty() ? options_.mapsDir : mapPath_.parent_path().parent_path();
-        const fs::path path = mapsDir / name / (name + ".map");
+        const fs::path path = findMap(name);
         std::uint32_t types = 0;
         try {
             if (!fs::exists(resolveNoCase(path))) {
