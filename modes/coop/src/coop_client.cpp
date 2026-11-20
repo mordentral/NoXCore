@@ -146,7 +146,7 @@ std::optional<coopmsg::SeenCells> CoopClient::takeSeen(std::string_view map)
     return std::exchange(seen_, std::nullopt);
 }
 
-std::filesystem::path campaignCharacterFile(const std::filesystem::path& characterFile)
+std::filesystem::path campaignCharacterFile(const std::filesystem::path& characterFile, const std::filesystem::path& folder)
 {
     if (characterFile.empty()) {
         return {};
@@ -156,13 +156,27 @@ std::filesystem::path campaignCharacterFile(const std::filesystem::path& charact
     if (!stem.ends_with(mark)) {
         stem += mark;
     }
-    return characterFile.parent_path() / std::filesystem::path(stem + u".plr");
+    return (folder.empty() ? characterFile.parent_path() : folder) / std::filesystem::path(stem + u".plr");
 }
 
-std::optional<client::SpellBars> guestBars(const std::filesystem::path& characterFile, player::CharacterClass characterClass, bool kept)
+std::filesystem::path guestCharacterFolder(const modes::Registry& registry, std::string_view campaignId)
+{
+    const modes::Mode* mod = campaignId.empty() ? nullptr : modes::installedCampaign(registry, campaignId);
+    const std::filesystem::path saves = mod ? modes::campaignSavesFolder(*mod) : std::filesystem::path();
+    if (saves.empty()) {
+        return {};
+    }
+    const std::filesystem::path dir = saves / "characters";
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    return !ec && std::filesystem::is_directory(dir, ec) ? dir : std::filesystem::path();
+}
+
+std::optional<client::SpellBars> guestBars(const std::filesystem::path& characterFile, player::CharacterClass characterClass, bool kept,
+                                           const std::filesystem::path& folder)
 {
     if (kept) {
-        const std::filesystem::path campaign = campaignCharacterFile(characterFile);
+        const std::filesystem::path campaign = campaignCharacterFile(characterFile, folder);
         if (!campaign.empty() && campaign != characterFile) {
             if (auto bars = client::SpellBars::read(campaign, characterClass)) {
                 return bars;

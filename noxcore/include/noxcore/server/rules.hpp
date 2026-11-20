@@ -86,4 +86,25 @@ bool writeRules(const std::filesystem::path& mapsDir, const std::string& map, co
 /// The rule sets in a map's folder (its *.rul but user.rul and the map's own).
 std::vector<std::string> ruleSets(const std::filesystem::path& mapsDir, const std::string& map);
 
+/// (noxcpp) Where one map's rule files are, for the functions below. A stock map's (ruleFolders:
+/// `mapsDir`\<map, 8 letters>\, its own <map, 8 letters>.rul, internet.rul in `mapsDir`'s parent)
+/// is read and written as above, nothing else. A mod's map (GameHost::ruleFoldersOf) keeps the
+/// files saved for it with the mod's saved data (`saved`, made as one is written) and reads one
+/// there first, then the one its mod ships beside the map (`shipped`: read only).
+struct RuleFolders {
+    std::filesystem::path saved;   ///< read first, and the one written to and deleted from
+    std::filesystem::path shipped; ///< read when `saved` has no such file (empty: none)
+    std::filesystem::path gameDir; ///< internet.rul's folder
+    std::string own;               ///< the map's own file's name, without ".rul"
+    bool make = false;             ///< `saved` made as a file is written (a stock map's never is)
+    bool readOnly = false;         ///< nothing written or deleted (a mod's map on a host that keeps no mod data)
+};
+RuleFolders ruleFolders(const std::filesystem::path& mapsDir, const std::string& map);
+RuleSet readRules(const RuleFolders& at, const std::optional<std::string>& file, int flags, std::uint32_t mode,
+                  const things::ThingDb& things, bool host = true, bool wol = false);
+bool writeRules(const RuleFolders& at, const std::string& file, const RuleSet& rules, std::uint32_t mode, const things::ThingDb& things,
+                bool wol = false);
+/// The rule sets of both folders, each name once (saved first), sorted.
+std::vector<std::string> ruleSets(const RuleFolders& at);
+
 } // namespace nox::server

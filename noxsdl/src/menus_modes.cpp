@@ -193,6 +193,12 @@ void Menus::modeList(ModeListFor list)
     const auto chosenRow = [state]() -> const Row* {
         return state->chosen >= 0 && state->chosen < static_cast<int>(state->rows.size()) ? &state->rows[static_cast<std::size_t>(state->chosen)] : nullptr;
     };
+    // A row's settings as last set (none set: each its default).
+    const auto settingsOf = [this](const Row& r) -> const nox::modes::OptionValues& {
+        static const nox::modes::OptionValues kNone;
+        const auto it = modeSettings_.find(r.id);
+        return it != modeSettings_.end() ? it->second : kNone;
+    };
     const auto choose = [this, state, kept](int row, bool sound) {
         const int n = static_cast<int>(state->rows.size());
         row = std::clamp(row, 0, std::max(0, n - 1));
@@ -236,14 +242,10 @@ void Menus::modeList(ModeListFor list)
                 }
                 break;
             default:
-                pendingModeOptions_ = modeSettings_[r.id]; // (its row's settings: the difficulty...)
-                // (Its Campaign choice as the mod it names: the option "campaign" is a mode's id,
-                // none for the mode's own.)
-                if (const std::string campaign = chosenCampaign(r, pendingModeOptions_); !campaign.empty()) {
-                    pendingModeOptions_["campaign"] = campaign;
-                } else {
-                    pendingModeOptions_.erase("campaign");
-                }
+                // (Its row's settings: the difficulty...; its Campaign choice as the mod it names,
+                // the option "campaign" a mode's id, none for the mode's own, with that mod's own
+                // settings: mode_list.hpp.)
+                pendingModeOptions_ = hostedModeOptions(r, modeSettings_[r.id]);
                 if (hosting && r.soloScreens) {
                     onSoloScreensMode(r.id); // (its own start: the class and character screens)
                 } else {
@@ -285,15 +287,18 @@ void Menus::modeList(ModeListFor list)
         if (from.id >= kOptionId && from.id < kOptionId + kVisibleOptions) {
             const Row* row = chosenRow();
             const std::size_t k = static_cast<std::size_t>(from.id - kOptionId);
-            if (!row || k >= row->options.size()) {
+            if (!row) {
                 return true;
             }
-            const nox::modes::OptionSpec& s = row->options[k];
+            nox::modes::OptionValues& set = modeSettings_[row->id];
+            const nox::modes::OptionSpec* s = shownOption(*row, set, k); // (a campaign's own after the row's)
+            if (!s) {
+                return true;
+            }
             // The value's left half goes back, the rest on.
             const SDL_Point pos = from.screenPos();
             const bool back = mouse_.x < pos.x + kOptionLabelW + kOptionValueW / 2;
-            nox::modes::OptionValues& set = modeSettings_[row->id];
-            set[s.key] = std::to_string(stepModeOption(s, modeOptionValue(set, s), back ? -1 : 1));
+            set[s->key] = std::to_string(stepModeOption(*s, modeOptionValue(set, *s), back ? -1 : 1));
             gui_.resources().sound(0x398);
             return true;
         }
@@ -319,7 +324,7 @@ void Menus::modeList(ModeListFor list)
         for (std::size_t c = 0; c < kColumnCount; ++c) {
             titles[c] = nox::l10n::tr(kColumns[c].title);
         }
-        canvas->draw = [chosenRow, hosting, titles](gui::Window& w, gui::Painter& p) {
+        canvas->draw = [settingsOf, chosenRow, hosting, titles](gui::Window& w, gui::Painter& p) {
             const SDL_Point pos = w.screenPos();
             for (std::size_t c = 0; c < kColumnCount; ++c) {
                 p.text(fit(p, titles[c], kColumns[c].w - 4, false), pos.x + kColumns[c].x, pos.y + kHeaderY, false, kGold); // (a long translation cut as the rows are)
@@ -351,17 +356,26 @@ void Menus::modeList(ModeListFor list)
                        x, y, false, kDim, kWidth - 24);
                 break;
             default: {
-                p.text(row->description, x, y, false, kGold, kWidth - 24); // (whole: the list's column cuts it)
+                // (A mod's campaign chosen: its mod's description, and its title in the heading.)
+                const nox::modes::OptionValues& set = settingsOf(*row);
+                const std::size_t campaign = chosenCampaignIndex(*row, set);
+                const bool modCampaign = campaign > 0 && campaign < row->campaignTitles.size();
+                p.text(modCampaign ? row->campaignAbout[campaign] : row->description, x, y, false, kGold,
+                       kWidth - 24); // (whole: the list's column cuts it)
                 const int sy = y + kAboutH;
-                if (row->options.empty()) {
+                const std::size_t shown = shownOptionCount(*row, set);
+                if (shown == 0) {
                     p.text(fit(p, nox::l10n::format(NOX_TR("menus.modes.no_settings", "{name}: no settings to choose here."), {{"name", row->name}}),
                                kWidth - 24, false),
                            x, sy, false, kDim);
                 } else {
-                    p.text(fit(p, nox::l10n::format(NOX_TR("menus.modes.settings_heading", "{name} settings"), {{"name", row->name}}),
+                    p.text(fit(p,
+                               modCampaign ? nox::l10n::format(NOX_TR("menus.modes.campaign_settings_heading", "{name} settings: {campaign}"),
+                                                               {{"name", row->name}, {"campaign", row->campaignTitles[campaign]}})
+                                           : nox::l10n::format(NOX_TR("menus.modes.settings_heading", "{name} settings"), {{"name", row->name}}),
                                kWidth - 24, false),
                            x, sy, false, kGold);
-                    if (row->options.size() > static_cast<std::size_t>(kVisibleOptions)) {
+                    if (shown > static_cast<std::size_t>(kVisibleOptions)) {
                         p.text(nox::l10n::format(NOX_TR("menus.modes.first_options", "(the first {n})"), {{"n", kVisibleOptions}}), x + 300,
                                sy, false, kDim);
                     }
@@ -373,7 +387,7 @@ void Menus::modeList(ModeListFor list)
     }
     for (int i = 0; i < kVisibleRows; ++i) {
         if (gui::Window* w = dialog_->find(kRowId + i)) {
-            w->draw = [state, i](gui::Window& win, gui::Painter& p) {
+            w->draw = [state, settingsOf, i](gui::Window& win, gui::Painter& p) {
                 const int row = state->scroll + i;
                 if (row >= static_cast<int>(state->rows.size())) {
                     return;
@@ -398,30 +412,40 @@ void Menus::modeList(ModeListFor list)
                 const std::string name =
                     r.builtIn() ? nox::l10n::format(NOX_TR("menus.modes.built_in_name", "{name} (built in)"), {{"name", r.name}}) : r.name;
                 p.text(fit(p, name, kColumns[0].w - 4, false), dx + kColumns[0].x, ty, false, c);
+                // (A mod's campaign chosen on it: its title there, the game's own's words otherwise.)
+                const std::size_t campaign = broken ? 0 : chosenCampaignIndex(r, settingsOf(r));
                 p.text(fit(p,
                            broken ? nox::l10n::format(NOX_TR("menus.modes.didnt_load_row", "Didn't load: {why}"), {{"why", r.description}})
-                                  : r.description,
+                           : campaign > 0 && campaign < r.campaignTitles.size()
+                               ? nox::l10n::format(NOX_TR("menus.modes.campaign_row", "{campaign}, with friends."),
+                                                   {{"campaign", r.campaignTitles[campaign]}})
+                               : r.description,
                            kColumns[1].w - 4, false),
                        dx + kColumns[1].x, ty, false, about);
                 p.text(fit(p, r.players.empty() ? "-" : r.players, kColumns[2].w - 4, false), dx + kColumns[2].x, ty, false, about);
-                p.text(fit(p, r.stock.empty() ? "-" : r.stock, kColumns[3].w - 4, false), dx + kColumns[3].x, ty, false, about);
+                const std::string& stock = campaign > 0 && campaign < r.campaignStock.size() ? r.campaignStock[campaign] : r.stock;
+                p.text(fit(p, stock.empty() ? "-" : stock, kColumns[3].w - 4, false), dx + kColumns[3].x, ty, false, about);
                 p.text(fit(p, r.levels.empty() ? "-" : r.levels, kColumns[4].w - 4, false), dx + kColumns[4].x, ty, false, about);
             };
         }
     }
     for (int i = 0; i < kVisibleOptions; ++i) {
         if (gui::Window* w = dialog_->find(kOptionId + i)) {
-            w->draw = [this, chosenRow, i](gui::Window& win, gui::Painter& p) {
+            w->draw = [settingsOf, chosenRow, i](gui::Window& win, gui::Painter& p) {
                 const Row* row = chosenRow();
-                if (!row || row->kind != Row::Kind::Mode || static_cast<std::size_t>(i) >= row->options.size()) {
+                if (!row || row->kind != Row::Kind::Mode) {
                     return;
                 }
-                const nox::modes::OptionSpec& s = row->options[static_cast<std::size_t>(i)];
+                const nox::modes::OptionValues& set = settingsOf(*row);
+                const nox::modes::OptionSpec* shown = shownOption(*row, set, static_cast<std::size_t>(i)); // (a campaign's own after the row's)
+                if (!shown) {
+                    return;
+                }
+                const nox::modes::OptionSpec& s = *shown;
                 const SDL_Point pos = win.screenPos();
                 const int ty = pos.y + (kOptionH - p.fontHeight(false)) / 2;
                 p.text(fit(p, s.label, kOptionLabelW - 8, false), pos.x, ty, false, kGold);
-                const auto it = modeSettings_.find(row->id);
-                const int v = it != modeSettings_.end() ? modeOptionValue(it->second, s) : s.defaultValue;
+                const int v = modeOptionValue(set, s);
                 const std::string value = fit(p, modeOptionText(s, v), kOptionValueW - 40, false);
                 const int vx = pos.x + kOptionLabelW;
                 p.text("<", vx, ty, false, kDim);

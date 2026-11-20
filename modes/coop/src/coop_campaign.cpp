@@ -26,14 +26,49 @@ CoopDirector::Options campaignOptions(const modes::CampaignInfo& campaign, int m
     return options;
 }
 
+modes::OptionValues campaignScriptOptions(const modes::Mode& mod, const modes::OptionValues& options)
+{
+    modes::OptionValues out;
+    const std::string prefix = mod.info.id + ".";
+    for (const auto& [key, value] : options) {
+        if (key.find('.') == std::string::npos) {
+            out.emplace(key, value); // (the co-op row's)
+        }
+    }
+    for (const modes::OptionSpec& s : mod.info.options) {
+        out.erase(s.key); // (its own key: its own setting alone, else its default)
+    }
+    for (const auto& [key, value] : options) {
+        if (key.size() > prefix.size() && key.starts_with(prefix)) {
+            out[key.substr(prefix.size())] = value;
+        }
+    }
+    return out;
+}
+
+namespace {
+
+/// The director's options for `mod`'s campaign: its id and title told to NoX Core players (Hello).
+CoopDirector::Options withCampaign(CoopDirector::Options options, const modes::Mode& mod)
+{
+    options.campaignId = mod.info.id;
+    options.campaignTitle = mod.info.campaign ? mod.info.campaign->title : mod.info.name;
+    return options;
+}
+
+} // namespace
+
 CoopCampaign::CoopCampaign(const modes::Mode& mod, const modes::ServerContext& ctx, CoopDirector::Options options)
-    : director_(options)
+    : director_(withCampaign(std::move(options), mod))
 {
     if (!mod.info.campaign || !mod.makeServer) {
         throw std::runtime_error(mod.info.id + ": not a campaign");
     }
     campaign_ = *mod.info.campaign;
-    std::unique_ptr<modes::ServerMode> made = mod.makeServer(ctx);
+    // (Its script made with its own settings, as on a row of its own: campaignScriptOptions.)
+    modes::ServerContext own = ctx;
+    own.options = campaignScriptOptions(mod, ctx.options);
+    std::unique_ptr<modes::ServerMode> made = mod.makeServer(own);
     if (auto* script = dynamic_cast<modes::script::ScriptedMode*>(made.get())) {
         script_.reset(script);
         (void)made.release();

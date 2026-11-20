@@ -349,6 +349,8 @@ private:
     std::string soloCampaign() const;
     /// Its declaration (null: none).
     const nox::modes::CampaignInfo* soloCampaignInfo() const;
+    /// Its title, as the class and character screens name it (campaign_line.hpp); empty: none.
+    std::string soloCampaignTitle() const;
     /// Whether the class screen offers class `playerClass` (0-2): every class but for a mod's
     /// campaign, whose own classes alone.
     bool classOffered(int playerClass) const;

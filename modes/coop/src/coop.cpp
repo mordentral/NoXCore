@@ -499,6 +499,8 @@ void CoopDirector::tellHello(server::GameHost& host, const Member& m)
     h.maxPlayers = static_cast<std::uint8_t>(options_.maxPlayers);
     h.youAreHost = m.host;
     h.characterKept = m.restored;
+    h.campaignId = options_.campaignId; // (the game's own: none, the message as it always was)
+    h.campaignTitle = options_.campaignTitle;
     if (const server::ServerObject* u = server::hostPlayer(world())) {
         h.hostNetCode = server::netCodeOf(*u);
     }

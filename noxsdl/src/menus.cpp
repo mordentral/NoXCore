@@ -2,6 +2,7 @@
 // they lead to one another); the XWIS chat lobby screen is in menus_wolchat.cpp.
 #include "menus.hpp"
 
+#include "campaign_line.hpp"
 #include "cinematics.hpp"
 #include "client_level_gate.hpp"
 #include "console.hpp"
@@ -453,10 +454,15 @@ void Menus::enter(State s)
         optsBack_->show(true);
         break;
     case State::SelChar: {
-        // game_showSelChar: from 440 above; the three lists move together.
-        screen_ = gui_.load(windowDir_ / "SelChar.wnd", [this](gui::Window&, int message, gui::Window& from) {
+        // game_showSelChar: from 440 above; the three lists move together. (noxcpp: a mod's
+        // campaign named between the heading and the lists: campaign_line.hpp.)
+        nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / "SelChar.wnd");
+        const std::string campaign = solo_ ? soloCampaignTitle() : std::string();
+        addCampaignLine(def, campaign, 108, 92, 400, 14);
+        screen_ = gui_.load(def, [this](gui::Window&, int message, gui::Window& from) {
             return shellSound(message) && message == gui::Clicked && onSelChar(from);
         });
+        drawCampaignLine(screen_, campaign);
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
         if (gui::Window* lists = screen_->find(kCharLists)) {
             lists->proc = screen_->proc; // wndSetProc: the lists' clicks reach the screen
@@ -493,10 +499,15 @@ void Menus::enter(State s)
         break;
     }
     case State::SelClass: {
-        // game_showSelClass: from 460 above. The portraits not picked are darkened.
-        screen_ = gui_.load(windowDir_ / "SelClass.wnd", [this](gui::Window&, int message, gui::Window& from) {
+        // game_showSelClass: from 460 above. The portraits not picked are darkened. (noxcpp: a
+        // mod's campaign named above the portraits: campaign_line.hpp.)
+        nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / "SelClass.wnd");
+        const std::string campaign = solo_ ? soloCampaignTitle() : std::string();
+        addCampaignLine(def, campaign, 99, 1, 442, 12);
+        screen_ = gui_.load(def, [this](gui::Window&, int message, gui::Window& from) {
             return shellSound(message) && onSelClass(message, from);
         });
+        drawCampaignLine(screen_, campaign);
         slides_.push_back(gui_.slideIn(screen_, {0, -460}, {0, 20}, {0, -40}));
         chosenClass_ = -1;
         for (std::int32_t id = kClassFirst; id <= kClassLast; ++id) {
@@ -819,6 +830,12 @@ std::string Menus::soloCampaign() const
     return c ? std::string(*c) : std::string();
 }
 
+std::string Menus::soloCampaignTitle() const
+{
+    const nox::modes::CampaignInfo* c = soloCampaignInfo();
+    return c ? c->title : std::string();
+}
+
 const nox::modes::CampaignInfo* Menus::soloCampaignInfo() const
 {
     const std::string id = soloCampaign();
@@ -888,6 +905,7 @@ void Menus::fillSoloList()
     names->lines.clear();
     lists->selectedLine = dates->selectedLine = names->selectedLine = -1;
     soloSlots_ = saves::list(soloRoot());
+    const std::string campaign = soloCampaignTitle();
     for (int i = 0; i < static_cast<int>(soloSlots_.size()); ++i) {
         const auto& slot = soloSlots_[static_cast<std::size_t>(i)];
         const nox::gui::Color c = paletteWindowColor(saves::lineColor(slot));
@@ -908,7 +926,7 @@ void Menus::fillSoloList()
         }
         lists->lines.push_back({" ", c});
         dates->lines.push_back({saves::whenText(slot.info.time), c});
-        names->lines.push_back({line, c});
+        names->lines.push_back({campaignSaveLine(std::move(line), campaign), c}); // (noxcpp: a mod's campaign's title after it)
     }
     if (const int newest = saves::latest(soloSlots_); newest != -1) {
         lists->selectedLine = dates->selectedLine = names->selectedLine = newest;

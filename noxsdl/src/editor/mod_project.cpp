@@ -7,6 +7,7 @@
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/modes/script/manifest.hpp"
 #include "noxcore/strings/l10n.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -462,6 +463,10 @@ std::vector<ModProject::Entry> ModProject::files() const
         const bool folder = e.is_directory(ec);
         if (folder && it.depth() >= 7) {
             it.disable_recursion_pending();
+        }
+        if (it.depth() == 0 && nox::util::equalsNoCase(e.path().filename().string(), nox::modes::kModSavesFolder)) {
+            it.disable_recursion_pending(); // (its players' saves: not the mod's files, never listed or exported)
+            continue;
         }
         std::string rel;
         try {

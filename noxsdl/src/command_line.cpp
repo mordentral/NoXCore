@@ -78,6 +78,16 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             (a == "--fake-xwis-games" ? opts.fakeXwisGames : opts.fakeWolConnecting) = true;
             continue;
         }
+        if (a == "--host-coop-campaign") {
+            // Tests: --host-coop with mod ID's campaign (its row's Campaign choice), from its first map.
+            hosting().solo = true;
+            app.hostSoloScreensTest = "coop";
+            app.hostCoopCampaignTest = next();
+            if (opts.hostSettings->map == "Estate") {
+                opts.hostSettings->map.clear();
+            }
+            continue;
+        }
         if (a == "--host") {
             hosting().map = next();
         } else if (a == "--host-port") {

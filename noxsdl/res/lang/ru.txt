@@ -8438,6 +8438,10 @@ menus.main.game_modes = Игровые режимы
 menus.modes.built_in_name = {name} (встроенный)
 #@ 96bbf648 mt: The game's own
 menus.modes.campaign_own = Кампания игры
+#@ bd7d04e8 mt: {campaign}, with friends.
+menus.modes.campaign_row = {campaign} вместе с друзьями.
+#@ 0845bcfd mt: {name} settings: {campaign}
+menus.modes.campaign_settings_heading = Настройки {name}: {campaign}
 #@ 66de7a09 mt: Description
 menus.modes.col_description = Описание
 #@ e75b310a mt: Levels
@@ -8540,6 +8544,8 @@ menus.servers.removed = Сохраненный адрес удален.
 menus.servers.select_saved = Выберите сохраненный адрес
 #@ b10cbd09 mt: Could not change servers.txt. Check that it is writable and try again.
 menus.servers.write_failed = Не удалось изменить servers.txt. Проверьте, что он доступен для записи, и попробуйте снова.
+#@ 3f618f8b mt: Campaign: {campaign}
+menus.solo.campaign_line = Кампания: {campaign}
 
 #@ a1cf2fd3 mt: Campaign
 modes.coop.campaign = Кампания

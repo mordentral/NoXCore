@@ -86,10 +86,28 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
                 if (c->info.campaign && c->makeServer) {
                     if (r.campaigns.empty()) {
                         r.campaigns.emplace_back();
+                        r.campaignTitles.emplace_back();
+                        r.campaignAbout.emplace_back();
+                        r.campaignStock.push_back(r.stock);
+                        r.campaignOptions.emplace_back();
                         choice.choices.push_back(NOX_TR("menus.modes.campaign_own", "The game's own"));
                     }
                     r.campaigns.push_back(c->info.id);
+                    r.campaignTitles.push_back(c->info.campaign->title);
+                    r.campaignAbout.push_back(c->info.description);
+                    // (A mod that refuses stock clients refuses them in its co-op campaign too: its own rule.)
+                    r.campaignStock.push_back(m->info.stockClients && c->info.stockClients ? NOX_TR("menus.modes.yes", "Yes")
+                                                                                            : NOX_TR("menus.modes.no", "No"));
                     choice.choices.push_back(c->info.campaign->title);
+                    // (Its own settings, as its own row would show them: its keys under its id.)
+                    std::vector<nox::modes::OptionSpec> own;
+                    for (const nox::modes::OptionSpec& s : c->info.options) {
+                        if (s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text) {
+                            own.push_back(s);
+                            own.back().key = c->info.id + "." + s.key;
+                        }
+                    }
+                    r.campaignOptions.push_back(std::move(own));
                 }
             }
             if (!r.campaigns.empty()) {
@@ -133,13 +151,62 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     return rows;
 }
 
-std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set)
+std::size_t chosenCampaignIndex(const ModeListRow& row, const nox::modes::OptionValues& set)
 {
     if (row.campaigns.empty() || row.options.empty() || row.options.front().key != "campaign") {
-        return {};
+        return 0;
     }
     const int v = modeOptionValue(set, row.options.front());
-    return v >= 0 && v < static_cast<int>(row.campaigns.size()) ? row.campaigns[static_cast<std::size_t>(v)] : std::string();
+    return v >= 0 && v < static_cast<int>(row.campaigns.size()) ? static_cast<std::size_t>(v) : 0;
+}
+
+std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set)
+{
+    const std::size_t i = chosenCampaignIndex(row, set);
+    return i < row.campaigns.size() ? row.campaigns[i] : std::string();
+}
+
+namespace {
+
+/// The chosen campaign's own settings (none: the row's own campaign).
+const std::vector<nox::modes::OptionSpec>* campaignOptionsOf(const ModeListRow& row, const nox::modes::OptionValues& set)
+{
+    const std::size_t i = chosenCampaignIndex(row, set);
+    return i > 0 && i < row.campaignOptions.size() ? &row.campaignOptions[i] : nullptr;
+}
+
+} // namespace
+
+std::size_t shownOptionCount(const ModeListRow& row, const nox::modes::OptionValues& set)
+{
+    const auto* own = campaignOptionsOf(row, set);
+    return row.options.size() + (own ? own->size() : 0);
+}
+
+const nox::modes::OptionSpec* shownOption(const ModeListRow& row, const nox::modes::OptionValues& set, std::size_t k)
+{
+    if (k < row.options.size()) {
+        return &row.options[k];
+    }
+    const auto* own = campaignOptionsOf(row, set);
+    k -= row.options.size();
+    return own && k < own->size() ? &(*own)[k] : nullptr;
+}
+
+nox::modes::OptionValues hostedModeOptions(const ModeListRow& row, nox::modes::OptionValues set)
+{
+    const std::string campaign = chosenCampaign(row, set);
+    // (Another campaign's settings, kept in the row's for when it's chosen again: not hosted.)
+    std::erase_if(set, [&](const auto& kv) {
+        const std::size_t dot = kv.first.find('.');
+        return dot != std::string::npos && (campaign.empty() || std::string_view(kv.first).substr(0, dot) != campaign);
+    });
+    if (!campaign.empty()) {
+        set["campaign"] = campaign;
+    } else {
+        set.erase("campaign");
+    }
+    return set;
 }
 
 std::string modeListKey(const ModeListRow& row)

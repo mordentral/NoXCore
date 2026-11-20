@@ -121,6 +121,7 @@ add_executable(noxsdl WIN32
     src/image_decoder.cpp
     src/menus.cpp
     src/mode_ui.cpp
+    src/campaign_line.cpp
     src/mods_folder.cpp
     src/menus_modes.cpp
     src/mode_list.cpp

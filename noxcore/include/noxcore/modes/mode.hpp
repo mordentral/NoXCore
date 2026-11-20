@@ -194,7 +194,16 @@ struct Mode {
     /// for a program that finds one before hosting (the menus' first map of a mod's campaign); null:
     /// none. Its games get them through their own configure (GameHost::Options::modeMaps).
     std::shared_ptr<const server::ModeMaps> maps;
+    /// A mod's folder (mods\<folder>\, loadMods'); empty: built into the program. What's in its
+    /// saves\ (kModSavesFolder) is its players' (a campaign's saves: registry.hpp's
+    /// campaignSavesFolder), never the mod's: nothing that reads the mod reads it.
+    std::filesystem::path folder;
 };
+
+/// The folder in a mod's own folder that holds its players' saves (a campaign mod's: the host's
+/// campaign saves, a guest's co-op characters), never part of the mod: its loading, its maps'
+/// index, the map editor's mod files (listed, sent to a session, exported) all pass it over.
+inline constexpr std::string_view kModSavesFolder = "saves";
 
 /// A host's set-up of the mode's server side it made (every host's, so each mode and mod gets
 /// it): the game told to NoX Core lists by the mode's name (GameHost::Options::modeName: a mod's

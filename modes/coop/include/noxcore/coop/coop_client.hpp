@@ -11,6 +11,7 @@
 #include "noxcore/client/spell_bars.hpp"
 #include "noxcore/coop/coop_proto.hpp"
 #include "noxcore/modes/mode.hpp"
+#include "noxcore/modes/registry.hpp"
 #include "noxcore/player/player_file.hpp"
 
 #include <cstdint>
@@ -106,8 +107,16 @@ private:
 
 /// A guest's campaign character beside the character it joined with (`characterFile`): "<name>
 /// (Co-op).plr" in the same folder, which the host's saves write (noxsdl's coop_ui). That file
-/// itself when it's the one joined with; none without one.
-std::filesystem::path campaignCharacterFile(const std::filesystem::path& characterFile);
+/// itself when it's the one joined with; none without one. With `folder` (a mod's campaign's:
+/// guestCharacterFolder) that name in `folder` instead: never the file joined with.
+std::filesystem::path campaignCharacterFile(const std::filesystem::path& characterFile, const std::filesystem::path& folder = {});
+
+/// Where a NoX Core guest keeps its co-op character for the campaign the host's Hello named
+/// (`campaignId`, from the network): the characters\ of that mod's players' saves (registry.hpp's
+/// campaignSavesFolder), made as it's asked for. Empty (the file beside the character, as for the
+/// game's own campaign) when no campaign is named, the id isn't a plain one of an installed
+/// campaign mod in `registry`, or its folder can't be made or written.
+std::filesystem::path guestCharacterFolder(const modes::Registry& registry, std::string_view campaignId);
 
 /// A NoX Core guest's spell bars once the host has greeted it (noxsdl's coop_ui). The bars of the
 /// file it joined with (`characterFile`) are loaded by then. Returns the bars to use instead, or
@@ -118,6 +127,7 @@ std::filesystem::path campaignCharacterFile(const std::filesystem::path& charact
 /// - otherwise a character no solo game saved (no GameData: a network character, or no file) gets
 ///   empty bars, as a new solo character's are, so no spell it doesn't know is on them. A late
 ///   joiner fills its bars from its book itself.
-std::optional<client::SpellBars> guestBars(const std::filesystem::path& characterFile, player::CharacterClass characterClass, bool kept);
+std::optional<client::SpellBars> guestBars(const std::filesystem::path& characterFile, player::CharacterClass characterClass, bool kept,
+                                           const std::filesystem::path& folder = {});
 
 } // namespace nox::coop

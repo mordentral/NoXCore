@@ -2,6 +2,7 @@
 #include "noxcore/mapedit/mod_files.hpp"
 
 #include "noxcore/mapedit/session_proto.hpp"
+#include "noxcore/modes/mode.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
@@ -107,6 +108,9 @@ bool modPathValid(std::string_view rel)
         if (++parts > kMaxModDepth) {
             return false; // (deeper than a mod's folder is ever read: readModFolder)
         }
+        if (parts == 1 && util::equalsNoCase(part, modes::kModSavesFolder)) {
+            return false; // (its players' saves: never the mod's, never listed, sent, written or removed as its files)
+        }
         start = slash + 1;
     }
     // (A file being written goes through "<name>.saving": never a mod file's own name.)
@@ -168,7 +172,8 @@ ModFolderFiles readModFolder(const fs::path& folder)
                 continue;
             }
             if (e.is_directory(ec)) {
-                if (it.depth() + 1 >= static_cast<int>(kMaxModDepth)) {
+                if (it.depth() + 1 >= static_cast<int>(kMaxModDepth) ||
+                    (it.depth() == 0 && util::equalsNoCase(e.path().filename().string(), modes::kModSavesFolder))) {
                     it.disable_recursion_pending(); // (no file in it could have a path modPathValid takes)
                 }
                 continue;

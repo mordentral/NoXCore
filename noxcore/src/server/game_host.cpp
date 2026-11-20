@@ -3709,6 +3709,28 @@ std::filesystem::path GameHost::findMap(const Options& o, std::string_view name)
     return o.mapsDir / n / (n + ".map");
 }
 
+RuleFolders GameHost::ruleFoldersOf(const std::string& name) const
+{
+    RuleFolders at = ruleFolders(mapsDir(), name); // (every map's but a mode's own: as always)
+    if (options_.modeMaps) {
+        if (const ModeMaps::Entry* own = options_.modeMaps->find(name)) {
+            // A mode's own map: its saved rules with the mod's saved data, the ones it ships after.
+            // (The index's name: a plain folder name, checked as the mod was read.)
+            at.own = own->name;
+            at.shipped = own->map.parent_path();
+            if (!options_.modeRulesDir.empty()) {
+                at.saved = options_.modeRulesDir / own->name;
+                at.make = true;
+            } else {
+                at.saved = at.shipped; // (nowhere to keep any: read only)
+                at.shipped.clear();
+                at.readOnly = true;
+            }
+        }
+    }
+    return at;
+}
+
 void GameHost::loadRules()
 {
     // The map's load, after server_loadMapFile (a network game's, not a chat game's):
@@ -3717,7 +3739,7 @@ void GameHost::loadRules()
     if (!(world.gameFlags & GameFlag::Network) || (world.gameFlags & GameFlag::Chat)) {
         rules_ = RuleSet{};
     } else {
-        rules_ = readRules(mapsDir(), mapPath_.stem().string(), std::nullopt, 3, world.gameFlags, things_);
+        rules_ = readRules(ruleFoldersOf(mapPath_.stem().string()), std::nullopt, 3, world.gameFlags, things_);
     }
     applyRules();
 }
@@ -3742,7 +3764,7 @@ void GameHost::applyRules()
 
 RuleSet GameHost::rulesFor(const std::string& map, std::uint32_t mode, const std::optional<std::string>& file)
 {
-    return readRules(mapsDir(), map, file, 7, mode, things_, true, server_.world().wolGame);
+    return readRules(ruleFoldersOf(map), file, 7, mode, things_, true, server_.world().wolGame);
 }
 
 std::optional<RuleSet> GameHost::internetRules()
@@ -3755,19 +3777,23 @@ std::optional<RuleSet> GameHost::internetRules()
 
 std::vector<std::string> GameHost::ruleSetsOf(const std::string& map)
 {
-    return ruleSets(mapsDir(), map);
+    return ruleSets(ruleFoldersOf(map));
 }
 
 bool GameHost::saveRuleSet(const std::string& map, const std::string& name, const RuleSet& rules, std::uint32_t mode)
 {
-    return writeRules(mapsDir(), map, name + ".rul", rules, mode, things_, server_.world().wolGame);
+    return writeRules(ruleFoldersOf(map), name + ".rul", rules, mode, things_, server_.world().wolGame);
 }
 
 void GameHost::deleteRuleSet(const std::string& map, const std::string& name)
 {
-    // maps\<map>\<name>.rul gone.
+    // maps\<map>\<name>.rul gone (a mode's own map's: the one saved for it; one it ships stays).
+    const RuleFolders at = ruleFoldersOf(map);
+    if (at.readOnly) {
+        return;
+    }
     std::error_code ec;
-    std::filesystem::remove(mapsDir() / map.substr(0, 8) / (name + ".rul"), ec);
+    std::filesystem::remove(at.saved / (name + ".rul"), ec);
 }
 
 GameHost::TeamsView GameHost::teamsView()
@@ -3941,8 +3967,9 @@ void GameHost::applyServerSettings(const ServerSettings& s)
         // The rules chosen into the map's user.rul for the mode, its other lines kept
         // (read, then written).
         RuleSet out = *s.rules;
-        out.other = readRules(mapsDir(), map, std::nullopt, 3, s.mode ? s.mode : world.gameFlags, things_).other;
-        writeRules(mapsDir(), map, "user.rul", out, s.mode ? s.mode : world.gameFlags, things_, world.wolGame);
+        const RuleFolders at = ruleFoldersOf(map); // (a mode's own map's with its mod's saved data)
+        out.other = readRules(at, std::nullopt, 3, s.mode ? s.mode : world.gameFlags, things_).other;
+        writeRules(at, "user.rul", out, s.mode ? s.mode : world.gameFlags, things_, world.wolGame);
     }
     if (!sameIgnoringCase(map, mapPath_.stem().string())) {
         nextMap(map);

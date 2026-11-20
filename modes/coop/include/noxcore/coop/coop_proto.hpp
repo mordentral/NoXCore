@@ -20,7 +20,9 @@ inline constexpr std::uint8_t kOp = 0xF7;
 // ---- server to client
 /// The campaign as the player joins it: {u8 the campaign's class (0 warrior, 1 wizard, 2 conjurer),
 /// u8 the most players, u8 flags (1: you are the host, 2: the campaign kept your character: don't
-/// send yours), u16 the host's net code}.
+/// send yours), u16 the host's net code}, then for a mod's campaign alone {u8 length, its mode id
+/// (1-24 of a-z, 0-9 and _), u8 length, its title's UTF-8 (1-32 bytes)} (the game's own: nothing
+/// more, as before; an older client reads the first five bytes and lets the rest go).
 inline constexpr std::uint8_t kHello = 1;
 /// A line the co-op rules tell a player, to show as a notice: {u8 kind (Notice), u8 length, its
 /// UTF-8 text}.
@@ -116,8 +118,14 @@ struct Hello {
     bool youAreHost = false;
     bool characterKept = false; ///< the campaign has the player's character (a returning one's)
     std::uint16_t hostNetCode = 0;
+    /// A mod's campaign (mode.json's "campaign"): its mode id and title; empty for the game's own.
+    std::string campaignId;
+    std::string campaignTitle;
     bool operator==(const Hello&) const = default;
 };
+/// A campaign's mode id and title in Hello at most this many bytes (manifest.cpp's limits).
+inline constexpr std::size_t kCampaignIdMost = 24;
+inline constexpr std::size_t kCampaignTitleMost = 32;
 
 struct Roster {
     struct Member {

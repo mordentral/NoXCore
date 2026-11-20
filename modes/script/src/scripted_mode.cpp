@@ -31,6 +31,7 @@
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
 #include "noxcore/util/random.hpp"
+#include "noxcore/util/text.hpp"
 #include "noxcore/video/nxz.hpp"
 
 #include "foes.hpp"
@@ -121,8 +122,8 @@ fs::file_time_type ModPackage::newest() const
     fs::file_time_type t = fs::file_time_type::min();
     std::error_code ec;
     for (fs::recursive_directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
-        if (it.depth() > 4) {
-            it.disable_recursion_pending();
+        if (it.depth() > 4 || (it.depth() == 0 && util::equalsNoCase(it->path().filename().string(), kModSavesFolder))) {
+            it.disable_recursion_pending(); // (too deep, or its players' saves: never the mod's)
             continue;
         }
         const fs::path& p = it->path();
@@ -5156,6 +5157,11 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
     // The maps it ships (its folder's maps\): this game's, found before the maps folder's.
     if (impl.package->maps && !impl.package->maps->empty()) {
         o.modeMaps = impl.package->maps;
+        // (Their saved rules with the mod's saved data, beside its store: a name no store key can
+        // have, keys being a-z, 0-9, _ and -. No moddata: only the rules it ships are read.)
+        if (!impl.ctx.modData.empty()) {
+            o.modeRulesDir = impl.ctx.modData / impl.package->manifest.info.id / "maps.rules";
+        }
     }
     // Its generated maps (mode.json's mapPrefix): named by its slot, the last game's swept.
     Generation& gen = impl.parts.generation;

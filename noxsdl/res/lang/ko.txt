@@ -8346,6 +8346,10 @@ menus.main.game_modes = 게임 모드
 menus.modes.built_in_name = {name}(기본 제공)
 #@ 96bbf648 mt: The game's own
 menus.modes.campaign_own = 게임 기본 캠페인
+#@ bd7d04e8 mt: {campaign}, with friends.
+menus.modes.campaign_row = 친구들과 함께하는 {campaign}입니다.
+#@ 0845bcfd mt: {name} settings: {campaign}
+menus.modes.campaign_settings_heading = {name} 설정: {campaign}
 #@ 66de7a09 mt: Description
 menus.modes.col_description = 설명
 #@ e75b310a mt: Levels
@@ -8448,6 +8452,8 @@ menus.servers.removed = 저장된 주소를 제거했습니다.
 menus.servers.select_saved = 저장된 주소 선택
 #@ b10cbd09 mt: Could not change servers.txt. Check that it is writable and try again.
 menus.servers.write_failed = servers.txt를 바꿀 수 없습니다. 쓰기 가능한지 확인하고 다시 시도하세요.
+#@ 3f618f8b mt: Campaign: {campaign}
+menus.solo.campaign_line = 캠페인: {campaign}
 
 #@ a1cf2fd3 mt: Campaign
 modes.coop.campaign = 캠페인

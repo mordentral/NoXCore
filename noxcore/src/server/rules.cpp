@@ -307,20 +307,44 @@ std::optional<std::string> ruleSection(std::uint32_t mode)
     return std::nullopt;
 }
 
+RuleFolders ruleFolders(const fs::path& mapsDir, const std::string& map)
+{
+    const std::string folder = map.substr(0, 8);
+    return RuleFolders{.saved = mapsDir / folder, .shipped = {}, .gameDir = mapsDir.parent_path(), .own = folder};
+}
+
+namespace {
+
+/// One of the map's files: the saved one, else the shipped one (nothing read: false).
+bool readFileAt(const RuleFolders& at, const std::string& name, RuleSet& rules, std::uint32_t mode, const things::ThingDb& things, bool host)
+{
+    if (readFile(at.saved / name, rules, mode, things, host)) {
+        return true;
+    }
+    return !at.shipped.empty() && readFile(at.shipped / name, rules, mode, things, host);
+}
+
+} // namespace
+
 RuleSet readRules(const fs::path& mapsDir, const std::string& map, const std::optional<std::string>& file, int flags,
                   std::uint32_t mode, const things::ThingDb& things, bool host, bool wol)
 {
+    return readRules(ruleFolders(mapsDir, map), file, flags, mode, things, host, wol);
+}
+
+RuleSet readRules(const RuleFolders& at, const std::optional<std::string>& file, int flags, std::uint32_t mode, const things::ThingDb& things,
+                  bool host, bool wol)
+{
     RuleSet rules;
-    const std::string folder = map.substr(0, 8);
     bool read = false;
     if (flags & 2) {
-        read = readFile(mapsDir / folder / (file ? *file : std::string("user.rul")), rules, mode & 0x17F0u, things, host);
+        read = readFileAt(at, file ? *file : std::string("user.rul"), rules, mode & 0x17F0u, things, host);
     }
     if ((flags & 1) && !read) {
-        readFile(mapsDir / folder / (folder + ".rul"), rules, mode & 0x17F0u, things, host);
+        readFileAt(at, at.own + ".rul", rules, mode & 0x17F0u, things, host);
     }
     if (wol && (flags & 4)) {
-        readFile(mapsDir.parent_path() / "internet.rul", rules, mode & 0x17F0u, things, host); // (the game's folder)
+        readFile(at.gameDir / "internet.rul", rules, mode & 0x17F0u, things, host); // (the game's folder)
     }
     if (mode & 0x40u) {
         rules.setSpell(0x84, false); // (a flagball game: no Wall)
@@ -331,8 +355,14 @@ RuleSet readRules(const fs::path& mapsDir, const std::string& map, const std::op
 bool writeRules(const fs::path& mapsDir, const std::string& map, const std::string& file, const RuleSet& rules, std::uint32_t mode,
                 const things::ThingDb& things, bool wol)
 {
-    if (mode & 0x80u) {
-        return false; // (a chat game's: not written)
+    return writeRules(ruleFolders(mapsDir, map), file, rules, mode, things, wol);
+}
+
+bool writeRules(const RuleFolders& at, const std::string& file, const RuleSet& rules, std::uint32_t mode, const things::ThingDb& things,
+                bool wol)
+{
+    if ((mode & 0x80u) || at.readOnly) {
+        return false; // (a chat game's, or a map whose rules have nowhere to be kept: not written)
     }
     // In a WOL game a spell's line is written only where internet.rul alone (flags 4) allows it,
     // or the map's file (flags 3: user.rul, else its own) has it off: internet.rul's own aren't
@@ -341,11 +371,14 @@ bool writeRules(const fs::path& mapsDir, const std::string& map, const std::stri
     RuleSet internet;
     RuleSet fileRules;
     if (wol) {
-        internet = readRules(mapsDir, map, std::nullopt, 4, mode, things, true, true);
-        fileRules = equalsNoCase(file, "user.rul") ? readRules(mapsDir, std::string(), std::nullopt, 0, mode, things)
-                                           : readRules(mapsDir, map, std::nullopt, 3, mode, things);
+        internet = readRules(at, std::nullopt, 4, mode, things, true, true);
+        fileRules = equalsNoCase(file, "user.rul") ? readRules(at, std::nullopt, 0, mode, things) : readRules(at, std::nullopt, 3, mode, things);
     }
-    const fs::path path = mapsDir / map.substr(0, 8) / lowered(file);
+    if (at.make) {
+        std::error_code ec;
+        fs::create_directories(at.saved, ec); // (a mod's map's: its folder in the mod's saved data, made as it's needed)
+    }
+    const fs::path path = at.saved / lowered(file);
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) {
         return false;
@@ -389,19 +422,31 @@ bool writeRules(const fs::path& mapsDir, const std::string& map, const std::stri
 
 std::vector<std::string> ruleSets(const fs::path& mapsDir, const std::string& map)
 {
+    return ruleSets(ruleFolders(mapsDir, map));
+}
+
+std::vector<std::string> ruleSets(const RuleFolders& at)
+{
     std::vector<std::string> out;
-    const std::string folder = map.substr(0, 8);
-    std::error_code ec;
-    for (const auto& e : fs::directory_iterator(mapsDir / folder, ec)) {
-        const fs::path p = e.path();
-        if (!equalsNoCase(p.extension().string(), ".rul")) {
+    for (const fs::path* dir : {&at.saved, &at.shipped}) {
+        if (dir->empty()) {
             continue;
         }
-        const std::string stem = p.stem().string();
-        if (equalsNoCase(stem, folder) || equalsNoCase(stem, "user")) {
-            continue;
+        std::error_code ec;
+        for (const auto& e : fs::directory_iterator(*dir, ec)) {
+            const fs::path p = e.path();
+            if (!equalsNoCase(p.extension().string(), ".rul")) {
+                continue;
+            }
+            const std::string stem = p.stem().string();
+            if (equalsNoCase(stem, at.own) || equalsNoCase(stem, "user")) {
+                continue;
+            }
+            if (dir == &at.shipped && std::ranges::any_of(out, [&](const std::string& s) { return equalsNoCase(s, stem); })) {
+                continue; // (one saved under that name: it's the one read)
+            }
+            out.push_back(stem);
         }
-        out.push_back(stem);
     }
     std::ranges::sort(out);
     return out;

@@ -1000,7 +1000,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         if (opts.hostSettings) {
             // Our own game: the server here on its port, and we join it like anyone else.
             if (opts.hostSettings->solo && opts.hostSettings->map.empty()) {
-                opts.hostSettings->map = std::string(nox::client::solo_menu::firstMap(opts.profile.playerClass));
+                const nox::modes::Mode* campaign =
+                    app->hostCoopCampaignTest.empty() ? nullptr : nox::modes::registry().find(app->hostCoopCampaignTest);
+                opts.hostSettings->map = campaign && campaign->info.campaign // (--host-coop-campaign: its first map, the one it ships)
+                                             ? campaignMapPath(app->gameDir, campaign->info.id, campaign->info.campaign->firstMap).string()
+                                             : std::string(nox::client::solo_menu::firstMap(opts.profile.playerClass));
             }
             if (!opts.hostSettings->solo) {
                 // nox.cfg's server switches (the command line's name, mode and limits stand).
@@ -1027,7 +1031,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 opts.hostSettings->updateRate = app->serverUpdateRate; // (noxcore.cfg's)
                 if (!app->hostSoloScreensTest.empty()) {
                     // (--host-coop: as Host Custom > Co-op Campaign's new campaign of --class's chain)
-                    beginSoloScreensHost(*app, app->hostSoloScreensTest, opts.profile.playerClass, *opts.hostSettings);
+                    beginSoloScreensHost(*app, app->hostSoloScreensTest, opts.profile.playerClass, *opts.hostSettings,
+                                         app->hostCoopCampaignTest); // (--host-coop-campaign: that mod's campaign)
                 }
                 opts.hostSettings->saveRoot = app->saveRoot;
                 newSoloCharacter(*app, opts.profile, opts.hostSettings->map);

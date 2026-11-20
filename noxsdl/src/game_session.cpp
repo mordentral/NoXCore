@@ -601,6 +601,7 @@ void startCinematics(App& app)
     }
     app.cinematics = std::make_unique<Cinematics>(res, app.gameDir, app.audio.get(), std::move(hooks));
     app.cinematics->setSaveRoot(app.saveRoot);
+    app.cinematics->setCampaignTitle(app.campaignTitle); // (a mod's campaign we host: its saves named; else none)
     if (app.host) {
         // (what the host reads of us between its calls, and our screen messages handled before
         // its queued calls run: local_host.hpp)

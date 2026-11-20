@@ -79,6 +79,15 @@ std::vector<std::uint8_t> helloMessage(const Hello& h)
     std::vector<std::uint8_t> r{h.campaignClass, h.maxPlayers,
                                 static_cast<std::uint8_t>((h.youAreHost ? 1u : 0u) | (h.characterKept ? 2u : 0u))};
     put16(r, h.hostNetCode);
+    if (!h.campaignId.empty()) {
+        // (A mod's campaign alone: the game's own's Hello stays its five bytes.)
+        putText(r, h.campaignId, kCampaignIdMost);
+        std::string_view title = std::string_view(h.campaignTitle).substr(0, std::min(h.campaignTitle.size(), kCampaignTitleMost));
+        while (!title.empty() && title.size() < h.campaignTitle.size() && (static_cast<unsigned char>(h.campaignTitle[title.size()]) & 0xC0) == 0x80) {
+            title.remove_suffix(1); // (cut between UTF-8 characters)
+        }
+        putText(r, title, kCampaignTitleMost);
+    }
     return framed(kHello, r);
 }
 
@@ -391,6 +400,18 @@ std::optional<Hello> parseHello(std::span<const std::uint8_t> rest)
     h.hostNetCode = in.u16();
     if (!in.ok || h.campaignClass > 2) {
         return std::nullopt;
+    }
+    if (in.at < rest.size()) {
+        // A mod's campaign: its id and title (a malformed one: no campaign named, the rest as sent).
+        Reader tail = in;
+        std::string id = tail.text();
+        std::string title = tail.text();
+        const bool plainId = !id.empty() && id.size() <= kCampaignIdMost &&
+                             std::ranges::all_of(id, [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; });
+        if (tail.ok && plainId && !title.empty() && title.size() <= kCampaignTitleMost) {
+            h.campaignId = std::move(id);
+            h.campaignTitle = std::move(title);
+        }
     }
     return h;
 }

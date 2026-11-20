@@ -8,6 +8,7 @@
 #include "noxcore/modes/mods.hpp"
 #include "noxcore/modes/registry.hpp"
 
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -40,6 +41,15 @@ struct ModeListRow {
     /// A mode that runs campaigns (ModeInfo::runsCampaigns) with a mod's installed: the Campaign
     /// choice's (options' "campaign", first) mode ids by its value, "" the mode's own. Empty: none.
     std::vector<std::string> campaigns;
+    /// By the same value: each campaign's title (the choice's label) and its mod's description;
+    /// the mode's own's empty.
+    std::vector<std::string> campaignTitles;
+    std::vector<std::string> campaignAbout;
+    std::vector<std::string> campaignStock; ///< (its Stock clients column: a mod that refuses them, "No")
+    /// By the same value: the settings a campaign's mod shows on its own (its Host Custom ones),
+    /// shown after the row's own while it's chosen, each key "<mod id>.<its key>" (a mode's own
+    /// keys are a-z, 0-9 and _: never one of these); the mode's own: none.
+    std::vector<std::vector<nox::modes::OptionSpec>> campaignOptions;
     /// Built into the program (the lists put these first and mark them): Quest, the Map Editor and
     /// the modes registerBuiltinModes adds.
     bool builtIn() const { return !fromMods; }
@@ -57,6 +67,18 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
 /// The campaign `set` (a row's settings) chooses on `row` (its Campaign choice): its mode id; empty
 /// for the row's own campaign, or a row without the choice.
 std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set);
+/// Its value (0: the row's own campaign, or a row without the choice).
+std::size_t chosenCampaignIndex(const ModeListRow& row, const nox::modes::OptionValues& set);
+
+/// The settings shown under `row` with `set`: its own, then the chosen campaign's (campaignOptions:
+/// none for the row's own campaign). How many, and the `k`th (null past the end).
+std::size_t shownOptionCount(const ModeListRow& row, const nox::modes::OptionValues& set);
+const nox::modes::OptionSpec* shownOption(const ModeListRow& row, const nox::modes::OptionValues& set, std::size_t k);
+
+/// What `row` is hosted with from its settings `set`: the chosen campaign's mode id as the option
+/// "campaign" (none for the row's own), its own settings kept, any other campaign's left out. A row
+/// without the Campaign choice: `set` without "campaign", as always.
+nox::modes::OptionValues hostedModeOptions(const ModeListRow& row, nox::modes::OptionValues set);
 
 /// The key a row is chosen again by, next time the list opens: a mode's id, "@quest", "@editor";
 /// empty for a broken folder (never kept).

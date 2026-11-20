@@ -34,6 +34,12 @@ namespace nox::coop {
 /// given when the campaign is played as it, else its first) and at most `maxPlayers` players.
 CoopDirector::Options campaignOptions(const modes::CampaignInfo& campaign, int maxPlayers, CoopDirector::Options options);
 
+/// The options campaign mod `mod`'s script is made with from the co-op game's `options`: its own
+/// settings as its own row would host them (each "<mod id>.<key>" of the co-op row's, the Campaign
+/// choice's mod's own: as "<key>"), none of the co-op row's of a key it declares itself, any other
+/// "<id>.<key>" left out; the co-op row's other options kept (class, difficulty, campaign).
+modes::OptionValues campaignScriptOptions(const modes::Mode& mod, const modes::OptionValues& options);
+
 class CoopCampaign final : public modes::ServerMode {
     /// (coop_links.hpp: its director's links, the director's own table.)
     template <class>

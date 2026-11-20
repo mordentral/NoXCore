@@ -89,6 +89,7 @@ ModsReport loadMods(const fs::path& modsDir, Registry& registry)
         m.info = package->manifest.info;
         m.info.fromMods = true; // (not built into the program: the lists show it after those that are)
         m.maps = package->maps; // (a campaign's first map found from the menus: the same index)
+        m.folder = folder;      // (its saves\: its players' saves, never read as the mod: mode.hpp's kModSavesFolder)
         m.makeServer = [package](const ServerContext& ctx) { return std::make_unique<script::ScriptedMode>(package, ctx); };
         // Its records, for a host that keeps a mode's records (its games' nox.records): <id>_records.txt
         // in the folder the host names. Nothing is written till the script puts a row.

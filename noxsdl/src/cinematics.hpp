@@ -223,6 +223,9 @@ public:
     void openSaveMenu() { openLoadMenu(); }
     /// The folder the saved games' Save\ is under (default: the game's; noxsdl's --save-dir).
     void setSaveRoot(std::filesystem::path root) { saveRoot_ = std::move(root); }
+    /// (noxcpp) The saves are a mod's campaign's (App::campaignTitle): the save menu names it, on
+    /// its heading and on each saved game. Empty (the game's own, any other game): as the game's.
+    void setCampaignTitle(std::string title) { campaignTitle_ = std::move(title); }
     /// (noxcpp: a campaign mode's guest, set by its UI) A chapter's loss screen ends as a
     /// start's does, faded back to the game, not in the load menu (the host loads); and isn't
     /// skipped for being seen before.
@@ -345,6 +348,7 @@ private:
     ThingArt art_{res_.things};
     std::filesystem::path gameDir_;
     std::filesystem::path saveRoot_; ///< (empty: gameDir_)
+    std::string campaignTitle_;      ///< (setCampaignTitle)
     Audio* audio_ = nullptr;
     Hooks hooks_;
     std::unique_ptr<Link> link_;

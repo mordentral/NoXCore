@@ -4,6 +4,8 @@
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 
@@ -104,6 +106,38 @@ Registry& registry()
 {
     static Registry r;
     return r;
+}
+
+const Mode* installedCampaign(const Registry& registry, std::string_view id)
+{
+    const bool plain = !id.empty() && id.size() <= 24 &&
+                       std::ranges::all_of(id, [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; });
+    const Mode* m = plain ? registry.find(id) : nullptr;
+    return m && m->info.campaign && !m->folder.empty() && m->info.id == id ? m : nullptr;
+}
+
+std::filesystem::path campaignSavesFolder(const Mode& mod)
+{
+    if (mod.folder.empty() || !mod.info.campaign) {
+        return {};
+    }
+    namespace fs = std::filesystem;
+    const fs::path dir = mod.folder / std::string(kModSavesFolder);
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    if (ec || !fs::is_directory(dir, ec)) {
+        return {};
+    }
+    // (Made, or there already: written to? A read-only install's folder may be there and refuse.)
+    const fs::path probe = dir / ".write-test";
+    {
+        std::ofstream f(probe, std::ios::binary | std::ios::trunc);
+        if (!f || !(f << 'x') || !f.flush()) {
+            return {};
+        }
+    }
+    fs::remove(probe, ec);
+    return dir;
 }
 
 } // namespace nox::modes

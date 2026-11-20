@@ -383,6 +383,11 @@ public:
         /// when the mod was read: mode_maps.hpp), found by name before the maps folder's in every
         /// lookup of this game (findMap). Null, as every game but such a mode's: the maps folder alone.
         std::shared_ptr<const ModeMaps> modeMaps;
+        /// (noxcpp: with modeMaps) Where its maps' saved rules go, each map's in a folder of its
+        /// name under it (ruleFoldersOf): the mod's saved data's (a script mode's configure sets
+        /// <ServerContext::modData>\<id>\maps.rules). Empty: its maps' rules are only read (those
+        /// shipped beside them), never written.
+        std::filesystem::path modeRulesDir;
         /// The game's folder, where execrul finds its .rul files (OTQuest.rul); empty: the maps
         /// folder's parent, as it is in every game but the map editor's quest play-test (whose
         /// maps folder is its own).
@@ -510,6 +515,11 @@ public:
     /// The same before a host is made (a mode's configure naming its first map): `o.mapsDir` as
     /// given.
     static std::filesystem::path findMap(const Options& o, std::string_view name);
+    /// (noxcpp) Where the map `name`'s rule files (.rul) are read, written and deleted for this game
+    /// (rules.hpp's RuleFolders): its mode's own map's (Options::modeMaps) are kept in
+    /// Options::modeRulesDir\<name>\ and read there first, then beside the map in its mod's folder;
+    /// every other map's are <mapsDir>\<name, 8 letters>\ as they always were.
+    RuleFolders ruleFoldersOf(const std::string& name) const;
     /// The game as XWIS lists it (the WOL record GAME.EXE posts: lobby::makeWolRecord): the name,
     /// the map, the mode, the players and their limit, the quest's stage, the Access settings
     /// (closed, password, the classes refused, the ping limits). The port is the caller's.

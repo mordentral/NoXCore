@@ -264,7 +264,11 @@ struct App {
     /// SoloScreensStart): the solo saves' root, kept while saveRoot is the mode's (back at the
     /// game's end: endSoloScreensHost). Empty: not hosting one.
     std::filesystem::path modeKeptRoot;
+    /// The mod's campaign it hosts (the Campaign choice: mode.json's "campaign" title), while it's
+    /// hosted (beginSoloScreensHost to endSoloScreensHost); empty: none, or the game's own.
+    std::string campaignTitle;
     std::string hostSoloScreensTest; ///< (tests: --host-coop, that mode of --class's hosted: its id)
+    std::string hostCoopCampaignTest; ///< (tests: --host-coop-campaign ID, mod ID's campaign so hosted)
     bool sessionInGame = false;
     bool sessionHosting = false;
     bool sessionNoticed = false;
