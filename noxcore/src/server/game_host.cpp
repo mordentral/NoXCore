@@ -2111,11 +2111,26 @@ void GameHost::onClientReady(std::uint8_t peer)
                 sendImportant(peer, World::textMessage(strings::fromUtf8(options_.stockRefusal->notice), 0));
             }
         }
+        players_[peer].watchingForMap = false;
         return;
     }
     if (options_.onClientReady) {
         options_.onClientReady(*this, peer); // (noxcpp: a mode told, e.g. to send its multiclass word)
     }
+    // (noxcpp) A map request's watching is over with this ready (the mode had its say on it).
+    if (const auto it = players_.find(peer); it != players_.end()) {
+        it->second.watchingForMap = false;
+    }
+}
+
+bool GameHost::watchingForMap(std::uint8_t peer)
+{
+    const auto it = players_.find(peer);
+    if (it == players_.end() || !it->second.watchingForMap) {
+        return false;
+    }
+    const ServerObject* unit = server_.world().byExtent(it->second.extent);
+    return unit && unit->player && unit->player->observing && !unit->player->heldOut;
 }
 
 // INCOMING_CLIENT (SrvNet_OnIncomingClient): the player into the game, told of everyone and everything

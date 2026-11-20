@@ -180,6 +180,10 @@ struct HostedPlayer {
     /// messages to everyone wait for its CLIENT_READY (frees a node only once each
     /// in-game player has it).
     bool joined = false;
+    /// (noxcpp) Sent watching by its map request (MSG_REQUEST_MAP: it was in play, and the request's
+    /// Plr_GoObserver made it an observer) and not ready since: what a mode may put right at that
+    /// CLIENT_READY (GameHost::watchingForMap). Its next ready ends it.
+    bool watchingForMap = false;
     std::uint32_t heardAt = 0;     ///< (Player's: the frame of its last packet, SrvNet_OnPacket)
     std::uint8_t slot = 0;        ///< its bit in objects' syncMask (0-31)
     float viewHalfWidth = 320;     ///< half its screen (CLIENT_ACCEPT's size / 2: Player view)
@@ -490,6 +494,11 @@ public:
     /// (ServerTransport::latency); the host's own (player 0x1F's) is the latency compensation's:
     /// 0 none, 1 the least of the others' over 0, 2 their average, 3 the amount set. 0 for no player.
     int latencyOf(std::uint8_t peer) const;
+    /// (noxcpp) Whether the player on `peer` is watching only because its map request sent it so
+    /// (HostedPlayer::watchingForMap): asked by a mode at that request's CLIENT_READY
+    /// (Options::onClientReady), false once the ready is over. A player that went watching any other
+    /// way (its own request, an idle client's, a mode's hold) is never this.
+    bool watchingForMap(std::uint8_t peer);
     const Options& options() const noexcept { return options_; }
     /// Where the game's maps are (Options::mapsDir; none: the map's folder's parent).
     std::filesystem::path mapsDir() const;

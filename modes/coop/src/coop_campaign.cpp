@@ -58,6 +58,7 @@ std::filesystem::path CoopCampaign::configure(server::GameHost::Options& o)
     const auto questScreens = o.questScreens;
     const auto questSaves = o.questSaves;
     const auto questMapsOnly = o.questMapsOnly;
+    const auto forceClass = o.forceClass; // (a quest's forced class: the party's is the host's)
     const auto mapCycleOn = o.mapCycleOn;
     const auto mapVote = o.mapVote;
     const auto sandboxNoScoring = o.sandboxNoScoring;
@@ -71,6 +72,7 @@ std::filesystem::path CoopCampaign::configure(server::GameHost::Options& o)
     o.questScreens = questScreens;
     o.questSaves = questSaves;
     o.questMapsOnly = questMapsOnly;
+    o.forceClass = forceClass;
     o.mapCycleOn = mapCycleOn;
     o.mapVote = mapVote;
     o.sandboxNoScoring = sandboxNoScoring; // (a stock mode's look: none here)

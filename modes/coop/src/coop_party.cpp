@@ -567,9 +567,12 @@ void CoopDirector::clientReady(server::GameHost& host, std::uint8_t peer)
         return;
     }
     // A guest that downloaded the map went watching as it asked for it, out of its team (the game's
-    // map request): a solo game has no way back for it, so it's back in play now, in the party's
-    // team by the host, as its join put it.
-    if (server::ServerObject* u = it->host ? nullptr : host.unitOf(peer); u && u->player && u->player->observing) {
+    // map request: Plr_GoObserver, free to join). The game's way back is its own Action, alone at a
+    // player start (Plr_UpdateObserver's rejoin), not with the party: so it's back in play now, in
+    // the party's team by the host, as its join put it. Only that one (GameHost::watchingForMap): a
+    // guest watching by its own choice (the observer command, an idle client's) or a mode's hold
+    // stays watching, as in the game.
+    if (server::ServerObject* u = it->host ? nullptr : host.unitOf(peer); u && u->player && host.watchingForMap(peer)) {
         server::Fight f = host.server().fight();
         server::leaveObserver(f, *u);
         u->player->cameraFollow = 0;

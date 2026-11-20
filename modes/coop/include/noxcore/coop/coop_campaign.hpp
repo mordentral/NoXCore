@@ -48,8 +48,8 @@ public:
 
     /// The director's options, then the script's (its configure run: a failing script throws, the
     /// game isn't hosted); the co-op campaign's own game kept whatever the script asked (a solo game
-    /// with room for the guests, no quest, no map cycle or vote, the game's flags); the game told to
-    /// NoX Core lists by the campaign's title. No map: the host's.
+    /// with room for the guests, no quest and no class it forces, no map cycle or vote, the game's
+    /// flags); the game told to NoX Core lists by the campaign's title. No map: the host's.
     std::filesystem::path configure(server::GameHost::Options& o) override;
     void attach(server::GameHost& host) override;
     void tick(server::GameHost& host, std::uint32_t nowMs) override;
