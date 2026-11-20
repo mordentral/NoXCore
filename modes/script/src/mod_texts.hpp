@@ -9,9 +9,9 @@
 // change that names its key finds it. Stock clients and older NoX Core ones are sent nothing and
 // keep their own nox.csf's texts. A mode that never calls nox.setText keeps and sends nothing;
 // nothing runs per frame. nox.tellStory opens a story dialog as TellStory does, with the mode's own
-// speaker. A story dialog's speaker name, which the server looks up itself ("NPC:<name>") and sends
-// as text, is the mode's key's text in the player's language first (ModeHooks::playerText), for
-// every client. (Internal to the script modes' sources.)
+// speaker. A story dialog's speaker name and a shop window's title, which the server looks up
+// itself ("NPC:<name>") and sends as text, are the mode's key's text in the player's language first
+// (ModeHooks::playerText), for every client. (Internal to the script modes' sources.)
 #pragma once
 
 #include <cstddef>
@@ -70,7 +70,7 @@ public:
     /// The server's own lookup of `key` for the player `peer` (none: one without a client, the host's
     /// language): the mode's text in that player's language (as its client would get it), none when
     /// the key isn't the mode's.
-    /// (ModeHooks::playerText: a story dialog's speaker name.)
+    /// (ModeHooks::playerText: a story dialog's speaker name, a shop window's title.)
     std::optional<std::u16string> textFor(const server::GameHost& host, std::optional<std::uint8_t> peer, std::string_view key) const;
     /// A player's map loaded (CLIENT_READY): a client the overlay reaches and hasn't had it gets
     /// the whole set.

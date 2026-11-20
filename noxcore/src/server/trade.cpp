@@ -10,7 +10,9 @@
 
 #include "noxcore/script/vm.hpp"
 #include "noxcore/server/combat.hpp"
+#include "noxcore/server/dialog.hpp"
 #include "noxcore/server/items.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/rewards.hpp"
@@ -23,7 +25,9 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <optional>
 #include <string>
+#include <utility>
 
 namespace nox::server {
 
@@ -259,16 +263,22 @@ void sendStartShop(World& world, const TradeSession& s)
         return;
     }
     // Its name: "NPC:" and its script name (its type's without one) after its last ':', no
-    // '_', from the string table.
-    std::string name = keeper->scriptName.empty() ? keeper->typeName : keeper->scriptName;
-    if (const auto colon = name.rfind(':'); colon != std::string::npos) {
-        name = name.substr(colon + 1);
+    // '_', from the string table (dialog.hpp's npcNameLabel, the dialog speaker's).
+    // (noxcpp: a mode's own text for that label for this player first, ModeHooks::playerText,
+    // cut at a whole character to the field's 24 letters; without a mode, or when it has none,
+    // the string table's as the game's.)
+    const std::string label = npcNameLabel(*keeper);
+    std::optional<std::u16string> modeName;
+    if (world.modeHooks) {
+        modeName = world.modeHooks->playerText(world, *player, label);
     }
-    std::erase(name, '_');
-    const std::u16string text = world.text("NPC:" + name);
+    const std::u16string text = modeName ? fitDialogTitle(std::move(*modeName), 24) : world.text(label);
     std::vector<std::uint8_t> m = {0xC9, 0x0D, lo(keeper->type), hi(keeper->type)};
+    // (wcsncpy of 24 letters, the rest zeros, then the 25th a zero.)
+    bool ended = false;
     for (std::size_t i = 0; i < 25; ++i) {
-        const char16_t c = i < 24 && i < text.size() ? text[i] : u'\0';
+        const char16_t c = !ended && i < 24 && i < text.size() ? text[i] : u'\0';
+        ended = ended || c == u'\0';
         m.push_back(static_cast<std::uint8_t>(c));
         m.push_back(static_cast<std::uint8_t>(c >> 8));
     }

@@ -5040,9 +5040,9 @@ public:
         impl_.guarded("castCost", [&] { priced = impl_.parts.events.castCost(impl_.vm->thread(), caster, spell, mana, trap, price.mana, price.health); });
         return priced ? std::optional(price) : std::nullopt;
     }
-    // ---- A story dialog's speaker name (its "NPC:<name>"): nox.setText's text for the key, in the
-    // player's language; none (the string table's) for a key the mode hasn't set, or a held-out
-    // stock player.
+    // ---- A story dialog's speaker name, a shop window's title (its "NPC:<name>"): nox.setText's text
+    // for the key, in the player's language; none (the string table's) for a key the mode hasn't
+    // set, or a held-out stock player.
     std::optional<std::u16string> playerText(const server::World&, const server::ServerObject& player, std::string_view label) override
     {
         if (!impl_.host || impl_.parts.texts.size() == 0 || impl_.hidden(player)) {

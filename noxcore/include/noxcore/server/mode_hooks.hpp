@@ -173,8 +173,9 @@ struct ModeHooks {
     }
     /// Asked (noxcpp): a string-table text the server writes into a message for one player alone
     /// (Str_GetString of `label`): the mode's own text for that player, or nullopt for the string
-    /// table's. Asked at one place: a story dialog's speaker name ("NPC:<name>", SrvNet_OpenNpcDialog's,
-    /// when no speaker is given), once a dialog, never a frame.
+    /// table's. Asked at two places, both "NPC:<name>": a story dialog's speaker name
+    /// (SrvNet_OpenNpcDialog's, when no speaker is given), once a dialog, and the shop window's title
+    /// (SrvNet_SendTradeStartShop's), once a shop opened; never a frame.
     virtual std::optional<std::u16string> playerText(const World& world, const ServerObject& player, std::string_view label)
     {
         (void)world;

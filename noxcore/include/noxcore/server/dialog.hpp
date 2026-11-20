@@ -43,8 +43,9 @@ std::string npcNameLabel(const ServerObject& npc);
 void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name);
 /// (noxcpp) A mode's name for that title (ModeHooks::playerText's answer) cut to its 31 UTF-16 letters
 /// at a whole character: a surrogate pair the 31st letter would split is left out, as nox.tellStory's
-/// speaker (strings::fromUtf8Cut) is. The string table's names are written as they are.
-std::u16string fitDialogTitle(std::u16string name);
+/// speaker (strings::fromUtf8Cut) is. The string table's names are written as they are. `letters`:
+/// another field's length (the shop window's title, 24).
+std::u16string fitDialogTitle(std::u16string name, std::size_t letters = 31);
 /// MSG_DIALOG 3 as SrvNet_OpenNpcDialog builds it (135 bytes; what the exe leaves of its stack
 /// as zeros): its text's id at +2, the NPC's name at +0x22 (Str_GetString("NPC:" + its script
 /// name after any ':' without '_', or its type's), 31 UTF-16 letters), 0 at +0x60, the sound at

@@ -105,11 +105,12 @@ void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name)
     }
 }
 
-std::u16string fitDialogTitle(std::u16string name)
+std::u16string fitDialogTitle(std::u16string name, std::size_t letters)
 {
-    // (31 letters, the title's; the 31st a pair's first half: the 30 before it.)
-    if (name.size() > 31) {
-        name.resize(name[30] >= 0xD800 && name[30] <= 0xDBFF ? 30 : 31);
+    // (`letters`, the field's (31 the dialog title's); the last a pair's first half: the ones
+    // before it.)
+    if (letters > 0 && name.size() > letters) {
+        name.resize(name[letters - 1] >= 0xD800 && name[letters - 1] <= 0xDBFF ? letters - 1 : letters);
     }
     return name;
 }
