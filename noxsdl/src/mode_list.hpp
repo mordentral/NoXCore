@@ -77,7 +77,8 @@ const nox::modes::OptionSpec* shownOption(const ModeListRow& row, const nox::mod
 
 /// What `row` is hosted with from its settings `set`: the chosen campaign's mode id as the option
 /// "campaign" (none for the row's own), its own settings kept, any other campaign's left out. A row
-/// without the Campaign choice: `set` without "campaign", as always.
+/// without the Campaign choice: `set` without "campaign" (one left from a choice it had), unless
+/// "campaign" is a setting of the mode's own: then kept, as any of its settings.
 nox::modes::OptionValues hostedModeOptions(const ModeListRow& row, nox::modes::OptionValues set);
 
 /// The key a row is chosen again by, next time the list opens: a mode's id, "@quest", "@editor";

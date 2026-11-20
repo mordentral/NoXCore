@@ -12347,16 +12347,16 @@ lobby.browser.xwis_logging_in = XWIS: logging in as {nick}
 # noxcore/src/lobby/browser.cpp:283
 #@ a1d5c981: XWIS: timed out
 lobby.browser.xwis_timed_out = XWIS: timed out
-# noxsdl/src/menus.cpp:1077
+# noxsdl/src/menus.cpp:1080
 #@ 639e2803: Log in to XWIS (a new name makes a new account with this password)
 lobby.login.go_tip = Log in to XWIS (a new name makes a new account with this password)
 # noxsdl/src/wol_screens.hpp:35
 #@ 7d20314c: Log in with your XWIS account. A new name becomes your account with the password you type; for a name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a game you host is listed under a generated one).
 lobby.login.help = Log in with your XWIS account. A new name becomes your account with the password you type; for a name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a game you host is listed under a generated one).
-# noxsdl/src/menus.cpp:1072
+# noxsdl/src/menus.cpp:1075
 #@ 68ee0803: Skip Login
 lobby.login.skip = Skip Login
-# noxsdl/src/menus.cpp:1073
+# noxsdl/src/menus.cpp:1076
 #@ f4f63f02: Go to the game list with no login name (a game you host is listed on XWIS under a generated one)
 lobby.login.skip_tip = Go to the game list with no login name (a game you host is listed on XWIS under a generated one)
 # noxcore/src/lobby/servserv.cpp:282, noxcore/src/lobby/servserv.cpp:293, noxcore/src/lobby/servserv.cpp:430
@@ -12621,10 +12621,10 @@ menus.modes.no_settings = {name}: no settings to choose here.
 # noxsdl/src/menus_modes.cpp:73
 #@ c3492022: Open Mods Folder
 menus.modes.open_mods_folder = Open Mods Folder
-# noxsdl/src/mode_list.cpp:252
+# noxsdl/src/mode_list.cpp:254
 #@ 0dc6b4aa: Off
 menus.modes.option_off = Off
-# noxsdl/src/mode_list.cpp:252
+# noxsdl/src/mode_list.cpp:254
 #@ 60e47df0: On
 menus.modes.option_on = On
 # noxsdl/src/menus_modes.cpp:348
@@ -12648,25 +12648,25 @@ menus.modes.start = Start
 # noxsdl/src/mode_list.cpp:62, noxsdl/src/mode_list.cpp:99, noxsdl/src/mode_list.cpp:133 ...
 #@ b3a43630: Yes
 menus.modes.yes = Yes
-# noxsdl/src/menus.cpp:2325
+# noxsdl/src/menus.cpp:2328
 #@ 034ee216: Check that your save folder is writable and has free space. See the log for details.
 menus.save_failed.body = Check that your save folder is writable and has free space. See the log for details.
-# noxsdl/src/menus.cpp:2324
+# noxsdl/src/menus.cpp:2327
 #@ 0685388d: Save failed
 menus.save_failed.title = Save failed
 # noxsdl/src/menus_servers.cpp:151, noxsdl/src/menus_servers.cpp:213
 #@ 9dc3aa14: Add
 menus.servers.add = Add
-# noxsdl/src/menus.cpp:616
+# noxsdl/src/menus.cpp:618
 #@ 02f448d1: Add/Remove
 menus.servers.add_remove = Add/Remove
-# noxsdl/src/menus.cpp:618
+# noxsdl/src/menus.cpp:620
 #@ 06e309b3: Add or remove saved server addresses
 menus.servers.add_remove_tip = Add or remove saved server addresses
 # noxsdl/src/menus_servers.cpp:184
 #@ 858b3346: Server added.
 menus.servers.added = Server added.
-# noxsdl/src/menus.cpp:1896
+# noxsdl/src/menus.cpp:1899
 #@ aa489a85: Address not found. Refresh to try again.
 menus.servers.address_not_found_refresh = Address not found. Refresh to try again.
 # noxsdl/src/menus_servers.cpp:211
@@ -12690,13 +12690,13 @@ menus.servers.confirm_remove = Remove saved address?
 # noxsdl/src/menus_servers.cpp:98
 #@ 435c2969: Add/Remove Servers
 menus.servers.dialog_title = Add/Remove Servers
-# noxsdl/src/menus.cpp:628, noxsdl/src/menus_modes.cpp:477
+# noxsdl/src/menus.cpp:630, noxsdl/src/menus_modes.cpp:477
 #@ c67511e6: Host Custom
 menus.servers.host_custom = Host Custom
-# noxsdl/src/menus.cpp:1333
+# noxsdl/src/menus.cpp:1336
 #@ 6a810ecf: Saved server
 menus.servers.info_saved_server = Saved server
-# noxsdl/src/menus.cpp:1333
+# noxsdl/src/menus.cpp:1336
 #@ 6d7302f2: Server
 menus.servers.info_server = Server
 # noxsdl/src/menus_servers.cpp:117

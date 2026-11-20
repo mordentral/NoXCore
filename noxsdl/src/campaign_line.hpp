@@ -4,6 +4,7 @@
 // other game: no line, the screen loaded as it always was.
 #pragma once
 
+#include "campaign_text.hpp"
 #include "gui.hpp"
 
 #include "noxcore/gui/window_file.hpp"
@@ -21,9 +22,6 @@ inline constexpr std::int32_t kCampaignLineId = 4290;
 void addCampaignLine(nox::gui::WindowDef& def, const std::string& title, int x, int y, int width, int height);
 /// The line's window in `screen` (addCampaignLine's) drawing `title` ("Campaign: <title>").
 void drawCampaignLine(gui::Window* screen, const std::string& title);
-
-/// A saved game's line on those screens ("<name> the <class> - <place>") with its campaign's
-/// title after it; as it is for an empty `title`.
-std::string campaignSaveLine(std::string line, const std::string& title);
+// (Its words, campaignSaveLine and campaignSavePlace: campaign_text.hpp.)
 
 } // namespace noxsdl

@@ -203,7 +203,9 @@ nox::modes::OptionValues hostedModeOptions(const ModeListRow& row, nox::modes::O
     });
     if (!campaign.empty()) {
         set["campaign"] = campaign;
-    } else {
+    } else if (!row.campaigns.empty() || std::ranges::none_of(row.options, [](const nox::modes::OptionSpec& s) { return s.key == "campaign"; })) {
+        // (The Campaign choice's own campaign, or one left from a choice the row no longer has:
+        // none. A mode's own setting of that name, on a row without the choice, is its own.)
         set.erase("campaign");
     }
     return set;

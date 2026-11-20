@@ -512,10 +512,12 @@ void Menus::enter(State s)
         chosenClass_ = -1;
         for (std::int32_t id = kClassFirst; id <= kClassLast; ++id) {
             if (gui::Window* w = screen_->find(id)) {
-                w->draw = [this](gui::Window& self, gui::Painter& p) {
-                    if (self.id != chosenClass_) {
+                // (noxcpp: a class a mod's campaign doesn't offer darker still, and off below:
+                // campaign_text.hpp's classPortraitShade. Every class offered otherwise.)
+                w->draw = [this, offered = classOffered(id - kClassFirst)](gui::Window& self, gui::Painter& p) {
+                    if (const std::uint8_t shade = classPortraitShade(self.id == chosenClass_, offered); shade != 0) {
                         const SDL_Point pos = self.screenPos();
-                        p.fillAlpha(pos.x, pos.y, self.rect.w, self.rect.h, {0, 0, 0, 128});
+                        p.fillAlpha(pos.x, pos.y, self.rect.w, self.rect.h, {0, 0, 0, shade});
                     }
                 };
             }
@@ -524,8 +526,8 @@ void Menus::enter(State s)
         if (const auto kept = kept_.take<optionstrip::SelClassKept>(); kept && kept->chosen >= 0 && classOffered(kept->chosen - kClassFirst)) {
             pickClass(kept->chosen);
         }
-        // (noxcpp) A mod's campaign is played as its classes alone: the others' portraits off, and
-        // its one class picked when it has one.
+        // (noxcpp) A mod's campaign is played as its classes alone: the others' portraits off (darker
+        // than a class not picked, above, and never picked), and its one class picked when it has one.
         if (soloCampaignInfo()) {
             int offered = 0;
             std::int32_t only = -1;
@@ -922,7 +924,8 @@ void Menus::fillSoloList()
         if (slot.name == "AUTOSAVE") {
             line += " " + gui_.text("AutoSaveLabel", "GUISave.c");
         } else {
-            line += " - " + gui_.text(std::string(saves::stageLabel(slot.info.questStage, cls)));
+            // (noxcpp: a mod's campaign's at the map it was saved on: campaign_text.hpp.)
+            line += " - " + campaignSavePlace(gui_.text(std::string(saves::stageLabel(slot.info.questStage, cls))), slot.info.mapName, campaign);
         }
         lists->lines.push_back({" ", c});
         dates->lines.push_back({saves::whenText(slot.info.time), c});

@@ -38,12 +38,4 @@ void drawCampaignLine(gui::Window* screen, const std::string& title)
     };
 }
 
-std::string campaignSaveLine(std::string line, const std::string& title)
-{
-    if (!title.empty()) {
-        line += " - " + title;
-    }
-    return line;
-}
-
 } // namespace noxsdl

@@ -1575,7 +1575,9 @@ void Cinematics::fillLoadMenu()
         if (slot.name == "AUTOSAVE") {
             line += " " + gui_.text("AutoSaveLabel", "GUISave.c");
         } else {
-            line += " - " + text(std::string(nox::client::solo_saves::stageLabel(slot.info.questStage, cls)));
+            // (noxcpp: a mod's campaign's at the map it was saved on: campaign_text.hpp.)
+            line += " - " + campaignSavePlace(text(std::string(nox::client::solo_saves::stageLabel(slot.info.questStage, cls))), slot.info.mapName,
+                                              campaignTitle_);
         }
         lists->lines.push_back({" ", c});
         dates->lines.push_back({nox::client::solo_saves::whenText(slot.info.time), c});
