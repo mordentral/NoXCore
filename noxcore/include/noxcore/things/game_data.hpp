@@ -101,5 +101,8 @@ float gameNumber(const GameData* data, const GameDataKey& key, std::uint32_t gam
 GameData parseGameData(std::string_view text);
 /// Reads and decrypts gamedata.bin. Throws on a missing file.
 GameData loadGameData(const std::filesystem::path& path);
+/// The same from the file's bytes (encrypted); `contentPacks` off: the installed content packs not
+/// applied (a mod's own copy, read as it ships on every side: data_files.hpp).
+GameData gameDataFromFile(std::vector<std::uint8_t> file, bool contentPacks);
 
 } // namespace nox::things

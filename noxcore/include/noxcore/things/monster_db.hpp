@@ -118,5 +118,8 @@ struct MonsterDb {
 /// Parses decrypted monster.bin text for a solo game's numbers or a network game's.
 MonsterDb parseMonsterDb(std::string_view text, bool solo);
 MonsterDb loadMonsterDb(const std::filesystem::path& path, bool solo);
+/// The same from the file's bytes (encrypted); `contentPacks` off: the installed content packs not
+/// applied (a mod's own copy, read as it ships on every side: data_files.hpp).
+MonsterDb monsterDbFromFile(std::vector<std::uint8_t> file, bool solo, bool contentPacks);
 
 } // namespace nox::things

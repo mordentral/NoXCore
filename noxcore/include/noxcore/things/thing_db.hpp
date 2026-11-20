@@ -276,5 +276,9 @@ ThingDb parseThingDb(std::span<const std::uint8_t> plain);
 
 /// Reads and decrypts thing.bin.
 ThingDb loadThingDb(const std::filesystem::path& path);
+/// The same from a thing.bin's bytes as they are in the file (encrypted); `contentPacks` off: the
+/// installed content packs not applied (a mod's own copy, read as it ships on every side:
+/// data_files.hpp). Throws as loadThingDb does.
+ThingDb thingDbFromFile(std::vector<std::uint8_t> file, bool contentPacks);
 
 } // namespace nox::things

@@ -6363,7 +6363,7 @@ editor.play.behind_editor = (full window, behind the editor)
 # noxsdl/src/editor/play_view.cpp:269, noxsdl/src/editor/play_view.cpp:313
 #@ 48db4540: (click the game to play)
 editor.play.click_to_play = (click the game to play)
-# noxsdl/src/editor_glue.cpp:735
+# noxsdl/src/editor_glue.cpp:737
 #@ e01f1fe1: couldn't start {program}: {error}
 editor.play.couldnt_start = couldn't start {program}: {error}
 # noxsdl/src/editor/play_view.cpp:258
@@ -6375,7 +6375,7 @@ editor.play.edit_f2_tip = Back to editing: your character stands aside as an obs
 # noxsdl/src/editor/play_view.cpp:265, noxsdl/src/editor/play_view.cpp:309
 #@ 502cba0c: ({key} frees the mouse)
 editor.play.frees_mouse = ({key} frees the mouse)
-# noxsdl/src/editor_glue.cpp:230, noxsdl/src/editor_glue.cpp:616
+# noxsdl/src/editor_glue.cpp:231, noxsdl/src/editor_glue.cpp:618
 #@ 1700be1d: a game is already running here
 editor.play.game_running = a game is already running here
 # noxsdl/src/editor/play_view.cpp:197
@@ -6396,10 +6396,10 @@ editor.play.hint_session_click = Click the game to play,  F2 edits
 # noxsdl/src/editor/play_view.cpp:183
 #@ 6c88cc30: F2 edits,  {key} frees the mouse
 editor.play.hint_session_release = F2 edits,  {key} frees the mouse
-# noxsdl/src/editor_glue.cpp:253
+# noxsdl/src/editor_glue.cpp:254
 #@ 9de6eb6a: the mod {mod} doesn't load: {why}
 editor.play.mod_doesnt_load = the mod {mod} doesn't load: {why}
-# noxsdl/src/editor_glue.cpp:257
+# noxsdl/src/editor_glue.cpp:258
 #@ be04e1cd: no mod {mod} in {folder}
 editor.play.no_mod = no mod {mod} in {folder}
 # noxsdl/src/editor/play_view.cpp:286
@@ -6426,7 +6426,7 @@ editor.play.playing_in_session = Playing in the session
 # noxsdl/src/editor/play_view.cpp:231
 #@ 86e4e260: Private Test
 editor.play.private_test = Private Test
-# noxsdl/src/editor_glue.cpp:696
+# noxsdl/src/editor_glue.cpp:698
 #@ 25fb2827: a private test is running already (close its window first)
 editor.play.private_test_running = a private test is running already (close its window first)
 # noxsdl/src/editor/play_view.cpp:234
@@ -10234,7 +10234,7 @@ editor.session.in_session = In the session: {map}
 # noxsdl/src/editor/session_panel.cpp:401
 #@ 59439eaf: In step with the session: {map}
 editor.session.in_step = In step with the session: {map}
-# noxsdl/src/editor_glue.cpp:881
+# noxsdl/src/editor_glue.cpp:883
 #@ de861393: This game is a map editor session: F2 opens the editor (/edit asks the host for edit rights).
 editor.session.joined_notice = This game is a map editor session: F2 opens the editor (/edit asks the host for edit rights).
 # noxsdl/src/editor/session_panel.cpp:105
@@ -10325,7 +10325,7 @@ editor.session.no_maps = No maps found.
 # noxsdl/src/editor/session_setup.cpp:151
 #@ 5eca17a1: No map matches.
 editor.session.no_match = No map matches.
-# noxsdl/src/editor_glue.cpp:598
+# noxsdl/src/editor_glue.cpp:600
 #@ a73c491d: The edit session wasn't hosted: {error}
 editor.session.not_hosted = The edit session wasn't hosted: {error}
 # noxsdl/src/editor/session_panel.cpp:288
@@ -12238,47 +12238,50 @@ editor.window.waypoints = Waypoints
 # noxsdl/src/app.cpp:113
 #@ 2329c92c: Team
 game.chat.team = Team
-# noxsdl/src/game_session.cpp:45
+# noxsdl/src/game_data_swap.cpp:60
+#@ 7007f0e1: another game is hosted here
+game.data.hosting_other = another game is hosted here
+# noxsdl/src/game_session.cpp:47
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2051
+# noxsdl/src/main.cpp:2052
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2024
+# noxsdl/src/main.cpp:2025
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2028
+# noxsdl/src/main.cpp:2029
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2059
+# noxsdl/src/main.cpp:2060
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2054
+# noxsdl/src/main.cpp:2055
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2038
+# noxsdl/src/main.cpp:2039
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2041
+# noxsdl/src/main.cpp:2042
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2053
+# noxsdl/src/main.cpp:2054
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
 #@ 00c5ff51: Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left | Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
 game.leaving.notice[one] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left
 game.leaving.notice[other] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
-# noxsdl/src/main.cpp:1172
+# noxsdl/src/main.cpp:1173
 #@ 41598c12: {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
 game.load_failed.error_other = {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
-# noxsdl/src/main.cpp:1168
+# noxsdl/src/main.cpp:1169
 #@ a52d10c8: {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.error_windows = {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:676
+# noxsdl/src/main.cpp:677
 #@ da4003ab: Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.no_game = Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:675, noxsdl/src/main.cpp:1177
+# noxsdl/src/main.cpp:676, noxsdl/src/main.cpp:1178
 #@ 28bae6e6: NoX Core: loading failed
 game.load_failed.title = NoX Core: loading failed
 # noxsdl/src/map_vote_window.cpp:175
@@ -13241,25 +13244,25 @@ server.bots.one_fewer = One fewer
 # noxsdl/src/server_options.cpp:445
 #@ d868d598: One more
 server.bots.one_more = One more
-# noxsdl/src/hosting.cpp:153
+# noxsdl/src/hosting.cpp:154
 #@ b5df2b27: dead
 server.bots.state_dead = dead
-# noxsdl/src/hosting.cpp:152
+# noxsdl/src/hosting.cpp:153
 #@ e6f385da: downloading the map
 server.bots.state_downloading_map = downloading the map
-# noxsdl/src/hosting.cpp:150
+# noxsdl/src/hosting.cpp:151
 #@ 847db527: joining
 server.bots.state_joining = joining
-# noxsdl/src/hosting.cpp:156
+# noxsdl/src/hosting.cpp:157
 #@ 010382db: leaving
 server.bots.state_leaving = leaving
-# noxsdl/src/hosting.cpp:154
+# noxsdl/src/hosting.cpp:155
 #@ 71ef5835: playing
 server.bots.state_playing = playing
-# noxsdl/src/hosting.cpp:151
+# noxsdl/src/hosting.cpp:152
 #@ 8bad92da: waiting for the map
 server.bots.state_waiting_map = waiting for the map
-# noxsdl/src/hosting.cpp:155
+# noxsdl/src/hosting.cpp:156
 #@ 75a4b320: watching
 server.bots.state_watching = watching
 # noxsdl/src/server_options.cpp:440
@@ -13316,10 +13319,10 @@ server.general.update_rate_hz = {rate} Hz
 # noxsdl/src/server_options_server.cpp:614
 #@ 089cc1d7: How often NoX Core players get the characters' and spells' positions: smoother at 60-120 Hz. The game itself, and players on the original game, stay at 30.
 server.general.update_rate_tip = How often NoX Core players get the characters' and spells' positions: smoother at 60-120 Hz. The game itself, and players on the original game, stay at 30.
-# noxsdl/src/hosting.cpp:299
+# noxsdl/src/hosting.cpp:301
 #@ 8993a927: Players outside your network may not be able to join: forward UDP port {port} on your router to this computer (UPnP: {detail}).
 server.hosting.forward_port = Players outside your network may not be able to join: forward UDP port {port} on your router to this computer (UPnP: {detail}).
-# noxsdl/src/hosting.cpp:204
+# noxsdl/src/hosting.cpp:206
 #@ e86ff947: Port {asked} is in use on this computer (another game or server): this game is on port {port}.
 server.hosting.port_moved = Port {asked} is in use on this computer (another game or server): this game is on port {port}.
 # noxsdl/src/port_mapper.cpp:139

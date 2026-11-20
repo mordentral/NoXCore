@@ -1,6 +1,7 @@
 // A game hosted here (app.hpp): its settings from nox.cfg, the server made, its XWIS post, its
 // bots, its router port, and a solo game's new character.
 #include "app.hpp"
+#include "game_data_swap.hpp"
 
 #include "noxcore/bot/bot_squad.hpp"
 #include "noxcore/client/solo_menu.hpp"
@@ -188,6 +189,7 @@ std::unique_ptr<LocalHost> makeHost(App& app, const HostSettings& settings)
     // Maths, noxcore.cfg's ExactMaths.)
     HostSettings s = settings;
     s.exactMaths = app.exactMaths;
+    useInstallData(app); // (a game is made from the install's tables: a mod's game copies them, its own read in their place)
     return std::make_unique<LocalHost>(app.things, &app.modifiers, app.gameData,
                                        app.strings.get(), app.gameDir, s);
 }

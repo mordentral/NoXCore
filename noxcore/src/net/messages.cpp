@@ -267,7 +267,7 @@ constexpr OpInfo kOps[256] = {
     {"MSG_NOXCPP_EDIT", "S->C / C->S", 0xFFFF, 0xFFFF, 0xFFFF}, // 0xF6 (noxcpp's own: identified clients only; the map editor's session)
     {"MSG_NOXCPP_COOP", "S->C / C->S", 0xFFFF, 0xFFFF, 0xFFFF}, // 0xF7 (noxcpp's own: identified clients only; a built-in mode's)
     {"MSG_NOXCPP_MODEUI", "S->C / C->S", 0xFFFF, 0xFFFF, 0xFFFF}, // 0xF8 (noxcpp's own: ModeUi clients only; a script mode's UI)
-    {"", "-", 0, 0, 0}, // 0xF9
+    {"MSG_NOXCPP_GAMEDATA", "S->C / C->S", 0xFFFF, 0xFFFF, 0xFFFF}, // 0xF9 (noxcpp's own: identified clients only; a mod's game data files)
     {"", "-", 0, 0, 0}, // 0xFA
     {"", "-", 0, 0, 0}, // 0xFB
     {"", "-", 0, 0, 0}, // 0xFC

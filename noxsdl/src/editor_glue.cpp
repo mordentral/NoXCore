@@ -4,6 +4,7 @@
 // client side), a session's private test in a second noxcore, and the editor's own frame and close.
 
 #include "app.hpp"
+#include "game_data_swap.hpp"
 #include "editor/close_plan.hpp"
 #include "editor/editor_settings.hpp"
 #include "editor/editor_text.hpp"
@@ -506,6 +507,7 @@ void endPlayTest(App& app)
     unbindModeClients(app); // (the modes' UIs let go of their client sides, before the client that has them goes)
     app.live.reset();
     app.view.reset();
+    useInstallData(app); // (a mod's own game data: the install's tables again)
     if (app.sprites) {
         app.sprites->beginMap({});
         app.sprites->setHolding(false);

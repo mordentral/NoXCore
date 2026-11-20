@@ -5201,6 +5201,11 @@ fs::path ScriptedMode::configure(server::GameHost::Options& o)
         impl.report(error);
         throw std::runtime_error(impl.package->manifest.info.id + ": " + error);
     }
+    // The game data files it ships (its folder's data\): this game's, sent to its NoX Core
+    // clients before their first map (its host read the game's tables from them: gameDataFor).
+    if (impl.package->data) {
+        o.modeData = impl.package->data;
+    }
     // The maps it ships (its folder's maps\): this game's, found before the maps folder's.
     if (impl.package->maps && !impl.package->maps->empty()) {
         o.modeMaps = impl.package->maps;

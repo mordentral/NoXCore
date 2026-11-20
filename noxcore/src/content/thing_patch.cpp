@@ -388,7 +388,7 @@ namespace {
 
 /// One patch line applied to `t` (in its NEW record when `fresh`: its locked keys and MENUICON
 /// may be set then). False, with the reason in `result.problems`, when it's refused.
-bool applyLine(things::ThingDef& t, ThingPatchLine l, bool fresh, ThingPatchResult& result)
+bool applyLine(things::ThingDef& t, ThingPatchLine l, bool fresh, ThingPatchResult& result, bool modOwned)
 {
     std::string label = t.name + "." + l.key;
     if (!plainKey(l.key)) {
@@ -405,7 +405,7 @@ bool applyLine(things::ThingDef& t, ThingPatchLine l, bool fresh, ThingPatchResu
         result.problems.push_back(label + ": DRAW isn't changed by a patch");
         return false;
     }
-    if (lockedThingKey(l.key) && !fresh) {
+    if (lockedThingKey(l.key) && !fresh && !modOwned) {
         result.problems.push_back(label + ": a type's " + l.key +
                                   " never changes (every player's game and the maps rely on it); a new type chooses its own in its NEW record");
         return false;
@@ -420,7 +420,7 @@ bool applyLine(things::ThingDef& t, ThingPatchLine l, bool fresh, ThingPatchResu
         auto& ref = l.key == "MENUICON" ? t.menuIcon : t.prettyImage;
         // Only the types with a MENUICON are kept in solo and quest saves: one added or taken
         // away changes which objects a save keeps (a new type's own choice, in its NEW record).
-        if (l.key == "MENUICON" && l.remove == ref.has_value() && !fresh) {
+        if (l.key == "MENUICON" && l.remove == ref.has_value() && !fresh && !modOwned) {
             result.problems.push_back(label + (l.remove ? ": a type without its MENUICON drops out of saves (can't be taken away)"
                                                         : ": a type given a MENUICON starts being saved (can't be added)"));
             return false;
@@ -473,7 +473,7 @@ bool applyLine(things::ThingDef& t, ThingPatchLine l, bool fresh, ThingPatchResu
 
 } // namespace
 
-ThingPatchResult applyThingPatch(things::ThingDb& db, const ThingPatch& patch)
+ThingPatchResult applyThingPatch(things::ThingDb& db, const ThingPatch& patch, bool modOwned)
 {
     ThingPatchResult result;
     bool any = false;
@@ -512,7 +512,7 @@ ThingPatchResult applyThingPatch(things::ThingDb& db, const ThingPatch& patch)
         bool clean = true;
         const std::size_t changed = result.changed.size();
         for (const auto& l : r.lines) {
-            clean = applyLine(t, l, true, result) && clean;
+            clean = applyLine(t, l, true, result, modOwned) && clean;
         }
         result.changed.resize(changed); // (a new type's lines are its own, not changes)
         if (!clean) {
@@ -537,7 +537,7 @@ ThingPatchResult applyThingPatch(things::ThingDb& db, const ThingPatch& patch)
         }
         things::ThingDef& t = db.things[static_cast<std::size_t>(found - db.things.data())];
         for (const auto& l : r.lines) {
-            any = applyLine(t, l, false, result) || any;
+            any = applyLine(t, l, false, result, modOwned) || any;
         }
     }
     if (any) {

@@ -185,7 +185,14 @@ struct ClientSecret {
 ///      kCharacterNote, kept by the client beside the character it joined with for its character
 ///      screens), sent only to a client of level 15 or above that named ModeUi (ui_proto.hpp's
 ///      kCharacterNoteLevel); any other is sent nothing (nox.characterNote says false)
-inline constexpr std::uint16_t kClientLevel = 15;
+///  16  a mod's own game data files (kGameDataLevel: MSG_NOXCPP_GAMEDATA, net/game_data_proto.hpp):
+///      a game whose mod ships thing.bin, modifier.bin or gamedata.bin, or an override of one (server/mode_data.hpp), sends
+///      them before the first map, and the client reads them for that game alone; such a game
+///      lets in no NoX Core client below 16 (the too-old notice) and no stock client
+inline constexpr std::uint16_t kClientLevel = 16;
+/// The client level that reads a mod's own game data files (kClientLevel's list, 16): a game
+/// that has them lets in none below it.
+inline constexpr std::uint16_t kGameDataLevel = 16;
 /// The client level whose script calls bind in source order: an edit session's lowest (kClientLevel's
 /// list, 13).
 inline constexpr std::uint16_t kSourceOrderCallsLevel = 13;

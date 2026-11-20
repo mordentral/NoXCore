@@ -53,4 +53,10 @@ const Mode* installedCampaign(const Registry& registry, std::string_view id);
 /// folder deletes them.
 std::filesystem::path campaignSavesFolder(const Mode& mod);
 
+/// (The one place that says which) The game data files a game of `mode` hosted with `options`
+/// reads in place of the install's: the mode's own (Mode::data), else, for a mode that runs
+/// campaigns, the chosen campaign mod's (its option "campaign": installedCampaign); null: the
+/// install's files, as every other game.
+std::shared_ptr<const server::ModeData> gameDataFor(const Registry& registry, const Mode& mode, const OptionValues& options);
+
 } // namespace nox::modes

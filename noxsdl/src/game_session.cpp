@@ -2,11 +2,13 @@
 // shop and dialog screens, the cinematics, the book), its chat and events, and the messages
 // and saves the server sends.
 #include "app.hpp"
+#include "game_data_swap.hpp"
 #include "new_game.hpp"
 
 #include "noxcore/client/inform_text.hpp"
 #include "noxcore/client/solo_saves.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/server/mode_data.hpp"
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/field_guide.hpp"
 #include "noxcore/util/text.hpp"
@@ -690,6 +692,16 @@ void setUpLiveSession(App& app, const std::string& host)
     }
     setOutfitModifiers(app);
     app.live->client().setModifiers(&app.modifiers);
+    // A mod's own game data (game_data_swap.hpp): read in place of the install's for this game,
+    // before its first map; the host's own client takes the host's files, never downloads them.
+    app.live->client().setGameDataHandler(
+        [&app](std::uint32_t hash, const std::vector<nox::things::DataFileBytes>& files) { return useGameData(app, hash, files); });
+    if (auto data = app.host ? app.host->modeData() : nullptr) {
+        app.live->client().setHostGameData([data](nox::things::DataFile kind, std::uint32_t crc) -> std::optional<std::vector<std::uint8_t>> {
+            const nox::things::DataFileBytes* f = data->find(kind);
+            return f && f->crc == crc ? std::optional<std::vector<std::uint8_t>>(f->bytes) : std::nullopt;
+        });
+    }
     app.inventory = std::make_unique<Inventory>(app.things, *app.art, app.modifiers, app.strings.get(), *app.sprites,
                                                 app.font.get());
     app.inventory->setSound([&app](std::uint32_t id) { uiSound(app, id); });

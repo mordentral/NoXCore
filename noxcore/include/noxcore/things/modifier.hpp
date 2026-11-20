@@ -161,6 +161,9 @@ ModifierDb parseModifierDb(std::string_view text);
 
 /// Reads and decrypts modifier.bin.
 ModifierDb loadModifierDb(const std::filesystem::path& path);
+/// The same from the file's bytes (encrypted); `contentPacks` off: the installed content packs not
+/// applied (a mod's own copy, read as it ships on every side: data_files.hpp).
+ModifierDb modifierDbFromFile(std::vector<std::uint8_t> file, bool contentPacks);
 
 /// The item drawn for an armour class bit (the exe's table), e.g. 0x20000 -> "Breastplate".
 std::string_view armorItemName(std::uint32_t armorBit);

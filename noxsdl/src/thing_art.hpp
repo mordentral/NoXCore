@@ -191,6 +191,15 @@ public:
         }
         return slot.art;
     }
+    /// Every type's art made afresh from the thing.bin as it now is (a game's own: game_data_swap.hpp).
+    /// What was made is kept, never freed, so an art a Named slot or a caller still holds stays
+    /// good (the old one: a slot looks up again only once it's reset itself).
+    void reset()
+    {
+        retired_.push_back(std::move(types_));
+        types_.clear();
+        byId_.clear();
+    }
 
 private:
     /// The type's entry (decoded on its first call; never erased, so it stays where it is).
@@ -199,6 +208,7 @@ private:
     const nox::things::ThingDb& things_;
     std::map<std::string, std::optional<TypeArt>, std::less<>> types_;
     std::vector<const std::optional<TypeArt>*> byId_; ///< types_' entries by type id, as they're first asked for
+    std::vector<std::map<std::string, std::optional<TypeArt>, std::less<>>> retired_; ///< (reset's: kept alive)
 };
 
 } // namespace noxsdl

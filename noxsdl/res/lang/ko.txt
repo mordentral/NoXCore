@@ -8133,6 +8133,8 @@ editor.window.waypoints = 웨이포인트
 
 #@ 2329c92c mt: Team
 game.chat.team = 팀
+#@ 7007f0e1 mt: another game is hosted here
+game.data.hosting_other = 여기서 이미 다른 게임을 호스팅하고 있습니다
 #@ 67d33758 mt: Asked the host for edit rights.
 game.edit_session.asked_rights = 호스트에게 편집 권한을 요청했습니다.
 #@ 418078d1 mt: Couldn't join {host}

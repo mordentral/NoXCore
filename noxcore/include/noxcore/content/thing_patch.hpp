@@ -94,6 +94,9 @@ struct ThingPatchResult {
     std::vector<std::string> problems;
     std::vector<std::string> warnings;
 };
-ThingPatchResult applyThingPatch(things::ThingDb& db, const ThingPatch& patch);
+/// `modOwned`: a mod's own thing.patch (things/data_files.hpp), applied for its games alone and
+/// checked to give the same table on the host and every client: a type's CLASS, XFER, FLAGS,
+/// COLLIDE and MENUICON may change there too (the mod's maps and saves are made for them).
+ThingPatchResult applyThingPatch(things::ThingDb& db, const ThingPatch& patch, bool modOwned = false);
 
 } // namespace nox::content

@@ -8,9 +8,11 @@
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/lobby/extended.hpp"
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/map/sections.hpp"
 #include "noxcore/net/framing.hpp"
+#include "noxcore/net/game_data_proto.hpp"
 #include "noxcore/net/player_input.hpp"
 #include "noxcore/player/player_file.hpp"
 #include "noxcore/script/opcodes.hpp"
@@ -20,6 +22,7 @@
 #include "noxcore/server/enchant.hpp"
 #include "noxcore/server/host_links.hpp"
 #include "noxcore/modes/registry.hpp"
+#include "noxcore/server/mode_data.hpp"
 #include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/modes.hpp"
 #include "noxcore/server/monsters.hpp"
@@ -132,6 +135,17 @@ GameHost::Options requireGameData(GameHost::Options o)
 {
     if (!o.gameData) {
         throw std::invalid_argument("GameHost: no gamedata.bin loaded");
+    }
+    // (noxcpp) A mode's own data files a client reads (Options::modeData): only NoX Core clients
+    // that read them play, whatever the mode said. An older one is refused at its join (the
+    // too-old notice), a stock one held out with the NoX Core-only notice: either would read the
+    // install's thing.bin where this game reads another.
+    if (o.modeData && std::ranges::any_of(o.modeData->files(), [](const things::DataFileBytes& f) { return things::clientReadsDataFile(f.kind); })) {
+        o.minClientLevel = std::max(o.minClientLevel, lobby::kGameDataLevel);
+        if (!o.stockRefusal) {
+            o.stockRefusal = GameHost::Options::StockRefusal{
+                "This game is a NoX Core mod with its own game data. Get the free NoX Core client from noxhub.net and join again."};
+        }
     }
     return o;
 }
@@ -290,8 +304,10 @@ GameHost::GameHost(const things::ThingDb& things, const std::filesystem::path& m
     transport_.setExtended(extendedServer());
     // The object types the content packs add: only games with the same ones are let in. (The
     // process's: its thing.bin loads once, with the installed packs, and every host shares it.)
+    // (A mod's own thing.bin is read without them, on every side: none to match then.)
     const content::NewThingTypes types = content::newThingTypes();
-    if (types.hash != 0) {
+    if (types.hash != 0 &&
+        !(options_.modeData && (options_.modeData->find(things::DataFile::Things) || options_.modeData->find(things::DataFile::ThingsPatch)))) {
         std::string packs;
         for (const auto& id : types.packs) {
             packs += (packs.empty() ? "" : ", ") + id;
@@ -480,6 +496,9 @@ void GameHost::tick(std::uint32_t nowMs)
     substepsRun_ = std::max(substepsRun_, due); // (a long stall isn't run back)
     if (!refused_.empty()) {
         putOutRefused(); // (noxcpp: Options::stockRefusal's holds that are up)
+    }
+    if (!dataSenders_.empty()) {
+        dataSendFrame(); // (noxcpp: a mod's game data files to the clients that asked)
     }
     // (game flags 1 and 8: no connects; but while our end of match vote holds it)
     transport_.setMatchOver((server_.world().gameFlags & GameFlag::GameOver) != 0 && !endVoteHolds());
@@ -1639,6 +1658,9 @@ void GameHost::onPayload(std::uint8_t peer, std::span<const std::uint8_t> bytes)
         case net::Op::NoxcppModeUi: // (a script mode's UI, from a noxsdl player that asked for it)
             onNoxcppModeMessage(peer, m);
             break;
+        case net::Op::NoxcppGameData: // (noxcpp's, from a noxsdl player: the mod's game data files it lacks)
+            onNoxcppGameData(peer, m);
+            break;
         case net::Op::ServerCmd: // (0xBB) {cmd, u16 its code, u8 chars, UTF-16 text}
             if (m.size() >= 5) {
                 onServerCmd(peer, m[1], strings::fromWire(utf16Until(m.subspan(5)), peerText(peer))); // (noxcpp: as Unicode)
@@ -2018,6 +2040,75 @@ void GameHost::onNoxcppModeMessage(std::uint8_t peer, std::span<const std::uint8
         // (A handler that lets its sender go, a kick: nothing here touches the sender after it, and
         // onPayload reads no more of its packet.)
         h->second(*this, peer, m);
+    }
+}
+
+void GameHost::sendDataSet(std::uint8_t peer)
+{
+    // (Only the files a client reads: monster.bin and soundset.bin stay the server's.)
+    net::gamedata::Set set;
+    set.hash = options_.modeData->hash();
+    for (const things::DataFileBytes& f : options_.modeData->files()) {
+        if (things::clientReadsDataFile(f.kind)) {
+            const std::uint32_t merged =
+                things::isDataPatch(f.kind) ? options_.modeDataMerged[static_cast<std::size_t>(things::dataTableOf(f.kind))] : 0u;
+            set.files.push_back({f.kind, static_cast<std::uint32_t>(f.bytes.size()), f.crc, merged});
+        }
+    }
+    // (The joining player isn't among players_ yet: straight to the transport, as its USE_MAP.)
+    if (!set.files.empty() && transport_.identified(peer)) {
+        transport_.sendReliable(peer, net::gamedata::encodeSet(set));
+    }
+}
+
+void GameHost::onNoxcppGameData(std::uint8_t peer, std::span<const std::uint8_t> m)
+{
+    // A client's kWant: the files of the set it has no copy of, sent in order. Anything else (a
+    // game without the data, a kind the set hasn't, a second ask while one goes) is let go.
+    const auto framed = net::gamedata::unframe(m);
+    if (!framed || framed->sub != net::gamedata::kWant || !options_.modeData || !transport_.identified(peer) ||
+        dataSenders_.contains(peer)) {
+        return;
+    }
+    const auto kinds = net::gamedata::decodeWant(framed->rest);
+    if (!kinds || kinds->empty()) {
+        return;
+    }
+    DataSender s;
+    for (const things::DataFile k : *kinds) {
+        if (!things::clientReadsDataFile(k) || !options_.modeData->find(k)) {
+            return;
+        }
+        s.kinds.push_back(static_cast<std::uint8_t>(k));
+    }
+    dataSenders_.emplace(peer, std::move(s));
+}
+
+void GameHost::dataSendFrame()
+{
+    // Each asker's next chunks while its queue has room, the game's own reliable messages first
+    // (reliableBulkRoom keeps their share free), at most 16 a call.
+    for (auto it = dataSenders_.begin(); it != dataSenders_.end();) {
+        const std::uint8_t peer = it->first;
+        DataSender& s = it->second;
+        for (int sent = 0; sent < 16 && !s.kinds.empty() && queuedReliable(peer) < 24 && reliableBulkRoom(peer) > 0; ++sent) {
+            const things::DataFileBytes* f = options_.modeData ? options_.modeData->find(static_cast<things::DataFile>(s.kinds.front())) : nullptr;
+            if (!f) {
+                s.kinds.clear();
+                break;
+            }
+            const std::size_t n = std::min<std::size_t>(net::gamedata::kChunkBytes, f->bytes.size() - s.offset);
+            if (!sendToIdentified(peer, net::gamedata::encodeChunk(f->kind, s.offset,
+                                                                  std::span<const std::uint8_t>(f->bytes).subspan(s.offset, n)))) {
+                break; // (refused: tried again next time, from the same place)
+            }
+            s.offset += static_cast<std::uint32_t>(n);
+            if (s.offset >= f->bytes.size()) {
+                s.kinds.erase(s.kinds.begin());
+                s.offset = 0;
+            }
+        }
+        it = s.kinds.empty() ? dataSenders_.erase(it) : std::next(it);
     }
 }
 
@@ -2599,6 +2690,9 @@ void GameHost::join(std::uint8_t peer, std::span<const std::uint8_t> bytes)
         append(first, text ? *text : announce);
     }
     transport_.sendReliable(peer, first);
+    if (options_.modeData) {
+        sendDataSet(peer); // (noxcpp: a mod's own game data, which its client reads before the map)
+    }
     transport_.sendReliable(peer, useMapBytes(frame, soloGuest(p)));
 
     // The others hear of it (it hears of them at its INCOMING_CLIENT: SrvNet_SendAllPlayersToNewPlayer):
@@ -2857,6 +2951,7 @@ void GameHost::leave(std::uint8_t peer)
     // Then, by its index, every object owed to its slot afresh, known only of the always-sent
     // kinds (the next player in the slot starts clean). (noxcpp: its map send let go, OB-163.)
     mapSendPeerGone(peer);
+    dataSenders_.erase(peer); // (noxcpp: its game data's send let go)
     forgetObjects(it->second.slot);
     if (ServerObject* unit = server_.world().byExtent(it->second.extent)) {
         // MSG_OUTGOING_CLIENT {its code} to the others (the first of the two notices: 0xAE here,

@@ -47,6 +47,8 @@
 
 namespace nox::server {
 
+class ModeData; // (mode_data.hpp)
+
 /// A set of extents, kept as a bit each (one past ExtentTable::kLimit in a std::set): a set's
 /// look-ups, walked upward as std::set's are.
 class ExtentSet {
@@ -388,6 +390,17 @@ public:
         /// <ServerContext::modData>\<id>\maps.rules). Empty: its maps' rules are only read (those
         /// shipped beside them), never written.
         std::filesystem::path modeRulesDir;
+        /// (noxcpp: a NoX Core mode's) Its own game data files (a mod's data\: mode_data.hpp). Its
+        /// host reads this game's tables from them (the things this host is made with, and
+        /// gameData, modifiers, monsterDb, soundSets above); the host sends each NoX Core client
+        /// those of them a client reads (thing.bin, modifier.bin, gamedata.bin) before its first
+        /// map, MSG_NOXCPP_GAMEDATA (net/game_data_proto.hpp), and the files it asks for. Null, as
+        /// every game but such a mode's: nothing sent, nothing kept.
+        std::shared_ptr<const ModeData> modeData;
+        /// (With modeData's overrides) the merged tables' checks the host's own merge gave
+        /// (things::DataTables::merged, by DataFile Things ... SoundSets): each client's merge must
+        /// give the same, else it leaves (its install's file isn't the host's).
+        std::array<std::uint32_t, 5> modeDataMerged{};
         /// The game's folder, where execrul finds its .rul files (OTQuest.rul); empty: the maps
         /// folder's parent, as it is in every game but the map editor's quest play-test (whose
         /// maps folder is its own).
@@ -1323,6 +1336,20 @@ private:
     std::map<std::uint8_t, std::uint8_t> fastMapRequests_; ///< by peer: fast sends since the map's load
     /// A fast sender's frame: up to `budget` blocks (the frame's share left, taken from it).
     void mapSendFast(std::uint8_t peer, MapSender& s, int& budget);
+
+    // noxcpp: a mode's own game data (Options::modeData, net/game_data_proto.hpp): the files a
+    // client asked for (kWant), sent a chunk at a time while its reliable queue has room. None
+    // kept in any game without the data.
+    struct DataSender {
+        std::vector<std::uint8_t> kinds; ///< (things::DataFile) the files still to go, in order
+        std::uint32_t offset = 0;        ///< in the first of them
+    };
+    std::map<std::uint8_t, DataSender> dataSenders_; ///< by peer
+    /// The join's kSet to an identified `peer` (before its USE_MAP), when the game has client files.
+    void sendDataSet(std::uint8_t peer);
+    void onNoxcppGameData(std::uint8_t peer, std::span<const std::uint8_t> m); ///< a client's kWant
+    /// The senders' chunks, each while its peer's queue has room (tick's).
+    void dataSendFrame();
     void mapSendNextBlock(std::uint8_t peer, MapSender& s); ///< SrvNet_MapSendNextBlock
     void mapSendAbortAll(std::uint8_t reason); ///< (SrvNet_MapSendAbort each)
     bool mapSendLoadMap();                 ///< SrvNet_MapSendLoadMap

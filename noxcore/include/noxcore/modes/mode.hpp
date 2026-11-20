@@ -23,6 +23,7 @@ namespace nox::client {
 class HeadlessClient;
 }
 namespace nox::server {
+class ModeData;
 class ModeMaps;
 }
 
@@ -194,6 +195,12 @@ struct Mode {
     /// for a program that finds one before hosting (the menus' first map of a mod's campaign); null:
     /// none. Its games get them through their own configure (GameHost::Options::modeMaps).
     std::shared_ptr<const server::ModeMaps> maps;
+    /// The game data files it ships (a mod's data\: server/mode_data.hpp, its package's, read and
+    /// checked once by loadMods), which its games read in place of the install's; null: none (the
+    /// install's, as every other game). A host reads its game's tables from them before it makes
+    /// the game (gameDataFor), and configure hands them to the game to send to its clients
+    /// (GameHost::Options::modeData).
+    std::shared_ptr<const server::ModeData> data;
     /// A mod's folder (mods\<folder>\, loadMods'); empty: built into the program. What's in its
     /// saves\ (kModSavesFolder) is its players' (a campaign's saves: registry.hpp's
     /// campaignSavesFolder), never the mod's: nothing that reads the mod reads it.

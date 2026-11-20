@@ -23,6 +23,7 @@
 #include "noxcore/net/player_input.hpp"
 #include "noxcore/net/transport.hpp"
 #include "noxcore/net/update_stream.hpp"
+#include "noxcore/things/data_files.hpp"
 #include "noxcore/things/modifier.hpp"
 
 #include <memory>
@@ -488,6 +489,30 @@ public:
     {
         hostMaps_ = std::move(hostMaps);
     }
+    /// (noxcpp) A game whose mod ships its own game data (server/mode_data.hpp): the server tells
+    /// the files at the join, before USE_MAP (MSG_NOXCPP_GAMEDATA: net/game_data_proto.hpp). Each
+    /// is taken from the host (setHostGameData), else our cache (<map cache>\gamedata\<file>-<CRC>.bin,
+    /// written as each arrives), else asked for and checked (size, CRC, things::checkDataFile) as it
+    /// comes. With them all, `handler` gets them (the set's hash and the files): it reads them
+    /// (things::readDataTables) and makes them this connection's game's (setThings, setModifiers,
+    /// its own tables), saying "" when it did or why not; only then is the map loaded. A refusal,
+    /// a bad file, or no handler at all: we leave ("can't read this mod's game data"). A game
+    /// without them sends nothing: nothing here runs.
+    using GameDataHandler = std::function<std::string(std::uint32_t hash, const std::vector<things::DataFileBytes>& files)>;
+    void setGameDataHandler(GameDataHandler handler) { gameDataHandler_ = std::move(handler); }
+    /// The host's own client: the host's file of a kind with that CRC (none: not the host's).
+    void setHostGameData(std::function<std::optional<std::vector<std::uint8_t>>(things::DataFile kind, std::uint32_t crc)> host)
+    {
+        hostGameData_ = std::move(host);
+    }
+    /// The game's data set as the handler took it (its hash); 0: the install's files.
+    std::uint32_t gameDataHash() const noexcept { return gameDataHash_; }
+    /// Whether the set the server told is still coming (the map waits for it).
+    bool gameDataPending() const noexcept { return gameData_.pending; }
+    /// The set's bytes come so far and all of them (a download's progress; 0 / 0: none).
+    std::pair<std::size_t, std::size_t> gameDataProgress() const noexcept { return {gameData_.received, gameData_.total}; }
+    /// thing.bin from now on (the game's own, a handler's): the update stream and the map's objects.
+    void setThings(const things::ThingDb* things);
     /// What a game frame's input said (movement prediction replays them): moving (MoveForward),
     /// the facing sent (Orientation), the Action control, and the cursor the server has (MSG_MOUSE,
     /// world units).
@@ -561,6 +586,24 @@ private:
     std::filesystem::path mapPath_;
     SoloMap soloMap_;
     std::function<std::optional<std::filesystem::path>(std::string_view)> hostMaps_;
+    // (noxcpp) A mod's game data set (setGameDataHandler).
+    GameDataHandler gameDataHandler_;
+    std::function<std::optional<std::vector<std::uint8_t>>(things::DataFile, std::uint32_t)> hostGameData_;
+    std::uint32_t gameDataHash_ = 0;
+    bool gameDataRefused_ = false; ///< (failGameData: no map loaded after it)
+    struct GameDataIn {
+        bool pending = false;                     ///< told, not all in
+        std::uint32_t hash = 0;
+        std::vector<things::DataFileBytes> files; ///< the set's, in its order (the ones coming still empty)
+        std::vector<std::uint32_t> sizes;         ///< each one's size, as told
+        std::vector<std::size_t> wanted;          ///< files' indices asked for, in the order they come
+        std::vector<std::uint8_t> heldUseMap;     ///< the USE_MAP that came meanwhile
+        std::size_t received = 0, total = 0;      ///< (gameDataProgress)
+    } gameData_;
+    void onGameData(std::span<const std::uint8_t> m);
+    /// Every file in: the handler's, then the held map.
+    void finishGameData();
+    void failGameData(const std::string& why);
     struct Download {
         std::string name;               ///< map name without extension
         std::uint32_t expectedCrc = 0;  ///< from USE_MAP

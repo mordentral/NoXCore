@@ -184,6 +184,16 @@ struct App {
     nox::things::ThingDb things;
     nox::things::ModifierDb modifiers; ///< item colours (empty if modifier.bin is missing)
     nox::things::GameData gameData; ///< gamedata.bin's tables (read at start-up, as thing.bin)
+    /// (game_data_swap.hpp) While a game reads a mod's own game data: the install's three tables,
+    /// kept here (the three above are the mod's, in their place), and the set's hash; null / 0:
+    /// the three above are the install's, as at start-up.
+    struct InstallTables {
+        nox::things::ThingDb things;
+        nox::things::ModifierDb modifiers;
+        nox::things::GameData gameData;
+    };
+    std::unique_ptr<InstallTables> installTables;
+    std::uint32_t gameDataHash = 0;
     SpellLimits spellLimits; ///< live: spells refused while our last one is out (the HUD marks them)
     std::unique_ptr<nox::video::VideoBag> bag;
     std::unique_ptr<SpriteCache> sprites;

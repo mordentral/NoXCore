@@ -96,6 +96,7 @@ add_library(noxcore
     src/lobby/xwis_login.cpp
     src/net/framing.cpp
     src/net/fx.cpp
+    src/net/game_data_proto.cpp
     src/net/messages.cpp
     src/net/player_input.cpp
     src/net/tcp_socket.cpp
@@ -132,6 +133,7 @@ add_library(noxcore
     src/server/map_send.cpp
     src/server/map_vote.cpp
     src/server/map_state.cpp
+    src/server/mode_data.cpp
     src/server/mode_maps.cpp
     src/server/modes.cpp
     src/server/monsters.cpp
@@ -173,6 +175,7 @@ add_library(noxcore
     src/strings/csf_language.cpp
     src/strings/l10n.cpp
     src/strings/string_table.cpp
+    src/things/data_files.cpp
     src/things/draw.cpp
     src/things/field_guide.cpp
     src/things/game_data.cpp

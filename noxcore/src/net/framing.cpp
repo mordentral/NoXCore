@@ -99,6 +99,7 @@ std::size_t messageSize(std::span<const std::uint8_t> data, Direction dir, const
     case Op::NoxcppEdit:
     case Op::NoxcppCoop:
     case Op::NoxcppModeUi:
+    case Op::NoxcppGameData:
         return data.size() >= 4 ? fits(data, 4 + std::size_t{u16At(data, 2)}) : 0;
     case Op::SeqImportant:
         return data.size() >= 4 ? fits(data, 4 + std::size_t{data[3]}) : 0;

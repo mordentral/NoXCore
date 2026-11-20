@@ -119,9 +119,15 @@ SoundSets parseSoundSets(std::string_view text)
 
 SoundSets loadSoundSets(const std::filesystem::path& path)
 {
-    auto data = readFileBytes(path);
+    return soundSetsFromFile(readFileBytes(path), true);
+}
+
+SoundSets soundSetsFromFile(std::vector<std::uint8_t> data, bool contentPacks)
+{
     crypto::cipherForKey(crypto::FileKey::SoundSetBin).decrypt(data);
-    content::applyContentPacks(content::TableFormat::SoundSet, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    if (contentPacks) {
+        content::applyContentPacks(content::TableFormat::SoundSet, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    }
     return parseSoundSets(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
 }
 

@@ -678,9 +678,15 @@ ModifierDb parseModifierDb(std::string_view text)
 
 ModifierDb loadModifierDb(const std::filesystem::path& path)
 {
-    auto data = readFileBytes(path);
+    return modifierDbFromFile(readFileBytes(path), true);
+}
+
+ModifierDb modifierDbFromFile(std::vector<std::uint8_t> data, bool contentPacks)
+{
     crypto::cipherForKey(crypto::FileKey::ModifierBin).decrypt(data);
-    content::applyContentPacks(content::TableFormat::Modifier, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    if (contentPacks) {
+        content::applyContentPacks(content::TableFormat::Modifier, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    }
     return parseModifierDb(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
 }
 

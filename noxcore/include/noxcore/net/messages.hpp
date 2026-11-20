@@ -297,6 +297,11 @@ enum class Op : std::uint8_t {
     /// (sub 10, configure's bookIsTheMod) and its things' draw scales (sub 11,
     /// nox.setDrawScale). u8 sub, u16 the rest's length, the rest.
     NoxcppModeUi = 0xF8,
+    /// noxcpp's own: a mod's own game data files (both ways, identified clients only:
+    /// net/game_data_proto.hpp): the set a game reads in place of the install's thing.bin,
+    /// modifier.bin and gamedata.bin, before the first map, and those a client asks for. u8 sub,
+    /// u16 the rest's length, the rest.
+    NoxcppGameData = 0xF9,
 };
 
 /// The first of noxcpp's own opcodes (MSG_NOXCPP_*, and any after them): the 1.2b client's

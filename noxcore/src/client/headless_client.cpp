@@ -12,7 +12,9 @@
 #include "noxcore/map/objects.hpp"
 #include "noxcore/map/sections.hpp"
 #include "noxcore/modes/registry.hpp"
+#include "noxcore/io/zip.hpp"
 #include "noxcore/net/framing.hpp"
+#include "noxcore/net/game_data_proto.hpp"
 #include "noxcore/net/player_input.hpp"
 #include "noxcore/server/map_vote.hpp"
 #include "noxcore/strings/string_table.hpp"
@@ -25,7 +27,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <exception>
+#include <fstream>
 #include <map>
 
 namespace nox::client {
@@ -1223,8 +1227,19 @@ void HeadlessClient::handleMessage(std::span<const std::uint8_t> m, std::uint32_
         ++snapshots_;
         break;
     }
+    case Op::NoxcppGameData: // (noxcpp's: a mod's own game data, before the map)
+        onGameData(m);
+        break;
     case Op::UseMap:
         closingForSave_ = false; // (Cli_ResetWorldState: cleared)
+        if (gameDataRefused_) {
+            break; // (noxcpp: a mod's game data refused: we're leaving, no map)
+        }
+        if (gameData_.pending) {
+            // (noxcpp: the mod's game data still coming: the map is loaded with it, once it's in)
+            gameData_.heldUseMap.assign(m.begin(), m.end());
+            break;
+        }
         onUseMap(m);
         break;
     case Op::MapSendStart: // Cli_MapDownload_Start: u32 size at +4, name at +8
@@ -1424,6 +1439,180 @@ void HeadlessClient::drainSeqImportant(std::uint32_t& datagramFrame)
 
 // USE_MAP: our copy of the map whose header CRC matches (the solo path, the maps folder, the
 // download cache), else the server is asked for it.
+namespace {
+
+/// Where a downloaded data file is kept: <cache>\gamedata\<name>-<CRC, 8 hex>.<bin or patch>.
+std::filesystem::path gameDataCachePath(const std::filesystem::path& mapCache, things::DataFile kind, std::uint32_t crc)
+{
+    const std::string_view file = things::dataFileName(kind);
+    const std::size_t dot = file.find('.');
+    char hex[9];
+    std::snprintf(hex, sizeof hex, "%08X", static_cast<unsigned>(crc));
+    return mapCache / "gamedata" / (std::string(file.substr(0, dot)) + "-" + hex + std::string(file.substr(dot)));
+}
+
+/// The file at `path` if it's `size` bytes whose CRC is `crc`; none otherwise (missing, other).
+std::optional<std::vector<std::uint8_t>> cachedFile(const std::filesystem::path& path, std::uint32_t size, std::uint32_t crc)
+{
+    std::error_code ec;
+    if (path.empty() || !std::filesystem::is_regular_file(path, ec) || std::filesystem::file_size(path, ec) != size || ec) {
+        return std::nullopt;
+    }
+    try {
+        auto bytes = readFileBytes(path);
+        if (bytes.size() == size && io::crc32(bytes) == crc) {
+            return bytes;
+        }
+    } catch (const std::exception&) {
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+void HeadlessClient::setThings(const things::ThingDb* things)
+{
+    things_ = things;
+    world_.setThings(things);
+}
+
+void HeadlessClient::failGameData(const std::string& why)
+{
+    gameData_ = GameDataIn{};
+    gameDataRefused_ = true;
+    stage_ = Stage::Failed;
+    event(ClientEvent::Kind::Disconnected, why);
+}
+
+void HeadlessClient::onGameData(std::span<const std::uint8_t> m)
+{
+    const auto framed = net::gamedata::unframe(m);
+    if (!framed || stage_ == Stage::Failed || stage_ == Stage::Closed) {
+        return;
+    }
+    if (framed->sub == net::gamedata::kSet) {
+        // Told once, before our first map; another set later (a server's fault) is let go.
+        if (gameData_.pending || gameDataHash_ != 0 || mapLoads_ != 0) {
+            return;
+        }
+        const auto set = net::gamedata::decodeSet(framed->rest);
+        if (!set) {
+            failGameData("the server's list of this mod's game data files isn't valid");
+            return;
+        }
+        if (!gameDataHandler_) {
+            failGameData("this game's mod has its own game data files, which this program can't read");
+            return;
+        }
+        GameDataIn in;
+        in.pending = true;
+        in.hash = set->hash;
+        std::vector<things::DataFile> want;
+        for (const net::gamedata::SetEntry& e : set->files) {
+            things::DataFileBytes f;
+            f.kind = e.kind;
+            f.crc = e.crc;
+            f.merged = e.merged;
+            in.total += e.size;
+            std::optional<std::vector<std::uint8_t>> have;
+            if (hostGameData_) {
+                have = hostGameData_(e.kind, e.crc);
+                if (have && (have->size() != e.size || io::crc32(*have) != e.crc)) {
+                    have.reset();
+                }
+            }
+            if (!have && !mapCache_.empty()) {
+                have = cachedFile(gameDataCachePath(mapCache_, e.kind, e.crc), e.size, e.crc);
+            }
+            if (have) {
+                f.bytes = std::move(*have);
+                in.received += e.size;
+            } else {
+                in.wanted.push_back(in.files.size());
+                want.push_back(e.kind);
+            }
+            in.files.push_back(std::move(f));
+            in.sizes.push_back(e.size);
+        }
+        gameData_ = std::move(in);
+        if (want.empty()) {
+            finishGameData();
+            return;
+        }
+        event(ClientEvent::Kind::Log, "this game's mod has its own game data files: downloading " + std::to_string(want.size()) + " of them");
+        queueReliable(net::gamedata::encodeWant(want));
+        return;
+    }
+    if (framed->sub != net::gamedata::kChunk || !gameData_.pending || gameData_.wanted.empty()) {
+        return;
+    }
+    const auto chunk = net::gamedata::decodeChunk(framed->rest);
+    const std::size_t at = gameData_.wanted.front();
+    things::DataFileBytes& f = gameData_.files[at];
+    const std::uint32_t size = gameData_.sizes[at];
+    // (In order, over the reliable stream, never past the size told: anything else is the server's fault.)
+    if (!chunk || chunk->kind != f.kind || chunk->offset != f.bytes.size() || f.bytes.size() + chunk->bytes.size() > size) {
+        failGameData("the server sent this mod's game data out of order");
+        return;
+    }
+    f.bytes.insert(f.bytes.end(), chunk->bytes.begin(), chunk->bytes.end());
+    gameData_.received += chunk->bytes.size();
+    if (f.bytes.size() < size) {
+        return; // (more to come)
+    }
+    const std::string name(things::dataFileName(f.kind));
+    if (io::crc32(f.bytes) != f.crc) {
+        failGameData("this mod's " + name + " came damaged (not the CRC the server told)");
+        return;
+    }
+    if (const std::string bad = things::checkDataFile(f.kind, f.bytes); !bad.empty()) {
+        failGameData("this mod's " + name + " from the server can't be read: " + bad);
+        return;
+    }
+    if (!mapCache_.empty()) {
+        // Kept for this mod's next game (a whole file or none: written beside, then renamed).
+        const std::filesystem::path path = gameDataCachePath(mapCache_, f.kind, f.crc);
+        std::error_code ec;
+        std::filesystem::create_directories(path.parent_path(), ec);
+        const std::filesystem::path part = std::filesystem::path(path).concat(".part");
+        bool written = false;
+        {
+            std::ofstream out(part, std::ios::binary | std::ios::trunc);
+            out.write(reinterpret_cast<const char*>(f.bytes.data()), static_cast<std::streamsize>(f.bytes.size()));
+            written = static_cast<bool>(out);
+        }
+        if (written) {
+            std::filesystem::rename(part, path, ec);
+        }
+        if (!written || ec) {
+            std::filesystem::remove(part, ec);
+            event(ClientEvent::Kind::Log, "this mod's " + name + " not kept in the download cache (it can't be written)");
+        }
+    }
+    gameData_.wanted.erase(gameData_.wanted.begin());
+    if (gameData_.wanted.empty()) {
+        finishGameData();
+    }
+}
+
+void HeadlessClient::finishGameData()
+{
+    std::vector<things::DataFileBytes> files = std::move(gameData_.files);
+    std::vector<std::uint8_t> held = std::move(gameData_.heldUseMap);
+    const std::uint32_t hash = gameData_.hash;
+    gameData_ = GameDataIn{};
+    const std::string why = gameDataHandler_ ? gameDataHandler_(hash, files) : std::string("no reader for it");
+    if (!why.empty()) {
+        failGameData("this game's mod's game data can't be read: " + why);
+        return;
+    }
+    gameDataHash_ = hash;
+    event(ClientEvent::Kind::Log, "this game's mod's own game data read (" + std::to_string(files.size()) + " files)");
+    if (!held.empty()) {
+        onUseMap(held);
+    }
+}
+
 void HeadlessClient::onUseMap(std::span<const std::uint8_t> m)
 {
     const auto useMap = decode<msg::UseMap>(m);

@@ -8221,6 +8221,8 @@ editor.window.waypoints = Путевые точки
 
 #@ 2329c92c mt: Team
 game.chat.team = Команде
+#@ 7007f0e1 mt: another game is hosted here
+game.data.hosting_other = здесь уже запущена другая игра
 #@ 67d33758 mt: Asked the host for edit rights.
 game.edit_session.asked_rights = Хосту отправлен запрос на право правки.
 #@ 418078d1 mt: Couldn't join {host}

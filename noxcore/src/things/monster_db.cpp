@@ -278,9 +278,15 @@ void MonsterDb::keepThingTypes(const ThingDb& things)
 
 MonsterDb loadMonsterDb(const std::filesystem::path& path, bool solo)
 {
-    auto data = readFileBytes(path);
+    return monsterDbFromFile(readFileBytes(path), solo, true);
+}
+
+MonsterDb monsterDbFromFile(std::vector<std::uint8_t> data, bool solo, bool contentPacks)
+{
     crypto::cipherForKey(crypto::FileKey::MonsterBin).decrypt(data);
-    content::applyContentPacks(content::TableFormat::Monster, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    if (contentPacks) {
+        content::applyContentPacks(content::TableFormat::Monster, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    }
     return parseMonsterDb(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()), solo);
 }
 

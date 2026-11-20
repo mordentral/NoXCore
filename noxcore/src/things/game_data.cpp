@@ -310,9 +310,15 @@ GameData parseGameData(std::string_view text)
 
 GameData loadGameData(const std::filesystem::path& path)
 {
-    auto data = readFileBytes(path);
+    return gameDataFromFile(readFileBytes(path), true);
+}
+
+GameData gameDataFromFile(std::vector<std::uint8_t> data, bool contentPacks)
+{
     crypto::cipherForKey(crypto::FileKey::GameDataBin).decrypt(data);
-    content::applyContentPacks(content::TableFormat::GameData, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    if (contentPacks) {
+        content::applyContentPacks(content::TableFormat::GameData, data); // (the installed content packs' changes, once, as it loads; none installed: nothing)
+    }
     return parseGameData(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
 }
 

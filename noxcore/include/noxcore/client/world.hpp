@@ -574,6 +574,9 @@ public:
     std::string thingName(std::uint16_t typeId) const;
     /// The thing.bin the type ids are of (null: none given; every name is then "#<id>").
     const things::ThingDb* things() const noexcept { return things_; }
+    /// (noxcpp) Another thing.bin from now on (a mod's game's own, before its first map: nothing
+    /// is known yet by type).
+    void setThings(const things::ThingDb* things) noexcept { things_ = things; }
 
     /// modifier.bin's id for UserColor1 (the clothes' colours are UserColor1 + index), for the
     /// default outfit. Without it the clothes get no colour modifiers.

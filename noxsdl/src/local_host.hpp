@@ -252,6 +252,10 @@ public:
     /// The maps the game's mode ships (GameHost::Options::modeMaps, fixed as the game began); null:
     /// none, the maps folder alone.
     std::shared_ptr<const nox::server::ModeMaps> modeMaps() const noexcept { return modeMaps_; }
+    /// The game data files the game's mod ships (Mode::data: gameDataFor), its tables read from
+    /// them and owned here for the game (the install's copied for the files it hasn't, so nothing
+    /// the server's thread reads is the client's); null: the install's, the program's own tables.
+    std::shared_ptr<const nox::server::ModeData> modeData() const noexcept { return modeData_; }
 
     /// The server's thread's last error, taken (it logs and runs on, as the loop's pump did).
     std::optional<std::string> takeError();
@@ -439,6 +443,13 @@ private:
     std::filesystem::path saveRoot_;
     std::optional<nox::things::MonsterDb> monsterDb_;
     std::optional<nox::things::SoundSets> soundSets_;
+    /// (A game whose mod ships its own game data: modeData) The game's own tables, every one of
+    /// them (the mod's, else copies of the install's): the server's thread reads none of the
+    /// program's, which its own client swaps for the mod's (game_data_swap.hpp).
+    std::shared_ptr<const nox::server::ModeData> modeData_;
+    std::optional<nox::things::ThingDb> ownThings_;
+    std::optional<nox::things::ModifierDb> ownModifiers_;
+    std::optional<nox::things::GameData> ownGameData_;
     /// A NoX Core mode's server side (HostSettings::modeId: the registry's; before game_: the host's
     /// hooks hold it), and its id (its log lines').
     std::unique_ptr<nox::modes::ServerMode> serverMode_;

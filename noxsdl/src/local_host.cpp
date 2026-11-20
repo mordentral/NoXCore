@@ -6,6 +6,7 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/server/host_client.hpp"
+#include "noxcore/server/mode_data.hpp"
 #include "noxcore/server/solo.hpp"
 #include "noxcore/server/solo_save.hpp"
 
@@ -225,9 +226,36 @@ private:
     Guess mapDrawn_, wideOn_, wideMoving_;
 };
 
-LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::ModifierDb* modifiers, const nox::things::GameData& gameData,
-                     const nox::strings::StringTable* strings, const fs::path& gameDir, const HostSettings& settings)
+LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::things::ModifierDb* installModifiers,
+                     const nox::things::GameData& installGameData, const nox::strings::StringTable* strings, const fs::path& gameDir,
+                     const HostSettings& settings)
 {
+    // (A mod's own game data, its game's alone: every table the server's thread reads is then
+    // this host's own, the mod's or a copy of the install's. Without one, the program's as always.)
+    if (!settings.modeId.empty()) {
+        if (const nox::modes::Mode* m = nox::modes::registry().find(settings.modeId)) {
+            modeData_ = nox::modes::gameDataFor(nox::modes::registry(), *m, settings.modeOptions);
+        }
+    }
+    std::optional<nox::things::DataTables> modTables;
+    if (modeData_) {
+        modTables = modeData_->tables(settings.solo, gameDir); // (throws: a file that won't read or an override that won't apply: the game not hosted)
+        ownThings_ = modTables->things ? std::move(*modTables->things) : installThings;
+        if (modTables->modifiers) {
+            ownModifiers_ = std::move(*modTables->modifiers);
+        } else if (installModifiers) {
+            ownModifiers_ = *installModifiers;
+        }
+        ownGameData_ = modTables->gameData ? std::move(*modTables->gameData) : installGameData;
+        SDL_Log("hosting: the mod's own game data (%zu files, %zu bytes) in place of the install's", modeData_->files().size(),
+                modeData_->bytes());
+    }
+    if (modTables && !modTables->addedBases.empty()) {
+        nox::things::setAddedTypeBases(modTables->addedBases); // (the mod's new types' stock types: its game's, till it's left)
+    }
+    const nox::things::ThingDb& things = ownThings_ ? *ownThings_ : installThings;
+    const nox::things::ModifierDb* modifiers = ownModifiers_ ? &*ownModifiers_ : installModifiers;
+    const nox::things::GameData& gameData = ownGameData_ ? *ownGameData_ : installGameData;
     // (in any case, as on Windows: the solo screens' maps/War01a/War01a.map is maps/war01a/... in some installs)
     fs::path path = nox::resolveNoCase(settings.map);
     if (!fs::exists(path)) { // a map's name: the game's maps folder
@@ -245,14 +273,20 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
     if (!generated && !settings.editSession && !fs::exists(nox::resolveNoCase(path))) {
         throw std::runtime_error("no map " + settings.map);
     }
-    if (fs::exists(nox::resolveNoCase(gameDir / "monster.bin"))) {
+    if (modTables && modTables->monsters) {
+        monsterDb_ = std::move(modTables->monsters); // (the mod's: read for this game's numbers)
+    } else if (fs::exists(nox::resolveNoCase(gameDir / "monster.bin"))) {
         monsterDb_ = nox::things::loadMonsterDb(gameDir / "monster.bin", settings.solo); // (a solo or network game's numbers)
+    }
+    if (monsterDb_) {
         monsterDb_->keepThingTypes(things);
         for (const std::string& p : monsterDb_->problems) { // (a modded file's: the shipped one has none)
             SDL_Log("%s", p.c_str());
         }
     }
-    if (fs::exists(nox::resolveNoCase(gameDir / "soundset.bin"))) {
+    if (modTables && modTables->soundSets) {
+        soundSets_ = std::move(modTables->soundSets);
+    } else if (fs::exists(nox::resolveNoCase(gameDir / "soundset.bin"))) {
         soundSets_ = nox::things::loadSoundSets(gameDir / "soundset.bin");
     }
     nox::server::GameHost::Options o;
@@ -261,6 +295,9 @@ LocalHost::LocalHost(const nox::things::ThingDb& things, const nox::things::Modi
     o.password = settings.password;
     o.gameFlags = (o.gameFlags & ~0x17F0u) | settings.mode;  // the game-type bits cleared, then the chosen mode
     o.gameData = &gameData;
+    if (modTables) {
+        o.modeDataMerged = modTables->merged; // (each client's merge of the mod's overrides must give these)
+    }
     o.modifiers = modifiers;
     o.monsterDb = monsterDb_ ? &*monsterDb_ : nullptr;
     o.soundSets = soundSets_ ? &*soundSets_ : nullptr;

@@ -40,6 +40,7 @@
 #include <SDL3/SDL_main.h>
 
 #include "app.hpp"
+#include "game_data_swap.hpp"
 #include "backend_hooks.hpp"
 #include "character_play.hpp"
 #include "client_level_gate.hpp"
@@ -2065,6 +2066,7 @@ SDL_AppResult gameLeft(App& app, JoinWaitEnd joinEnd = JoinWaitEnd::None)
         endSoloScreensHost(app); // (a campaign mode host's saves' root back)
         app.live.reset();
         app.view.reset();
+        useInstallData(app); // (a mod's own game data: the install's tables again)
         if (app.sprites) {
             app.sprites->beginMap({}); // (the map's images no longer kept)
             app.sprites->setHolding(false);

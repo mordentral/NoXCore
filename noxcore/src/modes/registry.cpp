@@ -116,6 +116,21 @@ const Mode* installedCampaign(const Registry& registry, std::string_view id)
     return m && m->info.campaign && !m->folder.empty() && m->info.id == id ? m : nullptr;
 }
 
+std::shared_ptr<const server::ModeData> gameDataFor(const Registry& registry, const Mode& mode, const OptionValues& options)
+{
+    if (mode.data) {
+        return mode.data;
+    }
+    if (mode.info.runsCampaigns) {
+        if (const auto id = option(options, "campaign")) {
+            if (const Mode* campaign = installedCampaign(registry, *id)) {
+                return campaign->data;
+            }
+        }
+    }
+    return nullptr;
+}
+
 std::filesystem::path campaignSavesFolder(const Mode& mod)
 {
     if (mod.folder.empty() || !mod.info.campaign) {

@@ -67,5 +67,8 @@ struct SoundSets {
 
 SoundSets parseSoundSets(std::string_view text);
 SoundSets loadSoundSets(const std::filesystem::path& path);
+/// The same from the file's bytes (encrypted); `contentPacks` off: the installed content packs not
+/// applied (a mod's own copy, read as it ships on every side: data_files.hpp).
+SoundSets soundSetsFromFile(std::vector<std::uint8_t> file, bool contentPacks);
 
 } // namespace nox::things

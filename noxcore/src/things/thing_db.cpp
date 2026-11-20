@@ -493,10 +493,16 @@ ThingDb parseThingDb(std::span<const std::uint8_t> plain)
 
 ThingDb loadThingDb(const std::filesystem::path& path)
 {
-    auto data = readFileBytes(path);
+    return thingDbFromFile(readFileBytes(path), true);
+}
+
+ThingDb thingDbFromFile(std::vector<std::uint8_t> data, bool contentPacks)
+{
     crypto::cipherForKey(crypto::FileKey::ThingBin).decrypt(data);
     ThingDb db = parseThingDb(data);
-    content::applyContentPacksToThings(db); // (the installed content packs' changes to types, once, as it loads; none installed: nothing)
+    if (contentPacks) {
+        content::applyContentPacksToThings(db); // (the installed content packs' changes to types, once, as it loads; none installed: nothing)
+    }
     return db;
 }
 
