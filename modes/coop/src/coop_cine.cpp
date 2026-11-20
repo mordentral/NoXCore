@@ -5,6 +5,8 @@
 #include "noxcore/coop/coop.hpp"
 
 #include "noxcore/net/messages.hpp"
+#include "noxcore/server/dialog.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/quest.hpp"
@@ -17,6 +19,7 @@
 #include "mode_shared.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -414,13 +417,23 @@ void CoopDirector::showSceneDialog(const server::ServerObject& host, std::size_t
     }
     const std::vector<std::uint8_t> bytes = *opened;
     sceneTalker_ = host.extent;
+    // (A mod's own text for the NPC's name, each player's: World::modeHooks' playerText, as the
+    // host's own window had it. No mode, the host's bytes as they are.)
+    server::ModeHooks* const hooks = world().modeHooks;
+    const std::string label = hooks ? server::npcNameLabel(*npc) : std::string();
     for (const Member& m : party_) {
         if (m.host) {
             continue;
         }
         if (const server::ServerObject* u = host_->unitOf(m.peer)) {
             sceneViewers_.emplace(u->extent);
-            tell(m, bytes);
+            std::vector<std::uint8_t> theirs = bytes;
+            if (hooks) {
+                if (const std::optional<std::u16string> own = hooks->playerText(world(), *u, label)) {
+                    server::putDialogTitle(theirs, *own);
+                }
+            }
+            tell(m, std::move(theirs));
         }
     }
 }

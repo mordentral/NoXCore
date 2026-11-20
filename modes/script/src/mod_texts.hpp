@@ -9,12 +9,15 @@
 // change that names its key finds it. Stock clients and older NoX Core ones are sent nothing and
 // keep their own nox.csf's texts. A mode that never calls nox.setText keeps and sends nothing;
 // nothing runs per frame. nox.tellStory opens a story dialog as TellStory does, with the mode's own
-// speaker. (Internal to the script modes' sources.)
+// speaker. A story dialog's speaker name, which the server looks up itself ("NPC:<name>") and sends
+// as text, is the mode's key's text in the player's language first (ModeHooks::playerText), for
+// every client. (Internal to the script modes' sources.)
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -34,14 +37,18 @@ public:
     static constexpr std::size_t kMaxBytes = 64 * 1024;
 
     /// A key's text: `all` for every language, else one per language code with English (or the
-    /// first code) for a language it hasn't.
+    /// first code) for a language it hasn't; with `othersOwn` (nox.setText's `others = "own"`), none
+    /// for a language it hasn't: that player keeps its own (its client's nox.csf, the server's string
+    /// table), as if the mode had no such key.
     struct Text {
         std::string all;
         std::map<std::string, std::string> byLanguage;
+        bool othersOwn = false;
         bool operator==(const Text&) const = default;
         std::size_t bytes() const;
-        /// The text in `language`: its own, else English's, else the first code's.
-        const std::string& in(std::string_view language) const;
+        /// The text in `language`: its own, else English's, else the first code's; null (with
+        /// othersOwn) when `language` has none.
+        const std::string* in(std::string_view language) const;
     };
 
     /// Whether `peer` may be sent the overlay: a player in the game with its unit, not a held-out
@@ -58,6 +65,13 @@ public:
     void clear(server::GameHost* host, std::string_view prefix);
     /// Whether `key` (any case) is one of the mode's.
     bool has(std::string_view key) const;
+    /// `key`'s text (any case), null when it isn't the mode's.
+    const Text* find(std::string_view key) const;
+    /// The server's own lookup of `key` for the player `peer` (none: one without a client, the host's
+    /// language): the mode's text in that player's language (as its client would get it), none when
+    /// the key isn't the mode's.
+    /// (ModeHooks::playerText: a story dialog's speaker name.)
+    std::optional<std::u16string> textFor(const server::GameHost& host, std::optional<std::uint8_t> peer, std::string_view key) const;
     /// A player's map loaded (CLIENT_READY): a client the overlay reaches and hasn't had it gets
     /// the whole set.
     void ready(server::GameHost& host, std::uint8_t peer);
@@ -77,7 +91,10 @@ private:
     /// Each reached client that hasn't the set sent it now (whole).
     void syncAll(server::GameHost& host);
     void sendWhole(server::GameHost& host, std::uint8_t peer);
-    void sendKey(server::GameHost& host, std::uint8_t peer, const Entry& e);
+    /// `e` to the player in its language; one it has no text in (othersOwn) isn't sent, and when
+    /// `was` (the key's text before) gave it one, the key is cleared on it (the keys that go on from
+    /// it sent again).
+    void sendKey(server::GameHost& host, std::uint8_t peer, const Entry& e, const Text* was = nullptr);
 
     std::map<std::string, Entry> table_; ///< by key folded to small letters
     std::set<std::uint8_t> synced_;      ///< the players whose clients have the set

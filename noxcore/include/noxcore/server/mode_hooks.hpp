@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -169,6 +170,17 @@ struct ModeHooks {
         (void)player;
         (void)npc;
         return true;
+    }
+    /// Asked (noxcpp): a string-table text the server writes into a message for one player alone
+    /// (Str_GetString of `label`): the mode's own text for that player, or nullopt for the string
+    /// table's. Asked at one place: a story dialog's speaker name ("NPC:<name>", SrvNet_OpenNpcDialog's,
+    /// when no speaker is given), once a dialog, never a frame.
+    virtual std::optional<std::u16string> playerText(const World& world, const ServerObject& player, std::string_view label)
+    {
+        (void)world;
+        (void)player;
+        (void)label;
+        return std::nullopt;
     }
     /// Something about to be picked up (Obj_TryPickup, past its own checks: a live taker with room,
     /// a thing on the ground): false leaves it there.

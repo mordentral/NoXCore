@@ -3,6 +3,7 @@
 // NPC's script functions (dialog.hpp has the flow).
 #include "noxcore/server/dialog.hpp"
 
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/monsters.hpp"
 #include "noxcore/server/objects.hpp"
 #include "noxcore/server/player.hpp"
@@ -12,6 +13,7 @@
 #include "noxcore/things/object_class.hpp"
 
 #include <array>
+#include <optional>
 
 namespace nox::server {
 
@@ -19,11 +21,18 @@ namespace {
 
 namespace oc = things::ObjectClass;
 
-/// the NPC's name, Str_GetString("NPC:" + its script name (IDPtr) after its last
-/// ':', or its type's, with the '_' left out). Missing from the string table: Str_GetString's
+/// the NPC's name, Str_GetString(npcNameLabel). Missing from the string table: Str_GetString's
 /// "MISSING:'<label>'" (World::text).
 std::u16string npcName(const World& world, const ServerObject& npc)
 {
+    return world.text(npcNameLabel(npc));
+}
+
+} // namespace
+
+std::string npcNameLabel(const ServerObject& npc)
+{
+    // "NPC:" + its script name (IDPtr) after its last ':', or its type's, with the '_' left out.
     std::string_view name = npc.scriptName.empty() ? std::string_view(npc.typeName) : std::string_view(npc.scriptName);
     name = name.substr(0, name.find('\0'));
     if (const auto colon = name.rfind(':'); colon != std::string_view::npos) {
@@ -35,10 +44,8 @@ std::u16string npcName(const World& world, const ServerObject& npc)
             label += c;
         }
     }
-    return world.text(label);
+    return label;
 }
-
-} // namespace
 
 std::uint8_t dialogType(std::string_view name)
 {
@@ -82,6 +89,21 @@ void storyPic(ServerObject& npc, std::string_view picture)
     }
 }
 
+void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name)
+{
+    // The name: (wcsncpy) of 31 letters, the rest of them zeros.
+    if (m.size() < 0x60) {
+        return;
+    }
+    bool ended = false;
+    for (std::size_t i = 0; i < 31; ++i) {
+        const char16_t c = !ended && i < name.size() ? name[i] : u'\0';
+        ended = ended || c == u'\0';
+        m[0x22 + 2 * i] = static_cast<std::uint8_t>(c);
+        m[0x23 + 2 * i] = static_cast<std::uint8_t>(c >> 8);
+    }
+}
+
 std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId,
                                            const std::u16string* speaker)
 {
@@ -104,15 +126,7 @@ std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObjec
     m[0] = 0xD0;
     m[1] = 3;
     strcpyAt(2, textId);
-    // The name: (wcsncpy) of 31 letters, the rest of them zeros; then 0 at +0x60.
-    const std::u16string name = speaker ? *speaker : npcName(world, npc);
-    bool ended = false;
-    for (std::size_t i = 0; i < 31; ++i) {
-        const char16_t c = !ended && i < name.size() ? name[i] : u'\0';
-        ended = ended || c == u'\0';
-        put(0x22 + 2 * i, static_cast<std::uint8_t>(c));
-        put(0x23 + 2 * i, static_cast<std::uint8_t>(c >> 8));
-    }
+    putDialogTitle(m, speaker ? *speaker : npcName(world, npc));
     put(0x60, 0);
     put(0x61, 0);
     const ServerObject::Monster* mon = npc.monster ? &*npc.monster : nullptr;
@@ -134,6 +148,15 @@ void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::u
     }
     World& world = fight.world;
     player->player->dialogWith = npc->extent;
+    // (noxcpp: no speaker given, a mode's own text for the NPC's name label, the player's; none
+    // without a mode, the string table's as the game's.)
+    std::optional<std::u16string> modeName;
+    if (!name && world.modeHooks) {
+        modeName = world.modeHooks->playerText(world, *player, npcNameLabel(*npc));
+        if (modeName) {
+            name = &*modeName;
+        }
+    }
     world.broadcasts().push_back({npcDialogMessage(world, *npc, sound, textId, name), true, player->extent});
     freezeUnit(fight, *player, 0);
 }

@@ -6,7 +6,7 @@
 //     script first, then the native mode, a no from either the answer (the script's no keeps the
 //     native mode from starting what it would on a yes: a gathering at an exit);
 //   - asked for an answer (a builtin's value, a respawn point, a cast's price or refusal, a script
-//     block, a map's LuauCall, a shared key): the native mode's, else the
+//     block, a map's LuauCall, a shared key, a player's text): the native mode's, else the
 //     script's;
 //   - told: the native mode, then the script;
 //   - the host's client: the script's view of the native mode's.
@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -61,6 +62,13 @@ public:
     bool mayStartDialog(Fight& fight, ServerObject& player, ServerObject& npc) override
     {
         return script_.mayStartDialog(fight, player, npc) && native_.mayStartDialog(fight, player, npc);
+    }
+    std::optional<std::u16string> playerText(const World& world, const ServerObject& player, std::string_view label) override
+    {
+        if (auto t = native_.playerText(world, player, label)) {
+            return t;
+        }
+        return script_.playerText(world, player, label);
     }
     bool mayPickUp(World& world, ServerObject& taker, ServerObject& item) override
     {

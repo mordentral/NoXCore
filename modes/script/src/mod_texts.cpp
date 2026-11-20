@@ -60,18 +60,21 @@ std::size_t Texts::Text::bytes() const
     return n;
 }
 
-const std::string& Texts::Text::in(std::string_view language) const
+const std::string* Texts::Text::in(std::string_view language) const
 {
     if (byLanguage.empty()) {
-        return all;
+        return &all;
     }
     if (const auto it = byLanguage.find(std::string(language)); it != byLanguage.end()) {
-        return it->second;
+        return &it->second;
+    }
+    if (othersOwn) {
+        return nullptr;
     }
     if (const auto it = byLanguage.find("en"); it != byLanguage.end()) {
-        return it->second;
+        return &it->second;
     }
-    return byLanguage.begin()->second;
+    return &byLanguage.begin()->second;
 }
 
 bool Texts::reaches(const server::GameHost& host, std::uint8_t peer)
@@ -127,13 +130,17 @@ bool Texts::set(server::GameHost* host, const std::string& key, const Text* text
         return true; // (as it is: nothing to send)
     }
     bytes_ = bytes_ - was + now;
+    std::optional<Text> before;
+    if (it != table_.end()) {
+        before = it->second.text;
+    }
     Entry& e = table_[k];
     e.key = key;
     e.text = *text;
     if (host) {
         for (const std::uint8_t peer : synced_) {
             if (reaches(*host, peer)) {
-                sendKey(*host, peer, e);
+                sendKey(*host, peer, e, before ? &*before : nullptr);
             }
         }
         syncAll(*host); // (a client in the game that hasn't the set: all of it, this one with it)
@@ -166,6 +173,29 @@ void Texts::clear(server::GameHost* host, std::string_view prefix)
 bool Texts::has(std::string_view key) const
 {
     return table_.contains(folded(key));
+}
+
+const Texts::Text* Texts::find(std::string_view key) const
+{
+    if (table_.empty()) {
+        return nullptr;
+    }
+    const auto it = table_.find(folded(key));
+    return it != table_.end() ? &it->second.text : nullptr;
+}
+
+std::optional<std::u16string> Texts::textFor(const server::GameHost& host, std::optional<std::uint8_t> peer, std::string_view key) const
+{
+    const Text* t = find(key);
+    if (!t) {
+        return std::nullopt;
+    }
+    const std::string language = peer ? languageOf(host, *peer) : std::string(l10n::language());
+    const std::string* s = t->in(language);
+    if (!s) {
+        return std::nullopt; // (others = "own": the server's own lookup)
+    }
+    return strings::fromUtf8(*s);
 }
 
 void Texts::ready(server::GameHost& host, std::uint8_t peer)
@@ -215,10 +245,25 @@ void Texts::sendWhole(server::GameHost& host, std::uint8_t peer)
     }
 }
 
-void Texts::sendKey(server::GameHost& host, std::uint8_t peer, const Entry& e)
+void Texts::sendKey(server::GameHost& host, std::uint8_t peer, const Entry& e, const Text* was)
 {
-    for (auto& m : uimsg::textSetMessages(e.key, e.text.in(languageOf(host, peer)))) {
-        sendTo(host, peer, std::move(m));
+    const std::string language = languageOf(host, peer);
+    if (const std::string* s = e.text.in(language)) {
+        for (auto& m : uimsg::textSetMessages(e.key, *s)) {
+            sendTo(host, peer, std::move(m));
+        }
+        return;
+    }
+    // (None in its language: its own text. It had the mode's before: cleared as a prefix, so the
+    // mode's keys that go on from it are sent again.)
+    if (was && was->in(language)) {
+        sendTo(host, peer, uimsg::textClearMessage(e.key));
+        const std::string k = folded(e.key);
+        for (const auto& [k2, e2] : table_) {
+            if (k2.size() > k.size() && k2.starts_with(k)) {
+                sendKey(host, peer, e2);
+            }
+        }
     }
 }
 
@@ -241,6 +286,15 @@ Texts::Text textArg(lua_State* L, int idx)
     while (lua_next(L, idx) != 0) {
         if (lua_type(L, -2) != LUA_TSTRING || lua_type(L, -1) != LUA_TSTRING) {
             luaL_argerror(L, idx, "a table of texts by language code ({ en = ..., ru = ... })");
+        }
+        if (std::string_view(lua_tostring(L, -2)) == "others") {
+            // others = "own": a language not given keeps its own text (else English's, the first's).
+            if (std::string_view(lua_tostring(L, -1)) != "own") {
+                luaL_argerror(L, idx, "others = \"own\" (a language not given keeps its own text) is the only choice");
+            }
+            t.othersOwn = true;
+            lua_pop(L, 1);
+            continue;
         }
         const std::string code = lobby::languageCode(lua_tostring(L, -2));
         if (code.empty() || code != lua_tostring(L, -2)) {
@@ -301,7 +355,7 @@ int noxTellStory(lua_State* L)
 {
     // nox.tellStory(unit, npc, key, speaker?): TellStory's dialog from the npc to that player with
     // the text of `key` (nox.setText's or nox.csf's), the speaker's name `speaker` (nil: the NPC's
-    // own, as TellStory gives it); whether it was told.
+    // own, as TellStory gives it: nox.setText's "NPC:<name>" first); whether it was told.
     toolbox::refuseInsideAsked(L, "nox.tellStory");
     server::ServerObject& unit = toolbox::playerUnitArg(L, 1);
     server::ServerObject& npc = toolbox::objectArg(L, 2);
@@ -325,8 +379,10 @@ int noxTellStory(lua_State* L)
         }
     }
     Texts& texts = toolbox::partsOf(L).texts;
-    // A key of the mode's own: only to a client that shows the overlay (its set sent first).
-    if (!peer || (texts.has(key) && !texts.shows(*host, *peer))) {
+    // A key of the mode's own: only to a client that shows the overlay (its set sent first); one
+    // with no text in the player's language (others = "own") is its own nox.csf's, as any.
+    const Texts::Text* own = peer ? texts.find(key) : nullptr;
+    if (!peer || (own && own->in(Texts::languageOf(*host, *peer)) && !texts.shows(*host, *peer))) {
         lua_pushboolean(L, 0);
         return 1;
     }

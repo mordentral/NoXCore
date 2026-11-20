@@ -35,6 +35,12 @@ void setDialog(ServerObject& npc, std::uint8_t type, std::int32_t start, std::in
 void cancelDialog(ServerObject& npc);
 /// StoryPic: a monster's portrait.
 void storyPic(ServerObject& npc, std::string_view picture);
+/// The label of an NPC's name in the string table: "NPC:" + its script name after any ':' without
+/// '_', or its type's.
+std::string npcNameLabel(const ServerObject& npc);
+/// MSG_DIALOG 3's name at +0x22 written as npcDialogMessage writes it (31 UTF-16 letters, the rest
+/// zeros); nothing for a shorter message.
+void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name);
 /// MSG_DIALOG 3 as SrvNet_OpenNpcDialog builds it (135 bytes; what the exe leaves of its stack
 /// as zeros): its text's id at +2, the NPC's name at +0x22 (Str_GetString("NPC:" + its script
 /// name after any ':' without '_', or its type's), 31 UTF-16 letters), 0 at +0x60, the sound at
@@ -46,7 +52,9 @@ void storyPic(ServerObject& npc, std::string_view picture);
 std::vector<std::uint8_t> npcDialogMessage(const World& world, const ServerObject& npc, std::uint32_t sound, std::string_view textId,
                                            const std::u16string* name = nullptr);
 /// SrvNet_OpenNpcDialog (TellStory): a player talks to `npc` (DialogWith), sent MSG_DIALOG 3 and
-/// frozen (monsters.hpp's freezeUnit, lock 0). (`name` as npcDialogMessage's.)
+/// frozen (monsters.hpp's freezeUnit, lock 0). (`name` as npcDialogMessage's. noxcpp: with none
+/// given, a NoX Core mode's own text for the NPC's name label for this player first: World::modeHooks'
+/// playerText; without a mode, or when it has none, the string table's.)
 void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::uint32_t sound, std::string_view textId,
                    const std::u16string* name = nullptr);
 /// SrvNet_OnDialogStart (MSG_DIALOG 1, StartDialog): a player not dead nor gone, a monster with
