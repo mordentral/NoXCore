@@ -12241,44 +12241,44 @@ game.chat.team = Team
 # noxsdl/src/game_session.cpp:45
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2045
+# noxsdl/src/main.cpp:2051
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2018
+# noxsdl/src/main.cpp:2024
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2022
+# noxsdl/src/main.cpp:2028
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2053
+# noxsdl/src/main.cpp:2059
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2048
+# noxsdl/src/main.cpp:2054
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2032
+# noxsdl/src/main.cpp:2038
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2035
+# noxsdl/src/main.cpp:2041
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2047
+# noxsdl/src/main.cpp:2053
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
 #@ 00c5ff51: Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left | Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
 game.leaving.notice[one] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left
 game.leaving.notice[other] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
-# noxsdl/src/main.cpp:1166
+# noxsdl/src/main.cpp:1172
 #@ 41598c12: {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
 game.load_failed.error_other = {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
-# noxsdl/src/main.cpp:1162
+# noxsdl/src/main.cpp:1168
 #@ a52d10c8: {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.error_windows = {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:671
+# noxsdl/src/main.cpp:676
 #@ da4003ab: Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.no_game = Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:670, noxsdl/src/main.cpp:1171
+# noxsdl/src/main.cpp:675, noxsdl/src/main.cpp:1177
 #@ 28bae6e6: NoX Core: loading failed
 game.load_failed.title = NoX Core: loading failed
 # noxsdl/src/map_vote_window.cpp:175
@@ -12347,16 +12347,16 @@ lobby.browser.xwis_logging_in = XWIS: logging in as {nick}
 # noxcore/src/lobby/browser.cpp:283
 #@ a1d5c981: XWIS: timed out
 lobby.browser.xwis_timed_out = XWIS: timed out
-# noxsdl/src/menus.cpp:1080
+# noxsdl/src/menus.cpp:1112
 #@ 639e2803: Log in to XWIS (a new name makes a new account with this password)
 lobby.login.go_tip = Log in to XWIS (a new name makes a new account with this password)
 # noxsdl/src/wol_screens.hpp:35
 #@ 7d20314c: Log in with your XWIS account. A new name becomes your account with the password you type; for a name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a game you host is listed under a generated one).
 lobby.login.help = Log in with your XWIS account. A new name becomes your account with the password you type; for a name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a game you host is listed under a generated one).
-# noxsdl/src/menus.cpp:1075
+# noxsdl/src/menus.cpp:1107
 #@ 68ee0803: Skip Login
 lobby.login.skip = Skip Login
-# noxsdl/src/menus.cpp:1076
+# noxsdl/src/menus.cpp:1108
 #@ f4f63f02: Go to the game list with no login name (a game you host is listed on XWIS under a generated one)
 lobby.login.skip_tip = Go to the game list with no login name (a game you host is listed on XWIS under a generated one)
 # noxcore/src/lobby/servserv.cpp:282, noxcore/src/lobby/servserv.cpp:293, noxcore/src/lobby/servserv.cpp:430
@@ -12522,16 +12522,34 @@ menus.browser.title = Nox games
 # noxsdl/src/browser_screen.cpp:534
 #@ 644d5488: \s(Update needed)
 menus.browser.update_needed_mark = \s(Update needed)
+# noxsdl/src/character_labels.hpp:34
+#@ bd325812: the game's own campaign
+menus.characters.coop_own = the game's own campaign
+# noxsdl/src/character_labels.hpp:35
+#@ 95760b2a: Co-op · {campaign}
+menus.characters.coop_place = Co-op · {campaign}
+# noxsdl/src/character_labels.hpp:64
+#@ 31b8846a: Last played: {places}
+menus.characters.last_played = Last played: {places}
+# noxsdl/src/character_labels.hpp:78
+#@ 02d6eb8a: {place} only
+menus.characters.only = {place} only
+# noxsdl/src/character_labels.hpp:47
+#@ 337d0395: {place} · {note}
+menus.characters.place_note = {place} · {note}
+# noxsdl/src/character_labels.hpp:70
+#@ 04c83daf: Show all
+menus.characters.show_all = Show all
 # noxsdl/src/menus_modes.cpp:75, noxsdl/src/menus_servers.cpp:219
 #@ 35afca3b: Cancel
 menus.common.cancel = Cancel
 # noxsdl/src/menus_servers.cpp:216
 #@ cd86acc3: Close
 menus.common.close = Close
-# noxsdl/src/menus.cpp:169, noxsdl/src/quit_menu.cpp:84, noxsdl/src/quit_menu.cpp:105
+# noxsdl/src/menus.cpp:176, noxsdl/src/quit_menu.cpp:84, noxsdl/src/quit_menu.cpp:105
 #@ e26d8706: \s- WIP
 menus.common.wip_suffix = \s- WIP
-# noxsdl/src/menus.cpp:374
+# noxsdl/src/menus.cpp:381
 #@ 40a44dac: Your NoX Core is too out of date for this game.
 menus.dialog.client_too_old = Your NoX Core is too out of date for this game.
 # noxsdl/src/host_listing.hpp:60
@@ -12549,7 +12567,7 @@ menus.host_listing.why_no_xwis = XWIS is off here (--no-xwis)
 # noxsdl/src/host_listing.hpp:42
 #@ 353cc175: you aren't logged in to XWIS (Online > Network), and XWIS lists a game under its host's login
 menus.host_listing.why_not_logged_in = you aren't logged in to XWIS (Online > Network), and XWIS lists a game under its host's login
-# noxsdl/src/menus.cpp:435, noxsdl/src/menus_modes.cpp:477
+# noxsdl/src/menus.cpp:442, noxsdl/src/menus_modes.cpp:477
 #@ 291bbe93: Game Modes
 menus.main.game_modes = Game Modes
 # noxsdl/src/menus_modes.cpp:413
@@ -12648,25 +12666,25 @@ menus.modes.start = Start
 # noxsdl/src/mode_list.cpp:62, noxsdl/src/mode_list.cpp:99, noxsdl/src/mode_list.cpp:133 ...
 #@ b3a43630: Yes
 menus.modes.yes = Yes
-# noxsdl/src/menus.cpp:2328
+# noxsdl/src/menus.cpp:2555
 #@ 034ee216: Check that your save folder is writable and has free space. See the log for details.
 menus.save_failed.body = Check that your save folder is writable and has free space. See the log for details.
-# noxsdl/src/menus.cpp:2327
+# noxsdl/src/menus.cpp:2554
 #@ 0685388d: Save failed
 menus.save_failed.title = Save failed
 # noxsdl/src/menus_servers.cpp:151, noxsdl/src/menus_servers.cpp:213
 #@ 9dc3aa14: Add
 menus.servers.add = Add
-# noxsdl/src/menus.cpp:618
+# noxsdl/src/menus.cpp:649
 #@ 02f448d1: Add/Remove
 menus.servers.add_remove = Add/Remove
-# noxsdl/src/menus.cpp:620
+# noxsdl/src/menus.cpp:651
 #@ 06e309b3: Add or remove saved server addresses
 menus.servers.add_remove_tip = Add or remove saved server addresses
 # noxsdl/src/menus_servers.cpp:184
 #@ 858b3346: Server added.
 menus.servers.added = Server added.
-# noxsdl/src/menus.cpp:1899
+# noxsdl/src/menus.cpp:2106
 #@ aa489a85: Address not found. Refresh to try again.
 menus.servers.address_not_found_refresh = Address not found. Refresh to try again.
 # noxsdl/src/menus_servers.cpp:211
@@ -12690,13 +12708,13 @@ menus.servers.confirm_remove = Remove saved address?
 # noxsdl/src/menus_servers.cpp:98
 #@ 435c2969: Add/Remove Servers
 menus.servers.dialog_title = Add/Remove Servers
-# noxsdl/src/menus.cpp:630, noxsdl/src/menus_modes.cpp:477
+# noxsdl/src/menus.cpp:661, noxsdl/src/menus_modes.cpp:477
 #@ c67511e6: Host Custom
 menus.servers.host_custom = Host Custom
-# noxsdl/src/menus.cpp:1336
+# noxsdl/src/menus.cpp:1368
 #@ 6a810ecf: Saved server
 menus.servers.info_saved_server = Saved server
-# noxsdl/src/menus.cpp:1336
+# noxsdl/src/menus.cpp:1368
 #@ 6d7302f2: Server
 menus.servers.info_server = Server
 # noxsdl/src/menus_servers.cpp:117
@@ -12717,26 +12735,26 @@ menus.servers.select_saved = Select saved address
 # noxsdl/src/menus_servers.cpp:189
 #@ b10cbd09: Could not change servers.txt. Check that it is writable and try again.
 menus.servers.write_failed = Could not change servers.txt. Check that it is writable and try again.
-# noxsdl/src/campaign_line.cpp:33, modes/coop/ui/coop_ui.cpp:262
+# noxsdl/src/campaign_line.cpp:33, modes/coop/ui/coop_ui.cpp:274
 #@ 3f618f8b: Campaign: {campaign}
 menus.solo.campaign_line = Campaign: {campaign}
 
 # noxsdl/src/mode_list.cpp:28, noxsdl/src/mode_list.cpp:84
 #@ a1cf2fd3: Campaign
 modes.coop.campaign = Campaign
-# modes/coop/ui/coop_ui.cpp:274
+# modes/coop/ui/coop_ui.cpp:286
 #@ 637c4607: Waiting for {n} of {of} to finish the chapter screen.
 modes.coop.chapter.waiting = Waiting for {n} of {of} to finish the chapter screen.
-# modes/coop/ui/coop_ui.cpp:275
+# modes/coop/ui/coop_ui.cpp:287
 #@ 7d2b3238: Waiting for {n} of {of} to finish the chapter screen (type ?skip to go on)
 modes.coop.chapter.waiting_host = Waiting for {n} of {of} to finish the chapter screen (type ?skip to go on)
-# modes/coop/ui/coop_ui.cpp:327
+# modes/coop/ui/coop_ui.cpp:339
 #@ 77b9a097: Conjurer
 modes.coop.class.conjurer = Conjurer
-# modes/coop/ui/coop_ui.cpp:325
+# modes/coop/ui/coop_ui.cpp:337
 #@ 33c476a9: Warrior
 modes.coop.class.warrior = Warrior
-# modes/coop/ui/coop_ui.cpp:326
+# modes/coop/ui/coop_ui.cpp:338
 #@ 42181c2a: Wizard
 modes.coop.class.wizard = Wizard
 # noxsdl/src/mode_list.cpp:31
@@ -12766,10 +12784,10 @@ modes.coop.difficulty_nightmare = Nightmare
 # noxsdl/src/mode_list.cpp:25
 #@ 58de2772: Normal
 modes.coop.difficulty_normal = Normal
-# modes/coop/ui/coop_ui.cpp:328
+# modes/coop/ui/coop_ui.cpp:340
 #@ 755d2cd0: This co-op campaign is for {class} characters only.
 modes.coop.join.class_only = This co-op campaign is for {class} characters only.
-# modes/coop/ui/coop_ui.cpp:331
+# modes/coop/ui/coop_ui.cpp:343
 #@ e62a194a: This co-op campaign doesn't take characters of your class.
 modes.coop.join.class_refused = This co-op campaign doesn't take characters of your class.
 # noxsdl/src/mode_list.cpp:19
@@ -13198,7 +13216,7 @@ options.weather.on = On
 #@ 8dc6c6d9: Reduced
 options.weather.reduced = Reduced
 
-# noxsdl/src/menus.cpp:381, noxsdl/src/editor/map_editor.cpp:275
+# noxsdl/src/menus.cpp:388, noxsdl/src/editor/map_editor.cpp:275
 #@ db79a3a6: {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
 script.memory_tricks = {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
 

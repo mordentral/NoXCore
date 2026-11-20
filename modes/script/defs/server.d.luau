@@ -286,6 +286,8 @@ declare nox: {
     setAbility: (unit: number, ability: number, level: number, report: boolean?, show: boolean?) -> (),
     --- Puts a spell ("spell": its name or number) or an ability ("ability": 1-5) the player knows on its client's spell bars quietly: the first empty slot, only where no slot holds it (nothing moved or doubled), no book, sound, sparks or line. Sent once the player is in play and every revoke owed to it (nox.revoke) has gone. Whether it will be sent (false: not known, or a client below client level 10 or without the mode UI: nothing sent).
     putOnBars: (unit: number, kind: "spell" | "ability", what: string | number) -> boolean,
+    --- A line about the player's character ("level 12, act 3"), which its NoX Core client keeps beside the character it joined with and shows next to it on its character screens. Plain text, cut to 80 bytes, control characters dropped; "" takes it away; the same line again is sent once. Whether it was sent (false: a stock client, one below client level 15 or without the mode UI: nothing sent).
+    characterNote: (unit: number, text: string) -> boolean,
     --- A player's field guide: for each creature 1-40, whether it has it.
     fieldGuide: (unit: number) -> { boolean },
     --- Puts a creature (its guide number 1-40 or its type's name) in a player's field guide as a found guide does; with notify, the player and the others told. Whether it was put in (false: already known, or no such creature).

@@ -78,6 +78,7 @@
 #include "view3d.hpp"
 #include "weather.hpp"
 
+#include "noxcore/client/character_notes.hpp"
 #include "noxcore/client/edit_session_client.hpp"
 #include "noxcore/client/spell_bars.hpp"
 #include "noxcore/client/state_draw.hpp"
@@ -513,7 +514,19 @@ struct App {
     /// Live: a co-op guest's campaign character ("<name> (Co-op).plr", set by coop_ui.cpp): its bars
     /// are saved there when the game is left, when the campaign's save has made it (saveBars).
     std::filesystem::path guestBarsFile;
-    bool barsExpanded = false;         ///< all five sets showing
+    /// (noxcpp) This game's place in the note beside the character we joined with (character_play.hpp:
+    /// a mode's or the co-op campaign's, with the mode's line); none: nothing noted (a stock or arena
+    /// game, a character the network character screen doesn't list). The .plr it's noted beside, a
+    /// co-op file noted with it, a line held back to be written, and when one last was.
+    std::optional<nox::client::character_notes::Place> characterPlace;
+    std::filesystem::path characterPlaceFile;
+    std::filesystem::path characterCoopFile;
+    bool characterNoteHeld = false;
+    std::uint64_t characterNoteWrittenMs = 0;
+    /// (noxcpp) The character screen's switch, each screen's ("host", "join", "local"): its characters
+    /// for the game's mode alone (noxcore.cfg's CharactersModeOnly*; Menus::setCharacterListModeOnly).
+    std::map<std::string, bool, std::less<>> charactersModeOnly;
+    bool barsExpanded = false;       ///< all five sets showing
     int barsClass = -1;                 ///< the class the bars were loaded for (ownClass)
     bool barsMulticlass = false;        ///< loaded for noxcpp's multiclass (a warrior's abilities tagged)
     bool barsInverted = false;          ///< InvertSpellTarget held

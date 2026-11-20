@@ -1,6 +1,7 @@
 // A script mode's server side (scripted_mode.hpp): the VM, the script's hooks, and the toolbox.
 #include "noxcore/modes/script/scripted_mode.hpp"
 
+#include "noxcore/client/character_notes.hpp"
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/modes/script/ui_proto.hpp"
 #include "noxcore/net/messages.hpp"
@@ -297,6 +298,11 @@ struct ScriptedMode::Impl {
         }
     }
     std::uint32_t revokedAt = ~0u;
+    /// (Client level 15) The line each player's client was last sent (nox.characterNote: kCharacterNote),
+    /// by its unit: the same again isn't sent. Forgotten past kMaxNotesKept units (a long game's
+    /// many maps: a new unit each).
+    static constexpr std::size_t kMaxNotesKept = 64;
+    std::map<std::uint32_t, std::string> characterNotes;
     /// nox.lock's: the host's own Closed and allowed list, put back by nox.unlock. `lockChanged`:
     /// since the host last asked (ServerMode::takeLockChanged: a pool opens another lobby).
     bool locked = false;
@@ -3236,6 +3242,37 @@ int noxPutOnBars(lua_State* L)
     return 1;
 }
 
+int noxCharacterNote(lua_State* L)
+{
+    // nox.characterNote(unit, text) -> whether it was sent: a line about the player's character
+    // ("level 12, act 3"), plain text, which its NoX Core client keeps beside the character it joined
+    // with and shows on its character screens (kCharacterNote). Cut to 80 bytes, control characters
+    // dropped; "" takes it away. False: a client that doesn't take it (stock, below client level 15,
+    // ModeUi not named, a held-out or unit-less player): nothing sent. The same line again is sent once.
+    const server::ServerObject& u = unitArg(L, 1);
+    size_t len = 0;
+    const char* s = luaL_checklstring(L, 2, &len);
+    Impl& impl = implOf(L);
+    const std::optional<std::uint8_t> peer = peerOfUnit(impl, u.extent);
+    if (!peer || impl.hidden(u) || !(impl.host->clientFeatures(*peer) & lobby::ClientFeature::ModeUi) ||
+        impl.host->clientLevel(*peer) < uimsg::kCharacterNoteLevel) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    std::string line = ::nox::client::character_notes::cleanText(std::string_view(s, len), uimsg::kMaxCharacterNoteBytes);
+    if (const auto it = impl.characterNotes.find(u.extent); it != impl.characterNotes.end() && it->second == line) {
+        lua_pushboolean(L, 1); // (sent already)
+        return 1;
+    }
+    if (impl.characterNotes.size() >= Impl::kMaxNotesKept) {
+        impl.characterNotes.clear();
+    }
+    worldOf(L).broadcasts().push_back({uimsg::characterNoteMessage(line), true, u.extent});
+    impl.characterNotes[u.extent] = std::move(line);
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 int noxGrantCreature(lua_State* L)
 {
     // nox.grantCreature(unit, creature, notify): Plr_AwardFieldGuide, as a found field guide gives
@@ -4443,7 +4480,7 @@ void Impl::installToolbox()
         {"gold", noxGold},     {"setGold", noxSetGold}, {"mana", noxMana},       {"setMana", noxSetMana},
         {"setPlayerHealth", noxSetPlayerHealth}, {"strength", noxStrength}, {"setStrength", noxSetStrength},
         {"spellLevel", noxSpellLevel}, {"spells", noxSpells}, {"raiseSpell", noxRaiseSpell}, {"grantSpell", noxGrantSpell},
-        {"abilityLevel", noxAbilityLevel}, {"setAbility", noxSetAbility}, {"putOnBars", noxPutOnBars}, {"fieldGuide", noxFieldGuide},
+        {"abilityLevel", noxAbilityLevel}, {"setAbility", noxSetAbility}, {"putOnBars", noxPutOnBars}, {"characterNote", noxCharacterNote}, {"fieldGuide", noxFieldGuide},
         {"clearBook", noxClearBook},
         {"grantCreature", noxGrantCreature}, {"spellId", noxSpellId}, {"guideNumber", noxGuideNumber},
         {"revoke", noxRevoke}, {"sendRevokes", noxSendRevokes}, {"status", noxStatus}, {"gameOverAt", noxGameOverAt},

@@ -41,6 +41,7 @@
 
 #include "app.hpp"
 #include "backend_hooks.hpp"
+#include "character_play.hpp"
 #include "client_level_gate.hpp"
 #include "command_line.hpp"
 #include "editor/editor_settings.hpp"
@@ -617,6 +618,10 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         return true;
     };
     callbacks.loggedIn = [](const std::string& nick) { SDL_Log("account: %s (XWIS login)", nick.c_str()); };
+    callbacks.characterListModeOnly = [app](const std::string& screen, bool on) {
+        app->charactersModeOnly[screen] = on; // (kept in noxcore.cfg with the Options' switches)
+        saveExtras(*app, currentExtras(*app));
+    };
     return callbacks;
 }
 
@@ -1073,6 +1078,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 app->menus->setSaveDir(opts.saveDir);
             }
             app->menus->setSaveRoot(app->saveRoot);
+            app->menus->setCharacterListModeOnly(app->charactersModeOnly); // (noxcore.cfg's: character_labels.hpp)
             app->menus->setThings(&app->things);
             app->menus->setAudio(app->audio.get());
             SDL_StartTextInput(app->window); // for the menus' entry fields
@@ -2789,6 +2795,7 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         }
         if (inGame && app->inGameSinceMs == 0) {
             app->inGameSinceMs = SDL_GetTicks();
+            characterPlayedHere(*app); // (noxcpp: a mode's game noted beside the character we joined with: character_play.hpp)
             if (app->joinTeam != 0) {
                 client.joinTeam(app->joinTeam);
             }

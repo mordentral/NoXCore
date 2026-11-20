@@ -339,6 +339,17 @@ function hero.saveAll(why: string): number
 	return n
 end
 
+-- Where the character stands, for its NoX Core client's character screens (nox.characterNote,
+-- client level 15; an older or stock client is sent nothing): its level and act. Only a character
+-- its join names (store.keyFor: the player's own .plr's name and class); a server character
+-- (roster.luau, characters=server) is the server's record, never the player's .plr: nothing told.
+local function tellNote(h: any)
+	if h.server or not nox.characterNote then
+		return
+	end
+	nox.characterNote(h.unit, string.format("level %d, act %d", h.record.level.level, h.record.world.act or 1))
+end
+
 -- The record set on the unit: what it carried taken away (for this game only: the player's own
 -- .plr is never written), the record's gear given (worn as it was), its gold and numbers. `at`: a
 -- point to put the unit at (nil: where it stands). `keep`: it still carries the record's gear and
@@ -447,6 +458,7 @@ function hero.setUp(h: any, at: any, keep: boolean?)
 	h.ready = true
 	h.since = nox.frame()
 	hud.hero(h)
+	tellNote(h) -- (each arrival: a join, a new map or act; the same line again isn't sent)
 end
 
 -- A set-up hero found watching (a client that finished a new map's download after its unit was
@@ -557,6 +569,7 @@ function hero.join(p: any, chosen: any?)
 		peer = p.peer,
 		unit = p.unit,
 		key = key,
+		server = chosen ~= nil, -- (a server character: roster.luau's)
 		record = record,
 		ready = false,
 		bonus = { damage = 0, health = 0, mana = 0, strength = 0, healthPct = 0, manaPct = 0, resist = 0, healthRegen = 0, manaRegen = 0,
@@ -672,6 +685,7 @@ local function levelUp(h: any)
 	nox.sound(h.unit, "LevelUp")
 	nox.tell(h.unit, string.format("You reached level %d.", h.record.level.level))
 	hero.save(h, "level up")
+	tellNote(h)
 end
 
 -- Experience to one hero; levels gained with it.

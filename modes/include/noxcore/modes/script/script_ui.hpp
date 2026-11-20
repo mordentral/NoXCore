@@ -511,6 +511,10 @@ public:
     /// (ui_proto.hpp's kToBars: nox.putOnBars) since the last take, in order; at most kUiMaxToBars
     /// wait (more: let go). Whatever the UI's state (a mode with no UI sends them too).
     std::vector<uimsg::ToBars> takeToBars();
+    /// (Client level 15) The server's latest line about our character (ui_proto.hpp's
+    /// kCharacterNote: nox.characterNote) since the last take, as sent (untrusted: the program
+    /// cleans it); none when none came. Only the latest is kept. Whatever the UI's state.
+    std::optional<std::string> takeCharacterNote();
     /// (Client level 8) The things in a leap now (ui_proto.hpp's kLeap), each its height at the
     /// last frame()'s time: 4 h t (1 - t) from the message's arrival. A leap over is let go in
     /// frame(); a new one for the same thing replaces it.

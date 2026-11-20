@@ -4,6 +4,7 @@
 // says when a co-op game refuses a character of another class. Its hosting goes through the solo
 // screens (SoloScreensStart: the class screen picks the campaign, its saves under Save\Coop).
 #include "app.hpp"
+#include "character_play.hpp"
 #include "mode_ui.hpp"
 
 #include "noxcore/client/solo_saves.hpp"
@@ -228,6 +229,11 @@ public:
                 barsLooked_ = true; // (a guest's spell bars looked at once it's in)
                 characterFolder_ = coopCharacterFolder(coop_); // (once a game: Hello's campaign)
                 barsForGuest(app, coop_->hello() && coop_->hello()->characterKept, characterFolder_);
+                // (noxcpp) The campaign noted beside the character we joined with, and its co-op file
+                // when that's one the character screen lists (character_play.hpp).
+                if (coop_->hello()) {
+                    characterPlayedCoop(app, coop_->hello()->campaignId, coop_->hello()->campaignTitle);
+                }
                 abilitiesSeen_ = app.quietAbilityAwards;
                 abilitiesForGuest(app);
             } else if (app.quietAbilityAwards != abilitiesSeen_ && !app.flight) {
@@ -236,6 +242,12 @@ public:
             }
             if (const auto kept = coop_->takeCharacter()) {
                 keepCoopCharacter(app, *kept, characterFolder_);
+                if (coop_->hello()) {
+                    // (noxcpp) The co-op file noted too, when the character screen lists it (the game's own
+                    // campaign's, beside ours).
+                    characterPlayedCoop(app, coop_->hello()->campaignId, coop_->hello()->campaignTitle,
+                                        nox::coop::campaignCharacterFile(app.characterFile, characterFolder_));
+                }
             }
         }
         for (const auto& [kind, text] : coop_->takeNotices()) {

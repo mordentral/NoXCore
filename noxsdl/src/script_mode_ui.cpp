@@ -25,6 +25,7 @@
 // the HD pack's where it has them) and things fitted to a box, clips a window's draws to a box of it, and may cover the game's
 // HUD pieces with a window (coversHud: gameHudShown hides them).
 #include "app.hpp"
+#include "character_play.hpp"
 #include "audio.hpp"
 #include "chat_entry.hpp"
 #include "cinematics.hpp"
@@ -271,6 +272,12 @@ public:
             for (const nox::modes::script::uimsg::ToBars& b : ui_->takeToBars()) {
                 putOnBarsQuietly(app, b.id, b.kind == nox::modes::script::uimsg::BarKind::Ability);
             }
+            // (Client level 15) The mode's line about our character (nox.characterNote): kept in the note
+            // beside the character we joined with (character_play.hpp; untrusted, cleaned there).
+            if (const auto line = ui_->takeCharacterNote()) {
+                characterSummary(app, *line);
+            }
+            characterNotesDue(app);
             for (const nox::modes::script::UiDrawScale& s : ui_->drawScales()) {
                 if (!s.gone) {
                     app.modeDrawScales.push_back({s.object, s.type, s.scale});

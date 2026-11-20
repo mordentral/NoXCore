@@ -138,6 +138,8 @@ struct ScriptUiClient::Impl {
     std::vector<uimsg::TextLine> textLines;
     /// (Client level 10) The quiet bar fills the server asked for, not yet taken (at most kUiMaxToBars).
     std::vector<uimsg::ToBars> toBars;
+    /// (Client level 15) The server's latest line about our character (kCharacterNote), not yet taken.
+    std::optional<std::string> characterNote;
     /// (Client level 8) The leaps told (kLeap), each from the frame time it came at.
     struct LeapNow {
         std::uint16_t object = 0;
@@ -1929,6 +1931,12 @@ void Impl::onMessage(std::span<const std::uint8_t> m)
             overlayTable->clearOverlay(*prefix);
         }
         break;
+    case uimsg::kCharacterNote:
+        // (Client level 15; whatever the UI's state.) The latest kept, as sent: the program cleans it.
+        if (auto line = uimsg::decodeCharacterNote(rest)) {
+            characterNote = std::move(*line);
+        }
+        break;
     default: break; // (a sub from a newer server: let go)
     }
 }
@@ -2279,6 +2287,11 @@ std::vector<uimsg::TextLine> ScriptUiClient::takeTextLines()
 std::vector<uimsg::ToBars> ScriptUiClient::takeToBars()
 {
     return std::exchange(impl_->toBars, {});
+}
+
+std::optional<std::string> ScriptUiClient::takeCharacterNote()
+{
+    return std::exchange(impl_->characterNote, std::nullopt);
 }
 
 std::optional<std::uint32_t> gameIconId(std::string_view name)

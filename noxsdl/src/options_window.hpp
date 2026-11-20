@@ -115,6 +115,12 @@ public:
         /// Not shown here: the keys of a mod's ability strip's four buttons (client level 8:
         /// noxcore.cfg's ModAbilityKey1-4, nox.cfg's key names; the stock table leaves 3-6 free).
         std::array<std::string, 4> modAbilityKeys{"3", "4", "5", "6"};
+        /// Not shown here: the character screen's switch (character_labels.hpp), each screen's:
+        /// its characters for the game's mode alone, not every one (noxcore.cfg's
+        /// CharactersModeOnlyHost, ...Join, ...Local).
+        bool charactersModeOnlyHost = false;
+        bool charactersModeOnlyJoin = false;
+        bool charactersModeOnlyLocal = false;
     };
     static constexpr int kMouseSpeedMin = 25, kMouseSpeedMax = 300;
     /// Sound effects, speech and music on (the checkboxes; not kept in nox.cfg, whose volumes say

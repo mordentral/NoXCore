@@ -67,6 +67,7 @@
 #include "mode_list.hpp"
 #include "options_trip.hpp"
 
+#include "noxcore/client/character_notes.hpp"
 #include "noxcore/client/headless_client.hpp"
 #include "noxcore/client/solo_menu.hpp"
 #include "noxcore/client/solo_saves.hpp"
@@ -151,6 +152,9 @@ public:
         std::function<void(std::function<void()> after)> intro;
         /// Game Modes' Map Editor (noxcpp's): the single-player map editor.
         std::function<void()> editor;
+        /// (noxcpp) The character screen's switch changed: its characters for the game's mode alone
+        /// (`on`) or every one, for `screen` ("host", "join", "local": noxcore.cfg keeps each).
+        std::function<void(const std::string& screen, bool on)> characterListModeOnly;
     };
 
     /// `gameDir` is the Nox folder (its window and Save folders). `profile` supplies what the
@@ -201,6 +205,10 @@ public:
     bool joinWaitUp() const noexcept { return joinWaitUp_; }
     /// Where characters are listed from and saved to (default: the game's Save folder).
     void setSaveDir(std::filesystem::path dir) { saveDir_ = std::move(dir); }
+    const std::filesystem::path& saveDir() const { return saveDir_; }
+    /// (noxcpp) The character screen's switch as noxcore.cfg kept it, by screen ("host", "join",
+    /// "local"; one not there: every character shown).
+    void setCharacterListModeOnly(std::map<std::string, bool, std::less<>> on) { modeOnly_ = std::move(on); }
     /// The folder a solo game's Save\ is under (default: the game's).
     void setSaveRoot(std::filesystem::path dir) { saveRoot_ = std::move(dir); }
     /// thing.bin, for a new character's starting spell bars (their spells' flags).
@@ -333,7 +341,17 @@ private:
     void closeGameInfo();
     void scrollGameInfo(int first);
     void loadCharacters();
+    /// (noxcpp) characters_ from listed_: those played at the game's mode first (character_notes'
+    /// order), the rest after unless the switch is on.
+    void arrangeCharacters();
     void fillCharacterList();
+    /// (noxcpp) What the character screen chooses for (charTarget_, charScreen_), from the game chosen.
+    void targetFor(const std::string& host);
+    /// (noxcpp) `text` as a line of `list` shows it whole: cut, with "...", to the list's width.
+    std::string fitToList(const std::string& text, const gui::Window& list);
+    bool characterModeOnly() const;
+    /// (noxcpp) The character screen's added windows' drawing: the selected one's places, the switch.
+    void drawCharacterExtras();
     void join(const nox::client::PlayerProfile& profile);
     // Solo (game flag 0x800).
     void onSolo();
@@ -447,6 +465,19 @@ private:
     std::optional<nox::io::SavedLogin> guestLogin_; ///< (Skip Login's, for posting a hosted game)
     std::string pendingHost_;
     std::vector<Character> characters_;
+    // (noxcpp) Where each character was last played (character_labels.hpp): the list as read, with
+    // each one's note (read once, as the list is made); the notes of characters_ (the list shown), and
+    // each one's places' line; what the screen chooses for, and its switch's screen and choices.
+    struct Listed {
+        Character character;
+        std::optional<nox::client::character_notes::Notes> notes;
+    };
+    std::vector<Listed> listed_;
+    std::vector<const nox::client::character_notes::Notes*> shownNotes_;
+    std::vector<std::string> placeLines_;
+    nox::client::character_notes::Target charTarget_;
+    std::string charScreen_;
+    std::map<std::string, bool, std::less<>> modeOnly_;
     gui::Window* dialog_ = nullptr;
     /// The keys of the dialog `dialogKeysOf_` (noxcpp's mode lists: arrows and Enter) while it's
     /// the one up; true when it took the key.

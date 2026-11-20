@@ -181,7 +181,11 @@ struct ClientSecret {
 ///      client's string lookups find before nox.csf's, each in that client's language), sent only to
 ///      a client of level 14 or above that named ModeUi (ui_proto.hpp's kTextsLevel); any other is
 ///      sent nothing and keeps its own nox.csf's texts
-inline constexpr std::uint16_t kClientLevel = 14;
+///  15  a script mode's line about a player's character (nox.characterNote: MSG_NOXCPP_MODEUI's
+///      kCharacterNote, kept by the client beside the character it joined with for its character
+///      screens), sent only to a client of level 15 or above that named ModeUi (ui_proto.hpp's
+///      kCharacterNoteLevel); any other is sent nothing (nox.characterNote says false)
+inline constexpr std::uint16_t kClientLevel = 15;
 /// The client level whose script calls bind in source order: an edit session's lowest (kClientLevel's
 /// list, 13).
 inline constexpr std::uint16_t kSourceOrderCallsLevel = 13;

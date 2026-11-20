@@ -90,6 +90,10 @@
 //   kTextSet      str key, u8 flags (kTextMore: the text goes on in the next kTextSet), str text
 //                 (UTF-8; a long one in pieces, one after another)
 //   kTextClear    str prefix (the keys that start with it gone; "": every one)
+// and, only to a client at client level 15 or above (kCharacterNoteLevel) that named ModeUi, a
+// script mode's line about the player's character (nox.characterNote: its level, how far it has
+// come), which the client keeps beside the character it joined with for its character screens:
+//   kCharacterNote str the line (UTF-8, plain text, at most kMaxCharacterNoteBytes; "": none)
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
 //   kSend   a value from the UI, for the server script's onUiMessage
@@ -145,6 +149,7 @@ enum Sub : std::uint8_t {
     kToBars = 26,
     kTextSet = 27,
     kTextClear = 28,
+    kCharacterNote = 29,
 };
 
 /// The most UI source a server sends, and a client takes (section 10.3's cap).
@@ -785,6 +790,37 @@ inline std::optional<std::string> decodeTextClear(std::span<const std::uint8_t> 
     }
     prefix.resize(std::min(prefix.size(), kMaxTextKeyBytes));
     return prefix;
+}
+
+/// (Client level 15) A script mode's line about a player's character (nox.characterNote): kept by
+/// the client beside the character it joined with, shown on its character screens. kCharacterNote's
+/// payload: str the line (UTF-8, at most kMaxCharacterNoteBytes). The client treats it as
+/// untrusted: cut and cleaned again (character_notes.hpp's cleanText), shown as plain text.
+inline constexpr std::uint16_t kCharacterNoteLevel = 15;
+inline constexpr std::size_t kMaxCharacterNoteBytes = 80;
+
+inline std::vector<std::uint8_t> characterNoteMessage(std::string_view line)
+{
+    Writer w;
+    std::size_t n = std::min(line.size(), kMaxCharacterNoteBytes);
+    while (n > 0 && n < line.size() && (static_cast<unsigned char>(line[n]) & 0xC0) == 0x80) {
+        --n; // (cut between UTF-8 characters)
+    }
+    w.str(line.substr(0, n));
+    return message(kCharacterNote, w.out);
+}
+
+/// A kCharacterNote payload read, its line as sent (cut to kMaxCharacterNoteBytes; bytes past it
+/// left for later versions); none: cut short.
+inline std::optional<std::string> decodeCharacterNote(std::span<const std::uint8_t> payload)
+{
+    Reader r{payload};
+    std::string line = r.str();
+    if (!r.ok) {
+        return std::nullopt;
+    }
+    line.resize(std::min(line.size(), kMaxCharacterNoteBytes));
+    return line;
 }
 
 } // namespace nox::modes::script::uimsg

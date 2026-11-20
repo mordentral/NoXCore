@@ -8322,6 +8322,18 @@ menus.browser.status_online = 온라인
 menus.browser.title = Nox 게임
 #@ 644d5488 mt: \s(Update needed)
 menus.browser.update_needed_mark = \s(업데이트 필요)
+#@ bd325812 mt: the game's own campaign
+menus.characters.coop_own = 게임 기본 캠페인
+#@ 95760b2a mt: Co-op · {campaign}
+menus.characters.coop_place = 협동 · {campaign}
+#@ 31b8846a mt: Last played: {places}
+menus.characters.last_played = 최근 플레이: {places}
+#@ 02d6eb8a mt: {place} only
+menus.characters.only = {place}만
+#@ 337d0395 mt: {place} · {note}
+menus.characters.place_note = {place} · {note}
+#@ 04c83daf mt: Show all
+menus.characters.show_all = 모두 표시
 #@ 35afca3b mt: Cancel
 menus.common.cancel = 취소
 #@ cd86acc3 mt: Close

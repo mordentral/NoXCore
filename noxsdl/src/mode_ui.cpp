@@ -2,6 +2,7 @@
 #include "mode_ui.hpp"
 
 #include "app.hpp"
+#include "character_play.hpp"
 #include "local_host.hpp"
 
 #include "noxcore/io/file.hpp"
@@ -44,6 +45,7 @@ void bindModeClients(App& app)
 {
     // (The live client's own sides, each idle unless its server plays its mode; one not made with
     // every client, as it acts for our player, made for ours now.)
+    characterNotesEnd(app); // (a new game: its place not known yet)
     app.scriptUi = nullptr;
     for (auto& [id, ui] : app.modeUis) {
         if (!app.live) {
@@ -71,6 +73,7 @@ void bindModeClients(App& app)
 
 void unbindModeClients(App& app)
 {
+    characterNotesEnd(app); // (a mode's line held back written as the game ends)
     for (auto& [id, ui] : app.modeUis) {
         ui->bind(nullptr);
     }

@@ -326,3 +326,4 @@ noxsdl/src/thing_art.cpp: "NPCDraw"
 
 # noxsdl/src/trade_screens.cpp: thing names
 noxsdl/src/trade_screens.cpp: "Shopkeeper"
+noxsdl/src/character_play.cpp: "Save"

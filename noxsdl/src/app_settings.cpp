@@ -190,6 +190,12 @@ OptionsWindow::Extras loadExtras(const fs::path& gameDir)
                                         OptionsWindow::kMouseSpeedMax);
         } else if (name == "PendingChanges") {
             e.pendingView = std::clamp(std::atoi(line.c_str() + eq + 1), 0, 2);
+        } else if (name == "CharactersModeOnlyHost") {
+            e.charactersModeOnlyHost = on;
+        } else if (name == "CharactersModeOnlyJoin") {
+            e.charactersModeOnlyJoin = on;
+        } else if (name == "CharactersModeOnlyLocal") {
+            e.charactersModeOnlyLocal = on;
         } else if (name == "WeatherEffects") {
             e.weather = std::clamp(std::atoi(line.c_str() + eq + 1), 0, 2);
         } else if (name.size() == 14 && name.starts_with("ModAbilityKey") && name[13] >= '1' && name[13] <= '4') {
@@ -214,7 +220,8 @@ void saveExtras(const App& app, const OptionsWindow::Extras& e)
         << "\nMouseSpeed = " << e.mouseSpeed << "\nMouseSpeed3D = " << e.mouseSpeed3D << "\nKillFeed = " << e.killFeed << "\nDisplay = " << e.display
         << "\nVSync = " << e.vsync << "\nServerUpdateRate = " << e.serverUpdateRate
         << "\nServerMapVote = " << e.serverMapVote << "\nExactMaths = " << e.exactMaths << "\nPendingChanges = " << e.pendingView
-        << "\nWeatherEffects = " << e.weather << "\nCsfText = "
+        << "\nWeatherEffects = " << e.weather << "\nCharactersModeOnlyHost = " << e.charactersModeOnlyHost
+        << "\nCharactersModeOnlyJoin = " << e.charactersModeOnlyJoin << "\nCharactersModeOnlyLocal = " << e.charactersModeOnlyLocal << "\nCsfText = "
         << (e.csfText == OptionsWindow::Extras::kCsfTextCp1251   ? (e.csfShift >= 0 ? "cp1251:" + std::to_string(e.csfShift) : std::string("cp1251"))
             : e.csfText == OptionsWindow::Extras::kCsfTextLatin1 ? std::string("latin1")
                                                                  : std::string("auto"))
@@ -261,6 +268,13 @@ OptionsWindow::Extras currentExtras(const App& app)
     e.pendingView = static_cast<int>(app.pendingView);
     e.weather = app.weatherEffects;
     e.modAbilityKeys = app.modAbilityKeyNames;
+    const auto modeOnly = [&app](std::string_view screen) {
+        const auto it = app.charactersModeOnly.find(screen);
+        return it != app.charactersModeOnly.end() && it->second;
+    };
+    e.charactersModeOnlyHost = modeOnly("host");
+    e.charactersModeOnlyJoin = modeOnly("join");
+    e.charactersModeOnlyLocal = modeOnly("local");
     return e;
 }
 
@@ -451,6 +465,7 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
     app.pendingView = static_cast<nox::mapedit::PendingView>(std::clamp(e.pendingView, 0, 2));
     app.weatherEffects = std::clamp(e.weather, 0, 2);
     app.modAbilityKeyNames = e.modAbilityKeys;
+    app.charactersModeOnly = {{"host", e.charactersModeOnlyHost}, {"join", e.charactersModeOnlyJoin}, {"local", e.charactersModeOnlyLocal}};
     for (std::size_t i = 0; i < e.modAbilityKeys.size(); ++i) {
         const auto* key = nox::config::findKey(e.modAbilityKeys[i]);
         app.modAbilityKeys[i] = key ? key->code : 0;

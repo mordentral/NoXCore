@@ -33,6 +33,7 @@ add_library(noxcore
     src/client/movies.cpp
     src/client/navigation.cpp
     src/client/sight.cpp
+    src/client/character_notes.cpp
     src/client/solo_menu.cpp
     src/client/solo_saves.cpp
     src/client/spell_bars.cpp
