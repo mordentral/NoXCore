@@ -1944,7 +1944,8 @@ void Menus::targetFor(const std::string& host)
     if (!e || !e->extended) {
         return;
     }
-    const std::string& name = e->extended->modeName;
+    // (the host's name as sent: cleaned as a note's title is, for the switch's words)
+    const std::string name = charnotes::cleanText(e->extended->modeName, charnotes::kMaxTitleBytes);
     if (e->extended->features & nox::lobby::ServerFeature::CoopCampaign) {
         const nox::modes::Mode* coop = nox::modes::registry().find("coop");
         const bool own = name.empty() || (coop && name == coop->info.name);
@@ -2029,13 +2030,30 @@ void Menus::drawCharacterExtras()
     // The switch: "Show all" and "<the mode> only" on a dark strip, the one chosen in the gold, the
     // other dim; a click takes the other.
     if (gui::Window* w = screen_ ? screen_->find(kCharSwitch) : nullptr) {
-        w->draw = [this, all = showAllText(), only = onlyTargetText(charTarget_)](gui::Window& self, gui::Painter& p) {
+        w->draw = [this, all = showAllText(), only = onlyTargetText(charTarget_), fitted = false](gui::Window& self, gui::Painter& p) mutable {
             const SDL_Point pos = self.screenPos();
             const bool lit = (self.state & gui::kLit) != 0;
             p.fillAlpha(pos.x, pos.y, self.rect.w, self.rect.h, SDL_Color{0, 0, 0, static_cast<std::uint8_t>(lit ? 200 : 160)});
             const bool on = characterModeOnly();
             const nox::gui::Color chosen{240, 180, 42}, other{150, 132, 100};
             const std::string bar = "  |  ";
+            if (!fitted) {
+                // (a long mode name, a remote host's: its choice cut with "..." to the strip, once)
+                fitted = true;
+                const int room = self.rect.w - 4 - p.textWidth(all, false) - p.textWidth(bar, false);
+                while (!only.empty() && p.textWidth(only, false) > room) {
+                    do {
+                        only.pop_back(); // (a whole UTF-8 character)
+                    } while (!only.empty() && (static_cast<unsigned char>(only.back()) & 0xC0) == 0x80);
+                    if (!only.empty() && (static_cast<unsigned char>(only.back()) & 0xC0) == 0xC0) {
+                        only.pop_back();
+                    }
+                    if (p.textWidth(only + "...", false) <= room) {
+                        only += "...";
+                        break;
+                    }
+                }
+            }
             const int wa = p.textWidth(all, false), wb = p.textWidth(bar, false), wo = p.textWidth(only, false);
             int x = pos.x + std::max(2, (self.rect.w - (wa + wb + wo)) / 2);
             const int y = pos.y + (self.rect.h - p.fontHeight(false)) / 2;

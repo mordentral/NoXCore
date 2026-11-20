@@ -96,7 +96,8 @@ void remove(const std::filesystem::path& plr);
 void move(const std::filesystem::path& from, const std::filesystem::path& to);
 
 /// Whether `place` is where `target` plays: the same kind, and the same id when both have one,
-/// else the same title (letters' case aside; the game's own co-op campaign: both empty).
+/// else the same title (letters' case aside, the target's cleaned as a note's is: cleanText; the
+/// game's own co-op campaign: both empty).
 bool matches(const Place& place, const Target& target);
 
 /// `notes` with `place` put first (the same place as one it has is that one moved up, its line

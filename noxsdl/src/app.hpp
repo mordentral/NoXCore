@@ -294,7 +294,7 @@ struct App {
     bool privateTestRun = false;    ///< --private-test: this process is one (no router port asked for)
     std::filesystem::path exePath;               ///< argv[0] (a private test runs another of us)
     bool hostLoopback = false;      ///< --host-loopback: a game hosted here binds the loopback alone (local tests)
-    std::uint16_t menuHostPort = 0; ///< --menu-host-port: a campaign mode or an edit session hosted from the menus on it (0: the game's)
+    std::uint16_t menuHostPort = 0; ///< --menu-host-port: every game the menus host on it (host_listing.hpp's menuHostSocket; 0: the game's)
     /// The session's pending edits in our game view: "Pending changes" Shaded / As final / Hidden
     /// (noxsdl pending, noxcore.cfg's PendingChanges; --pending-view for one run), and what the
     /// view was last given (updatePending).

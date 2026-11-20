@@ -302,7 +302,9 @@ bool matches(const Place& place, const Target& target)
     if (!place.id.empty() && !target.id.empty()) {
         return place.id == target.id;
     }
-    return util::equalsNoCase(place.title, target.title);
+    // (the target's title as a note keeps it: a remote host's mode name is as sent, its spaces,
+    // control characters and length not yet cleaned)
+    return util::equalsNoCase(place.title, cleanText(target.title, kMaxTitleBytes));
 }
 
 void played(Notes& notes, Place place, std::int64_t now)

@@ -440,12 +440,12 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
                 app->profile.account.clear();
                 app->soloFromMenus = true;
             }
-            if (hostGame) {
-                // (Local tests: --menu-host-port, --host-loopback; normally the game's port.)
-                if (app->menuHostPort != 0) {
-                    settings.port = app->menuHostPort;
-                }
-                settings.loopbackOnly = app->hostLoopback;
+            {
+                // (Local tests: --menu-host-port, --host-loopback; normally the game's port. Game
+                // Modes' own modes and its Quest too, so a test run never needs 18590.)
+                const MenuHostSocket socket = menuHostSocket({settings.port, settings.loopbackOnly}, app->menuHostPort, app->hostLoopback);
+                settings.port = socket.port;
+                settings.loopbackOnly = socket.loopbackOnly;
             }
             try {
                 app->host = makeHost(*app, settings);

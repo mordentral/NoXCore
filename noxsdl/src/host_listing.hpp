@@ -89,4 +89,25 @@ inline std::string hostListingLog(const HostListing& l, const std::string& what,
     return line;
 }
 
+/// (Tests, recordings) A game the menus host on this computer, on the port and loopback the command
+/// line asks for: --menu-host-port (`menuHostPort`; 0: `port` as the game chose it) and --host-loopback
+/// (`hostLoopback`; off: `loopbackOnly` as it was). Every game the menus host takes them (Host, Host
+/// Quest, Host Custom's modes, Game Modes' modes and its Quest, a campaign mode, an edit session),
+/// so a test run never needs the game's port; without them a player's game is hosted as before.
+struct MenuHostSocket {
+    std::uint16_t port = 18590;
+    bool loopbackOnly = false;
+    bool operator==(const MenuHostSocket&) const = default;
+};
+inline MenuHostSocket menuHostSocket(MenuHostSocket chosen, std::uint16_t menuHostPort, bool hostLoopback)
+{
+    if (menuHostPort != 0) {
+        chosen.port = menuHostPort;
+    }
+    if (hostLoopback) {
+        chosen.loopbackOnly = true;
+    }
+    return chosen;
+}
+
 } // namespace noxsdl

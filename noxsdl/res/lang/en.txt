@@ -12666,10 +12666,10 @@ menus.modes.start = Start
 # noxsdl/src/mode_list.cpp:62, noxsdl/src/mode_list.cpp:99, noxsdl/src/mode_list.cpp:133 ...
 #@ b3a43630: Yes
 menus.modes.yes = Yes
-# noxsdl/src/menus.cpp:2555
+# noxsdl/src/menus.cpp:2573
 #@ 034ee216: Check that your save folder is writable and has free space. See the log for details.
 menus.save_failed.body = Check that your save folder is writable and has free space. See the log for details.
-# noxsdl/src/menus.cpp:2554
+# noxsdl/src/menus.cpp:2572
 #@ 0685388d: Save failed
 menus.save_failed.title = Save failed
 # noxsdl/src/menus_servers.cpp:151, noxsdl/src/menus_servers.cpp:213
@@ -12684,7 +12684,7 @@ menus.servers.add_remove_tip = Add or remove saved server addresses
 # noxsdl/src/menus_servers.cpp:184
 #@ 858b3346: Server added.
 menus.servers.added = Server added.
-# noxsdl/src/menus.cpp:2106
+# noxsdl/src/menus.cpp:2124
 #@ aa489a85: Address not found. Refresh to try again.
 menus.servers.address_not_found_refresh = Address not found. Refresh to try again.
 # noxsdl/src/menus_servers.cpp:211
