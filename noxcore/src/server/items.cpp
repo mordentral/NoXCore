@@ -1346,10 +1346,11 @@ bool Items::dropDefault(ServerObject& player, ServerObject& item, float x, float
     if (item.holder != player.extent) {
         return false;
     }
-    // A player's quest items stay with it (ItemIsDroppable(1): the exe's table, or a mode's own
-    // list for the world: questItem), however they'd go, its death's drop too (dropAllItems ->
-    // Obj_DropAt); told only while it's neither dead nor destroyed (0x8020).
-    if ((player.classes & oc::Player) && questItem(world, item)) {
+    // A player's quest items stay with it (ItemIsDroppable, and its entry's flag 1: the game's
+    // table but the two Lich orb keys, or a mode's own list for the world: keptFromDrop), however
+    // they'd go, its death's drop too (dropAllItems -> Obj_DropAt); told only while it's neither
+    // dead nor destroyed (0x8020).
+    if ((player.classes & oc::Player) && keptFromDrop(world, item)) {
         if (!(player.flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
             tellString(player, "drop.c:CantDropThat");
             playSound(world, 0x39D, player, 2, player.extent);

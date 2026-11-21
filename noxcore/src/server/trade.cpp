@@ -458,19 +458,45 @@ ObjectKey dynamicCode(World& world, NetCode code)
 
 } // namespace
 
+namespace {
+
+/// The game's quest items (ItemIsDroppable's table, in its order): the type, and its entry's flag 1
+/// (kept from a drop as well: Obj_DropDefault asks it), clear for the two Lich orb keys alone.
+struct KeptItem {
+    std::string_view type;
+    bool fromDrop;
+};
+constexpr KeptItem kKept[] = {
+    {"BookOfOblivion", true},      {"OblivionHalberd", true},     {"OblivionHeart", true},         {"OblivionWierdling", true},
+    {"OblivionOrb", true},         {"AmuletOfClarity", true},     {"AmuletOfTeleportation", true}, {"BridgeGuardsBoots", true},
+    {"Spectacles", true},          {"MatildasCloak", true},       {"ThaviusStaff", true},          {"BlueOrbKeyOfTheLich", false},
+    {"RedOrbKeyOfTheLich", false}, {"SilverKey", true},           {"GoldKey", true},               {"SapphireKey", true},
+    {"RubyKey", true},             {"SponsorshipLetter", true},   {"MayorsScepter", true},
+};
+
+/// The item's entry: the mode's list (nox.setKeptItems: every type kept from a drop too) or the
+/// game's; null for none.
+const KeptItem* keptEntry(const World& world, const ServerObject& o)
+{
+    static constexpr KeptItem kOwn{"", true};
+    if (const std::vector<std::string>* own = world.keptItems()) { // (noxcpp: a mode's own list for this world)
+        return std::ranges::find(*own, std::string_view(o.typeName)) != own->end() ? &kOwn : nullptr;
+    }
+    const auto it = std::ranges::find(kKept, std::string_view(o.typeName), &KeptItem::type);
+    return it != std::end(kKept) ? &*it : nullptr;
+}
+
+} // namespace
+
 bool questItem(const World& world, const ServerObject& o)
 {
-    // (noxcpp: a mode's own list for this world, nox.setKeptItems.)
-    if (const std::vector<std::string>* own = world.keptItems()) {
-        return std::ranges::find(*own, std::string_view(o.typeName)) != own->end();
-    }
-    static constexpr std::string_view kKept[] = {
-        "BookOfOblivion", "OblivionHalberd", "OblivionHeart", "OblivionWierdling", "OblivionOrb", "AmuletOfClarity",
-        "AmuletOfTeleportation", "BridgeGuardsBoots", "Spectacles", "MatildasCloak", "ThaviusStaff",
-        "BlueOrbKeyOfTheLich", "RedOrbKeyOfTheLich", "SilverKey", "GoldKey", "SapphireKey", "RubyKey",
-        "SponsorshipLetter", "MayorsScepter",
-    };
-    return std::ranges::find(kKept, std::string_view(o.typeName)) != std::end(kKept);
+    return keptEntry(world, o) != nullptr;
+}
+
+bool keptFromDrop(const World& world, const ServerObject& o)
+{
+    const KeptItem* k = keptEntry(world, o);
+    return k && k->fromDrop;
 }
 
 namespace {

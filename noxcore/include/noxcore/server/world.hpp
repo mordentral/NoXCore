@@ -2181,8 +2181,9 @@ public:
     /// The mode's worth of a type in this world (setWorth), if it set one.
     std::optional<std::uint32_t> ownWorth(std::string_view type) const;
     /// noxcpp: the item types a player keeps in this world alone (nox.setKeptItems): it can't drop
-    /// or sell them, and a full inventory doesn't drop them (questItem: ItemIsDroppable's list); nullopt
-    /// gives the game's own list back. The next map's world has the game's list again.
+    /// or sell them, and a full inventory doesn't drop them (questItem and keptFromDrop:
+    /// ItemIsDroppable's list); nullopt gives the game's own list back. The next map's world has the
+    /// game's list again.
     void setKeptItems(std::optional<std::vector<std::string>> types);
     /// The mode's kept types in this world (null: the game's own list).
     const std::vector<std::string>* keptItems() const noexcept { return keptItems_.get(); }

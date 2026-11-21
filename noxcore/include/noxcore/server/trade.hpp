@@ -51,8 +51,12 @@ void repairItem(World& world, ServerObject& item, const ServerObject* holder);
 /// `holder`'s client as a repair tells it (null: no one).
 void setItemHealth(World& world, ServerObject& item, std::uint16_t health, const ServerObject* holder);
 /// ItemIsDroppable (nonzero: kept): a quest item of the table, or of a mode's own list for the world
-/// (World::setKeptItems).
+/// (World::setKeptItems). What a shop won't buy and a full inventory never drops.
 bool questItem(const World& world, const ServerObject& o);
+/// Obj_DropDefault's test: a quest item whose entry is also kept from a drop (the entry's flag 1).
+/// The table's two Lich orb keys have it clear: a player drops them, and still can't sell them.
+/// Every type of a mode's own list is kept from a drop.
+bool keptFromDrop(const World& world, const ServerObject& o);
 
 /// The session `id` (PlayerControl::trade), or null.
 TradeSession* tradeSession(World& world, std::uint32_t id);

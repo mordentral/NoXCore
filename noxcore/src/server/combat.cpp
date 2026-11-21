@@ -821,7 +821,7 @@ int Fight::playerDamage(ServerObject& t, ServerObject* src, ServerObject* obj3, 
         npc->killKind = 0;
     }
     // Watching a creature: back to itself (playerObserveClear).
-    if (p && possessed(world, t)) {
+    if (p && watchingThing(t)) {
         observeClear(*this, t);
     }
     // A reflective shield turns a missile, and a ray (types 0x10, 0x11), met at its front.

@@ -874,7 +874,7 @@ void followNext(Fight& fight, ServerObject& unit)
 {
     PlayerControl& p = *unit.player;
     std::uint32_t next = 0;
-    if (possessed(fight.world, unit)) {
+    if (watchingThing(unit)) {
         ServerObject* c = nextCreature(fight.world, unit);
         if (!c) {
             observeClear(fight, unit);
@@ -898,6 +898,11 @@ ServerObject* possessed(World& world, const ServerObject& player)
         return nullptr;
     }
     return world.byExtent(player.player->cameraFollow);
+}
+
+bool watchingThing(const ServerObject& player)
+{
+    return player.player && (player.player->statusFlags & 2u) && player.player->cameraFollow != 0;
 }
 
 void observeClear(Fight& fight, ServerObject& player)
@@ -1030,7 +1035,7 @@ bool goObserver(Fight& fight, ServerObject& unit, bool canJoin, bool force)
             }
         }
     }
-    if (possessed(world, unit)) { // (watching a creature: back first)
+    if (watchingThing(unit)) { // (watching a creature: back first)
         observeClear(fight, unit);
     }
     fight.setStatus(unit, 1, true);
@@ -1180,7 +1185,7 @@ void updateObserver(Fight& fight, ServerObject& unit)
                     p.camY = y;
                 }
             }
-        } else if (code == net::ControlCode::Action || (code == net::ControlCode::Jump && (possessed(world, unit) || world.quest()))) {
+        } else if (code == net::ControlCode::Action || (code == net::ControlCode::Jump && (watchingThing(unit) || world.quest()))) {
             // Rejoin; watching a creature, back to itself. (The exe's check decides in those cases:
             // shut out (0x100) or without a clan, no.) In a quest: one waiting in a warp gate is put
             // out of it (nothing else); one out by a quest exit or not in the quest
@@ -1214,7 +1219,7 @@ void updateObserver(Fight& fight, ServerObject& unit)
             } else if (!out) {  // out of a quest: no rejoining in clan games, under game flag 0x8000, or shut out (0x100) while anyone plays
                 mayRejoin = !(world.clanTeams || (world.gameFlags & 0x8000u) || ((p.statusFlags & 0x100u) && anyonePlaying(world)));
             }
-            if (mayRejoin && possessed(world, unit)) {
+            if (mayRejoin && watchingThing(unit)) {
                 observeClear(fight, unit);
             } else if (mayRejoin) {
                 joinTeam(fight, unit);

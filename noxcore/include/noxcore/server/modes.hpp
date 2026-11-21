@@ -186,8 +186,13 @@ void observeCreature(Fight& fight, ServerObject& player, ServerObject& creature)
 /// playerObserveClear: watching a creature, back to itself (status 2 off, the
 /// camera let go, the player's update).
 void observeClear(Fight& fight, ServerObject& player);
-/// The creature it's watching (playerGetPossess: status 2's camera), or none.
+/// The creature it's watching (playerGetPossess: status 2's camera), or none (none too once that
+/// thing has left the world).
 ServerObject* possessed(World& world, const ServerObject& player);
+/// Whether it watches a thing (playerGetPossess answers one: status 2 and its camera on something),
+/// whether or not the thing is still in the world: the game keeps the camera's link to a thing
+/// that went, so its watcher's Move, Action or Jump, or a hit, still bring it back.
+bool watchingThing(const ServerObject& player);
 /// Plr_ClearStatusFlags' host part for status 1 (out of observing): outside a chat game, with
 /// others in play and the timer stopped, it starts at the mode's limit.
 void observingEnded(World& world, std::uint32_t frame);

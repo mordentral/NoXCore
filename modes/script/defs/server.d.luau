@@ -428,7 +428,7 @@ declare nox: {
     setItemSpec: (item: number, spec: { effectiveness: (string | boolean)?, material: (string | boolean)?, primary: (string | boolean)?, secondary: (string | boolean)? }) -> (boolean, string?),
     --- A thing type's (name or number) worth for this map's world (shop prices, repair costs, a quest's sale) in place of thing.bin's; nil gives thing.bin's back. Nothing is sent.
     setWorth: (thingType: string | number, worth: number?) -> (),
-    --- The item types a player can't drop or sell in this map's world in place of the game's own list (the quest items: BookOfOblivion, the Oblivion staffs, the keys...); nil gives the game's back.
+    --- The item types (at most 64) a player can't drop or sell in this map's world in place of the game's own list (the quest items: BookOfOblivion, the Oblivion staffs, the keys...; its two Lich orb keys can be dropped, never sold); nil gives the game's back.
     setKeptItems: (types: { string | number }?) -> (),
     --- Sets a thing's pickup by name: "DefaultPickup", "WeaponPickup" or "ArmorPickup" (an Oblivion staff's without its own line, OblivionUp and wear); nil gives it its type's own back.
     setPickup: (id: number, name: string?) -> (),

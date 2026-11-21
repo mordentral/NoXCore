@@ -435,6 +435,9 @@ int noxSetWorth(lua_State* L)
     return 0;
 }
 
+/// The most types nox.setKeptItems takes (the game's list has 19): each drop and sale reads the list.
+constexpr int kMostKeptItems = 64;
+
 int noxSetKeptItems(lua_State* L)
 {
     // nox.setKeptItems(types | nil): the item types a player can't drop or sell in this map's world
@@ -446,6 +449,7 @@ int noxSetKeptItems(lua_State* L)
     luaL_checktype(L, 1, LUA_TTABLE);
     std::vector<std::string> types;
     const int n = lua_objlen(L, 1);
+    luaL_argcheck(L, n <= kMostKeptItems, 1, "at most 64 item types");
     for (int i = 1; i <= n; ++i) {
         lua_rawgeti(L, 1, i);
         types.push_back(thingTypeArg(L, lua_gettop(L)).name);
