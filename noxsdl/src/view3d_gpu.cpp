@@ -282,7 +282,11 @@ SDL_Texture* DepthPass::render(SDL_Renderer* renderer, int width, int height, st
         // Reading a pixel back makes the renderer flush its queued commands, so this pass sees their
         // results on the shared device.
         SDL_Texture* const previous = SDL_GetRenderTarget(renderer);
-        if (!SDL_SetRenderTarget(renderer, sync_)) return nullptr;
+        if (!SDL_SetRenderTarget(renderer, sync_)) {
+            // SDL may already have selected sync_ before queuing its viewport failed.
+            SDL_SetRenderTarget(renderer, previous);
+            return nullptr;
+        }
         const SDL_Rect one{0, 0, 1, 1};
         SDL_Surface* pixel = SDL_RenderReadPixels(renderer, &one);
         const bool synced = pixel != nullptr;
