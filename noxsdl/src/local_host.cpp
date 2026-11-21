@@ -3,6 +3,7 @@
 #include "local_host.hpp"
 #include "mods_folder.hpp"
 
+#include "noxcore/server/mode_maps.hpp"
 #include "noxcore/content/content_pack.hpp"
 #include "noxcore/io/file.hpp"
 #include "noxcore/modes/registry.hpp"
@@ -275,6 +276,14 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
     if (!fs::exists(path)) { // a map's name: the game's maps folder
         path = gameDir / "maps" / settings.map / (settings.map + ".map");
     }
+    // Use the host's additional-map index for lookup, listing and guest downloads alike.
+    std::shared_ptr<const nox::server::ModeMaps> authored;
+    std::error_code mapError;
+    if (!settings.authoredMapsDir.empty() && fs::is_directory(settings.authoredMapsDir, mapError) &&
+        !fs::equivalent(settings.authoredMapsDir, gameDir / "maps", mapError)) {
+        authored = nox::server::ModeMaps::index(settings.authoredMapsDir);
+        if (const auto* entry = authored->find(settings.map)) path = entry->map;
+    }
     const nox::modes::Mode* mode = nullptr;
     if (!settings.modeId.empty()) {
         mode = nox::modes::registry().find(settings.modeId);
@@ -367,6 +376,8 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
     }
     o.sysopPassword = nox::strings::fromUtf8(settings.sysopPassword);
     o.mapsDir = settings.mapsDir.empty() ? gameDir / "maps" : settings.mapsDir;
+    o.modeMaps = std::move(authored);
+    o.modeRulesDir = settings.authoredMapsDir;
     o.questMapsOnly = settings.questMapsOnly;
     o.gameDir = gameDir; // (execrul's files: the game's folder whatever the maps folder)
     if (fs::exists(nox::resolveNoCase(gameDir / "mapcycle.txt"))) {

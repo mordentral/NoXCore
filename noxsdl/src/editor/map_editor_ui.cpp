@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <set>
 
 namespace fs = std::filesystem;
 namespace me = nox::mapedit;
@@ -826,18 +827,20 @@ void MapEditor::refreshMapList()
 {
     mapList_.clear();
     std::error_code ec;
-    for (const auto& dir : fs::directory_iterator(ctx_.mapsDir, ec)) {
-        if (!dir.is_directory(ec)) {
-            continue;
-        }
-        const std::string name = dir.path().filename().string();
-        for (const auto& f : fs::directory_iterator(dir.path(), ec)) {
-            if (lowered(f.path().filename().string()) == lowered(name + ".map")) {
-                mapList_.push_back({name, f.path(), me::isStockMapName(name)});
-                break;
+    std::set<std::string> seen;
+    const auto scan = [&](const fs::path& root) {
+        for (const auto& dir : fs::directory_iterator(root, ec)) {
+            if (!dir.is_directory(ec)) continue;
+            const auto file = nox::findNoCase(dir.path(), dir.path().filename().concat(".map"));
+            const auto name = nox::pathUtf8(dir.path().filename());
+            if (fs::is_regular_file(file, ec) && seen.insert(lowered(name)).second) {
+                mapList_.push_back({name, file, me::isStockMapName(name)});
             }
         }
-    }
+    };
+    scan(ctx_.mapsDir);
+    const auto installed = ctx_.gameDir / "maps";
+    if (!fs::equivalent(ctx_.mapsDir, installed, ec)) scan(installed);
     std::ranges::sort(mapList_, [](const MapEntry& a, const MapEntry& b) {
         return a.stock != b.stock ? !a.stock : lowered(a.name) < lowered(b.name);
     });
