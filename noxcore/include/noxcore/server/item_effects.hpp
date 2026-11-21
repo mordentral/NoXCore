@@ -61,7 +61,8 @@ float wornProtection(World& world, const things::ModifierDb* modifiers, const Se
 float armorValueOf(const things::ModifierDb* modifiers, const ServerObject& item);
 /// The blow's ATTACKEFFECTs: `weapon`'s four slots', `attacker` dealing `damage`.
 void attackEffects(Fight& fight, ServerObject& weapon, ServerObject* attacker, float& damage);
-/// The ATTACKPREHITEFFECTs of `weapon`'s enchantments on `victim` (playerPreAttackEffects).
+/// The ATTACKPREHITEFFECTs of `weapon`'s enchantments on `victim` (playerPreAttackEffects); a
+/// running mode asked first, past the same checks (ModeHooks::strike).
 void preHitEffects(Fight& fight, ServerObject& victim, ServerObject* attacker, ServerObject* weapon);
 /// The ATTACKPREDAMAGEEFFECTs of `weapon`'s four slots, `damage` from `source` to `victim`
 /// (itemApplyPreDamageEffect).

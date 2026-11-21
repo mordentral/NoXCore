@@ -324,6 +324,20 @@ struct ModeHooks {
         (void)front;
         return false;
     }
+    /// Asked, at once (noxcpp): `weapon` (what holds the modifiers: the swung weapon, a thrown
+    /// chakram, a shot arrow or bolt) strikes `victim`, by `attacker` (null: none), where the game
+    /// runs the weapon's ATTACKPREHITEFFECTs: past their checks (not a friend in a game without
+    /// friendly hits, not one invulnerable or behind a reflective shield), before the first of them
+    /// and the blow's own damage. The mode may change the world here (damage, effects, sounds), as a
+    /// pre-hit effect does. Asked for every such strike while a mode runs (a strike is no frame's
+    /// work); no mode, nothing asked.
+    virtual void strike(Fight& fight, ServerObject& victim, ServerObject* attacker, ServerObject& weapon)
+    {
+        (void)fight;
+        (void)victim;
+        (void)attacker;
+        (void)weapon;
+    }
     /// Asked (noxcpp): what a player's spell costs, the game's mana price `mana` given; `trap`: a
     /// spell put into a glyph's trap (at its check, and again as it's paid). nullopt: the game's
     /// price. Asked once a cast, never a frame (Spells::castPrice).

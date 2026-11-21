@@ -60,7 +60,8 @@ bool questItemValid(const ServerObject& item, const things::ModifierDb* modifier
 /// A weapon's or armour's modifiers as questItemValid checks them: its effectiveness, material and
 /// enchantments each in their table, allowed on its kind (ALLOWED_WEAPONS / ALLOWED_ARMOR, not the
 /// row's exclusions), the enchantments in their position (ALLOWED_POSITION); a Replenishment only on
-/// a '#' staff. (Also what a mode's items are held to: no item the game never makes.)
+/// a '#' staff. (Also what a mode's items are held to: no item the game never makes.) A mod's own
+/// modifier (ModifierDb::ownRecord) by its section and ALLOWED_* alone.
 bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db);
 
 } // namespace nox::server

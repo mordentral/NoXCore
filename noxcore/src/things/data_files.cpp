@@ -8,6 +8,7 @@
 #include "noxcore/io/zip.hpp"
 #include "noxcore/util/text.hpp"
 
+#include <algorithm>
 #include <array>
 #include <exception>
 #include <map>
@@ -228,8 +229,12 @@ std::string mergeDataFile(DataFile table, std::span<const std::uint8_t> patchByt
         } else {
             const content::TableFormat format = tableFormat(table);
             content::TextTable merged = content::TextTable::load(format, base);
+            // (The install's modifiers: every one a mod's patch adds comes after them.)
+            const auto installIds = static_cast<std::size_t>(std::ranges::count_if(merged.records(), [](const content::TableRecord& rec) {
+                return rec.section == "EFFECTIVENESS" || rec.section == "MATERIAL" || rec.section == "ENCHANTMENT";
+            }));
             const content::TextTable patch = content::TextTable::parsePatch(format, text);
-            const content::PatchResult r = content::applyPatch(merged, patch);
+            const content::PatchResult r = content::applyPatch(merged, patch, true); // (a mod's: new modifiers too)
             if (!r.problems.empty()) {
                 return r.problems.front();
             }
@@ -238,6 +243,9 @@ std::string mergeDataFile(DataFile table, std::span<const std::uint8_t> patchByt
             check = check == 0 ? 1u : check;
             if (std::string why = readText(table, plain, solo, out); !why.empty()) {
                 return why;
+            }
+            if (table == DataFile::Modifiers && out.modifiers && out.modifiers->modifiers.size() > installIds) {
+                out.modifiers->firstOwnId = static_cast<std::uint16_t>(installIds);
             }
         }
         if (expected != 0 && expected != check) {

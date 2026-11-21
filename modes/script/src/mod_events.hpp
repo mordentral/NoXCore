@@ -28,7 +28,7 @@ public:
     struct Has {
         bool onObjectKilled = false, onDestroyed = false, onDamage = false, onDamaged = false, onPickup = false,
              onDrop = false, onEquip = false, onSpellCast = false, onExit = false, castCost = false, onReflect = false,
-             onAbility = false, onUse = false, onTryPickup = false;
+             onAbility = false, onUse = false, onTryPickup = false, onStrike = false;
     };
     /// Which of them the script's mode table (on top of L's stack) has (each load).
     void look(lua_State* L);
@@ -72,6 +72,10 @@ public:
     /// game's checks), in place of its pickup: true has it picked up as the game would; anything
     /// else: left where it is. A failing hook: picked up (the game's own).
     bool tryPickup(lua_State* L, const server::ServerObject& taker, const server::ServerObject& item);
+    /// onStrike(weapon, victim, attacker, modifiers) at a weapon's pre-hit moment (ModeHooks::strike),
+    /// at once: the world may change (nox.damage, nox.effect, nox.sound...). modifiers: the weapon's by
+    /// slot (effectiveness, material, primary, secondary: names, a slot without one left out).
+    void strike(lua_State* L, const server::ServerObject& victim, const server::ServerObject* attacker, const server::ServerObject& weapon);
 
     /// The recorded events to the script's hooks, in order (each its own protected call).
     void deliver(lua_State* L);

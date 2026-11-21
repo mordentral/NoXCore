@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 namespace nox::content {
 
@@ -348,7 +349,29 @@ TextSpan modTrim(const std::string& text, std::size_t b, std::size_t e)
     return {b, e};
 }
 
-void parseModifiers(const std::string& text, std::size_t contentEnd, std::vector<TableRecord>& out)
+/// A patch's `NEW <name> LIKE <record>` line: its name and record; nullopt for any other line.
+std::optional<std::pair<std::string, std::string>> newLike(std::string_view line)
+{
+    std::vector<std::string_view> words;
+    for (std::size_t p = 0; p < line.size();) {
+        while (p < line.size() && isBlank(line[p])) {
+            ++p;
+        }
+        const std::size_t b = p;
+        while (p < line.size() && !isBlank(line[p])) {
+            ++p;
+        }
+        if (p > b) {
+            words.push_back(line.substr(b, p - b));
+        }
+    }
+    if (words.size() != 4 || !equalsNoCase(words[0], "NEW") || !equalsNoCase(words[2], "LIKE")) {
+        return std::nullopt;
+    }
+    return std::pair{std::string(words[1]), std::string(words[3])};
+}
+
+void parseModifiers(const std::string& text, std::size_t contentEnd, std::vector<TableRecord>& out, bool patch)
 {
     enum class Where { Top, Section, Entry } where = Where::Top;
     std::string section;
@@ -384,6 +407,12 @@ void parseModifiers(const std::string& text, std::size_t contentEnd, std::vector
             out.emplace_back();
             rec = &out.back();
             rec->name = std::string(s);
+            if (patch) {
+                if (auto made = newLike(s)) { // (a patch's new record)
+                    rec->name = std::move(made->first);
+                    rec->like = std::move(made->second);
+                }
+            }
             rec->section = section;
             rec->nameAt = line;
             rec->whole = {line.begin, contentEnd};
@@ -564,7 +593,7 @@ void TextTable::reparse()
     case TableFormat::GameData: parseGameData(text_, contentEnd_, records_); break;
     case TableFormat::Monster: parseMonsters(text_, contentEnd_, records_); break;
     case TableFormat::SoundSet: parseSoundSets(text_, contentEnd_, records_, patch_, stopped_); break;
-    case TableFormat::Modifier: parseModifiers(text_, contentEnd_, records_); break;
+    case TableFormat::Modifier: parseModifiers(text_, contentEnd_, records_, patch_); break;
     }
 }
 
@@ -794,6 +823,42 @@ void TextTable::appendRecord(std::string_view recordText)
     reparse();
 }
 
+std::size_t TextTable::addLastRecord(std::string_view section, std::string_view recordText)
+{
+    std::string add(recordText);
+    if (add.empty() || add.back() != '\n') {
+        add += newline();
+    }
+    // The last section's END: the first line that's only END after the last record's own.
+    std::size_t at = npos;
+    if (!records_.empty() && records_.back().section == section) {
+        for (std::size_t p = lineEnd(text_, records_.back().whole.end); p < contentEnd_; p = lineEnd(text_, p)) {
+            const TextSpan line = modTrim(text_, p, std::min(lineEnd(text_, p), contentEnd_));
+            if (line.empty()) {
+                continue;
+            }
+            if (std::string_view(text_.data() + line.begin, line.size()) == "END") {
+                at = p;
+            }
+            break;
+        }
+    }
+    if (at == npos) {
+        // A section of its own after everything (the readers take a section's name again).
+        at = contentEnd_;
+        std::string block;
+        if (at > 0 && text_[at - 1] != '\n') {
+            block += newline();
+        }
+        block += std::string(section) + std::string(newline()) + add + "END" + std::string(newline());
+        add = std::move(block);
+    }
+    text_.insert(at, add);
+    changed_ = true;
+    reparse();
+    return records_.size() - 1;
+}
+
 std::vector<std::uint8_t> TextTable::encrypt() const
 {
     std::vector<std::uint8_t> out(text_.begin(), text_.end());
@@ -850,7 +915,50 @@ bool keyTaken(const TextTable& base, std::string_view section, std::string_view 
 
 } // namespace
 
-PatchResult applyPatch(TextTable& base, const TextTable& patch)
+namespace {
+
+bool hasId(std::string_view section)
+{
+    return section == "EFFECTIVENESS" || section == "MATERIAL" || section == "ENCHANTMENT";
+}
+
+/// A modifier.bin patch's `NEW <name> LIKE <record>` into `base` as a copy of that record (its name
+/// line its own); its index, or nullopt with why in `problems`.
+std::optional<std::size_t> addLike(TextTable& base, const TableRecord& pr, bool allowed, std::vector<std::string>& problems)
+{
+    const std::string label = pr.section + "/NEW " + pr.name;
+    if (!allowed) {
+        problems.push_back(label + ": modifier.bin takes no new record here (only a mod's own data adds one: each side's merge is checked to be the same)");
+        return std::nullopt;
+    }
+    const auto like = base.find(pr.like, pr.section);
+    if (!like) {
+        problems.push_back(label + ": modifier.bin has no " + pr.like + " in " + pr.section + " to make it like");
+        return std::nullopt;
+    }
+    if (std::ranges::any_of(base.records(), [&](const TableRecord& r) { return r.name == pr.name && (r.section == pr.section || (hasId(r.section) && hasId(pr.section))); })) {
+        problems.push_back(label + ": modifier.bin has a record of that name already");
+        return std::nullopt;
+    }
+    if (hasId(pr.section) && std::ranges::count_if(base.records(), [](const TableRecord& r) { return hasId(r.section); }) >= 255) {
+        problems.push_back(label + ": modifier.bin has 255 modifiers already (an id is one byte, 0xFF none)");
+        return std::nullopt;
+    }
+    // Its text: the record's, its name line's indentation kept and the new name in place of its own.
+    const TableRecord& from = base.records()[*like];
+    const std::string& text = base.text();
+    std::size_t indent = from.nameAt.begin;
+    while (indent > 0 && (text[indent - 1] == ' ' || text[indent - 1] == '\t')) {
+        --indent;
+    }
+    std::string copy = text.substr(indent, from.nameAt.begin - indent) + pr.name +
+                       text.substr(from.nameAt.end, from.whole.end - from.nameAt.end);
+    return base.addLastRecord(pr.section, copy);
+}
+
+} // namespace
+
+PatchResult applyPatch(TextTable& base, const TextTable& patch, bool newModifiers)
 {
     PatchResult result;
     if (!patch.stopped().empty()) {
@@ -867,11 +975,22 @@ PatchResult applyPatch(TextTable& base, const TextTable& patch)
         return s + f.key;
     };
     for (const TableRecord& pr : patch.records()) {
-        const auto at = base.find(pr.name, pr.section);
+        std::optional<std::size_t> at;
+        if (!pr.like.empty()) {
+            // (A new modifier.bin record: made, then its fields set as any record's.)
+            at = addLike(base, pr, newModifiers, result.problems);
+            if (!at) {
+                continue;
+            }
+            result.added.push_back(pr.section + "/" + pr.name);
+        } else {
+            at = base.find(pr.name, pr.section);
+        }
         if (!at && base.format() == TableFormat::Modifier) {
             // (A record belongs inside its section, and a new modifier would be given an id the
-            // network carries: not added.)
-            result.problems.push_back(pr.section + "/" + pr.name + ": modifier.bin has no such record (new ones aren't added)");
+            // network carries: only a mod's NEW <name> LIKE <record> adds one.)
+            result.problems.push_back(pr.section + "/" + pr.name + ": modifier.bin has no such record (a mod adds one with NEW " + pr.name +
+                                      " LIKE <record>)");
             continue;
         }
         if (!at) {

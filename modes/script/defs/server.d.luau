@@ -535,6 +535,7 @@ declare function require(name: string): any
 --- @hook onDestroyed(e) | A watched thing was destroyed ({ id, type, x, y }).
 --- @hook onDamage(target, source, weapon, amount, kind, cause) | Before a watched thing takes a hit (cause: "blow", "missile", "spell" or "other"): return a new amount (0 cancels) or nil, and optionally a second number, the amount its worn armour, raised shield or blocking weapon wear by instead (the hit before the mode's own scaling; nil: by the hit as it lands); changes nothing in the world.
 --- @hook onReflect(target, missile, front) | A missile about to hit a watched thing (front: met at its front): return true to turn it as a reflective shield does (back, the target's now) instead of the hit; changes nothing in the world.
+--- @hook onStrike(weapon, victim, attacker, modifiers) | A weapon strikes (weapon: the swung one, a thrown chakram, a shot arrow or bolt; attacker nil: none), at the moment its enchantments' pre-hit effects would run (past their checks: not a friend in a game without friendly hits, not one invulnerable or behind a reflective shield), before them and the blow's own damage, at once: the world may change (nox.damage, nox.effect, nox.sound...). modifiers: the weapon's by slot ({ effectiveness, material, primary, secondary }, names; a slot without one left out).
 --- @hook onDamaged(target, amount) | A watched thing took a hit.
 --- @hook onPickup(taker, item, x, y) | Something picked an item up from (x, y).
 --- @hook onDrop(holder, item) | A holder dropped a watched item.

@@ -5096,6 +5096,13 @@ public:
         impl_.guarded("onReflect", [&] { turned = impl_.parts.events.reflect(impl_.vm->thread(), target, missile, front); });
         return turned;
     }
+    void strike(server::Fight&, server::ServerObject& victim, server::ServerObject* attacker, server::ServerObject& weapon) override
+    {
+        if (!impl_.parts.events.has().onStrike || impl_.hidden(victim) || (attacker && impl_.hidden(*attacker))) {
+            return;
+        }
+        impl_.guarded("onStrike", [&] { impl_.parts.events.strike(impl_.vm->thread(), victim, attacker, weapon); });
+    }
     std::optional<CastPrice> castPrice(server::World&, const server::ServerObject& caster, std::uint32_t spell, int mana, bool trap) override
     {
         if (!impl_.parts.events.has().castCost || impl_.hidden(caster)) {

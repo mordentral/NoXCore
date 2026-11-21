@@ -134,6 +134,11 @@ public:
     {
         return native_.reflect(fight, target, missile, front) || script_.reflect(fight, target, missile, front);
     }
+    void strike(Fight& fight, ServerObject& victim, ServerObject* attacker, ServerObject& weapon) override
+    {
+        native_.strike(fight, victim, attacker, weapon);
+        script_.strike(fight, victim, attacker, weapon);
+    }
     std::optional<CastPrice> castPrice(World& world, const ServerObject& caster, std::uint32_t spell, int mana, bool trap) override
     {
         if (const auto p = native_.castPrice(world, caster, spell, mana, trap)) {

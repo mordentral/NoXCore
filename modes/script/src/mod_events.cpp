@@ -4,6 +4,7 @@
 #include "mod_parts.hpp"
 #include "toolbox.hpp"
 
+#include "noxcore/things/modifier.hpp"
 #include "noxcore/things/spell_ids.hpp"
 
 #include "lua.h"
@@ -52,7 +53,7 @@ void Events::look(lua_State* L)
     has_ = {.onObjectKilled = hasFn("onObjectKilled"), .onDestroyed = hasFn("onDestroyed"), .onDamage = hasFn("onDamage"),
             .onDamaged = hasFn("onDamaged"), .onPickup = hasFn("onPickup"), .onDrop = hasFn("onDrop"), .onEquip = hasFn("onEquip"),
             .onSpellCast = hasFn("onSpellCast"), .onExit = hasFn("onExit"), .castCost = hasFn("castCost"), .onReflect = hasFn("onReflect"),
-            .onAbility = hasFn("onAbility"), .onUse = hasFn("onUse"), .onTryPickup = hasFn("onTryPickup")};
+            .onAbility = hasFn("onAbility"), .onUse = hasFn("onUse"), .onTryPickup = hasFn("onTryPickup"), .onStrike = hasFn("onStrike")};
 }
 
 void Events::ability(const server::ServerObject& unit, const server::AbilityNews& news)
@@ -286,6 +287,27 @@ bool Events::tryPickup(lua_State* L, const server::ServerObject& taker, const se
     const bool take = lua_isboolean(L, -1) && lua_toboolean(L, -1);
     lua_pop(L, 1);
     return take;
+}
+
+void Events::strike(lua_State* L, const server::ServerObject& victim, const server::ServerObject* attacker, const server::ServerObject& weapon)
+{
+    if (!has_.onStrike || !toolbox::beginHook(L, "onStrike")) {
+        return;
+    }
+    lua_pushnumber(L, weapon.extent);
+    lua_pushnumber(L, victim.extent);
+    pushId(L, attacker ? attacker->extent : 0);
+    // Its modifiers by slot, by name (a flying chakram's or arrow's too: nox.item knows only items).
+    static constexpr const char* kSlots[4] = {"effectiveness", "material", "primary", "secondary"};
+    const things::ModifierDb* db = toolbox::modifiersOf(L);
+    lua_createtable(L, 0, 4);
+    for (std::size_t i = 0; i < 4; ++i) {
+        if (const things::ModifierDef* m = db ? db->modifier(weapon.modifiers[i]) : nullptr) {
+            lua_pushlstring(L, m->name.data(), m->name.size());
+            lua_setfield(L, -2, kSlots[i]);
+        }
+    }
+    toolbox::callHook(L, "onStrike", 4, 0); // (a failing hook: reported, the game's strike goes on)
 }
 
 void Events::deliver(lua_State* L)

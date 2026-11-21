@@ -56,6 +56,9 @@ struct TableField {
 struct TableRecord {
     std::string name;    ///< gamedata: "" (the one record is the whole file)
     std::string section; ///< modifier.bin: WEAPON_DEFINITIONS, ARMOR_DEFINITIONS, EFFECTIVENESS, MATERIAL, ENCHANTMENT
+    /// A modifier.bin patch's new record, `NEW <name> LIKE <record>`: the record of its section it's
+    /// made a copy of ("" for a record by its name alone, and in every other table).
+    std::string like;
     TextSpan nameAt;
     TextSpan whole;      ///< from its name to the end of its END (gamedata: the text before the padding)
     std::size_t insertAt = 0; ///< where a new field goes: its END's line (gamedata: the end of the text)
@@ -105,6 +108,11 @@ public:
     /// Appends `recordText` (a whole record as the file writes one) at the end of the text,
     /// before the padding.
     void appendRecord(std::string_view recordText);
+    /// modifier.bin: a record of `section` (its text as the file writes one) after every record the
+    /// text has, so every record before it keeps its place (a modifier's id): before the last
+    /// section's END when that's `section`, else in a `section` ... END of its own at the end.
+    /// Its index in records().
+    std::size_t addLastRecord(std::string_view section, std::string_view recordText);
 
     /// The text encrypted as the game's file: padded with zeros to the cipher's 8-byte blocks
     /// (a text unchanged since it was read keeps the padding it came with).
@@ -146,6 +154,12 @@ struct PatchResult {
 /// Applies `patch` (a table of the same format holding the records and fields that change) to
 /// `base`: each patch field set as `set` does (a key written "-KEY" removes that key's lines of
 /// its kind instead); a record the base doesn't have is appended as the patch writes it.
-PatchResult applyPatch(TextTable& base, const TextTable& patch);
+/// modifier.bin takes no record of a name it hasn't (a modifier's id is its place in the file, and
+/// the network carries it); with `newModifiers` (a mod's own patch, checked the same on every side)
+/// a `NEW <name> LIKE <record>` adds one, a copy of that record of its section with the patch's
+/// fields over it, after every record there is (addLastRecord: the ids before it unchanged, its own
+/// the next), at most 255 modifiers in all (0xFF is "none"); without it (a content pack's: each side
+/// applies its own) a NEW is refused too.
+PatchResult applyPatch(TextTable& base, const TextTable& patch, bool newModifiers = false);
 
 } // namespace nox::content

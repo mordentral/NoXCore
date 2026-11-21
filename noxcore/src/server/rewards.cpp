@@ -876,15 +876,17 @@ bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db)
     const std::uint32_t bits = weapon ? things::weaponBitOf(item.typeName) : things::armorBitOf(item.typeName);
     const auto allowed = [&](const things::ModifierDef& m) { return ((weapon ? m.allowedWeapons : m.allowedArmor) & bits) != 0; };
     const auto excluded = [&](const ModRow& r) { return ((weapon ? r.weaponExcl : r.armorExcl) & bits) != 0; };
+    // (noxcpp: a mod's own modifier is in no table of the game's: its section and ALLOWED_* alone.)
+    const auto own = [&](const things::ModifierDef& m, std::string_view section) { return db.ownRecord(m) && m.section == section; };
     if (const things::ModifierDef* m = db.modifier(item.modifiers[0])) {
         const ModRow* r = findRow(weapon ? std::span<const ModRow>(kWeaponPower) : std::span<const ModRow>(kArmorQuality), m);
-        if (!r || !allowed(*m) || excluded(*r)) {
+        if (own(*m, "EFFECTIVENESS") ? !allowed(*m) : (!r || !allowed(*m) || excluded(*r))) {
             return false;
         }
     }
     if (const things::ModifierDef* m = db.modifier(item.modifiers[1])) {
         const ModRow* r = findRow(kMaterials, m);
-        if (!r || !allowed(*m) || excluded(*r)) {
+        if (own(*m, "MATERIAL") ? !allowed(*m) : (!r || !allowed(*m) || excluded(*r))) {
             return false;
         }
     }
@@ -895,6 +897,12 @@ bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db)
         }
         if (!(m->allowedPosition & (slot == 2 ? 1u : 2u))) {
             return false;
+        }
+        if (own(*m, "ENCHANTMENT")) {
+            if (!allowed(*m)) {
+                return false;
+            }
+            continue;
         }
         const bool replenishment = m->name == "Replenishment1" || m->name == "Replenishment2" || m->name == "Replenishment3" ||
                                    m->name == "Replenishment4";

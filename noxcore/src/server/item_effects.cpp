@@ -4,6 +4,7 @@
 #include "noxcore/server/item_effects.hpp"
 
 #include "noxcore/server/enchant.hpp"
+#include "noxcore/server/mode_hooks.hpp"
 #include "noxcore/server/physics.hpp"
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/spells.hpp"
@@ -274,6 +275,9 @@ void preHitEffects(Fight& fight, ServerObject& victim, ServerObject* attacker, S
     }
     if (enchanted(victim, Enchant::Invulnerable) || enchanted(victim, Enchant::ReflectiveShield)) {
         return;
+    }
+    if (world.modeHooks) {
+        world.modeHooks->strike(fight, victim, attacker, *weapon); // (noxcpp: a mode's own pre-hit, first)
     }
     const bool creature = (victim.classes & (oc::Monster | oc::Player)) != 0;
     for (std::size_t slot = 2; slot < 4; ++slot) {
