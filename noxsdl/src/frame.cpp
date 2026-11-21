@@ -110,7 +110,7 @@ void beginFrame(App& app)
 
 namespace {
 
-/// ScreenShot (F12): the frame just drawn (the render target's) as nox<n>.bmp in the game folder, n
+/// ScreenShot (F12): the frame just drawn (the render target's) as nox<n>.bmp in the settings folder, n
 /// counting from 1. The exe starts again at 1 each run and writes over what's there; here the next
 /// free number.
 void saveF12Screenshot(App& app)
@@ -119,11 +119,15 @@ void saveF12Screenshot(App& app)
     if (!shot) {
         return;
     }
+    const auto& directory = backend::settingsDirectory(app.gameDir);
     fs::path path;
+    std::error_code ec;
+    bool available = false;
     do {
-        path = app.gameDir / ("nox" + std::to_string(++app.screenshotNumber) + ".bmp");
-    } while (fs::exists(path) && app.screenshotNumber < 100000);
-    const bool saved = SDL_SaveBMP(shot, path.string().c_str());
+        path = directory / ("nox" + std::to_string(++app.screenshotNumber) + ".bmp");
+        available = !fs::exists(path, ec) && !ec;
+    } while (!available && !ec && app.screenshotNumber < 100000);
+    const bool saved = available && SDL_SaveBMP(shot, nox::pathUtf8(path).c_str());
     SDL_DestroySurface(shot);
     if (app.console) {
         app.console->print(nox::l10n::format(saved ? NOX_TR("game.screenshot.saved", "screenshot: {path}")
