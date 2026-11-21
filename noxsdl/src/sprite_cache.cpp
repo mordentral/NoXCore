@@ -141,14 +141,14 @@ SDL_FRect insetPageEdges(SDL_FRect from, const SDL_FRect& whole)
 
 void drawSprite(SDL_Renderer* renderer, const Sprite& sprite, const SDL_FRect* src, const SDL_FRect& dst)
 {
-    sprite.ready();
+    if (!sprite.ready()) return;
     const float tw = sprite.rect.w;
     const float th = sprite.rect.h;
     const int level = mipLevel(renderer, sprite, src ? src->w : tw, dst);
     if (level == 0) {
         SDL_SetTextureScaleMode(sprite.texture, sprite.scale);
         SDL_FRect from = sprite.source(src);
-        if (sprite.gpu && sprite.scale != SDL_SCALEMODE_NEAREST) {
+        if (sprite.gpuBatch && sprite.scale != SDL_SCALEMODE_NEAREST) {
             from = insetPageEdges(from, sprite.rect);
         }
         SDL_RenderTexture(renderer, sprite.texture, &from, &dst);
@@ -173,7 +173,7 @@ void drawSprite(SDL_Renderer* renderer, const Sprite& sprite, const SDL_FRect* s
     SDL_FRect scaled = src ? SDL_FRect{mip.rect.x + src->x * mw / tw, mip.rect.y + src->y * mh / th, src->w * mw / tw,
                                        src->h * mh / th}
                            : mip.rect;
-    if (sprite.gpu) {
+    if (sprite.gpuBatch) {
         scaled = insetPageEdges(scaled, mip.rect);
     }
     SDL_RenderTexture(renderer, mip.texture, &scaled, &dst);
@@ -379,7 +379,7 @@ void SpriteCache::endFrame(std::uint64_t nowMs)
         flushPage(static_cast<int>(i)); // (made and not drawn)
     }
     if (atlas_) {
-        atlas_->flush(); // (the frame's BC7 uploads in one copy pass)
+        atlas_->endFrame(); // (the frame's BC7 uploads in one copy pass)
     }
     // The sweep below runs at most once a second.
     if (nowMs - sweptMs_ < 1000) {
@@ -578,7 +578,7 @@ SpriteCache::Entry SpriteCache::makeAtlasEntry(const DecodeResult& result, GpuAt
     s.hd = true;
     s.scale = SDL_SCALEMODE_LINEAR;
     s.owner = this;
-    s.gpu = true;
+    s.gpuBatch = atlas_->latestBatch();
     if (labelPage >= 0) {
         s.labelState = atlas_->labelState(labelPage);
         s.labelTexture = atlas_->gpuTexture(labelPage);
@@ -1435,14 +1435,12 @@ void SpriteCache::flushPage(int page)
     p.dirty = {};
 }
 
-void Sprite::ready() const
+bool Sprite::ready() const
 {
     if (owner && page >= 0) {
         owner->flushPage(page);
     }
-    if (owner && gpu) {
-        owner->flushGpu();
-    }
+    return !gpuBatch || (owner && owner->gpuReady(gpuBatch));
 }
 
 const nox::video::DecodedImage* SpriteCache::decoded(std::int32_t imageIndex)
@@ -1794,7 +1792,7 @@ void SpriteCache::render(const Sprite& sprite, const SDL_FRect* src, const SDL_F
         drawSprite(renderer_, sprite, src, dst);
         return;
     }
-    sprite.ready();
+    if (!sprite.ready()) return;
     // The material shader (shaders/material.frag.hlsl, material_split.frag.hlsl): the colours, the
     // filtering, the image's size and its corner in the texture (a page's place, or the mip level
     // drawn) and in the material texture, then the draw from the image.

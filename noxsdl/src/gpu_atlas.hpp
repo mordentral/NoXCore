@@ -94,7 +94,10 @@ public:
     /// Anything staged and not uploaded yet.
     bool pending() const { return !uploads_.empty(); }
     /// The staged uploads in one copy pass (nothing staged: nothing done).
-    void flush();
+    bool flush();
+    std::size_t latestBatch() const { return stats_.flushes + (pending() ? 1 : 0); }
+    bool ready(std::size_t batch) { return batch <= stats_.flushes || flush(); }
+    void endFrame() { retryNextFrame_ = false; flush(); }
     /// A page's textures let go (its wrapper destroyed, then the GPU textures; SDL keeps them till
     /// the GPU is done with them). Its slot is reused.
     void release(int page);
@@ -166,6 +169,7 @@ private:
     std::uint32_t transferSize_ = 0;
     std::size_t bytes_ = 0;
     std::size_t usedBytes_ = 0;
+    bool retryNextFrame_ = false; ///< throttle failed uploads until the next frame boundary
     bool failed_ = false; ///< a page couldn't be made (logged once)
     Stats stats_;
 };

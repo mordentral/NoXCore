@@ -274,7 +274,7 @@ void GpuAtlas::stage(const Page& page, const Level& level, SDL_Point at)
 int GpuAtlas::place(Kind kind, Pool pool, std::span<const Level> levels, std::vector<SDL_Point>& corners)
 {
     corners.clear();
-    if (levels.empty()) {
+    if (levels.empty() || (retryNextFrame_ && staging_.size() >= kFlushAt)) {
         return -1;
     }
     const bool bc7 = kind == Kind::Bc7;
@@ -339,11 +339,12 @@ void GpuAtlas::closePool(Pool pool)
     }
 }
 
-void GpuAtlas::flush()
+bool GpuAtlas::flush()
 {
-    if (uploads_.empty()) {
-        return;
-    }
+    if (uploads_.empty()) return true;
+    if (retryNextFrame_) return false;
+    // Keep this batch intact on failure. No sprite from it can draw until it submits.
+    retryNextFrame_ = true;
     const std::uint64_t start = SDL_GetTicksNS();
     const auto size = static_cast<std::uint32_t>(staging_.size());
     if (!transfer_ || transferSize_ < size) {
@@ -358,9 +359,7 @@ void GpuAtlas::flush()
         if (!transfer_) {
             SDL_Log("image pack: a %u-byte transfer buffer: %s", transferSize_, SDL_GetError());
             transferSize_ = 0;
-            staging_.clear();
-            uploads_.clear();
-            return;
+            return false;
         }
     }
     // (Cycled: the last flush's copy may still be on its way.)
@@ -371,13 +370,15 @@ void GpuAtlas::flush()
         if (mapped) {
             SDL_UnmapGPUTransferBuffer(device_, transfer_);
         }
-        staging_.clear();
-        uploads_.clear();
-        return;
+        return false;
     }
     std::memcpy(mapped, staging_.data(), size);
     SDL_UnmapGPUTransferBuffer(device_, transfer_);
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_CancelGPUCommandBuffer(cmd);
+        return false;
+    }
     for (const Upload& u : uploads_) {
         SDL_GPUTextureTransferInfo from{};
         from.transfer_buffer = transfer_;
@@ -394,13 +395,15 @@ void GpuAtlas::flush()
         SDL_UploadToGPUTexture(copy, &from, &to, false);
     }
     SDL_EndGPUCopyPass(copy);
-    SDL_SubmitGPUCommandBuffer(cmd);
+    if (!SDL_SubmitGPUCommandBuffer(cmd)) return false;
+    retryNextFrame_ = false;
     ++stats_.flushes;
     stats_.regions += uploads_.size();
     stats_.uploadedBytes += size;
     stats_.flushMs += static_cast<double>(SDL_GetTicksNS() - start) / 1e6;
     staging_.clear();
     uploads_.clear();
+    return true;
 }
 
 void GpuAtlas::release(int page)
@@ -409,9 +412,10 @@ void GpuAtlas::release(int page)
     if (!p.gpu) {
         return;
     }
-    // (Its staged uploads go first: they name its texture.)
-    if (std::ranges::any_of(uploads_, [&](const Upload& u) { return u.texture == p.gpu; })) {
-        flush();
+    std::erase_if(uploads_, [&](const Upload& u) { return u.texture == p.gpu; });
+    if (uploads_.empty()) {
+        staging_.clear();
+        retryNextFrame_ = false;
     }
     if (p.wrapper) {
         SDL_DestroyTexture(p.wrapper); // (SDL leaves a texture it was given alone)
