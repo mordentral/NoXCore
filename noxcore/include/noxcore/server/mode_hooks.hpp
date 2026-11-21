@@ -92,6 +92,13 @@ inline constexpr std::uint8_t Equip = 0x40;     ///< equipped told (an item put 
 inline constexpr std::uint8_t Pickup = 0x80;
 } // namespace ModeEvent
 
+/// What a mode set on an object (ServerObject::modeMarks). 0 on every object of the game's.
+namespace ModeMark {
+/// Its holder can't let it go: every drop of it fails (by hand, a Fumble, its holder's death), as
+/// an item whose DROP does nothing (nox.setDroppable).
+inline constexpr std::uint8_t KeptByHolder = 0x01;
+} // namespace ModeMark
+
 /// A map script's call of its mod (NoX Core's LuauCall / LuauCallReturn builtins: ModeHooks::mapCall).
 struct MapCall {
     std::string_view name;               ///< the handler's name (the script's string)

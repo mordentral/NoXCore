@@ -117,6 +117,12 @@ struct MonsterDb {
 
 /// Parses decrypted monster.bin text for a solo game's numbers or a network game's.
 MonsterDb parseMonsterDb(std::string_view text, bool solo);
+/// STATUS's value as a record's line gives it: the names of `bits`' bits joined with '+' (bit i the
+/// reader's name i), "NULL" for none; bits past the names (22 and up) left out.
+std::string monsterStatusText(std::uint32_t bits);
+/// MELEE_ATTACK_DAMAGE_TYPE's name for a damage type number (BLADE 0 ... AIRBORNE_ELECTRIC 17); ""
+/// past them.
+std::string_view monsterDamageTypeName(int type);
 MonsterDb loadMonsterDb(const std::filesystem::path& path, bool solo);
 /// The same from the file's bytes (encrypted); `contentPacks` off: the installed content packs not
 /// applied (a mod's own copy, read as it ships on every side: data_files.hpp).

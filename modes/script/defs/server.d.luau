@@ -145,6 +145,28 @@ declare nox: {
     touch: (id: number) -> (),
     --- A creature's sight range; given a range, sets it instead.
     sightRange: (id: number, range: number?) -> number,
+    --- A creature reads `profile` as its monster.bin record in place of its type's (nil: its type's again): monster.bin's keys with their values, a whole record (a key left out is 0 or none, as in the file), `name` its name; STATUS a number of bits or '+' names, MELEE_ATTACK_DAMAGE_TYPE a number or name, a missile or function "" for none. Its AI's retreat and resume levels, status flags and flee range are taken from it as for one made with it, unless keepAi; its health, experience and speed stay. Not kept in a saved map.
+    setCreatureProfile: (id: number, profile: { [string]: number | string | boolean }?, keepAi: boolean?) -> (),
+    --- The monster.bin record a creature reads (its own, else its type's) as nox.setCreatureProfile takes one; nil when it has none.
+    creatureProfile: (id: number) -> { [string]: number | string }?,
+    --- A creature's or player's base speed and this frame's.
+    speed: (id: number) -> (number, number),
+    --- A creature's or player's base speed (0-100: what each frame's is worked out from), and this frame's when given.
+    setSpeed: (id: number, base: number, current: number?) -> (),
+    --- A thing's mass (how hard it is to push), above 0.
+    setMass: (id: number, mass: number) -> (),
+    --- Whether a creature is immune to "poison", "fire" or "electricity" (its SUBCLASS's IMMUNE_*); given on, sets it so first.
+    immune: (id: number, kind: "poison" | "fire" | "electricity", on: boolean?) -> boolean,
+    --- The sound set (soundset.bin's, by name) a creature's cries come from; nil: its type's again.
+    setSoundSet: (id: number, name: string?) -> (),
+    --- An NPC's (subclass NPC or FEMALE_NPC) six colours, each { r, g, b } 0-255 (nil: kept); the players who know it told.
+    setNpcColors: (id: number, colors: { { number } }) -> (),
+    --- A creature's AI told to cast a spell (its number 0-136, or name) at a point, as its own CAST_SPELL_ON_LOCATION; whether it was pushed.
+    creatureCast: (id: number, spell: string | number, x: number, y: number) -> boolean,
+    --- A creature's spellbook and casting rhythm (each field left out kept): spells[name or number] = its ways ("reaction", "defensive", "disabling", "offensive", "escape"; one, a list, or false: not cast); delays[way] = { least, most } frames; power 0-5; aim 0-1.
+    setCaster: (id: number, caster: { spells: { [string | number]: string | { string } | boolean }?, delays: { [string]: { number } }?, power: number?, aim: number? }) -> (),
+    --- false: an item's holder can't let it go (every drop of it fails: by hand, a Fumble, the holder's death); true or nil: as the game has it.
+    setDroppable: (id: number, droppable: boolean?) -> (),
     --- The ids of the live enemy creatures a unit sees within range, nearest first, at most `most`.
     nearestFoes: (unit: number, range: number, most: number, losTested: number) -> { number },
     --- Pushes a thing away from (fromX, fromY) as the engine does; a negative force pulls.

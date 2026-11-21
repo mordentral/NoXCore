@@ -92,6 +92,22 @@ constexpr const char* kDamage[] = {"BLADE", "FLAME", "CRUSH", "IMPALE", "DRAIN",
 
 } // namespace
 
+std::string monsterStatusText(std::uint32_t bits)
+{
+    std::string out;
+    for (std::size_t b = 0; b < std::size(kStatus); ++b) {
+        if (bits & (1u << b)) {
+            out += (out.empty() ? "" : "+") + std::string(kStatus[b]);
+        }
+    }
+    return out.empty() ? std::string("NULL") : out;
+}
+
+std::string_view monsterDamageTypeName(int type)
+{
+    return type >= 0 && static_cast<std::size_t>(type) < std::size(kDamage) ? std::string_view(kDamage[type]) : std::string_view();
+}
+
 void MonsterDb::reindex()
 {
     index.clear();
