@@ -5,6 +5,7 @@
 #pragma once
 
 #include "noxcore/modes/mode.hpp"
+#include "noxcore/modes/script/script_data.hpp"
 #include "noxcore/server/combat.hpp"
 
 #include <cstdint>
@@ -57,6 +58,15 @@ bool beginHook(lua_State* L, const char* name);
 /// The function under its `nargs` arguments called, protected, on a fresh budget (an error
 /// reported as `what`'s); false: it failed (nothing left), else its `nresults` on the stack.
 bool callHook(lua_State* L, const char* what, int nargs, int nresults);
+/// A script's number as the float the engine takes: the nearest float (ties to even) whatever the
+/// thread's rounding, as a compiled map script's float literal is. (The server's figuring rounds
+/// toward zero, as the game's FPU: a plain conversion there would take a decimal such as 0.1 a
+/// float lower, and differently from a call made outside it.) Every number a script hands the
+/// engine as a float goes through it; the engine's own figuring keeps the game's rounding.
+inline float toFloat(double v) noexcept
+{
+    return nearestFloat(v);
+}
 
 } // namespace toolbox
 

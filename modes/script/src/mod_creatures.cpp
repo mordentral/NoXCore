@@ -21,6 +21,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -40,12 +41,12 @@ server::ServerObject& creatureArg(lua_State* L, int idx)
     return o;
 }
 
-/// A finite number from `lo` to `hi`.
+/// A finite number from `lo` to `hi`, as the nearest float (toolbox::toFloat).
 float floatIn(lua_State* L, int idx, double lo, double hi, const char* what)
 {
     const double v = luaL_checknumber(L, idx);
     luaL_argcheck(L, std::isfinite(v) && v >= lo && v <= hi, idx, what);
-    return static_cast<float>(v);
+    return toolbox::toFloat(v);
 }
 
 // ---- the record ------------------------------------------------------------------------------
@@ -119,13 +120,16 @@ std::string lineValue(lua_State* L, const RecordKey& k)
         return std::to_string(static_cast<long long>(v));
     }
     case KeyKind::Float: {
-        if (!lua_isnumber(L, -1) || !std::isfinite(lua_tonumber(L, -1))) {
-            return bad("takes a number");
+        // (The nearest float, as a map script's literal: toolbox::toFloat; one past a float's range
+        // refused.)
+        const float f = lua_isnumber(L, -1) ? toolbox::toFloat(lua_tonumber(L, -1)) : std::numeric_limits<float>::quiet_NaN();
+        if (!std::isfinite(f)) {
+            return bad("takes a number (a float's: finite, at most about 3.4e38 either way)");
         }
         char buf[48];
-        // (In hexadecimal: the reader takes it back as the same float whatever the thread's rounding,
-        // which on the server is toward zero; a decimal may not.)
-        std::snprintf(buf, sizeof buf, "%a", static_cast<double>(static_cast<float>(lua_tonumber(L, -1))));
+        // (In hexadecimal: the reader takes it back as exactly that float, whatever any printing's
+        // rounding.)
+        std::snprintf(buf, sizeof buf, "%a", static_cast<double>(f));
         return buf;
     }
     case KeyKind::Status:
@@ -437,8 +441,10 @@ int noxCreatureCast(lua_State* L)
     toolbox::refuseInsideAsked(L, "nox.creatureCast");
     server::ServerObject& o = creatureArg(L, 1);
     const std::uint32_t spell = spellOf(L, 2);
-    const float x = floatIn(L, 3, -1e6, 1e6, "a coordinate");
-    const float y = floatIn(L, 4, -1e6, 1e6, "a coordinate");
+    // (A point on the map, as every point a script gives: one off it would reach the spell's
+    // effects, the things it makes and the clients' messages.)
+    const float x = floatIn(L, 3, 0, 256.0 * 23.0, "a point on the map (0 to 5888)");
+    const float y = floatIn(L, 4, 0, 256.0 * 23.0, "a point on the map (0 to 5888)");
     server::Fight fight = toolbox::fightOf(L);
     server::ServerObject::Monster::Item* it = server::Monsters{fight}.push(o, server::MonsterAction::CastSpellOnLocation);
     if (it) {
@@ -551,7 +557,7 @@ int noxSetCaster(lua_State* L)
         if (!(v >= 0 && v <= 1)) {
             luaL_error(L, "nox.setCaster: aim is 0-1");
         }
-        m.field330 = static_cast<float>(v);
+        m.field330 = toolbox::toFloat(v);
     }
     lua_pop(L, 1);
     return 0;

@@ -26,6 +26,13 @@ struct lua_State;
 
 namespace nox::modes::script {
 
+/// Luau source compiled to bytecode (a compile error as bytecode that fails to load, as luau_compile
+/// gives it; empty only when it couldn't be made at all), to nearest whatever the thread's rounding:
+/// its decimal literals and folded constants are the doubles they are anywhere, also when a script
+/// is compiled inside a server frame (a require there), where the thread rounds toward zero
+/// (util/x87.hpp) and the C library's reading of 0.1 would come out a double lower.
+std::string compileLuau(std::string_view source);
+
 class LuauVm {
 public:
     struct Limits {

@@ -161,7 +161,7 @@ declare nox: {
     setSoundSet: (id: number, name: string?) -> (),
     --- An NPC's (subclass NPC or FEMALE_NPC) six colours, each { r, g, b } 0-255 (nil: kept); the players who know it told.
     setNpcColors: (id: number, colors: { { number } }) -> (),
-    --- A creature's AI told to cast a spell (its number 0-136, or name) at a point, as its own CAST_SPELL_ON_LOCATION; whether it was pushed.
+    --- A creature's AI told to cast a spell (its number 0-136, or name) at a point on the map (0-5888), as its own CAST_SPELL_ON_LOCATION; whether it was pushed.
     creatureCast: (id: number, spell: string | number, x: number, y: number) -> boolean,
     --- A creature's spellbook and casting rhythm (each field left out kept): spells[name or number] = its ways ("reaction", "defensive", "disabling", "offensive", "escape"; one, a list, or false: not cast); delays[way] = { least, most } frames; power 0-5; aim 0-1.
     setCaster: (id: number, caster: { spells: { [string | number]: string | { string } | boolean }?, delays: { [string]: { number } }?, power: number?, aim: number? }) -> (),

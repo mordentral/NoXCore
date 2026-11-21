@@ -907,7 +907,7 @@ float coordArg(lua_State* L, int idx)
 {
     const double v = luaL_checknumber(L, idx);
     luaL_argcheck(L, v >= 0 && v <= kMapExtent, idx, "a point on the map (0 to 5888)");
-    return static_cast<float>(v);
+    return toolbox::toFloat(v);
 }
 
 /// A unit's peer (its player's), none for a unit without one (a test's, a bot's own).
@@ -1574,7 +1574,7 @@ int noxCreate(lua_State* L)
 int noxFloorAt(lua_State* L)
 {
     // The floor tile (a FLOR index) at a point; -1 none.
-    lua_pushinteger(L, worldOf(L).floorAt(static_cast<float>(luaL_checknumber(L, 1)), static_cast<float>(luaL_checknumber(L, 2))));
+    lua_pushinteger(L, worldOf(L).floorAt(toolbox::toFloat(luaL_checknumber(L, 1)), toolbox::toFloat(luaL_checknumber(L, 2))));
     return 1;
 }
 
@@ -1587,15 +1587,15 @@ int noxWallAt(lua_State* L)
 
 int noxCosf(lua_State* L)
 {
-    // cos of the value as a float, the float result (the C++'s std::cos(float), in the thread's
-    // rounding: the server's).
-    lua_pushnumber(L, std::cos(static_cast<float>(luaL_checknumber(L, 1))));
+    // cos of the value as a float (the nearest, toolbox::toFloat), the float result (the C++'s
+    // std::cos(float), in the thread's rounding: the server's).
+    lua_pushnumber(L, std::cos(toolbox::toFloat(luaL_checknumber(L, 1))));
     return 1;
 }
 
 int noxSinf(lua_State* L)
 {
-    lua_pushnumber(L, std::sin(static_cast<float>(luaL_checknumber(L, 1))));
+    lua_pushnumber(L, std::sin(toolbox::toFloat(luaL_checknumber(L, 1))));
     return 1;
 }
 
@@ -2223,7 +2223,7 @@ float floatArg(lua_State* L, int idx, double lo, double hi, const char* what)
 {
     const double v = luaL_checknumber(L, idx);
     luaL_argcheck(L, v >= lo && v <= hi, idx, what);
-    return static_cast<float>(v);
+    return toolbox::toFloat(v);
 }
 
 /// A thing on the map (not in an inventory: moving one there would leave it in two places).
@@ -2639,7 +2639,7 @@ int noxSetGameNumber(lua_State* L)
     const double value = luaL_checknumber(L, 2);
     luaL_argcheck(L, std::isfinite(value) && std::fabs(value) <= 3.0e38, 2, "a finite number");
     const std::size_t index = lua_isnoneornil(L, 3) ? 0 : static_cast<std::size_t>(wholeArg(L, 3, 0, 254, "an index 0-254"));
-    lua_pushboolean(L, worldOf(L).setNumber(std::string_view(s, len), index, static_cast<float>(value)));
+    lua_pushboolean(L, worldOf(L).setNumber(std::string_view(s, len), index, toolbox::toFloat(value)));
     return 1;
 }
 
@@ -4090,19 +4090,17 @@ int noxRequire(lua_State* L)
     if (!source) {
         luaL_error(L, "require: no %s", path.c_str());
     }
-    lua_CompileOptions options{};
-    options.optimizationLevel = 1;
-    options.debugLevel = 1;
-    std::size_t size = 0;
-    std::unique_ptr<char, decltype(&std::free)> bytecode(luau_compile(source->data(), source->size(), &options, &size), &std::free);
-    if (!bytecode) {
+    // (To nearest, as the main script is: a require inside a server frame reads its literals as
+    // anywhere else.)
+    const std::string bytecode = compileLuau(*source);
+    if (bytecode.empty()) {
         luaL_error(L, "require: %s couldn't be compiled", path.c_str());
     }
     const std::string chunk = "=" + path;
     // (A second chunk into the same globals: their "safe" mark off first, or Luau resolves the
     // module's globals once as it loads and keeps the values they had then.)
     lua_setsafeenv(L, LUA_GLOBALSINDEX, 0);
-    if (luau_load(L, chunk.c_str(), bytecode.get(), size, 0) != 0) {
+    if (luau_load(L, chunk.c_str(), bytecode.data(), bytecode.size(), 0) != 0) {
         lua_error(L); // (its message on the stack)
     }
     lua_pushlightuserdata(L, &impl); // (loading: a cycle's mark)
@@ -5005,7 +5003,7 @@ public:
             if (lua_isnumber(L, -2) && lua_isnumber(L, -1)) {
                 const double x = lua_tonumber(L, -2), y = lua_tonumber(L, -1);
                 if (x >= 0 && x <= kMapExtent && y >= 0 && y <= kMapExtent) {
-                    at = std::pair{static_cast<float>(x), static_cast<float>(y)};
+                    at = std::pair{toolbox::toFloat(x), toolbox::toFloat(y)};
                 } else {
                     impl_.report("respawnPoint: a point off the map (the game's start used)");
                 }

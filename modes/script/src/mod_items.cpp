@@ -588,7 +588,7 @@ int noxSetExperience(lua_State* L)
     server::ServerObject& u = toolbox::playerUnitArg(L, 1);
     const double xp = luaL_checknumber(L, 2);
     luaL_argcheck(L, xp >= 0 && xp <= 2147483647.0, 2, "an amount from 0");
-    u.experience = static_cast<float>(xp);
+    u.experience = toolbox::toFloat(xp);
     server::reportExperience(toolbox::worldOf(L), u);
     return 0;
 }
@@ -601,7 +601,7 @@ int noxGiveExperience(lua_State* L)
     const double xp = luaL_checknumber(L, 2);
     luaL_argcheck(L, xp >= 0 && xp <= 1'000'000'000.0, 2, "an amount from 0");
     server::Fight f = toolbox::fightOf(L);
-    server::giveExperience(f, u, static_cast<float>(xp));
+    server::giveExperience(f, u, toolbox::toFloat(xp));
     return 0;
 }
 

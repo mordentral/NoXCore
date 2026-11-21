@@ -1,6 +1,8 @@
 // The sandboxed, capped Luau VM (luau_vm.hpp).
 #include "noxcore/modes/script/luau_vm.hpp"
 
+#include "noxcore/util/x87.hpp"
+
 #include "lua.h"
 #include "luacode.h"
 #include "lualib.h"
@@ -27,6 +29,18 @@ LuauVm* vmOf(lua_State* L)
 }
 
 } // namespace
+
+// (A scope of its own at the top of a function the compiler can't fold into its caller: x87.hpp's rule.)
+NOX_NOINLINE std::string compileLuau(std::string_view source)
+{
+    const util::RoundingScope nearest(false);
+    lua_CompileOptions options{};
+    options.optimizationLevel = 1;
+    options.debugLevel = 1; // (line numbers in errors)
+    std::size_t size = 0;
+    std::unique_ptr<char, decltype(&std::free)> bytecode(luau_compile(source.data(), source.size(), &options, &size), &std::free);
+    return bytecode ? std::string(bytecode.get(), size) : std::string();
+}
 
 std::chrono::nanoseconds LuauVm::threadCpuTime() noexcept
 {
@@ -179,17 +193,13 @@ void LuauVm::beginBudget()
 
 bool LuauVm::run(std::string_view name, std::string_view source, int nresults, std::string& error)
 {
-    lua_CompileOptions options{};
-    options.optimizationLevel = 1;
-    options.debugLevel = 1; // (line numbers in errors)
-    std::size_t size = 0;
-    std::unique_ptr<char, decltype(&std::free)> bytecode(luau_compile(source.data(), source.size(), &options, &size), &std::free);
-    if (!bytecode) {
+    const std::string bytecode = compileLuau(source);
+    if (bytecode.empty()) {
         error = std::string(name) + ": couldn't be compiled";
         return false;
     }
     const std::string chunk = "=" + std::string(name);
-    if (luau_load(thread_, chunk.c_str(), bytecode.get(), size, 0) != 0) {
+    if (luau_load(thread_, chunk.c_str(), bytecode.data(), bytecode.size(), 0) != 0) {
         // (A compile error comes back as bytecode that fails to load with the message.)
         error = lua_tostring(thread_, -1) ? lua_tostring(thread_, -1) : std::string(name) + ": couldn't be loaded";
         lua_pop(thread_, 1);
