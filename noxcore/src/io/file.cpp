@@ -11,6 +11,9 @@
 #include <fstream>
 #include <memory>
 #include <system_error>
+#ifdef _WIN32
+#include <share.h>
+#endif
 
 namespace nox {
 
@@ -59,8 +62,7 @@ std::string pathUtf8(const std::filesystem::path& path)
 std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path)
 {
 #ifdef _WIN32
-    std::FILE* file = nullptr;
-    _wfopen_s(&file, path.c_str(), L"rb");
+    std::FILE* file = _wfsopen(path.c_str(), L"rb", _SH_DENYNO);
 #else
     std::FILE* file = std::fopen(path.c_str(), "rb");
     if (!file) {

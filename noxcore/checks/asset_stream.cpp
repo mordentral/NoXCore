@@ -17,6 +17,13 @@ int main() try {
         nox::writeFileBytes(file, expected);
         checks::require(nox::readFileBytes(temp.path / "mixedcase.BIN") == expected, "block boundary or case lookup");
     }
+    {
+        std::ofstream writer(file, std::ios::binary | std::ios::trunc);
+        writer << "shared" << std::flush;
+        checks::require(writer.good(), "could not flush the shared fixture");
+        const auto bytes = nox::readFileBytes(file);
+        checks::require(std::string(bytes.begin(), bytes.end()) == "shared", "could not read while writer remained open");
+    }
     bool rejected = false;
     try {
         nox::readFileBytes(temp.path);
