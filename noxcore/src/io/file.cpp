@@ -4,10 +4,10 @@
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <fstream>
-#include <iterator>
 #include <system_error>
 
 namespace nox {
@@ -67,8 +67,13 @@ std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path)
     if (!in) {
         throw std::system_error(errno, std::generic_category(), "cannot open " + pathUtf8(path));
     }
-    std::vector<std::uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-    if (in.bad()) {
+    std::vector<std::uint8_t> out;
+    std::array<char, 64 * 1024> block;
+    while (in) {
+        in.read(block.data(), block.size());
+        out.insert(out.end(), block.data(), block.data() + in.gcount());
+    }
+    if (!in.eof() || in.bad()) {
         throw std::system_error(errno, std::generic_category(), "cannot read " + pathUtf8(path));
     }
     return out;
