@@ -12315,10 +12315,10 @@ game.map_vote.votes[other] = {n} votes
 # noxsdl/src/quit_menu.cpp:102
 #@ 67a1e1af: Vote Map
 game.quit_menu.vote_map = Vote Map
-# noxsdl/src/frame.cpp:130
+# noxsdl/src/frame.cpp:134
 #@ 1c3df593: screenshot: couldn't write {path}
 game.screenshot.failed = screenshot: couldn't write {path}
-# noxsdl/src/frame.cpp:129
+# noxsdl/src/frame.cpp:133
 #@ 0941a2e6: screenshot: {path}
 game.screenshot.saved = screenshot: {path}
 
