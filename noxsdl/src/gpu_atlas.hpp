@@ -95,6 +95,8 @@ public:
     bool pending() const { return !uploads_.empty(); }
     /// The staged uploads in one copy pass (nothing staged: nothing done).
     bool flush();
+    /// Stop admitting whole sprites while a failed full batch is waiting for retry.
+    bool stagingBlocked() const;
     std::size_t latestBatch() const { return stats_.flushes + (pending() ? 1 : 0); }
     bool ready(std::size_t batch) { return batch <= stats_.flushes || flush(); }
     void endFrame() { retryNextFrame_ = false; flush(); }

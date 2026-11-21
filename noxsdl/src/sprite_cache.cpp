@@ -528,7 +528,10 @@ DecodeJob SpriteCache::jobFor(DecodeKind kind, std::int32_t index) const
 SpriteCache::Entry SpriteCache::makeNow(const DecodeJob& job)
 {
     const std::uint64_t start = SDL_GetTicksNS();
-    Entry e = makeHdEntry(buildDecodeResult(job, packImage(job.index, job.blocks)));
+    // An immediate request cannot wait for the next frame. In a full, failed batch
+    // use the existing RGBA HD path; workers keep their BC7 results queued below.
+    const bool blocks = job.blocks && atlas_ && !atlas_->stagingBlocked();
+    Entry e = makeHdEntry(buildDecodeResult(job, packImage(job.index, blocks)));
     ++loadStats_.misses;
     loadStats_.missMs += static_cast<double>(SDL_GetTicksNS() - start) / 1e6;
     return e;
@@ -765,7 +768,7 @@ void SpriteCache::pump(std::uint64_t nowMs)
     const std::uint64_t start = SDL_GetTicksNS();
     const std::uint64_t budget = holding_ ? kHoldUploadBudgetNs : kUploadBudgetNs;
     DecodeResult r;
-    while (decoder_->take(r)) {
+    while ((!atlas_ || !atlas_->stagingBlocked()) && decoder_->take(r)) {
         install(std::move(r));
         if (SDL_GetTicksNS() - start >= budget) {
             break;
@@ -1948,7 +1951,7 @@ bool SpriteCache::awaitAsked(std::uint64_t maxMs)
     DecodeResult r;
     std::size_t taken = 0;
     double workMs = 0;
-    while (outstanding()) {
+    while ((!atlas_ || !atlas_->stagingBlocked()) && outstanding()) {
         const std::uint64_t now = SDL_GetTicksNS();
         if (now >= deadline || !decoder_->takeWait(r, std::max<std::uint64_t>(1, (deadline - now) / 1'000'000))) {
             SDL_Log("image pack: waited %llu ms for %zu floor tiles and %zu composites; drawn as they are",

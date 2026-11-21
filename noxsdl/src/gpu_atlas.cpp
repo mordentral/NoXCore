@@ -271,10 +271,15 @@ void GpuAtlas::stage(const Page& page, const Level& level, SDL_Point at)
     uploads_.push_back(u);
 }
 
+bool GpuAtlas::stagingBlocked() const
+{
+    return retryNextFrame_ && staging_.size() >= kFlushAt;
+}
+
 int GpuAtlas::place(Kind kind, Pool pool, std::span<const Level> levels, std::vector<SDL_Point>& corners)
 {
     corners.clear();
-    if (levels.empty() || (retryNextFrame_ && staging_.size() >= kFlushAt)) {
+    if (levels.empty()) {
         return -1;
     }
     const bool bc7 = kind == Kind::Bc7;
