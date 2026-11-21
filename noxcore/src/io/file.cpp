@@ -81,6 +81,7 @@ void writeFileBytes(const std::filesystem::path& path, std::span<const std::uint
         throw std::system_error(errno, std::generic_category(), "cannot create " + pathUtf8(path));
     }
     out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+    out.close();
     if (!out) {
         throw std::system_error(errno, std::generic_category(), "cannot write " + pathUtf8(path));
     }

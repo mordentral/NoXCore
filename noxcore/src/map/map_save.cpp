@@ -14,8 +14,10 @@
 #include "noxcore/video/nxz.hpp"
 
 #include "section_io.hpp"
+#include "map_publication.hpp"
 
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <string>
 
@@ -230,10 +232,12 @@ void writeFileReplacing(const std::filesystem::path& path, std::span<const std::
     std::filesystem::rename(tmp, path);
 }
 
-std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& filesToSave,
-                                     std::string_view who, std::optional<std::string_view> sidecar)
+std::filesystem::path detail::publishMap(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& filesToSave,
+                                       std::string_view who, std::optional<std::string_view> sidecar,
+                                       std::filesystem::path& retainedCleanup, ReplaceFile replace, RemoveTree cleanup)
 {
     namespace fs = std::filesystem;
+    retainedCleanup.clear();
     const fs::path dir = mapsDir / std::string(name);
     fs::create_directories(dir);
     const auto target = [&](const char* ext) { return dir / (std::string(name) + ext); };
@@ -271,7 +275,7 @@ std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::
             writeFileBytes(stage / f.path.filename(), f.data);
         }
         for (const auto& f : files) {
-            fs::rename(stage / f.path.filename(), f.path);
+            replace(stage / f.path.filename(), f.path);
             ++published;
         }
     } catch (...) {
@@ -287,8 +291,35 @@ std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::
         fs::remove_all(stage);
         throw;
     }
-    fs::remove_all(stage);
+    // Publication is complete. A cleanup error must not turn it into a failed save.
+    std::error_code ec;
+    cleanup(stage, ec);
+    if (ec) {
+        retainedCleanup = stage;
+        // Move any leftovers away from the lock name so a later save can proceed.
+        // We still own the lock; only this writer can choose a new cleanup name.
+        for (unsigned i = 1; i != 0; ++i) {
+            const fs::path spare = dir / (".nox-save-cleanup-" + std::to_string(i));
+            const auto st = fs::symlink_status(spare, ec);
+            if (st.type() == fs::file_type::not_found) {
+                fs::rename(stage, spare, ec);
+                if (!ec) retainedCleanup = spare;
+                break;
+            }
+            if (ec) break;
+        }
+    }
     return files.front().path;
+}
+
+std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
+                                     std::string_view who, std::optional<std::string_view> sidecar, std::filesystem::path* retainedCleanup)
+{
+    std::filesystem::path retained;
+    auto map = detail::publishMap(mapsDir, name, files, who, sidecar, retained, std::filesystem::rename, std::filesystem::remove_all);
+    if (!retained.empty()) std::clog << who << ": saved map; cleanup required in " << retained << '\n';
+    if (retainedCleanup) *retainedCleanup = std::move(retained);
+    return map;
 }
 
 } // namespace nox::map

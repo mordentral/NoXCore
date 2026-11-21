@@ -61,6 +61,11 @@ endif()
 include(NoxDependencies)
 include(NoxWindowsResources)
 
+option(NOX_BUILD_PUBLIC_CHECKS "Build portable regression checks for the public source tree" OFF)
+if(NOX_BUILD_PUBLIC_CHECKS)
+    enable_testing()
+endif()
+
 add_subdirectory(noxcore)
 add_subdirectory(modes) # (the game modes built in: hosts and the client link nox::modes)
 

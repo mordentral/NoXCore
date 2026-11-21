@@ -41,6 +41,7 @@ struct SavedPaths {
     std::filesystem::path map;
     std::filesystem::path nxz;
     std::filesystem::path sidecar; // empty when none was written
+    std::filesystem::path retainedCleanup; // committed save with leftover staging files
 };
 
 /// Validates (throws FormatError listing the errors), then writes <mapsDir>\<name>\<name>.map

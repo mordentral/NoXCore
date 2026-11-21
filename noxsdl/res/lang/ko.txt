@@ -7114,6 +7114,8 @@ editor.status.refused_held = {action} 거부됨: {who} 님이 {element}을(를) 
 editor.status.save_failed = 저장 실패
 #@ 45b405e1 mt: Saved {path}
 editor.status.saved = {path} 저장함
+#@ 8e652581 mt: Saved {path}. Leftover save files are in {folder}.
+editor.status.saved_cleanup = {path}에 저장했습니다. 남은 임시 저장 파일은 {folder}에 있습니다.
 #@ f1bed63e mt: ({n} sending)
 editor.status.sending = ({n}개 보내는 중)
 #@ fa770f64 mt: Session {name}

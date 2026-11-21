@@ -197,6 +197,12 @@ add_library(noxcore
 )
 add_library(nox::core ALIAS noxcore)
 
+if(NOX_BUILD_PUBLIC_CHECKS)
+    add_executable(map_publication_check checks/map_publication.cpp)
+    target_link_libraries(map_publication_check PRIVATE nox::core)
+    add_test(NAME map_publication COMMAND map_publication_check)
+endif()
+
 # The NoxScript builtins' documentation and stock-map usage (script/builtin_docs.hpp), compiled in
 # from their text files so the editor needs no data files of its own.
 foreach(doc IN ITEMS builtin_docs:kBuiltinDocsText builtin_usage:kBuiltinUsageText)

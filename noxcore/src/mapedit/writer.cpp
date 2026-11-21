@@ -449,7 +449,7 @@ SavedPaths saveDocument(const MapDocument& d, const things::ThingDb& things, con
         text = side.toJson();
     }
     SavedPaths out;
-    out.map = map::writeMapFolder(mapsDir, name, encodeFiles(d, things), "map editor", text);
+    out.map = map::writeMapFolder(mapsDir, name, encodeFiles(d, things), "map editor", text, &out.retainedCleanup);
     out.nxz = std::filesystem::path(out.map).replace_extension(".nxz");
     if (sidecar) out.sidecar = std::filesystem::path(out.map).replace_extension(".nxe");
     return out;

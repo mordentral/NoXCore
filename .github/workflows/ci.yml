@@ -9,11 +9,11 @@
 #
 # The same steps by hand:
 #   Windows, a "Developer PowerShell for VS 2022":
-#     cmake --preset msvc-release -DNOX_PRIVATE_TOOLS=OFF
+#     cmake --preset msvc-release -DNOX_BUILD_PUBLIC_CHECKS=ON -DNOX_PRIVATE_TOOLS=OFF
 #     cmake --build --preset msvc-release
 #     ctest --preset msvc-release
 #   Linux (Ubuntu 24.04, the packages below):
-#     cmake --preset linux-release -DNOX_PRIVATE_TOOLS=OFF
+#     cmake --preset linux-release -DNOX_BUILD_PUBLIC_CHECKS=ON -DNOX_PRIVATE_TOOLS=OFF
 #     cmake --build --preset linux-release -j 4
 #     ctest --preset linux-release
 name: build
@@ -48,7 +48,7 @@ jobs:
           path: build/msvc-release/_deps
           key: deps-windows-${{ hashFiles('cmake/NoxDependencies.cmake', 'cmake/patches/**') }}
       - name: Configure
-        run: cmake --preset msvc-release -DNOX_PRIVATE_TOOLS=OFF -DNOX_WARNINGS_AS_ERRORS=OFF
+        run: cmake --preset msvc-release -DNOX_BUILD_PUBLIC_CHECKS=ON -DNOX_PRIVATE_TOOLS=OFF -DNOX_WARNINGS_AS_ERRORS=OFF
       - name: Build
         run: cmake --build --preset msvc-release
       - name: Test
@@ -74,7 +74,7 @@ jobs:
           path: build/linux-release/_deps
           key: deps-linux-${{ hashFiles('cmake/NoxDependencies.cmake', 'cmake/patches/**') }}
       - name: Configure
-        run: cmake --preset linux-release -DNOX_PRIVATE_TOOLS=OFF
+        run: cmake --preset linux-release -DNOX_BUILD_PUBLIC_CHECKS=ON -DNOX_PRIVATE_TOOLS=OFF
       - name: Build
         run: cmake --build --preset linux-release -j 4
       - name: Test
