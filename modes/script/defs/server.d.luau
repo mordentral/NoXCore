@@ -247,8 +247,8 @@ declare nox: {
     present: (id: number?, thingType: number?) -> boolean,
     --- Whether a thing is present, not flagged dead, and has some health.
     living: (id: number?) -> boolean,
-    --- Sets a thing's collide by name: "DefaultCollide" or "ModeCollide".
-    setCollide: (id: number, name: string) -> (),
+    --- Sets a thing's collide by name: "DefaultCollide" or "ModeCollide"; nil gives it its type's own back (thing.bin's, with the data it was made with).
+    setCollide: (id: number, name: string?) -> (),
     --- Brings a watching (observing, not dead) player's unit back into play as the quest does.
     backIntoPlay: (unit: number) -> (),
     --- on: puts a player out of play watching (unseen, out of reach), held out (its Action never brings it in), its camera the mode's (nox.camera; where it is till then) and no "observation mode" told; off: back into play as nox.backIntoPlay brings it, the hold let go (as it is when anything else brings it into play: a later watch is a free one).
@@ -412,9 +412,9 @@ declare nox: {
     modifiers: (section: string) -> { string },
     --- Whether a modifier fits a slot ("effectiveness", "material", "primary", "secondary") of an item type.
     modifierFits: (thingType: string, slot: string, name: string) -> boolean,
-    --- Puts on an item the player's unit carries; true, or false and why.
+    --- Puts on an item the player's unit (or a creature) carries; true, or false and why.
     equip: (unit: number, item: number) -> (boolean, string?),
-    --- Takes off an item the player's unit wears; whether it came off.
+    --- Takes off an item the player's unit (or a creature) wears; whether it came off.
     unequip: (unit: number, item: number) -> boolean,
     --- The item the player's client holds as its secondary weapon; nil for none, one no longer carried or one in hand now.
     secondaryWeapon: (unit: number) -> number?,
@@ -424,6 +424,14 @@ declare nox: {
     repair: (item: number) -> boolean,
     --- Sets an item's durability, 1 to its most (more is its most), its holder's client told; false for a thing without durability.
     setDurability: (item: number, durability: number) -> boolean,
+    --- Sets an existing item's modifiers by slot (a name, false for none; a slot left out stays), the clients that know it told; an arrow or bolt in flight takes any (its hits read them). true, or false and why (a thing that takes none, one worn, a set that doesn't fit: nox.modifierFits).
+    setItemSpec: (item: number, spec: { effectiveness: (string | boolean)?, material: (string | boolean)?, primary: (string | boolean)?, secondary: (string | boolean)? }) -> (boolean, string?),
+    --- A thing type's (name or number) worth for this map's world (shop prices, repair costs, a quest's sale) in place of thing.bin's; nil gives thing.bin's back. Nothing is sent.
+    setWorth: (thingType: string | number, worth: number?) -> (),
+    --- The item types a player can't drop or sell in this map's world in place of the game's own list (the quest items: BookOfOblivion, the Oblivion staffs, the keys...); nil gives the game's back.
+    setKeptItems: (types: { string | number }?) -> (),
+    --- Sets a thing's pickup by name: "DefaultPickup", "WeaponPickup" or "ArmorPickup" (an Oblivion staff's without its own line, OblivionUp and wear); nil gives it its type's own back.
+    setPickup: (id: number, name: string?) -> (),
     --- # Player levels
     --- Sets a player's level (1-10), its numbers worked out again.
     setLevel: (unit: number, level: number) -> (),

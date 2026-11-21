@@ -561,6 +561,36 @@ bool World::setNumber(std::string_view name, std::size_t index, float value)
     return true;
 }
 
+void World::setWorth(std::string_view type, std::optional<std::uint32_t> worth)
+{
+    if (!worth) {
+        if (ownWorths_) {
+            if (const auto it = ownWorths_->find(type); it != ownWorths_->end()) {
+                ownWorths_->erase(it);
+            }
+        }
+        return;
+    }
+    if (!ownWorths_) {
+        ownWorths_ = std::make_unique<std::map<std::string, std::uint32_t, std::less<>>>();
+    }
+    (*ownWorths_)[std::string(type)] = *worth;
+}
+
+std::optional<std::uint32_t> World::ownWorth(std::string_view type) const
+{
+    if (!ownWorths_) {
+        return std::nullopt;
+    }
+    const auto it = ownWorths_->find(type);
+    return it != ownWorths_->end() ? std::optional<std::uint32_t>(it->second) : std::nullopt;
+}
+
+void World::setKeptItems(std::optional<std::vector<std::string>> types)
+{
+    keptItems_ = types ? std::make_unique<std::vector<std::string>>(std::move(*types)) : nullptr;
+}
+
 /// What an item's xfer reads into it (WeaponXfer's charges and health, ArmorXfer
 /// XFerArmor's health, the item flags, AmmoXfer's ammunition, the books' entries:
 /// SpellRewardXfer, AbilityRewardXfer, FieldGuideXfer; ReadableXfer

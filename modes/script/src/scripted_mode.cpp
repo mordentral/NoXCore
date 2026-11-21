@@ -1704,8 +1704,15 @@ int noxSetCollide(lua_State* L)
 {
     // A thing's COLLIDE set by name: "DefaultCollide" (its touches do nothing: a soul gate's look
     // alone, no checkpoint) or "ModeCollide" (the mode's: nox.watchCollide). No other: the
-    // game's own need the data their things are made with.
+    // game's own need the data their things are made with. nil: its type's own back (thing.bin's
+    // last COLLIDE line's function; its data is the one the thing was made with, never changed here).
     server::ServerObject& o = objectArg(L, 1);
+    if (lua_isnoneornil(L, 2)) {
+        const things::ThingDef* def = toolbox::thingsOf(L).findThing(o.typeName);
+        const std::string_view line = def ? def->lastAttribute("COLLIDE").value_or("") : std::string_view{};
+        o.collideFn = server::Name(line.substr(0, line.find(' ')));
+        return 0;
+    }
     const std::string_view name = luaL_checkstring(L, 2);
     luaL_argcheck(L, name == "DefaultCollide" || name == "ModeCollide", 2, "DefaultCollide or ModeCollide");
     o.collideFn = server::Name(name);

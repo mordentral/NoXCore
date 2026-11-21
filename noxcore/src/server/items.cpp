@@ -17,6 +17,7 @@
 #include "noxcore/server/script_host.hpp"
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/spells.hpp"
+#include "noxcore/server/trade.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/util/bytes.hpp"
 #include "noxcore/util/x87.hpp"
@@ -1345,16 +1346,10 @@ bool Items::dropDefault(ServerObject& player, ServerObject& item, float x, float
     if (item.holder != player.extent) {
         return false;
     }
-    // A player's quest items stay with it (ItemIsDroppable(1): the exe's table),
-    // however they'd go, its death's drop too (dropAllItems ->
+    // A player's quest items stay with it (ItemIsDroppable(1): the exe's table, or a mode's own
+    // list for the world: questItem), however they'd go, its death's drop too (dropAllItems ->
     // Obj_DropAt); told only while it's neither dead nor destroyed (0x8020).
-    constexpr std::string_view kKept[] = {
-        "BookOfOblivion", "OblivionHalberd", "OblivionHeart", "OblivionWierdling", "OblivionOrb", "AmuletOfClarity",
-        "AmuletOfTeleportation", "BridgeGuardsBoots", "Spectacles", "MatildasCloak", "ThaviusStaff",
-        "BlueOrbKeyOfTheLich", "RedOrbKeyOfTheLich", "SilverKey", "GoldKey", "SapphireKey", "RubyKey",
-        "SponsorshipLetter", "MayorsScepter",
-    };
-    if ((player.classes & oc::Player) && std::ranges::find(kKept, std::string_view(item.typeName)) != std::end(kKept)) {
+    if ((player.classes & oc::Player) && questItem(world, item)) {
         if (!(player.flags & (ObjFlag::Dead | ObjFlag::Destroyed))) {
             tellString(player, "drop.c:CantDropThat");
             playSound(world, 0x39D, player, 2, player.extent);

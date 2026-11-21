@@ -1003,7 +1003,7 @@ int ScriptHost::creatureItems(std::uint32_t id, script::Vm& vm)
                 int lowest = 999999;
                 for (const std::uint32_t e : taker->inventory) {
                     ServerObject* i = world_.byExtent(e);
-                    if (!i || (i->classes & oc::Food) || (i->flags & ObjFlag::Equipped) || i->typeName == "Glyph" || questItem(*i)) {
+                    if (!i || (i->classes & oc::Food) || (i->flags & ObjFlag::Equipped) || i->typeName == "Glyph" || questItem(world_, *i)) {
                         continue;
                     }
                     if (const int cost = itemCost(world_, modifiers_, 1, nullptr, *i); cost < lowest) {

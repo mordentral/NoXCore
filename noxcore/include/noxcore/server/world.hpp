@@ -2173,6 +2173,19 @@ public:
     bool setNumber(std::string_view name, std::size_t index, float value);
     /// Whether this world reads its own copy of the numbers (setNumber was used).
     bool ownNumbers() const noexcept { return ownGameData_ != nullptr; }
+    /// noxcpp: a mode's own WORTH for a thing type in this world alone (nox.setWorth): what a shop's
+    /// prices, a repair's cost and a quest's sale read for its things in place of thing.bin's
+    /// (typeWorth); nullopt gives thing.bin's back. Nothing is sent: prices are the server's. The
+    /// install's thing.bin is never changed, and the next map's world reads it again.
+    void setWorth(std::string_view type, std::optional<std::uint32_t> worth);
+    /// The mode's worth of a type in this world (setWorth), if it set one.
+    std::optional<std::uint32_t> ownWorth(std::string_view type) const;
+    /// noxcpp: the item types a player keeps in this world alone (nox.setKeptItems): it can't drop
+    /// or sell them, and a full inventory doesn't drop them (questItem: ItemIsDroppable's list); nullopt
+    /// gives the game's own list back. The next map's world has the game's list again.
+    void setKeptItems(std::optional<std::vector<std::string>> types);
+    /// The mode's kept types in this world (null: the game's own list).
+    const std::vector<std::string>* keptItems() const noexcept { return keptItems_.get(); }
     bool solo() const noexcept { return (gameFlags & (GameFlag::Solo | GameFlag::SoloOther)) != 0; }
     bool quest() const noexcept { return (gameFlags & GameFlag::Quest) != 0; }
     bool network() const noexcept { return (gameFlags & GameFlag::Network) != 0; }
@@ -2639,6 +2652,10 @@ private:
     mutable TypeCache typeCache_;
     /// setNumber's copy of the numbers (null: gameData is the install's).
     std::unique_ptr<things::GameData> ownGameData_;
+    /// setWorth's worths by type name (null: none set, thing.bin's read).
+    std::unique_ptr<std::map<std::string, std::uint32_t, std::less<>>> ownWorths_;
+    /// setKeptItems' list (null: the game's own).
+    std::unique_ptr<std::vector<std::string>> keptItems_;
     MapGrid grid_;
     std::vector<std::uint32_t> fresh_; ///< the new list (noteNew), oldest first
     WallMap walls_;

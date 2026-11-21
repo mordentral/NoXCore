@@ -148,6 +148,9 @@ ServerObject* newThing(Fight& fight, std::string_view type)
 /// A thing type's WORTH (the object's Worth, its type's).
 std::uint32_t typeWorth(const World& world, std::string_view type)
 {
+    if (const auto own = world.ownWorth(type)) {
+        return *own; // (noxcpp: a mode's worth for this world, nox.setWorth)
+    }
     const things::ThingDef* t = world.thingDb ? world.thingDb->findThing(type) : nullptr;
     const auto w = t ? t->lastAttribute("WORTH") : std::nullopt;
     return w ? static_cast<std::uint32_t>(std::strtoul(std::string(*w).c_str(), nullptr, 10)) : 0;
@@ -455,8 +458,12 @@ ObjectKey dynamicCode(World& world, NetCode code)
 
 } // namespace
 
-bool questItem(const ServerObject& o)
+bool questItem(const World& world, const ServerObject& o)
 {
+    // (noxcpp: a mode's own list for this world, nox.setKeptItems.)
+    if (const std::vector<std::string>* own = world.keptItems()) {
+        return std::ranges::find(*own, std::string_view(o.typeName)) != own->end();
+    }
     static constexpr std::string_view kKept[] = {
         "BookOfOblivion", "OblivionHalberd", "OblivionHeart", "OblivionWierdling", "OblivionOrb", "AmuletOfClarity",
         "AmuletOfTeleportation", "BridgeGuardsBoots", "Spectacles", "MatildasCloak", "ThaviusStaff",
@@ -1000,7 +1007,7 @@ void sell(Fight& fight, ServerObject& player, TradeSession& s, ServerObject& ite
 /// glyph ("CantSellItem"), 0x39D to the player alone.
 bool refuseSale(World& world, ServerObject& player, const ServerObject& item)
 {
-    const char* id = questItem(item) ? "Trade.c:CantSellQuestItem" : item.typeName == "Glyph" ? "Trade.c:CantSellItem" : nullptr;
+    const char* id = questItem(world, item) ? "Trade.c:CantSellQuestItem" : item.typeName == "Glyph" ? "Trade.c:CantSellItem" : nullptr;
     if (!id) {
         return false;
     }

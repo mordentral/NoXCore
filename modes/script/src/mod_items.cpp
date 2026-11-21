@@ -7,6 +7,7 @@
 #include "noxcore/mapedit/content.hpp"
 #include "noxcore/server/game_host.hpp"
 #include "noxcore/server/items.hpp"
+#include "noxcore/server/npc.hpp"
 #include "noxcore/server/player.hpp"
 #include "noxcore/server/rewards.hpp"
 #include "noxcore/server/server.hpp"
@@ -348,15 +349,149 @@ int noxSetDurability(lua_State* L)
     return 1;
 }
 
+// ---- nox.setItemSpec, nox.setWorth, nox.setKeptItems, nox.setPickup
+
+int noxSetItemSpec(lua_State* L)
+{
+    // nox.setItemSpec(thing, spec): an existing item's modifiers by slot (a name; false: none; a slot
+    // the spec leaves out stays), told to the clients that know it (MSG_REPORT_MODIFIER, as the game
+    // tells a change: modifSetItemAttrs's owed report), under the rule nox.create holds a spec to. An
+    // arrow or bolt in flight takes any (its hits read them, as a shot one's are its quiver's). true,
+    // or false and why: a thing that takes none, one worn (its effects are on: take it off first), a
+    // set that doesn't fit.
+    toolbox::refuseInsideAsked(L, "nox.setItemSpec");
+    server::ServerObject& o = toolbox::objectArg(L, 1);
+    luaL_checktype(L, 2, LUA_TTABLE);
+    const bool missile = (o.classes & oc::Missile) != 0 && !o.player && !o.monster;
+    luaL_argcheck(L, missile || isItem(o), 1, "an item or a missile");
+    std::array<std::uint8_t, 4> mods = o.modifiers;
+    for (std::size_t i = 0; i < kSlots.size(); ++i) {
+        lua_rawgetfield(L, 2, kSlots[i]);
+        if (lua_isboolean(L, -1) && !lua_toboolean(L, -1)) {
+            mods[i] = 0xFF;
+        } else if (!lua_isnil(L, -1)) {
+            mods[i] = modifierIdArg(L, lua_gettop(L), static_cast<int>(i), kSlots[i]);
+        }
+        lua_pop(L, 1);
+    }
+    const char* why = nullptr;
+    std::string fit;
+    if (!missile && !(o.classes & 0x13001000u)) { // (a weapon, armour, wand or flag: modifSetItemAttrs's)
+        why = "it takes no modifiers";
+    } else if (o.flags & server::ObjFlag::Equipped) {
+        why = "worn";
+    } else if (!missile) {
+        const things::ModifierDb* db = toolbox::modifiersOf(L);
+        const std::array<std::uint8_t, 4> was = o.modifiers;
+        o.modifiers = mods; // (asked of the item as it would be)
+        const bool fits = db != nullptr && modifiersFit(o, *db);
+        o.modifiers = was;
+        if (!fits) {
+            fit = "those modifiers don't fit " + std::string(o.typeName.view()) + " (nox.modifierFits)";
+            why = fit.c_str();
+        }
+    }
+    if (why) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, why);
+        return 2;
+    }
+    if (mods != o.modifiers) {
+        o.modifiers = mods;
+        o.touch(); // (unitNeedSync)
+        o.modifierOwed = (o.classes & 0x20400004u) ? 0xFFFFFFFFu : (o.modifierOwed | o.knownBy);
+    }
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/// A thing type by name or number: its definition (an argument error for none).
+const things::ThingDef& thingTypeArg(lua_State* L, int idx)
+{
+    const things::ThingDb& db = toolbox::thingsOf(L);
+    const things::ThingDef* def = nullptr;
+    if (lua_type(L, idx) == LUA_TNUMBER) {
+        const double n = lua_tonumber(L, idx);
+        def = n >= 1 && n <= static_cast<double>(db.things.size()) && n == std::floor(n) ? &db.things[static_cast<std::size_t>(n) - 1] : nullptr;
+    } else {
+        def = db.findThing(luaL_checkstring(L, idx));
+    }
+    luaL_argcheck(L, def != nullptr, idx, "thing.bin has no such type");
+    return *def;
+}
+
+int noxSetWorth(lua_State* L)
+{
+    // nox.setWorth(type, worth | nil): the type's WORTH for this map's world (shop prices, repair
+    // costs, a quest's sale), in place of thing.bin's; nil gives thing.bin's back.
+    const things::ThingDef& def = thingTypeArg(L, 1);
+    std::optional<std::uint32_t> worth;
+    if (!lua_isnoneornil(L, 2)) {
+        const double n = luaL_checknumber(L, 2);
+        luaL_argcheck(L, n >= 0 && n <= 2147483647.0 && n == std::floor(n), 2, "a whole number of gold");
+        worth = static_cast<std::uint32_t>(n);
+    }
+    toolbox::worldOf(L).setWorth(def.name, worth);
+    return 0;
+}
+
+int noxSetKeptItems(lua_State* L)
+{
+    // nox.setKeptItems(types | nil): the item types a player can't drop or sell in this map's world
+    // (the game's own list: the quest items); nil gives the game's back.
+    if (lua_isnoneornil(L, 1)) {
+        toolbox::worldOf(L).setKeptItems(std::nullopt);
+        return 0;
+    }
+    luaL_checktype(L, 1, LUA_TTABLE);
+    std::vector<std::string> types;
+    const int n = lua_objlen(L, 1);
+    for (int i = 1; i <= n; ++i) {
+        lua_rawgeti(L, 1, i);
+        types.push_back(thingTypeArg(L, lua_gettop(L)).name);
+        lua_pop(L, 1);
+    }
+    toolbox::worldOf(L).setKeptItems(std::move(types));
+    return 0;
+}
+
+int noxSetPickup(lua_State* L)
+{
+    // nox.setPickup(thing, name | nil): its PICKUP function by name: "DefaultPickup", "WeaponPickup" or
+    // "ArmorPickup" (the game's, which need no data of their own), nil its type's (thing.bin's).
+    server::ServerObject& o = toolbox::objectArg(L, 1);
+    if (lua_isnoneornil(L, 2)) {
+        const things::ThingDef* def = toolbox::thingsOf(L).findThing(o.typeName);
+        const auto line = def ? def->lastAttribute("PICKUP") : std::nullopt;
+        o.pickup = server::Name(line ? *line : std::string_view{});
+        return 0;
+    }
+    const std::string_view name = luaL_checkstring(L, 2);
+    luaL_argcheck(L, name == "DefaultPickup" || name == "WeaponPickup" || name == "ArmorPickup", 2,
+                  "DefaultPickup, WeaponPickup or ArmorPickup");
+    o.pickup = server::Name(name == "DefaultPickup" ? std::string_view{} : name);
+    return 0;
+}
+
 // ---- nox.equip, nox.unequip
+
+/// A player's unit or a creature (the engine equips both: Obj_PlayerEquipWeapon's NPC part).
+server::ServerObject& wearerArg(lua_State* L, int idx)
+{
+    server::ServerObject& u = toolbox::objectArg(L, idx);
+    if (u.monster && !u.player) {
+        return u;
+    }
+    return toolbox::playerUnitArg(L, idx);
+}
 
 int noxEquip(lua_State* L)
 {
     // nox.equip(unit, item): put on (the engine's own: Obj_PlayerEquipWeapon, a staff too, or
-    // ...Armor), told to everyone. true, or false and why (the engine's refusal: its class, its
-    // strength, already worn, not its own).
+    // ...Armor; a creature's NPCEquipWeapon / NPCEquipArmor), told to everyone. true, or false and
+    // why (the engine's refusal: its class, its strength, already worn, not its own).
     toolbox::refuseInsideAsked(L, "nox.equip");
-    server::ServerObject& u = toolbox::playerUnitArg(L, 1);
+    server::ServerObject& u = wearerArg(L, 1);
     server::ServerObject& item = toolbox::objectArg(L, 2);
     const char* why = nullptr;
     if (item.holder != u.extent) {
@@ -365,6 +500,15 @@ int noxEquip(lua_State* L)
         why = "worn already";
     } else if (!(item.classes & (oc::Weapon | oc::Wand | oc::Armor))) {
         why = "not a weapon or armour";
+    }
+    if (!why && u.monster) {
+        server::World& world = toolbox::worldOf(L);
+        const things::ModifierDb* mods = toolbox::modifiersOf(L);
+        if ((item.classes & oc::Armor) ? server::npcEquipArmor(world, mods, u, item) : server::npcEquipWeapon(world, mods, u, item)) {
+            lua_pushboolean(L, 1);
+            return 1;
+        }
+        why = "refused";
     }
     if (!why) {
         server::Items items = toolbox::hostOf(L)->server().items();
@@ -382,12 +526,19 @@ int noxEquip(lua_State* L)
 
 int noxUnequip(lua_State* L)
 {
-    // nox.unequip(unit, item): taken off (the engine's), told to everyone; whether it was worn.
+    // nox.unequip(unit, item): taken off (the engine's; a creature's equipWeaponNPC / its armour's),
+    // told to everyone; whether it was worn.
     toolbox::refuseInsideAsked(L, "nox.unequip");
-    server::ServerObject& u = toolbox::playerUnitArg(L, 1);
+    server::ServerObject& u = wearerArg(L, 1);
     server::ServerObject& item = toolbox::objectArg(L, 2);
     if (item.holder != u.extent || !(item.flags & server::ObjFlag::Equipped)) {
         lua_pushboolean(L, 0);
+        return 1;
+    }
+    if (u.monster) {
+        server::World& world = toolbox::worldOf(L);
+        const things::ModifierDb* mods = toolbox::modifiersOf(L);
+        lua_pushboolean(L, (item.classes & oc::Armor) ? server::npcDequipArmor(world, mods, u, item) : server::npcDequipWeapon(world, mods, u, item));
         return 1;
     }
     toolbox::hostOf(L)->server().items().takeOff(u, item, true, true);
@@ -538,6 +689,7 @@ void addItemsToolbox(lua_State* L)
         {"item", noxItem},           {"modifier", noxModifier},     {"modifiers", noxModifiers},  {"itemStats", noxItemStats},
         {"modifierFits", noxModifierFits}, {"equip", noxEquip},     {"unequip", noxUnequip}, {"secondaryWeapon", noxSecondaryWeapon},
         {"repairCost", noxRepairCost}, {"repair", noxRepair},       {"setDurability", noxSetDurability},
+        {"setItemSpec", noxSetItemSpec}, {"setWorth", noxSetWorth}, {"setKeptItems", noxSetKeptItems}, {"setPickup", noxSetPickup},
         {"setLevel", noxSetLevel},   {"setExperience", noxSetExperience}, {"giveExperience", noxGiveExperience},
     };
     for (const auto& [name, fn] : kFns) {

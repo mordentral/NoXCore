@@ -50,8 +50,9 @@ void repairItem(World& world, ServerObject& item, const ServerObject* holder);
 /// `item`'s durability set to `health` (its caller keeps it within 1 and its most), told to
 /// `holder`'s client as a repair tells it (null: no one).
 void setItemHealth(World& world, ServerObject& item, std::uint16_t health, const ServerObject* holder);
-/// ItemIsDroppable (nonzero: kept): a quest item of the table.
-bool questItem(const ServerObject& o);
+/// ItemIsDroppable (nonzero: kept): a quest item of the table, or of a mode's own list for the world
+/// (World::setKeptItems).
+bool questItem(const World& world, const ServerObject& o);
 
 /// The session `id` (PlayerControl::trade), or null.
 TradeSession* tradeSession(World& world, std::uint32_t id);
