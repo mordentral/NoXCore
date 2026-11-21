@@ -222,6 +222,7 @@ void writeFileReplacing(const std::filesystem::path& path, std::span<const std::
     {
         std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
         out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        out.close();
         if (!out) {
             throw FormatError(std::string(who) + ": can't write " + pathUtf8(tmp));
         }
@@ -229,15 +230,65 @@ void writeFileReplacing(const std::filesystem::path& path, std::span<const std::
     std::filesystem::rename(tmp, path);
 }
 
-std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
-                                     std::string_view who)
+std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& filesToSave,
+                                     std::string_view who, std::optional<std::string_view> sidecar)
 {
-    const std::filesystem::path dir = mapsDir / std::string(name);
-    std::filesystem::create_directories(dir);
-    const std::filesystem::path mapPath = dir / (std::string(name) + ".map");
-    writeFileReplacing(mapPath, files.map, who);
-    writeFileReplacing(dir / (std::string(name) + ".nxz"), files.nxz, who);
-    return mapPath;
+    namespace fs = std::filesystem;
+    const fs::path dir = mapsDir / std::string(name);
+    fs::create_directories(dir);
+    const auto target = [&](const char* ext) { return dir / (std::string(name) + ext); };
+    struct File {
+        fs::path path;
+        std::span<const std::uint8_t> data;
+        bool hadOriginal = false;
+    };
+    std::vector<File> files{{target(".map"), filesToSave.map}, {target(".nxz"), filesToSave.nxz}};
+    if (sidecar) {
+        files.push_back({target(".nxe"), {reinterpret_cast<const std::uint8_t*>(sidecar->data()), sidecar->size()}});
+    }
+
+    // Exclusive across processes. A retained directory also protects backups after
+    // an interrupted save or unsuccessful rollback.
+    const fs::path stage = dir / ".nox-save";
+    if (!fs::create_directory(stage)) {
+        throw FormatError(std::string(who) + ": unfinished or concurrent save in " + pathUtf8(stage));
+    }
+    std::size_t published = 0;
+    try {
+        fs::create_directory(stage / "previous");
+        for (auto& f : files) {
+            const auto type = fs::symlink_status(f.path).type();
+            if (type != fs::file_type::not_found) {
+                if (type != fs::file_type::regular) {
+                    throw FormatError(std::string(who) + ": not a regular file: " + pathUtf8(f.path));
+                }
+                const auto backup = stage / "previous" / f.path.filename();
+                std::error_code ec;
+                fs::create_hard_link(f.path, backup, ec);
+                if (ec) fs::copy_file(f.path, backup);
+                f.hadOriginal = true;
+            }
+            writeFileBytes(stage / f.path.filename(), f.data);
+        }
+        for (const auto& f : files) {
+            fs::rename(stage / f.path.filename(), f.path);
+            ++published;
+        }
+    } catch (...) {
+        std::error_code rollbackError;
+        while (published > 0) {
+            const auto& f = files[--published];
+            std::error_code ec;
+            if (f.hadOriginal) fs::rename(stage / "previous" / f.path.filename(), f.path, ec);
+            else fs::remove(f.path, ec);
+            if (ec) rollbackError = ec;
+        }
+        if (rollbackError) throw fs::filesystem_error("cannot restore map; backups retained", stage, rollbackError);
+        fs::remove_all(stage);
+        throw;
+    }
+    fs::remove_all(stage);
+    return files.front().path;
 }
 
 } // namespace nox::map

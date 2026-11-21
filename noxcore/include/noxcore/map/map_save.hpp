@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -43,9 +44,9 @@ EncodedMapFiles encodeMapBytes(std::vector<std::uint8_t> plain);
 /// never leaves half a file. Throws FormatError ("<who>: can't write <path>.tmp") when the write
 /// fails.
 void writeFileReplacing(const std::filesystem::path& path, std::span<const std::uint8_t> bytes, std::string_view who);
-/// Writes the pair as <mapsDir>\<name>\<name>.map and .nxz (each writeFileReplacing), creating
-/// the folder. Returns the .map's path.
+/// Stages the .map, .nxz and optional editor sidecar together. If replacement fails,
+/// restores the previous files. Other files in the map folder are preserved.
 std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
-                                     std::string_view who);
+                                     std::string_view who, std::optional<std::string_view> sidecar = std::nullopt);
 
 } // namespace nox::map
