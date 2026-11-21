@@ -244,12 +244,14 @@ void Menus::modeList(ModeListFor list)
             default:
                 // (Its row's settings: the difficulty...; its Campaign choice as the mod it names,
                 // the option "campaign" a mode's id, none for the mode's own, with that mod's own
-                // settings: mode_list.hpp.)
+                // settings: mode_list.hpp. A campaign's own row: its mode's, with it chosen.)
                 pendingModeOptions_ = hostedModeOptions(r, modeSettings_[r.id]);
-                if (hosting && r.soloScreens) {
-                    onSoloScreensMode(r.id); // (its own start: the class and character screens)
+                if (r.soloScreens && (hosting || !r.campaignOf.empty())) {
+                    // (its own start: the class and character screens; from Game Modes, a
+                    // campaign's row hosts on this computer, unlisted, as its other modes)
+                    onSoloScreensMode(hostedModeId(r), !hosting);
                 } else {
-                    chooseCharacter(modeHostKey(r.id, !hosting));
+                    chooseCharacter(modeHostKey(hostedModeId(r), !hosting));
                 }
                 break;
             }
@@ -369,10 +371,14 @@ void Menus::modeList(ModeListFor list)
                                kWidth - 24, false),
                            x, sy, false, kDim);
                 } else {
+                    // (A campaign's own row: as its mode's row heads it with the campaign chosen.)
+                    const bool ownRow = !row->campaignOf.empty();
                     p.text(fit(p,
-                               modCampaign ? nox::l10n::format(NOX_TR("menus.modes.campaign_settings_heading", "{name} settings: {campaign}"),
-                                                               {{"name", row->name}, {"campaign", row->campaignTitles[campaign]}})
-                                           : nox::l10n::format(NOX_TR("menus.modes.settings_heading", "{name} settings"), {{"name", row->name}}),
+                               modCampaign || ownRow
+                                   ? nox::l10n::format(NOX_TR("menus.modes.campaign_settings_heading", "{name} settings: {campaign}"),
+                                                       {{"name", ownRow ? row->hostName : row->name},
+                                                        {"campaign", ownRow ? row->name : row->campaignTitles[campaign]}})
+                                   : nox::l10n::format(NOX_TR("menus.modes.settings_heading", "{name} settings"), {{"name", row->name}}),
                                kWidth - 24, false),
                            x, sy, false, kGold);
                     if (shown > static_cast<std::size_t>(kVisibleOptions)) {
@@ -412,13 +418,17 @@ void Menus::modeList(ModeListFor list)
                 const std::string name =
                     r.builtIn() ? nox::l10n::format(NOX_TR("menus.modes.built_in_name", "{name} (built in)"), {{"name", r.name}}) : r.name;
                 p.text(fit(p, name, kColumns[0].w - 4, false), dx + kColumns[0].x, ty, false, c);
-                // (A mod's campaign chosen on it: its title there, the game's own's words otherwise.)
+                // (A mod's campaign chosen on it: its title there, the game's own's words otherwise.
+                // A campaign's own row: marked with the mode it's played as, then its description.)
                 const std::size_t campaign = broken ? 0 : chosenCampaignIndex(r, settingsOf(r));
                 p.text(fit(p,
                            broken ? nox::l10n::format(NOX_TR("menus.modes.didnt_load_row", "Didn't load: {why}"), {{"why", r.description}})
                            : campaign > 0 && campaign < r.campaignTitles.size()
                                ? nox::l10n::format(NOX_TR("menus.modes.campaign_row", "{campaign}, with friends."),
                                                    {{"campaign", r.campaignTitles[campaign]}})
+                           : !r.campaignOf.empty()
+                               ? nox::l10n::format(NOX_TR("menus.modes.campaign_mark_row", "{mode}: {description}"),
+                                                   {{"mode", r.hostName}, {"description", r.description}})
                                : r.description,
                            kColumns[1].w - 4, false),
                        dx + kColumns[1].x, ty, false, about);

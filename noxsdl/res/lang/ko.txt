@@ -8358,6 +8358,8 @@ menus.host_listing.why_not_logged_in = XWIS에 로그인하지 않았고(Online 
 menus.main.game_modes = 게임 모드
 #@ 421f4a16 mt: {name} (built in)
 menus.modes.built_in_name = {name}(기본 제공)
+#@ 66743dea mt: {mode}: {description}
+menus.modes.campaign_mark_row = {mode}: {description}
 #@ 96bbf648 mt: The game's own
 menus.modes.campaign_own = 게임 기본 캠페인
 #@ bd7d04e8 mt: {campaign}, with friends.

@@ -536,14 +536,24 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         // LAN, XWIS when logged in, the router's port), then joined. (Online as join's:
         // Westwood Online's game list, not Network's LAN play. The game stays a solo one,
         // not a WOL game's rules, wherever it's listed.)
+        // (Game Modes' campaign row: the same game, local and unlisted as Game Modes' other modes
+        // are: no router port, no XWIS post, its end back to the main menu.)
+        const bool local = app->menus && app->menus->soloScreensLocal();
+        const auto backToMenus = [app, local] {
+            if (local) {
+                app->menus->showMainMenu();
+            } else {
+                app->menus->showGameBrowser();
+            }
+        };
         const ModeUiEntry* entry = modeUiEntry(modeId);
         if (!entry || !entry->soloScreens) {
             SDL_Log("no game mode %s", modeId.c_str());
-            app->menus->showGameBrowser();
+            backToMenus();
             return;
         }
         const SoloScreensStart& how = *entry->soloScreens;
-        app->online = xwis && !(app->menus && app->menus->lanOnly());
+        app->online = !local && xwis && !(app->menus && app->menus->lanOnly());
         app->profile = start.profile;
         app->characterFile = start.characterFile;
         app->heldFileInfo = start.info;
@@ -573,9 +583,10 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         if (app->menuHostPort != 0) {
             settings.port = app->menuHostPort; // (--menu-host-port: tests, recordings)
         }
+        const bool listed = !local && !app->hostLoopback;
         try {
             app->host = makeHost(*app, settings);
-            startPortMapping(*app, !app->hostLoopback);
+            startPortMapping(*app, listed);
             app->xwisHost.reset();
             if (app->online && app->menus && app->menus->hostLogin()) {
                 startXwisPost(*app, *app->menus->hostLogin());
@@ -583,7 +594,7 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         } catch (const std::exception& ex) {
             SDL_Log("%s: %s", how.logTag.c_str(), ex.what());
             endSoloScreensHost(*app);
-            app->menus->showGameBrowser();
+            backToMenus();
             if (const auto* refused = dynamic_cast<const nox::server::MapRefused*>(&ex)) {
                 app->menus->memoryTricksNotice(refused->map);
             }
@@ -596,7 +607,10 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
                                                                             : modeId;
         SDL_Log("%s: hosting %s at %s%s", how.logTag.c_str(), what.c_str(),
                 settings.map.c_str(), start.continueSlot.empty() ? "" : (", continuing " + start.continueSlot).c_str());
-        SDL_Log("%s", hostListingLog(menusHostListing(*app, !app->hostLoopback), how.logTag, app->host->port()).c_str());
+        SDL_Log("%s", hostListingLog(menusHostListing(*app, listed), how.logTag, app->host->port()).c_str());
+        if (local) {
+            app->soloFromMenus = true; // (its end back to the main menu, as Game Modes' other modes')
+        }
         startLive(*app, app->host->address());
         notePortMoved(*app);
     };

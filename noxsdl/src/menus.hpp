@@ -120,6 +120,9 @@ public:
     static std::optional<ModeHost> modeOfHostKey(std::string_view host);
     /// The settings Host Custom's list had for the mode it's hosting.
     const nox::modes::OptionValues& pendingModeOptions() const { return pendingModeOptions_; }
+    /// The solo screens' mode is Game Modes' (a campaign's own row there): hosted here, local and
+    /// unlisted, its end back to the main menu; else Host Custom's, listed for others.
+    bool soloScreensLocal() const { return soloScreensLocal_; }
     /// A solo game to start.
     struct SoloStart {
         nox::client::PlayerProfile profile;
@@ -357,8 +360,8 @@ private:
     void onSolo();
     void onSoloQuest();
     /// noxcpp's Host Custom > a mode started through the solo screens (a campaign mode): the solo
-    /// screens on the mode's own saves.
-    void onSoloScreensMode(const std::string& modeId);
+    /// screens on the mode's own saves. `local`: Game Modes' (soloScreensLocal).
+    void onSoloScreensMode(const std::string& modeId, bool local = false);
     /// The saves the solo screens list and write: the mode's while soloScreensMode_ (a mod's campaign's
     /// own under it), else the solo game's.
     std::filesystem::path soloRoot() const;
@@ -446,6 +449,7 @@ private:
     std::filesystem::path characterFile_;
     bool solo_ = false;         ///< game flag 0x800 (the main menu's Solo; Multiplay clears it)
     std::string soloScreensMode_; ///< (noxcpp) the solo screens are Host Custom's for this mode (a campaign mode's)
+    bool soloScreensLocal_ = false; ///< (noxcpp) ...or Game Modes' (a campaign's own row there): local
     bool viaSelChar_ = false;   ///< the class screen reached from the character screen
     bool questGame_ = false;    ///< isQuest: the game joined is a quest
     std::vector<nox::client::solo_saves::Slot> soloSlots_; ///< the solo list's 14 (savegame_sub)

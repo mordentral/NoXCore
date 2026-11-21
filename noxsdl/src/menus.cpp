@@ -828,12 +828,14 @@ void Menus::onSolo()
     leave([this, next] { enter(next); });
 }
 
-void Menus::onSoloScreensMode(const std::string& modeId)
+void Menus::onSoloScreensMode(const std::string& modeId, bool local)
 {
     // noxcpp's Host Custom > a campaign mode (a mode started through the solo screens): the solo
     // game's screens on the mode's own saves (its Save\ folder: modeSaveRoot), the class screen choosing
     // the campaign's chain and the character screen its saved campaign; the game hosted for others
-    // to join (callbacks_.soloScreensMode).
+    // to join (callbacks_.soloScreensMode). Game Modes' (a campaign's own row): the same, the game
+    // local and unlisted.
+    soloScreensLocal_ = local;
     if (!nox::client::solo_menu::hasSoloMaps(gameDir_)) {
         dialog(gui_.text("mainmenu.c:solo"), gui_.text("mainmenu.c:caution"), 0x21, {});
         if (dialog_) {

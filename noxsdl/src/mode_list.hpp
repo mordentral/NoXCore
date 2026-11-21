@@ -1,7 +1,8 @@
 // The mode lists' rows (menus_modes.cpp): Host Custom's, the modes hosted for others, and the main
 // menu's Game Modes, the same list played on this computer. Both are laid out as the game list:
 // first what's built into the program (its modes, then Quest and the Map Editor), then the mods
-// folder's modes, then each mods folder that didn't load, greyed with why. No SDL here (so it's testable alone).
+// folder's modes (a mod's campaign among them, a row of its own), then each mods folder that didn't
+// load, greyed with why. No SDL here (so it's testable alone).
 #pragma once
 
 #include "noxcore/modes/mode.hpp"
@@ -50,6 +51,11 @@ struct ModeListRow {
     /// shown after the row's own while it's chosen, each key "<mod id>.<its key>" (a mode's own
     /// keys are a-z, 0-9 and _: never one of these); the mode's own: none.
     std::vector<std::vector<nox::modes::OptionSpec>> campaignOptions;
+    /// A mod's campaign's own row (ModeInfo::campaign; `id` the mod's, `name` its title): the mode
+    /// that runs it (its Campaign choice's), started as that mode's row is with this campaign chosen;
+    /// `hostName` that mode's name, as its row shows it. Empty on every other row.
+    std::string campaignOf;
+    std::string hostName;
     /// Built into the program (the lists put these first and mark them): Quest, the Map Editor and
     /// the modes registerBuiltinModes adds.
     bool builtIn() const { return !fromMods; }
@@ -59,13 +65,16 @@ struct ModeListRow {
 /// player's own game alone doesn't host) by their order, Quest and the Map Editor; then the mods
 /// folder's modes the same way; then each folder `report` says didn't load. `soloScreens` says
 /// whether a mode starts through the solo screens (mode_ui.hpp; none: never). A mod's campaign
-/// (ModeInfo::campaign) is no row of its own: each mode that runs campaigns lists them in its
-/// Campaign choice, its first setting (with none installed, no such choice).
+/// (ModeInfo::campaign) is listed twice: in the Campaign choice of each mode that runs campaigns
+/// (its first setting; with none installed, no such choice), and as a row of its own among the
+/// mods' (both lists, even Game Modes, which leaves that mode out: `campaignOf` the first mode that
+/// runs campaigns; none: no row). Its row's settings are that mode's row's own, less the Campaign
+/// choice, then the mod's (keys "<mod id>.<key>", as in the choice).
 std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Registry& registry, const nox::modes::ModsReport& report,
                                       const std::function<bool(std::string_view)>& soloScreens = {});
 
 /// The campaign `set` (a row's settings) chooses on `row` (its Campaign choice): its mode id; empty
-/// for the row's own campaign, or a row without the choice.
+/// for the row's own campaign, or a row without the choice. A campaign's own row: its id.
 std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set);
 /// Its value (0: the row's own campaign, or a row without the choice).
 std::size_t chosenCampaignIndex(const ModeListRow& row, const nox::modes::OptionValues& set);
@@ -78,8 +87,11 @@ const nox::modes::OptionSpec* shownOption(const ModeListRow& row, const nox::mod
 /// What `row` is hosted with from its settings `set`: the chosen campaign's mode id as the option
 /// "campaign" (none for the row's own), its own settings kept, any other campaign's left out. A row
 /// without the Campaign choice: `set` without "campaign" (one left from a choice it had), unless
-/// "campaign" is a setting of the mode's own: then kept, as any of its settings.
+/// "campaign" is a setting of the mode's own: then kept, as any of its settings. A campaign's own
+/// row: what its mode's row hosts with it chosen (its id as "campaign", its settings and its mode's).
 nox::modes::OptionValues hostedModeOptions(const ModeListRow& row, nox::modes::OptionValues set);
+/// The mode `row` is started as: `campaignOf` for a campaign's own row, else its id.
+const std::string& hostedModeId(const ModeListRow& row);
 
 /// The key a row is chosen again by, next time the list opens: a mode's id, "@quest", "@editor";
 /// empty for a broken folder (never kept).

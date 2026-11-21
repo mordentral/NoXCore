@@ -8450,6 +8450,8 @@ menus.host_listing.why_not_logged_in = вы не вошли в XWIS (Online > Ne
 menus.main.game_modes = Игровые режимы
 #@ 421f4a16 mt: {name} (built in)
 menus.modes.built_in_name = {name} (встроенный)
+#@ 66743dea mt: {mode}: {description}
+menus.modes.campaign_mark_row = {mode}: {description}
 #@ 96bbf648 mt: The game's own
 menus.modes.campaign_own = Кампания игры
 #@ bd7d04e8 mt: {campaign}, with friends.

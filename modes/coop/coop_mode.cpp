@@ -37,7 +37,8 @@ void registerMode_coop(Registry& registry)
          .defaultValue = 1, .legacyFlag = {}},
     };
     // A mod's campaign (mode.json's "campaign") beside the game's own: Host Custom's row offers each
-    // as its Campaign choice, hosted with the option "campaign" naming the mod.
+    // as its Campaign choice, hosted with the option "campaign" naming the mod (each also a row of
+    // its own in the mode lists, hosted the same way).
     m.info.runsCampaigns = true;
     m.makeServer = [](const ServerContext& ctx) -> std::unique_ptr<ServerMode> {
         coop::CoopDirector::Options o;

@@ -48,10 +48,8 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     std::vector<ModeListRow> rows;
     std::vector<ModeListRow> mods;
     const std::vector<const nox::modes::Mode*> all = registry.all();
-    for (const nox::modes::Mode* m : all) {
-        if (!m->makeServer || (list == ModeListFor::GameModes && m->info.playerHost) || m->info.campaign) {
-            continue; // (a campaign: its mode's Campaign choice lists it, below)
-        }
+    // A mode's row as it's shown, before any Campaign choice.
+    const auto rowOf = [](const nox::modes::Mode* m) {
         ModeListRow r;
         r.fromMods = m->info.fromMods;
         r.id = m->info.id;
@@ -78,6 +76,50 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
                 }
             }
         }
+        return r;
+    };
+    // A mod's campaign's own settings, under its id (a mode's own keys are never dotted).
+    const auto campaignSettings = [](const nox::modes::Mode* c) {
+        std::vector<nox::modes::OptionSpec> own;
+        for (const nox::modes::OptionSpec& s : c->info.options) {
+            if (s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text) {
+                own.push_back(s);
+                own.back().key = c->info.id + "." + s.key;
+            }
+        }
+        return own;
+    };
+    // The mode a campaign's own row is started as: the first that runs campaigns (the co-op
+    // campaign), in either list (Game Modes leaves its row out, not its campaigns'). None: no rows.
+    const auto host = std::ranges::find_if(all, [](const nox::modes::Mode* m) { return m->info.runsCampaigns && m->makeServer; });
+    for (const nox::modes::Mode* m : all) {
+        if (m->info.campaign) {
+            if (!m->makeServer || host == all.end()) {
+                continue;
+            }
+            // Its own row: the title, the mod's description, its mode's settings (not the Campaign
+            // choice) then its own; started as its mode's row with it chosen.
+            const nox::modes::Mode* h = *host;
+            const ModeListRow hostRow = rowOf(h);
+            ModeListRow r = rowOf(m);
+            r.name = m->info.campaign->title;
+            r.campaignOf = h->info.id;
+            r.hostName = hostRow.name;
+            const int fewest = std::max(h->info.minPlayers, m->info.minPlayers);
+            const int most = std::max(fewest, std::min(h->info.maxPlayers, m->info.maxPlayers));
+            r.players = fewest == most ? std::to_string(most) : std::to_string(fewest) + "-" + std::to_string(most);
+            r.stock = h->info.stockClients && m->info.stockClients ? NOX_TR("menus.modes.yes", "Yes") : NOX_TR("menus.modes.no", "No");
+            r.levels = hostRow.levels;
+            r.options = hostRow.options;
+            std::ranges::move(campaignSettings(m), std::back_inserter(r.options));
+            r.soloScreens = soloScreens && soloScreens(h->info.id);
+            (r.fromMods ? mods : rows).push_back(std::move(r));
+            continue;
+        }
+        if (!m->makeServer || (list == ModeListFor::GameModes && m->info.playerHost)) {
+            continue;
+        }
+        ModeListRow r = rowOf(m);
         // A mode that runs campaigns: the mods' campaigns beside its own, its first setting (none
         // installed: no choice, the row as it always was).
         if (m->info.runsCampaigns) {
@@ -99,15 +141,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
                     r.campaignStock.push_back(m->info.stockClients && c->info.stockClients ? NOX_TR("menus.modes.yes", "Yes")
                                                                                             : NOX_TR("menus.modes.no", "No"));
                     choice.choices.push_back(c->info.campaign->title);
-                    // (Its own settings, as its own row would show them: its keys under its id.)
-                    std::vector<nox::modes::OptionSpec> own;
-                    for (const nox::modes::OptionSpec& s : c->info.options) {
-                        if (s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text) {
-                            own.push_back(s);
-                            own.back().key = c->info.id + "." + s.key;
-                        }
-                    }
-                    r.campaignOptions.push_back(std::move(own));
+                    r.campaignOptions.push_back(campaignSettings(c)); // (as its own row shows them)
                 }
             }
             if (!r.campaigns.empty()) {
@@ -162,6 +196,9 @@ std::size_t chosenCampaignIndex(const ModeListRow& row, const nox::modes::Option
 
 std::string chosenCampaign(const ModeListRow& row, const nox::modes::OptionValues& set)
 {
+    if (!row.campaignOf.empty()) {
+        return row.id; // (a campaign's own row)
+    }
     const std::size_t i = chosenCampaignIndex(row, set);
     return i < row.campaigns.size() ? row.campaigns[i] : std::string();
 }
@@ -202,13 +239,18 @@ nox::modes::OptionValues hostedModeOptions(const ModeListRow& row, nox::modes::O
         return dot != std::string::npos && (campaign.empty() || std::string_view(kv.first).substr(0, dot) != campaign);
     });
     if (!campaign.empty()) {
-        set["campaign"] = campaign;
+        set["campaign"] = campaign; // (the choice's, or a campaign's own row's)
     } else if (!row.campaigns.empty() || std::ranges::none_of(row.options, [](const nox::modes::OptionSpec& s) { return s.key == "campaign"; })) {
         // (The Campaign choice's own campaign, or one left from a choice the row no longer has:
         // none. A mode's own setting of that name, on a row without the choice, is its own.)
         set.erase("campaign");
     }
     return set;
+}
+
+const std::string& hostedModeId(const ModeListRow& row)
+{
+    return row.campaignOf.empty() ? row.id : row.campaignOf;
 }
 
 std::string modeListKey(const ModeListRow& row)
