@@ -7,7 +7,9 @@
 #include <array>
 #include <cctype>
 #include <cerrno>
+#include <cstdio>
 #include <fstream>
+#include <memory>
 #include <system_error>
 
 namespace nox {
@@ -56,25 +58,30 @@ std::string pathUtf8(const std::filesystem::path& path)
 
 std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path)
 {
-    std::ifstream in(path, std::ios::binary);
-#ifndef _WIN32
-    if (!in) {
+#ifdef _WIN32
+    std::FILE* file = nullptr;
+    _wfopen_s(&file, path.c_str(), L"rb");
+#else
+    std::FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) {
         if (const auto found = resolveNoCase(path); found != path) {
-            in.open(found, std::ios::binary);
+            file = std::fopen(found.c_str(), "rb");
         }
     }
 #endif
-    if (!in) {
+    if (!file) {
         throw std::system_error(errno, std::generic_category(), "cannot open " + pathUtf8(path));
     }
+    const std::unique_ptr<std::FILE, decltype(&std::fclose)> input(file, std::fclose);
     std::vector<std::uint8_t> out;
-    std::array<char, 64 * 1024> block;
-    while (in) {
-        in.read(block.data(), block.size());
-        out.insert(out.end(), block.data(), block.data() + in.gcount());
-    }
-    if (!in.eof() || in.bad()) {
-        throw std::system_error(errno, std::generic_category(), "cannot read " + pathUtf8(path));
+    std::array<std::uint8_t, 64 * 1024> block;
+    for (;;) {
+        const auto size = std::fread(block.data(), 1, block.size(), input.get());
+        if (std::ferror(input.get())) {
+            throw std::system_error(errno, std::generic_category(), "cannot read " + pathUtf8(path));
+        }
+        out.insert(out.end(), block.data(), block.data() + size);
+        if (size < block.size()) break;
     }
     return out;
 }
