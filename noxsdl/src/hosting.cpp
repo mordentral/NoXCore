@@ -189,6 +189,10 @@ std::unique_ptr<LocalHost> makeHost(App& app, const HostSettings& settings)
     // Maths, noxcore.cfg's ExactMaths.)
     HostSettings s = settings;
     s.exactMaths = app.exactMaths;
+    if (!app.privateTestRun && !s.solo && !s.quest && !s.editSession && s.modeId.empty() && s.mapsDir.empty() &&
+        nox::isPlainFileName(s.map) && fs::path(s.map).extension().empty()) {
+        s.authoredMapsDir = app.editorMapsDir;
+    }
     useInstallData(app); // (a game is made from the install's tables: a mod's game copies them, its own read in their place)
     return std::make_unique<LocalHost>(app.things, &app.modifiers, app.gameData,
                                        app.strings.get(), app.gameDir, s);

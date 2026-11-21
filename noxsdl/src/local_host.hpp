@@ -160,6 +160,8 @@ struct HostSettings {
     /// quest's, an exit's, the map list's); empty: the game's maps folder. (The map editor's
     /// play-test: its own folder.)
     std::filesystem::path mapsDir;
+    /// Optional additional maps for a normal multiplayer host, from the local editor.
+    std::filesystem::path authoredMapsDir;
     /// A quest's maps, these alone (GameHost::Options::questMapsOnly: the map editor's quest
     /// play-test, its map); empty: the maps folder's quest maps.
     std::vector<std::string> questMapsOnly;
