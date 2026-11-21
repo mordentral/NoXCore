@@ -2285,9 +2285,7 @@ bool View3D::drawDepth(const Frame& f)
         if (b.count == 0 || (!b.texture && b.kind == DepthPass::Kind::Scene)) {
             continue;
         }
-        if (b.sprite) {
-            b.sprite->ready(); // (an atlas page's new images uploaded before our pass)
-        }
+        if (b.sprite && !b.sprite->ready()) continue;
         gpuDraws_.push_back({b.texture, b.sprite, b.first, b.count, b.alpha < 255, b.linear, item.depth, b.kind});
     }
     SDL_Texture* scene = depth_->render(f.renderer, viewW_, viewH_, gpuVerts_, gpuDraws_);
@@ -2329,12 +2327,10 @@ void View3D::drawSorted(const Frame& f)
         if (b.count == 0 || b.kind != DepthPass::Kind::Scene) {
             continue; // (particles: the depth pass's only)
         }
+        if (b.sprite && !b.sprite->ready()) continue;
         if (b.texture != runTexture) {
             flushRun();
             runTexture = b.texture;
-            if (b.sprite) {
-                b.sprite->ready(); // (an atlas page's new images uploaded)
-            }
             SDL_SetTextureScaleMode(runTexture, SDL_SCALEMODE_PIXELART);
         }
         // Each triangle clipped to the near plane, then projected; a clipped one (4 corners) as a fan.

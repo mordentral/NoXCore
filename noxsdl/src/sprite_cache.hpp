@@ -84,7 +84,7 @@ struct Sprite {
     SpriteCache* owner = nullptr;
     int page = -1;
     /// On a BC7 page (GpuAtlas): its staged uploads go up before it's first drawn (ready()).
-    bool gpu = false;
+    std::size_t gpuBatch = 0;
     /// A BC7 material sprite's material bytes: on a page of their own (at `labels`, its mips'
     /// at theirs), which the material shader reads through the page's render state (2D) or
     /// texture (the 3D view). Unset, a material sprite has them beside its image.
@@ -102,7 +102,7 @@ struct Sprite {
     }
     /// Its pixels uploaded (a page's pending ones in one go); drawSprite and
     /// SpriteCache::render call it, and anything drawing `texture` itself must.
-    void ready() const;
+    bool ready() const;
 };
 
 /// Draws a sprite's texture (its whole image when `src` is null), or for an HD sprite drawn
@@ -310,12 +310,7 @@ public:
     /// A page's images made since its last upload, uploaded (Sprite::ready).
     void flushPage(int page);
     /// The BC7 pages' staged uploads sent (Sprite::ready).
-    void flushGpu()
-    {
-        if (atlas_) {
-            atlas_->flush();
-        }
-    }
+    bool gpuReady(std::size_t batch) { return atlas_ && atlas_->ready(batch); }
 
     /// Images from this pack from now on (nullptr: video.bag's again). Drops every texture made
     /// so far, so call it between frames. With the pack's `path`, its HD images are decoded on
