@@ -41,6 +41,10 @@ struct Slot {
     bool exists = false;      ///< the File Info reader read it (the exe's path copied in)
     bool infoRead = false;    ///< a File Info section read (copied into the record)
     player::FileInfo info;    ///< its File Info (zeros without one)
+    /// (noxcpp) NoX Core's label section's data (player::SectionId::NoxCoreLabels: where the
+    /// character was last played, client/character_notes.hpp reads it), read in the same walk;
+    /// empty: none, or one bigger than character_store::kMaxLabelBytes.
+    std::vector<std::uint8_t> labels;
 };
 
 /// Save\<name>\Player.plr read for its File Info.
@@ -97,8 +101,9 @@ KeptSave keepSaveData(const std::filesystem::path& saveDir, const std::filesyste
 /// data) in the table's order (g_plrClientSections: GUI, File Info, Music), then the 0 id and zeros to the
 /// block.
 std::vector<std::uint8_t> clientSectionBytes(const player::Gui& gui, const player::FileInfo& info, const player::Music& music);
-/// The same, enciphered and appended to `plr` (which ends on a block: the server's sections);
-/// false when it couldn't be written.
+/// The same, enciphered and appended to `plr` (which ends on a block: the server's sections), with
+/// the character's labels waiting for it after the music (player::character_store::appendSections:
+/// the file written whole, a scratch file put in its place); false when it couldn't be written.
 bool appendClientSections(const std::filesystem::path& plr, const player::Gui& gui, const player::FileInfo& info,
                           const player::Music& music);
 

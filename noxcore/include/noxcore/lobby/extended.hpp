@@ -182,7 +182,7 @@ struct ClientSecret {
 ///      a client of level 14 or above that named ModeUi (ui_proto.hpp's kTextsLevel); any other is
 ///      sent nothing and keeps its own nox.csf's texts
 ///  15  a script mode's line about a player's character (nox.characterNote: MSG_NOXCPP_MODEUI's
-///      kCharacterNote, kept by the client beside the character it joined with for its character
+///      kCharacterNote, kept by the client in the .plr of the character it joined with for its character
 ///      screens), sent only to a client of level 15 or above that named ModeUi (ui_proto.hpp's
 ///      kCharacterNoteLevel); any other is sent nothing (nox.characterNote says false)
 ///  16  a mod's own game data files (kGameDataLevel: MSG_NOXCPP_GAMEDATA, net/game_data_proto.hpp):

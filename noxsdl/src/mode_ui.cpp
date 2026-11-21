@@ -73,7 +73,7 @@ void bindModeClients(App& app)
 
 void unbindModeClients(App& app)
 {
-    characterNotesEnd(app); // (a mode's line held back written as the game ends)
+    characterNotesEnd(app); // (labels no write took written as the game ends)
     for (auto& [id, ui] : app.modeUis) {
         ui->bind(nullptr);
     }

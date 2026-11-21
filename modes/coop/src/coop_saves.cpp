@@ -3,6 +3,7 @@
 #include "noxcore/coop/coop.hpp"
 
 #include "noxcore/crypto/noxcrypt.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/player/player_file.hpp"
 #include "noxcore/server/items.hpp"
 #include "noxcore/server/monsters.hpp"
@@ -232,10 +233,10 @@ std::vector<std::uint8_t> CoopDirector::keepGuest(const Member& m, server::Serve
         return {}; // (the exe's save would fail too: its last kept stays)
     }
     std::vector<std::uint8_t> bytes = player::serializePlayerFile(*built);
-    crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(bytes);
+    player::character_store::encipher(bytes);
     std::error_code ec;
     fs::create_directories(dir, ec);
-    if (!writeAll(dir / (fileKey(m.key) + ".plr"), bytes)) {
+    if (!player::character_store::writeEnciphered(dir / (fileKey(m.key) + ".plr"), bytes)) {
         return {};
     }
     Record r;

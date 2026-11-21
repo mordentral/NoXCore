@@ -1,37 +1,38 @@
-// (noxcpp) Where a saved character was last played, kept by NoX Core in a small file beside it:
-// Save\<name>.plr's is Save\<name>.plr.noxcore. The .plr is the game's and is never written for
-// it, so the original game reads it exactly as before; nothing that lists *.plr sees the note
-// (its extension is ".noxcore"), and the original game's own listing never opens it.
+// (noxcpp) Where a saved character was last played, kept by NoX Core inside the character's own
+// .plr, as a section of its own (player::SectionId::NoxCoreLabels, after the game's sections). The
+// original game skips a section it doesn't know, by its size, wherever it reads a .plr, so it reads
+// the file exactly as before; when it writes the file itself it leaves the section out. The section
+// is written only by NoX Core's character writer (player/character_store.hpp), when it writes the
+// character anyway.
 //
-// The file is plain text, one "key = value" a line (UTF-8, no control characters in a value):
-//   noxcore-character-notes = 1
-//   name = Jack                       (the character's name and class as its .plr has them:
-//   class = 0                          a note left by a deleted character of the same file name
-//                                      is passed over)
-//   [place]                           (each place it was played, newest first, at most kMaxPlaces)
-//   kind = mode | coop                 (a NoX Core mode, or the co-op campaign)
-//   id = deep_delve                    (the mode's id, or the co-op campaign mod's; may be empty:
-//                                       a remote host's mode is known by its name alone; the
-//                                       game's own co-op campaign has none)
-//   title = Deep Delve                 (the mode's name, or the campaign's title; the game's own
-//                                       co-op campaign has none)
-//   last = 1763600000                  (when it was last played there: seconds since 1970, UTC)
-//   note = level 12, act 3             (optional: the mode's own line, nox.characterNote)
-// Keys it doesn't know are passed over. Read once when the character list is made, never while
-// the game draws.
+// The section's data (little-endian, every length counted, nothing past the places read):
+//   u16 version = 1
+//   u8  places                 (at most kMaxPlaces, newest first)
+//   each place:
+//     u8  kind                 0 a NoX Core mode, 1 the co-op campaign
+//     u8  id length, id        (the mode's id, or the co-op campaign mod's; may be empty: a remote
+//                               host's mode is known by its name alone; the game's own campaign has
+//                               none; at most kMaxIdBytes)
+//     u8  title length, title  (the mode's name, or the campaign's title; the game's own co-op
+//                               campaign has none; at most kMaxTitleBytes)
+//     i64 last                 (when it was last played there: seconds since 1970, UTC)
+//     u8  note length, note    (optional: the mode's own line, nox.characterNote; at most
+//                               kMaxNoteBytes)
+// The text is UTF-8, cleaned as it's read and written (cleanText). Read once when the character list
+// is made, never while the game draws.
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace nox::client::character_notes {
 
-/// The places a note keeps (the oldest let go past them).
+/// The places a character's labels keep (the oldest let go past them).
 inline constexpr std::size_t kMaxPlaces = 8;
 /// A title's bytes at most (UTF-8, cut at a whole character).
 inline constexpr std::size_t kMaxTitleBytes = 64;
@@ -39,8 +40,8 @@ inline constexpr std::size_t kMaxTitleBytes = 64;
 inline constexpr std::size_t kMaxNoteBytes = 80;
 /// An id's bytes at most.
 inline constexpr std::size_t kMaxIdBytes = 32;
-/// The most of a file that's read (a bigger one is passed over).
-inline constexpr std::uintmax_t kMaxFileBytes = 8 * 1024;
+/// The section's version.
+inline constexpr std::uint16_t kVersion = 1;
 
 /// Where a character was played.
 struct Place {
@@ -53,10 +54,8 @@ struct Place {
     bool operator==(const Place&) const = default;
 };
 
-/// A character's note.
+/// A character's labels.
 struct Notes {
-    std::string name;       ///< (UTF-8)
-    int characterClass = 0; ///< 0 warrior, 1 wizard, 2 conjurer
     std::vector<Place> places; ///< newest first
     bool operator==(const Notes&) const = default;
 };
@@ -69,42 +68,30 @@ struct Target {
     bool any = false; ///< a mode or campaign at all
 };
 
-/// `plr`'s note file: the same path with ".noxcore" after it.
-std::filesystem::path fileOf(const std::filesystem::path& plr);
-
-/// `text` as a note may keep it: valid UTF-8 only (a broken sequence dropped), no control
+/// `text` as the labels may keep it: valid UTF-8 only (a broken sequence dropped), no control
 /// characters (C0, DEL, C1, the line and paragraph separators, the direction overrides and
 /// isolates), runs of spaces one, no space at either end, at most `maxBytes` (cut at a whole
 /// character).
 std::string cleanText(std::string_view text, std::size_t maxBytes);
 
-/// The note's text (what `write` puts in the file).
-std::string format(const Notes& notes);
-/// A note's text read; none when it isn't one (the first line's key, or too long). Each value is
-/// cleaned (cleanText) and places past kMaxPlaces let go.
-std::optional<Notes> parse(std::string_view text);
-
-/// `plr`'s note, when there's one for the character it is: `name` (UTF-8) and `characterClass` as
-/// its .plr has them (a note naming another is left where it is, and passed over).
-std::optional<Notes> read(const std::filesystem::path& plr, std::string_view name, int characterClass);
-/// `notes` written beside `plr` (to a scratch file first, then put in place). False: not written.
-bool write(const std::filesystem::path& plr, const Notes& notes);
-/// `plr`'s note gone (a character deleted); nothing when there's none.
-void remove(const std::filesystem::path& plr);
-/// `from`'s note moved to `to`'s (a character renamed), replacing one there; when `from` has none,
-/// one at `to` goes (it was another character's).
-void move(const std::filesystem::path& from, const std::filesystem::path& to);
+/// The labels as their section's data (each text cleaned, places past kMaxPlaces let go). Empty:
+/// no places (no section).
+std::vector<std::uint8_t> encode(const Notes& notes);
+/// A section's data read; none when it isn't one (another version, a length past its bound or
+/// the data's end, a kind it doesn't know, more than player::character_store::kMaxLabelBytes).
+/// Each text is cleaned; places are read newest first.
+std::optional<Notes> decode(std::span<const std::uint8_t> data);
 
 /// Whether `place` is where `target` plays: the same kind, and the same id when both have one,
-/// else the same title (letters' case aside, the target's cleaned as a note's is: cleanText; the
-/// game's own co-op campaign: both empty).
+/// else the same title (letters' case aside, the target's cleaned as the labels' are: cleanText;
+/// the game's own co-op campaign: both empty).
 bool matches(const Place& place, const Target& target);
 
 /// `notes` with `place` put first (the same place as one it has is that one moved up, its line
 /// kept when `place` brings none), played at `now`; past kMaxPlaces the oldest go.
 void played(Notes& notes, Place place, std::int64_t now);
 
-/// A character list's order for `target`: `of[i]` the note of the list's i-th character (null:
+/// A character list's order for `target`: `of[i]` the labels of the list's i-th character (null:
 /// none). The characters played at the target first, the most recent there first; then the rest
 /// as the list had them, unless `onlyTarget` (then left out). With no target, the list as it is.
 std::vector<std::size_t> order(const std::vector<const Notes*>& of, const Target& target, bool onlyTarget);

@@ -470,7 +470,7 @@ private:
     std::string pendingHost_;
     std::vector<Character> characters_;
     // (noxcpp) Where each character was last played (character_labels.hpp): the list as read, with
-    // each one's note (read once, as the list is made); the notes of characters_ (the list shown), and
+    // each one's labels (from its .plr, read once as the list is made); those of characters_ (the list shown), and
     // each one's places' line; what the screen chooses for, and its switch's screen and choices.
     struct Listed {
         Character character;

@@ -92,7 +92,7 @@
 //   kTextClear    str prefix (the keys that start with it gone; "": every one)
 // and, only to a client at client level 15 or above (kCharacterNoteLevel) that named ModeUi, a
 // script mode's line about the player's character (nox.characterNote: its level, how far it has
-// come), which the client keeps beside the character it joined with for its character screens:
+// come), which the client keeps in the .plr of the character it joined with for its character screens:
 //   kCharacterNote str the line (UTF-8, plain text, at most kMaxCharacterNoteBytes; "": none)
 // Client -> server:
 //   kReady  u8 1 when the UI draws views itself (it has onView), else 0     (it runs)
@@ -793,7 +793,7 @@ inline std::optional<std::string> decodeTextClear(std::span<const std::uint8_t> 
 }
 
 /// (Client level 15) A script mode's line about a player's character (nox.characterNote): kept by
-/// the client beside the character it joined with, shown on its character screens. kCharacterNote's
+/// the client in the .plr of the character it joined with, shown on its character screens. kCharacterNote's
 /// payload: str the line (UTF-8, at most kMaxCharacterNoteBytes). The client treats it as
 /// untrusted: cut and cleaned again (character_notes.hpp's cleanText), shown as plain text.
 inline constexpr std::uint16_t kCharacterNoteLevel = 15;

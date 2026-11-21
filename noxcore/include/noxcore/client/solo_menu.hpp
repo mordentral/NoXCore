@@ -77,6 +77,9 @@ int countNetworkCharacters(const std::filesystem::path& saveFolder);
 struct Character {
     std::filesystem::path path;
     player::FileInfo info;
+    /// (noxcpp) Its label section's data, read with its File Info (solo_saves::Slot::labels; empty:
+    /// none). Where it was last played: client/character_notes.hpp's decode.
+    std::vector<std::uint8_t> labels;
 };
 /// findAutosaves out of a solo game: Save\ made, then each Save\*.plr (not a
 /// folder) read by the .plr reader into the next record of a zeroed array, kept when

@@ -8,6 +8,7 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/map/map_save.hpp"
 #include "noxcore/map/sections.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/server/host_client.hpp"
 #include "noxcore/server/map_state.hpp"
 #include "noxcore/server/monsters.hpp"
@@ -33,6 +34,14 @@ namespace nox::server {
 namespace fs = std::filesystem;
 
 namespace {
+
+/// A .plr by its name's extension (its letters' case aside).
+bool isPlr(const fs::path& p)
+{
+    std::u16string ext = p.extension().u16string();
+    std::ranges::transform(ext, ext.begin(), [](char16_t c) { return c >= u'A' && c <= u'Z' ? static_cast<char16_t>(c - u'A' + u'a') : c; });
+    return ext == u".plr";
+}
 
 /// The exe's object list as a saved map's load leaves it: the map's things in its file's order
 /// (World::loadOrder), then what was there before (the carried things), ours by extent; then
@@ -490,12 +499,8 @@ bool saveSoloGame(Server& server, const SoloSaveOptions& options, std::string_vi
     if (bytes.empty()) {
         return false;
     }
-    {
-        std::ofstream f(plr, std::ios::binary | std::ios::trunc);
-        f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        if (!f) {
-            return false;
-        }
+    if (!player::character_store::writeEnciphered(plr, bytes)) {
+        return false;
     }
     // The host's own client's sections appended (the client's: its File Info's stage set just
     // before, the held File Info's bit 8 cleared, its save window's flag never being set).
@@ -513,11 +518,8 @@ bool saveSoloGame(Server& server, const SoloSaveOptions& options, std::string_vi
     if (!client) {
         // With no client sections the file still ends with its 0 id (the close
         // filling the block: one zero block, the server sections ending on one).
-        std::vector<std::uint8_t> end(crypto::Blowfish::kBlockSize, 0);
-        crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(end);
-        std::ofstream f(plr, std::ios::binary | std::ios::app);
-        f.write(reinterpret_cast<const char*>(end.data()), static_cast<std::streamsize>(end.size()));
-        client = static_cast<bool>(f);
+        const std::vector<std::uint8_t> end(crypto::Blowfish::kBlockSize, 0);
+        client = player::character_store::appendPlain(plr, end);
     }
     if (!*client) {
         return false;
@@ -581,7 +583,7 @@ bool copy(const fs::path& gameDir, std::string_view from, std::string_view to)
     }
     remove(gameDir, to, false);
     std::error_code ec;
-    if (!fs::copy_file(src / "Player.plr", dst / "Player.plr", fs::copy_options::overwrite_existing, ec)) {
+    if (!player::character_store::copy(src / "Player.plr", dst / "Player.plr")) {
         return false;
     }
     if (!fs::is_directory(src, ec)) {
@@ -603,7 +605,14 @@ bool copy(const fs::path& gameDir, std::string_view from, std::string_view to)
     bool ok = true;
     for (const fs::path& f : folders) {
         for (const auto& e : fs::directory_iterator(src / f, ec)) {
-            if (!e.is_directory(ec) && !fs::copy_file(e.path(), dst / f / e.path().filename(), fs::copy_options::overwrite_existing, ec)) {
+            if (e.is_directory(ec)) {
+                continue;
+            }
+            // (noxcpp: a .plr there, the co-op party's, through the character writer; the rest as files)
+            const fs::path to = dst / f / e.path().filename();
+            const bool copied = isPlr(e.path()) ? player::character_store::copy(e.path(), to)
+                                                : fs::copy_file(e.path(), to, fs::copy_options::overwrite_existing, ec);
+            if (!copied) {
                 ok = false;
             }
         }

@@ -2,6 +2,8 @@
 // write them back. Typed section decoding is in sections.cpp.
 #include "noxcore/player/player_file.hpp"
 
+#include "noxcore/player/character_store.hpp"
+
 #include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/byte_writer.hpp"
@@ -97,9 +99,7 @@ PlayerFile loadPlayerFile(const std::filesystem::path& path)
 
 void savePlayerFile(const std::filesystem::path& path, const PlayerFile& file)
 {
-    auto data = serializePlayerFile(file);
-    crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(data);
-    writeFileBytes(path, data);
+    character_store::write(path, file);
 }
 
 } // namespace nox::player

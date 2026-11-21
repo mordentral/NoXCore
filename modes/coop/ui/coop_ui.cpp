@@ -229,8 +229,8 @@ public:
                 barsLooked_ = true; // (a guest's spell bars looked at once it's in)
                 characterFolder_ = coopCharacterFolder(coop_); // (once a game: Hello's campaign)
                 barsForGuest(app, coop_->hello() && coop_->hello()->characterKept, characterFolder_);
-                // (noxcpp) The campaign noted beside the character we joined with, and its co-op file
-                // when that's one the character screen lists (character_play.hpp).
+                // (noxcpp) The campaign in the labels of the character we joined with, and of its co-op
+                // file when that's one the character screen lists (character_play.hpp).
                 if (coop_->hello()) {
                     characterPlayedCoop(app, coop_->hello()->campaignId, coop_->hello()->campaignTitle);
                 }
@@ -241,13 +241,13 @@ public:
                 abilitiesForGuest(app);
             }
             if (const auto kept = coop_->takeCharacter()) {
-                keepCoopCharacter(app, *kept, characterFolder_);
                 if (coop_->hello()) {
-                    // (noxcpp) The co-op file noted too, when the character screen lists it (the game's own
-                    // campaign's, beside ours).
+                    // (noxcpp) The co-op file labelled too, when the character screen lists it (the game's
+                    // own campaign's, beside ours): before its write, which takes the labels in.
                     characterPlayedCoop(app, coop_->hello()->campaignId, coop_->hello()->campaignTitle,
                                         nox::coop::campaignCharacterFile(app.characterFile, characterFolder_));
                 }
+                keepCoopCharacter(app, *kept, characterFolder_);
             }
         }
         for (const auto& [kind, text] : coop_->takeNotices()) {

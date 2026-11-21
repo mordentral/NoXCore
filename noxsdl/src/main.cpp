@@ -2812,7 +2812,7 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         }
         if (inGame && app->inGameSinceMs == 0) {
             app->inGameSinceMs = SDL_GetTicks();
-            characterPlayedHere(*app); // (noxcpp: a mode's game noted beside the character we joined with: character_play.hpp)
+            characterPlayedHere(*app); // (noxcpp: a mode's game in the labels of the character we joined with: character_play.hpp)
             if (app->joinTeam != 0) {
                 client.joinTeam(app->joinTeam);
             }
@@ -3056,6 +3056,7 @@ void SDL_AppQuit(void* appstate, SDL_AppResult /*result*/)
         if (app->live) {
             saveBars(*app); // leaving the game by closing the window
         }
+        characterNotesEnd(*app); // (noxcpp: labels no write took, written as the game ends: character_play.hpp)
         app->editor.reset(); // (its textures and ImGui's before the renderer)
         app->cinematics.reset();
         app->book.reset();

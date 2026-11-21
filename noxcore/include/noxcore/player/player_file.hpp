@@ -41,6 +41,10 @@ enum class SectionId : std::uint32_t {
     GameData = 10,
     Pad = 11,
     Music = 12,
+    /// (noxcpp) NoX Core's own: where the character was last played (client/character_notes.hpp
+    /// gives its data). "NXCL" as its bytes on disk; the game's ids are 1-12. The original game
+    /// skips it by its size wherever it reads a .plr, and drops it when it writes the file.
+    NoxCoreLabels = 0x4C43584E,
 };
 
 enum class CharacterClass : std::uint8_t { Warrior = 0, Wizard = 1, Conjurer = 2 };
@@ -63,6 +67,8 @@ PlayerFile parsePlayerFile(std::span<const std::uint8_t> plain);
 std::vector<std::uint8_t> serializePlayerFile(const PlayerFile& file);
 
 PlayerFile loadPlayerFile(const std::filesystem::path& path);
+/// `file` as the whole of `path`: character_store::write (the one way a .plr is written: a scratch
+/// file put in its place, the character's labels with it). Throws when it can't be written.
 void savePlayerFile(const std::filesystem::path& path, const PlayerFile& file);
 
 // ---------------------------------------------------------------------------------------------

@@ -2,8 +2,8 @@
 // characters in Save, deleting a slot, and writing a new character's first Player.plr.
 #include "noxcore/client/solo_menu.hpp"
 
-#include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/server/solo_save.hpp"
 
 #include <algorithm>
@@ -179,6 +179,7 @@ std::vector<Character> listCharacters(const fs::path& saveFolder, bool questGame
                 record.info = read.info; // (as parseFileInfoData read it)
             }
             record.path = plr; // (the path copied in at the end)
+            record.labels = read.labels; // (noxcpp: NoX Core's labels, the same file's)
         }
         if (listedForGame(record.info.flags, questGame)) {
             out.push_back(std::move(record));
@@ -226,13 +227,8 @@ fs::path writeNewCharacter(const fs::path& saveRoot, const player::FileInfo& hel
     } catch (const std::exception&) {
         return {};
     }
-    crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(bytes);
-    std::ofstream f(plr, std::ios::binary | std::ios::trunc); // (cryptOpen(path, 0))
-    if (!f) {
-        return {};
-    }
-    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    return f ? plr : fs::path{};
+    // (cryptOpen(path, 0); noxcpp: through the character writer, character_store.hpp)
+    return player::character_store::writePlain(plr, bytes) ? plr : fs::path{};
 }
 
 fs::path continueMap(const fs::path& saveRoot, const fs::path& gameDir, std::string_view mapName)

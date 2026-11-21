@@ -3,7 +3,7 @@
 #include "noxcore/client/solo_saves.hpp"
 
 #include "noxcore/crypto/noxcrypt.hpp"
-#include "noxcore/io/byte_writer.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/util/bytes.hpp"
 
 #include <chrono>
@@ -107,6 +107,14 @@ Slot readPlr(const fs::path& plr)
                 return slot;
             }
             slot.infoRead = true;
+        } else if (id == static_cast<std::uint32_t>(player::SectionId::NoxCoreLabels)) {
+            // (noxcpp: NoX Core's labels, read in the same walk; one too big passed over)
+            const auto data = std::span(bytes).subspan(sizeAt + 8, size);
+            if (size <= player::character_store::kMaxLabelBytes) {
+                slot.labels.assign(data.begin(), data.end());
+            } else {
+                slot.labels.clear();
+            }
         }
         pos = sizeAt + 8 + size;
     }
@@ -243,21 +251,16 @@ player::FileInfo saveFileInfo(player::FileInfo held, const std::string& plrPath,
     return f;
 }
 
+std::vector<player::RawSection> clientSections(const player::Gui& gui, const player::FileInfo& info, const player::Music& music)
+{
+    return {{static_cast<std::uint32_t>(player::SectionId::Gui), gui.serialize()},
+            {static_cast<std::uint32_t>(player::SectionId::FileInfo), info.serialize()},
+            {static_cast<std::uint32_t>(player::SectionId::Music), music.serialize()}};
+}
+
 std::vector<std::uint8_t> clientSectionBytes(const player::Gui& gui, const player::FileInfo& info, const player::Music& music)
 {
-    ByteWriter w;
-    const auto section = [&](player::SectionId id, const std::vector<std::uint8_t>& data) {
-        w.u32(static_cast<std::uint32_t>(id));
-        w.align(kBlock);
-        w.u64(data.size());
-        w.bytes(data);
-    };
-    section(player::SectionId::Gui, gui.serialize());
-    section(player::SectionId::FileInfo, info.serialize());
-    section(player::SectionId::Music, music.serialize());
-    w.u32(0);
-    w.align(kBlock);
-    return std::move(w).take();
+    return player::character_store::sectionBytes(clientSections(gui, info, music));
 }
 
 KeptSave keepSaveData(const fs::path& saveDir, const fs::path& plr, std::span<const std::uint8_t> data, bool host)
@@ -271,33 +274,20 @@ KeptSave keepSaveData(const fs::path& saveDir, const fs::path& plr, std::span<co
     // (noxcpp: all of it. The stock client writes the size's low 16 bits of it (a short), so a
     // save of 64 KiB or more was cut short: OB-089, fixed. A NoX Core host sends such a save
     // whole; a stock one sends only those 16 bits' worth.)
-    std::vector<std::uint8_t> bytes(data.begin(), data.end());
-    bytes.resize((bytes.size() + kBlock - 1) / kBlock * kBlock, 0);
-    crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(bytes);
-    std::ofstream f(plr, std::ios::binary | std::ios::trunc);
-    if (!f) {
-        return KeptSave::Unwritten;
-    }
-    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    return f ? KeptSave::Written : KeptSave::Unwritten;
+    return player::character_store::writePlain(plr, data) ? KeptSave::Written : KeptSave::Unwritten;
 }
 
 bool appendClientSections(const fs::path& plr, const player::Gui& gui, const player::FileInfo& info, const player::Music& music)
 {
-    std::vector<std::uint8_t> bytes;
+    std::vector<player::RawSection> sections;
     try {
-        bytes = clientSectionBytes(gui, info, music);
+        sections = clientSections(gui, info, music);
     } catch (const std::exception&) {
         return false;
     }
-    crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(bytes);
-    std::error_code ec;
-    if (!fs::exists(plr, ec)) {
-        return false; // (cryptOpen's append: the file must be there)
-    }
-    std::ofstream f(plr, std::ios::binary | std::ios::app);
-    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    return static_cast<bool>(f);
+    // (cryptOpen's append: the file must be there. noxcpp: the character's labels, when it has
+    // some waiting, after the music: character_store.hpp.)
+    return player::character_store::appendSections(plr, sections);
 }
 
 } // namespace nox::client::solo_saves

@@ -123,7 +123,7 @@ content.character.conjurer = Conjurer
 # videotools/src/gui/character_form.cpp:245
 #@ f682d34b: As the character creator draws it.
 content.character.doll_note = As the character creator draws it.
-# videotools/src/content/character.cpp:222
+# videotools/src/content/character.cpp:224
 #@ e578a019: {folder} holds GAME.EXE (a game install): save somewhere else
 content.character.game_install = {folder} holds GAME.EXE (a game install): save somewhere else
 # videotools/src/gui/character_form.cpp:289
@@ -138,7 +138,7 @@ content.character.goatee = Goatee
 # videotools/src/gui/character_form.cpp:43
 #@ 54e455d9: Hair
 content.character.hair = Hair
-# videotools/src/content/character.cpp:218
+# videotools/src/content/character.cpp:220
 #@ ed4738d1: that's in the game's folder: save somewhere else (a copy of the game, say)
 content.character.in_game_folder = that's in the game's folder: save somewhere else (a copy of the game, say)
 # videotools/src/gui/character_form.cpp:209
@@ -156,7 +156,7 @@ content.character.name_length = A name is 1 to 24 characters.
 # videotools/src/gui/character_form.cpp:242
 #@ 976e616c: (the doll's pictures aren't in video.bag)
 content.character.no_doll = (the doll's pictures aren't in video.bag)
-# videotools/src/content/character.cpp:209
+# videotools/src/content/character.cpp:211
 #@ 7d7d473a: no file name given
 content.character.no_file_name = no file name given
 # videotools/src/gui/character_form.cpp:270
@@ -174,7 +174,7 @@ content.character.plr_filter = Nox character
 # videotools/src/gui/character_form.cpp:210
 #@ 819af4e0: Quest character.
 content.character.quest = Quest character.
-# videotools/src/content/character.cpp:213
+# videotools/src/content/character.cpp:215
 #@ aab942b1: that's the file it was read from: save a new one
 content.character.same_file = that's the file it was read from: save a new one
 # videotools/src/gui/character_form.cpp:355
@@ -12525,22 +12525,22 @@ menus.browser.title = Nox games
 # noxsdl/src/browser_screen.cpp:534
 #@ 644d5488: \s(Update needed)
 menus.browser.update_needed_mark = \s(Update needed)
-# noxsdl/src/character_labels.hpp:34
+# noxsdl/src/character_labels.hpp:35
 #@ bd325812: the game's own campaign
 menus.characters.coop_own = the game's own campaign
-# noxsdl/src/character_labels.hpp:35
+# noxsdl/src/character_labels.hpp:36
 #@ 95760b2a: Co-op · {campaign}
 menus.characters.coop_place = Co-op · {campaign}
-# noxsdl/src/character_labels.hpp:64
+# noxsdl/src/character_labels.hpp:65
 #@ 31b8846a: Last played: {places}
 menus.characters.last_played = Last played: {places}
-# noxsdl/src/character_labels.hpp:78
+# noxsdl/src/character_labels.hpp:79
 #@ 02d6eb8a: {place} only
 menus.characters.only = {place} only
-# noxsdl/src/character_labels.hpp:47
+# noxsdl/src/character_labels.hpp:48
 #@ 337d0395: {place} · {note}
 menus.characters.place_note = {place} · {note}
-# noxsdl/src/character_labels.hpp:70
+# noxsdl/src/character_labels.hpp:71
 #@ 04c83daf: Show all
 menus.characters.show_all = Show all
 # noxsdl/src/menus_modes.cpp:75, noxsdl/src/menus_servers.cpp:219
@@ -12672,10 +12672,10 @@ menus.modes.start = Start
 # noxsdl/src/mode_list.cpp:60, noxsdl/src/mode_list.cpp:111, noxsdl/src/mode_list.cpp:141 ...
 #@ b3a43630: Yes
 menus.modes.yes = Yes
-# noxsdl/src/menus.cpp:2575
+# noxsdl/src/menus.cpp:2573
 #@ 034ee216: Check that your save folder is writable and has free space. See the log for details.
 menus.save_failed.body = Check that your save folder is writable and has free space. See the log for details.
-# noxsdl/src/menus.cpp:2574
+# noxsdl/src/menus.cpp:2572
 #@ 0685388d: Save failed
 menus.save_failed.title = Save failed
 # noxsdl/src/menus_servers.cpp:151, noxsdl/src/menus_servers.cpp:213
@@ -12690,7 +12690,7 @@ menus.servers.add_remove_tip = Add or remove saved server addresses
 # noxsdl/src/menus_servers.cpp:184
 #@ 858b3346: Server added.
 menus.servers.added = Server added.
-# noxsdl/src/menus.cpp:2126
+# noxsdl/src/menus.cpp:2127
 #@ aa489a85: Address not found. Refresh to try again.
 menus.servers.address_not_found_refresh = Address not found. Refresh to try again.
 # noxsdl/src/menus_servers.cpp:211

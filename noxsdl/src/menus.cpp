@@ -1882,12 +1882,13 @@ void Menus::loadCharacters()
     // findAutosaves: every .plr in the Save folder read into the records that suit the game
     // (a quest character for a quest game, any other for the rest; an unreadable
     // one out of a quest a zeroed record), newest first.
-    // (noxcpp: each one's note read with it, once: where it was last played, character_labels.hpp)
+    // (noxcpp: each one's labels read with it, from its own .plr in the same read, once: where it was
+    // last played, character_labels.hpp)
     listed_.clear();
     for (Character& c : nox::client::solo_menu::listCharacters(saveDir_, questGame_)) {
         std::optional<nox::client::character_notes::Notes> notes;
-        if (!c.path.empty()) {
-            notes = nox::client::character_notes::read(c.path, nox::strings::toUtf8(c.info.name), static_cast<int>(c.info.characterClass));
+        if (!c.path.empty() && !c.labels.empty()) {
+            notes = nox::client::character_notes::decode(c.labels);
         }
         listed_.push_back({std::move(c), std::move(notes)});
     }
@@ -2231,9 +2232,6 @@ bool Menus::onSelChar(gui::Window& from)
                [this, path] {
                    std::error_code ec;
                    std::filesystem::remove(path, ec);
-                   if (!std::filesystem::exists(path, ec)) {
-                       nox::client::character_notes::remove(path); // (noxcpp: its note with it)
-                   }
                    loadCharacters();
                    fillCharacterList();
                });
@@ -2669,7 +2667,6 @@ std::optional<nox::client::PlayerProfile> Menus::saveNewCharacter()
     }
     SDL_Log("menus: saved %s", nox::pathUtf8(path).c_str());
     characterFile_ = path;
-    nox::client::character_notes::remove(path); // (noxcpp: a note a deleted character of this file name left)
 
     // The profile to join with, from the same looks: 5 colours (RGB each) and 5 clothing picks.
     return profileOf(info);

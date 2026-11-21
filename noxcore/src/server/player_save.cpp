@@ -8,6 +8,7 @@
 #include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/map/xfer.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/server/abilities.hpp"
 #include "noxcore/server/enchant.hpp"
 #include "noxcore/server/host_client.hpp"
@@ -1248,7 +1249,7 @@ std::vector<std::uint8_t> savePlayerData(Fight& fight, ServerObject& player)
         return {};
     }
     auto bytes = player::serializePlayerFile(*file);
-    crypto::cipherForKey(crypto::FileKey::PlayerFile).encrypt(bytes);
+    player::character_store::encipher(bytes);
     return bytes;
 }
 

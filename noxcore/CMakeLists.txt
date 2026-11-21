@@ -105,6 +105,7 @@ add_library(noxcore
     src/net/udp_socket.cpp
     src/net/update_stream.cpp
     src/player/player_file.cpp
+    src/player/character_store.cpp
     src/player/sections.cpp
     src/gui/window_file.cpp
     src/lobby/extended.cpp

@@ -3310,8 +3310,8 @@ int noxPutOnBars(lua_State* L)
 int noxCharacterNote(lua_State* L)
 {
     // nox.characterNote(unit, text) -> whether it was sent: a line about the player's character
-    // ("level 12, act 3"), plain text, which its NoX Core client keeps beside the character it joined
-    // with and shows on its character screens (kCharacterNote). Cut to 80 bytes, control characters
+    // ("level 12, act 3"), plain text, which its NoX Core client keeps in the .plr of the character it
+    // joined with and shows on its character screens (kCharacterNote). Cut to 80 bytes, control characters
     // dropped; "" takes it away. False: a client that doesn't take it (stock, below client level 15,
     // ModeUi not named, a held-out or unit-less player): nothing sent. The same line again is sent once.
     const server::ServerObject& u = unitArg(L, 1);

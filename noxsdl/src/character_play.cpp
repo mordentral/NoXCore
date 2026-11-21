@@ -1,4 +1,4 @@
-// The note beside the character we play (character_play.hpp).
+// The labels of the character we play (character_play.hpp).
 #include "character_play.hpp"
 
 #include "app.hpp"
@@ -10,7 +10,7 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/modes/registry.hpp"
-#include "noxcore/strings/string_table.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/util/text.hpp"
 
 #include <SDL3/SDL.h>
@@ -22,56 +22,36 @@ namespace noxsdl {
 
 namespace fs = std::filesystem;
 namespace charnotes = nox::client::character_notes;
+namespace store = nox::player::character_store;
 
 namespace {
-
-/// A line held back at most this long after the last write (a mode that tells one often).
-constexpr std::uint64_t kNoteSpacingMs = 5000;
 
 std::int64_t nowSeconds()
 {
     return static_cast<std::int64_t>(std::time(nullptr));
 }
 
-/// `place` noted beside `plr` (its name and class from its own File Info), played now.
-bool notePlace(const fs::path& plr, const charnotes::Place& place)
+/// `plr`'s labels as its file has them (none: no file, none there, or ones that don't read).
+charnotes::Notes labelsOf(const fs::path& plr)
 {
     const nox::client::solo_saves::Slot read = nox::client::solo_saves::readPlr(plr);
-    if (!read.exists || !read.infoRead) {
-        return false;
+    if (!read.exists || read.labels.empty()) {
+        return {};
     }
-    const std::string name = nox::strings::toUtf8(read.info.name);
-    const int cls = static_cast<int>(read.info.characterClass);
-    charnotes::Notes notes = charnotes::read(plr, name, cls).value_or(charnotes::Notes{});
-    notes.name = name;
-    notes.characterClass = cls;
-    charnotes::played(notes, place, nowSeconds());
-    if (!charnotes::write(plr, notes)) {
-        SDL_Log("characters: couldn't write %s", nox::pathUtf8(charnotes::fileOf(plr)).c_str());
-        return false;
-    }
-    return true;
+    return charnotes::decode(read.labels).value_or(charnotes::Notes{});
 }
 
-/// This game's place, with its line, written beside the character we joined with (and the co-op
-/// file kept for it).
-void writeNow(App& app)
+/// This game's place put in `labels` (played now) and kept for `plr`'s next write.
+void record(const fs::path& plr, charnotes::Notes& labels, const charnotes::Place& place)
 {
-    app.characterNoteHeld = false;
-    app.characterNoteWrittenMs = SDL_GetTicks();
-    if (!app.characterPlace) {
-        return;
-    }
-    notePlace(app.characterPlaceFile, *app.characterPlace);
-    if (!app.characterCoopFile.empty()) {
-        notePlace(app.characterCoopFile, *app.characterPlace);
-    }
+    charnotes::played(labels, place, nowSeconds());
+    store::setLabels(plr, charnotes::encode(labels));
 }
 
 void begin(App& app, charnotes::Place place)
 {
     if (app.characterFile.empty() || !listedCharacter(app, app.characterFile)) {
-        return; // (a solo game's slot, a campaign mode's save, none: no note)
+        return; // (a solo game's slot, a campaign mode's save, none: no labels)
     }
     place.id = charnotes::cleanText(place.id, charnotes::kMaxIdBytes);
     place.title = charnotes::cleanText(place.title, charnotes::kMaxTitleBytes);
@@ -80,7 +60,8 @@ void begin(App& app, charnotes::Place place)
     }
     app.characterPlace = std::move(place);
     app.characterPlaceFile = app.characterFile;
-    writeNow(app);
+    app.characterLabels = labelsOf(app.characterPlaceFile);
+    record(app.characterPlaceFile, app.characterLabels, *app.characterPlace);
     const charnotes::Place& p = *app.characterPlace;
     SDL_Log("characters: %s played at %s%s", nox::pathUtf8(app.characterPlaceFile.filename()).c_str(),
             p.kind == charnotes::Place::Kind::Coop ? "co-op, " : "",
@@ -102,7 +83,7 @@ bool listedCharacter(const App& app, const fs::path& plr)
 void characterPlayedHere(App& app)
 {
     if (app.characterPlace) {
-        return; // (noted already this game)
+        return; // (labelled already this game)
     }
     charnotes::Place place;
     if (app.host) {
@@ -149,43 +130,42 @@ void characterPlayedCoop(App& app, std::string_view campaignId, std::string_view
     if (app.characterPlace && !coopFile.empty() && coopFile != app.characterPlaceFile && app.characterCoopFile != coopFile &&
         listedCharacter(app, coopFile)) {
         app.characterCoopFile = coopFile;
-        notePlace(coopFile, *app.characterPlace);
+        app.characterCoopLabels = labelsOf(coopFile); // (before its next write: kept by it)
+        record(coopFile, app.characterCoopLabels, *app.characterPlace);
     }
 }
 
 void characterSummary(App& app, std::string_view line)
 {
     if (!app.characterPlace) {
-        return; // (not a character we keep a note for: the line goes nowhere)
+        return; // (not a character we keep labels for: the line goes nowhere)
     }
     std::string note = charnotes::cleanText(line, charnotes::kMaxNoteBytes);
     if (note == app.characterPlace->note) {
         return;
     }
     app.characterPlace->note = std::move(note);
-    if (SDL_GetTicks() - app.characterNoteWrittenMs >= kNoteSpacingMs) {
-        writeNow(app);
-    } else {
-        app.characterNoteHeld = true;
-    }
-}
-
-void characterNotesDue(App& app)
-{
-    if (app.characterNoteHeld && SDL_GetTicks() - app.characterNoteWrittenMs >= kNoteSpacingMs) {
-        writeNow(app);
+    record(app.characterPlaceFile, app.characterLabels, *app.characterPlace);
+    if (!app.characterCoopFile.empty()) {
+        record(app.characterCoopFile, app.characterCoopLabels, *app.characterPlace);
     }
 }
 
 void characterNotesEnd(App& app)
 {
-    if (app.characterNoteHeld) {
-        writeNow(app);
+    for (const fs::path& plr : {app.characterPlaceFile, app.characterCoopFile}) {
+        if (plr.empty()) {
+            continue;
+        }
+        if (store::flushLabels(plr)) {
+            SDL_Log("characters: labels written into %s", nox::pathUtf8(plr.filename()).c_str());
+        }
     }
     app.characterPlace.reset();
     app.characterPlaceFile.clear();
+    app.characterLabels = {};
     app.characterCoopFile.clear();
-    app.characterNoteHeld = false;
+    app.characterCoopLabels = {};
 }
 
 } // namespace noxsdl

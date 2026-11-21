@@ -1,5 +1,5 @@
 // (noxcpp) Where a saved character was last played, on the character screens and as it's played
-// (noxcore/client/character_notes.hpp keeps it, in a file beside the .plr: never the .plr).
+// (noxcore/client/character_notes.hpp: a section of NoX Core's own in the character's .plr).
 //
 // The words (no SDL here, so they're testable alone):
 //   a mode's place        its name, with the mode's own line after it: "Deep Delve · level 12, act 3"
@@ -9,11 +9,12 @@
 // when the game is a mode's, a switch under the buttons: every character, or that mode's alone.
 // A character with no note reads exactly as before.
 //
-// Written as a NoX Core client plays: a mode's game (hosted here, or a remote host's mode, known by
-// the name its extended reply gives), the co-op campaign (its Hello's campaign), and a mode's line
-// (nox.characterNote, client level 15: untrusted, cleaned, never choosing the file: always the
-// character the game was joined with). Only a character the network character screen lists (a
-// .plr in its folder): never a solo game's slot. Stock and arena games write nothing.
+// Kept as a NoX Core client plays (character_play.hpp): a mode's game (hosted here, or a remote
+// host's mode, known by the name its extended reply gives), the co-op campaign (its Hello's
+// campaign), and a mode's line (nox.characterNote, client level 15: untrusted, cleaned, never
+// choosing the file: always the character the game was joined with); written into the .plr with
+// its next write. Only a character the network character screen lists (a .plr in its folder):
+// never a solo game's slot. Stock and arena games label nothing.
 #pragma once
 
 #include "noxcore/client/character_notes.hpp"

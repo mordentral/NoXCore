@@ -524,15 +524,16 @@ struct App {
     /// Live: a co-op guest's campaign character ("<name> (Co-op).plr", set by coop_ui.cpp): its bars
     /// are saved there when the game is left, when the campaign's save has made it (saveBars).
     std::filesystem::path guestBarsFile;
-    /// (noxcpp) This game's place in the note beside the character we joined with (character_play.hpp:
-    /// a mode's or the co-op campaign's, with the mode's line); none: nothing noted (a stock or arena
-    /// game, a character the network character screen doesn't list). The .plr it's noted beside, a
-    /// co-op file noted with it, a line held back to be written, and when one last was.
+    /// (noxcpp) This game's place in the labels of the character we joined with (character_play.hpp:
+    /// a mode's or the co-op campaign's, with the mode's line); none: nothing labelled (a stock or
+    /// arena game, a character the network character screen doesn't list). The .plr it labels and
+    /// its labels as they'll be written (in memory: they go into the file with its next write), and
+    /// a co-op file labelled with it and its.
     std::optional<nox::client::character_notes::Place> characterPlace;
     std::filesystem::path characterPlaceFile;
+    nox::client::character_notes::Notes characterLabels;
     std::filesystem::path characterCoopFile;
-    bool characterNoteHeld = false;
-    std::uint64_t characterNoteWrittenMs = 0;
+    nox::client::character_notes::Notes characterCoopLabels;
     /// (noxcpp) The character screen's switch, each screen's ("host", "join", "local"): its characters
     /// for the game's mode alone (noxcore.cfg's CharactersModeOnly*; Menus::setCharacterListModeOnly).
     std::map<std::string, bool, std::less<>> charactersModeOnly;

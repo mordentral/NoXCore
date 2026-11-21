@@ -3,6 +3,7 @@
 
 #include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/io/file.hpp"
+#include "noxcore/player/character_store.hpp"
 #include "noxcore/strings/l10n.hpp"
 
 #include <algorithm>
@@ -125,9 +126,10 @@ std::vector<std::uint8_t> Character::plain() const
 
 void Character::save(const fs::path& file)
 {
-    auto data = plain();
-    nox::crypto::cipherForKey(nox::crypto::FileKey::PlayerFile).encrypt(data);
-    nox::writeFileBytes(file, data);
+    // (Through NoX Core's character writer: the whole file to a scratch file put in its place.)
+    if (!nox::player::character_store::writePlain(file, plain())) {
+        throw std::system_error(std::make_error_code(std::errc::io_error), nox::pathUtf8(file));
+    }
     path_ = file;
     changed_ = false;
 }

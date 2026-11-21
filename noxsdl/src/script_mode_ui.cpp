@@ -272,12 +272,12 @@ public:
             for (const nox::modes::script::uimsg::ToBars& b : ui_->takeToBars()) {
                 putOnBarsQuietly(app, b.id, b.kind == nox::modes::script::uimsg::BarKind::Ability);
             }
-            // (Client level 15) The mode's line about our character (nox.characterNote): kept in the note
-            // beside the character we joined with (character_play.hpp; untrusted, cleaned there).
+            // (Client level 15) The mode's line about our character (nox.characterNote): kept in the
+            // labels of the character we joined with, written into its .plr with its next write
+            // (character_play.hpp; untrusted, cleaned there).
             if (const auto line = ui_->takeCharacterNote()) {
                 characterSummary(app, *line);
             }
-            characterNotesDue(app);
             for (const nox::modes::script::UiDrawScale& s : ui_->drawScales()) {
                 if (!s.gone) {
                     app.modeDrawScales.push_back({s.object, s.type, s.scale});
