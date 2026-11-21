@@ -220,7 +220,7 @@ void ImagesView::listPane(float height)
                 if (io.KeyShift && anchor_ >= 0) {
                     const auto a = std::find(list_.begin(), list_.end(), anchor_);
                     if (a != list_.end()) {
-                        const auto [lo, hi] = std::minmax(int(a - list_.begin()), r);
+                        const auto [lo, hi] = std::minmax({int(a - list_.begin()), r});
                         if (!io.KeyCtrl) {
                             selected_.clear();
                         }

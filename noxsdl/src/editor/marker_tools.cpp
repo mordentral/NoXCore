@@ -1660,7 +1660,7 @@ void MarkerTools::waypointsPanel()
                     const ImGuiIO& io = ImGui::GetIO();
                     std::set<std::uint32_t> s = ed_.selection_.waypoints;
                     if (io.KeyShift && wpAnchorRow_ && *wpAnchorRow_ < rows.size()) {
-                        const auto [a, b] = std::minmax(*wpAnchorRow_, static_cast<std::size_t>(r));
+                        const auto [a, b] = std::minmax({*wpAnchorRow_, static_cast<std::size_t>(r)});
                         for (std::size_t k = a; k <= b; ++k) s.insert(list[rows[k]].id);
                         selectWaypoints(std::move(s));
                     } else if (io.KeyCtrl) {
