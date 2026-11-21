@@ -210,6 +210,7 @@ bool DepthPass::ensureTargets(SDL_Renderer* renderer, int width, int height)
     if (scene_ && width == width_ && height == height_) {
         return true;
     }
+    width_ = height_ = 0; // A failed resize cannot satisfy a later request for the old size.
     if (scene_) {
         SDL_DestroyTexture(scene_);
         scene_ = nullptr;
@@ -281,12 +282,12 @@ SDL_Texture* DepthPass::render(SDL_Renderer* renderer, int width, int height, st
         // Reading a pixel back makes the renderer flush its queued commands, so this pass sees their
         // results on the shared device.
         SDL_Texture* const previous = SDL_GetRenderTarget(renderer);
-        SDL_SetRenderTarget(renderer, sync_);
+        if (!SDL_SetRenderTarget(renderer, sync_)) return nullptr;
         const SDL_Rect one{0, 0, 1, 1};
-        if (SDL_Surface* s = SDL_RenderReadPixels(renderer, &one)) {
-            SDL_DestroySurface(s);
-        }
-        SDL_SetRenderTarget(renderer, previous);
+        SDL_Surface* pixel = SDL_RenderReadPixels(renderer, &one);
+        const bool synced = pixel != nullptr;
+        SDL_DestroySurface(pixel);
+        if (!SDL_SetRenderTarget(renderer, previous) || !synced) return nullptr;
     }
     SDL_GPUTexture* const colour = gpuTexture(scene_);
     if (!colour) {
@@ -300,11 +301,18 @@ SDL_Texture* DepthPass::render(SDL_Renderer* renderer, int width, int height, st
     if (bytes > 0) {
         // Mapped with cycling (last frame's copy may still be in use on the GPU), then copied into the
         // vertex buffer.
-        if (void* mapped = SDL_MapGPUTransferBuffer(device_, transfer_, true)) {
-            std::memcpy(mapped, vertices.data(), bytes);
-            SDL_UnmapGPUTransferBuffer(device_, transfer_);
+        void* mapped = SDL_MapGPUTransferBuffer(device_, transfer_, true);
+        if (!mapped) {
+            SDL_CancelGPUCommandBuffer(cmd);
+            return nullptr;
         }
+        std::memcpy(mapped, vertices.data(), bytes);
+        SDL_UnmapGPUTransferBuffer(device_, transfer_);
         SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
+        if (!copy) {
+            SDL_CancelGPUCommandBuffer(cmd);
+            return nullptr;
+        }
         SDL_GPUTransferBufferLocation from{transfer_, 0};
         SDL_GPUBufferRegion to{vertexBuffer_, 0, bytes};
         SDL_UploadToGPUBuffer(copy, &from, &to, true);
@@ -324,7 +332,11 @@ SDL_Texture* DepthPass::render(SDL_Renderer* renderer, int width, int height, st
     depth.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
     depth.cycle = true;
     SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, &depth);
-    if (pass && bytes > 0) {
+    if (!pass) {
+        SDL_CancelGPUCommandBuffer(cmd);
+        return nullptr;
+    }
+    if (bytes > 0) {
         SDL_GPUBufferBinding binding{vertexBuffer_, 0};
         SDL_BindGPUVertexBuffers(pass, 0, &binding, 1);
         // Opaque first; then the translucent, far to near; then the particles, the blended far to
@@ -409,11 +421,8 @@ SDL_Texture* DepthPass::render(SDL_Renderer* renderer, int width, int height, st
             SDL_DrawGPUPrimitives(pass, static_cast<Uint32>(d.count), 1, static_cast<Uint32>(d.first), 0);
         }
     }
-    if (pass) {
-        SDL_EndGPURenderPass(pass);
-    }
-    SDL_SubmitGPUCommandBuffer(cmd);
-    return scene_;
+    SDL_EndGPURenderPass(pass);
+    return SDL_SubmitGPUCommandBuffer(cmd) ? scene_ : nullptr;
 }
 
 } // namespace noxsdl
