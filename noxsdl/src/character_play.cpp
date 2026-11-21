@@ -60,6 +60,7 @@ void begin(App& app, charnotes::Place place)
     }
     app.characterPlace = std::move(place);
     app.characterPlaceFile = app.characterFile;
+    app.characterGameFlags = app.live ? gameFlags(app) : 0u; // (its end writes the labels or drops them: characterNotesEnd)
     app.characterLabels = labelsOf(app.characterPlaceFile);
     record(app.characterPlaceFile, app.characterLabels, *app.characterPlace);
     const charnotes::Place& p = *app.characterPlace;
@@ -157,10 +158,13 @@ void characterNotesEnd(App& app)
         if (plr.empty()) {
             continue;
         }
-        if (store::flushLabels(plr)) {
+        // (Only where the original game writes the character at its end, a network game that isn't
+        // a quest; elsewhere labels no write took are dropped.)
+        if (store::flushLabels(plr, app.characterGameFlags)) {
             SDL_Log("characters: labels written into %s", nox::pathUtf8(plr.filename()).c_str());
         }
     }
+    app.characterGameFlags = 0;
     app.characterPlace.reset();
     app.characterPlaceFile.clear();
     app.characterLabels = {};

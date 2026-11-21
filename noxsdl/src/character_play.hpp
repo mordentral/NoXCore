@@ -2,8 +2,9 @@
 // and a mode's line about it, put in the character's labels in memory as they become known. They
 // are written into its .plr only when NoX Core writes that file anyway (the spell bars as a network
 // game is left, a quest's or the co-op campaign's save kept: player/character_store.hpp), or once as
-// the game ends when no such write took them. Nothing here runs per frame; no write happens while the
-// game is played but those.
+// the game ends when no such write took them, and that only in a game whose end writes the character
+// in the original game too (a network game that isn't a quest); in any other game they're dropped.
+// Nothing here runs per frame; no write happens while the game is played but those.
 #pragma once
 
 #include "noxcore/client/character_notes.hpp"
@@ -35,7 +36,8 @@ void characterPlayedCoop(App& app, std::string_view campaignId, std::string_view
 /// ever put in the labels of the character we joined with, at this game's place). In memory only.
 void characterSummary(App& app, std::string_view line);
 /// The game's end: labels no write took written now (each file once, its other sections as they
-/// were); this game's place forgotten.
+/// were) when the game's end writes the character (character_store::gameEndWrites: a network game
+/// that isn't a quest), dropped in any other; this game's place forgotten.
 void characterNotesEnd(App& app);
 
 } // namespace noxsdl

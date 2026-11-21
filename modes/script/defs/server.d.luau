@@ -165,7 +165,7 @@ declare nox: {
     creatureCast: (id: number, spell: string | number, x: number, y: number) -> boolean,
     --- A creature's spellbook and casting rhythm (each field left out kept): spells[name or number] = its ways ("reaction", "defensive", "disabling", "offensive", "escape"; one, a list, or false: not cast); delays[way] = { least, most } frames; power 0-5; aim 0-1.
     setCaster: (id: number, caster: { spells: { [string | number]: string | { string } | boolean }?, delays: { [string]: { number } }?, power: number?, aim: number? }) -> (),
-    --- false: an item's holder can't let it go (every drop of it fails: by hand, a Fumble, the holder's death); true or nil: as the game has it.
+    --- false: a creature or a player holding the item can't let it go (every drop of it by one fails: by hand, a Fumble, the holder's death); a chest, or a thrown chakram in flight, lets it out as any item; true or nil: as the game has it.
     setDroppable: (id: number, droppable: boolean?) -> (),
     --- The ids of the live enemy creatures a unit sees within range, nearest first, at most `most`.
     nearestFoes: (unit: number, range: number, most: number, losTested: number) -> { number },
@@ -275,7 +275,7 @@ declare nox: {
     backIntoPlay: (unit: number) -> (),
     --- on: puts a player out of play watching (unseen, out of reach), held out (its Action never brings it in), its camera the mode's (nox.camera; where it is till then) and no "observation mode" told; off: back into play as nox.backIntoPlay brings it, the hold let go (as it is when anything else brings it into play: a later watch is a free one).
     observe: (unit: number, on: boolean) -> (),
-    --- Holds a watching player's camera (the view it's sent and where it hears from) at (x, y), or on a thing (thingOrX alone: following it while it's in the world), so its own controls no longer move it; nil lets it go (the stock observer's controls again). A player in play (alive, not watching) watches a thing as a creature's watcher does (status 2: its camera on it, it stands where it is; its own Move, Action or Jump or a hit bring it back), the mode's abilities still heard from it; nil brings it back.
+    --- Holds a watching player's camera (the view it's sent and where it hears from) at (x, y), or on a thing (thingOrX alone: following it while it's in the world), so its own controls no longer move it; nil lets it go (the stock observer's controls again). A player in play (alive, not watching) watches a thing as a creature's watcher does (status 2: its camera on it, it stands where it is; its own Move, Action or Jump or a hit bring it back, and so does a map change), the mode's abilities still heard from it; nil brings it back.
     camera: (unit: number, thingOrX: number?, y: number?) -> (),
     --- The spot beside a soul gate where its fallen come back.
     nearSoulGate: (gate: number) -> (number, number),

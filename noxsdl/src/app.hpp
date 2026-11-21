@@ -534,6 +534,9 @@ struct App {
     nox::client::character_notes::Notes characterLabels;
     std::filesystem::path characterCoopFile;
     nox::client::character_notes::Notes characterCoopLabels;
+    /// The game flags of the game labelled (gameFlags, as its place was put in): whether its end
+    /// writes the labels no write took (character_store::gameEndWrites) or drops them.
+    std::uint32_t characterGameFlags = 0;
     /// (noxcpp) The character screen's switch, each screen's ("host", "join", "local"): its characters
     /// for the game's mode alone (noxcore.cfg's CharactersModeOnly*; Menus::setCharacterListModeOnly).
     std::map<std::string, bool, std::less<>> charactersModeOnly;

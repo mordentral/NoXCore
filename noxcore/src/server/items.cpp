@@ -1257,8 +1257,8 @@ bool Items::dropAt(ServerObject& player, ServerObject& item, float x, float y)
     if (item.holder != player.extent) {
         return false;
     }
-    if (item.modeMarks & ModeMark::KeptByHolder) {
-        return false; // (noxcpp, a mode's nox.setDroppable: a DROP that does nothing)
+    if ((item.modeMarks & ModeMark::KeptByHolder) && (player.classes & (oc::Monster | oc::Player))) {
+        return false; // (noxcpp, a mode's nox.setDroppable: a creature's or a player's drop of it does nothing; a chest's or a flying chakram's as any)
     }
     // (Obj_DropAt) In a network game but a quest a weapon, wand, armour or food (0x3001010) can't
     // be picked up at once.

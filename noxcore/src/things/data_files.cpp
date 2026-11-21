@@ -245,7 +245,27 @@ std::string mergeDataFile(DataFile table, std::span<const std::uint8_t> patchByt
                 return why;
             }
             if (table == DataFile::Modifiers && out.modifiers && out.modifiers->modifiers.size() > installIds) {
-                out.modifiers->firstOwnId = static_cast<std::uint16_t>(installIds);
+                things::ModifierDb& db = *out.modifiers;
+                db.firstOwnId = static_cast<std::uint16_t>(installIds);
+                // Each new modifier's stock record: its LIKE (of its section), or that one's when it
+                // names a modifier added before it.
+                db.ownStock.assign(db.modifiers.size() - installIds, 0xFF);
+                const auto inSection = [&](std::string_view name, std::string_view section) -> const things::ModifierDef* {
+                    const auto it = std::ranges::find_if(db.modifiers, [&](const things::ModifierDef& m) { return m.name == name && m.section == section; });
+                    return it != db.modifiers.end() ? &*it : nullptr;
+                };
+                for (const content::TableRecord& rec : patch.records()) {
+                    if (rec.like.empty()) {
+                        continue;
+                    }
+                    const things::ModifierDef* made = inSection(rec.name, rec.section);
+                    const things::ModifierDef* like = inSection(rec.like, rec.section);
+                    if (!made || !like || !db.ownRecord(*made)) {
+                        continue; // (a weapon or armour definition: no id)
+                    }
+                    const things::ModifierDef* stock = db.stockOf(*like);
+                    db.ownStock[made->id - installIds] = stock ? stock->id : 0xFF;
+                }
             }
         }
         if (expected != 0 && expected != check) {

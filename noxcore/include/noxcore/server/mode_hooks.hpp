@@ -94,8 +94,9 @@ inline constexpr std::uint8_t Pickup = 0x80;
 
 /// What a mode set on an object (ServerObject::modeMarks). 0 on every object of the game's.
 namespace ModeMark {
-/// Its holder can't let it go: every drop of it fails (by hand, a Fumble, its holder's death), as
-/// an item whose DROP does nothing (nox.setDroppable).
+/// A creature or a player holding it can't let it go: every drop of it by one fails (by hand, a
+/// Fumble, its holder's death, a deleted holder's drop), as an item whose DROP does nothing
+/// (nox.setDroppable). Any other holder (a chest, a thrown chakram in flight) drops it as any item.
 inline constexpr std::uint8_t KeptByHolder = 0x01;
 } // namespace ModeMark
 

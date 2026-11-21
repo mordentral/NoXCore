@@ -216,6 +216,11 @@ void mapChangePlayer(Fight& fight, ServerObject& unit, bool keep)
         leaveObserver(fight, unit);
         p.cameraFollow = 0;
     }
+    // (noxcpp) A watch a mode made (nox.camera on a player in play: modWatch) ends here, so its
+    // player starts the new map in play; a player's own watch goes on as the game's does.
+    if (p.modWatch) {
+        observeClear(fight, unit);
+    }
     p.stateFrame = fight.frame;
 }
 

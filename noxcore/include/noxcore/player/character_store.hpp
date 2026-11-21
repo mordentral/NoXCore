@@ -13,7 +13,9 @@
 //     go into that file, as a section of NoX Core's own (SectionId::NoxCoreLabels, last before
 //     the end), whenever the file is written whole (write) or its client sections are written
 //     (appendSections). Nothing else writes them, save the game's end for a file that no write
-//     carried them to (flushLabels). The original game skips a section it doesn't know, by its
+//     carried them to (flushLabels), and that only in a game whose end writes the character in the
+//     original game too (a network game that isn't a quest: gameEndWrites); in any other game
+//     labels no write took are dropped. The original game skips a section it doesn't know, by its
 //     size, everywhere it reads a .plr; it drops it when it writes the file itself.
 #pragma once
 
@@ -66,11 +68,16 @@ void putLabels(PlayerFile& file, const std::vector<std::uint8_t>& labels);
 void setLabels(const std::filesystem::path& path, std::vector<std::uint8_t> labels);
 /// Whether labels set for `path` wait for a write.
 bool labelsWaiting(const std::filesystem::path& path);
-/// The game over for `path`: labels that no write carried written into it now (the file read, its
-/// labels put in, written whole: its other sections byte for byte as they were), then forgotten.
-/// Nothing when none wait, when the file isn't there, or when it doesn't read back as it is.
-/// Returns whether it wrote.
-bool flushLabels(const std::filesystem::path& path);
+/// Whether the end of a game with `gameFlags` (the game's flags as its client has them, 0x800 for a
+/// solo or co-op campaign game) writes the player's character, as the original game's end does: a
+/// network game's (0x2000), not a quest's (0x1000) nor a solo or campaign game's (0x800).
+bool gameEndWrites(std::uint32_t gameFlags);
+/// The game over for `path` (a game with `gameFlags`): when its end writes the character
+/// (gameEndWrites), labels that no write carried written into it now (the file read, its labels
+/// put in, written whole: its other sections byte for byte as they were); in any other game they
+/// are dropped, the file left as it is. Forgotten either way. Nothing written when none wait, when
+/// the file isn't there, or when it doesn't read back as it is. Returns whether it wrote.
+bool flushLabels(const std::filesystem::path& path, std::uint32_t gameFlags);
 /// Labels kept for `path` forgotten (unwritten ones let go).
 void forgetLabels(const std::filesystem::path& path);
 /// Every path's let go (tests).

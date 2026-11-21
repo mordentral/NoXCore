@@ -876,17 +876,23 @@ bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db)
     const std::uint32_t bits = weapon ? things::weaponBitOf(item.typeName) : things::armorBitOf(item.typeName);
     const auto allowed = [&](const things::ModifierDef& m) { return ((weapon ? m.allowedWeapons : m.allowedArmor) & bits) != 0; };
     const auto excluded = [&](const ModRow& r) { return ((weapon ? r.weaponExcl : r.armorExcl) & bits) != 0; };
-    // (noxcpp: a mod's own modifier is in no table of the game's: its section and ALLOWED_* alone.)
+    // (noxcpp: a mod's own modifier is in no table of the game's: its section and ALLOWED_*, and the
+    // exclusions of the row of the stock record it was made like, when that has one.)
     const auto own = [&](const things::ModifierDef& m, std::string_view section) { return db.ownRecord(m) && m.section == section; };
+    const auto stockExcluded = [&](const things::ModifierDef& m, std::span<const ModRow> rows) {
+        const ModRow* r = findRow(rows, db.stockOf(m));
+        return r && excluded(*r);
+    };
     if (const things::ModifierDef* m = db.modifier(item.modifiers[0])) {
-        const ModRow* r = findRow(weapon ? std::span<const ModRow>(kWeaponPower) : std::span<const ModRow>(kArmorQuality), m);
-        if (own(*m, "EFFECTIVENESS") ? !allowed(*m) : (!r || !allowed(*m) || excluded(*r))) {
+        const auto rows = weapon ? std::span<const ModRow>(kWeaponPower) : std::span<const ModRow>(kArmorQuality);
+        const ModRow* r = findRow(rows, m);
+        if (own(*m, "EFFECTIVENESS") ? (!allowed(*m) || stockExcluded(*m, rows)) : (!r || !allowed(*m) || excluded(*r))) {
             return false;
         }
     }
     if (const things::ModifierDef* m = db.modifier(item.modifiers[1])) {
         const ModRow* r = findRow(kMaterials, m);
-        if (own(*m, "MATERIAL") ? !allowed(*m) : (!r || !allowed(*m) || excluded(*r))) {
+        if (own(*m, "MATERIAL") ? (!allowed(*m) || stockExcluded(*m, kMaterials)) : (!r || !allowed(*m) || excluded(*r))) {
             return false;
         }
     }
@@ -898,14 +904,19 @@ bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db)
         if (!(m->allowedPosition & (slot == 2 ? 1u : 2u))) {
             return false;
         }
+        const auto isReplenishment = [](const things::ModifierDef* d) {
+            return d && (d->name == "Replenishment1" || d->name == "Replenishment2" || d->name == "Replenishment3" || d->name == "Replenishment4");
+        };
         if (own(*m, "ENCHANTMENT")) {
-            if (!allowed(*m)) {
+            // (Its own lists, and what its stock record's row keeps it off (the wand staves for
+            // the attack enchantments), or a Replenishment's '#' staff rule.)
+            const things::ModifierDef* stock = db.stockOf(*m);
+            if (!allowed(*m) || stockExcluded(*m, kEnchantments) || (isReplenishment(stock) && !replenishedStaff(item))) {
                 return false;
             }
             continue;
         }
-        const bool replenishment = m->name == "Replenishment1" || m->name == "Replenishment2" || m->name == "Replenishment3" ||
-                                   m->name == "Replenishment4";
+        const bool replenishment = isReplenishment(m);
         const ModRow* r = findRow(kEnchantments, m);
         if (!r && !replenishment) {
             return false;

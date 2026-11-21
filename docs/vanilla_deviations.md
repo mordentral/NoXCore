@@ -227,6 +227,30 @@ What follows from it:
 - **Revert:** pass the game's maps folder as the map cache (`--map-cache <game>\maps`), and let a
   download overwrite a same-named map there.
 
+### VD-79: A character's .plr can hold a labels section of NoX Core's own ("NXCL")
+
+- **Vanilla:** a .plr holds only the game's own sections, each an id, its size and its data, and a
+  0 id after the last.
+- **Ours:** NoX Core may add one more section, last before the 0 id, its id the four bytes "NXCL":
+  where the character was last played (up to 8 places, newest first: a game mode's or the co-op
+  campaign's id and title, when, and the mode's own short line such as "level 12, act 3"), for the
+  character screens to show and sort by (noxcore/include/noxcore/client/character_notes.hpp). It is
+  written only with a write of the file NoX Core makes anyway (the spell bars as a network game is
+  left, a quest's or the co-op campaign's save), or once as a network game that isn't a quest ends,
+  where the original game writes the character too; never during play. Every .plr write goes through
+  one writer (noxcore/include/noxcore/player/character_store.hpp), and the game's own sections are
+  written byte for byte as without it. A labels section that is too big or doesn't read is passed
+  over: the character reads as ever.
+- **Why:** players often don't name their Deep Delve or co-op characters apart; the screens say where
+  each was last played. A mod can't reach the player's files, so the client keeps the labels.
+- **Risk:** none known for the original game: every reader of a .plr it has skips a section id it
+  doesn't know by its size, and a join sends only the server's sections, so the labels never travel.
+  When the original game saves the character itself (a network game's end, a quest's save, a solo
+  save) it writes only its own sections and the labels are dropped; NoX Core then shows that
+  character without them until it plays it again.
+- **Revert:** stop passing labels to the character store (setLabels in noxsdl/src/character_play.cpp);
+  files that have the section keep reading as before.
+
 ## Client display (no effect on the wire)
 
 These change only what noxsdl shows; every one is off with `--stock-effects` or the matching

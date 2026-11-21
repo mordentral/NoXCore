@@ -267,10 +267,18 @@ bool labelsWaiting(const fs::path& path)
     return it != waiting().end() && it->second.unwritten;
 }
 
-bool flushLabels(const fs::path& path)
+bool gameEndWrites(std::uint32_t gameFlags)
+{
+    // (The original game's end writes the client's character only in a network game, not a quest:
+    // a quest's is kept by its saves alone. NoX Core's solo and co-op campaign games keep theirs by
+    // their saves too.)
+    return (gameFlags & 0x2000u) != 0 && (gameFlags & (0x1000u | 0x800u)) == 0;
+}
+
+bool flushLabels(const fs::path& path, std::uint32_t gameFlags)
 {
     std::optional<std::vector<std::uint8_t>> labels;
-    {
+    if (gameEndWrites(gameFlags)) {
         std::lock_guard lock(waitingLock());
         const auto it = waiting().find(keyOf(path));
         if (it != waiting().end() && it->second.unwritten) {

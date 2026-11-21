@@ -282,7 +282,7 @@ struct PlayerControl {
     /// (noxcpp: a script mode's, nox.camera on a player in play) It watches a thing for the mode
     /// (status 2, as a creature's watcher: playerObserveMonster): the mode's abilities still heard
     /// from it. Off as that watch ends by any path (observeClear, a new watch) and at the mode's end;
-    /// never sent.
+    /// never sent. A map change ends such a watch (mapChangePlayer); a player's own goes on.
     bool modWatch = false;
     float camX = 0;
     float camY = 0;

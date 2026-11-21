@@ -61,7 +61,9 @@ bool questItemValid(const ServerObject& item, const things::ModifierDb* modifier
 /// enchantments each in their table, allowed on its kind (ALLOWED_WEAPONS / ALLOWED_ARMOR, not the
 /// row's exclusions), the enchantments in their position (ALLOWED_POSITION); a Replenishment only on
 /// a '#' staff. (Also what a mode's items are held to: no item the game never makes.) A mod's own
-/// modifier (ModifierDb::ownRecord) by its section and ALLOWED_* alone.
+/// modifier (ModifierDb::ownRecord) by its section and ALLOWED_*, and held to the stock record it
+/// was made like (ModifierDb::stockOf) too: that one's row's exclusions (the wand staves for the
+/// attack enchantments), a Replenishment's '#' staff rule.
 bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db);
 
 } // namespace nox::server

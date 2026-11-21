@@ -567,9 +567,10 @@ int noxSetCaster(lua_State* L)
 
 int noxSetDroppable(lua_State* L)
 {
-    // nox.setDroppable(id, droppable): false: its holder can't let it go (every drop of it fails: by
-    // hand, a Fumble, its holder's death), as an item whose DROP does nothing; true or nil: as the
-    // game has it.
+    // nox.setDroppable(id, droppable): false: a creature or a player holding it can't let it go
+    // (every drop of it by one fails: by hand, a Fumble, its holder's death, a deleted holder's
+    // drop), as an item whose DROP does nothing; a chest or a thrown chakram in flight lets it out
+    // as any item. true or nil: as the game has it.
     toolbox::refuseInsideAsked(L, "nox.setDroppable");
     server::ServerObject& o = toolbox::objectArg(L, 1);
     luaL_argcheck(L, lua_isnoneornil(L, 2) || lua_isboolean(L, 2), 2, "true, false or nil");
