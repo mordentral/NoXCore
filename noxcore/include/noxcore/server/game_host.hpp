@@ -382,12 +382,16 @@ public:
         /// names are found in (empty: the hosted map's folder's).
         std::filesystem::path mapCycle;
         std::filesystem::path mapsDir;
-        /// Additional maps indexed for this game (mode_maps.hpp): a mode's shipped maps or
-        /// a local multiplayer host's authored maps. Looked up before the installed maps.
+        /// (noxcpp) Additional maps indexed for this game (mode_maps.hpp), indexed once when the
+        /// game is set up: a NoX Core mode's shipped maps (a mod's maps\ folder, when the mod was
+        /// read) or a local multiplayer host's authored maps (the map editor's folder). Found by
+        /// name before the maps folder's in every lookup of this game (findMap). Null, as every
+        /// other game's: the maps folder alone.
         std::shared_ptr<const ModeMaps> modeMaps;
         /// (noxcpp: with modeMaps) Where its maps' saved rules go, each map's in a folder of its
         /// name under it (ruleFoldersOf): the mod's saved data's (a script mode's configure sets
-        /// <ServerContext::modData>\<id>\maps.rules). Empty: its maps' rules are only read (those
+        /// <ServerContext::modData>\<id>\maps.rules), or the authored maps' own folder for a local
+        /// host's (each map's rules beside it). Empty: its maps' rules are only read (those
         /// shipped beside them), never written.
         std::filesystem::path modeRulesDir;
         /// (noxcpp: a NoX Core mode's) Its own game data files (a mod's data\: mode_data.hpp). Its

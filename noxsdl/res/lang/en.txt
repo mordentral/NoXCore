@@ -12244,44 +12244,44 @@ game.data.hosting_other = another game is hosted here
 # noxsdl/src/game_session.cpp:47
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2053
+# noxsdl/src/main.cpp:2052
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2026
+# noxsdl/src/main.cpp:2025
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2030
+# noxsdl/src/main.cpp:2029
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2061
+# noxsdl/src/main.cpp:2060
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2056
+# noxsdl/src/main.cpp:2055
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2040
+# noxsdl/src/main.cpp:2039
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2043
+# noxsdl/src/main.cpp:2042
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2055
+# noxsdl/src/main.cpp:2054
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
 #@ 00c5ff51: Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left | Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
 game.leaving.notice[one] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left
 game.leaving.notice[other] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
-# noxsdl/src/main.cpp:1174
+# noxsdl/src/main.cpp:1173
 #@ 41598c12: {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
 game.load_failed.error_other = {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
-# noxsdl/src/main.cpp:1170
+# noxsdl/src/main.cpp:1169
 #@ a52d10c8: {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.error_windows = {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 # noxsdl/src/main.cpp:677
 #@ da4003ab: Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.no_game = Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:676, noxsdl/src/main.cpp:1179
+# noxsdl/src/main.cpp:676, noxsdl/src/main.cpp:1178
 #@ 28bae6e6: NoX Core: loading failed
 game.load_failed.title = NoX Core: loading failed
 # noxsdl/src/map_vote_window.cpp:175
