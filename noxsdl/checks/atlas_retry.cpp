@@ -4,6 +4,8 @@
 #include "noxcore/io/byte_writer.hpp"
 #include "noxcore/io/file.hpp"
 
+#include <string_view>
+
 // Interpose only the copy compiled into this executable. SpriteCache calls that implementation.
 #define SDL_CreateGPUTransferBuffer gpucheck::createTransfer
 #define SDL_MapGPUTransferBuffer gpucheck::mapTransfer
@@ -51,6 +53,42 @@ void makeImages(const std::filesystem::path& dir)
     pack.finish();
 }
 
+// One worker and a one-block budget make the queue limit deterministic.
+void checkDecoderBacklog()
+{
+    checks::TempDirectory temp;
+    const auto path = temp.path / "small.nxp";
+    nox::video::ImagePackWriter pack(path, 4);
+    nox::video::PackImage image;
+    image.width = image.height = 1;
+    image.pixelWidth = image.pixelHeight = 4;
+    image.type = 2;
+    image.bc7.emplace_back(16, 0x40);
+    for (unsigned i = 0; i < 4; ++i) pack.put(i, image, 1);
+    pack.finish();
+
+    noxsdl::ImageDecoder decoder(path, 1, 16);
+    for (int i = 0; i < 4; ++i) {
+        noxsdl::DecodeJob job;
+        job.index = i;
+        job.blocks = true;
+        decoder.request(job, SDL_GetTicks());
+    }
+    noxsdl::DecodeJob floor;
+    floor.kind = noxsdl::DecodeKind::Composite;
+    floor.cacheKey = "floor";
+    floor.width = floor.height = 1;
+    floor.build = [] { return std::vector<std::uint8_t>(4, 255); };
+    decoder.preload({floor});
+
+    noxsdl::DecodeResult result;
+    require(decoder.takeWait(result, 5000, false) && result.ok && result.job.key() == floor.key(),
+            "a saturated demand queue starved the floor preload");
+    decoder.dropRequests(); // Only work admitted before the floor completed should remain.
+    require(decoder.take(result) && result.needsAtlas(), "lost deferred atlas result");
+    require(!decoder.take(result), "decoded past the blocked atlas budget");
+}
+
 void checkSpriteCache(SDL_Renderer* renderer)
 {
     checks::TempDirectory temp;
@@ -72,6 +110,16 @@ void checkSpriteCache(SDL_Renderer* renderer)
     cache.endFrame(SDL_GetTicks());
     require(cache.preloading(), "discarded the queued sprite while blocked");
 
+    require(!cache.hdTile(0), "expected an asynchronous floor tile");
+    for (int frame = 0; frame < 3; ++frame) {
+        cache.endFrame(SDL_GetTicks());
+        require(!first->ready(), "atlas unexpectedly recovered during sustained failure");
+    }
+    cache.awaitAsked(5000);
+    const auto tile = cache.hdTile(0);
+    require(tile && tile->rgba.size() == 4 * 4 * 4, "floor tile stalled behind the blocked atlas");
+    require(cache.preloading(), "atlas preload lost before recovery");
+
     gpucheck::fault = Fault::None;
     const auto deadline = SDL_GetTicks() + 5000;
     do {
@@ -84,7 +132,11 @@ void checkSpriteCache(SDL_Renderer* renderer)
 }
 } // namespace
 
-int main() try {
+int main(int argc, char** argv) try {
+    if (argc == 2 && std::string_view(argv[1]) == "--decoder") {
+        checkDecoderBacklog();
+        return 0;
+    }
     gpucheck::Video video;
     if (!video.renderer || !GpuAtlas::create(video.renderer, nullptr)) {
         std::cerr << "Skipping: BC7 GPU renderer unavailable\n";

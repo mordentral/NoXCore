@@ -768,7 +768,7 @@ void SpriteCache::pump(std::uint64_t nowMs)
     const std::uint64_t start = SDL_GetTicksNS();
     const std::uint64_t budget = holding_ ? kHoldUploadBudgetNs : kUploadBudgetNs;
     DecodeResult r;
-    while ((!atlas_ || !atlas_->stagingBlocked()) && decoder_->take(r)) {
+    while (decoder_->take(r, !atlas_ || !atlas_->stagingBlocked())) {
         install(std::move(r));
         if (SDL_GetTicksNS() - start >= budget) {
             break;
@@ -1951,9 +1951,10 @@ bool SpriteCache::awaitAsked(std::uint64_t maxMs)
     DecodeResult r;
     std::size_t taken = 0;
     double workMs = 0;
-    while ((!atlas_ || !atlas_->stagingBlocked()) && outstanding()) {
+    while (outstanding()) {
         const std::uint64_t now = SDL_GetTicksNS();
-        if (now >= deadline || !decoder_->takeWait(r, std::max<std::uint64_t>(1, (deadline - now) / 1'000'000))) {
+        const bool allowAtlas = !atlas_ || !atlas_->stagingBlocked();
+        if (now >= deadline || !decoder_->takeWait(r, std::max<std::uint64_t>(1, (deadline - now) / 1'000'000), allowAtlas)) {
             SDL_Log("image pack: waited %llu ms for %zu floor tiles and %zu composites; drawn as they are",
                     static_cast<unsigned long long>(maxMs), askedTiles_.size(), askedComposites_.size());
             break;

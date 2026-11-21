@@ -101,6 +101,7 @@ struct DecodeResult {
     /// texel; the smaller ones halved as labels: each 2x2 block's first).
     std::vector<std::vector<std::uint8_t>> labels;
     std::optional<nox::video::PackImage> pixels; ///< Tile: the image itself
+    bool needsAtlas() const { return !levels.empty() && levels.front().bc7; }
     double decodeMs = 0; ///< the worker's time on it (read, decompress, levels)
 };
 
@@ -122,7 +123,7 @@ DecodeResult buildDecodeResult(const DecodeJob& job, std::optional<nox::video::P
 class ImageDecoder {
 public:
     /// Starts `threads` workers on the pack at `pack` (each opens its own reader).
-    ImageDecoder(std::filesystem::path pack, int threads);
+    ImageDecoder(std::filesystem::path pack, int threads, std::size_t waitingByteLimit = std::size_t{96} << 20);
     ~ImageDecoder();
     ImageDecoder(const ImageDecoder&) = delete;
     ImageDecoder& operator=(const ImageDecoder&) = delete;
@@ -146,9 +147,10 @@ public:
     /// preload list instead).
     void dropStale(std::uint64_t nowMs, std::uint64_t maxIdleMs);
     /// The oldest finished decode, if any: those asked for while drawing before the preload's.
-    bool take(DecodeResult& out);
+    /// If atlas uploads are blocked, leave their results queued and take the next eligible one.
+    bool take(DecodeResult& out, bool allowAtlas = true);
     /// The same, waiting up to `maxMs` for one to finish (false: none came).
-    bool takeWait(DecodeResult& out, std::uint64_t maxMs);
+    bool takeWait(DecodeResult& out, std::uint64_t maxMs, bool allowAtlas = true);
 
 private:
     struct Want {
@@ -157,6 +159,7 @@ private:
         std::uint64_t askedMs = 0;
         bool mapImage = false; ///< it was on the preload list
     };
+    bool takeReady(DecodeResult& out, bool allowAtlas); // mutex_ held
     void run();
 
     std::filesystem::path path_;
@@ -171,6 +174,8 @@ private:
     std::deque<DecodeResult> done_;        ///< finished: asked for while drawing (taken first)
     std::deque<DecodeResult> donePreload_; ///< finished: the map's preload
     std::size_t doneBytes_ = 0; ///< in done_ and donePreload_
+    std::size_t atlasBytes_ = 0; // part of doneBytes_ waiting for atlas placement
+    const std::size_t waitingByteLimit_;
     std::uint64_t seq_ = 0;
     std::atomic<int> waiting_{0}; ///< frames in takeWait (the workers' priority goes by it)
     bool stop_ = false;
