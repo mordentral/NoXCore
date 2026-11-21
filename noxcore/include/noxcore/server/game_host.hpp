@@ -182,10 +182,11 @@ struct HostedPlayer {
     /// messages to everyone wait for its CLIENT_READY (frees a node only once each
     /// in-game player has it).
     bool joined = false;
-    /// (noxcpp) Sent watching by its map request (MSG_REQUEST_MAP: it was in play, and the request's
-    /// Plr_GoObserver made it an observer) and not ready since: what a mode may put right at that
-    /// CLIENT_READY (GameHost::watchingForMap). Its next ready ends it.
-    bool watchingForMap = false;
+    /// (noxcpp) Sent watching by a download (it was in play, and the download's Plr_GoObserver
+    /// made it an observer: its map request, MSG_REQUEST_MAP, or its ask for a mod's game data,
+    /// MSG_NOXCPP_GAMEDATA's kWant) and not ready since: what a mode may put right at that
+    /// CLIENT_READY (GameHost::watchingForDownload). Its next ready ends it.
+    bool watchingForDownload = false;
     std::uint32_t heardAt = 0;     ///< (Player's: the frame of its last packet, SrvNet_OnPacket)
     std::uint8_t slot = 0;        ///< its bit in objects' syncMask (0-31)
     float viewHalfWidth = 320;     ///< half its screen (CLIENT_ACCEPT's size / 2: Player view)
@@ -512,11 +513,12 @@ public:
     /// (ServerTransport::latency); the host's own (player 0x1F's) is the latency compensation's:
     /// 0 none, 1 the least of the others' over 0, 2 their average, 3 the amount set. 0 for no player.
     int latencyOf(std::uint8_t peer) const;
-    /// (noxcpp) Whether the player on `peer` is watching only because its map request sent it so
-    /// (HostedPlayer::watchingForMap): asked by a mode at that request's CLIENT_READY
-    /// (Options::onClientReady), false once the ready is over. A player that went watching any other
-    /// way (its own request, an idle client's, a mode's hold) is never this.
-    bool watchingForMap(std::uint8_t peer);
+    /// (noxcpp) Whether the player on `peer` is watching only because a download sent it so (its
+    /// map, or a mod's game data: HostedPlayer::watchingForDownload): asked by a mode at the
+    /// CLIENT_READY that follows (Options::onClientReady), false once the ready is over. A player
+    /// that went watching any other way (its own request, an idle client's, a mode's hold) is never
+    /// this.
+    bool watchingForDownload(std::uint8_t peer);
     const Options& options() const noexcept { return options_; }
     /// Where the game's maps are (Options::mapsDir; none: the map's folder's parent).
     std::filesystem::path mapsDir() const;
@@ -1318,6 +1320,10 @@ private:
     int mapSendsInProgress_ = 0;                   ///< (g_mapSendsInProgress)
     std::uint32_t mapSendsStarted_ = 0;            ///< (g_mapSendsStarted: the unacknowledged count's "stream" for sender 30)
     void onRequestMap(std::uint8_t peer);  ///< SrvNet_OnRequestMap
+    /// A download asked for (the map's, a mod's game data): the player observing, free to join,
+    /// and out of its team (the map request's Plr_GoObserver(.., 1, 1) and Team_RemoveMember); one
+    /// that was in play marked HostedPlayer::watchingForDownload.
+    void watchForDownload(std::uint8_t peer);
     void onCancelMap(std::uint8_t peer);   ///< SrvNet_OnCancelMap
     void onReceivedMap(std::uint8_t peer); ///< SrvNet_OnReceivedMap
     /// A slot forgotten (SrvNet_OnReceivedMap's, Plr_OnDisconnect's): every object owed to player slot

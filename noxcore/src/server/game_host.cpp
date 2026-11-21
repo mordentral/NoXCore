@@ -2082,6 +2082,9 @@ void GameHost::onNoxcppGameData(std::uint8_t peer, std::span<const std::uint8_t>
         s.kinds.push_back(static_cast<std::uint8_t>(k));
     }
     dataSenders_.emplace(peer, std::move(s));
+    // The player watches its download, as a map request's does (watchForDownload: back in play as
+    // after one, a mode's say at its ready). A client with every file at hand never asks.
+    watchForDownload(peer);
 }
 
 void GameHost::dataSendFrame()
@@ -2202,22 +2205,22 @@ void GameHost::onClientReady(std::uint8_t peer)
                 sendImportant(peer, World::textMessage(strings::fromUtf8(options_.stockRefusal->notice), 0));
             }
         }
-        players_[peer].watchingForMap = false;
+        players_[peer].watchingForDownload = false;
         return;
     }
     if (options_.onClientReady) {
         options_.onClientReady(*this, peer); // (noxcpp: a mode told, e.g. to send its multiclass word)
     }
-    // (noxcpp) A map request's watching is over with this ready (the mode had its say on it).
+    // (noxcpp) A download's watching is over with this ready (the mode had its say on it).
     if (const auto it = players_.find(peer); it != players_.end()) {
-        it->second.watchingForMap = false;
+        it->second.watchingForDownload = false;
     }
 }
 
-bool GameHost::watchingForMap(std::uint8_t peer)
+bool GameHost::watchingForDownload(std::uint8_t peer)
 {
     const auto it = players_.find(peer);
-    if (it == players_.end() || !it->second.watchingForMap) {
+    if (it == players_.end() || !it->second.watchingForDownload) {
         return false;
     }
     const ServerObject* unit = server_.world().byExtent(it->second.extent);

@@ -13,6 +13,8 @@
 // three checkboxes switch each part off. With no audio device, or no Audio.bag, it stays silent.
 #pragma once
 
+#include "game_sounds.hpp"
+
 #include "noxcore/audio/audio_bag.hpp"
 #include "noxcore/audio/mixer.hpp"
 #include "noxcore/audio/music.hpp"
@@ -150,7 +152,11 @@ public:
     void setLog(bool on) { log_ = on; }
 
     nox::audio::SoundEngine& engine() { return engine_; }
-    const nox::audio::SoundEventTable& events() const { return events_; }
+    const nox::audio::SoundEventTable& events() const { return sounds_.table(); }
+    /// A game's sound effects' table (game_sounds.hpp): a mod's whole thing.bin's (`files`, its
+    /// set; `things` the app's thing table now), or the install's again (no files). Any sound
+    /// effect or loop playing stops when the table is made anew.
+    void useGameSounds(const nox::things::ThingDb& things, std::span<const nox::things::DataFileBytes> files);
 
 private:
     Audio(SDL_AudioStream* stream, std::uint32_t rate, const std::filesystem::path& gameDir,
@@ -161,7 +167,7 @@ private:
     SDL_AudioStream* stream_ = nullptr;
     nox::audio::Mixer mixer_;
     nox::audio::AudioBag bag_;
-    nox::audio::SoundEventTable events_;
+    GameSounds sounds_; ///< (the engine reads its table)
     nox::audio::SoundEngine engine_;
     nox::audio::MusicPlayer music_;
     nox::audio::DialogPlayer dialog_;

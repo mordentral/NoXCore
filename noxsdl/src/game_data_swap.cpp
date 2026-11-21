@@ -2,6 +2,7 @@
 #include "game_data_swap.hpp"
 
 #include "app.hpp"
+#include "audio.hpp"
 #include "local_host.hpp"
 #include "spell_chant.hpp"
 
@@ -71,6 +72,9 @@ void restoreInstall(App& app, bool bases)
     app.installTables.reset();
     app.gameDataHash = 0;
     remakeFromTables(app);
+    if (app.audio) {
+        app.audio->useGameSounds(app.things, {}); // (the install's sound events, if a mod's thing.bin's were the game's)
+    }
     SDL_Log("game data: the install's again");
 }
 
@@ -104,6 +108,9 @@ std::string useGameData(App& app, std::uint32_t hash, const std::vector<nox::thi
     app.gameDataHash = hash;
     nox::things::useAddedTypeBases(tables); // (the mod's new types' stock types, for this game; a whole thing.bin's: none)
     remakeFromTables(app);
+    if (app.audio) {
+        app.audio->useGameSounds(app.things, files); // (a whole thing.bin's AUD and AVNT, as GAME.EXE reads its own file's)
+    }
     SDL_Log("game data: this game's mod's own (%zu files) in place of the install's", files.size());
     return {};
 }

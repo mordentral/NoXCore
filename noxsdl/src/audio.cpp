@@ -62,7 +62,7 @@ std::unique_ptr<Audio> Audio::open(const std::filesystem::path& gameDir, const n
     SDL_SetAudioStreamGetCallback(stream, &Audio::feed, audio.get());
     SDL_ResumeAudioStreamDevice(stream);
     SDL_Log("audio: %u Hz, %zu sound events, %zu samples", rate,
-            static_cast<std::size_t>(std::ranges::count_if(audio->events_.events, [](const auto& e) { return e.defined; })),
+            static_cast<std::size_t>(std::ranges::count_if(audio->events().events, [](const auto& e) { return e.defined; })),
             audio->bag_.samples().size());
     return audio;
 }
@@ -72,8 +72,8 @@ Audio::Audio(SDL_AudioStream* stream, std::uint32_t rate, const std::filesystem:
     : stream_(stream)
     , mixer_(rate)
     , bag_(std::move(bag))
-    , events_(nox::audio::buildSoundEvents(things, &bag_))
-    , engine_(events_, bag_, mixer_, now())
+    , sounds_(things, &bag_)
+    , engine_(sounds_.table(), bag_, mixer_, now())
     , music_(mixer_, gameDir, now())
     , dialog_(mixer_, gameDir, now())
     , rate_(rate)
@@ -377,6 +377,19 @@ void Audio::stopEffects()
     cues_.clear();
     dialog_.stop();
     mixer_.stopStream(nox::audio::Mixer::kModUi);
+}
+
+void Audio::useGameSounds(const nox::things::ThingDb& things, std::span<const nox::things::DataFileBytes> files)
+{
+    if (!sounds_.changes(files)) {
+        return;
+    }
+    // The voices hold their events' entries, the loops their voices: stopped before the table changes.
+    engine_.stopAll();
+    loops_.clear();
+    sounds_.use(things, files);
+    SDL_Log("audio: %s sound events (%zu)", sounds_.fromMod() ? "the mod's thing.bin's" : "the install's",
+            static_cast<std::size_t>(std::ranges::count_if(sounds_.table().events, [](const auto& e) { return e.defined; })));
 }
 
 void Audio::enterGame()

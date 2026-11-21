@@ -88,6 +88,7 @@ add_executable(noxsdl WIN32
     src/effects_puffs.cpp
     src/game_cursor.cpp
     src/game_data_swap.cpp
+    src/game_sounds.cpp
     src/game_session.cpp
     src/game_windows.cpp
     src/gpu_atlas.cpp

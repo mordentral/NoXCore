@@ -129,10 +129,10 @@ bool GameHost::mapSendLoadForGuests()
     return true;
 }
 
-void GameHost::onRequestMap(std::uint8_t peer)
+void GameHost::watchForDownload(std::uint8_t peer)
 {
-    // SrvNet_OnPacket's 0xB6 first: the player goes observing (Plr_GoObserver(.., 1, 1): free to
-    // join, forced) and leaves its team (Team_RemoveMember).
+    // The player goes observing (Plr_GoObserver(.., 1, 1): free to join, forced) and leaves its
+    // team (Team_RemoveMember).
     if (const auto it = players_.find(peer); it != players_.end()) {
         if (ServerObject* unit = server_.world().byExtent(it->second.extent); unit && unit->player) {
             const bool inPlay = !unit->player->observing;
@@ -140,10 +140,16 @@ void GameHost::onRequestMap(std::uint8_t peer)
             goObserver(f, *unit, true, true);
             removeTeamMember(server_.world(), *unit);
             // (noxcpp) Watching for this download alone, not by a choice of its own: a mode may put
-            // it back in play at the ready that follows (watchingForMap).
-            it->second.watchingForMap = inPlay || it->second.watchingForMap;
+            // it back in play at the ready that follows (watchingForDownload).
+            it->second.watchingForDownload = inPlay || it->second.watchingForDownload;
         }
     }
+}
+
+void GameHost::onRequestMap(std::uint8_t peer)
+{
+    // SrvNet_OnPacket's 0xB6 first: the player watches the download (watchForDownload).
+    watchForDownload(peer);
     // SrvNet_OnRequestMap: counted as under way even when it's turned down (an original bug);
     // an idle sender starts: block 1, 512 bytes a block, the size loaded, the time.
     ++mapSendsInProgress_;
@@ -203,7 +209,7 @@ void GameHost::onCancelMap(std::uint8_t peer)
     // SrvNet_OnCancelMap: its sender reset (its own copy freed).
     mapSendReset(mapSenders_[peer]);
     if (const auto p = players_.find(peer); p != players_.end()) {
-        p->second.watchingForMap = false; // (noxcpp: no download's ready to come: watching as the game leaves it)
+        p->second.watchingForDownload = false; // (noxcpp: no download's ready to come: watching as the game leaves it)
     }
     if (mapSendsInProgress_ != 0) {
         --mapSendsInProgress_;

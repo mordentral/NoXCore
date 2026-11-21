@@ -6,9 +6,10 @@
 // contents are swapped (the install's kept in App::installTables meanwhile), on the main thread
 // before the game's first map, with nothing of any game drawn yet. What was made from them is made
 // afresh: every type's art (ThingArt::reset), the types the scene names, the spell chant's
-// phonemes and the looping sounds. What keeps the install's (made once at start-up, from the
-// install's own tables): the sound effects' table (thing.bin's AUD and AVNT sections) and the
-// minimap's invisible wall sets, the HUD's and cursor's pictures by name.
+// phonemes and the looping sounds; with a whole thing.bin, the sound effects' table too (its AUD
+// and AVNT sections: game_sounds.hpp; a thing.patch can't change them). What keeps the install's
+// (made once at start-up, from the install's own tables): the minimap's invisible wall sets, the
+// HUD's and cursor's pictures by name.
 //
 // No host thread reads the app's tables meanwhile: a hosted mod game's server reads its own
 // (LocalHost::modeData), and the hosts that left their games are let go first.
