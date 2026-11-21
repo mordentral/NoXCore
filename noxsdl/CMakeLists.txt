@@ -256,6 +256,13 @@ set(NOXSDL_SHADERS
     # The 3D view's vertex shader (view3d_gpu.cpp draws with its own pipelines, not SDL's).
     view3d_scene.vert)
 
+if(NOX_BUILD_PUBLIC_CHECKS)
+    add_executable(depth_fallback_check checks/depth_fallback.cpp src/gpu_shader_code.cpp)
+    target_link_libraries(depth_fallback_check PRIVATE nox::core SDL3::SDL3)
+    add_test(NAME depth_fallback COMMAND depth_fallback_check)
+    set_tests_properties(depth_fallback PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 45)
+endif()
+
 # shaders/<shader>.hlsl compiled to <format> (dxil, spv) by `compiler` and embedded as
 # kShader_<name>_<format>: <name> is a fragment shader's own name, view3d_scene_vert the vertex
 # shader's.
@@ -299,6 +306,9 @@ function(noxsdl_add_shader shader format)
         VERBATIM
     )
     target_sources(noxsdl PRIVATE ${cpp})
+    if(TARGET depth_fallback_check)
+        target_sources(depth_fallback_check PRIVATE ${cpp})
+    endif()
 endfunction()
 
 find_program(NOXSDL_DXC dxc)
@@ -315,6 +325,9 @@ if(NOXSDL_DXC)
         noxsdl_add_shader(${shader} dxil)
     endforeach()
     target_compile_definitions(noxsdl PRIVATE NOXSDL_HAVE_DXIL=1)
+    if(TARGET depth_fallback_check)
+        target_compile_definitions(depth_fallback_check PRIVATE NOXSDL_HAVE_DXIL=1)
+    endif()
 endif()
 
 find_program(NOXSDL_GLSLANG NAMES glslangValidator glslang)
@@ -324,6 +337,9 @@ if(NOXSDL_GLSLANG)
         noxsdl_add_shader(${shader} spv)
     endforeach()
     target_compile_definitions(noxsdl PRIVATE NOXSDL_HAVE_SPIRV=1)
+    if(TARGET depth_fallback_check)
+        target_compile_definitions(depth_fallback_check PRIVATE NOXSDL_HAVE_SPIRV=1)
+    endif()
 endif()
 
 if(NOT NOXSDL_DXC AND NOT NOXSDL_GLSLANG)
