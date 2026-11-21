@@ -127,8 +127,8 @@ declare nox: {
     unitsNear: (x: number, y: number, radius: number, filter: NoxUnitFilter?) -> { number },
     --- How many units unitsNear would list (no list made).
     countNear: (x: number, y: number, radius: number, filter: NoxUnitFilter?) -> number,
-    --- A point effect every client draws (a MSG_FX_* message that carries only x and y).
-    effect: (op: number, x: number, y: number) -> (),
+    --- An effect every client draws: op a MSG_FX_* message of a point (x, y), of two points (x, y, x2, y2: lightning, rays) or the green bolt (0x98: x, y, x2, y2, its frames); or a quest effect by name: "GENERATOR_BREAK" (x, y, size 0-255, 200 a generator's), "GENERATOR_HURT" (x, y), "GREEN_ZAP" (x, y, x2, y2, frames).
+    effect: (op: number | string, x: number, y: number, x2: number?, y2: number?, frames: number?) -> (),
     --- A spell's sound's name (which: 0 its cast, 1 on, 2 off) for nox.sound; nil when none.
     spellSound: (spell: string | number, which: number?) -> string?,
     --- Makes a thing of a type (name or number) at (x, y), owned by maker if given, an item with a spec's modifiers; its id, nil for no such type.
@@ -201,6 +201,16 @@ declare nox: {
     setTeam: (id: number, team: number) -> (),
     --- Sets or clears a thing's NO_COLLIDE flag: nothing touches it, it pushes nothing.
     setNoCollide: (id: number, on: boolean?) -> (),
+    --- A thing's object flags as the engine has them (0x10 SHORT, 0x40 NO_COLLIDE, 0x2000 NO_PUSH_CHARACTERS, 0x4000 AIRBORNE, 0x8000 DEAD, 0x1000000 ENABLED...), read only.
+    flags: (id: number) -> number,
+    --- Sets (on or nil) or clears flags among 0x10 SHORT (missiles and flyers pass over it), 0x40 NO_COLLIDE, 0x2000 NO_PUSH_CHARACTERS (creatures don't push it) and 0x8000 DEAD (not a creature's or a player's: a chest with it stays shut), as fields; nothing sent.
+    setFlag: (id: number, flags: number, on: boolean?) -> (),
+    --- A creature's status bits as it plays (monster.bin's STATUS and the AI's own: 0x4000 running...); given bits among the run ones (0x2000 CAN_RUN, 0x4000 RUNNING, 0x8000 ALWAYS_RUN, 0x10000 NEVER_RUN), sets (on or nil) or clears them first; the bits after.
+    monsterStatus: (id: number, bits: number?, on: boolean?) -> number,
+    --- Where a player's cursor is in the world, as its client last told the server (what aims its swings and spells).
+    cursor: (unit: number) -> (number, number),
+    --- What a wall type's (thing.bin's WALL name) breakable walls throw when hit or broken, for this map alone: up to 8 thing types in place of thing.bin's ({} none); nil, thing.bin's again. Each map loads with thing.bin's.
+    setWallDebris: (wallType: string, names: { string }?) -> (),
     --- A missile's hit shape: a point made a circle of 1-32, a circle's radius up to 4x its type's (its owner spared by the growth until it's clear; only nil gives the stock hit back).
     setHitRadius: (id: number, radius: number?) -> (),
     --- A missile's burst reach and push reach times 0.5-3, read as it bursts (nil: 1).
@@ -243,7 +253,7 @@ declare nox: {
     backIntoPlay: (unit: number) -> (),
     --- on: puts a player out of play watching (unseen, out of reach), held out (its Action never brings it in), its camera the mode's (nox.camera; where it is till then) and no "observation mode" told; off: back into play as nox.backIntoPlay brings it, the hold let go (as it is when anything else brings it into play: a later watch is a free one).
     observe: (unit: number, on: boolean) -> (),
-    --- Holds a watching player's camera (the view it's sent and where it hears from) at (x, y), or on a thing (thingOrX alone: following it while it's in the world), so its own controls no longer move it; nil lets it go (the stock observer's controls again).
+    --- Holds a watching player's camera (the view it's sent and where it hears from) at (x, y), or on a thing (thingOrX alone: following it while it's in the world), so its own controls no longer move it; nil lets it go (the stock observer's controls again). A player in play (alive, not watching) watches a thing as a creature's watcher does (status 2: its camera on it, it stands where it is; its own Move, Action or Jump or a hit bring it back), the mode's abilities still heard from it; nil brings it back.
     camera: (unit: number, thingOrX: number?, y: number?) -> (),
     --- The spot beside a soul gate where its fallen come back.
     nearSoulGate: (gate: number) -> (number, number),

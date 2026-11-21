@@ -45,6 +45,7 @@ target_sources(noxmodes PRIVATE
     script/src/mod_camera.cpp
     script/src/mod_draw_scale.cpp
     script/src/mod_events.cpp
+    script/src/mod_fields.cpp
     script/src/mod_generate.cpp
     script/src/mod_items.cpp
     script/src/mod_leap.cpp

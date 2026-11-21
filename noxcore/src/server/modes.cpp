@@ -909,6 +909,7 @@ void observeClear(Fight& fight, ServerObject& player)
     fight.setStatus(player, 2, false);
     player.player->cameraFollow = 0;
     player.player->observing = false; // (Update: the player's again)
+    player.player->modWatch = false;
 }
 
 void observeCreature(Fight& fight, ServerObject& player, ServerObject& creature)
@@ -925,6 +926,7 @@ void observeCreature(Fight& fight, ServerObject& player, ServerObject& creature)
     p.cameraFollow = 0;
     follow(p, creature.extent);
     p.observing = true; // (Update: Plr_UpdateObserver)
+    p.modWatch = false;  // (noxcpp: a mode's watch sets it again after: nox.camera)
 }
 
 void nobodyLeftCheck(Fight& fight)

@@ -2115,15 +2115,73 @@ int noxTell(lua_State* L)
     return 0;
 }
 
+int wholeArg(lua_State* L, int idx, double lo, double hi, const char* what);
+
+/// u16 little-endian onto a message.
+void putU16(std::vector<std::uint8_t>& m, int v)
+{
+    m.push_back(static_cast<std::uint8_t>(v));
+    m.push_back(static_cast<std::uint8_t>(v >> 8));
+}
+
+/// A point as the game's effects send one: each coordinate cut to an int, its low 16 bits.
+void putPoint(std::vector<std::uint8_t>& m, float x, float y)
+{
+    putU16(m, static_cast<int>(x));
+    putU16(m, static_cast<int>(y));
+}
+
 int noxEffect(lua_State* L)
 {
-    // A point effect every client draws: one of the game's MSG_FX_* that is just a point
-    // ({op, u16 x, u16 y}), never another message (a client would frame what follows wrongly).
+    // An effect every client draws, never another message (a client would frame what follows
+    // wrongly). op a number: one of the game's MSG_FX_* that is a point ({op, u16 x, u16 y}), two
+    // points ({op, x1, y1, x2, y2}: lightning, rays...), or MSG_FX_GREEN_BOLT (0x98: two points and
+    // the u16 frames it lasts). op a name: one of the quest's effects (MSG_GAUNTLET's):
+    // "GENERATOR_BREAK" (x, y, size 0-255: a generator's breaking burst, the game's 200),
+    // "GENERATOR_HURT" (x, y: the sparks of a blow to one), "GREEN_ZAP" (x1, y1, x2, y2, frames: the
+    // green bolt a generator's new creature comes down by).
+    server::World& world = worldOf(L);
+    std::vector<std::uint8_t> m;
+    if (lua_type(L, 1) == LUA_TSTRING) {
+        const std::string_view name = lua_tostring(L, 1);
+        m = {static_cast<std::uint8_t>(net::Op::Gauntlet)};
+        if (name == "GENERATOR_BREAK") {
+            m.push_back(0x19);
+            putPoint(m, coordArg(L, 2), coordArg(L, 3));
+            m.push_back(static_cast<std::uint8_t>(lua_isnoneornil(L, 4) ? 200 : wholeArg(L, 4, 0, 255, "a size 0-255")));
+        } else if (name == "GENERATOR_HURT") {
+            m.push_back(0x1A);
+            putPoint(m, coordArg(L, 2), coordArg(L, 3));
+        } else if (name == "GREEN_ZAP") {
+            m.push_back(0x10);
+            putPoint(m, coordArg(L, 2), coordArg(L, 3));
+            putPoint(m, coordArg(L, 4), coordArg(L, 5));
+            putU16(m, wholeArg(L, 6, 0, 65535, "its frames 0-65535"));
+        } else {
+            luaL_argerror(L, 1, "a MSG_FX_* number, or GENERATOR_BREAK, GENERATOR_HURT or GREEN_ZAP");
+        }
+        world.broadcasts().push_back({std::move(m), false, 0});
+        return 0;
+    }
     const int op = luaL_checkinteger(L, 1);
     luaL_argcheck(L, op >= 0 && op < 256, 1, "a message 0-255");
     const net::OpInfo& info = net::opInfo(static_cast<std::uint8_t>(op));
-    luaL_argcheck(L, info.name.starts_with("MSG_FX_") && info.serverToClient == 5, 1, "a point effect's message (MSG_FX_*, {x, y})");
-    server::pointFx(worldOf(L), static_cast<std::uint8_t>(op), coordArg(L, 2), coordArg(L, 3));
+    constexpr int kGreenBolt = 0x98;
+    const bool line = info.serverToClient == 9 || op == kGreenBolt;
+    luaL_argcheck(L, info.name.starts_with("MSG_FX_") && (info.serverToClient == 5 || line), 1,
+                  "an effect's message (MSG_FX_*: a point, two points, or the green bolt)");
+    if (!line) {
+        luaL_argcheck(L, lua_isnoneornil(L, 4), 4, "a point effect: x and y alone");
+        server::pointFx(world, static_cast<std::uint8_t>(op), coordArg(L, 2), coordArg(L, 3));
+        return 0;
+    }
+    m = {static_cast<std::uint8_t>(op)};
+    putPoint(m, coordArg(L, 2), coordArg(L, 3));
+    putPoint(m, coordArg(L, 4), coordArg(L, 5));
+    if (op == kGreenBolt) {
+        putU16(m, wholeArg(L, 6, 0, 65535, "its frames 0-65535"));
+    }
+    world.broadcasts().push_back({std::move(m), false, 0});
     return 0;
 }
 
@@ -4391,7 +4449,8 @@ void Impl::useAbility(std::uint8_t peer, std::span<const std::uint8_t> payload)
         return;
     }
     const server::ServerObject* unit = world.byExtent(host->players().at(peer).extent);
-    if (!unit || unit->gone() || !unit->player || unit->player->observing || (unit->flags & server::ObjFlag::Dead)) {
+    // (A player watching a thing for the mode, nox.camera: still in play, still heard.)
+    if (!unit || unit->gone() || !unit->player || (unit->player->observing && !unit->player->modWatch) || (unit->flags & server::ObjFlag::Dead)) {
         if (asked->release) {
             parts.abilities.letGo(peer);
             abilityEnded(peer, asked->def); // (a hold let go by a player out of play: its "end")
@@ -5480,7 +5539,7 @@ void ScriptedMode::tick(server::GameHost& host, std::uint32_t)
         const auto inPlay = [&](std::uint8_t peer) {
             const auto it = host.players().find(peer);
             const server::ServerObject* u = it != host.players().end() ? host.server().world().byExtent(it->second.extent) : nullptr;
-            return u && !u->gone() && u->player && !u->player->observing && !(u->flags & server::ObjFlag::Dead);
+            return u && !u->gone() && u->player && (!u->player->observing || u->player->modWatch) && !(u->flags & server::ObjFlag::Dead);
         };
         for (const auto& [peer, def] : impl.parts.abilities.step(inPlay)) {
             impl.guarded("onModAbility", [&] { impl.abilityEnded(peer, def); });

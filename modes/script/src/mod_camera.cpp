@@ -67,15 +67,32 @@ int noxCamera(lua_State* L)
     // no longer move it); nox.camera(unit, thing): held on the thing, following it while it's in
     // the world (where it was last, once it's gone); nox.camera(unit, nil): let go, the stock
     // observer's controls again (a held-out player stays out).
+    // A player in play: nox.camera(unit, thing) watches the thing as a creature's watcher does
+    // (playerObserveMonster: status 2, its camera on it, the observer's update; its own Move, Action
+    // or Jump, or a hit, bring it back), the mode's abilities still heard from it; nil brings it
+    // back (playerObserveClear).
     toolbox::refuseInsideAsked(L, "nox.camera");
     server::ServerObject& u = toolbox::playerUnitArg(L, 1);
     server::PlayerControl& p = *u.player;
     if (lua_isnoneornil(L, 2)) {
         luaL_argcheck(L, lua_isnoneornil(L, 3), 3, "nothing after nil");
         p.modCamera = false;
+        if (!watching(u) && (p.statusFlags & 2u)) {
+            server::Fight f = toolbox::fightOf(L);
+            server::observeClear(f, u);
+        }
         return 0;
     }
-    luaL_argcheck(L, watching(u), 1, "a player watching (nox.observe)");
+    if (!watching(u)) {
+        luaL_argcheck(L, !(u.flags & server::ObjFlag::Dead), 1, "a player alive or watching");
+        luaL_argcheck(L, lua_isnoneornil(L, 3), 1, "a player watching (nox.observe) for a point; a player in play watches a thing");
+        server::ServerObject& t = toolbox::objectArg(L, 2);
+        luaL_argcheck(L, !toolbox::hidden(L, t) && !t.gone(), 2, "no such thing (gone?)");
+        server::Fight f = toolbox::fightOf(L);
+        server::observeCreature(f, u, t);
+        p.modWatch = true;
+        return 0;
+    }
     if (lua_isnoneornil(L, 3)) {
         const server::ServerObject& t = toolbox::objectArg(L, 2);
         luaL_argcheck(L, !toolbox::hidden(L, t), 2, "no such thing (gone?)");
@@ -126,6 +143,7 @@ void releaseCameras(server::GameHost& host)
             u->player->modHeld = false;
         }
         u->player->modCamera = false;
+        u->player->modWatch = false; // (a watch it made goes on as the stock one: its controls end it)
     }
 }
 

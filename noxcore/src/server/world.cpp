@@ -2645,6 +2645,14 @@ int World::wallMaterial(std::string_view name) const
     return -1;
 }
 
+void World::setWallDebris(int material, std::optional<std::vector<std::string>> names)
+{
+    std::erase_if(wallDebris_, [&](const auto& e) { return e.first == material; });
+    if (names) {
+        wallDebris_.emplace_back(material, std::move(*names));
+    }
+}
+
 World::Line World::line(std::string_view label) const
 {
     if (!strings) {

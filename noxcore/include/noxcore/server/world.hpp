@@ -279,6 +279,11 @@ struct PlayerControl {
     /// goObserver tells it nothing and leaves the camera be. Off as it leaves watching
     /// (leaveObserver), by nox.camera(unit, nil) and at the mode's end; never sent.
     bool modCamera = false;
+    /// (noxcpp: a script mode's, nox.camera on a player in play) It watches a thing for the mode
+    /// (status 2, as a creature's watcher: playerObserveMonster): the mode's abilities still heard
+    /// from it. Off as that watch ends by any path (observeClear, a new watch) and at the mode's end;
+    /// never sent.
+    bool modWatch = false;
     float camX = 0;
     float camY = 0;
     ObjectRef cameraFollow;
@@ -2416,6 +2421,23 @@ public:
     std::uint8_t wallHealth(int material) const;
     std::uint8_t wallVariations(int material) const;
     int wallMaterial(std::string_view name) const;
+    /// (noxcpp: a mode's, nox.setWallDebris) The things a WALL material's breakable walls throw when
+    /// hit or broken, for this map alone (its world's): `names` in place of thing.bin's list (empty:
+    /// none), nullopt thing.bin's again. With none set the walls read thing.bin's, as ever.
+    void setWallDebris(int material, std::optional<std::vector<std::string>> names);
+    /// What a material's walls throw: setWallDebris's, else `own` (its thing.bin's list).
+    const std::vector<std::string>& wallDebris(int material, const std::vector<std::string>& own) const
+    {
+        if (wallDebris_.empty()) {
+            return own;
+        }
+        for (const auto& [m, names] : wallDebris_) {
+            if (m == material) {
+                return names;
+            }
+        }
+        return own;
+    }
     /// The Wall spell's walls, and what their end owes the players they were sent to (the bytes
     /// to send, by player slot).
     std::vector<MagicWall>& magicWalls() noexcept { return magicWalls_; }
@@ -2623,6 +2645,7 @@ private:
     std::uint32_t nextWallSerial_ = 0; ///< WallCell::serial's next
     std::vector<std::pair<int, int>> secretWalls_;
     std::vector<std::pair<int, int>> breakableWalls_;
+    std::vector<std::pair<int, std::vector<std::string>>> wallDebris_; ///< setWallDebris's, by material
     std::vector<std::uint32_t> wallDefFlags_; ///< WALL flags by material
     std::vector<std::uint8_t> wallDefHealth_;
     std::vector<std::uint8_t> wallDefVariations_;

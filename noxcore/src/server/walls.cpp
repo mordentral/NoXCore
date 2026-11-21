@@ -71,11 +71,11 @@ bool Walls::damage(int x, int y, int amount, int type, ServerObject* by)
     if (w->health > dmg) {
         w->health = static_cast<std::uint8_t>(w->health - dmg);
         const things::WallDef* def = w->material < things.walls.size() ? &things.walls[w->material] : nullptr;
-        if (def && !def->debris.empty()) {
+        if (const auto* list = def ? &world.wallDebris(w->material, def->debris) : nullptr; list && !list->empty()) {
             // One piece from its middle (pushed from its middle too: no push at all).
-            const int i = nox::util::uniform_int_distribution<int>(0, static_cast<int>(def->debris.size()) - 1)(rng);
+            const int i = nox::util::uniform_int_distribution<int>(0, static_cast<int>(list->size()) - 1)(rng);
             const float push = util::randomFloat(rng, 10.0f, 20.0f).f(); // (randomFloat, stored)
-            debris(def->debris[static_cast<std::size_t>(i)], middle(x), middle(y), push, middle(x), middle(y));
+            debris((*list)[static_cast<std::size_t>(i)], middle(x), middle(y), push, middle(x), middle(y));
         }
         if (by) { // (its material damaged, at what struck it)
             damagedSound(world, *by, wallMaterial);
@@ -103,7 +103,8 @@ bool Walls::breakWall(int x, int y)
     pointFx(world, 0x8A, cx, cy);
     if (!world.quest()) {
         const things::WallDef* def = w->material < things.walls.size() ? &things.walls[w->material] : nullptr;
-        const int count = def ? static_cast<int>(def->debris.size()) : 0;
+        const std::vector<std::string>* list = def ? &world.wallDebris(w->material, def->debris) : nullptr;
+        const int count = list ? static_cast<int>(list->size()) : 0;
         if (count != 0) {
             // 3-6 pieces, its material's debris kinds taken in turn from a random first one.
             int i = nox::util::uniform_int_distribution<int>(0, count - 1)(rng);
@@ -112,7 +113,7 @@ bool Walls::breakWall(int x, int y)
                 const float py = (util::randomFloat(rng, -2.0f, 2.0f) + cy).f();
                 const float px = (util::randomFloat(rng, -2.0f, 2.0f) + cx).f();
                 const float push = util::randomFloat(rng, 4.0f, 10.0f).f();
-                debris(def->debris[static_cast<std::size_t>(i)], px, py, push, cx, cy);
+                debris((*list)[static_cast<std::size_t>(i)], px, py, push, cx, cy);
                 i = (i + 1) % count;
             }
         }
