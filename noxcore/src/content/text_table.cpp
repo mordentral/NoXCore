@@ -931,6 +931,11 @@ std::optional<std::size_t> addLike(TextTable& base, const TableRecord& pr, bool 
         problems.push_back(label + ": modifier.bin takes no new record here (only a mod's own data adds one: each side's merge is checked to be the same)");
         return std::nullopt;
     }
+    if (pr.name == "END") {
+        // (Its name line would end the section: the readers would take the rest as no record.)
+        problems.push_back(label + ": not a record's name (the readers take END as the section's end)");
+        return std::nullopt;
+    }
     const auto like = base.find(pr.like, pr.section);
     if (!like) {
         problems.push_back(label + ": modifier.bin has no " + pr.like + " in " + pr.section + " to make it like");
