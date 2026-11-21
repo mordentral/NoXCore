@@ -7199,7 +7199,7 @@ editor.status.save_failed = Сохранить не удалось
 #@ 45b405e1 mt: Saved {path}
 editor.status.saved = Сохранено: {path}
 #@ 8e652581 mt: Saved {path}. Leftover save files are in {folder}.
-editor.status.saved_cleanup = Карта сохранена: {path}. Оставшиеся временные файлы находятся в {folder}.
+editor.status.save_cleanup = Карта сохранена: {path}. Оставшиеся временные файлы находятся в {folder}.
 #@ f1bed63e mt: ({n} sending)
 editor.status.sending = (отправляется: {n})
 #@ fa770f64 mt: Session {name}

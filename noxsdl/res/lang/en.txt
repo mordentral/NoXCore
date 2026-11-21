@@ -10702,15 +10702,15 @@ editor.status.refused = {action} refused: {why}
 # noxsdl/src/editor/map_editor.cpp:451
 #@ 9f9d18e0: {action} refused: {element} is being edited by {who}
 editor.status.refused_held = {action} refused: {element} is being edited by {who}
+# noxsdl/src/editor/map_editor.cpp:1575
+#@ 8e652581: Saved {path}. Leftover save files are in {folder}.
+editor.status.save_cleanup = Saved {path}. Leftover save files are in {folder}.
 # noxsdl/src/editor/map_editor.cpp:336
 #@ 0685388d: Save failed
 editor.status.save_failed = Save failed
 # noxsdl/src/editor/map_editor.cpp:1573
 #@ 45b405e1: Saved {path}
 editor.status.saved = Saved {path}
-# noxsdl/src/editor/map_editor.cpp:1575
-#@ 8e652581: Saved {path}. Leftover save files are in {folder}.
-editor.status.saved_cleanup = Saved {path}. Leftover save files are in {folder}.
 # noxsdl/src/editor/map_editor_ui.cpp:488
 #@ f1bed63e: ({n} sending)
 editor.status.sending = ({n} sending)

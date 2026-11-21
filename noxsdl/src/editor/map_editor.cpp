@@ -1572,7 +1572,7 @@ void MapEditor::reportSavedMap(const fs::path& map, const fs::path& retainedClea
     if (retainedCleanup.empty()) {
         status(format(NOX_TR("editor.status.saved", "Saved {path}"), {{"path", pathText(map)}}));
     } else {
-        status(format(NOX_TR("editor.status.saved_cleanup", "Saved {path}. Leftover save files are in {folder}."),
+        status(format(NOX_TR("editor.status.save_cleanup", "Saved {path}. Leftover save files are in {folder}."),
                       {{"path", pathText(map)}, {"folder", pathText(retainedCleanup)}}));
     }
 }
