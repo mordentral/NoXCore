@@ -317,7 +317,7 @@ std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::
 {
     std::filesystem::path retained;
     auto map = detail::publishMap(mapsDir, name, files, who, sidecar, retained, std::filesystem::rename, std::filesystem::remove_all);
-    if (!retained.empty()) std::clog << who << ": saved map; cleanup required in " << retained << '\n';
+    if (!retained.empty()) std::clog << who << ": saved map; cleanup required in " << pathUtf8(retained) << '\n';
     if (retainedCleanup) *retainedCleanup = std::move(retained);
     return map;
 }

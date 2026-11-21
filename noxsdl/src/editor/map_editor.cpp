@@ -330,12 +330,7 @@ bool MapEditor::saveAs(const std::string& name)
         history_.markSaved();
         settings_.addRecent(pathText(paths.map));
         saveSettings();
-        if (paths.retainedCleanup.empty()) {
-            status(format(NOX_TR("editor.status.saved", "Saved {path}"), {{"path", pathText(paths.map)}}));
-        } else {
-            status(format(NOX_TR("editor.status.saved_cleanup", "Saved {path}. Leftover save files are in {folder}."),
-                          {{"path", pathText(paths.map)}, {"folder", pathText(paths.retainedCleanup)}}));
-        }
+        reportSavedMap(paths.map, paths.retainedCleanup);
     } catch (const std::exception& ex) {
         errorText_ = format(NOX_TR("editor.error.not_saved", "Not saved:\n{error}"), {{"error", ex.what()}});
         status(NOX_TR("editor.status.save_failed", "Save failed"));
@@ -1569,6 +1564,16 @@ void MapEditor::runValidation()
         // Off the drawing thread, on a copy (the editor stays usable on big maps).
         validatedRevision_ = rev;
         validating_ = std::async(std::launch::async, [doc = doc_, things = &things_] { return me::validate(doc, *things); });
+    }
+}
+
+void MapEditor::reportSavedMap(const fs::path& map, const fs::path& retainedCleanup)
+{
+    if (retainedCleanup.empty()) {
+        status(format(NOX_TR("editor.status.saved", "Saved {path}"), {{"path", pathText(map)}}));
+    } else {
+        status(format(NOX_TR("editor.status.saved_cleanup", "Saved {path}. Leftover save files are in {folder}."),
+                      {{"path", pathText(map)}, {"folder", pathText(retainedCleanup)}}));
     }
 }
 

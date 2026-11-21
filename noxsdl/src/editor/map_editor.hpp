@@ -273,6 +273,7 @@ private:
     void resetDocumentState();
     bool save();
     bool saveAs(const std::string& name);
+    void reportSavedMap(const std::filesystem::path& map, const std::filesystem::path& retainedCleanup);
     /// Whether Save asks for a name: none yet (a stock map's edits, a new map), or one the game's
     /// map lists can't show (over 8 characters: a map named before the limit still opens).
     bool saveNeedsName() const;
