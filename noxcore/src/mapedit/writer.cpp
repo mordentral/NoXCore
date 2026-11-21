@@ -442,19 +442,16 @@ SavedPaths saveDocument(const MapDocument& d, const things::ThingDb& things, con
     if (!errors.empty()) {
         throw FormatError("map editor: the map can't be saved:" + errors);
     }
-    // (Each file written beside, then moved over: a failed save never leaves half a map.)
-    constexpr std::string_view kWho = "map editor";
-    SavedPaths out;
-    out.map = map::writeMapFolder(mapsDir, name, encodeFiles(d, things), kWho);
-    out.nxz = std::filesystem::path(out.map).replace_extension(".nxz");
+    std::optional<std::string> text;
     if (sidecar) {
-        out.sidecar = std::filesystem::path(out.map).replace_extension(".nxe");
-        // Whether the map needs a NoX Core server, from the script as saved (in the sidecar only).
         Sidecar side = *sidecar;
         markNoxCoreNeeds(side, d);
-        const std::string text = side.toJson();
-        map::writeFileReplacing(out.sidecar, std::span(reinterpret_cast<const std::uint8_t*>(text.data()), text.size()), kWho);
+        text = side.toJson();
     }
+    SavedPaths out;
+    out.map = map::writeMapFolder(mapsDir, name, encodeFiles(d, things), "map editor", text);
+    out.nxz = std::filesystem::path(out.map).replace_extension(".nxz");
+    if (sidecar) out.sidecar = std::filesystem::path(out.map).replace_extension(".nxe");
     return out;
 }
 
