@@ -260,6 +260,12 @@ public:
         /// one's), before it's relayed: true takes it (not relayed; the mode's own answers and
         /// commands, as "?difficulty").
         std::function<bool(GameHost&, std::uint8_t peer, std::u16string_view text)> onChat;
+        /// (noxcpp: a NoX Core mode's) The host console's load of a solo map (its MapInfo's type 1:
+        /// a campaign's), which a solo game's mode refuses (NoMapLoadNewMode): the mode takes it in
+        /// that refusal's place (a co-op campaign's party goes there as through a way on to it, the
+        /// WORKING save first). `map`: the map's name as findMap finds it. Whether it's under way
+        /// (false: not now). None: refused as GAME.EXE's.
+        std::function<bool(GameHost&, const std::string& map)> consoleLoad;
         /// noxcpp's own messages from a noxsdl client (one that identified itself; a stock
         /// client's are dropped), by their opcode: each NoX Core mode's set-up adds its own
         /// (MSG_NOXCPP_MODE_F4 0xF4, MSG_NOXCPP_MODE_F5 0xF5 and MSG_NOXCPP_COOP 0xF7: the built-in
@@ -526,7 +532,8 @@ public:
     /// Where the game's maps are (Options::mapsDir; none: the map's folder's parent).
     std::filesystem::path mapsDir() const;
     /// (noxcpp) The .map file the map `name` (a folder's name, no extension) is for this game: its
-    /// mode's own (Options::modeMaps) when it ships one of that name, else
+    /// mode's own (Options::modeMaps) when it ships one of that name, else another mod's map the
+    /// host console loaded in this game (one the maps folder hasn't), else
     /// <mapsDir>\<name>\<name>.map as it always was (whether or not it's there). Every load, list,
     /// cycle, vote, download and CRC of the game finds its maps through this.
     std::filesystem::path findMap(std::string_view name) const;
@@ -1056,6 +1063,19 @@ private:
     /// The load nextMap asked for, in the server's next frame (its load tick: Server's map-load hook).
     void loadNextMap();
     std::optional<std::string> pendingExit_;
+    /// (noxcpp) The maps the host console's load took from another installed mod (one this game's
+    /// mode doesn't ship, the maps folder hasn't): by lower-case name, found by findMap after the
+    /// mode's own for the rest of this game (its load, its download, a later exit to it).
+    std::map<std::string, std::filesystem::path> consoleMaps_;
+    /// The host console's load: the map `name` (a plain name, or "<mod id>/<name>") as this game
+    /// finds it, else in the installed mods (consoleMapOf).
+    struct ConsoleMap {
+        std::filesystem::path path; ///< (empty: none, `refusal` says why)
+        std::string name;           ///< the map's name to load (the mod's index's spelling)
+        bool otherMod = false;      ///< another mod's: pinned in consoleMaps_ once it's loaded
+        std::string refusal;        ///< the console's line when it can't be loaded (empty: CannotAccessMap)
+    };
+    ConsoleMap consoleMapOf(std::string_view name) const;
     // noxcpp's map vote (map_vote.hpp; not in the stock game).
     MapVote vote_;
     std::minstd_rand voteRng_; ///< (its own: the game's random numbers stay the game's)

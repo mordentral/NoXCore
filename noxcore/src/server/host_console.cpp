@@ -10,6 +10,7 @@
 #include "noxcore/io/file.hpp"
 #include "noxcore/map/map_file.hpp"
 #include "noxcore/map/sections.hpp"
+#include "noxcore/modes/registry.hpp"
 #include "noxcore/net/framing.hpp"
 #include "noxcore/server/abilities.hpp"
 #include "noxcore/server/collide.hpp"
@@ -26,6 +27,7 @@
 #include "noxcore/server/solo_save.hpp"
 #include "noxcore/server/sound.hpp"
 #include "noxcore/server/teleport.hpp"
+#include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/spell_ids.hpp"
@@ -112,6 +114,87 @@ void broadcastSound(World& world)
 }
 
 } // namespace
+
+GameHost::ConsoleMap GameHost::consoleMapOf(std::string_view name) const
+{
+    namespace fs = std::filesystem;
+    ConsoleMap out;
+    std::string_view modId; // ("<mod id>/<name>": that mod's map)
+    if (const auto slash = name.find('/'); slash != std::string_view::npos) {
+        modId = name.substr(0, slash);
+        name = name.substr(slash + 1);
+        if (modId.empty()) {
+            return out; // (CannotAccessMap)
+        }
+    }
+    if (name.empty() || name.find_first_of("/\\:") != std::string_view::npos) {
+        return out; // (CannotAccessMap)
+    }
+    out.name = std::string(name);
+    std::error_code ec;
+    const fs::path here = findMap(name); // (the mode's own, another mod's loaded before, else the maps folder's)
+    const bool hereThere = fs::exists(resolveNoCase(here), ec);
+    if (modId.empty() && hereThere) {
+        out.path = here; // (as it always was: the game's own lookup first)
+        return out;
+    }
+    const modes::Registry& registry = modes::registry();
+    if (!modId.empty()) {
+        // This game's own mod named: its own map of that name, or none.
+        if (const modes::Mode* named = registry.find(modId); named && named->maps && named->maps == options_.modeMaps) {
+            if (const ModeMaps::Entry* e = options_.modeMaps->find(name)) {
+                out.path = e->map;
+                out.name = e->name;
+            }
+            return out;
+        }
+    }
+    // The other installed mods' (loadMods', each its maps\ indexed as it was read).
+    struct Found {
+        const modes::Mode* mod;
+        const ModeMaps::Entry* entry;
+    };
+    std::vector<Found> found;
+    for (const modes::Mode* m : registry.all()) {
+        if (!m->maps || m->maps == options_.modeMaps || (!modId.empty() && !util::equalsNoCase(m->info.id, modId))) {
+            continue;
+        }
+        if (const ModeMaps::Entry* e = m->maps->find(name)) {
+            found.push_back({m, e});
+        }
+    }
+    if (found.empty()) {
+        return out; // (CannotAccessMap)
+    }
+    if (found.size() > 1) {
+        std::string ids;
+        for (const Found& f : found) {
+            ids += (ids.empty() ? "" : ", ") + f.mod->info.id;
+        }
+        out.refusal = l10n::format(NOX_TR("console.load.ambiguous", "More than one mod has a map named {map} ({mods}). Name the one to load, for example: load {mod}/{map}"),
+                                   {{"map", found.front().entry->name}, {"mods", ids}, {"mod", found.front().mod->info.id}});
+        return out;
+    }
+    const Found& f = found.front();
+    if (hereThere && here != f.entry->map) {
+        // (Named, but the name is this game's own map or the maps folder's: that one is the map of
+        // that name in this game, as everywhere.)
+        out.refusal = l10n::format(NOX_TR("console.load.name_taken",
+                                          "This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here."),
+                                   {{"map", f.entry->name}, {"mod", f.mod->info.id}});
+        return out;
+    }
+    if (f.mod->data) {
+        // (Its maps are made for its own game data: thing types this game's tables may lack.)
+        out.refusal = l10n::format(NOX_TR("console.load.mod_data", "{map} belongs to {mod}, which uses its own game data. Host {mod} to play it."),
+                                   {{"map", f.entry->name}, {"mod", f.mod->info.id}});
+        return out;
+    }
+    out.path = f.entry->map;
+    out.name = f.entry->name;
+    out.otherMod = true;
+    return out;
+}
 
 // A line of console output; also sent in chat to the remote sysop whose command printed it.
 // (noxcpp: the exe prints a sysop's command's lines on the host's screen alone, so the sysop saw
@@ -529,7 +612,10 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
     if (is(0, "load") && w.size() == 2) {
         // not in a quest; a map of this mode (a network game's, not a solo map's;
         // "NoMapLoadNewMode" for another mode's, but in a chat game); then it's loaded
-        // ("maploaded").
+        // ("maploaded"). (noxcpp: a map this game doesn't find is looked for in the other
+        // installed mods' maps, "<mod id>/<name>" naming one (consoleMapOf); a solo map in a solo
+        // game whose mode takes the console's loads, a co-op campaign, is that mode's to load
+        // (Options::consoleLoad), the party moved as by a way on to it.)
         if (world.quest()) {
             return;
         }
@@ -538,14 +624,18 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         if (name.size() > 4 && equalsNoCase(std::string_view(name).substr(name.size() - 4), ".map")) {
             name.resize(name.size() - 4);
         }
-        const fs::path path = findMap(name);
+        const ConsoleMap pick = consoleMapOf(name);
+        if (!pick.refusal.empty()) {
+            printText(pick.refusal);
+            return;
+        }
         std::uint32_t types = 0;
         try {
-            if (!fs::exists(resolveNoCase(path))) {
+            if (pick.path.empty() || !fs::exists(resolveNoCase(pick.path))) {
                 print("CannotAccessMap", {name});
                 return;
             }
-            const auto file = map::loadMapFile(path);
+            const auto file = map::loadMapFile(pick.path);
             types = file.find(map::MapInfo::kName) ? map::decodeSection<map::MapInfo>(file).gameFlags : 0;
         } catch (const std::exception&) {
             print("CannotAccessMap", {name});
@@ -554,13 +644,36 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         if (types == 0 || (types & 0x200u)) {
             return;
         }
+        // (noxcpp) Another mod's map is this game's from its load on: found by name as the game's
+        // own are (findMap), for its load, its download and a later way back to it.
+        bool pinned = false;
+        const auto pin = [&] {
+            if (pick.otherMod) {
+                pinned = consoleMaps_.emplace(util::lowered(pick.name), pick.path).second;
+            }
+        };
+        if ((types & 1u) && (world.gameFlags & GameFlag::Solo) && options_.consoleLoad) {
+            pin();
+            if (!options_.consoleLoad(*this, pick.name)) {
+                if (pinned) {
+                    consoleMaps_.erase(util::lowered(pick.name));
+                }
+                printText(l10n::format(NOX_TR("console.load.party_busy",
+                                              "The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment."),
+                                       {{"map", pick.name}}));
+                return;
+            }
+            print("maploaded", {pick.name});
+            return;
+        }
         // Out of chat, the map must allow the mode being played (0x17F0: the game flags' mode bits).
         if (!(world.gameFlags & GameFlag::Chat) && (mapToGameFlags(types) & world.gameFlags & 0x17F0u) == 0) {
             print("NoMapLoadNewMode");
             return;
         }
-        nextMap(name);
-        print("maploaded", {name});
+        pin();
+        nextMap(pick.name);
+        print("maploaded", {pick.name});
         return;
     }
     if (is(0, "list") && is(1, "users")) {

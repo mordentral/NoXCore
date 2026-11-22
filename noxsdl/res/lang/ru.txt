@@ -5,6 +5,15 @@
 # native speaker hasn't checked yet (drop it once checked). Keep every {placeholder}, %d and
 # ## id as the English has them. \n is a new line, \s a space at either end.
 
+#@ 590d8dc4 mt: More than one mod has a map named {map} ({mods}). Name the one to load, for example: load {mod}/{map}
+console.load.ambiguous = Карта {map} есть в нескольких модах ({mods}). Укажите, какую загрузить, например: load {mod}/{map}
+#@ 13d1f9bf mt: {map} belongs to {mod}, which uses its own game data. Host {mod} to play it.
+console.load.mod_data = Карта {map} принадлежит моду {mod}, который использует собственные игровые данные. Чтобы сыграть на ней, создайте игру {mod}.
+#@ 2d012396 mt: This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here.
+console.load.name_taken = В этой игре уже есть своя карта {map}, поэтому карту с таким именем из мода {mod} здесь загрузить нельзя.
+#@ 5d738dbd mt: The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment.
+console.load.party_busy = Отряд не может сейчас перейти на {map} (идёт сохранение или хост повержен). Попробуйте чуть позже.
+
 #@ c451710f mt: nothing to play
 content.audio.nothing_to_play = нечего воспроизводить
 #@ 2b043744 mt: Black

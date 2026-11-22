@@ -1915,6 +1915,10 @@ public:
         ObjectRef exit;
         std::uint32_t at = 0;
         std::uint32_t delay = 0;
+        /// (noxcpp) With no exit, the map to go to once saved, an exit's string ("<name>.map"): the
+        /// host console's load in a co-op campaign (GameHost::Options::consoleLoad), gone as through
+        /// an exit to it. Empty: none (every requestSave clears it).
+        std::string map;
     } saveRequest;
     std::string saveName;
     bool cameByExit = false;

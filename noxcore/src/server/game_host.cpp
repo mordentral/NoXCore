@@ -3792,6 +3792,11 @@ std::filesystem::path GameHost::findMap(std::string_view name) const
             return own->map;
         }
     }
+    if (!consoleMaps_.empty()) {
+        if (const auto it = consoleMaps_.find(util::lowered(name)); it != consoleMaps_.end()) {
+            return it->second; // (another mod's the console loaded: a name the maps folder hasn't)
+        }
+    }
     const std::string n(name);
     return mapsDir() / n / (n + ".map");
 }
@@ -3824,7 +3829,15 @@ RuleFolders GameHost::ruleFoldersOf(const std::string& name) const
                 at.shipped.clear();
                 at.readOnly = true;
             }
+            return at;
         }
+    }
+    if (const auto it = consoleMaps_.find(util::lowered(name)); it != consoleMaps_.end()) {
+        // Another mod's map the console loaded: the rules its mod ships beside it, read only.
+        at.own = it->second.parent_path().filename().string();
+        at.saved = it->second.parent_path();
+        at.shipped.clear();
+        at.readOnly = true;
     }
     return at;
 }

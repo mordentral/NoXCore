@@ -1594,6 +1594,34 @@ The engine's logic is the exe's; these are where the output differs.
     the middle of the screen for a few seconds, and in the console).
 - **Revert:** don't host one (every hook the core gives a mode is a no-op without one).
 
+### VD-80: The console's `load`: a co-op campaign's party to a campaign map; the installed mods' maps
+
+- **Vanilla:** the host console's `load <map>` (ParseCmd.c) loads a network map that allows the
+  mode being played. In a solo game every campaign map is refused ("NoMapLoadNewMode": the map's
+  type 1 isn't among the solo game's mode flags), so there's no way to jump to a campaign map. A
+  name not in the maps folder is "CannotAccessMap".
+- **Ours:**
+  - In a co-op campaign (stock or a campaign mod's, modes/coop: GameHost::Options::consoleLoad), a
+    campaign map (type 1) is the co-op director's to load: the party goes there as through a way
+    on to it (CoopDirector::consoleLoad: every talk closed, the glyphs on the ground gone, a
+    script's freeze let go; the WORKING save first, which keeps each guest's campaign character in
+    the Party folder and sends it to its client; then the map, a visited one's saved copy as a way
+    back to it gives). The save is at the host's place (no exit, so no exit's way out), and the map
+    named in the exit's place (World::SaveRequest::map). While a save is asked for or waiting (a
+    map's AUTOSAVE in its first second), or with the host down, it says it can't now and does
+    nothing. Network maps are refused there as before.
+  - A name the game doesn't find (its mode's own maps, then the maps folder, as every lookup) is
+    looked for in the other installed mods' maps (each mod's maps\, indexed as the mods are read).
+    One mod's is loaded, and is this game's map of that name from then on (GameHost::findMap: its
+    download, a way back to it); its .rul files are read beside it, never written. In two or more:
+    it names them, and `load <mod id>/<map>` loads that one. A name the game has itself stays the
+    game's (the mod's is refused, said so), and a mod with game data of its own is refused (its
+    maps want its tables: host that mod). Every refusal of the map's type stays as GAME.EXE's: a
+    plain network game still refuses a solo map, a mod's included.
+  - For testing specific maps (the owner's request of 2026-11-22).
+- **Revert:** host_console.cpp's `load` without consoleMapOf and Options::consoleLoad (CoopDirector
+  sets it in configure).
+
 ### VD-42: A mode's dead players keep their things (World::keepThingsOnDeath)
 
 - **Vanilla:** outside a quest a dead player's things go on the ground round it (Plr_Die's

@@ -122,6 +122,7 @@ std::filesystem::path CoopDirector::configure(server::GameHost::Options& o)
     o.onLeave = [this](server::GameHost& host, std::uint8_t peer, server::ServerObject& unit) { leaving(host, peer, unit); };
     o.noxcppMessages[coopmsg::kOp] = [this](server::GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m) { onMessage(host, peer, m); };
     o.onChat = [this](server::GameHost& host, std::uint8_t peer, std::u16string_view text) { return onChat(host, peer, text); };
+    o.consoleLoad = [this](server::GameHost& host, const std::string& map) { return consoleLoad(host, map); };
     o.onClientReady = [this](server::GameHost& host, std::uint8_t peer) { clientReady(host, peer); };
     o.carryLinks = [this](server::GameHost&, const server::KeyCarry& carry) { carryLinks(carry); };
     o.forPeer = [this](server::GameHost&, std::uint8_t peer, std::span<const std::uint8_t> m) { return forPeer(peer, m); };

@@ -239,6 +239,26 @@ void CoopDirector::partyGoes(server::Fight& fight, server::ServerObject* exit, b
     }
 }
 
+bool CoopDirector::consoleLoad(server::GameHost& host, const std::string& map)
+{
+    host_ = &host;
+    server::World& w = world();
+    const server::ServerObject* h = server::hostPlayer(w);
+    if (server::saveBusy(w) || !h || (h->flags & server::ObjFlag::Dead)) {
+        return false;
+    }
+    server::Fight f = host.server().fight();
+    partyGoes(f, nullptr, true); // (nobody walked onto it: the party let go of a script's freeze as a scripted way on's)
+    // (exitCollide's solo go with the map in the exit's place: the WORKING save, the map after it at
+    // the server's tick end, as an exit's.)
+    w.cameByExit = true;
+    w.saveName = "WORKING";
+    server::requestSave(w, true, 0, 0, f.frame);
+    w.saveRequest.map = map + ".map";
+    w.saveByExit = true;
+    return true;
+}
+
 server::ServerObject* CoopDirector::exitUnder(const server::ServerObject& unit)
 {
     // (Whether it's on or off: ExitCollide doesn't ask, nor does the contact that calls it.)

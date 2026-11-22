@@ -5,6 +5,15 @@
 # native speaker hasn't checked yet (drop it once checked). Keep every {placeholder}, %d and
 # ## id as the English has them. \n is a new line, \s a space at either end.
 
+#@ 590d8dc4 mt: More than one mod has a map named {map} ({mods}). Name the one to load, for example: load {mod}/{map}
+console.load.ambiguous = {map} 맵이 여러 모드에 있습니다({mods}). 불러올 맵을 지정하세요. 예: load {mod}/{map}
+#@ 13d1f9bf mt: {map} belongs to {mod}, which uses its own game data. Host {mod} to play it.
+console.load.mod_data = {map} 맵은 자체 게임 데이터를 쓰는 {mod} 모드의 맵입니다. 이 맵을 플레이하려면 {mod} 게임을 호스트하세요.
+#@ 2d012396 mt: This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here.
+console.load.name_taken = 이 게임에는 이미 {map}(이)라는 자체 맵이 있어서, 같은 이름의 {mod} 맵은 여기서 불러올 수 없습니다.
+#@ 5d738dbd mt: The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment.
+console.load.party_busy = 지금은 파티가 {map}(으)로 갈 수 없습니다(저장 중이거나 호스트가 쓰러져 있음). 잠시 후 다시 시도하세요.
+
 #@ c451710f mt: nothing to play
 content.audio.nothing_to_play = 재생할 것이 없음
 #@ 2b043744 mt: Black

@@ -1334,6 +1334,9 @@ void Server::tickEnd()
             const bool dead = (host->flags & ObjFlag::Dead) != 0;
             bool saved = false;
             ServerObject* exit = world_.saveRequest.exit ? world_.byExtent(world_.saveRequest.exit) : nullptr;
+            // (noxcpp) No exit but a map named in its place (the host console's load in a co-op
+            // campaign): gone to as through an exit to it, the save at the player (no exit's way out).
+            const std::string named = exit ? std::string() : world_.saveRequest.map;
             if (!dead) {
                 if (script_) {
                     script_->setFrame(clock_.frame());
@@ -1356,11 +1359,23 @@ void Server::tickEnd()
                         }
                     }
                     world_.exitTo = exit->exitMap;
+                } else if (!named.empty()) {
+                    if (!saveFolder_.empty()) {
+                        if (const auto copy = savedMapCopy(saveFolder_, named)) {
+                            world_.switchToSolo = true;
+                            world_.noMultiplayer = true;
+                            world_.soloPath = copy->string();
+                        }
+                    }
+                    world_.exitTo = named;
                 }
             } else if (exit) {
                 setPosition(world_, *host, exit->exitX, exit->exitY, clock_.frame());
             }
             requestSave(world_, false, world_.saveRequest.exit, 0, clock_.frame());
+            if (saved && !named.empty()) {
+                world_.saveByExit = true; // (as an exit's: the creatures that come along aren't a visited copy's too)
+            }
         }
     }
     pauseTick(world_);
