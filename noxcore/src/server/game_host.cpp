@@ -3801,6 +3801,37 @@ std::filesystem::path GameHost::findMap(std::string_view name) const
     return mapsDir() / n / (n + ".map");
 }
 
+std::optional<ModeMaps::Entry> GameHost::PinnedMaps::find(std::string_view name) const
+{
+    const std::string key = util::lowered(name);
+    std::lock_guard lock(mutex_);
+    const auto it = maps_.find(key);
+    return it != maps_.end() ? std::optional<ModeMaps::Entry>(it->second) : std::nullopt;
+}
+
+void GameHost::PinnedMaps::set(const std::map<std::string, ModeMaps::Entry>& maps)
+{
+    std::lock_guard lock(mutex_);
+    maps_ = maps;
+}
+
+std::function<std::optional<std::filesystem::path>(std::string_view)> GameHost::hostMapLookup() const
+{
+    // (The mode's index is fixed for the game; the pinned maps change on the server's thread, read
+    // here under their own lock. Neither is the host's itself: a lookup may outlive it.)
+    return [own = options_.modeMaps, pinned = std::shared_ptr<const PinnedMaps>(pinnedMaps_)](std::string_view name) -> std::optional<std::filesystem::path> {
+        if (own) {
+            if (const ModeMaps::Entry* e = own->find(name)) {
+                return e->map;
+            }
+        }
+        if (const auto e = pinned->find(name)) {
+            return e->map;
+        }
+        return std::nullopt;
+    };
+}
+
 std::filesystem::path GameHost::findMap(const Options& o, std::string_view name)
 {
     if (o.modeMaps) {

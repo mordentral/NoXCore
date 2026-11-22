@@ -37,6 +37,8 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <span>
@@ -545,6 +547,24 @@ public:
     /// Options::modeRulesDir\<name>\ and read there first, then beside the map in its mod's folder;
     /// every other map's are <mapsDir>\<name, 8 letters>\ as they always were.
     RuleFolders ruleFoldersOf(const std::string& name) const;
+    /// (noxcpp) The maps the host console pinned from other mods (consoleMaps_), shared with the
+    /// host's own client, which reads them on a thread of its own (noxsdl's main thread): a copy
+    /// kept under its own lock, set as a pin is made or taken back, read through find.
+    class PinnedMaps {
+    public:
+        /// The pinned map `name` (any case); none: not pinned.
+        std::optional<ModeMaps::Entry> find(std::string_view name) const;
+        void set(const std::map<std::string, ModeMaps::Entry>& maps);
+
+    private:
+        mutable std::mutex mutex_;
+        std::map<std::string, ModeMaps::Entry> maps_; ///< (by lower-case name; mutex_)
+    };
+    /// (noxcpp) What the host's own client finds a map's file by (HeadlessClient::setHostMaps): the
+    /// mode's own (Options::modeMaps, fixed at the start), then the console's pinned maps
+    /// (PinnedMaps). It holds shared copies alone, so it may be called on any thread and may
+    /// outlive the host.
+    std::function<std::optional<std::filesystem::path>(std::string_view name)> hostMapLookup() const;
     /// The game as XWIS lists it (the WOL record GAME.EXE posts: lobby::makeWolRecord): the name,
     /// the map, the mode, the players and their limit, the quest's stage, the Access settings
     /// (closed, password, the classes refused, the ping limits). The port is the caller's.
@@ -1068,6 +1088,8 @@ private:
     /// mode's own for the rest of this game (its load, its download's .nxz: mapSendFile, a later
     /// exit to it), each as its mod's index has it.
     std::map<std::string, ModeMaps::Entry> consoleMaps_;
+    /// consoleMaps_ as the host's own client reads it (hostMapLookup): set again at each change.
+    std::shared_ptr<PinnedMaps> pinnedMaps_ = std::make_shared<PinnedMaps>();
     /// The host console's load: the map `name` (a plain name, or "<mod id>/<name>") as this game
     /// finds it, else in the installed mods (consoleMapOf).
     struct ConsoleMap {

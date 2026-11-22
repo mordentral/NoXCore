@@ -368,7 +368,11 @@ void GameHost::onServerCmd(std::uint8_t peer, std::uint8_t cmd, const std::u16st
     }
     PlayerControl& p = *unit->player;
     // (Game flags 0xC000, a map switching: only 0, 4 and 5.)
-    const bool sysop = sysops_.contains(peer);
+    // Commands 1 and 2 are a sysop's, or anyone's in a solo game (0x800), which in the game has no
+    // one but its host. (noxcpp: a solo game with guests, the co-op campaign's, has others too:
+    // there only the host's own player is excused, the guests need the sysop's password as in a
+    // network game. VD-81.)
+    const bool trusted = sysops_.contains(peer) || ((world.gameFlags & GameFlag::Solo) && isHostPlayer(it->second));
     switch (cmd) {
     case 0: { // Plr_GoObserver: not over, not a quest, not observing already
         if ((world.gameFlags & GameFlag::GameOver) || world.quest() || (p.statusFlags & 1u)) {
@@ -390,7 +394,7 @@ void GameHost::onServerCmd(std::uint8_t peer, std::uint8_t cmd, const std::u16st
         break;
     }
     case 1: { // a script function by name (a sysop's): run with it as caller and trigger
-        if (!sysop && !(world.gameFlags & GameFlag::Solo)) {
+        if (!trusted) {
             break;
         }
         const std::string name = strings::toUtf8(text.substr(0, text.find(u' ')));
@@ -404,7 +408,7 @@ void GameHost::onServerCmd(std::uint8_t peer, std::uint8_t cmd, const std::u16st
         break;
     }
     case 2: // a console command (a sysop's), run as the host's
-        if (!sysop && !(world.gameFlags & GameFlag::Solo)) {
+        if (!trusted) {
             break;
         }
         print("RemoteSysop");
@@ -651,6 +655,9 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         const auto pin = [&] {
             if (pick.otherMod) {
                 pinned = consoleMaps_.emplace(util::lowered(pick.name), ModeMaps::Entry{pick.name, pick.path, pick.nxz}).second;
+                if (pinned) {
+                    pinnedMaps_->set(consoleMaps_); // (the host's own client finds it too: hostMapLookup)
+                }
             }
         };
         if ((types & 1u) && (world.gameFlags & GameFlag::Solo) && options_.consoleLoad) {
@@ -658,6 +665,7 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
             if (!options_.consoleLoad(*this, pick.name)) {
                 if (pinned) {
                     consoleMaps_.erase(util::lowered(pick.name));
+                    pinnedMaps_->set(consoleMaps_);
                 }
                 printText(l10n::format(NOX_TR("console.load.party_busy",
                                               "The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment."),

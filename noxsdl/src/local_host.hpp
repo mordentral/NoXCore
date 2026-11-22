@@ -96,6 +96,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -254,6 +255,10 @@ public:
     /// The maps the game's mode ships (GameHost::Options::modeMaps, fixed as the game began); null:
     /// none, the maps folder alone.
     std::shared_ptr<const nox::server::ModeMaps> modeMaps() const noexcept { return modeMaps_; }
+    /// What our client finds the game's own map files by (GameHost::hostMapLookup: the mode's
+    /// maps, then those the console took from other mods, shared under their own lock): called on
+    /// the main thread without the server lock, and it may outlive us.
+    const std::function<std::optional<std::filesystem::path>(std::string_view)>& hostMaps() const noexcept { return hostMaps_; }
     /// The game data files the game's mod ships (Mode::data: gameDataFor), its tables read from
     /// them and owned here for the game (the install's copied for the files it hasn't, so nothing
     /// the server's thread reads is the client's); null: the install's, the program's own tables.
@@ -437,6 +442,7 @@ private:
     bool noMultiplayer_ = false;
     std::string soloPath_;
     std::shared_ptr<const nox::server::ModeMaps> modeMaps_;
+    std::function<std::optional<std::filesystem::path>(std::string_view)> hostMaps_; ///< (set once, as game_ is made)
 
     /// Held by the closures that may outlive us (a fade's `done` wrapped for the server's side).
     std::shared_ptr<int> alive_ = std::make_shared<int>(0);

@@ -1634,9 +1634,29 @@ The engine's logic is the exe's; these are where the output differs.
     game's (the mod's is refused, said so), and a mod with game data of its own is refused (its
     maps want its tables: host that mod). Every refusal of the map's type stays as GAME.EXE's: a
     plain network game still refuses a solo map, a mod's included.
-  - For testing specific maps (the owner's request of 2026-11-22).
+  - The host's own client finds such a map's file as the host does (GameHost::hostMapLookup: the
+    mode's maps, then those the console took from other mods, a copy shared under its own lock as
+    the client reads it on its own thread), so it never downloads it from its own game; a mod
+    that ships no .nxz is played by the host as well (its guests can't download it in a network
+    game, as a mode's own map without one).
+  - For testing specific maps (the owner's request of 2026-11-22; the host's own client by the
+    owner's decision of 2026-11-22).
 - **Revert:** host_console.cpp's `load` without consoleMapOf and Options::consoleLoad (CoopDirector
-  sets it in configure).
+  sets it in configure); the host's client's lookup without the pinned maps (hostMapLookup).
+
+### VD-81: A co-op campaign's guests need the sysop's password for the host's commands
+
+- **Vanilla:** a client's MSG_SERVER_CMD runs a map script function by name (1) or a host console
+  command (2) for a sysop (a client that gave the sysop's password, MSG_SYSOP_PW), or for anyone in
+  a solo game (game flag 0x800: SrvNet_OnServerCmd). The game's solo game has no one but its host.
+- **Ours (`noxcore/src/server/host_console.cpp`, GameHost::onServerCmd):** a solo game with guests
+  (the co-op campaign, stock or a campaign mod's: GameHost::Options::soloGuests) has others in it
+  too, so the solo game's exemption is the host's own player's alone (GameHost::isHostPlayer).
+  A guest is treated as in a network game: refused unless it gave the sysop's password. A solo
+  game with no guests, the plain campaign, is as before (its one player is the host).
+- **Why:** otherwise any guest's client that sends the message runs any of the host's commands
+  (kick, ban, cheat, exec, set, load) and any map function: the owner's decision (2026-11-22).
+- **Revert:** take `isHostPlayer` out of onServerCmd's test.
 
 ### VD-42: A mode's dead players keep their things (World::keepThingsOnDeath)
 

@@ -425,6 +425,7 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
     gameDir_ = gameDir;
     modeMaps_ = o.modeMaps;
     game_ = std::make_unique<nox::server::GameHost>(things, path, o);
+    hostMaps_ = game_->hostMapLookup(); // (before the thread: from then on game_ is the server thread's)
     if (serverMode_) {
         serverMode_->attach(*game_);
     }
