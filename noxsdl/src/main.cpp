@@ -692,8 +692,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 return SDL_APP_FAILURE;
             }
             const auto png = nox::encodePng(p.width, p.height, p.rgba);
-            std::ofstream(opts.mapPictureOut, std::ios::binary).write(reinterpret_cast<const char*>(png.data()),
-                                                                  static_cast<std::streamsize>(png.size()));
+            // Report success only after the PNG has been written and closed.
+            nox::writeFileBytes(opts.mapPictureOut, png);
             SDL_Log("map picture: %s %dx%d in %llu ms", nox::pathUtf8(opts.mapPictureOut).c_str(), p.width, p.height,
                     static_cast<unsigned long long>(SDL_GetTicks() - start));
         } catch (const std::exception& ex) {
