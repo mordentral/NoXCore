@@ -716,6 +716,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     {
         bool fromDefault = false;
         const auto& settingsDir = backend::settingsDirectory(app->gameDir);
+        if (app->editorMapsDir.empty() && settingsDir != app->gameDir) app->editorMapsDir = settingsDir / "maps";
         const auto loaded = nox::config::loadConfig(settingsDir, app->gameDir, &fromDefault);
         if (!loaded) {
             SDL_Log("neither %s nor %s read: no key bindings", nox::pathUtf8(settingsDir / "nox.cfg").c_str(),

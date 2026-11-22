@@ -3017,34 +3017,34 @@ editor.builtins.sort_priority = Priority
 # noxsdl/src/editor/builtin_list.cpp:39
 #@ dbca0430: Use in stock maps
 editor.builtins.sort_usage = Use in stock maps
-# noxsdl/src/editor/map_editor_ui.cpp:59, noxsdl/src/editor/map_editor_ui.cpp:228
+# noxsdl/src/editor/map_editor_ui.cpp:60, noxsdl/src/editor/map_editor_ui.cpp:229
 #@ c2c76cb1: Edit
 editor.category.edit = Edit
-# noxsdl/src/editor/map_editor_ui.cpp:58, noxsdl/src/editor/map_editor_ui.cpp:197, noxsdl/src/editor/mod_panel.cpp:787 ...
+# noxsdl/src/editor/map_editor_ui.cpp:59, noxsdl/src/editor/map_editor_ui.cpp:198, noxsdl/src/editor/mod_panel.cpp:787 ...
 #@ 2b183663: File
 editor.category.file = File
-# noxsdl/src/editor/map_editor_ui.cpp:64, noxsdl/src/editor/map_editor_ui.cpp:315, noxsdl/src/editor/mod_panel.cpp:788 ...
+# noxsdl/src/editor/map_editor_ui.cpp:65, noxsdl/src/editor/map_editor_ui.cpp:316, noxsdl/src/editor/mod_panel.cpp:788 ...
 #@ b89df01a: Help
 editor.category.help = Help
-# noxsdl/src/editor/map_editor_ui.cpp:67, noxsdl/src/editor/mod_panel.cpp:194, noxsdl/src/editor/mod_panel.cpp:789
+# noxsdl/src/editor/map_editor_ui.cpp:68, noxsdl/src/editor/mod_panel.cpp:194, noxsdl/src/editor/mod_panel.cpp:789
 #@ 44a37323: Mod
 editor.category.mod = Mod
-# noxsdl/src/editor/map_editor_ui.cpp:66, noxsdl/src/editor/mod_panel.cpp:788, noxsdl/src/editor/script_panel.cpp:277 ...
+# noxsdl/src/editor/map_editor_ui.cpp:67, noxsdl/src/editor/mod_panel.cpp:788, noxsdl/src/editor/script_panel.cpp:277 ...
 #@ 29ab6f83: Play
 editor.category.play = Play
-# noxsdl/src/editor/map_editor_ui.cpp:65, noxsdl/src/editor/script_panel.cpp:276, noxsdl/src/editor/script_panel.cpp:472
+# noxsdl/src/editor/map_editor_ui.cpp:66, noxsdl/src/editor/script_panel.cpp:276, noxsdl/src/editor/script_panel.cpp:472
 #@ 6651e9ca: Script
 editor.category.script = Script
-# noxsdl/src/editor/map_editor_ui.cpp:60, noxsdl/src/editor/map_editor_ui.cpp:240
+# noxsdl/src/editor/map_editor_ui.cpp:61, noxsdl/src/editor/map_editor_ui.cpp:241
 #@ 3e892b4d: Select
 editor.category.select = Select
-# noxsdl/src/editor/map_editor_ui.cpp:62, noxsdl/src/editor/map_editor_ui.cpp:267, noxsdl/src/editor/property_panel.cpp:236
+# noxsdl/src/editor/map_editor_ui.cpp:63, noxsdl/src/editor/map_editor_ui.cpp:268, noxsdl/src/editor/property_panel.cpp:236
 #@ 950196fc: Tools
 editor.category.tools = Tools
-# noxsdl/src/editor/map_editor_ui.cpp:61, noxsdl/src/editor/map_editor_ui.cpp:248
+# noxsdl/src/editor/map_editor_ui.cpp:62, noxsdl/src/editor/map_editor_ui.cpp:249
 #@ 5e4baa18: View
 editor.category.view = View
-# noxsdl/src/editor/map_editor_ui.cpp:63, noxsdl/src/editor/map_editor_ui.cpp:280, noxsdl/src/editor/mod_panel.cpp:249 ...
+# noxsdl/src/editor/map_editor_ui.cpp:64, noxsdl/src/editor/map_editor_ui.cpp:281, noxsdl/src/editor/mod_panel.cpp:249 ...
 #@ e78631fd: Window
 editor.category.window = Window
 # noxsdl/src/editor/chat_log.cpp:66
@@ -3899,16 +3899,16 @@ editor.code.hover_error = error: {message}
 # noxsdl/src/editor/code_editor.cpp:920
 #@ 8341c1cc: warning: {message}
 editor.code.hover_warning = warning: {message}
-# noxsdl/src/editor/map_editor_ui.cpp:1013
+# noxsdl/src/editor/map_editor_ui.cpp:1016
 #@ 414cf243: Browse...
 editor.common.browse = Browse...
-# noxsdl/src/editor/map_editor_ui.cpp:969, noxsdl/src/editor/map_editor_ui.cpp:1022, noxsdl/src/editor/map_editor_ui.cpp:1073 ...
+# noxsdl/src/editor/map_editor_ui.cpp:972, noxsdl/src/editor/map_editor_ui.cpp:1025, noxsdl/src/editor/map_editor_ui.cpp:1076 ...
 #@ 35afca3b: Cancel
 editor.common.cancel = Cancel
 # noxsdl/src/editor/content_browser.cpp:861
 #@ 04a57fc2: Clear
 editor.common.clear = Clear
-# noxsdl/src/editor/map_editor_ui.cpp:875, noxsdl/src/editor/map_editor_ui.cpp:1327
+# noxsdl/src/editor/map_editor_ui.cpp:878, noxsdl/src/editor/map_editor_ui.cpp:1330
 #@ cd86acc3: Close
 editor.common.close = Close
 # noxsdl/src/editor/content_browser.cpp:590, noxsdl/src/editor/marker_tools.cpp:1229, noxsdl/src/editor/marker_tools.cpp:1380 ...
@@ -3917,28 +3917,28 @@ editor.common.delete = Delete
 # noxsdl/src/editor/mod_panel.cpp:2095
 #@ c7c2a422: Don't Save
 editor.common.dont_save = Don't Save
-# noxsdl/src/editor/map_editor_ui.cpp:1016
+# noxsdl/src/editor/map_editor_ui.cpp:1019
 #@ 1ed50feb: All files
 editor.common.filter_all_files = All files
 # noxsdl/src/editor/marker_tools.cpp:1593
 #@ d3e4f771: ({n} listed)
 editor.common.n_listed = ({n} listed)
-# noxsdl/src/editor/map_editor_ui.cpp:484, noxsdl/src/editor/map_editor_ui.cpp:760
+# noxsdl/src/editor/map_editor_ui.cpp:485, noxsdl/src/editor/map_editor_ui.cpp:761
 #@ ebda8468: {n} selected
 editor.common.n_selected = {n} selected
-# noxsdl/src/editor/map_editor_ui.cpp:1269, noxsdl/src/editor/marker_tools.cpp:2360
+# noxsdl/src/editor/map_editor_ui.cpp:1272, noxsdl/src/editor/marker_tools.cpp:2360
 #@ 90458a20: (none)
 editor.common.none = (none)
-# noxsdl/src/editor/map_editor_ui.cpp:424, noxsdl/src/editor/map_editor_ui.cpp:525
+# noxsdl/src/editor/map_editor_ui.cpp:425, noxsdl/src/editor/map_editor_ui.cpp:526
 #@ 0dc6b4aa: Off
 editor.common.off = Off
-# noxsdl/src/editor/map_editor_ui.cpp:861, noxsdl/src/editor/mod_panel.cpp:1991
+# noxsdl/src/editor/map_editor_ui.cpp:864, noxsdl/src/editor/mod_panel.cpp:1991
 #@ 85e4b82f: OK
 editor.common.ok = OK
-# noxsdl/src/editor/map_editor_ui.cpp:389, noxsdl/src/editor/map_editor_ui.cpp:1010
+# noxsdl/src/editor/map_editor_ui.cpp:390, noxsdl/src/editor/map_editor_ui.cpp:1013
 #@ 538b10e9: Open
 editor.common.open = Open
-# noxsdl/src/editor/map_editor_ui.cpp:393, noxsdl/src/editor/map_editor_ui.cpp:589
+# noxsdl/src/editor/map_editor_ui.cpp:394, noxsdl/src/editor/map_editor_ui.cpp:590
 #@ 7412e5e9: Redo
 editor.common.redo = Redo
 # noxsdl/src/editor/mod_panel.cpp:1373
@@ -3950,16 +3950,16 @@ editor.common.remove = Remove
 # noxsdl/src/editor/mod_panel.cpp:1368
 #@ c80631f3: Rename
 editor.common.rename = Rename
-# noxsdl/src/editor/map_editor_ui.cpp:390, noxsdl/src/editor/map_editor_ui.cpp:1067, noxsdl/src/editor/map_editor_ui.cpp:1092 ...
+# noxsdl/src/editor/map_editor_ui.cpp:391, noxsdl/src/editor/map_editor_ui.cpp:1070, noxsdl/src/editor/map_editor_ui.cpp:1095 ...
 #@ 4d2d5d68: Save
 editor.common.save = Save
 # noxsdl/src/editor/mod_panel.cpp:1550, noxsdl/src/editor/script_panel.cpp:1735
 #@ c646a2c9: Search
 editor.common.search = Search
-# noxsdl/src/editor/map_editor_ui.cpp:947
+# noxsdl/src/editor/map_editor_ui.cpp:950
 #@ 803328a9: search
 editor.common.search_hint = search
-# noxsdl/src/editor/map_editor_ui.cpp:392, noxsdl/src/editor/map_editor_ui.cpp:585
+# noxsdl/src/editor/map_editor_ui.cpp:393, noxsdl/src/editor/map_editor_ui.cpp:586
 #@ 71fd4acf: Undo
 editor.common.undo = Undo
 # noxcore/src/mapedit/content.cpp:195
@@ -4193,133 +4193,133 @@ editor.content.folder.webs_debris = Webs & Debris
 # noxcore/src/mapedit/content.cpp:201
 #@ d63e19d9: Wounded
 editor.content.folder.wounded = Wounded
-# noxsdl/src/editor/map_editor_ui.cpp:873
+# noxsdl/src/editor/map_editor_ui.cpp:876
 #@ 7c2e0ee8: Maps are written as the game reads them; stock maps are saved under new names.
 editor.dialog.about.maps = Maps are written as the game reads them; stock maps are saved under new names.
-# noxsdl/src/editor/map_editor_ui.cpp:872
+# noxsdl/src/editor/map_editor_ui.cpp:875
 #@ 1b13b08e: NoX Core Map Editor (shell, P2a)
 editor.dialog.about.name = NoX Core Map Editor (shell, P2a)
-# noxsdl/src/editor/map_editor_ui.cpp:874
+# noxsdl/src/editor/map_editor_ui.cpp:877
 #@ 7628a0fb: Panels: Dear ImGui {version} (docking), MIT.
 editor.dialog.about.panels = Panels: Dear ImGui {version} (docking), MIT.
-# noxsdl/src/editor/map_editor_ui.cpp:868, noxsdl/src/editor/map_editor_ui.cpp:871
+# noxsdl/src/editor/map_editor_ui.cpp:871, noxsdl/src/editor/map_editor_ui.cpp:874
 #@ 384dca04: About the Map Editor
 editor.dialog.about.title = About the Map Editor
-# noxsdl/src/editor/map_editor_ui.cpp:1133
+# noxsdl/src/editor/map_editor_ui.cpp:1136
 #@ 990b3edf: Closing the editor ends your map editor session for everyone in it: their game ends and they go back to their menus.
 editor.dialog.end_session.close_text = Closing the editor ends your map editor session for everyone in it: their game ends and they go back to their menus.
-# noxsdl/src/editor/map_editor_ui.cpp:1140
+# noxsdl/src/editor/map_editor_ui.cpp:1143
 #@ a1afe312: End Session
 editor.dialog.end_session.end = End Session
-# noxsdl/src/editor/map_editor_ui.cpp:1140
+# noxsdl/src/editor/map_editor_ui.cpp:1143
 #@ cab0ea96: End and Quit
 editor.dialog.end_session.end_quit = End and Quit
-# noxsdl/src/editor/map_editor_ui.cpp:1135
+# noxsdl/src/editor/map_editor_ui.cpp:1138
 #@ ee7b4044: Publish first to keep the working copy's changes in the session's map.
 editor.dialog.end_session.publish_first = Publish first to keep the working copy's changes in the session's map.
-# noxsdl/src/editor/map_editor_ui.cpp:1131
+# noxsdl/src/editor/map_editor_ui.cpp:1134
 #@ 64546475: Quitting ends your map editor session for everyone in it: their game ends and they go back to their menus.
 editor.dialog.end_session.quit_text = Quitting ends your map editor session for everyone in it: their game ends and they go back to their menus.
-# noxsdl/src/editor/map_editor_ui.cpp:1122, noxsdl/src/editor/map_editor_ui.cpp:1126
+# noxsdl/src/editor/map_editor_ui.cpp:1125, noxsdl/src/editor/map_editor_ui.cpp:1129
 #@ 1363d022: End the Session?
 editor.dialog.end_session.title = End the Session?
-# noxsdl/src/editor/map_editor_ui.cpp:855, noxsdl/src/editor/map_editor_ui.cpp:857
+# noxsdl/src/editor/map_editor_ui.cpp:858, noxsdl/src/editor/map_editor_ui.cpp:860
 #@ 98ff6cdd: Problem##err
 editor.dialog.error.title = Problem##err
-# noxsdl/src/editor/map_editor_ui.cpp:944
+# noxsdl/src/editor/map_editor_ui.cpp:947
 #@ ab5ebc5e: Base floor
 editor.dialog.new_map.base_floor = Base floor
-# noxsdl/src/editor/map_editor_ui.cpp:932
+# noxsdl/src/editor/map_editor_ui.cpp:935
 #@ ecd51d0a: {n} x {n} cells
 editor.dialog.new_map.cells = {n} x {n} cells
-# noxsdl/src/editor/map_editor_ui.cpp:963
+# noxsdl/src/editor/map_editor_ui.cpp:966
 #@ 990de47d: Create
 editor.dialog.new_map.create = Create
-# noxsdl/src/editor/map_editor_ui.cpp:935
+# noxsdl/src/editor/map_editor_ui.cpp:938
 #@ 495404bd: Floored area
 editor.dialog.new_map.floored_area = Floored area
-# noxsdl/src/editor/map_editor_ui.cpp:942
+# noxsdl/src/editor/map_editor_ui.cpp:945
 #@ 22c0588f: A square of floor in the middle of the map (the whole map is 256 x 256 wall cells).
 editor.dialog.new_map.floored_area_help = A square of floor in the middle of the map (the whole map is 256 x 256 wall cells).
-# noxsdl/src/editor/map_editor_ui.cpp:955
+# noxsdl/src/editor/map_editor_ui.cpp:958
 #@ df3f78da: Game types
 editor.dialog.new_map.game_types = Game types
-# noxsdl/src/editor/map_editor_ui.cpp:927
+# noxsdl/src/editor/map_editor_ui.cpp:930
 #@ 24d471a9: Title
 editor.dialog.new_map.map_title = Title
-# noxsdl/src/editor/map_editor_ui.cpp:931
+# noxsdl/src/editor/map_editor_ui.cpp:934
 #@ 5c881f00: No floor
 editor.dialog.new_map.no_floor = No floor
-# noxsdl/src/editor/map_editor_ui.cpp:960
+# noxsdl/src/editor/map_editor_ui.cpp:963
 #@ c5f9f435: Player start in the middle
 editor.dialog.new_map.player_start = Player start in the middle
-# noxsdl/src/editor/map_editor_ui.cpp:961
+# noxsdl/src/editor/map_editor_ui.cpp:964
 #@ bb325684: A multiplayer map needs at least one PlayerStart.
 editor.dialog.new_map.player_start_help = A multiplayer map needs at least one PlayerStart.
-# noxsdl/src/editor/map_editor_ui.cpp:920, noxsdl/src/editor/map_editor_ui.cpp:923
+# noxsdl/src/editor/map_editor_ui.cpp:923, noxsdl/src/editor/map_editor_ui.cpp:926
 #@ 3ab64893: New Map
 editor.dialog.new_map.title = New Map
-# noxsdl/src/editor/map_editor_ui.cpp:1007
+# noxsdl/src/editor/map_editor_ui.cpp:1010
 #@ 93332e52: No maps in this folder.
 editor.dialog.open_map.empty = No maps in this folder.
-# noxsdl/src/editor/map_editor_ui.cpp:1015
+# noxsdl/src/editor/map_editor_ui.cpp:1018
 #@ 5e38b21d: Nox maps
 editor.dialog.open_map.filter_maps = Nox maps
-# noxsdl/src/editor/map_editor_ui.cpp:991
+# noxsdl/src/editor/map_editor_ui.cpp:994
 #@ 137f50d8: Search maps
 editor.dialog.open_map.search_hint = Search maps
-# noxsdl/src/editor/map_editor_ui.cpp:1000
+# noxsdl/src/editor/map_editor_ui.cpp:1003
 #@ 491d3821: (stock: saved under a new name)
 editor.dialog.open_map.stock_note = (stock: saved under a new name)
-# noxsdl/src/editor/map_editor_ui.cpp:979, noxsdl/src/editor/map_editor_ui.cpp:985
+# noxsdl/src/editor/map_editor_ui.cpp:982, noxsdl/src/editor/map_editor_ui.cpp:988
 #@ d96e553b: Open Map
 editor.dialog.open_map.title = Open Map
-# noxsdl/src/editor/map_editor_ui.cpp:1062
+# noxsdl/src/editor/map_editor_ui.cpp:1065
 #@ dd96997b: A map with this name is there: saving replaces it.
 editor.dialog.save_as.exists = A map with this name is there: saving replaces it.
-# noxsdl/src/editor/map_editor_ui.cpp:1039
+# noxsdl/src/editor/map_editor_ui.cpp:1042
 #@ 72ef1d31: Into {folder}
 editor.dialog.save_as.into = Into {folder}
-# noxsdl/src/editor/map_editor_ui.cpp:1054
+# noxsdl/src/editor/map_editor_ui.cpp:1057
 #@ 647aa828: Map name
 editor.dialog.save_as.map_name = Map name
-# noxsdl/src/editor/map_editor_ui.cpp:1048
+# noxsdl/src/editor/map_editor_ui.cpp:1051
 #@ 88d7ccd6: "{name}" can't be saved under its own name: {why}.
 editor.dialog.save_as.own_name_bad = "{name}" can't be saved under its own name: {why}.
-# noxsdl/src/editor/map_editor_ui.cpp:1041
+# noxsdl/src/editor/map_editor_ui.cpp:1044
 #@ 74c14ad4: {name} is a stock map: its edits are saved under a new name, so nobody's own copy is overwritten.
 editor.dialog.save_as.stock = {name} is a stock map: its edits are saved under a new name, so nobody's own copy is overwritten.
-# noxsdl/src/editor/map_editor_ui.cpp:1033, noxsdl/src/editor/map_editor_ui.cpp:1036
+# noxsdl/src/editor/map_editor_ui.cpp:1036, noxsdl/src/editor/map_editor_ui.cpp:1039
 #@ 05973bf8: Save As
 editor.dialog.save_as.title = Save As
-# noxsdl/src/editor/map_editor_ui.cpp:1064
+# noxsdl/src/editor/map_editor_ui.cpp:1067
 #@ 7a6a80a7: Writes {name}\\{name}.map, .nxz and .nxe
 editor.dialog.save_as.writes = Writes {name}\\{name}.map, .nxz and .nxe
-# noxsdl/src/editor/map_editor_ui.cpp:911
+# noxsdl/src/editor/map_editor_ui.cpp:914
 #@ 5f1d032e: Start with a blank map
 editor.dialog.start.blank = Start with a blank map
-# noxsdl/src/editor/map_editor_ui.cpp:891
+# noxsdl/src/editor/map_editor_ui.cpp:894
 #@ ee65e13f: New Map...
 editor.dialog.start.new = New Map...
-# noxsdl/src/editor/map_editor_ui.cpp:895
+# noxsdl/src/editor/map_editor_ui.cpp:898
 #@ f5db14e7: Open Map...
 editor.dialog.start.open = Open Map...
-# noxsdl/src/editor/map_editor_ui.cpp:901
+# noxsdl/src/editor/map_editor_ui.cpp:904
 #@ 50e888fe: Recent
 editor.dialog.start.recent = Recent
-# noxsdl/src/editor/map_editor_ui.cpp:883, noxsdl/src/editor/map_editor_ui.cpp:887
+# noxsdl/src/editor/map_editor_ui.cpp:886, noxsdl/src/editor/map_editor_ui.cpp:890
 #@ 2a4e0c38: Map Editor##start
 editor.dialog.start.title = Map Editor##start
-# noxsdl/src/editor/map_editor_ui.cpp:1104
+# noxsdl/src/editor/map_editor_ui.cpp:1107
 #@ c7c2a422: Don't Save
 editor.dialog.unsaved.dont_save = Don't Save
-# noxsdl/src/editor/map_editor_ui.cpp:1090
+# noxsdl/src/editor/map_editor_ui.cpp:1093
 #@ f2d5c71f: Save the changes to {name} first?
 editor.dialog.unsaved.question = Save the changes to {name} first?
-# noxsdl/src/editor/map_editor_ui.cpp:1089
+# noxsdl/src/editor/map_editor_ui.cpp:1092
 #@ bd22c223: this map
 editor.dialog.unsaved.this_map = this map
-# noxsdl/src/editor/map_editor_ui.cpp:1083, noxsdl/src/editor/map_editor_ui.cpp:1086
+# noxsdl/src/editor/map_editor_ui.cpp:1086, noxsdl/src/editor/map_editor_ui.cpp:1089
 #@ 7e94a4e4: Unsaved Changes
 editor.dialog.unsaved.title = Unsaved Changes
 # noxcore/src/mapedit/locks.cpp:104
@@ -4400,28 +4400,28 @@ editor.game_texts.use_help = Puts this label in the field the browser was opened
 # noxsdl/src/editor/marker_tools.cpp:2749
 #@ e4fea86e: Variant {n} (the game picks one at random)
 editor.game_texts.variant = Variant {n} (the game picks one at random)
-# noxsdl/src/editor/map_editor_ui.cpp:48
+# noxsdl/src/editor/map_editor_ui.cpp:49
 #@ f22a6288: Arena
 editor.game_type.arena = Arena
-# noxsdl/src/editor/map_editor_ui.cpp:49
+# noxsdl/src/editor/map_editor_ui.cpp:50
 #@ 01741f9c: Capture the Flag
 editor.game_type.capture_the_flag = Capture the Flag
-# noxsdl/src/editor/map_editor_ui.cpp:53
+# noxsdl/src/editor/map_editor_ui.cpp:54
 #@ 2279d8cb: Chat
 editor.game_type.chat = Chat
-# noxsdl/src/editor/map_editor_ui.cpp:51
+# noxsdl/src/editor/map_editor_ui.cpp:52
 #@ c35f119a: Elimination
 editor.game_type.elimination = Elimination
-# noxsdl/src/editor/map_editor_ui.cpp:52
+# noxsdl/src/editor/map_editor_ui.cpp:53
 #@ 7d5a6e74: Flag Ball
 editor.game_type.flag_ball = Flag Ball
-# noxsdl/src/editor/map_editor_ui.cpp:50
+# noxsdl/src/editor/map_editor_ui.cpp:51
 #@ 9aadc7fb: King of the Realm
 editor.game_type.king_of_the_realm = King of the Realm
-# noxsdl/src/editor/map_editor_ui.cpp:47
+# noxsdl/src/editor/map_editor_ui.cpp:48
 #@ af8c40dd: Quest
 editor.game_type.quest = Quest
-# noxsdl/src/editor/map_editor_ui.cpp:46
+# noxsdl/src/editor/map_editor_ui.cpp:47
 #@ 698f976a: Solo
 editor.game_type.solo = Solo
 # noxcore/src/mapedit/markers.cpp:601, noxcore/include/noxcore/mapedit/op_label.hpp:73
@@ -4649,13 +4649,13 @@ editor.groups.select_members_help = Selects the members on the map (and frames t
 # noxsdl/src/editor/marker_tools.cpp:2001
 #@ 973ccedb: Group: {name}
 editor.groups.title = Group: {name}
-# noxsdl/src/editor/map_editor_ui.cpp:592
+# noxsdl/src/editor/map_editor_ui.cpp:593
 #@ 9655ac4e: {n} changes
 editor.history.changes = {n} changes
-# noxsdl/src/editor/map_editor_ui.cpp:595
+# noxsdl/src/editor/map_editor_ui.cpp:596
 #@ 8fa24503: (older changes dropped)
 editor.history.dropped = (older changes dropped)
-# noxsdl/src/editor/map_editor_ui.cpp:595
+# noxsdl/src/editor/map_editor_ui.cpp:596
 #@ 1d655e69: (opened)
 editor.history.opened = (opened)
 # noxsdl/src/editor/ordered_json.cpp:39
@@ -4694,196 +4694,196 @@ editor.json.unknown_escape = an unknown escape \\{e}
 # noxsdl/src/editor/ordered_json.cpp:166
 #@ 80788e37: a value expected
 editor.json.value_expected = a value expected
-# noxsdl/src/editor/map_editor_ui.cpp:1275
+# noxsdl/src/editor/map_editor_ui.cpp:1278
 #@ 453be06a: Also on {command}
 editor.keys.also_on = Also on {command}
-# noxsdl/src/editor/map_editor_ui.cpp:1250
+# noxsdl/src/editor/map_editor_ui.cpp:1253
 #@ c67c8f52: Command
 editor.keys.command = Command
-# noxsdl/src/editor/map_editor_ui.cpp:1239
+# noxsdl/src/editor/map_editor_ui.cpp:1242
 #@ 0258192b: {n} shortcut conflicts (the first command listed wins)
 editor.keys.conflicts = {n} shortcut conflicts (the first command listed wins)
-# noxsdl/src/editor/map_editor_ui.cpp:1230
+# noxsdl/src/editor/map_editor_ui.cpp:1233
 #@ f4a9c097: Filter
 editor.keys.filter_hint = Filter
-# noxsdl/src/editor/map_editor_ui.cpp:1249
+# noxsdl/src/editor/map_editor_ui.cpp:1252
 #@ 00c6075a: Menu
 editor.keys.menu = Menu
-# noxsdl/src/editor/map_editor_ui.cpp:1243
+# noxsdl/src/editor/map_editor_ui.cpp:1246
 #@ 77adf2b1: Press the new shortcut for "{command}" (Escape cancels, Backspace clears)
 editor.keys.press_new = Press the new shortcut for "{command}" (Escape cancels, Backspace clears)
-# noxsdl/src/editor/map_editor_ui.cpp:1281
+# noxsdl/src/editor/map_editor_ui.cpp:1284
 #@ 0ac8a560: Reset
 editor.keys.reset = Reset
-# noxsdl/src/editor/map_editor_ui.cpp:1232
+# noxsdl/src/editor/map_editor_ui.cpp:1235
 #@ a1429413: Reset All
 editor.keys.reset_all = Reset All
-# noxsdl/src/editor/map_editor_ui.cpp:1251
+# noxsdl/src/editor/map_editor_ui.cpp:1254
 #@ 97dcc893: Shortcut
 editor.keys.shortcut = Shortcut
-# noxsdl/src/editor/map_editor_ui.cpp:514
+# noxsdl/src/editor/map_editor_ui.cpp:515
 #@ 4f264c63: Floor edges
 editor.layers.edges = Floor edges
-# noxsdl/src/editor/map_editor_ui.cpp:514
+# noxsdl/src/editor/map_editor_ui.cpp:515
 #@ b63ad997: The edges blended over tiles.
 editor.layers.edges_help = The edges blended over tiles.
-# noxsdl/src/editor/map_editor_ui.cpp:548
+# noxsdl/src/editor/map_editor_ui.cpp:549
 #@ 7b4ae43b: 3D extents
 editor.layers.extents3d = 3D extents
-# noxsdl/src/editor/map_editor_ui.cpp:554
+# noxsdl/src/editor/map_editor_ui.cpp:555
 #@ 8166162c: Extents drawn with a raised copy at the type's height (with Extents shown).
 editor.layers.extents3d_help = Extents drawn with a raised copy at the type's height (with Extents shown).
-# noxsdl/src/editor/map_editor_ui.cpp:530
+# noxsdl/src/editor/map_editor_ui.cpp:531
 #@ f5a9fc1f: Extents: all
 editor.layers.extents_all = Extents: all
-# noxsdl/src/editor/map_editor_ui.cpp:529
+# noxsdl/src/editor/map_editor_ui.cpp:530
 #@ e62b2685: Extents: colliding
 editor.layers.extents_colliding = Extents: colliding
-# noxsdl/src/editor/map_editor_ui.cpp:533
+# noxsdl/src/editor/map_editor_ui.cpp:534
 #@ 98c2f650: Objects' collision shapes (thing.bin EXTENT).
 editor.layers.extents_help = Objects' collision shapes (thing.bin EXTENT).
-# noxsdl/src/editor/map_editor_ui.cpp:529
+# noxsdl/src/editor/map_editor_ui.cpp:530
 #@ 998a6808: Extents: hidden
 editor.layers.extents_hidden = Extents: hidden
-# noxsdl/src/editor/map_editor_ui.cpp:534
+# noxsdl/src/editor/map_editor_ui.cpp:535
 #@ 561d0777: Facing arrows
 editor.layers.facing = Facing arrows
-# noxsdl/src/editor/map_editor_ui.cpp:535
+# noxsdl/src/editor/map_editor_ui.cpp:536
 #@ 1b840f7b: Creatures' and NPCs' facing, doors' hanging and sentries' beams.
 editor.layers.facing_help = Creatures' and NPCs' facing, doors' hanging and sentries' beams.
-# noxsdl/src/editor/map_editor_ui.cpp:513
+# noxsdl/src/editor/map_editor_ui.cpp:514
 #@ 5ea410bd: Floor
 editor.layers.floor = Floor
-# noxsdl/src/editor/map_editor_ui.cpp:513
+# noxsdl/src/editor/map_editor_ui.cpp:514
 #@ 131220a7: The floor tiles.
 editor.layers.floor_help = The floor tiles.
-# noxsdl/src/editor/map_editor_ui.cpp:525
+# noxsdl/src/editor/map_editor_ui.cpp:526
 #@ 33b23440: Wall cells
 editor.layers.grid_cells = Wall cells
-# noxsdl/src/editor/map_editor_ui.cpp:528
+# noxsdl/src/editor/map_editor_ui.cpp:529
 #@ 76312629: The grid: wall cells (23 x 23) or the floor's diamonds.
 editor.layers.grid_help = The grid: wall cells (23 x 23) or the floor's diamonds.
-# noxsdl/src/editor/map_editor_ui.cpp:525
+# noxsdl/src/editor/map_editor_ui.cpp:526
 #@ 33193080: Floor tiles
 editor.layers.grid_tiles = Floor tiles
-# noxsdl/src/editor/map_editor_ui.cpp:564
+# noxsdl/src/editor/map_editor_ui.cpp:565
 #@ 503eac7e: Extents
 editor.layers.label_extents = Extents
-# noxsdl/src/editor/map_editor_ui.cpp:563
+# noxsdl/src/editor/map_editor_ui.cpp:564
 #@ 6d25294a: Script names
 editor.layers.label_script_names = Script names
-# noxsdl/src/editor/map_editor_ui.cpp:562
+# noxsdl/src/editor/map_editor_ui.cpp:563
 #@ a7f6d385: Type names
 editor.layers.label_types = Type names
-# noxsdl/src/editor/map_editor_ui.cpp:561
+# noxsdl/src/editor/map_editor_ui.cpp:562
 #@ eaa26caa: Labels
 editor.layers.labels = Labels
-# noxsdl/src/editor/map_editor_ui.cpp:543
+# noxsdl/src/editor/map_editor_ui.cpp:544
 #@ 5636da0c: Light radius rings
 editor.layers.light_rings = Light radius rings
-# noxsdl/src/editor/map_editor_ui.cpp:544
+# noxsdl/src/editor/map_editor_ui.cpp:545
 #@ 252185de: Each invisible light's radius, in its colour.
 editor.layers.light_rings_help = Each invisible light's radius, in its colour.
-# noxsdl/src/editor/map_editor_ui.cpp:519
+# noxsdl/src/editor/map_editor_ui.cpp:520
 #@ 0a44f01d: Lighting preview
 editor.layers.lighting = Lighting preview
-# noxsdl/src/editor/map_editor_ui.cpp:520
+# noxsdl/src/editor/map_editor_ui.cpp:521
 #@ 3875e98d: The map's lights and ambient colour, as the game lights it.
 editor.layers.lighting_help = The map's lights and ambient colour, as the game lights it.
-# noxsdl/src/editor/map_editor_ui.cpp:545
+# noxsdl/src/editor/map_editor_ui.cpp:546
 #@ 9202088e: Links
 editor.layers.links = Links
-# noxsdl/src/editor/map_editor_ui.cpp:546
+# noxsdl/src/editor/map_editor_ui.cpp:547
 #@ 9927a225: Lines from teleporters, elevators and shafts to their partners, movers to their waypoints and what they carry, glyphs to their targets, exits and pits to their points.
 editor.layers.links_help = Lines from teleporters, elevators and shafts to their partners, movers to their waypoints and what they carry, glyphs to their targets, exits and pits to their points.
-# noxsdl/src/editor/map_editor_ui.cpp:552
+# noxsdl/src/editor/map_editor_ui.cpp:553
 #@ 66cbc6b9: Live creatures
 editor.layers.live_creatures = Live creatures
-# noxsdl/src/editor/map_editor_ui.cpp:553
+# noxsdl/src/editor/map_editor_ui.cpp:554
 #@ a9365db0: In a session: the running game's creatures and moving things. View only.
 editor.layers.live_creatures_help = In a session: the running game's creatures and moving things. View only.
-# noxsdl/src/editor/map_editor_ui.cpp:549
+# noxsdl/src/editor/map_editor_ui.cpp:550
 #@ b6839e11: Live players
 editor.layers.live_players = Live players
-# noxsdl/src/editor/map_editor_ui.cpp:550
+# noxsdl/src/editor/map_editor_ui.cpp:551
 #@ 3f851f7a: In a session: the players in the running game where they are now (name, team colour, stock or NoX Core client). View only.
 editor.layers.live_players_help = In a session: the players in the running game where they are now (name, team colour, stock or NoX Core client). View only.
-# noxsdl/src/editor/map_editor_ui.cpp:567
+# noxsdl/src/editor/map_editor_ui.cpp:568
 #@ 553a45b4: Floor##lock
 editor.layers.lock_floor = Floor##lock
-# noxsdl/src/editor/map_editor_ui.cpp:571
+# noxsdl/src/editor/map_editor_ui.cpp:572
 #@ 4da3220e: Objects##lock
 editor.layers.lock_objects = Objects##lock
-# noxsdl/src/editor/map_editor_ui.cpp:574
+# noxsdl/src/editor/map_editor_ui.cpp:575
 #@ ca7dd613: Polygons##lock
 editor.layers.lock_polygons = Polygons##lock
-# noxsdl/src/editor/map_editor_ui.cpp:569
+# noxsdl/src/editor/map_editor_ui.cpp:570
 #@ daff29a7: Walls##lock
 editor.layers.lock_walls = Walls##lock
-# noxsdl/src/editor/map_editor_ui.cpp:572
+# noxsdl/src/editor/map_editor_ui.cpp:573
 #@ e79599ce: Waypoints##lock
 editor.layers.lock_waypoints = Waypoints##lock
-# noxsdl/src/editor/map_editor_ui.cpp:565
+# noxsdl/src/editor/map_editor_ui.cpp:566
 #@ ee5bd213: Locked layers
 editor.layers.locked = Locked layers
-# noxsdl/src/editor/map_editor_ui.cpp:566
+# noxsdl/src/editor/map_editor_ui.cpp:567
 #@ 406346f0: Shown, but not picked or changed by the tools:
 editor.layers.locked_note = Shown, but not picked or changed by the tools:
-# noxsdl/src/editor/map_editor_ui.cpp:512
+# noxsdl/src/editor/map_editor_ui.cpp:513
 #@ 44a7f051: Map
 editor.layers.map = Map
-# noxsdl/src/editor/map_editor_ui.cpp:536
+# noxsdl/src/editor/map_editor_ui.cpp:537
 #@ 83af7594: Mark disabled objects
 editor.layers.mark_disabled = Mark disabled objects
-# noxsdl/src/editor/map_editor_ui.cpp:516
+# noxsdl/src/editor/map_editor_ui.cpp:517
 #@ 0828760b: Objects
 editor.layers.objects = Objects
-# noxsdl/src/editor/map_editor_ui.cpp:524
+# noxsdl/src/editor/map_editor_ui.cpp:525
 #@ 11681a70: Overlays
 editor.layers.overlays = Overlays
-# noxsdl/src/editor/map_editor_ui.cpp:555
+# noxsdl/src/editor/map_editor_ui.cpp:556
 #@ b80645fb: Pending changes: as final
 editor.layers.pending_final = Pending changes: as final
-# noxsdl/src/editor/map_editor_ui.cpp:559
+# noxsdl/src/editor/map_editor_ui.cpp:560
 #@ 5d34bc56: In a session: walls, floor and client-only things not yet published. Shaded: greyed, and what they remove as see-through hatched ghosts; As final: as they will look once published; Hidden: only what the game has (G flips to it and back).
 editor.layers.pending_help = In a session: walls, floor and client-only things not yet published. Shaded: greyed, and what they remove as see-through hatched ghosts; As final: as they will look once published; Hidden: only what the game has (G flips to it and back).
-# noxsdl/src/editor/map_editor_ui.cpp:556
+# noxsdl/src/editor/map_editor_ui.cpp:557
 #@ c1f97f47: Pending changes: hidden
 editor.layers.pending_hidden = Pending changes: hidden
-# noxsdl/src/editor/map_editor_ui.cpp:555
+# noxsdl/src/editor/map_editor_ui.cpp:556
 #@ bab98ed0: Pending changes: shaded
 editor.layers.pending_shaded = Pending changes: shaded
-# noxsdl/src/editor/map_editor_ui.cpp:518
+# noxsdl/src/editor/map_editor_ui.cpp:519
 #@ 3c18cfae: Polygons
 editor.layers.polygons = Polygons
-# noxsdl/src/editor/map_editor_ui.cpp:537
+# noxsdl/src/editor/map_editor_ui.cpp:538
 #@ 1a63d7fa: Schematic
 editor.layers.schematic = Schematic
-# noxsdl/src/editor/map_editor_ui.cpp:538
+# noxsdl/src/editor/map_editor_ui.cpp:539
 #@ f021b5e4: Flat colours over the map: walls by kind (secret blue, breakable red, window cyan), objects as dots.
 editor.layers.schematic_help = Flat colours over the map: walls by kind (secret blue, breakable red, window cyan), objects as dots.
-# noxsdl/src/editor/map_editor_ui.cpp:521
+# noxsdl/src/editor/map_editor_ui.cpp:522
 #@ cadd6886: See-through walls near the view centre
 editor.layers.see_through = See-through walls near the view centre
-# noxsdl/src/editor/map_editor_ui.cpp:522
+# noxsdl/src/editor/map_editor_ui.cpp:523
 #@ 119a402a: Walls below the view's centre drawn half see-through over everything, as the game draws them. Off, every wall is drawn whole and opaque.
 editor.layers.see_through_help = Walls below the view's centre drawn half see-through over everything, as the game draws them. Off, every wall is drawn whole and opaque.
-# noxsdl/src/editor/map_editor_ui.cpp:539
+# noxsdl/src/editor/map_editor_ui.cpp:540
 #@ 9c665b62: Tint special walls
 editor.layers.special_walls = Tint special walls
-# noxsdl/src/editor/map_editor_ui.cpp:540
+# noxsdl/src/editor/map_editor_ui.cpp:541
 #@ f9693077: Secret walls blue, breakable red, windows cyan, over the drawn map.
 editor.layers.special_walls_help = Secret walls blue, breakable red, windows cyan, over the drawn map.
-# noxsdl/src/editor/map_editor_ui.cpp:541
+# noxsdl/src/editor/map_editor_ui.cpp:542
 #@ f1df697f: Trigger and plate boxes
 editor.layers.triggers = Trigger and plate boxes
-# noxsdl/src/editor/map_editor_ui.cpp:542
+# noxsdl/src/editor/map_editor_ui.cpp:543
 #@ eebee7c7: Triggers' and pressure plates' areas (their size, turned 45 degrees), in their colours.
 editor.layers.triggers_help = Triggers' and pressure plates' areas (their size, turned 45 degrees), in their colours.
-# noxsdl/src/editor/map_editor_ui.cpp:515
+# noxsdl/src/editor/map_editor_ui.cpp:516
 #@ 13883432: Walls
 editor.layers.walls = Walls
-# noxsdl/src/editor/map_editor_ui.cpp:517
+# noxsdl/src/editor/map_editor_ui.cpp:518
 #@ 1d756bcb: Waypoints
 editor.layers.waypoints = Waypoints
 # noxcore/src/mapedit/object_edit.cpp:217
@@ -5222,49 +5222,49 @@ editor.markers.waypoint_flag.registered = Registered (run time only)
 # noxcore/src/mapedit/markers.cpp:116
 #@ c581fdf9: The game's own mark for a waypoint put in its map grid at load. A map storing it keeps the waypoint out of the grid, so the nearest-waypoint search never finds it: clear it.
 editor.markers.waypoint_flag.registered.help = The game's own mark for a waypoint put in its map grid at load. A map storing it keeps the waypoint out of the grid, so the nearest-waypoint search never finds it: clear it.
-# noxsdl/src/editor/map_editor_ui.cpp:208
+# noxsdl/src/editor/map_editor_ui.cpp:209
 #@ 4c687c3d: Clear Recent
 editor.menu.clear_recent = Clear Recent
-# noxsdl/src/editor/map_editor_ui.cpp:234
+# noxsdl/src/editor/map_editor_ui.cpp:235
 #@ 8b9be253: Copy as Text
 editor.menu.copy_as_text = Copy as Text
-# noxsdl/src/editor/map_editor_ui.cpp:221
+# noxsdl/src/editor/map_editor_ui.cpp:222
 #@ a4dd18fe: Host a Session...
 editor.menu.host_session = Host a Session...
-# noxsdl/src/editor/map_editor_ui.cpp:255
+# noxsdl/src/editor/map_editor_ui.cpp:256
 #@ eaa26caa: Labels
 editor.menu.labels = Labels
-# noxsdl/src/editor/map_editor_ui.cpp:299
+# noxsdl/src/editor/map_editor_ui.cpp:300
 #@ 8d39bde6: name
 editor.menu.layout_name_hint = name
-# noxsdl/src/editor/map_editor_ui.cpp:286
+# noxsdl/src/editor/map_editor_ui.cpp:287
 #@ 17809004: Layouts
 editor.menu.layouts = Layouts
 # noxsdl/src/editor/mod_panel.cpp:269
 #@ 44a37323: Mod
 editor.menu.mod = Mod
-# noxsdl/src/editor/map_editor_ui.cpp:296
+# noxsdl/src/editor/map_editor_ui.cpp:297
 #@ d50b29aa: No saved layouts
 editor.menu.no_layouts = No saved layouts
-# noxsdl/src/editor/map_editor_ui.cpp:200
+# noxsdl/src/editor/map_editor_ui.cpp:201
 #@ d22c5db8: Open Recent
 editor.menu.open_recent = Open Recent
-# noxsdl/src/editor/map_editor_ui.cpp:259
+# noxsdl/src/editor/map_editor_ui.cpp:260
 #@ ff67caf5: Pending Changes
 editor.menu.pending_changes = Pending Changes
 # noxsdl/src/editor/play_view.cpp:320, noxsdl/src/editor/script_panel.cpp:2594
 #@ 29ab6f83: Play
 editor.menu.play = Play
-# noxsdl/src/editor/map_editor_ui.cpp:301
+# noxsdl/src/editor/map_editor_ui.cpp:302
 #@ 0a857a0e: Save Layout
 editor.menu.save_layout = Save Layout
 # noxsdl/src/editor/script_panel.cpp:2580
 #@ 6651e9ca: Script
 editor.menu.script = Script
-# noxsdl/src/editor/map_editor_ui.cpp:327
+# noxsdl/src/editor/map_editor_ui.cpp:328
 #@ 4eaf7c92: Theme
 editor.menu.theme = Theme
-# noxsdl/src/editor/map_editor_ui.cpp:336
+# noxsdl/src/editor/map_editor_ui.cpp:337
 #@ 25511be7: The editor's colours: Light, Medium (NoX Core's stone greys and gold) or Dark (near-black with blue accents).
 editor.menu.theme_help = The editor's colours: Light, Medium (NoX Core's stone greys and gold) or Dark (near-black with blue accents).
 # noxsdl/src/editor/marker_tools.cpp:2636
@@ -6296,10 +6296,10 @@ editor.op.unlink_waypoints = Unlink waypoint {from} from {to}
 # noxcore/include/noxcore/mapedit/op_label.hpp:121
 #@ a7262d15: wall
 editor.op.wall_unnamed = wall
-# noxsdl/src/editor/map_editor_ui.cpp:1183
+# noxsdl/src/editor/map_editor_ui.cpp:1186
 #@ 783d3867: Type a command
 editor.palette.hint = Type a command
-# noxsdl/src/editor/map_editor_ui.cpp:1209
+# noxsdl/src/editor/map_editor_ui.cpp:1212
 #@ 92d8f238: No command matches.
 editor.palette.none = No command matches.
 # noxsdl/src/editor/marker_tools.cpp:2371
@@ -6681,34 +6681,34 @@ editor.prefab.selected = {n} selected: they're saved with their places relative 
 # noxsdl/src/editor/object_tools.cpp:627, noxsdl/src/editor/object_tools.cpp:630
 #@ 0263058a: Save Prefab
 editor.prefab.title = Save Prefab
-# noxsdl/src/editor/map_editor_ui.cpp:626
+# noxsdl/src/editor/map_editor_ui.cpp:627
 #@ 06034c5d: {errors} errors, {warnings} warnings
 editor.problems.counts = {errors} errors, {warnings} warnings
-# noxsdl/src/editor/map_editor_ui.cpp:668
+# noxsdl/src/editor/map_editor_ui.cpp:669
 #@ f38d9cf1: Error
 editor.problems.error = Error
-# noxsdl/src/editor/map_editor_ui.cpp:624
+# noxsdl/src/editor/map_editor_ui.cpp:625
 #@ 36900dc3: No problems: the game will load this map.
 editor.problems.none = No problems: the game will load this map.
-# noxsdl/src/editor/map_editor_ui.cpp:660
+# noxsdl/src/editor/map_editor_ui.cpp:661
 #@ 448c5c7c: Problem
 editor.problems.problem = Problem
-# noxsdl/src/editor/map_editor_ui.cpp:631
+# noxsdl/src/editor/map_editor_ui.cpp:632
 #@ b7e838fa: (saving is refused until the errors are fixed)
 editor.problems.save_refused = (saving is refused until the errors are fixed)
-# noxsdl/src/editor/map_editor_ui.cpp:639, noxsdl/src/editor/map_editor_ui.cpp:641
+# noxsdl/src/editor/map_editor_ui.cpp:640, noxsdl/src/editor/map_editor_ui.cpp:642
 #@ 2048cc97: Session
 editor.problems.session = Session
-# noxsdl/src/editor/map_editor_ui.cpp:673
+# noxsdl/src/editor/map_editor_ui.cpp:674
 #@ dde2b87c: Click to show it on the map.
 editor.problems.show_help = Click to show it on the map.
-# noxsdl/src/editor/map_editor_ui.cpp:653
+# noxsdl/src/editor/map_editor_ui.cpp:654
 #@ 35e752f3: Click to show the object on the map.
 editor.problems.show_object_help = Click to show the object on the map.
-# noxsdl/src/editor/map_editor_ui.cpp:668
+# noxsdl/src/editor/map_editor_ui.cpp:669
 #@ 37c4fc8f: Warning
 editor.problems.warning = Warning
-# noxsdl/src/editor/map_editor_ui.cpp:659
+# noxsdl/src/editor/map_editor_ui.cpp:660
 #@ 91dad0f8: Where
 editor.problems.where = Where
 # noxcore/src/mapedit/properties.cpp:1481
@@ -9970,97 +9970,97 @@ editor.script.where.polygon = polygon {n}: {field}
 # noxcore/src/mapedit/script_doc.cpp:323
 #@ b9e48739: polygon {n} ({name}): {field}
 editor.script.where.polygon_named = polygon {n} ({name}): {field}
-# noxsdl/src/editor/map_editor_ui.cpp:790
+# noxsdl/src/editor/map_editor_ui.cpp:791
 #@ fa7c39f9: 45° box
 editor.select_tool.box45 = 45° box
-# noxsdl/src/editor/map_editor_ui.cpp:793
+# noxsdl/src/editor/map_editor_ui.cpp:794
 #@ 3f92d71d: Copy area
 editor.select_tool.copy_area = Copy area
-# noxsdl/src/editor/map_editor_ui.cpp:803
+# noxsdl/src/editor/map_editor_ui.cpp:804
 #@ c23b1f3d: Copy Area
 editor.select_tool.copy_area_button = Copy Area
-# noxsdl/src/editor/map_editor_ui.cpp:806
+# noxsdl/src/editor/map_editor_ui.cpp:807
 #@ 8057e151: The copy goes to the system clipboard too, so it pastes into another map (Ctrl+V).
 editor.select_tool.copy_area_help = The copy goes to the system clipboard too, so it pastes into another map (Ctrl+V).
-# noxsdl/src/editor/map_editor_ui.cpp:794
+# noxsdl/src/editor/map_editor_ui.cpp:795
 #@ d186a9cb: Takes everything in a dragged box, of the layers ticked:
 editor.select_tool.copy_area_note = Takes everything in a dragged box, of the layers ticked:
-# noxsdl/src/editor/map_editor_ui.cpp:797
+# noxsdl/src/editor/map_editor_ui.cpp:798
 #@ b710576b: Floor##ca
 editor.select_tool.copy_floor = Floor##ca
-# noxsdl/src/editor/map_editor_ui.cpp:799
+# noxsdl/src/editor/map_editor_ui.cpp:800
 #@ f5352725: Objects##ca
 editor.select_tool.copy_objects = Objects##ca
-# noxsdl/src/editor/map_editor_ui.cpp:795
+# noxsdl/src/editor/map_editor_ui.cpp:796
 #@ 05401748: Walls##ca
 editor.select_tool.copy_walls = Walls##ca
-# noxsdl/src/editor/map_editor_ui.cpp:801
+# noxsdl/src/editor/map_editor_ui.cpp:802
 #@ 0e0823e5: Waypoints##ca
 editor.select_tool.copy_waypoints = Waypoints##ca
-# noxsdl/src/editor/map_editor_ui.cpp:802
+# noxsdl/src/editor/map_editor_ui.cpp:803
 #@ ecdc9917: Drag a box on the map...
 editor.select_tool.drag_box = Drag a box on the map...
-# noxsdl/src/editor/map_editor_ui.cpp:810
+# noxsdl/src/editor/map_editor_ui.cpp:811
 #@ 13837315: Move and rotate gizmos come with the property panels (P2d).
 editor.select_tool.gizmos = Move and rotate gizmos come with the property panels (P2d).
-# noxsdl/src/editor/map_editor_ui.cpp:786
+# noxsdl/src/editor/map_editor_ui.cpp:787
 #@ 6ddc5a78: Click to select; Shift-click adds or toggles, Ctrl-click removes. Drag on empty map to select an area, drag a selected item to move the selection. Middle- or right-drag pans, the wheel zooms.
 editor.select_tool.help = Click to select; Shift-click adds or toggles, Ctrl-click removes. Drag on empty map to select an area, drag a selected item to move the selection. Middle- or right-drag pans, the wheel zooms.
-# noxsdl/src/editor/map_editor_ui.cpp:807
+# noxsdl/src/editor/map_editor_ui.cpp:808
 #@ 7f2c2a34: Move
 editor.select_tool.move = Move
-# noxsdl/src/editor/map_editor_ui.cpp:808
+# noxsdl/src/editor/map_editor_ui.cpp:809
 #@ 11e19507: Arrows nudge one unit, Shift+arrows one cell. Objects and waypoints snap as the toolbar's Snap says; walls and floor tiles move by whole cells, keeping their grid.
 editor.select_tool.move_help = Arrows nudge one unit, Shift+arrows one cell. Objects and waypoints snap as the toolbar's Snap says; walls and floor tiles move by whole cells, keeping their grid.
-# noxsdl/src/editor/map_editor_ui.cpp:718
+# noxsdl/src/editor/map_editor_ui.cpp:719
 #@ fb18c863: {walls} walls, {tiles} floor tiles, {objects} objects, {waypoints} waypoints, {polygons} polygons, {groups} groups
 editor.selinfo.counts = {walls} walls, {tiles} floor tiles, {objects} objects, {waypoints} waypoints, {polygons} polygons, {groups} groups
-# noxsdl/src/editor/map_editor_ui.cpp:752
+# noxsdl/src/editor/map_editor_ui.cpp:753
 #@ d337c1e8: {edge} over {floor}, direction {direction}
 editor.selinfo.edge_over = {edge} over {floor}, direction {direction}
-# noxsdl/src/editor/map_editor_ui.cpp:749
+# noxsdl/src/editor/map_editor_ui.cpp:750
 #@ 079106fd: Edges
 editor.selinfo.edges = Edges
-# noxsdl/src/editor/map_editor_ui.cpp:744
+# noxsdl/src/editor/map_editor_ui.cpp:745
 #@ 5ea410bd: Floor
 editor.selinfo.floor = Floor
-# noxsdl/src/editor/map_editor_ui.cpp:730
+# noxsdl/src/editor/map_editor_ui.cpp:731
 #@ 8eb6f3e1: Groups...
 editor.selinfo.groups = Groups...
-# noxsdl/src/editor/map_editor_ui.cpp:769
+# noxsdl/src/editor/map_editor_ui.cpp:770
 #@ 8394bbfd: Keep only the objects
 editor.selinfo.keep_objects = Keep only the objects
-# noxsdl/src/editor/map_editor_ui.cpp:717
+# noxsdl/src/editor/map_editor_ui.cpp:718
 #@ e41ce0a9: Map: {title}
 editor.selinfo.map = Map: {title}
-# noxsdl/src/editor/map_editor_ui.cpp:728
+# noxsdl/src/editor/map_editor_ui.cpp:729
 #@ 9dff7a73: Map Info...
 editor.selinfo.map_info = Map Info...
-# noxsdl/src/editor/map_editor_ui.cpp:762
+# noxsdl/src/editor/map_editor_ui.cpp:763
 #@ 633a1fcf: {n} objects
 editor.selinfo.n_objects = {n} objects
-# noxsdl/src/editor/map_editor_ui.cpp:766
+# noxsdl/src/editor/map_editor_ui.cpp:767
 #@ 5c9a7eda: {n} polygons
 editor.selinfo.n_polygons = {n} polygons
-# noxsdl/src/editor/map_editor_ui.cpp:764
+# noxsdl/src/editor/map_editor_ui.cpp:765
 #@ 00107054: {n} floor tiles
 editor.selinfo.n_tiles = {n} floor tiles
-# noxsdl/src/editor/map_editor_ui.cpp:763
+# noxsdl/src/editor/map_editor_ui.cpp:764
 #@ 85ccf6d6: {n} walls
 editor.selinfo.n_walls = {n} walls
-# noxsdl/src/editor/map_editor_ui.cpp:765
+# noxsdl/src/editor/map_editor_ui.cpp:766
 #@ 31e34a37: {n} waypoints
 editor.selinfo.n_waypoints = {n} waypoints
-# noxsdl/src/editor/map_editor_ui.cpp:715
+# noxsdl/src/editor/map_editor_ui.cpp:716
 #@ 1b71c40b: Nothing selected.
 editor.selinfo.nothing = Nothing selected.
-# noxsdl/src/editor/map_editor_ui.cpp:768
+# noxsdl/src/editor/map_editor_ui.cpp:769
 #@ ab2d7a36: Properties edit one kind at a time: select only objects, walls, waypoints or polygons.
 editor.selinfo.one_kind = Properties edit one kind at a time: select only objects, walls, waypoints or polygons.
-# noxsdl/src/editor/map_editor_ui.cpp:745
+# noxsdl/src/editor/map_editor_ui.cpp:746
 #@ f3e131e9: Tile
 editor.selinfo.tile = Tile
-# noxsdl/src/editor/map_editor_ui.cpp:747
+# noxsdl/src/editor/map_editor_ui.cpp:748
 #@ 8433b026: Variant
 editor.selinfo.variant = Variant
 # noxsdl/src/editor/pencil_mark.hpp:42
@@ -10072,52 +10072,52 @@ editor.session.activity.idle = idle
 # noxsdl/src/editor/pencil_mark.hpp:44
 #@ 71ef5835: playing
 editor.session.activity.playing = playing
-# noxsdl/src/editor/session_panel.cpp:730
+# noxsdl/src/editor/session_panel.cpp:717
 #@ ad4bbd04: Always
 editor.session.always = Always
-# noxsdl/src/editor/session_panel.cpp:731
+# noxsdl/src/editor/session_panel.cpp:718
 #@ cb650c79: Approve, and let this player edit whenever they join.
 editor.session.always_tip = Approve, and let this player edit whenever they join.
-# noxsdl/src/editor/session_panel.cpp:405
+# noxsdl/src/editor/session_panel.cpp:392
 #@ fbad6e5e: an edit
 editor.session.an_edit = an edit
 # noxsdl/src/editor/session_setup.cpp:231
 #@ d93baf44: ...and creatures
 editor.session.and_creatures = ...and creatures
-# noxsdl/src/editor/session_panel.cpp:728, noxsdl/src/editor/session_panel.cpp:830
+# noxsdl/src/editor/session_panel.cpp:715, noxsdl/src/editor/session_panel.cpp:817
 #@ e6edf55a: Approve
 editor.session.approve = Approve
-# noxsdl/src/editor/session_panel.cpp:835
+# noxsdl/src/editor/session_panel.cpp:822
 #@ 20e120d6: Always for this player
 editor.session.approve_always = Always for this player
-# noxsdl/src/editor/session_panel.cpp:834
+# noxsdl/src/editor/session_panel.cpp:821
 #@ 8b536268: For this session
 editor.session.approve_once = For this session
-# noxsdl/src/editor/session_panel.cpp:626
+# noxsdl/src/editor/session_panel.cpp:613
 #@ e935e266: Asked the host for edit rights
 editor.session.asked_edit_rights = Asked the host for edit rights
-# noxsdl/src/editor/session_panel.cpp:292
+# noxsdl/src/editor/session_panel.cpp:279
 #@ 95c4e6ca: Asked the host to hot-reload the script for everyone in the game
 editor.session.asked_hot_reload = Asked the host to hot-reload the script for everyone in the game
-# noxsdl/src/editor/session_panel.cpp:293
+# noxsdl/src/editor/session_panel.cpp:280
 #@ dae67b9c: Asked the host to restart the script for everyone in the game
 editor.session.asked_restart = Asked the host to restart the script for everyone in the game
-# noxsdl/src/editor/session_panel.cpp:722
+# noxsdl/src/editor/session_panel.cpp:709
 #@ 39b51db9: Asking to edit
 editor.session.asking_to_edit = Asking to edit
-# noxsdl/src/editor/session_panel.cpp:828
+# noxsdl/src/editor/session_panel.cpp:815
 #@ 90a5581c: asks to edit
 editor.session.asks_to_edit = asks to edit
-# noxsdl/src/editor/session_panel.cpp:439
+# noxsdl/src/editor/session_panel.cpp:426
 #@ 58a19e65: {name} asks to edit
 editor.session.asks_to_edit_status = {name} asks to edit
-# noxsdl/src/editor/session_panel.cpp:781
+# noxsdl/src/editor/session_panel.cpp:768
 #@ 7ef548d5: Publish objects automatically
 editor.session.auto_publish = Publish objects automatically
 # noxsdl/src/editor/session_setup.cpp:234
 #@ 2f1f8c6b: Publish object changes automatically
 editor.session.auto_publish_changes = Publish object changes automatically
-# noxsdl/src/editor/session_panel.cpp:613
+# noxsdl/src/editor/session_panel.cpp:600
 #@ df9e1976: \s |  object changes published automatically
 editor.session.auto_publish_mark = \s |  object changes published automatically
 # noxsdl/src/editor/session_setup.cpp:235
@@ -10141,46 +10141,46 @@ editor.session.cant_host_stock = Can't host "{name}": it is a map that ships wit
 # noxsdl/src/editor/session_setup.cpp:369
 #@ 0dbfab25: Can't prepare the session's map {name}:\n{error}
 editor.session.cant_prepare = Can't prepare the session's map {name}:\n{error}
-# noxsdl/src/editor/session_panel.cpp:607
+# noxsdl/src/editor/session_panel.cpp:594
 #@ 211ca83a: Catching up with the session...
 editor.session.catching_up = Catching up with the session...
 # noxsdl/src/editor/session_setup.cpp:172
 #@ de52d8b0: Choose a map to start from.
 editor.session.choose_map = Choose a map to start from.
-# noxsdl/src/editor/session_panel.cpp:688
+# noxsdl/src/editor/session_panel.cpp:675
 #@ c20c8395: stock
 editor.session.client_stock = stock
-# noxsdl/src/editor/session_panel.cpp:635
+# noxsdl/src/editor/session_panel.cpp:622
 #@ d5a6163e: Client
 editor.session.col_client = Client
-# noxsdl/src/editor/session_panel.cpp:634
+# noxsdl/src/editor/session_panel.cpp:621
 #@ 6ed196a4: Doing
 editor.session.col_doing = Doing
-# noxsdl/src/editor/session_panel.cpp:632
+# noxsdl/src/editor/session_panel.cpp:619
 #@ 0fe07306: Name
 editor.session.col_name = Name
-# noxsdl/src/editor/session_panel.cpp:633
+# noxsdl/src/editor/session_panel.cpp:620
 #@ 902b7e39: Role
 editor.session.col_role = Role
-# noxsdl/src/editor/session_panel.cpp:780
+# noxsdl/src/editor/session_panel.cpp:767
 #@ 2c7aa513: Creatures too
 editor.session.creatures_too = Creatures too
-# noxsdl/src/editor/session_panel.cpp:733, noxsdl/src/editor/session_panel.cpp:839
+# noxsdl/src/editor/session_panel.cpp:720, noxsdl/src/editor/session_panel.cpp:826
 #@ 07d5fa87: Deny
 editor.session.deny = Deny
-# noxsdl/src/editor/session_panel.cpp:805
+# noxsdl/src/editor/session_panel.cpp:792
 #@ 3066ddfc: line {line}: {text}
 editor.session.diag_line = line {line}: {text}
-# noxsdl/src/editor/session_panel.cpp:620
+# noxsdl/src/editor/session_panel.cpp:607
 #@ 5983169c: Edit rights
 editor.session.edit_rights = Edit rights
-# noxsdl/src/editor/session_panel.cpp:650
+# noxsdl/src/editor/session_panel.cpp:637
 #@ 93087cc8: Editing the map (the pencil marks their character in the game)
 editor.session.editing_tip = Editing the map (the pencil marks their character in the game)
 # noxsdl/src/editor/session_setup.cpp:191
 #@ 63c61cd6: Edits {name} itself: publishing writes over it.
 editor.session.edits_itself = Edits {name} itself: publishing writes over it.
-# noxsdl/src/editor/session_panel.cpp:758
+# noxsdl/src/editor/session_panel.cpp:745
 #@ cdadb093: End play-test
 editor.session.end_round = End play-test
 # noxsdl/src/editor/session_panel.cpp:87
@@ -10195,22 +10195,22 @@ editor.session.floored_area = Floored area
 # noxsdl/src/editor/session_setup.cpp:163
 #@ 6f466cc5: A square of floor in the middle of the map (the whole map is 256 x 256 wall cells), with a player start.
 editor.session.floored_area_tip = A square of floor in the middle of the map (the whole map is 256 x 256 wall cells), with a player start.
-# noxsdl/src/editor/session_panel.cpp:215, noxsdl/src/editor/session_panel.cpp:700
+# noxsdl/src/editor/session_panel.cpp:202, noxsdl/src/editor/session_panel.cpp:687
 #@ 8aad7d90: Follow
 editor.session.follow = Follow
-# noxsdl/src/editor/session_panel.cpp:707
+# noxsdl/src/editor/session_panel.cpp:694
 #@ b77c5843: The camera follows this player in the game (pan or Escape stops).
 editor.session.follow_tip = The camera follows this player in the game (pan or Escape stops).
-# noxsdl/src/editor/session_panel.cpp:178
+# noxsdl/src/editor/session_panel.cpp:165
 #@ 02bd89f2: The player you followed left the game
 editor.session.followed_left = The player you followed left the game
-# noxsdl/src/editor/session_panel.cpp:220
+# noxsdl/src/editor/session_panel.cpp:207
 #@ 095f6964: Following {name} (pan or Escape stops)
 editor.session.following = Following {name} (pan or Escape stops)
-# noxsdl/src/editor/session_panel.cpp:193
+# noxsdl/src/editor/session_panel.cpp:180
 #@ f86db7c3: Following {name} (pan or Escape stops; right-click: Jump in here)
 editor.session.following_click = Following {name} (pan or Escape stops; right-click: Jump in here)
-# noxsdl/src/editor/session_panel.cpp:793
+# noxsdl/src/editor/session_panel.cpp:780
 #@ ddf26161: Force release
 editor.session.force_release = Force release
 # noxsdl/src/editor/session_setup.cpp:255
@@ -10219,19 +10219,19 @@ editor.session.game_list = Game list
 # noxsdl/src/editor/session_setup.cpp:270
 #@ 302af18f: Host
 editor.session.host = Host
-# noxsdl/src/editor/session_panel.cpp:616
+# noxsdl/src/editor/session_panel.cpp:603
 #@ d44b16ac: Host: {text}
 editor.session.host_role_text = Host: {text}
-# noxsdl/src/editor/session_panel.cpp:435, noxsdl/src/editor/session_panel.cpp:471
+# noxsdl/src/editor/session_panel.cpp:422, noxsdl/src/editor/session_panel.cpp:458
 #@ 5b5815f4: Session: {text}
 editor.session.host_says = Session: {text}
-# noxsdl/src/editor/session_panel.cpp:579
+# noxsdl/src/editor/session_panel.cpp:566
 #@ e03abeac: \s (idle)
 editor.session.idle_mark = \s (idle)
 # noxsdl/src/editor/session_panel.cpp:104
 #@ 4f782e55: In the session: {map}
 editor.session.in_session = In the session: {map}
-# noxsdl/src/editor/session_panel.cpp:401
+# noxsdl/src/editor/session_panel.cpp:388
 #@ 59439eaf: In step with the session: {map}
 editor.session.in_step = In step with the session: {map}
 # noxsdl/src/editor_glue.cpp:883
@@ -10240,35 +10240,35 @@ editor.session.joined_notice = This game is a map editor session: F2 opens the e
 # noxsdl/src/editor/session_panel.cpp:105
 #@ 8a985c96: Joining the session...
 editor.session.joining = Joining the session...
-# noxsdl/src/editor/session_panel.cpp:710
+# noxsdl/src/editor/session_panel.cpp:697
 #@ 2dd4e63c: Jump in
 editor.session.jump_in = Jump in
-# noxsdl/src/editor/session_panel.cpp:712
+# noxsdl/src/editor/session_panel.cpp:699
 #@ 87471015: Your character into the game beside this player, and play (F2 comes back).
 editor.session.jump_in_help = Your character into the game beside this player, and play (F2 comes back).
-# noxsdl/src/editor/session_panel.cpp:225
+# noxsdl/src/editor/session_panel.cpp:212
 #@ 636d0072: Jump in here
 editor.session.jump_in_here = Jump in here
-# noxsdl/src/editor/session_panel.cpp:231
+# noxsdl/src/editor/session_panel.cpp:218
 #@ ee185099: Your character into the game beside this player, and play (F2 comes back)
 editor.session.jump_in_tip = Your character into the game beside this player, and play (F2 comes back)
-# noxsdl/src/editor/session_panel.cpp:242
+# noxsdl/src/editor/session_panel.cpp:229
 #@ 5f56346d: Jumping in beside {name}
 editor.session.jumping_in = Jumping in beside {name}
-# noxsdl/src/editor/session_panel.cpp:692
+# noxsdl/src/editor/session_panel.cpp:679
 #@ 819aebd2: Let edit
 editor.session.let_edit = Let edit
-# noxsdl/src/editor/session_panel.cpp:458
+# noxsdl/src/editor/session_panel.cpp:445
 #@ 9136df2d: {n} item let go: being edited by others | {n} items let go: being edited by others
 editor.session.let_go[one] = {n} item let go: being edited by others
 editor.session.let_go[other] = {n} items let go: being edited by others
-# noxsdl/src/editor/session_panel.cpp:778
+# noxsdl/src/editor/session_panel.cpp:765
 #@ cf9bbf80: Live view
 editor.session.live_view = Live view
-# noxsdl/src/editor/session_panel.cpp:786
+# noxsdl/src/editor/session_panel.cpp:773
 #@ 0fa2f1c3: Locks
 editor.session.locks = Locks
-# noxsdl/src/editor/session_panel.cpp:808
+# noxsdl/src/editor/session_panel.cpp:795
 #@ 54c8d181: Session log
 editor.session.log = Session log
 # noxsdl/src/editor/session_setup.cpp:168
@@ -10277,7 +10277,7 @@ editor.session.map_name = Session map name
 # noxsdl/src/editor/session_setup.cpp:169
 #@ 90a095a3: The map the session publishes, in your maps folder. A stock map is copied under this name.
 editor.session.map_name_tip = The map the session publishes, in your maps folder. A stock map is copied under this name.
-# noxsdl/src/editor/session_panel.cpp:598
+# noxsdl/src/editor/session_panel.cpp:585
 #@ 6e9df49f: Map: {map}   version {version}
 editor.session.map_version = Map: {map}   version {version}
 # noxsdl/src/editor/session_setup.hpp:52
@@ -10295,10 +10295,10 @@ editor.session.mode_flagball = Flag Ball
 # noxsdl/src/editor/session_setup.hpp:55
 #@ 9aadc7fb: King of the Realm
 editor.session.mode_kotr = King of the Realm
-# noxsdl/src/editor/session_panel.cpp:842
+# noxsdl/src/editor/session_panel.cpp:829
 #@ d32d349e: (+{n} more: Session panel)
 editor.session.more_requests = (+{n} more: Session panel)
-# noxsdl/src/editor/session_panel.cpp:677
+# noxsdl/src/editor/session_panel.cpp:664
 #@ bde06ffc: {n} more
 editor.session.n_more = {n} more
 # noxsdl/src/editor/session_setup.cpp:193
@@ -10328,16 +10328,16 @@ editor.session.no_match = No map matches.
 # noxsdl/src/editor_glue.cpp:600
 #@ a73c491d: The edit session wasn't hosted: {error}
 editor.session.not_hosted = The edit session wasn't hosted: {error}
-# noxsdl/src/editor/session_panel.cpp:288
+# noxsdl/src/editor/session_panel.cpp:275
 #@ fb24bbcc: Only editors can reload the session's script
 editor.session.only_editors_reload = Only editors can reload the session's script
-# noxsdl/src/editor/session_panel.cpp:276
+# noxsdl/src/editor/session_panel.cpp:263
 #@ 5ab99aeb: Only the session's host publishes
 editor.session.only_host_publishes = Only the session's host publishes
-# noxsdl/src/editor/session_panel.cpp:767, noxsdl/src/editor/session_setup.cpp:214
+# noxsdl/src/editor/session_panel.cpp:754, noxsdl/src/editor/session_setup.cpp:214
 #@ d9d30f77: Only me
 editor.session.only_me = Only me
-# noxsdl/src/editor/session_panel.cpp:769, noxsdl/src/editor/session_setup.cpp:218
+# noxsdl/src/editor/session_panel.cpp:756, noxsdl/src/editor/session_setup.cpp:218
 #@ 0707c098: Others when I approve
 editor.session.others_approve = Others when I approve
 # noxsdl/src/editor/session_setup.cpp:248
@@ -10346,7 +10346,7 @@ editor.session.password = Game password
 # noxsdl/src/editor/session_setup.cpp:249
 #@ 330b43f1: Asked of everyone joining (the game's own prompt for stock clients). Empty: none.
 editor.session.password_tip = Asked of everyone joining (the game's own prompt for stock clients). Empty: none.
-# noxsdl/src/editor/session_panel.cpp:630
+# noxsdl/src/editor/session_panel.cpp:617
 #@ 8390060e: People
 editor.session.people = People
 # noxsdl/src/editor/session_setup.cpp:238
@@ -10358,55 +10358,55 @@ editor.session.play_test_mode_tip = The mode a play-test round runs (the map mus
 # noxsdl/src/editor/session_setup.cpp:250
 #@ bfd56a03: Player limit
 editor.session.player_limit = Player limit
-# noxsdl/src/editor/session_panel.cpp:752
+# noxsdl/src/editor/session_panel.cpp:739
 #@ b58425e9: Players can die
 editor.session.players_can_die = Players can die
-# noxsdl/src/editor/session_panel.cpp:612
+# noxsdl/src/editor/session_panel.cpp:599
 #@ b58425e9: Players can die
 editor.session.players_can_die_state = Players can die
-# noxsdl/src/editor/session_panel.cpp:777
+# noxsdl/src/editor/session_panel.cpp:764
 #@ 01b7f152: Players can't die
 editor.session.players_cant_die = Players can't die
-# noxsdl/src/editor/session_panel.cpp:256
+# noxsdl/src/editor/session_panel.cpp:243
 #@ 747669d6: Playing in the session from {where}
 editor.session.playing_from = Playing in the session from {where}
-# noxsdl/src/editor/session_panel.cpp:475
+# noxsdl/src/editor/session_panel.cpp:462
 #@ f0896587: Session problem: {text}
 editor.session.problem = Session problem: {text}
-# noxsdl/src/editor/session_panel.cpp:737
+# noxsdl/src/editor/session_panel.cpp:724
 #@ 6c6229a8: Publish
 editor.session.publish_heading = Publish
-# noxsdl/src/editor/session_panel.cpp:738
+# noxsdl/src/editor/session_panel.cpp:725
 #@ d04e80fd: Publish (map change)
 editor.session.publish_map = Publish (map change)
-# noxsdl/src/editor/session_panel.cpp:740
+# noxsdl/src/editor/session_panel.cpp:727
 #@ 5f7518eb: Objects only
 editor.session.publish_objects = Objects only
-# noxsdl/src/editor/session_panel.cpp:741
+# noxsdl/src/editor/session_panel.cpp:728
 #@ ed932bd2: Write the working objects for players who join later, without a map change (the game already has them).
 editor.session.publish_objects_tip = Write the working objects for players who join later, without a map change (the game already has them).
-# noxsdl/src/editor/session_panel.cpp:443
+# noxsdl/src/editor/session_panel.cpp:430
 #@ a6e9cebd: Published version {version}: the map changes for everyone
 editor.session.published = Published version {version}: the map changes for everyone
-# noxsdl/src/editor/session_panel.cpp:445
+# noxsdl/src/editor/session_panel.cpp:432
 #@ 19f50c8e: Objects published (auto) for players who join later
 editor.session.published_auto = Objects published (auto) for players who join later
-# noxsdl/src/editor/session_panel.cpp:281
+# noxsdl/src/editor/session_panel.cpp:268
 #@ b0677388: Publishing: the map changes for everyone (stock clients download it)
 editor.session.publishing = Publishing: the map changes for everyone (stock clients download it)
-# noxsdl/src/editor/session_panel.cpp:622
+# noxsdl/src/editor/session_panel.cpp:609
 #@ 009003f4: why (optional)
 editor.session.reason_hint = why (optional)
-# noxsdl/src/editor/session_panel.cpp:423
+# noxsdl/src/editor/session_panel.cpp:410
 #@ db76ee37: Refused by the host: {why}
 editor.session.refused = Refused by the host: {why}
 # noxsdl/src/editor/session_setup.cpp:203
 #@ 6ed01316: {name} can't be published under its own name ({why}): the session copies it under a new one.
 editor.session.renamed_copy = {name} can't be published under its own name ({why}): the session copies it under a new one.
-# noxsdl/src/editor/session_panel.cpp:624
+# noxsdl/src/editor/session_panel.cpp:611
 #@ 8e64364a: Request edit
 editor.session.request_edit = Request edit
-# noxsdl/src/editor/session_panel.cpp:691
+# noxsdl/src/editor/session_panel.cpp:678
 #@ 2219c453: Revoke
 editor.session.revoke = Revoke
 # noxsdl/src/editor/session_panel.cpp:59
@@ -10421,28 +10421,28 @@ editor.session.role.player = player
 # noxsdl/src/editor/session_panel.cpp:58
 #@ 18756ecf: viewer
 editor.session.role.viewer = viewer
-# noxsdl/src/editor/session_panel.cpp:744
+# noxsdl/src/editor/session_panel.cpp:731
 #@ 06d63ea6: Play-test round
 editor.session.round_heading = Play-test round
-# noxsdl/src/editor/session_panel.cpp:746
+# noxsdl/src/editor/session_panel.cpp:733
 #@ 534e7732: Mode
 editor.session.round_mode = Mode
-# noxsdl/src/editor/session_panel.cpp:608
+# noxsdl/src/editor/session_panel.cpp:595
 #@ fcb0dac4: A play-test round is running: editing waits
 editor.session.round_running = A play-test round is running: editing waits
-# noxsdl/src/editor/session_panel.cpp:611
+# noxsdl/src/editor/session_panel.cpp:598
 #@ 3d9406c7: Sandbox: players can't die
 editor.session.sandbox_cant_die = Sandbox: players can't die
-# noxsdl/src/editor/session_panel.cpp:800
+# noxsdl/src/editor/session_panel.cpp:787
 #@ 6651e9ca: Script
 editor.session.script = Script
-# noxsdl/src/editor/session_panel.cpp:449
+# noxsdl/src/editor/session_panel.cpp:436
 #@ 4bbeed36: Script: {summary}
 editor.session.script_status = Script: {summary}
 # noxsdl/src/editor/session_setup.cpp:122
 #@ 137f50d8: Search maps
 editor.session.search_maps = Search maps
-# noxsdl/src/editor/session_panel.cpp:762
+# noxsdl/src/editor/session_panel.cpp:749
 #@ 4b058728: Settings
 editor.session.settings = Settings
 # noxsdl/src/editor/session_setup.cpp:117
@@ -10454,37 +10454,37 @@ editor.session.setup_title = Host a map editor session
 # noxsdl/src/editor/session_setup.cpp:228
 #@ 90998a95: Show live players in the editor
 editor.session.show_live_players = Show live players in the editor
-# noxsdl/src/editor/session_panel.cpp:754
+# noxsdl/src/editor/session_panel.cpp:741
 #@ 04789032: Start play-test
 editor.session.start_round = Start play-test
-# noxsdl/src/editor/session_panel.cpp:757
+# noxsdl/src/editor/session_panel.cpp:744
 #@ 2cb1ce2f: Publishes what's pending, then the map's real mode for everyone; editing waits till it ends.
 editor.session.start_round_tip = Publishes what's pending, then the map's real mode for everyone; editing waits till it ends.
 # noxsdl/src/editor/session_setup.cpp:145
 #@ e643a9a6: \s  (stock: copied under a new name)
 editor.session.stock_copied = \s  (stock: copied under a new name)
-# noxsdl/src/editor/session_panel.cpp:212
+# noxsdl/src/editor/session_panel.cpp:199
 #@ 382a764b: \s [stock]
 editor.session.stock_mark = \s [stock]
 # noxsdl/src/editor/session_setup.cpp:176
 #@ 91752db3: {name} is a map that ships with the game: choose a new name
 editor.session.stock_name = {name} is a map that ships with the game: choose a new name
-# noxsdl/src/editor/session_panel.cpp:215
+# noxsdl/src/editor/session_panel.cpp:202
 #@ 7a795c5e: Stop following
 editor.session.stop_following = Stop following
-# noxsdl/src/editor/session_panel.cpp:182
+# noxsdl/src/editor/session_panel.cpp:169
 #@ cb12f852: Stopped following {name}
 editor.session.stopped_following = Stopped following {name}
-# noxsdl/src/editor/session_panel.cpp:230
+# noxsdl/src/editor/session_panel.cpp:217
 #@ 7b06793d: That's you
 editor.session.thats_you = That's you
 # noxsdl/src/editor/session_setup.cpp:225
 #@ a840e99e: The game
 editor.session.the_game = The game
-# noxsdl/src/editor/session_panel.cpp:424
+# noxsdl/src/editor/session_panel.cpp:411
 #@ c18c6a04: Undone (another's edit came first): {why}
 editor.session.undone = Undone (another's edit came first): {why}
-# noxsdl/src/editor/session_panel.cpp:700
+# noxsdl/src/editor/session_panel.cpp:687
 #@ f4a8c527: Unfollow
 editor.session.unfollow = Unfollow
 # noxsdl/src/editor/session_setup.cpp:212
@@ -10496,55 +10496,55 @@ editor.session.who_may_edit_tip = NoX Core players ask to edit; you approve each
 # noxsdl/src/editor/session_setup.cpp:195
 #@ 66d45ec7: Writes {name}\\{name}.map
 editor.session.writes = Writes {name}\\{name}.map
-# noxsdl/src/editor/session_panel.cpp:602
+# noxsdl/src/editor/session_panel.cpp:589
 #@ d094acf5: You: {name} (editor)
 editor.session.you_editor = You: {name} (editor)
-# noxsdl/src/editor/session_panel.cpp:601
+# noxsdl/src/editor/session_panel.cpp:588
 #@ 5679ad44: You: {name} (host)
 editor.session.you_host = You: {name} (host)
-# noxsdl/src/editor/session_panel.cpp:603
+# noxsdl/src/editor/session_panel.cpp:590
 #@ 92d45a8e: You: {name} (viewer: ask to edit)
 editor.session.you_viewer = You: {name} (viewer: ask to edit)
-# noxsdl/src/editor/map_editor_ui.cpp:1305
+# noxsdl/src/editor/map_editor_ui.cpp:1308
 #@ 34c77813: Autosave (minutes)
 editor.settings.autosave = Autosave (minutes)
-# noxsdl/src/editor/map_editor_ui.cpp:1306
+# noxsdl/src/editor/map_editor_ui.cpp:1309
 #@ e791db45: A recovery copy in your settings folder (File > Open Autosave); 0 turns it off.
 editor.settings.autosave_help = A recovery copy in your settings folder (File > Open Autosave); 0 turns it off.
-# noxsdl/src/editor/map_editor_ui.cpp:1308
+# noxsdl/src/editor/map_editor_ui.cpp:1311
 #@ 7b6a82c3: Allow floating panels
 editor.settings.floating = Allow floating panels
-# noxsdl/src/editor/map_editor_ui.cpp:1313
+# noxsdl/src/editor/map_editor_ui.cpp:1316
 #@ 64b42958: Drag a panel's tab or title bar out of the window and it becomes a window of its own, for another monitor. Floating panels keep their places with the layout. The Map panel stays in the main window. Off: panels stay inside it.
 editor.settings.floating_help = Drag a panel's tab or title bar out of the window and it becomes a window of its own, for another monitor. Floating panels keep their places with the layout. The Map panel stays in the main window. Off: panels stay inside it.
-# noxsdl/src/editor/map_editor_ui.cpp:1317
+# noxsdl/src/editor/map_editor_ui.cpp:1320
 #@ 9ba153da: (not on this system: e.g. Wayland can't place our windows)
 editor.settings.floating_unsupported = (not on this system: e.g. Wayland can't place our windows)
-# noxsdl/src/editor/map_editor_ui.cpp:1326
+# noxsdl/src/editor/map_editor_ui.cpp:1329
 #@ 88b59486: Settings: {folder}
 editor.settings.folder = Settings: {folder}
-# noxsdl/src/editor/map_editor_ui.cpp:1320
+# noxsdl/src/editor/map_editor_ui.cpp:1323
 #@ f3a71c16: Allow NoX Core-only script features (object variables)
 editor.settings.noxcore_script = Allow NoX Core-only script features (object variables)
-# noxsdl/src/editor/map_editor_ui.cpp:1323
+# noxsdl/src/editor/map_editor_ui.cpp:1326
 #@ d44b2f1b: Lets scripts declare and use object variables (int object.hp;). Maps that use them crash the original game and need a NoX Core server. Off: the compiler refuses them, and a map whose script already has them is shown read-only.
 editor.settings.noxcore_script_help = Lets scripts declare and use object variables (int object.hp;). Maps that use them crash the original game and need a NoX Core server. Off: the compiler refuses them, and a map whose script already has them is shown read-only.
-# noxsdl/src/editor/map_editor_ui.cpp:1325
+# noxsdl/src/editor/map_editor_ui.cpp:1328
 #@ 72dd69a2: Maps that use them crash the original game and need a NoX Core server.
 editor.settings.noxcore_script_note = Maps that use them crash the original game and need a NoX Core server.
-# noxsdl/src/editor/map_editor_ui.cpp:1319
+# noxsdl/src/editor/map_editor_ui.cpp:1322
 #@ 74b72736: Scripting
 editor.settings.scripting = Scripting
-# noxsdl/src/editor/map_editor_ui.cpp:1303
+# noxsdl/src/editor/map_editor_ui.cpp:1306
 #@ b86ac52d: Theme##settings
 editor.settings.theme = Theme##settings
-# noxsdl/src/editor/map_editor_ui.cpp:1304
+# noxsdl/src/editor/map_editor_ui.cpp:1307
 #@ b0b2cd6c: Light, Medium (NoX Core's stone greys and gold) or Dark (near-black with blue accents). Also at the menu bar's right end.
 editor.settings.theme_help = Light, Medium (NoX Core's stone greys and gold) or Dark (near-black with blue accents). Also at the menu bar's right end.
-# noxsdl/src/editor/map_editor_ui.cpp:1300
+# noxsdl/src/editor/map_editor_ui.cpp:1303
 #@ a9288212: Interface scale
 editor.settings.ui_scale = Interface scale
-# noxsdl/src/editor/map_editor_ui.cpp:1302
+# noxsdl/src/editor/map_editor_ui.cpp:1305
 #@ d18c8e65: On top of the display's own scale.
 editor.settings.ui_scale_help = On top of the display's own scale.
 # noxsdl/src/editor/map_editor.cpp:370
@@ -10587,7 +10587,7 @@ editor.status.copied_text = Copied {text}
 # noxsdl/src/editor/map_editor.cpp:939
 #@ e2e8f4f8: Copied waypoint ids: {list}
 editor.status.copied_waypoints = Copied waypoint ids: {list}
-# noxsdl/src/editor/map_editor_ui.cpp:467
+# noxsdl/src/editor/map_editor_ui.cpp:468
 #@ 3601fa7a: (copy area)
 editor.status.copy_area = (copy area)
 # noxsdl/src/editor/map_editor.cpp:913
@@ -10624,13 +10624,13 @@ editor.status.held_other = Being edited by another editor
 # noxsdl/src/editor/map_editor.cpp:1448
 #@ cd34693c: Layout {name}
 editor.status.layout_loaded = Layout {name}
-# noxsdl/src/editor/map_editor_ui.cpp:306
+# noxsdl/src/editor/map_editor_ui.cpp:307
 #@ b825e741: Layout saved as {name}
 editor.status.layout_saved = Layout saved as {name}
 # noxsdl/src/editor/map_editor.cpp:1450
 #@ 8acb01ea: Layout {name} can't be read
 editor.status.layout_unreadable = Layout {name} can't be read
-# noxsdl/src/editor/map_editor_ui.cpp:492
+# noxsdl/src/editor/map_editor_ui.cpp:493
 #@ d5b147f3: New map
 editor.status.new_map = New map
 # noxsdl/src/editor/map_editor.cpp:234
@@ -10642,7 +10642,7 @@ editor.status.new_map_no_floor = Started a new map (no floor)
 # noxsdl/src/editor/map_editor.cpp:885
 #@ bea34a55: No autosave to recover
 editor.status.no_autosave = No autosave to recover
-# noxsdl/src/editor/map_editor_ui.cpp:492
+# noxsdl/src/editor/map_editor_ui.cpp:493
 #@ e2da1e45: No unsaved changes
 editor.status.no_unsaved = No unsaved changes
 # noxsdl/src/editor/map_editor.cpp:694
@@ -10708,10 +10708,10 @@ editor.status.save_failed = Save failed
 # noxsdl/src/editor/map_editor.cpp:333
 #@ 45b405e1: Saved {path}
 editor.status.saved = Saved {path}
-# noxsdl/src/editor/map_editor_ui.cpp:488
+# noxsdl/src/editor/map_editor_ui.cpp:489
 #@ f1bed63e: ({n} sending)
 editor.status.sending = ({n} sending)
-# noxsdl/src/editor/map_editor_ui.cpp:486
+# noxsdl/src/editor/map_editor_ui.cpp:487
 #@ fa770f64: Session {name}
 editor.status.session = Session {name}
 # noxsdl/src/editor/map_editor.cpp:396
@@ -10733,7 +10733,7 @@ editor.status.skipped[other] = {n} items skipped: being edited by others
 # noxsdl/src/editor/map_editor.cpp:193
 #@ 39dac2c6: the host
 editor.status.the_host = the host
-# noxsdl/src/editor/map_editor_ui.cpp:476
+# noxsdl/src/editor/map_editor_ui.cpp:477
 #@ 2b310ae0: tile {x},{y}
 editor.status.tile_cell = tile {x},{y}
 # noxsdl/src/editor/map_editor.cpp:670
@@ -10778,13 +10778,13 @@ editor.status.undid_note = Undid {action} ({note})
 # noxsdl/src/editor/map_editor.cpp:526
 #@ 764fc39e: Undo failed: {error}
 editor.status.undo_failed = Undo failed: {error}
-# noxsdl/src/editor/map_editor_ui.cpp:491
+# noxsdl/src/editor/map_editor_ui.cpp:492
 #@ ebea5784: Unsaved changes
 editor.status.unsaved = Unsaved changes
-# noxsdl/src/editor/map_editor_ui.cpp:494, noxsdl/src/editor/map_editor_ui.cpp:622
+# noxsdl/src/editor/map_editor_ui.cpp:495, noxsdl/src/editor/map_editor_ui.cpp:623
 #@ c2bbf4a2: Validating...
 editor.status.validating = Validating...
-# noxsdl/src/editor/map_editor_ui.cpp:473
+# noxsdl/src/editor/map_editor_ui.cpp:474
 #@ 40aec5e4: wall {x},{y}
 editor.status.wall_cell = wall {x},{y}
 # noxsdl/src/editor/object_tools.cpp:538, noxsdl/src/editor/object_tools.cpp:545
@@ -10922,97 +10922,97 @@ editor.title.session = [EDIT] {name} (session) - NoX Core Map Editor
 # noxsdl/src/editor/map_editor.cpp:179
 #@ 2e35a678: Untitled
 editor.title.untitled = Untitled
-# noxsdl/src/editor/map_editor_ui.cpp:402, noxsdl/src/editor/map_editor_ui.cpp:463
+# noxsdl/src/editor/map_editor_ui.cpp:403, noxsdl/src/editor/map_editor_ui.cpp:464
 #@ bdd66f5c: Edge
 editor.tool.edge = Edge
-# noxsdl/src/editor/map_editor_ui.cpp:401, noxsdl/src/editor/map_editor_ui.cpp:463
+# noxsdl/src/editor/map_editor_ui.cpp:402, noxsdl/src/editor/map_editor_ui.cpp:464
 #@ 5ea410bd: Floor
 editor.tool.floor = Floor
-# noxsdl/src/editor/map_editor_ui.cpp:403, noxsdl/src/editor/map_editor_ui.cpp:464
+# noxsdl/src/editor/map_editor_ui.cpp:404, noxsdl/src/editor/map_editor_ui.cpp:465
 #@ e58e64da: Object
 editor.tool.object = Object
-# noxsdl/src/editor/map_editor_ui.cpp:405, noxsdl/src/editor/map_editor_ui.cpp:465, noxsdl/src/editor/marker_tools.cpp:1160
+# noxsdl/src/editor/map_editor_ui.cpp:406, noxsdl/src/editor/map_editor_ui.cpp:466, noxsdl/src/editor/marker_tools.cpp:1160
 #@ 8e37f629: Polygon
 editor.tool.polygon = Polygon
-# noxsdl/src/editor/map_editor_ui.cpp:399, noxsdl/src/editor/map_editor_ui.cpp:462, noxsdl/src/editor/map_editor_ui.cpp:785
+# noxsdl/src/editor/map_editor_ui.cpp:400, noxsdl/src/editor/map_editor_ui.cpp:463, noxsdl/src/editor/map_editor_ui.cpp:786
 #@ 3e892b4d: Select
 editor.tool.select = Select
-# noxsdl/src/editor/map_editor_ui.cpp:400, noxsdl/src/editor/map_editor_ui.cpp:462
+# noxsdl/src/editor/map_editor_ui.cpp:401, noxsdl/src/editor/map_editor_ui.cpp:463
 #@ 29cce235: Wall
 editor.tool.wall = Wall
-# noxsdl/src/editor/map_editor_ui.cpp:404, noxsdl/src/editor/map_editor_ui.cpp:464, noxsdl/src/editor/marker_tools.cpp:1123
+# noxsdl/src/editor/map_editor_ui.cpp:405, noxsdl/src/editor/map_editor_ui.cpp:465, noxsdl/src/editor/marker_tools.cpp:1123
 #@ bd6e2f9a: Waypoint
 editor.tool.waypoint = Waypoint
-# noxsdl/src/editor/map_editor_ui.cpp:407, noxsdl/src/editor/map_editor_ui.cpp:788
+# noxsdl/src/editor/map_editor_ui.cpp:408, noxsdl/src/editor/map_editor_ui.cpp:789
 #@ d5cb7ed2: Box
 editor.toolbar.box = Box
-# noxsdl/src/editor/map_editor_ui.cpp:408
+# noxsdl/src/editor/map_editor_ui.cpp:409
 #@ 97f1a259: 45° Box
 editor.toolbar.box45 = 45° Box
-# noxsdl/src/editor/map_editor_ui.cpp:409, noxsdl/src/editor/map_editor_ui.cpp:792
+# noxsdl/src/editor/map_editor_ui.cpp:410, noxsdl/src/editor/map_editor_ui.cpp:793
 #@ 38453f99: Lasso
 editor.toolbar.lasso = Lasso
-# noxsdl/src/editor/map_editor_ui.cpp:388
+# noxsdl/src/editor/map_editor_ui.cpp:389
 #@ 8b242db1: New
 editor.toolbar.new = New
-# noxsdl/src/editor/map_editor_ui.cpp:411
+# noxsdl/src/editor/map_editor_ui.cpp:412
 #@ f077df86: Pick:
 editor.toolbar.pick = Pick:
-# noxsdl/src/editor/map_editor_ui.cpp:413
+# noxsdl/src/editor/map_editor_ui.cpp:414
 #@ 0828760b: Objects
 editor.toolbar.pick_objects = Objects
-# noxsdl/src/editor/map_editor_ui.cpp:417
+# noxsdl/src/editor/map_editor_ui.cpp:418
 #@ 8581156e: Tiles
 editor.toolbar.pick_tiles = Tiles
-# noxsdl/src/editor/map_editor_ui.cpp:415
+# noxsdl/src/editor/map_editor_ui.cpp:416
 #@ 13883432: Walls
 editor.toolbar.pick_walls = Walls
-# noxsdl/src/editor/map_editor_ui.cpp:419
+# noxsdl/src/editor/map_editor_ui.cpp:420
 #@ 1d756bcb: Waypoints
 editor.toolbar.pick_waypoints = Waypoints
-# noxsdl/src/editor/map_editor_ui.cpp:438
+# noxsdl/src/editor/map_editor_ui.cpp:439
 #@ e505513a: Play (F2)
 editor.toolbar.play_f2 = Play (F2)
-# noxsdl/src/editor/map_editor_ui.cpp:439
+# noxsdl/src/editor/map_editor_ui.cpp:440
 #@ f8b6a675: Back to the running game (the editor waits; F2 comes back).
 editor.toolbar.play_f2_help = Back to the running game (the editor waits; F2 comes back).
-# noxsdl/src/editor/map_editor_ui.cpp:442
+# noxsdl/src/editor/map_editor_ui.cpp:443
 #@ 6c6229a8: Publish
 editor.toolbar.publish = Publish
-# noxsdl/src/editor/map_editor_ui.cpp:443
+# noxsdl/src/editor/map_editor_ui.cpp:444
 #@ 113c12c9: Write the working copy as the session map's new version and change the map to it (walls, floors and the script's bytecode reach the game; stock clients download it).
 editor.toolbar.publish_help = Write the working copy as the session map's new version and change the map to it (walls, floors and the script's bytecode reach the game; stock clients download it).
-# noxsdl/src/editor/map_editor_ui.cpp:446
+# noxsdl/src/editor/map_editor_ui.cpp:447
 #@ 8e64364a: Request edit
 editor.toolbar.request_edit = Request edit
-# noxsdl/src/editor/map_editor_ui.cpp:447
+# noxsdl/src/editor/map_editor_ui.cpp:448
 #@ e9b879f6: Ask the host for edit rights (or type /edit <reason> in the game's chat).
 editor.toolbar.request_edit_help = Ask the host for edit rights (or type /edit <reason> in the game's chat).
-# noxsdl/src/editor/map_editor_ui.cpp:451
+# noxsdl/src/editor/map_editor_ui.cpp:452
 #@ 4968bf98: Editor
 editor.toolbar.role_editor = Editor
-# noxsdl/src/editor/map_editor_ui.cpp:450
+# noxsdl/src/editor/map_editor_ui.cpp:451
 #@ 302af18f: Host
 editor.toolbar.role_host = Host
-# noxsdl/src/editor/map_editor_ui.cpp:452
+# noxsdl/src/editor/map_editor_ui.cpp:453
 #@ 8d4262ef: Viewer
 editor.toolbar.role_viewer = Viewer
-# noxsdl/src/editor/map_editor_ui.cpp:421
+# noxsdl/src/editor/map_editor_ui.cpp:422
 #@ 07200485: Snap:
 editor.toolbar.snap = Snap:
-# noxsdl/src/editor/map_editor_ui.cpp:425
+# noxsdl/src/editor/map_editor_ui.cpp:426
 #@ 9525b78e: Custom
 editor.toolbar.snap_custom = Custom
-# noxsdl/src/editor/map_editor_ui.cpp:424
+# noxsdl/src/editor/map_editor_ui.cpp:425
 #@ bdb143f5: Grid (23)
 editor.toolbar.snap_grid = Grid (23)
-# noxsdl/src/editor/map_editor_ui.cpp:425
+# noxsdl/src/editor/map_editor_ui.cpp:426
 #@ 8137765c: Half grid
 editor.toolbar.snap_half = Half grid
-# noxsdl/src/editor/map_editor_ui.cpp:427
+# noxsdl/src/editor/map_editor_ui.cpp:428
 #@ bdedebe4: Where dragged objects and waypoints land. Walls and floor tiles always move by whole cells.
 editor.toolbar.snap_help = Where dragged objects and waypoints land. Walls and floor tiles always move by whole cells.
-# noxsdl/src/editor/map_editor_ui.cpp:434
+# noxsdl/src/editor/map_editor_ui.cpp:435
 #@ 7a98446b: Validate
 editor.toolbar.validate = Validate
 # noxsdl/src/editor/map_editor_tools.cpp:874
@@ -12153,85 +12153,85 @@ editor.waypoints.title = Waypoint {id}
 # noxsdl/src/editor/marker_tools.cpp:1148
 #@ 98be983a: Snap: the toolbar's. Delete removes the selected waypoints (and the links to them).
 editor.waypoints.tool_note = Snap: the toolbar's. Delete removes the selected waypoints (and the links to them).
-# noxsdl/src/editor/content_browser.cpp:180, noxsdl/src/editor/content_browser.cpp:750, noxsdl/src/editor/map_editor_ui.cpp:165
+# noxsdl/src/editor/content_browser.cpp:180, noxsdl/src/editor/content_browser.cpp:750, noxsdl/src/editor/map_editor_ui.cpp:166
 #@ faf6f7ba: Content Browser
 editor.window.content_browser = Content Browser
 # noxsdl/src/editor/map_editor_tools.cpp:1417
 #@ 8337757b: Edge Rules
 editor.window.edge_rules = Edge Rules
-# noxsdl/src/editor/map_editor_ui.cpp:1296
+# noxsdl/src/editor/map_editor_ui.cpp:1299
 #@ 27decad5: Editor Settings
 editor.window.editor_settings = Editor Settings
 # noxsdl/src/editor/script_panel.cpp:2056
 #@ d623f80f: Function Info
 editor.window.function_info = Function Info
-# noxsdl/src/editor/map_editor_ui.cpp:178, noxsdl/src/editor/marker_tools.cpp:2665
+# noxsdl/src/editor/map_editor_ui.cpp:179, noxsdl/src/editor/marker_tools.cpp:2665
 #@ d699c517: Game Texts
 editor.window.game_texts = Game Texts
-# noxsdl/src/editor/map_editor_ui.cpp:175, noxsdl/src/editor/marker_tools.cpp:382, noxsdl/src/editor/marker_tools.cpp:1880
+# noxsdl/src/editor/map_editor_ui.cpp:176, noxsdl/src/editor/marker_tools.cpp:382, noxsdl/src/editor/marker_tools.cpp:1880
 #@ f57f458d: Groups
 editor.window.groups = Groups
-# noxsdl/src/editor/map_editor_ui.cpp:169, noxsdl/src/editor/map_editor_ui.cpp:580
+# noxsdl/src/editor/map_editor_ui.cpp:170, noxsdl/src/editor/map_editor_ui.cpp:581
 #@ 7d96597f: History
 editor.window.history = History
-# noxsdl/src/editor/map_editor_ui.cpp:1224
+# noxsdl/src/editor/map_editor_ui.cpp:1227
 #@ ba51bd57: Keyboard Shortcuts
 editor.window.keyboard_shortcuts = Keyboard Shortcuts
-# noxsdl/src/editor/map_editor_ui.cpp:163, noxsdl/src/editor/map_editor_ui.cpp:503
+# noxsdl/src/editor/map_editor_ui.cpp:164, noxsdl/src/editor/map_editor_ui.cpp:504
 #@ bc7fe97f: Layers
 editor.window.layers = Layers
-# noxsdl/src/editor/content_browser.cpp:274, noxsdl/src/editor/map_editor_ui.cpp:162, noxsdl/src/editor/map_editor_view.cpp:325 ...
+# noxsdl/src/editor/content_browser.cpp:274, noxsdl/src/editor/map_editor_ui.cpp:163, noxsdl/src/editor/map_editor_view.cpp:325 ...
 #@ 44a7f051: Map
 editor.window.map = Map
-# noxsdl/src/editor/map_editor_ui.cpp:177, noxsdl/src/editor/marker_tools.cpp:2124
+# noxsdl/src/editor/map_editor_ui.cpp:178, noxsdl/src/editor/marker_tools.cpp:2124
 #@ 7a1e1a17: Map Info
 editor.window.map_info = Map Info
-# noxsdl/src/editor/map_editor_ui.cpp:176, noxsdl/src/editor/marker_tools.cpp:2510
+# noxsdl/src/editor/map_editor_ui.cpp:177, noxsdl/src/editor/marker_tools.cpp:2510
 #@ 3553bee4: Minimap
 editor.window.minimap = Minimap
-# noxsdl/src/editor/map_editor_ui.cpp:183, noxsdl/src/editor/mod_panel.cpp:421, noxsdl/src/editor/mod_panel.cpp:1163 ...
+# noxsdl/src/editor/map_editor_ui.cpp:184, noxsdl/src/editor/mod_panel.cpp:421, noxsdl/src/editor/mod_panel.cpp:1163 ...
 #@ 44a37323: Mod
 editor.window.mod = Mod
-# noxsdl/src/editor/map_editor_ui.cpp:185, noxsdl/src/editor/mod_panel.cpp:1161, noxsdl/src/editor/mod_panel.cpp:1439
+# noxsdl/src/editor/map_editor_ui.cpp:186, noxsdl/src/editor/mod_panel.cpp:1161, noxsdl/src/editor/mod_panel.cpp:1439
 #@ 29bc2cb0: Mod Code
 editor.window.mod_code = Mod Code
-# noxsdl/src/editor/map_editor_ui.cpp:184, noxsdl/src/editor/mod_panel.cpp:1162, noxsdl/src/editor/mod_panel.cpp:1349
+# noxsdl/src/editor/map_editor_ui.cpp:185, noxsdl/src/editor/mod_panel.cpp:1162, noxsdl/src/editor/mod_panel.cpp:1349
 #@ 8500dfc4: Mod Files
 editor.window.mod_files = Mod Files
-# noxsdl/src/editor/map_editor_ui.cpp:187, noxsdl/src/editor/mod_panel.cpp:1598
+# noxsdl/src/editor/map_editor_ui.cpp:188, noxsdl/src/editor/mod_panel.cpp:1598
 #@ df5318f3: Mod Preview
 editor.window.mod_preview = Mod Preview
-# noxsdl/src/editor/map_editor_ui.cpp:186, noxsdl/src/editor/mod_panel.cpp:1540
+# noxsdl/src/editor/map_editor_ui.cpp:187, noxsdl/src/editor/mod_panel.cpp:1540
 #@ 09ec8296: Mod Reference
 editor.window.mod_reference = Mod Reference
-# noxsdl/src/editor/map_editor_ui.cpp:164, noxsdl/src/editor/object_list.cpp:24
+# noxsdl/src/editor/map_editor_ui.cpp:165, noxsdl/src/editor/object_list.cpp:24
 #@ b7ed2e7a: Object List
 editor.window.object_list = Object List
-# noxsdl/src/editor/map_editor_ui.cpp:174, noxsdl/src/editor/marker_tools.cpp:1697
+# noxsdl/src/editor/map_editor_ui.cpp:175, noxsdl/src/editor/marker_tools.cpp:1697
 #@ 3c18cfae: Polygons
 editor.window.polygons = Polygons
-# noxsdl/src/editor/map_editor_ui.cpp:168, noxsdl/src/editor/map_editor_ui.cpp:615
+# noxsdl/src/editor/map_editor_ui.cpp:169, noxsdl/src/editor/map_editor_ui.cpp:616
 #@ f7f4eb9d: Problems
 editor.window.problems = Problems
-# noxsdl/src/editor/map_editor_ui.cpp:166, noxsdl/src/editor/map_editor_ui.cpp:684
+# noxsdl/src/editor/map_editor_ui.cpp:167, noxsdl/src/editor/map_editor_ui.cpp:685
 #@ 81c809fc: Properties
 editor.window.properties = Properties
 # noxsdl/src/editor/marker_tools.cpp:2323
 #@ 0056a2a4: Quest Pictures
 editor.window.quest_pictures = Quest Pictures
-# noxsdl/src/editor/map_editor_ui.cpp:170, noxsdl/src/editor/script_panel.cpp:1592
+# noxsdl/src/editor/map_editor_ui.cpp:171, noxsdl/src/editor/script_panel.cpp:1592
 #@ 6651e9ca: Script
 editor.window.script = Script
-# noxsdl/src/editor/map_editor_ui.cpp:171, noxsdl/src/editor/script_panel.cpp:1730
+# noxsdl/src/editor/map_editor_ui.cpp:172, noxsdl/src/editor/script_panel.cpp:1730
 #@ b63657eb: Script Reference
 editor.window.script_reference = Script Reference
-# noxsdl/src/editor/chat_panel.cpp:57, noxsdl/src/editor/map_editor_ui.cpp:179, noxsdl/src/editor/session_panel.cpp:364 ...
+# noxsdl/src/editor/chat_panel.cpp:57, noxsdl/src/editor/map_editor_ui.cpp:180, noxsdl/src/editor/session_panel.cpp:351 ...
 #@ 2048cc97: Session
 editor.window.session = Session
-# noxsdl/src/editor/map_editor_ui.cpp:167, noxsdl/src/editor/map_editor_ui.cpp:779
+# noxsdl/src/editor/map_editor_ui.cpp:168, noxsdl/src/editor/map_editor_ui.cpp:780
 #@ 85f71dc5: Tool Options
 editor.window.tool_options = Tool Options
-# noxsdl/src/editor/map_editor_ui.cpp:173, noxsdl/src/editor/marker_tools.cpp:1570
+# noxsdl/src/editor/map_editor_ui.cpp:174, noxsdl/src/editor/marker_tools.cpp:1570
 #@ 1d756bcb: Waypoints
 editor.window.waypoints = Waypoints
 
@@ -12244,44 +12244,44 @@ game.data.hosting_other = another game is hosted here
 # noxsdl/src/game_session.cpp:47
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2052
+# noxsdl/src/main.cpp:2053
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2025
+# noxsdl/src/main.cpp:2026
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2029
+# noxsdl/src/main.cpp:2030
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2060
+# noxsdl/src/main.cpp:2061
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2055
+# noxsdl/src/main.cpp:2056
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2039
+# noxsdl/src/main.cpp:2040
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2042
+# noxsdl/src/main.cpp:2043
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2054
+# noxsdl/src/main.cpp:2055
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
 #@ 00c5ff51: Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left | Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
 game.leaving.notice[one] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left
 game.leaving.notice[other] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
-# noxsdl/src/main.cpp:1173
+# noxsdl/src/main.cpp:1174
 #@ 41598c12: {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
 game.load_failed.error_other = {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
-# noxsdl/src/main.cpp:1169
+# noxsdl/src/main.cpp:1170
 #@ a52d10c8: {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.error_windows = {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 # noxsdl/src/main.cpp:677
 #@ da4003ab: Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.no_game = Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:676, noxsdl/src/main.cpp:1178
+# noxsdl/src/main.cpp:676, noxsdl/src/main.cpp:1179
 #@ 28bae6e6: NoX Core: loading failed
 game.load_failed.title = NoX Core: loading failed
 # noxsdl/src/map_vote_window.cpp:175
@@ -13319,10 +13319,10 @@ server.general.update_rate_hz = {rate} Hz
 # noxsdl/src/server_options_server.cpp:614
 #@ 089cc1d7: How often NoX Core players get the characters' and spells' positions: smoother at 60-120 Hz. The game itself, and players on the original game, stay at 30.
 server.general.update_rate_tip = How often NoX Core players get the characters' and spells' positions: smoother at 60-120 Hz. The game itself, and players on the original game, stay at 30.
-# noxsdl/src/hosting.cpp:301
+# noxsdl/src/hosting.cpp:305
 #@ 8993a927: Players outside your network may not be able to join: forward UDP port {port} on your router to this computer (UPnP: {detail}).
 server.hosting.forward_port = Players outside your network may not be able to join: forward UDP port {port} on your router to this computer (UPnP: {detail}).
-# noxsdl/src/hosting.cpp:206
+# noxsdl/src/hosting.cpp:210
 #@ e86ff947: Port {asked} is in use on this computer (another game or server): this game is on port {port}.
 server.hosting.port_moved = Port {asked} is in use on this computer (another game or server): this game is on port {port}.
 # noxsdl/src/port_mapper.cpp:139

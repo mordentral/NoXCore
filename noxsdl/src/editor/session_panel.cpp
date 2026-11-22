@@ -114,19 +114,6 @@ void MapEditor::showSessionSetup(std::function<void(const editor::SessionSetup&)
     for (const auto& m : mapList_) {
         maps.push_back({m.name, m.path, m.stock});
     }
-    // The game's own maps too (a stock map is copied under a new name), when the editor's maps
-    // folder is another.
-    std::error_code ec;
-    const fs::path gameMaps = ctx_.gameDir / "maps";
-    if (!fs::equivalent(gameMaps, ctx_.mapsDir, ec)) {
-        for (const auto& dir : fs::directory_iterator(gameMaps, ec)) {
-            if (!dir.is_directory(ec)) continue;
-            const std::string name = dir.path().filename().string();
-            if (std::ranges::any_of(maps, [&](const auto& m) { return m.name == name; })) continue;
-            const fs::path p = nox::resolveNoCase(dir.path() / (name + ".map"));
-            if (fs::exists(p, ec)) maps.push_back({name, p, me::isStockMapName(name)});
-        }
-    }
     editor::SessionSetup defaults;
     defaults.newOptions = newOptions_;
     setupDialog_.open(std::move(maps), defaults, setupListing_);
