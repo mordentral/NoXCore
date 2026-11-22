@@ -1702,7 +1702,10 @@ void MapView::drawFloor(SDL_Renderer* renderer, const Camera& screen, SpriteCach
             }
             SDL_SetRenderTarget(renderer, previousTarget);
 
-            SDL_SetTextureScaleMode(floorTarget_, screen.artScaleMode());
+            // Without the image pack the target holds the original tiles at 1 texel a unit: scaled up
+            // smoothly, so their fine noise (water, grass) doesn't turn into hard blocks on a big screen.
+            // With the pack it's at about the screen's resolution already.
+            SDL_SetTextureScaleMode(floorTarget_, sprites.usingPack() ? screen.artScaleMode() : SDL_SCALEMODE_LINEAR);
             const SDL_FRect src{0, 0, static_cast<float>(ptw), static_cast<float>(pth)};
             SDL_FRect dst{(left - screen.left()) * screen.zoom, (top - screen.top()) * screen.zoom,
                           width * screen.zoom, height * screen.zoom};
