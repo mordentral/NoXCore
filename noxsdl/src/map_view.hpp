@@ -295,6 +295,10 @@ public:
 
     /// Window walls (the map's WindowWalls), keyed by wallKey(x, y).
     const std::set<std::uint16_t>& windows() const { return windows_; }
+    /// The cells that hold a door's leaf, keyed by wallKey(x, y): every top-level door record's
+    /// (nox::client::doorWallCell), whichever objects the view draws. Their walls are left out of
+    /// the sight, so never drawn while it's on (the game marks them as the map loads).
+    const DoorWalls& doorWalls() const { return doorWalls_; }
 
     /// Whether the wall has been seen, for the minimap: drawn on screen at some point
     /// (drawWalls sets its byte 0xC), or saved as seen in the map (a solo map).
@@ -533,6 +537,7 @@ private:
     std::set<std::uint16_t> breakableStanding_; ///< breakable_'s cells whose map wall stands (setWallState)
     std::vector<std::pair<std::uint16_t, bool>> secret_; ///< SecretWalls cells and "starts open", by id
     std::set<std::uint16_t> windows_;
+    DoorWalls doorWalls_; ///< (loadObjects)
     std::vector<Object> objects_;
     std::map<std::uint32_t, std::size_t> objectIndex_; ///< objects_ by extent
     std::vector<Door> doors_; ///< the doors among objects_, as they stand (listDoors)

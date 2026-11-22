@@ -3,7 +3,8 @@
 //
 // drawBlack:
 //   occluders  every wall cell in view (the even cells of the wall grid) whose WALL def blocks
-//              sight adds the edges from its centre (23x + 11, 23y + 11) toward its corners:
+//              sight, and that holds no door's leaf (such a wall is skipped altogether: neither
+//              swept nor drawn), adds the edges from its centre (23x + 11, 23y + 11) toward its corners:
 //              directions 0 and 1 one full diagonal each, the others a half-diagonal per arm
 //              (1 NE, 2 NW, 4 SE, 8 SW). A window wall is see-through from close by. The screen's
 //              four sides and the sight-blocking objects (a door's leaf, a circle, a box: the
@@ -45,6 +46,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace nox::client {
@@ -79,6 +81,9 @@ public:
         std::uint8_t direction = 0; ///< the facing (0-10)
         bool blocksSight = true;    ///< WALL def flag 1
         bool window = false;        ///< in the map's WindowWalls (wall flag 0x40)
+        /// Holds a door's leaf (wall flag 0x10: doorWallCell): the wall test skips it, so it is
+        /// never swept nor seen, and never drawn.
+        bool door = false;
     };
 
     /// A sight-blocking object: a door along its leaf from (x0, y0) to (x1, y1), a circle of
@@ -289,5 +294,14 @@ private:
     std::vector<ScreenPoint> points_;
     std::vector<std::vector<int>> rows_; ///< per screen row, the polygon's crossings in x, sorted
 };
+
+/// A door's shut direction (0-31) from its map record's DoorXfer fields (`extra`): the third u32
+/// from version 0x29 on, else the first (its direction); 0 for a record too short to hold them.
+std::uint8_t doorShutDirection(std::uint16_t xferVersion, std::span<const std::uint8_t> extra);
+/// The wall cell a map door's leaf takes, as the map loads (each door record as it's read): the
+/// cell half its shut leaf reaches from its hinge at (x, y). That cell's wall (a blank one when
+/// there's none) is marked as the door's (wall flag 0x10), so a wall that stands there is never
+/// swept nor drawn (Wall::door). Nullopt off the 256 x 256 wall grid.
+std::optional<std::pair<int, int>> doorWallCell(float x, float y, std::uint8_t shut);
 
 } // namespace nox::client

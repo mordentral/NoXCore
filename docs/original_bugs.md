@@ -1968,6 +1968,28 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   them (wall and side: a shadow edge) gets the ten lines along the side, a small dark patch at
   the screen's edge where the wall leaves it.
 
+### OB-436: A door standing on a wall cell turns into the wall on a joining client
+- **Where:** as the server reads each door's map record it marks the wall cell half the door's
+  shut leaf reaches as the door's (doorAttachWall, the wall's flag 0x10), and the client's wall
+  test finds no wall in such a cell: drawBlack never sweeps it and drawWalls never draws it. A
+  hosting game shares that wall grid with its client. A joining client reads the walls from its
+  own copy of the map and marks only the doors it loads itself (none of the shipped doors), so a
+  wall the map has under a door's leaf stays an ordinary wall there. Its arm and the shut leaf
+  span the same angles and compete by their middles (OB-174): the leaf's is its hinge plus half
+  the leaf chopped toward zero, the wall's its cell's corner plus 11. For a leaf pointing
+  down-right they're the same point and the wall, swept first, keeps the tie; for one pointing
+  up-left the leaf's middle is a unit further right and down, so which is nearer turns with where
+  the eye is.
+- **Effect:** on a joining client such a door is hidden, the wall drawn in its place: from
+  everywhere (down-right), or from some places and not others, so it comes and goes as the player
+  walks (up-left); the host sees the door and no wall.
+  No shipped map has a wall under a door's leaf (each leaf takes its wall line's gap); a converted
+  or custom map can: Hardcore Warrior's HW01b, its cellar's WoodenDoor at (1541, 4209) on an
+  unbroken wall line.
+- **Ours:** the host's view on every client (vanilla_deviations.md, VD-05): noxsdl marks the cells
+  from the map's door records as it loads them (MapView::doorWalls, `client::doorWallCell`), and
+  SightRegion skips a wall there (`SightRegion::Wall::door`): the door is drawn, the wall isn't.
+
 ### OB-183: A BELOW thing or wall hanging told into shadows stays faded out after it comes back
 - **Where:** MSG_OBJECT_IN_SHADOWS (CliNet_OnPacket) sets the drawable's lingering mark with its
   seen and told marks; an update (Cli_CreateOrUpdateDrawable) clears only the told mark. Only the

@@ -13,6 +13,7 @@
 #include "noxcore/map/sections.hpp"
 
 #include <array>
+#include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <set>
@@ -34,6 +35,10 @@ void standingWalls(std::span<const nox::map::Wall> mapWalls, std::span<const std
                    const std::set<std::uint16_t>& opened, const std::set<std::uint16_t>& closed,
                    std::span<const std::pair<std::pair<int, int>, nox::map::Wall>> magic, std::vector<nox::map::Wall>& walls,
                    std::set<std::uint16_t>& breakableStanding);
+
+/// The wall cells that hold a door's leaf (nox::client::doorWallCell: the map's doors, as the
+/// map loads), keyed (x << 8) | y as MapView::wallKey. A wall there is left out of the sight.
+using DoorWalls = std::bitset<0x10000>;
 
 class WallGrid {
 public:

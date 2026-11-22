@@ -2289,7 +2289,8 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
         const int jiggle = app.effects->jiggle();
         const int eyeShift = jiggle > 0 ? 1 - jiggle : jiggle < 0 ? -1 - jiggle : 0;
         app.sight.setClassicWalls(app.classicWalls);
-        app.sight.build(app.camera, app.view->walls(), &app.view->wallGrid(), app.view->windows(), app.things, blockers, eyeShift);
+        app.sight.build(app.camera, app.view->walls(), &app.view->wallGrid(), app.view->windows(), app.view->doorWalls(), app.things,
+                        blockers, eyeShift);
         app.sight.setSoftEdges(app.softShadowEdge);
         sight = &app.sight;
     }

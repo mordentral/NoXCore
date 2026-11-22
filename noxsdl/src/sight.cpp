@@ -25,7 +25,7 @@ SightMap::~SightMap()
 }
 
 void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls, const WallGrid* grid,
-                     const std::set<std::uint16_t>& windows, const nox::things::ThingDb& things,
+                     const std::set<std::uint16_t>& windows, const DoorWalls& doorWalls, const nox::things::ThingDb& things,
                      std::span<const Blocker> blockers, int eyeShiftY)
 {
     // The game's view: the world rectangle on screen in whole units (its viewport's World and
@@ -53,6 +53,7 @@ void SightMap::build(const Camera& camera, std::span<const nox::map::Wall> walls
         c.direction = static_cast<std::uint8_t>(w.direction & 0x7F);
         c.blocksSight = w.material < things.walls.size() && (things.walls[w.material].flags & 1);
         c.window = windows.contains(static_cast<std::uint16_t>((w.x << 8) | w.y));
+        c.door = doorWalls.test(static_cast<std::size_t>((w.x << 8) | w.y));
         cells.push_back(c);
     };
     if (grid && grid->size() == walls.size()) {

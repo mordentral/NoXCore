@@ -2,6 +2,8 @@
 // soft shadow edge take from it.
 #include "noxcore/client/sight.hpp"
 
+#include "noxcore/util/x87.hpp"
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -703,6 +705,9 @@ void SightRegion::build(const View& view, std::span<const Wall> walls, std::span
                 continue;
             }
             const Wall& w = walls[static_cast<std::size_t>(index)];
+            if (w.door) {
+                continue; // (the wall test finds none in a door's cell: the door is the occluder there)
+            }
             WallState& state = *wallAt(x, y);
             if (!w.blocksSight) {
                 // Seen wherever it is in view; a front wall when its row is below the eye.
@@ -1631,6 +1636,39 @@ std::optional<SightRegion::WallDraw> SightRegion::wallDraw(int x, int y, std::ui
         d.clipRight = right + view_.left;
     }
     return d;
+}
+
+std::uint8_t doorShutDirection(std::uint16_t xferVersion, std::span<const std::uint8_t> extra)
+{
+    const auto u32At = [&](std::size_t at) {
+        return static_cast<std::uint32_t>(extra[at]) | static_cast<std::uint32_t>(extra[at + 1]) << 8 |
+               static_cast<std::uint32_t>(extra[at + 2]) << 16 | static_cast<std::uint32_t>(extra[at + 3]) << 24;
+    };
+    if (extra.size() < 8) {
+        return 0;
+    }
+    return static_cast<std::uint8_t>((xferVersion >= 0x29 && extra.size() >= 12 ? u32At(8) : u32At(0)) & 31);
+}
+
+std::optional<std::pair<int, int>> doorWallCell(float x, float y, std::uint8_t shut)
+{
+    // Where the shut leaf ends, from the hinge, at each of the 32 directions.
+    static constexpr std::array<std::pair<int, int>, 32> kLeaf = {{
+        {-23, -23}, {-18, -27}, {-12, -30}, {-6, -31}, {0, -32}, {6, -31}, {12, -30}, {18, -27},
+        {23, -23}, {27, -18}, {30, -12}, {31, -6}, {32, 0}, {31, 6}, {30, 12}, {27, 18},
+        {23, 23}, {18, 27}, {12, 30}, {6, 31}, {0, 32}, {-6, 31}, {-12, 30}, {-18, 27},
+        {-23, 23}, {-27, 18}, {-30, 12}, {-31, 6}, {-32, 0}, {-31, -6}, {-30, -12}, {-27, -18},
+    }};
+    using util::X87;
+    constexpr float kInvCell = 1.0f / kCell;
+    const auto [dx, dy] = kLeaf[shut & 31];
+    // (Each half chopped toward zero, the position added and scaled on the stack, then truncated.)
+    const int cx = util::ftol((X87::fromDouble(dx / 2) + x) * kInvCell);
+    const int cy = util::ftol((X87::fromDouble(dy / 2) + y) * kInvCell);
+    if (cx < 0 || cx >= 256 || cy < 0 || cy >= 256) {
+        return std::nullopt;
+    }
+    return std::pair{cx, cy};
 }
 
 } // namespace nox::client

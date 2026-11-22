@@ -215,6 +215,7 @@ void MapView::loadObjects(const nox::map::MapFile& map)
     ThingArt& art = *art_;
     const nox::things::ModifierDb& modifiers = *modifiers_;
     const ObjectSet objectSet = objectSet_;
+    doorWalls_.reset();
     // Top-level objects only: inventory records follow their owner and aren't drawn.
     const auto toc = nox::map::decodeSection<nox::map::ObjectTOC>(map);
     std::map<std::uint16_t, std::string_view> typeNames;
@@ -238,6 +239,14 @@ void MapView::loadObjects(const nox::map::MapFile& map)
             continue;
         }
         if (const auto* def = things.findThing(name->second)) {
+            if (nox::things::thingClasses(*def) & nox::things::ObjectClass::Door) {
+                // Its leaf's wall cell, as the map loads (drawn by us or sent by the server).
+                const auto& x = xfers[root.record];
+                if (const auto cell = nox::client::doorWallCell(x.header.x, x.header.y,
+                                                                nox::client::doorShutDirection(x.xferVersion, x.extra))) {
+                    doorWalls_.set(wallKey(cell->first, cell->second));
+                }
+            }
             constexpr std::uint32_t kStatic = nox::things::ObjectClass::ClientPersist | nox::things::ObjectClass::Immobile;
             if (nox::things::thingClasses(*def) & kStatic) {
                 const auto& h = xfers[root.record].header;

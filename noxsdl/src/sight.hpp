@@ -53,10 +53,12 @@ public:
     /// Rebuilds the visible region for the camera's view, from its centre. `walls` are the ones
     /// standing (MapView::walls: broken and open secret walls left out), `grid` them by where they
     /// stand (MapView::wallGrid: only those near the view are looked at; null, or a grid of
-    /// another list's length, and every wall is); `windows` holds the window walls (x << 8 | y).
+    /// another list's length, and every wall is); `windows` holds the window walls (x << 8 | y),
+    /// `doorWalls` the cells that hold a door's leaf (MapView::doorWalls, by the same key): their
+    /// walls are left out of the sight, so never drawn either.
     /// `eyeShiftY` is the screen shake as swung for this frame (SightRegion::View::eyeShiftY).
     void build(const Camera& camera, std::span<const nox::map::Wall> walls, const WallGrid* grid,
-               const std::set<std::uint16_t>& windows, const nox::things::ThingDb& things,
+               const std::set<std::uint16_t>& windows, const DoorWalls& doorWalls, const nox::things::ThingDb& things,
                std::span<const Blocker> blockers = {}, int eyeShiftY = 0);
 
     /// Whether the sight reached the blocker with this key (its interval made it into the

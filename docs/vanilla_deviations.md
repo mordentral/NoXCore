@@ -290,6 +290,11 @@ Options switch unless noted.
   plus the learnt input lag, ~9 frames live), so what we aim at is where a spell will land;
   vanilla draws them where the server last said. Newest draws them so (no smoothing delay).
 - **Front walls are always translucent** (vanilla's TranslucentFrontWalls, an option there).
+- **A door standing on a wall cell is drawn, as the host draws it** (2026-11-21, OB-436): the
+  original's host marks the cell each map door's leaf takes and never sweeps or draws a wall there;
+  a joining GAME.EXE client lacks the mark, so the wall hides the door. Every noxsdl client works
+  the cells out from the map's door records (MapView::doorWalls) and leaves those walls out of the
+  line of sight: the host's view.
 - **The line of sight's drawing at the screen's resolution** (2026-10-13): the region is
   drawBlack's own (noxcore client::SightRegion: the same sweep, polygon, wall bits and spans), but
   the black is a mask over the polygon drawn at twice the screen's resolution (an anti-aliased
