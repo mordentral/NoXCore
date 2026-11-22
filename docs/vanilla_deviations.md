@@ -347,7 +347,9 @@ Options switch unless noted.
   Still the game's: which walls are reached at all (walls behind other walls stay hidden, and so do
   their cuts at other occluders' shadow edges), a junction drawn as the direction its seen arms
   make, the half images of directions 8 / 10. Walls drawn just off the screen are marked seen for
-  the map as drawn walls are. Cost: a second sweep a frame, some 0.04 ms at 240 walls.
+  the map as drawn walls are. Cost: a second sweep a frame, some 0.04 ms at 240 walls, and a third
+  (the grown view's walls without the objects) in a frame with sight-blocking objects and a see-over
+  wall in view.
 - **Fade Objects** (nox.cfg FadeObjects, on by default as the game's fast-machine default;
   2026-10-14): the rule is the exe's (noxcore client/fade.hpp: the scene sort for the general
   list, CliNet_OnPacket's MSG_OBJECT_IN_SHADOWS keeping the drawable gameFPS frames, the generic

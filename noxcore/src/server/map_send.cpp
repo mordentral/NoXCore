@@ -32,6 +32,7 @@
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/server/modes.hpp"
 #include "noxcore/strings/string_table.hpp"
+#include "noxcore/util/text.hpp"
 #include "noxcore/video/nxz.hpp"
 
 #include <algorithm>
@@ -81,10 +82,16 @@ bool GameHost::mapSendLoadMap()
 std::filesystem::path GameHost::mapSendFile(const std::string& stem) const
 {
     // (noxcpp) A mode's own map's beside it, as its index found it (checked inside the mode's
-    // folder then); else the maps folder's, as the exe's.
+    // folder then), or another mod's map the host console loaded (consoleMaps_, from its mod's
+    // index likewise); else the maps folder's, as the exe's.
     if (options_.modeMaps) {
         if (const ModeMaps::Entry* own = options_.modeMaps->find(stem)) {
             return own->nxz;
+        }
+    }
+    if (!consoleMaps_.empty()) {
+        if (const auto it = consoleMaps_.find(util::lowered(stem)); it != consoleMaps_.end()) {
+            return it->second.nxz;
         }
     }
     return mapsDir() / stem / (stem + ".nxz");

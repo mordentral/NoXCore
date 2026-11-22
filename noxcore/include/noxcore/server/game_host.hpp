@@ -1065,12 +1065,14 @@ private:
     std::optional<std::string> pendingExit_;
     /// (noxcpp) The maps the host console's load took from another installed mod (one this game's
     /// mode doesn't ship, the maps folder hasn't): by lower-case name, found by findMap after the
-    /// mode's own for the rest of this game (its load, its download, a later exit to it).
-    std::map<std::string, std::filesystem::path> consoleMaps_;
+    /// mode's own for the rest of this game (its load, its download's .nxz: mapSendFile, a later
+    /// exit to it), each as its mod's index has it.
+    std::map<std::string, ModeMaps::Entry> consoleMaps_;
     /// The host console's load: the map `name` (a plain name, or "<mod id>/<name>") as this game
     /// finds it, else in the installed mods (consoleMapOf).
     struct ConsoleMap {
         std::filesystem::path path; ///< (empty: none, `refusal` says why)
+        std::filesystem::path nxz;  ///< another mod's: its .nxz as its index found it (empty: none shipped)
         std::string name;           ///< the map's name to load (the mod's index's spelling)
         bool otherMod = false;      ///< another mod's: pinned in consoleMaps_ once it's loaded
         std::string refusal;        ///< the console's line when it can't be loaded (empty: CannotAccessMap)

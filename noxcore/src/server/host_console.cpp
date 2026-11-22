@@ -191,6 +191,7 @@ GameHost::ConsoleMap GameHost::consoleMapOf(std::string_view name) const
         return out;
     }
     out.path = f.entry->map;
+    out.nxz = f.entry->nxz;
     out.name = f.entry->name;
     out.otherMod = true;
     return out;
@@ -649,7 +650,7 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         bool pinned = false;
         const auto pin = [&] {
             if (pick.otherMod) {
-                pinned = consoleMaps_.emplace(util::lowered(pick.name), pick.path).second;
+                pinned = consoleMaps_.emplace(util::lowered(pick.name), ModeMaps::Entry{pick.name, pick.path, pick.nxz}).second;
             }
         };
         if ((types & 1u) && (world.gameFlags & GameFlag::Solo) && options_.consoleLoad) {
