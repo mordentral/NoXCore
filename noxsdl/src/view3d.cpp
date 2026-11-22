@@ -15,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <random>
 #include <string>
 
@@ -2285,8 +2286,8 @@ bool View3D::drawDepth(const Frame& f)
         if (b.count == 0 || (!b.texture && b.kind == DepthPass::Kind::Scene)) {
             continue;
         }
-        if (b.sprite) {
-            b.sprite->ready(); // (an atlas page's new images uploaded before our pass)
+        if (b.sprite && !b.sprite->ready()) {
+            continue; // (an atlas page's new images uploaded before our pass; a failed BC7 batch's left out)
         }
         gpuDraws_.push_back({b.texture, b.sprite, b.first, b.count, b.alpha < 255, b.linear, item.depth, b.kind});
     }
@@ -2309,6 +2310,7 @@ void View3D::drawSorted(const Frame& f)
     // Back to front (painter's: no depth buffer); runs of geometry with one texture in one call.
     std::ranges::stable_sort(items_, [](const Item& a, const Item& b) { return a.depth > b.depth; });
     SDL_Texture* runTexture = nullptr;
+    std::optional<std::uint64_t> runUploaded; // (the BC7 batches up in this run: Sprite::uploadedBy)
     const auto flushRun = [&] {
         if (!runVerts_.empty()) {
             SDL_RenderGeometry(f.renderer, runTexture, runVerts_.data(), static_cast<int>(runVerts_.size()), nullptr, 0);
@@ -2337,10 +2339,21 @@ void View3D::drawSorted(const Frame& f)
         if (b.texture != runTexture) {
             flushRun();
             runTexture = b.texture;
+            runUploaded.reset();
             if (b.sprite) {
                 b.sprite->ready(); // (an atlas page's new images uploaded)
             }
             SDL_SetTextureScaleMode(runTexture, SDL_SCALEMODE_PIXELART);
+        }
+        if (b.sprite && b.sprite->gpu) {
+            // (The BC7 uploads sent once a run; then each sprite's batch against them: one whose
+            // batch failed to go up is drawn once it has.)
+            if (!runUploaded) {
+                runUploaded = b.sprite->owner ? b.sprite->owner->gpuUploaded() : 0;
+            }
+            if (!b.sprite->uploadedBy(*runUploaded)) {
+                continue;
+            }
         }
         // Each triangle clipped to the near plane, then projected; a clipped one (4 corners) as a fan.
         for (int i = 0; i < b.count; i += 3) {

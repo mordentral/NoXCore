@@ -17,10 +17,6 @@ namespace {
 
 constexpr int kMaxMips = 4;    // down to 1/16: a 4x image drawn at a quarter of its logical size
 constexpr int kMinMipSide = 8; // no level smaller than this
-// Finished decodes the drawing thread hasn't taken yet: past this the workers leave the preload
-// list alone (what's asked for while drawing still goes ahead), so a map's preload can't pile up
-// its whole size in memory waiting for the uploads.
-constexpr std::size_t kMaxWaitingBytes = std::size_t{96} << 20;
 
 /// Half the size, each pixel the average of its 2x2 block with alpha weighting (premultiplied),
 /// so transparent pixels don't darken the edges.
@@ -234,8 +230,8 @@ DecodeResult buildDecodeResult(const DecodeJob& job, std::optional<nox::video::P
     return r;
 }
 
-ImageDecoder::ImageDecoder(std::filesystem::path pack, int threads)
-    : path_(std::move(pack))
+ImageDecoder::ImageDecoder(std::filesystem::path pack, int threads, DecodeLimits limits)
+    : path_(std::move(pack)), limits_(limits)
 {
     for (int i = 0; i < std::max(1, threads); ++i) {
         workers_.emplace_back([this] { run(); });
@@ -272,11 +268,11 @@ void ImageDecoder::request(const DecodeJob& job, std::uint64_t nowMs)
         if (it == wanted_.end()) {
             it = wanted_.emplace(key, Want{job, 0, 0, preloadKeys_.erase(key) > 0}).first;
         } else {
-            order_.erase(it->second.seq);
+            (it->second.job.blocks ? orderAtlas_ : order_).erase(it->second.seq);
         }
         it->second.seq = ++seq_;
         it->second.askedMs = nowMs;
-        order_.emplace(it->second.seq, key);
+        (it->second.job.blocks ? orderAtlas_ : order_).emplace(it->second.seq, key);
     }
     wake_.notify_one();
 }
@@ -286,10 +282,12 @@ void ImageDecoder::preload(std::vector<DecodeJob> jobs)
     {
         std::lock_guard lock(mutex_);
         preload_.clear();
+        preloadAtlas_.clear();
         preloadKeys_.clear();
         for (auto& j : jobs) {
             if (preloadKeys_.insert(j.key()).second) {
-                preload_.push_back(std::move(j));
+                auto& to = j.blocks ? preloadAtlas_ : preload_;
+                to.emplace_back(++preloadSeq_, std::move(j));
             }
         }
     }
@@ -307,6 +305,7 @@ void ImageDecoder::dropRequests()
     std::lock_guard lock(mutex_);
     wanted_.clear();
     order_.clear();
+    orderAtlas_.clear();
 }
 
 void ImageDecoder::dropStale(std::uint64_t nowMs, std::uint64_t maxIdleMs)
@@ -319,11 +318,13 @@ void ImageDecoder::dropStale(std::uint64_t nowMs, std::uint64_t maxIdleMs)
                 ++it;
                 continue;
             }
+            const bool atlas = it->second.job.blocks;
             if (it->second.mapImage && preloadKeys_.insert(it->first).second) {
-                preload_.push_back(it->second.job); // (still one of the map's: back in its queue)
+                // (Still one of the map's: back in its queue, at its end.)
+                (atlas ? preloadAtlas_ : preload_).emplace_back(++preloadSeq_, it->second.job);
                 requeued = true;
             }
-            order_.erase(it->second.seq);
+            (atlas ? orderAtlas_ : order_).erase(it->second.seq);
             it = wanted_.erase(it);
         }
     }
@@ -332,44 +333,95 @@ void ImageDecoder::dropStale(std::uint64_t nowMs, std::uint64_t maxIdleMs)
     }
 }
 
-bool ImageDecoder::takeWait(DecodeResult& out, std::uint64_t maxMs)
+bool ImageDecoder::takeWait(DecodeResult& out, std::uint64_t maxMs, bool allowAtlas)
 {
-    {
-        // (The workers take their next jobs at normal priority while a frame waits on them.)
-        ++waiting_;
-        struct Done {
-            std::atomic<int>& n;
-            ~Done() { --n; }
-        } done{waiting_};
-        std::unique_lock lock(mutex_);
-        if (!finished_.wait_for(lock, std::chrono::milliseconds(maxMs),
-                                [&] { return !done_.empty() || !donePreload_.empty(); })) {
-            return false;
-        }
+    // (The workers take their next jobs at normal priority while a frame waits on them.)
+    ++waiting_;
+    struct Waiting {
+        std::atomic<int>& n;
+        ~Waiting() { --n; }
+    } waiting{waiting_};
+    std::unique_lock lock(mutex_);
+    if (!finished_.wait_for(lock, std::chrono::milliseconds(maxMs),
+                            [&] { return done_.has(allowAtlas) || donePreload_.has(allowAtlas); })) {
+        return false;
     }
-    return take(out);
+    const bool resume = takeReady(out, allowAtlas);
+    lock.unlock();
+    if (resume) {
+        wake_.notify_all();
+    }
+    return true;
 }
 
-bool ImageDecoder::take(DecodeResult& out)
+bool ImageDecoder::take(DecodeResult& out, bool allowAtlas)
 {
     bool resume = false;
     {
         std::lock_guard lock(mutex_);
-        // What was asked for while drawing before the map's preload (it's on screen).
-        auto& from = !done_.empty() ? done_ : donePreload_;
-        if (from.empty()) {
+        if (!done_.has(allowAtlas) && !donePreload_.has(allowAtlas)) {
             return false;
         }
-        out = std::move(from.front());
-        from.pop_front();
-        const std::size_t bytes = resultBytes(out);
-        resume = doneBytes_ >= kMaxWaitingBytes && doneBytes_ - std::min(doneBytes_, bytes) < kMaxWaitingBytes;
-        doneBytes_ -= std::min(doneBytes_, bytes);
-        busy_.erase(out.job.key());
+        resume = takeReady(out, allowAtlas);
     }
     if (resume) {
         wake_.notify_all(); // (the preload list may go on)
     }
+    return true;
+}
+
+bool ImageDecoder::takeReady(DecodeResult& out, bool allowAtlas)
+{
+    // What was asked for while drawing before the map's preload (it's on screen); within each,
+    // the oldest finished, BC7 or not (without allowAtlas, the oldest that isn't).
+    DoneQueues& q = done_.has(allowAtlas) ? done_ : donePreload_;
+    const bool atlas = allowAtlas && !q.atlas.empty() && (q.other.empty() || q.atlas.front().seq < q.other.front().seq);
+    auto& from = atlas ? q.atlas : q.other;
+    const std::size_t bytes = from.front().bytes;
+    out = std::move(from.front().result);
+    from.pop_front();
+    // A limit it brings the backlog back under: the workers may go on (nextJob).
+    const auto under = [](std::size_t before, std::size_t after, std::size_t limit) { return before >= limit && after < limit; };
+    bool resume = under(doneBytes_, doneBytes_ - bytes, limits_.total);
+    doneBytes_ -= bytes;
+    if (atlas) {
+        resume = resume || under(atlasBytes_, atlasBytes_ - bytes, limits_.atlas) ||
+                 under(atlasBytes_, atlasBytes_ - bytes, limits_.atlasPreload);
+        atlasBytes_ -= bytes;
+    }
+    busy_.erase(out.job.key());
+    return resume;
+}
+
+ImageDecoder::Backlog ImageDecoder::backlog() const
+{
+    std::lock_guard lock(mutex_);
+    const std::size_t results = done_.atlas.size() + done_.other.size() + donePreload_.atlas.size() + donePreload_.other.size();
+    Source from{};
+    return {doneBytes_, atlasBytes_, results, decoding_, decoding_ == 0 && !nextJob(from)};
+}
+
+bool ImageDecoder::nextJob(Source& from) const
+{
+    // What's asked for while drawing first, the last asked first; then the preload list in order.
+    // The BC7 jobs only while their results have room (DecodeLimits), the preload only while the
+    // whole backlog has.
+    const bool room = doneBytes_ < limits_.total;
+    const bool askAtlas = !orderAtlas_.empty() && room && atlasBytes_ < limits_.atlas;
+    if (!order_.empty() || askAtlas) {
+        from = !askAtlas || (!order_.empty() && order_.rbegin()->first > orderAtlas_.rbegin()->first) ? Source::Asked
+                                                                                                         : Source::AskedAtlas;
+        return true;
+    }
+    if (!room) {
+        return false;
+    }
+    const bool preAtlas = !preloadAtlas_.empty() && atlasBytes_ < limits_.atlasPreload;
+    if (preload_.empty() && !preAtlas) {
+        return false;
+    }
+    from = !preAtlas || (!preload_.empty() && preload_.front().first < preloadAtlas_.front().first) ? Source::Preload
+                                                                                                    : Source::PreloadAtlas;
     return true;
 }
 
@@ -412,23 +464,24 @@ void ImageDecoder::run()
         bool mapImage = false;
         {
             std::unique_lock lock(mutex_);
-            wake_.wait(lock, [&] {
-                return stop_ || !order_.empty() || (!preload_.empty() && doneBytes_ < kMaxWaitingBytes);
-            });
+            Source from{};
+            wake_.wait(lock, [&] { return stop_ || nextJob(from); });
             if (stop_) {
                 return;
             }
-            if (!order_.empty()) {
+            if (from == Source::Asked || from == Source::AskedAtlas) {
                 // The last asked for first.
-                const auto last = std::prev(order_.end());
+                auto& order = from == Source::AskedAtlas ? orderAtlas_ : order_;
+                const auto last = std::prev(order.end());
                 const auto it = wanted_.find(last->second);
                 job = std::move(it->second.job);
                 mapImage = it->second.mapImage;
                 wanted_.erase(it);
-                order_.erase(last);
+                order.erase(last);
             } else {
-                job = std::move(preload_.front());
-                preload_.pop_front();
+                auto& list = from == Source::PreloadAtlas ? preloadAtlas_ : preload_;
+                job = std::move(list.front().second);
+                list.pop_front();
                 // Skipped if it came another way meanwhile (cancelled, asked for, or being decoded).
                 if (!preloadKeys_.erase(job.key()) || busy_.contains(job.key())) {
                     continue;
@@ -436,6 +489,7 @@ void ImageDecoder::run()
                 mapImage = true;
             }
             busy_.insert(job.key());
+            ++decoding_;
         }
         prioritise();
         const auto start = std::chrono::steady_clock::now();
@@ -489,9 +543,16 @@ void ImageDecoder::run()
         }
         r.decodeMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
         {
+            const std::size_t bytes = resultBytes(r);
+            const bool atlas = r.needsAtlas();
             std::lock_guard lock(mutex_);
-            doneBytes_ += resultBytes(r);
-            (mapImage ? donePreload_ : done_).push_back(std::move(r));
+            doneBytes_ += bytes;
+            if (atlas) {
+                atlasBytes_ += bytes;
+            }
+            DoneQueues& to = mapImage ? donePreload_ : done_;
+            (atlas ? to.atlas : to.other).push_back({++doneSeq_, bytes, std::move(r)});
+            --decoding_;
         }
         finished_.notify_all();
     }

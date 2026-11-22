@@ -88,6 +88,12 @@ noxsdl/src/game_session.cpp: "Replenishment1"
 # noxsdl/src/game_windows.cpp: map names
 noxsdl/src/game_windows.cpp: "So_Druid"
 
+# noxsdl/src/gpu_atlas.cpp: the log (what failed in an upload)
+noxsdl/src/gpu_atlas.cpp: "the transfer buffer"
+noxsdl/src/gpu_atlas.cpp: "a command buffer"
+noxsdl/src/gpu_atlas.cpp: "the copy pass"
+noxsdl/src/gpu_atlas.cpp: "the submit"
+
 # noxsdl/src/gui.cpp: image names
 noxsdl/src/gui.cpp: "UIScrollDnDis"
 noxsdl/src/gui.cpp: "UIScrollDnLit"
@@ -299,6 +305,7 @@ noxsdl/src/spellbook.cpp: "Spellbook"
 # noxsdl/src/sprite_cache.cpp: the log
 noxsdl/src/sprite_cache.cpp: "{} MB: {} atlas pages, {} MB in textures of their own"
 noxsdl/src/sprite_cache.cpp: ", {} BC7 pages + {} material pages ({} MB, {} MB of it images; {} made in {:.1f} ms, worst {:.1f} ms; {} uploads, {} MB in {:.1f} ms)"
+noxsdl/src/sprite_cache.cpp: "; {} uploads failed and were tried again"
 
 # noxsdl/src/summon_window.cpp: nox.csf labels; image names
 noxsdl/src/summon_window.cpp: "ccs:BANISH"

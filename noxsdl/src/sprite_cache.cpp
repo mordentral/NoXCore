@@ -141,7 +141,9 @@ SDL_FRect insetPageEdges(SDL_FRect from, const SDL_FRect& whole)
 
 void drawSprite(SDL_Renderer* renderer, const Sprite& sprite, const SDL_FRect* src, const SDL_FRect& dst)
 {
-    sprite.ready();
+    if (!sprite.ready()) {
+        return; // (its BC7 upload failed: drawn once it's gone up)
+    }
     const float tw = sprite.rect.w;
     const float th = sprite.rect.h;
     const int level = mipLevel(renderer, sprite, src ? src->w : tw, dst);
@@ -335,6 +337,9 @@ std::string SpriteCache::textureSummary() const
                            atlas_->pages(GpuAtlas::Kind::Bc7), atlas_->pages(GpuAtlas::Kind::Labels), atlas_->bytes() >> 20,
                            atlas_->usedBytes() >> 20, st.pagesMade, st.createMs, st.worstCreateMs, st.flushes,
                            st.uploadedBytes >> 20, st.flushMs);
+        if (st.failedFlushes != 0) {
+            out += std::format("; {} uploads failed and were tried again", st.failedFlushes);
+        }
     }
     return out;
 }
@@ -379,7 +384,7 @@ void SpriteCache::endFrame(std::uint64_t nowMs)
         flushPage(static_cast<int>(i)); // (made and not drawn)
     }
     if (atlas_) {
-        atlas_->flush(); // (the frame's BC7 uploads in one copy pass)
+        atlas_->endFrame(); // (the frame's BC7 uploads in one copy pass; a failed batch again)
     }
     // The sweep below runs at most once a second.
     if (nowMs - sweptMs_ < 1000) {
@@ -528,7 +533,10 @@ DecodeJob SpriteCache::jobFor(DecodeKind kind, std::int32_t index) const
 SpriteCache::Entry SpriteCache::makeNow(const DecodeJob& job)
 {
     const std::uint64_t start = SDL_GetTicksNS();
-    Entry e = makeHdEntry(buildDecodeResult(job, packImage(job.index, job.blocks)));
+    // (Wanted this frame: with a failed BC7 batch waiting and a flush's worth staged, decoded to
+    // RGBA textures of its own instead of joining it.)
+    const bool blocks = job.blocks && !(atlas_ && atlas_->stagingBlocked());
+    Entry e = makeHdEntry(buildDecodeResult(job, packImage(job.index, blocks)));
     ++loadStats_.misses;
     loadStats_.missMs += static_cast<double>(SDL_GetTicksNS() - start) / 1e6;
     return e;
@@ -579,6 +587,7 @@ SpriteCache::Entry SpriteCache::makeAtlasEntry(const DecodeResult& result, GpuAt
     s.scale = SDL_SCALEMODE_LINEAR;
     s.owner = this;
     s.gpu = true;
+    s.gpuBatch = atlas_->batch(); // (after both places: its colour and material bytes)
     if (labelPage >= 0) {
         s.labelState = atlas_->labelState(labelPage);
         s.labelTexture = atlas_->gpuTexture(labelPage);
@@ -765,7 +774,9 @@ void SpriteCache::pump(std::uint64_t nowMs)
     const std::uint64_t start = SDL_GetTicksNS();
     const std::uint64_t budget = holding_ ? kHoldUploadBudgetNs : kUploadBudgetNs;
     DecodeResult r;
-    while (decoder_->take(r)) {
+    // (A failed BC7 batch with a flush's worth staged: the workers' BC7 images stay queued, the
+    // rest come on.)
+    while (decoder_->take(r, !atlas_ || !atlas_->stagingBlocked())) {
         install(std::move(r));
         if (SDL_GetTicksNS() - start >= budget) {
             break;
@@ -1435,14 +1446,12 @@ void SpriteCache::flushPage(int page)
     p.dirty = {};
 }
 
-void Sprite::ready() const
+bool Sprite::ready() const
 {
     if (owner && page >= 0) {
         owner->flushPage(page);
     }
-    if (owner && gpu) {
-        owner->flushGpu();
-    }
+    return !gpu || (owner && owner->gpuReady(gpuBatch));
 }
 
 const nox::video::DecodedImage* SpriteCache::decoded(std::int32_t imageIndex)
@@ -1794,7 +1803,9 @@ void SpriteCache::render(const Sprite& sprite, const SDL_FRect* src, const SDL_F
         drawSprite(renderer_, sprite, src, dst);
         return;
     }
-    sprite.ready();
+    if (!sprite.ready()) {
+        return;
+    }
     // The material shader (shaders/material.frag.hlsl, material_split.frag.hlsl): the colours, the
     // filtering, the image's size and its corner in the texture (a page's place, or the mip level
     // drawn) and in the material texture, then the draw from the image.
@@ -1952,7 +1963,9 @@ bool SpriteCache::awaitAsked(std::uint64_t maxMs)
     double workMs = 0;
     while (outstanding()) {
         const std::uint64_t now = SDL_GetTicksNS();
-        if (now >= deadline || !decoder_->takeWait(r, std::max<std::uint64_t>(1, (deadline - now) / 1'000'000))) {
+        const bool allowAtlas = !atlas_ || !atlas_->stagingBlocked();
+        if (now >= deadline ||
+            !decoder_->takeWait(r, std::max<std::uint64_t>(1, (deadline - now) / 1'000'000), allowAtlas)) {
             SDL_Log("image pack: waited %llu ms for %zu floor tiles and %zu composites; drawn as they are",
                     static_cast<unsigned long long>(maxMs), askedTiles_.size(), askedComposites_.size());
             break;

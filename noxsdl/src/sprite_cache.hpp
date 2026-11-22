@@ -85,6 +85,9 @@ struct Sprite {
     int page = -1;
     /// On a BC7 page (GpuAtlas): its staged uploads go up before it's first drawn (ready()).
     bool gpu = false;
+    /// The GpuAtlas batch its uploads went in: it isn't drawn till that batch is up (a failed
+    /// one is kept and tried again next frame).
+    std::uint64_t gpuBatch = 0;
     /// A BC7 material sprite's material bytes: on a page of their own (at `labels`, its mips'
     /// at theirs), which the material shader reads through the page's render state (2D) or
     /// texture (the 3D view). Unset, a material sprite has them beside its image.
@@ -101,8 +104,12 @@ struct Sprite {
         return src ? SDL_FRect{rect.x + src->x, rect.y + src->y, src->w, src->h} : rect;
     }
     /// Its pixels uploaded (a page's pending ones in one go); drawSprite and
-    /// SpriteCache::render call it, and anything drawing `texture` itself must.
-    void ready() const;
+    /// SpriteCache::render call it, and anything drawing `texture` itself must, and skips the
+    /// draw when it's false (its BC7 batch failed to go up: drawn once it has).
+    bool ready() const;
+    /// For a run of draws from one texture after ready() on the first: whether this one's BC7
+    /// batch is up, given the atlas's uploaded() then (SpriteCache::gpuUploaded).
+    bool uploadedBy(std::uint64_t uploaded) const { return !gpu || gpuBatch <= uploaded; }
 };
 
 /// Draws a sprite's texture (its whole image when `src` is null), or for an HD sprite drawn
@@ -309,12 +316,17 @@ public:
     std::string textureSummary() const;
     /// A page's images made since its last upload, uploaded (Sprite::ready).
     void flushPage(int page);
-    /// The BC7 pages' staged uploads sent (Sprite::ready).
-    void flushGpu()
+    /// Whether a BC7 batch is up, the staged uploads sent if it isn't yet (Sprite::ready).
+    bool gpuReady(std::uint64_t batch) { return atlas_ && atlas_->ready(batch); }
+    /// The BC7 pages' staged uploads sent if they can be, and the batches up (Sprite::uploadedBy:
+    /// a run of draws from one page checks each sprite against it).
+    std::uint64_t gpuUploaded()
     {
-        if (atlas_) {
-            atlas_->flush();
+        if (!atlas_) {
+            return 0;
         }
+        atlas_->flush();
+        return atlas_->uploaded();
     }
 
     /// Images from this pack from now on (nullptr: video.bag's again). Drops every texture made

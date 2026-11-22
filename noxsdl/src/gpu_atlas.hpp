@@ -93,8 +93,26 @@ public:
 
     /// Anything staged and not uploaded yet.
     bool pending() const { return !uploads_.empty(); }
-    /// The staged uploads in one copy pass (nothing staged: nothing done).
-    void flush();
+    /// The staged uploads in one copy pass (nothing staged: nothing done, true). False: not sent,
+    /// the batch kept whole (the transfer buffer, its mapping, the copy pass or the submit failed;
+    /// after a failure nothing is tried again till endFrame).
+    bool flush();
+    /// Batches: everything staged between two flushes that went up. A sprite placed now is in
+    /// batch() (the one being staged, or the last sent if nothing waits); it may be drawn once
+    /// uploaded() reaches it.
+    std::uint64_t batch() const { return pending() ? sent_ + 1 : sent_; }
+    std::uint64_t uploaded() const { return sent_; }
+    /// Whether batch `b` is up, sending what's staged if it isn't yet (Sprite::ready).
+    bool ready(std::uint64_t b) { return b <= sent_ || flush(); }
+    /// A failed batch waiting with a whole flush's worth staged: take no more BC7 images till it
+    /// goes (SpriteCache leaves the workers' ones queued and makes those it can't wait for as RGBA).
+    bool stagingBlocked() const { return retryAtFrame_ && staging_.size() >= kFlushAt; }
+    /// The frame's staged uploads sent; a failed batch tried again (once a frame).
+    void endFrame()
+    {
+        retryAtFrame_ = false;
+        flush();
+    }
     /// A page's textures let go (its wrapper destroyed, then the GPU textures; SDL keeps them till
     /// the GPU is done with them). Its slot is reused.
     void release(int page);
@@ -112,6 +130,7 @@ public:
         double createMs = 0;
         double worstCreateMs = 0;
         std::size_t flushes = 0;
+        std::size_t failedFlushes = 0; ///< tries that didn't go up (the batch kept for the next)
         std::size_t regions = 0;
         std::size_t uploadedBytes = 0;
         double flushMs = 0;
@@ -119,6 +138,10 @@ public:
     const Stats& stats() const { return stats_; }
 
 private:
+    // Staged uploads go up once they reach this, whatever else comes (so the transfer buffer stays
+    // this size, plus one big image at most).
+    static constexpr std::size_t kFlushAt = std::size_t{16} << 20;
+
     GpuAtlas() = default;
     struct Page {
         Kind kind = Kind::Bc7;
@@ -167,6 +190,9 @@ private:
     std::size_t bytes_ = 0;
     std::size_t usedBytes_ = 0;
     bool failed_ = false; ///< a page couldn't be made (logged once)
+    std::uint64_t sent_ = 0;     ///< batches uploaded (the last one's number)
+    bool retryAtFrame_ = false;  ///< the staged batch failed: tried again at endFrame
+    bool failing_ = false;       ///< since the last flush that went up (logged once a run of them)
     Stats stats_;
 };
 

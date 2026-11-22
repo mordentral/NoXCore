@@ -19,9 +19,6 @@ constexpr int kBlock = 4;            // BC7's block side
 constexpr int kBlockBytes = 16;
 constexpr int kGutter = 4;           // one clear block
 constexpr std::uint32_t kPlacement = 512;  // Direct3D 12's upload placement alignment (rows: rowPitch_)
-// Staged uploads go up once they reach this, whatever else comes (so the transfer buffer stays
-// this size, plus one big image at most).
-constexpr std::size_t kFlushAt = std::size_t{16} << 20;
 
 // A transparent BC7 block: mode 6 (bit 6 of the first byte), every endpoint and index 0, so
 // all 16 texels are (0, 0, 0, 0).
@@ -339,11 +336,24 @@ void GpuAtlas::closePool(Pool pool)
     }
 }
 
-void GpuAtlas::flush()
+bool GpuAtlas::flush()
 {
     if (uploads_.empty()) {
-        return;
+        return true;
     }
+    if (retryAtFrame_) {
+        return false; // (it failed this frame: once a frame, endFrame)
+    }
+    // Till it's submitted the batch stays whole (its sprites aren't drawn: Sprite::ready), and a
+    // failure leaves it for the next frame.
+    retryAtFrame_ = true;
+    const auto failed = [&](const char* what) {
+        ++stats_.failedFlushes;
+        if (!std::exchange(failing_, true)) {
+            SDL_Log("image pack: uploading (%s): %s; kept and tried again each frame", what, SDL_GetError());
+        }
+        return false;
+    };
     const std::uint64_t start = SDL_GetTicksNS();
     const auto size = static_cast<std::uint32_t>(staging_.size());
     if (!transfer_ || transferSize_ < size) {
@@ -356,28 +366,26 @@ void GpuAtlas::flush()
         info.size = transferSize_;
         transfer_ = SDL_CreateGPUTransferBuffer(device_, &info);
         if (!transfer_) {
-            SDL_Log("image pack: a %u-byte transfer buffer: %s", transferSize_, SDL_GetError());
             transferSize_ = 0;
-            staging_.clear();
-            uploads_.clear();
-            return;
+            return failed("the transfer buffer");
         }
     }
     // (Cycled: the last flush's copy may still be on its way.)
     void* mapped = SDL_MapGPUTransferBuffer(device_, transfer_, true);
     SDL_GPUCommandBuffer* cmd = mapped ? SDL_AcquireGPUCommandBuffer(device_) : nullptr;
     if (!mapped || !cmd) {
-        SDL_Log("image pack: uploading: %s", SDL_GetError());
         if (mapped) {
             SDL_UnmapGPUTransferBuffer(device_, transfer_);
         }
-        staging_.clear();
-        uploads_.clear();
-        return;
+        return failed(mapped ? "a command buffer" : "mapping");
     }
     std::memcpy(mapped, staging_.data(), size);
     SDL_UnmapGPUTransferBuffer(device_, transfer_);
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_CancelGPUCommandBuffer(cmd);
+        return failed("the copy pass");
+    }
     for (const Upload& u : uploads_) {
         SDL_GPUTextureTransferInfo from{};
         from.transfer_buffer = transfer_;
@@ -394,13 +402,21 @@ void GpuAtlas::flush()
         SDL_UploadToGPUTexture(copy, &from, &to, false);
     }
     SDL_EndGPUCopyPass(copy);
-    SDL_SubmitGPUCommandBuffer(cmd);
+    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+        return failed("the submit");
+    }
+    if (std::exchange(failing_, false)) {
+        SDL_Log("image pack: the kept uploads went up (%zu tries failed so far)", stats_.failedFlushes);
+    }
+    retryAtFrame_ = false;
+    ++sent_;
     ++stats_.flushes;
     stats_.regions += uploads_.size();
     stats_.uploadedBytes += size;
     stats_.flushMs += static_cast<double>(SDL_GetTicksNS() - start) / 1e6;
     staging_.clear();
     uploads_.clear();
+    return true;
 }
 
 void GpuAtlas::release(int page)
@@ -409,9 +425,12 @@ void GpuAtlas::release(int page)
     if (!p.gpu) {
         return;
     }
-    // (Its staged uploads go first: they name its texture.)
-    if (std::ranges::any_of(uploads_, [&](const Upload& u) { return u.texture == p.gpu; })) {
-        flush();
+    // Its staged uploads dropped (they name its texture; nothing of it is drawn again). With none
+    // left, nothing waits.
+    std::erase_if(uploads_, [&](const Upload& u) { return u.texture == p.gpu; });
+    if (uploads_.empty()) {
+        staging_.clear();
+        retryAtFrame_ = false;
     }
     if (p.wrapper) {
         SDL_DestroyTexture(p.wrapper); // (SDL leaves a texture it was given alone)
@@ -429,6 +448,7 @@ void GpuAtlas::clear()
 {
     staging_.clear();
     uploads_.clear();
+    retryAtFrame_ = false;
     for (int i = 0; i < static_cast<int>(pages_.size()); ++i) {
         release(i);
     }

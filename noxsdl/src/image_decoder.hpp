@@ -10,6 +10,9 @@
 // Two queues: images asked for while drawing (newest first: what's on screen now), and a map's
 // images queued as it loads (in order, after anything asked for). A request not asked again for
 // a while is dropped (dropStale), as are all of them when the map changes (dropRequests).
+// Finished decodes wait for the drawing thread within DecodeLimits; each queue keeps its BC7 jobs
+// and results apart from the rest, so the next of either is at a queue's end (no searching),
+// and the BC7 ones can wait while the GPU atlas takes none without holding up the rest.
 //
 // No SDL renderer or texture calls here: workers touch only their reader and CPU buffers.
 #pragma once
@@ -32,6 +35,7 @@
 #include <string>
 #include <thread>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace noxsdl {
@@ -102,6 +106,9 @@ struct DecodeResult {
     std::vector<std::vector<std::uint8_t>> labels;
     std::optional<nox::video::PackImage> pixels; ///< Tile: the image itself
     double decodeMs = 0; ///< the worker's time on it (read, decompress, levels)
+
+    /// Its levels are BC7 blocks for the GPU atlas.
+    bool needsAtlas() const { return !levels.empty() && levels.front().bc7; }
 };
 
 /// Shades an image's material pixels (RGBA, straight alpha) by `colours`, as the game's material
@@ -119,10 +126,22 @@ std::vector<std::uint8_t> besideMaterial(const std::vector<std::uint8_t>& rgba, 
 /// work as a worker's, for the drawing thread's own decodes (no SD original to stand in).
 DecodeResult buildDecodeResult(const DecodeJob& job, std::optional<nox::video::PackImage> image);
 
+/// What the finished decodes not yet taken may hold, in bytes (ImageDecoder). One bound for them
+/// all, `total`: past it no more of the map's preload, nor BC7 images asked for. Within it the BC7
+/// ones (the GPU atlas's) have less, so the rest keep their room while the atlas takes none for a
+/// while (a failed upload waiting): those asked for while drawing stop at `atlas`, the preload's
+/// at `atlasPreload` (leaving the ones asked for room). The rest asked for while drawing always go
+/// ahead (they're taken every frame).
+struct DecodeLimits {
+    std::size_t total = std::size_t{96} << 20;
+    std::size_t atlas = std::size_t{88} << 20;
+    std::size_t atlasPreload = std::size_t{80} << 20;
+};
+
 class ImageDecoder {
 public:
     /// Starts `threads` workers on the pack at `pack` (each opens its own reader).
-    ImageDecoder(std::filesystem::path pack, int threads);
+    ImageDecoder(std::filesystem::path pack, int threads, DecodeLimits limits = {});
     ~ImageDecoder();
     ImageDecoder(const ImageDecoder&) = delete;
     ImageDecoder& operator=(const ImageDecoder&) = delete;
@@ -146,9 +165,21 @@ public:
     /// preload list instead).
     void dropStale(std::uint64_t nowMs, std::uint64_t maxIdleMs);
     /// The oldest finished decode, if any: those asked for while drawing before the preload's.
-    bool take(DecodeResult& out);
+    /// `allowAtlas` false (the GPU atlas takes none for now): the oldest that isn't BC7, the BC7
+    /// ones left queued.
+    bool take(DecodeResult& out, bool allowAtlas = true);
     /// The same, waiting up to `maxMs` for one to finish (false: none came).
-    bool takeWait(DecodeResult& out, std::uint64_t maxMs);
+    bool takeWait(DecodeResult& out, std::uint64_t maxMs, bool allowAtlas = true);
+
+    /// What's finished and not taken, in bytes, and the BC7 part of it.
+    struct Backlog {
+        std::size_t bytes = 0;
+        std::size_t atlasBytes = 0;
+        std::size_t results = 0;
+        int decoding = 0;     ///< workers on a job now
+        bool settled = false; ///< none, and no job may start till something's taken or asked for
+    };
+    Backlog backlog() const;
 
 private:
     struct Want {
@@ -157,21 +188,49 @@ private:
         std::uint64_t askedMs = 0;
         bool mapImage = false; ///< it was on the preload list
     };
+    /// A finished decode and when it finished (the two queues of a kind taken in that order).
+    struct Done {
+        std::uint64_t seq = 0;
+        std::size_t bytes = 0;
+        DecodeResult result;
+    };
+    /// One source's finished decodes, BC7 apart from the rest, so either is taken from the front.
+    struct DoneQueues {
+        std::deque<Done> atlas;
+        std::deque<Done> other;
+        /// Anything to take (allowAtlas false: anything but BC7).
+        bool has(bool allowAtlas) const { return !other.empty() || (allowAtlas && !atlas.empty()); }
+    };
+    /// The next job's place (mutex_ held), or false: none may go now.
+    enum class Source : std::uint8_t { Asked, AskedAtlas, Preload, PreloadAtlas };
+    bool nextJob(Source& from) const;
+    /// Takes the next finished decode (mutex_ held, one there to take); true: a limit it brought
+    /// the backlog back under, the workers to be woken.
+    bool takeReady(DecodeResult& out, bool allowAtlas);
     void run();
 
     std::filesystem::path path_;
+    const DecodeLimits limits_;
     mutable std::mutex mutex_;
     std::condition_variable wake_;
     std::condition_variable finished_; ///< a decode done (takeWait)
     std::map<DecodeJob::Key, Want> wanted_;
-    std::map<std::uint64_t, DecodeJob::Key> order_; ///< wanted_ by seq: the last asked last
-    std::deque<DecodeJob> preload_;
-    std::set<DecodeJob::Key> preloadKeys_; ///< preload_'s still wanted
+    /// wanted_ by seq (the last asked last), BC7 jobs (DecodeJob::blocks) apart from the rest.
+    std::map<std::uint64_t, DecodeJob::Key> order_;
+    std::map<std::uint64_t, DecodeJob::Key> orderAtlas_;
+    /// The preload list in order (each job's place in it first), BC7 jobs apart from the rest.
+    std::deque<std::pair<std::uint64_t, DecodeJob>> preload_;
+    std::deque<std::pair<std::uint64_t, DecodeJob>> preloadAtlas_;
+    std::set<DecodeJob::Key> preloadKeys_; ///< the preload lists' still wanted
     std::set<DecodeJob::Key> busy_;        ///< being decoded, or finished and not taken
-    std::deque<DecodeResult> done_;        ///< finished: asked for while drawing (taken first)
-    std::deque<DecodeResult> donePreload_; ///< finished: the map's preload
-    std::size_t doneBytes_ = 0; ///< in done_ and donePreload_
+    DoneQueues done_;        ///< finished: asked for while drawing (taken first)
+    DoneQueues donePreload_; ///< finished: the map's preload
+    std::size_t doneBytes_ = 0;  ///< in done_ and donePreload_
+    std::size_t atlasBytes_ = 0; ///< the BC7 part of doneBytes_
     std::uint64_t seq_ = 0;
+    std::uint64_t doneSeq_ = 0;
+    std::uint64_t preloadSeq_ = 0;
+    int decoding_ = 0;
     std::atomic<int> waiting_{0}; ///< frames in takeWait (the workers' priority goes by it)
     bool stop_ = false;
     std::vector<std::thread> workers_;

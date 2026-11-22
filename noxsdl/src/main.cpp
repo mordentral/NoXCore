@@ -2387,17 +2387,22 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
                 // Light sources' sprites go in (lit) and widen the lit box; a later sprite over that box hides
                 // what it covers.
                 for (const auto& b : list) {
+                    // (A sprite whose BC7 upload failed isn't drawn: ready() false.)
                     if (b.source) {
+                        if (!b.sprite->ready()) {
+                            continue;
+                        }
                         if (!anyLit) {
                             lit = b.dst;
                             anyLit = true;
                         } else {
                             SDL_GetRectUnionFloat(&lit, &b.dst, &lit);
                         }
-                        b.sprite->ready();
                         app.bloom->addSprite(app.renderer, b.sprite->texture, b.sprite->source(&b.src), b.dst, b.light, b.alpha);
                     } else if (anyLit && SDL_HasRectIntersectionFloat(&lit, &b.dst)) {
-                        b.sprite->ready();
+                        if (!b.sprite->ready()) {
+                            continue;
+                        }
                         app.bloom->hide(app.renderer, b.sprite->texture, b.sprite->source(&b.src), b.dst, b.alpha);
                     }
                 }
