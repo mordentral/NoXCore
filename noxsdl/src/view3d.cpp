@@ -2292,6 +2292,11 @@ bool View3D::drawDepth(const Frame& f)
     }
     SDL_Texture* scene = depth_->render(f.renderer, viewW_, viewH_, gpuVerts_, gpuDraws_);
     if (!scene) {
+        // (The frame drawn back to front instead; the pass is tried again next frame.)
+        if (!depthFallbackLogged_) {
+            depthFallbackLogged_ = true;
+            SDL_Log("view3d: the depth pass failed at %dx%d (%s): drawing back to front while it does", viewW_, viewH_, SDL_GetError());
+        }
         return false;
     }
     const SDL_FRect all{0, 0, static_cast<float>(viewW_), static_cast<float>(viewH_)};

@@ -4,11 +4,16 @@
 #include "noxcore/util/text.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cerrno>
+#include <cstdio>
 #include <fstream>
-#include <iterator>
+#include <memory>
 #include <system_error>
+#ifdef _WIN32
+#include <share.h>
+#endif
 
 namespace nox {
 
@@ -56,20 +61,36 @@ std::string pathUtf8(const std::filesystem::path& path)
 
 std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path)
 {
-    std::ifstream in(path, std::ios::binary);
-#ifndef _WIN32
-    if (!in) {
+    std::filesystem::path opened = path;
+#ifdef _WIN32
+    std::FILE* file = _wfsopen(path.c_str(), L"rb", _SH_DENYNO);
+#else
+    std::FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) {
         if (const auto found = resolveNoCase(path); found != path) {
-            in.open(found, std::ios::binary);
+            file = std::fopen(found.c_str(), "rb");
+            opened = found;
         }
     }
 #endif
-    if (!in) {
+    if (!file) {
         throw std::system_error(errno, std::generic_category(), "cannot open " + pathUtf8(path));
     }
-    std::vector<std::uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-    if (in.bad()) {
-        throw std::system_error(errno, std::generic_category(), "cannot read " + pathUtf8(path));
+    const std::unique_ptr<std::FILE, decltype(&std::fclose)> input(file, std::fclose);
+    std::vector<std::uint8_t> out;
+    // (The size as it is now, when it can be had: one allocation for a file that doesn't grow.)
+    std::error_code sizeError;
+    if (const auto known = std::filesystem::file_size(opened, sizeError); !sizeError) {
+        out.reserve(static_cast<std::size_t>(known));
+    }
+    std::array<std::uint8_t, 64 * 1024> block;
+    for (;;) {
+        const auto size = std::fread(block.data(), 1, block.size(), input.get());
+        if (std::ferror(input.get())) {
+            throw std::system_error(errno, std::generic_category(), "cannot read " + pathUtf8(path));
+        }
+        out.insert(out.end(), block.data(), block.data() + size);
+        if (size < block.size()) break;
     }
     return out;
 }

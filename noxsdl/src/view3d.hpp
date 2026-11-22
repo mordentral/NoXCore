@@ -350,6 +350,7 @@ private:
 
     std::unique_ptr<DepthPass> depth_; ///< the depth-buffered drawing, when the renderer's GPU allows it
     bool depthTried_ = false;
+    bool depthFallbackLogged_ = false; ///< (a failed depth pass said once, not every frame)
     std::vector<DepthPass::Vertex> gpuVerts_;
     std::vector<DepthPass::Draw> gpuDraws_;
 
