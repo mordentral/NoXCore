@@ -78,8 +78,8 @@ bool isItem(const server::ServerObject& o)
            (o.classes & (oc::Weapon | oc::Armor | oc::Wand | oc::Food | oc::Key | oc::InfoBook | oc::Flag | oc::Treasure | oc::Pickup)) != 0;
 }
 
-/// Whether an item with these modifiers is one the game makes (questModifiersValid's rule; a
-/// thing that takes none must have none).
+/// Whether an item with these modifiers is one the game makes (modModifiersValid: the quest
+/// rule's, and the grade below each table's rows; a thing that takes none must have none).
 bool modifiersFit(const server::ServerObject& item, const things::ModifierDb& db)
 {
     const bool none = std::ranges::all_of(item.modifiers, [](std::uint8_t m) { return m == 0xFF; });
@@ -89,7 +89,7 @@ bool modifiersFit(const server::ServerObject& item, const things::ModifierDb& db
     if (!(item.classes & (oc::Weapon | oc::Armor | oc::Wand))) {
         return false;
     }
-    return server::questModifiersValid(item, db);
+    return server::modModifiersValid(item, db);
 }
 
 void pushModifierName(lua_State* L, const things::ModifierDb* db, std::uint8_t id)

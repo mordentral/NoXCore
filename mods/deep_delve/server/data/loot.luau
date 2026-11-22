@@ -1,7 +1,8 @@
 --!strict
 -- Loot (design 4.3): what drops, how rare, its Deep Delve affixes and how it shows on the ground.
 -- Every type is thing.bin's; the modifiers are modifier.bin's own, drawn at the drop by
--- nox.modifiers and nox.modifierFits (so only ones that fit the item), never named here.
+-- nox.modifiers and nox.modifierFits (so only ones that fit the item), never named here but for
+-- the grade below the reward tables' rows (loot.belowRows).
 
 local loot = {}
 
@@ -103,6 +104,12 @@ loot.rarity = {
 -- A modifier's worth (modifier.bin's WORTH) may be at most base + perLevel x area level; none past
 -- `most` drop at all (the quest-only modifiers and the special materials stay out).
 loot.worth = { base = 300, perLevel = 120, most = 2500 }
+
+-- The grade below the reward tables' rows: the game's plainest drops' (a lower damage, armour or
+-- durability than a plain item's), which nox.modifierFits lets a mod give where they fit. Never
+-- drawn for a drop: a rare fills every slot it takes, and the loot stays what it was before
+-- nox.modifierFits allowed them. (Named items and "dd give" may still name them.)
+loot.belowRows = { WeaponPower1 = true, ArmorQuality1 = true, Material1 = true, Material2 = true }
 
 -- Only a modifier that does something drops (by decision 2026-11-01): one with an effect (its
 -- nox.modifier(name).effects, by function) the engine runs. These are the effect functions the

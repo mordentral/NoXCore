@@ -63,7 +63,17 @@ bool questItemValid(const ServerObject& item, const things::ModifierDb* modifier
 /// a '#' staff. (Also what a mode's items are held to: no item the game never makes.) A mod's own
 /// modifier (ModifierDb::ownRecord) by its section and ALLOWED_*, and held to the stock record it
 /// was made like (ModifierDb::stockOf) too: that one's row's exclusions (the wand staves for the
-/// attack enchantments), a Replenishment's '#' staff rule.
+/// attack enchantments), a Replenishment's '#' staff rule; when none of the slot's rows has that
+/// record (WeaponPower1, ArmorQuality1, Material1-2, an armour quality on a weapon, an
+/// enchantment the table hasn't), what every row of the slot's table keeps off (a power or
+/// material: the wand staves, bows and crossbows; an armour quality or enchantment: nothing).
 bool questModifiersValid(const ServerObject& item, const things::ModifierDb& db);
+/// questModifiersValid for a mod's item calls (nox.setItemSpec, nox.giveItem's and nox.create's
+/// spec, nox.modifierFits): also the stock records below each table's first row (WeaponPower1 on a
+/// weapon, ArmorQuality1 on armour, Material1 and Material2 on either: the game's own drops and
+/// outfits give them, its reward tables don't), on what their own ALLOWED_* lists allow less what
+/// every row of the table keeps off (no WeaponPower1 on a bow). The game's own checks (a quest's
+/// load, its carried inventory) and its reward draws never take them.
+bool modModifiersValid(const ServerObject& item, const things::ModifierDb& db);
 
 } // namespace nox::server

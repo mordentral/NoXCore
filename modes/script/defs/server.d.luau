@@ -432,7 +432,7 @@ declare nox: {
     itemStats: (thingType: string | number) -> NoxItemStats?,
     --- Every modifier's name in a section ("effectiveness", "material" or "enchantment"), in modifier.bin's order.
     modifiers: (section: string) -> { string },
-    --- Whether a modifier fits a slot ("effectiveness", "material", "primary", "secondary") of an item type.
+    --- Whether a modifier fits a slot ("effectiveness", "material", "primary", "secondary") of an item type: the game's reward-table rule, and the grade below its rows its own drops give (WeaponPower1, ArmorQuality1, Material1-2) where their lists allow it (never on a bow, a crossbow or a wand staff for a power or material).
     modifierFits: (thingType: string, slot: string, name: string) -> boolean,
     --- Puts on an item the player's unit (or a creature) carries; true, or false and why.
     equip: (unit: number, item: number) -> (boolean, string?),

@@ -7,8 +7,8 @@
 -- kind may carry: affixes.luau). A modifier is
 -- only ever one that fits the slot of that item (nox.modifierFits: the game's own rule), does
 -- something on it (loot.doesOn: an effect the engine runs, and a number of the item's for it to
--- scale: no armour quality on a shield) and is no dearer than the area level allows
--- (data/loot.luau's worth). A shield's effectiveness slot, where no armour quality does anything,
+-- scale: no armour quality on a shield), is no dearer than the area level allows
+-- (data/loot.luau's worth) and isn't below the reward tables' rows (data/loot.luau's belowRows). A shield's effectiveness slot, where no armour quality does anything,
 -- is filled with its own guard affix instead (affixes.slotAffix): one of a magic shield's one or
 -- two, always on a rare one. Rarely a loot roll's gear is a unique or a set piece instead, and a
 -- champion and an act boss roll for one of each besides (uniques.luau, data/uniques.luau).
@@ -171,8 +171,9 @@ local function poolFor(thingType: string): any
 	for _, slot in items.SLOTS do
 		local fits = {}
 		for _, name in nox.modifiers(sectionOf[slot]) do
-			-- (only one that fits the slot, as the game's rule has it, and does something)
-			if nox.modifierFits(thingType, slot, name) and loot.doesOn(thingType, name) then
+			-- (only one that fits the slot, as the game's rule has it, does something and isn't
+			-- below the reward tables' rows)
+			if not (data.belowRows :: any)[name] and nox.modifierFits(thingType, slot, name) and loot.doesOn(thingType, name) then
 				local m = nox.modifier(name)
 				table.insert(fits, { name = name, worth = if m then m.worth else 0 })
 			end
@@ -205,7 +206,7 @@ function loot.modifierLines(all: boolean?): { string }
 					end
 					if fit then
 						fits += 1
-						if loot.doesOn(g.type, name) and worth > 0 and worth <= data.worth.most then
+						if loot.doesOn(g.type, name) and worth > 0 and worth <= data.worth.most and not (data.belowRows :: any)[name] then
 							drops += 1
 						end
 					end

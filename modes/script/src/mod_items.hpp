@@ -5,7 +5,9 @@
 //   material, primary, secondary), durability and charges. It's applied after the item is made,
 //   before anyone hears of it (Items::give's `prepare`; create's within the frame), so the pickup
 //   and equip messages carry it. A modifier that doesn't fit the item by the rule a quest's items
-//   are held to (questModifiersValid) is an error: no item the game never makes.
+//   are held to (questModifiersValid), or the grade below each table's rows the game's own drops
+//   give (modModifiersValid: WeaponPower1, ArmorQuality1, Material1-2), is an error: no item the
+//   game never makes.
 // - nox.item, nox.modifier, nox.modifiers, nox.modifierFits, nox.equip, nox.unequip.
 // - A player's table (nox.player, every hook's) gains account, class, level and experience;
 //   nox.setLevel, nox.setExperience, nox.giveExperience. A held-out stock player's unit is refused
