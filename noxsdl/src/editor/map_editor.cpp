@@ -330,7 +330,12 @@ bool MapEditor::saveAs(const std::string& name)
         history_.markSaved();
         settings_.addRecent(pathText(paths.map));
         saveSettings();
-        status(format(NOX_TR("editor.status.saved", "Saved {path}"), {{"path", pathText(paths.map)}}));
+        if (paths.leftovers.empty()) {
+            status(format(NOX_TR("editor.status.saved", "Saved {path}"), {{"path", pathText(paths.map)}}));
+        } else {
+            status(format(NOX_TR("editor.status.save_cleanup", "Saved {path}. Leftover save files are in {folder}."),
+                          {{"path", pathText(paths.map)}, {"folder", pathText(paths.leftovers)}}));
+        }
     } catch (const std::exception& ex) {
         errorText_ = format(NOX_TR("editor.error.not_saved", "Not saved:\n{error}"), {{"error", ex.what()}});
         status(NOX_TR("editor.status.save_failed", "Save failed"));

@@ -7194,6 +7194,8 @@ editor.status.redo_failed = Повтор не удался: {error}
 editor.status.refused = {action} отклонено: {why}
 #@ 9f9d18e0 mt: {action} refused: {element} is being edited by {who}
 editor.status.refused_held = {action} отклонено: {element} правит {who}
+#@ 8e652581 mt: Saved {path}. Leftover save files are in {folder}.
+editor.status.save_cleanup = Карта сохранена: {path}. Оставшиеся временные файлы находятся в {folder}.
 #@ 0685388d mt: Save failed
 editor.status.save_failed = Сохранить не удалось
 #@ 45b405e1 mt: Saved {path}

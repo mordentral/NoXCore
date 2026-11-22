@@ -15,9 +15,24 @@
 
 #include "section_io.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cerrno>
 #include <fstream>
 #include <map>
 #include <string>
+
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#include <share.h>
+#include <sys/stat.h>
+#else
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace nox::map {
 
@@ -216,18 +231,152 @@ EncodedMapFiles encodeMapBytes(std::vector<std::uint8_t> plain)
     return out;
 }
 
+namespace {
+
+namespace fs = std::filesystem;
+
+void writeWhole(const fs::path& path, std::span<const std::uint8_t> bytes, std::string_view who)
+{
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    out.close(); // (a write that fails only as the file closes is a failed write too)
+    if (!out) {
+        throw FormatError(std::string(who) + ": can't write " + pathUtf8(path));
+    }
+}
+
+} // namespace
+
 void writeFileReplacing(const std::filesystem::path& path, std::span<const std::uint8_t> bytes, std::string_view who)
 {
     const auto tmp = std::filesystem::path(path).concat(".tmp");
-    {
-        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-        out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        if (!out) {
-            throw FormatError(std::string(who) + ": can't write " + pathUtf8(tmp));
-        }
-    }
+    writeWhole(tmp, bytes, who);
     std::filesystem::rename(tmp, path);
 }
+
+namespace {
+
+// An editor save's staging folder, in the map's folder: the lock, and one numbered folder per
+// save with its new files (<file>.new), the old ones (<file>.old) and the commit mark, put there
+// once every file is written whole, just before the first is moved in. (Never named .map: the
+// scans for a folder's maps don't find them.)
+constexpr std::string_view kStageFolder = ".nox-save";
+constexpr std::string_view kLockFile = "lock";
+constexpr std::string_view kCommitMark = "commit";
+
+fs::path newFile(const fs::path& attempt, const std::string& name)
+{
+    return attempt / (name + ".new");
+}
+
+fs::path oldFile(const fs::path& attempt, const std::string& name)
+{
+    return attempt / (name + ".old");
+}
+
+// One save of a map at a time, from any process: the staging folder's lock file, held open for
+// the whole save (on Windows shared with no one, elsewhere an flock). The system lets go when the
+// process ends, killed or not, so a lock file left behind never blocks a save: only a save under
+// way does.
+class SaveLock {
+public:
+    explicit SaveLock(const fs::path& stage) : stage_(stage), file_(stage / kLockFile)
+    {
+        // (Tried again when the folder went: a save ending beside this one removes it.)
+        for (int tries = 0; tries < 4 && fd_ < 0; ++tries) {
+            std::error_code ec;
+            fs::create_directories(stage, ec);
+#ifdef _WIN32
+            const errno_t err = _wsopen_s(&fd_, file_.c_str(), _O_CREAT | _O_RDWR | _O_BINARY | _O_NOINHERIT, _SH_DENYRW,
+                                          _S_IREAD | _S_IWRITE);
+            if (err != 0) {
+                fd_ = -1;
+                if (err != ENOENT) {
+                    return;
+                }
+            }
+#else
+            const int fd = ::open(file_.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+            if (fd < 0) {
+                if (errno != ENOENT) {
+                    return;
+                }
+                continue;
+            }
+            if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
+                ::close(fd);
+                return;
+            }
+            // (A save that ended meanwhile removed the file this one locked: lock the new one.)
+            struct stat held{};
+            struct stat named{};
+            if (::fstat(fd, &held) == 0 && ::stat(file_.c_str(), &named) == 0 && held.st_dev == named.st_dev &&
+                held.st_ino == named.st_ino) {
+                fd_ = fd;
+            } else {
+                ::close(fd);
+            }
+#endif
+        }
+    }
+    ~SaveLock() { release(); }
+    SaveLock(const SaveLock&) = delete;
+    SaveLock& operator=(const SaveLock&) = delete;
+
+    bool held() const { return fd_ >= 0; }
+    const fs::path& file() const { return file_; }
+
+    /// Lets go and removes the lock file (elsewhere than Windows removed while still held, so the
+    /// next save locks a new file, never this one), then the staging folder when that leaves it
+    /// empty.
+    void release()
+    {
+        if (fd_ < 0) {
+            return;
+        }
+        std::error_code ec;
+#ifdef _WIN32
+        _close(fd_);
+        fs::remove(file_, ec); // (fails, harmlessly, when the next save holds it already)
+#else
+        fs::remove(file_, ec);
+        ::close(fd_);
+#endif
+        fd_ = -1;
+        fs::remove(stage_, ec); // (only when empty: what a save left stays for the next)
+    }
+
+private:
+    fs::path stage_;
+    fs::path file_;
+    int fd_ = -1;
+};
+
+// The files a save of `base` stages, in the order they're moved in.
+std::array<std::string, 3> stagedNames(const std::string& base)
+{
+    return {base + ".map", base + ".nxz", base + ".nxe"};
+}
+
+// Finishes a save that was killed while moving its files in (it has the commit mark): moves in
+// what it still has staged, so the folder holds that save's whole set. Throws when a file can't
+// be moved (held open at the moment): this save fails, and the next one tries again.
+void finishEarlierSave(const fs::path& attempt, const fs::path& dir, const std::string& base, const std::string& who)
+{
+    for (const auto& n : stagedNames(base)) {
+        const fs::path staged = newFile(attempt, n);
+        if (fs::symlink_status(staged).type() != fs::file_type::regular) {
+            continue;
+        }
+        try {
+            fs::rename(staged, dir / n);
+        } catch (const fs::filesystem_error& e) {
+            throw FormatError(who + ": can't finish an earlier save of " + base + ": " + e.what());
+        }
+    }
+}
+
+} // namespace
 
 std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
                                      std::string_view who)
@@ -238,6 +387,133 @@ std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::
     writeFileReplacing(mapPath, files.map, who);
     writeFileReplacing(dir / (std::string(name) + ".nxz"), files.nxz, who);
     return mapPath;
+}
+
+PublishedMapFolder publishMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
+                                    std::optional<std::string_view> sidecar, std::string_view who)
+{
+    const std::string base(name);
+    const std::string by(who);
+    const fs::path dir = mapsDir / base;
+    fs::create_directories(dir);
+    const fs::path stage = dir / kStageFolder;
+    SaveLock lock(stage);
+    if (!lock.held()) {
+        throw FormatError(by + ": another save of " + base + " is under way (" + pathUtf8(lock.file()) + " is held)");
+    }
+
+    // What earlier saves left: one killed while moving its files in is finished, the rest dropped.
+    std::vector<std::pair<unsigned long, fs::path>> earlier;
+    for (const auto& e : fs::directory_iterator(stage)) {
+        const std::string n = pathUtf8(e.path().filename());
+        if (n == kLockFile) {
+            continue;
+        }
+        if (!n.empty() && n.size() < 10 && std::ranges::all_of(n, [](char c) { return c >= '0' && c <= '9'; }) && e.is_directory()) {
+            earlier.emplace_back(std::stoul(n), e.path());
+        } else {
+            std::error_code ec;
+            fs::remove_all(e.path(), ec);
+        }
+    }
+    std::ranges::sort(earlier);
+    unsigned long number = 1;
+    for (const auto& [n, attempt] : earlier) {
+        if (fs::exists(attempt / kCommitMark)) {
+            finishEarlierSave(attempt, dir, base, by);
+        }
+        // (What can't be removed is harmless: nothing staged is left in it, and this save takes
+        // the next number.)
+        std::error_code ec;
+        fs::remove_all(attempt, ec);
+        number = n + 1;
+    }
+
+    const auto names = stagedNames(base);
+    struct File {
+        std::string name;
+        std::span<const std::uint8_t> bytes;
+        bool hadOld = false;
+    };
+    std::vector<File> list{{names[0], files.map}, {names[1], files.nxz}};
+    if (sidecar) {
+        list.push_back({names[2], {reinterpret_cast<const std::uint8_t*>(sidecar->data()), sidecar->size()}});
+    }
+    for (auto& f : list) {
+        const auto type = fs::symlink_status(dir / f.name).type();
+        if (type != fs::file_type::not_found && type != fs::file_type::regular) {
+            throw FormatError(by + ": " + pathUtf8(dir / f.name) + " isn't a file");
+        }
+        f.hadOld = type == fs::file_type::regular;
+    }
+
+    // Staged: each new file whole, and the old one kept (a second name for it, or a copy where
+    // the drive has no hard links).
+    const fs::path attempt = stage / std::to_string(number);
+    fs::create_directory(attempt);
+    try {
+        for (const auto& f : list) {
+            if (f.hadOld) {
+                const fs::path keep = oldFile(attempt, f.name);
+                std::error_code ec;
+                fs::create_hard_link(dir / f.name, keep, ec);
+                if (ec) {
+                    fs::copy_file(dir / f.name, keep);
+                }
+            }
+            writeWhole(newFile(attempt, f.name), f.bytes, who);
+        }
+        writeWhole(attempt / kCommitMark, {}, who);
+    } catch (...) {
+        std::error_code ec;
+        fs::remove_all(attempt, ec);
+        throw;
+    }
+
+    std::size_t moved = 0;
+    try {
+        for (; moved < list.size(); ++moved) {
+            fs::rename(newFile(attempt, list[moved].name), dir / list[moved].name);
+        }
+    } catch (...) {
+        // Back as it was: each moved file returned to the staging folder, then the old one put
+        // back. Stopped part way (or killed), the commit mark stays, and the next save first
+        // finishes this one (its whole new set) instead.
+        bool back = true;
+        while (back && moved > 0) {
+            const File& f = list[--moved];
+            std::error_code ec;
+            fs::rename(dir / f.name, newFile(attempt, f.name), ec);
+            if (ec) {
+                back = false;
+            } else if (f.hadOld) {
+                fs::rename(oldFile(attempt, f.name), dir / f.name, ec);
+                if (ec) {
+                    fs::rename(newFile(attempt, f.name), dir / f.name, ec); // (the new one again, rather than none)
+                    back = false;
+                }
+            }
+        }
+        if (!back) {
+            throw FormatError(by + ": the save of " + base + " failed and the old files couldn't all be put back: the next save finishes it (" +
+                              pathUtf8(attempt) + ")");
+        }
+        std::error_code ec;
+        fs::remove(attempt / kCommitMark, ec);
+        if (!ec) {
+            fs::remove_all(attempt, ec);
+        }
+        throw;
+    }
+
+    PublishedMapFolder out;
+    out.map = dir / list.front().name;
+    std::error_code ec;
+    fs::remove_all(attempt, ec);
+    if (ec) {
+        out.leftovers = attempt;
+    }
+    return out; // (the lock let go, and the staging folder removed when empty)
 }
 
 } // namespace nox::map

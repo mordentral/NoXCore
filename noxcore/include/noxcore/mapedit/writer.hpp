@@ -41,12 +41,14 @@ struct SavedPaths {
     std::filesystem::path map;
     std::filesystem::path nxz;
     std::filesystem::path sidecar; // empty when none was written
+    std::filesystem::path leftovers; // empty, or staging files the saved map's folder still has
 };
 
 /// Validates (throws FormatError listing the errors), then writes <mapsDir>\<name>\<name>.map
 /// and .nxz, and the sidecar <name>.nxe beside them when one is given (with its "needs NoX Core"
-/// record set from the map's script: script_doc.hpp, markNoxCoreNeeds). Refuses a stock map's
-/// name (edits of a stock map are saved under a new name).
+/// record set from the map's script: script_doc.hpp, markNoxCoreNeeds), all or none
+/// (map::publishMapFolder). Refuses a stock map's name (edits of a stock map are saved under a
+/// new name).
 SavedPaths saveDocument(const MapDocument& doc, const things::ThingDb& things, const std::filesystem::path& mapsDir,
                         std::string_view name, const Sidecar* sidecar = nullptr);
 

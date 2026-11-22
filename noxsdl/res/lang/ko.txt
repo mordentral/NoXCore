@@ -7110,6 +7110,8 @@ editor.status.redo_failed = 다시 실행 실패: {error}
 editor.status.refused = {action} 거부됨: {why}
 #@ 9f9d18e0 mt: {action} refused: {element} is being edited by {who}
 editor.status.refused_held = {action} 거부됨: {who} 님이 {element}을(를) 편집 중
+#@ 8e652581 mt: Saved {path}. Leftover save files are in {folder}.
+editor.status.save_cleanup = {path}에 저장했습니다. 남은 임시 저장 파일은 {folder}에 있습니다.
 #@ 0685388d mt: Save failed
 editor.status.save_failed = 저장 실패
 #@ 45b405e1 mt: Saved {path}

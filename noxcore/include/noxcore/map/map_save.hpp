@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -44,8 +45,26 @@ EncodedMapFiles encodeMapBytes(std::vector<std::uint8_t> plain);
 /// fails.
 void writeFileReplacing(const std::filesystem::path& path, std::span<const std::uint8_t> bytes, std::string_view who);
 /// Writes the pair as <mapsDir>\<name>\<name>.map and .nxz (each writeFileReplacing), creating
-/// the folder. Returns the .map's path.
+/// the folder. Returns the .map's path. The generators' write (Delve and Undead Tide levels, a
+/// mod's generated maps): each file replaced on its own, with no staging. An editor save uses
+/// publishMapFolder.
 std::filesystem::path writeMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
                                      std::string_view who);
+
+/// What publishMapFolder wrote.
+struct PublishedMapFolder {
+    std::filesystem::path map;       // <mapsDir>\<name>\<name>.map
+    std::filesystem::path leftovers; // empty, or a staging folder the finished save couldn't remove
+};
+/// An editor save: <mapsDir>\<name>\<name>.map, .nxz and, when given, the .nxe sidecar, all or
+/// none, so a guest never downloads a new .map's old .nxz. The files are first written whole into
+/// <name>\.nox-save\<n>\ (the old ones kept there too), then moved into place; a move that fails
+/// puts the old files back. Other files in the folder are left alone. A save that was killed
+/// part way is finished (its files all moved in) or dropped (nothing was moved yet) by the next
+/// one, so a leftover staging folder never blocks a save. Throws FormatError when another save of
+/// the same map is under way (from any process). `leftovers` names what a finished save couldn't
+/// delete (the next save deletes it).
+PublishedMapFolder publishMapFolder(const std::filesystem::path& mapsDir, std::string_view name, const EncodedMapFiles& files,
+                                    std::optional<std::string_view> sidecar, std::string_view who);
 
 } // namespace nox::map

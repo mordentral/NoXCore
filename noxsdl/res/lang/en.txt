@@ -3095,115 +3095,115 @@ editor.chat.title = Chat
 # noxsdl/src/editor/chat_panel.cpp:37
 #@ 11595df4: Chat ({n})
 editor.chat.title_unread = Chat ({n})
-# noxsdl/src/editor/map_editor.cpp:1055
+# noxsdl/src/editor/map_editor.cpp:1060
 #@ af0f5d08: The floor brush one tile bigger.
 editor.cmd.brush.bigger.help = The floor brush one tile bigger.
-# noxsdl/src/editor/map_editor.cpp:1055
+# noxsdl/src/editor/map_editor.cpp:1060
 #@ 14009b95: Bigger Brush
 editor.cmd.brush.bigger.label = Bigger Brush
-# noxsdl/src/editor/map_editor.cpp:1056
+# noxsdl/src/editor/map_editor.cpp:1061
 #@ e12e9220: The floor brush one tile smaller.
 editor.cmd.brush.smaller.help = The floor brush one tile smaller.
-# noxsdl/src/editor/map_editor.cpp:1056
+# noxsdl/src/editor/map_editor.cpp:1061
 #@ 31fb505f: Smaller Brush
 editor.cmd.brush.smaller.label = Smaller Brush
-# noxsdl/src/editor/map_editor.cpp:1058
+# noxsdl/src/editor/map_editor.cpp:1063
 #@ 1ef2c1cd: Auto-edge again on the selected tiles (or every tile when none are), with the floor tool's edge options.
 editor.cmd.edges.recompute.help = Auto-edge again on the selected tiles (or every tile when none are), with the floor tool's edge options.
-# noxsdl/src/editor/map_editor.cpp:1057
+# noxsdl/src/editor/map_editor.cpp:1062
 #@ 9743604f: Recompute Edges
 editor.cmd.edges.recompute.label = Recompute Edges
-# noxsdl/src/editor/map_editor.cpp:910
+# noxsdl/src/editor/map_editor.cpp:915
 #@ 9d01124d: Drag a box on the map: everything in it, of the layers ticked in Tool Options, goes to the clipboard.
 editor.cmd.edit.area_copy.help = Drag a box on the map: everything in it, of the layers ticked in Tool Options, goes to the clipboard.
-# noxsdl/src/editor/map_editor.cpp:909
+# noxsdl/src/editor/map_editor.cpp:914
 #@ c23b1f3d: Copy Area
 editor.cmd.edit.area_copy.label = Copy Area
-# noxsdl/src/editor/map_editor.cpp:902
+# noxsdl/src/editor/map_editor.cpp:907
 #@ 120ca492: Copy the selection (walls, tiles, objects with their items, waypoints) to the clipboard.
 editor.cmd.edit.copy.help = Copy the selection (walls, tiles, objects with their items, waypoints) to the clipboard.
-# noxsdl/src/editor/map_editor.cpp:902
+# noxsdl/src/editor/map_editor.cpp:907
 #@ 658f3664: Copy
 editor.cmd.edit.copy.label = Copy
-# noxsdl/src/editor/map_editor.cpp:915
+# noxsdl/src/editor/map_editor.cpp:920
 #@ a66b003c: The mouse's (or the selection's) world coordinates as text.
 editor.cmd.edit.copy_coords.help = The mouse's (or the selection's) world coordinates as text.
-# noxsdl/src/editor/map_editor.cpp:915
+# noxsdl/src/editor/map_editor.cpp:920
 #@ b211fbc3: Copy Coordinates
 editor.cmd.edit.copy_coords.label = Copy Coordinates
-# noxsdl/src/editor/map_editor.cpp:925
+# noxsdl/src/editor/map_editor.cpp:930
 #@ 9484b4ca: The selected objects' extents as text.
 editor.cmd.edit.copy_extents.help = The selected objects' extents as text.
-# noxsdl/src/editor/map_editor.cpp:925
+# noxsdl/src/editor/map_editor.cpp:930
 #@ 894387d5: Copy Extents
 editor.cmd.edit.copy_extents.label = Copy Extents
-# noxsdl/src/editor/map_editor.cpp:933
+# noxsdl/src/editor/map_editor.cpp:938
 #@ f68618eb: The selected waypoints' ids as text.
 editor.cmd.edit.copy_waypoints.help = The selected waypoints' ids as text.
-# noxsdl/src/editor/map_editor.cpp:933
+# noxsdl/src/editor/map_editor.cpp:938
 #@ 187f8bbd: Copy Waypoint Ids
 editor.cmd.edit.copy_waypoints.label = Copy Waypoint Ids
-# noxsdl/src/editor/map_editor.cpp:901
+# noxsdl/src/editor/map_editor.cpp:906
 #@ 6a777bf4: Copy the selection to the clipboard and delete it.
 editor.cmd.edit.cut.help = Copy the selection to the clipboard and delete it.
-# noxsdl/src/editor/map_editor.cpp:901
+# noxsdl/src/editor/map_editor.cpp:906
 #@ 58e25863: Cut
 editor.cmd.edit.cut.label = Cut
-# noxsdl/src/editor/map_editor.cpp:908
+# noxsdl/src/editor/map_editor.cpp:913
 #@ aa2e2a9e: Delete the selection (undoable).
 editor.cmd.edit.delete.help = Delete the selection (undoable).
-# noxsdl/src/editor/map_editor.cpp:908
+# noxsdl/src/editor/map_editor.cpp:913
 #@ 5797ea6a: Delete
 editor.cmd.edit.delete.label = Delete
-# noxsdl/src/editor/map_editor.cpp:906
+# noxsdl/src/editor/map_editor.cpp:911
 #@ e092f223: Copy the selection two cells down and select the copy.
 editor.cmd.edit.duplicate.help = Copy the selection two cells down and select the copy.
-# noxsdl/src/editor/map_editor.cpp:906
+# noxsdl/src/editor/map_editor.cpp:911
 #@ fc330336: Duplicate
 editor.cmd.edit.duplicate.label = Duplicate
-# noxsdl/src/editor/map_editor.cpp:942
+# noxsdl/src/editor/map_editor.cpp:947
 #@ 05b6c07c: Move the selection (or pan the view when nothing is selected).
 editor.cmd.edit.nudge.help = Move the selection (or pan the view when nothing is selected).
-# noxsdl/src/editor/map_editor.cpp:952
+# noxsdl/src/editor/map_editor.cpp:957
 #@ c82fac67: Nudge a Cell Down
 editor.cmd.edit.nudge_cell_down.label = Nudge a Cell Down
-# noxsdl/src/editor/map_editor.cpp:949
+# noxsdl/src/editor/map_editor.cpp:954
 #@ 6b3b14d2: Nudge a Cell Left
 editor.cmd.edit.nudge_cell_left.label = Nudge a Cell Left
-# noxsdl/src/editor/map_editor.cpp:950
+# noxsdl/src/editor/map_editor.cpp:955
 #@ 59db47ff: Nudge a Cell Right
 editor.cmd.edit.nudge_cell_right.label = Nudge a Cell Right
-# noxsdl/src/editor/map_editor.cpp:951
+# noxsdl/src/editor/map_editor.cpp:956
 #@ 4f95741e: Nudge a Cell Up
 editor.cmd.edit.nudge_cell_up.label = Nudge a Cell Up
-# noxsdl/src/editor/map_editor.cpp:948
+# noxsdl/src/editor/map_editor.cpp:953
 #@ 3d5903d4: Nudge Down
 editor.cmd.edit.nudge_down.label = Nudge Down
-# noxsdl/src/editor/map_editor.cpp:945
+# noxsdl/src/editor/map_editor.cpp:950
 #@ 4f82e739: Nudge Left
 editor.cmd.edit.nudge_left.label = Nudge Left
-# noxsdl/src/editor/map_editor.cpp:946
+# noxsdl/src/editor/map_editor.cpp:951
 #@ 0db26d9a: Nudge Right
 editor.cmd.edit.nudge_right.label = Nudge Right
-# noxsdl/src/editor/map_editor.cpp:947
+# noxsdl/src/editor/map_editor.cpp:952
 #@ 52f8d9d5: Nudge Up
 editor.cmd.edit.nudge_up.label = Nudge Up
-# noxsdl/src/editor/map_editor.cpp:904
+# noxsdl/src/editor/map_editor.cpp:909
 #@ b00a0fd3: Paste at the mouse: new extents and waypoint ids, links inside the copy kept.
 editor.cmd.edit.paste.help = Paste at the mouse: new extents and waypoint ids, links inside the copy kept.
-# noxsdl/src/editor/map_editor.cpp:904
+# noxsdl/src/editor/map_editor.cpp:909
 #@ b34a0288: Paste
 editor.cmd.edit.paste.label = Paste
-# noxsdl/src/editor/map_editor.cpp:900
+# noxsdl/src/editor/map_editor.cpp:905
 #@ e2a84ef7: Redo what was undone.
 editor.cmd.edit.redo.help = Redo what was undone.
-# noxsdl/src/editor/map_editor.cpp:900
+# noxsdl/src/editor/map_editor.cpp:905
 #@ 7412e5e9: Redo
 editor.cmd.edit.redo.label = Redo
-# noxsdl/src/editor/map_editor.cpp:899
+# noxsdl/src/editor/map_editor.cpp:904
 #@ a844550e: Undo the last change.
 editor.cmd.edit.undo.help = Undo the last change.
-# noxsdl/src/editor/map_editor.cpp:899
+# noxsdl/src/editor/map_editor.cpp:904
 #@ 71fd4acf: Undo
 editor.cmd.edit.undo.label = Undo
 # noxsdl/src/editor/property_panel.cpp:258
@@ -3212,61 +3212,61 @@ editor.cmd.extents.reorder.help = Renumbers every object 1, 2, 3... in record or
 # noxsdl/src/editor/property_panel.cpp:257
 #@ cd5ca231: Reorder Extents
 editor.cmd.extents.reorder.label = Reorder Extents
-# noxsdl/src/editor/map_editor.cpp:894
+# noxsdl/src/editor/map_editor.cpp:899
 #@ 8f833ff7: Back to the main menu (asks about unsaved changes). Hosting a session, it ends the session for everyone (asked first); in someone else's, its game comes in front.
 editor.cmd.file.close.help = Back to the main menu (asks about unsaved changes). Hosting a session, it ends the session for everyone (asked first); in someone else's, its game comes in front.
-# noxsdl/src/editor/map_editor.cpp:893
+# noxsdl/src/editor/map_editor.cpp:898
 #@ 11cfa80c: Close Editor
 editor.cmd.file.close.label = Close Editor
-# noxsdl/src/editor/map_editor.cpp:857
+# noxsdl/src/editor/map_editor.cpp:862
 #@ 76fd69f5: A new map: its floored size, base floor and game types.
 editor.cmd.file.new.help = A new map: its floored size, base floor and game types.
-# noxsdl/src/editor/map_editor.cpp:857
+# noxsdl/src/editor/map_editor.cpp:862
 #@ ee65e13f: New Map...
 editor.cmd.file.new.label = New Map...
-# noxsdl/src/editor/map_editor.cpp:859
+# noxsdl/src/editor/map_editor.cpp:864
 #@ abd13bd8: Open a map from the maps folder, or any .map / .nxz file.
 editor.cmd.file.open.help = Open a map from the maps folder, or any .map / .nxz file.
-# noxsdl/src/editor/map_editor.cpp:859
+# noxsdl/src/editor/map_editor.cpp:864
 #@ 8da11e8d: Open...
 editor.cmd.file.open.label = Open...
-# noxsdl/src/editor/map_editor.cpp:871
+# noxsdl/src/editor/map_editor.cpp:876
 #@ b056b5b4: Open the last recovery copy the autosave wrote (saved under a new name).
 editor.cmd.file.recover.help = Open the last recovery copy the autosave wrote (saved under a new name).
-# noxsdl/src/editor/map_editor.cpp:871
+# noxsdl/src/editor/map_editor.cpp:876
 #@ 667c1ea1: Open Autosave...
 editor.cmd.file.recover.label = Open Autosave...
-# noxsdl/src/editor/map_editor.cpp:861
+# noxsdl/src/editor/map_editor.cpp:866
 #@ 6e8f49f0: Save the map (.map, .nxz and the editor's .nxe) into the maps folder.
 editor.cmd.file.save.help = Save the map (.map, .nxz and the editor's .nxe) into the maps folder.
-# noxsdl/src/editor/map_editor.cpp:861
+# noxsdl/src/editor/map_editor.cpp:866
 #@ 4d2d5d68: Save
 editor.cmd.file.save.label = Save
-# noxsdl/src/editor/map_editor.cpp:862
+# noxsdl/src/editor/map_editor.cpp:867
 #@ 31f884aa: Save under a new name. Stock maps' names are refused.
 editor.cmd.file.save_as.help = Save under a new name. Stock maps' names are refused.
-# noxsdl/src/editor/map_editor.cpp:862
+# noxsdl/src/editor/map_editor.cpp:867
 #@ 9a327bbe: Save As...
 editor.cmd.file.save_as.label = Save As...
-# noxsdl/src/editor/map_editor.cpp:866
+# noxsdl/src/editor/map_editor.cpp:871
 #@ 2a55ec45: Check the map against what the game accepts (the Problems panel).
 editor.cmd.file.validate.help = Check the map against what the game accepts (the Problems panel).
-# noxsdl/src/editor/map_editor.cpp:866
+# noxsdl/src/editor/map_editor.cpp:871
 #@ 7a98446b: Validate
 editor.cmd.file.validate.label = Validate
-# noxsdl/src/editor/map_editor.cpp:1111
+# noxsdl/src/editor/map_editor.cpp:1116
 #@ 384dca04: About the Map Editor
 editor.cmd.help.about.label = About the Map Editor
-# noxsdl/src/editor/map_editor.cpp:1109
+# noxsdl/src/editor/map_editor.cpp:1114
 #@ 0657fdcc: Every command's shortcut; click one to rebind it.
 editor.cmd.help.keys.help = Every command's shortcut; click one to rebind it.
-# noxsdl/src/editor/map_editor.cpp:1109
+# noxsdl/src/editor/map_editor.cpp:1114
 #@ b3c60e33: Keyboard Shortcuts...
 editor.cmd.help.keys.label = Keyboard Shortcuts...
-# noxsdl/src/editor/map_editor.cpp:1032
+# noxsdl/src/editor/map_editor.cpp:1037
 #@ 0dfa8e37: Search every command by name.
 editor.cmd.help.palette.help = Search every command by name.
-# noxsdl/src/editor/map_editor.cpp:1032
+# noxsdl/src/editor/map_editor.cpp:1037
 #@ c25856ff: Command Palette (F1)
 editor.cmd.help.palette.label = Command Palette (F1)
 # noxsdl/src/editor/mod_panel.cpp:237
@@ -3503,115 +3503,115 @@ editor.cmd.script.watch.help = Follow the .ns file beside the map: saving it in 
 # noxsdl/src/editor/script_panel.cpp:365
 #@ e2f06041: Watch .ns File
 editor.cmd.script.watch.label = Watch .ns File
-# noxsdl/src/editor/map_editor.cpp:955
+# noxsdl/src/editor/map_editor.cpp:960
 #@ dffc6c8a: Everything of the kinds the selection filter allows.
 editor.cmd.select.all.help = Everything of the kinds the selection filter allows.
-# noxsdl/src/editor/map_editor.cpp:955
+# noxsdl/src/editor/map_editor.cpp:960
 #@ cd7e3b12: Select All
 editor.cmd.select.all.label = Select All
-# noxsdl/src/editor/map_editor.cpp:987
+# noxsdl/src/editor/map_editor.cpp:992
 #@ 281b3bca: Whether clicks and boxes take this kind.
 editor.cmd.select.filter.help = Whether clicks and boxes take this kind.
-# noxsdl/src/editor/map_editor.cpp:991
+# noxsdl/src/editor/map_editor.cpp:996
 #@ 255ffb84: Pick Objects
 editor.cmd.select.filter_objects.label = Pick Objects
-# noxsdl/src/editor/map_editor.cpp:993
+# noxsdl/src/editor/map_editor.cpp:998
 #@ d6661c37: Pick Floor Tiles
 editor.cmd.select.filter_tiles.label = Pick Floor Tiles
-# noxsdl/src/editor/map_editor.cpp:992
+# noxsdl/src/editor/map_editor.cpp:997
 #@ 912c4bbd: Pick Walls
 editor.cmd.select.filter_walls.label = Pick Walls
-# noxsdl/src/editor/map_editor.cpp:994
+# noxsdl/src/editor/map_editor.cpp:999
 #@ 17a9e144: Pick Waypoints
 editor.cmd.select.filter_waypoints.label = Pick Waypoints
-# noxsdl/src/editor/map_editor.cpp:967
+# noxsdl/src/editor/map_editor.cpp:972
 #@ 3b081190: Select what isn't selected (of the kinds the filter allows).
 editor.cmd.select.invert.help = Select what isn't selected (of the kinds the filter allows).
-# noxsdl/src/editor/map_editor.cpp:967
+# noxsdl/src/editor/map_editor.cpp:972
 #@ 8fa692b7: Invert Selection
 editor.cmd.select.invert.label = Invert Selection
-# noxsdl/src/editor/map_editor.cpp:957
+# noxsdl/src/editor/map_editor.cpp:962
 #@ a511991b: Cancel a drag or the area copy, else clear the selection.
 editor.cmd.select.none.help = Cancel a drag or the area copy, else clear the selection.
-# noxsdl/src/editor/map_editor.cpp:957
+# noxsdl/src/editor/map_editor.cpp:962
 #@ 9b9a1627: Deselect / Cancel
 editor.cmd.select.none.label = Deselect / Cancel
-# noxsdl/src/editor/map_editor.cpp:972
+# noxsdl/src/editor/map_editor.cpp:977
 #@ f8d4d036: Every object of the selected objects' types.
 editor.cmd.select.same_type.help = Every object of the selected objects' types.
-# noxsdl/src/editor/map_editor.cpp:972
+# noxsdl/src/editor/map_editor.cpp:977
 #@ 314076db: Select Same Type
 editor.cmd.select.same_type.label = Select Same Type
-# noxsdl/src/editor/map_editor.cpp:984
+# noxsdl/src/editor/map_editor.cpp:989
 #@ 42a602e1: Dragging selects a box along the floor's diagonals.
 editor.cmd.select.shape45.help = Dragging selects a box along the floor's diagonals.
-# noxsdl/src/editor/map_editor.cpp:984
+# noxsdl/src/editor/map_editor.cpp:989
 #@ 7909bf24: 45-Degree Box Select
 editor.cmd.select.shape45.label = 45-Degree Box Select
-# noxsdl/src/editor/map_editor.cpp:983
+# noxsdl/src/editor/map_editor.cpp:988
 #@ 442d7ae2: Dragging on empty map selects a screen-aligned box.
 editor.cmd.select.shape_box.help = Dragging on empty map selects a screen-aligned box.
-# noxsdl/src/editor/map_editor.cpp:983
+# noxsdl/src/editor/map_editor.cpp:988
 #@ ad7f2f2e: Box Select
 editor.cmd.select.shape_box.label = Box Select
-# noxsdl/src/editor/map_editor.cpp:985
+# noxsdl/src/editor/map_editor.cpp:990
 #@ c2fa5a0f: Dragging draws the outline to select inside.
 editor.cmd.select.shape_lasso.help = Dragging draws the outline to select inside.
-# noxsdl/src/editor/map_editor.cpp:985
+# noxsdl/src/editor/map_editor.cpp:990
 #@ 4a325a1b: Lasso Select
 editor.cmd.select.shape_lasso.label = Lasso Select
-# noxsdl/src/editor/map_editor.cpp:1048
+# noxsdl/src/editor/map_editor.cpp:1053
 #@ 3b96de64: Floor edges by hand: add, remove, or auto-edge where clicked.
 editor.cmd.tool.edge.help = Floor edges by hand: add, remove, or auto-edge where clicked.
-# noxsdl/src/editor/map_editor.cpp:1048
+# noxsdl/src/editor/map_editor.cpp:1053
 #@ cab1ba2e: Edge Tool
 editor.cmd.tool.edge.label = Edge Tool
-# noxsdl/src/editor/map_editor.cpp:1052
+# noxsdl/src/editor/map_editor.cpp:1057
 #@ 6932bb3d: Pick what's under the mouse into the tool: a wall's material, a tile's floor, an edge (also Alt+click; Shift for everything).
 editor.cmd.tool.eyedropper.help = Pick what's under the mouse into the tool: a wall's material, a tile's floor, an edge (also Alt+click; Shift for everything).
-# noxsdl/src/editor/map_editor.cpp:1051
+# noxsdl/src/editor/map_editor.cpp:1056
 #@ 0249342e: Eyedropper
 editor.cmd.tool.eyedropper.label = Eyedropper
-# noxsdl/src/editor/map_editor.cpp:1045
+# noxsdl/src/editor/map_editor.cpp:1050
 #@ 4a7500d7: The floor brush: paint, erase, replace, fill, smooth, with auto-edges.
 editor.cmd.tool.floor.help = The floor brush: paint, erase, replace, fill, smooth, with auto-edges.
-# noxsdl/src/editor/map_editor.cpp:1045
+# noxsdl/src/editor/map_editor.cpp:1050
 #@ c9fa0bb1: Floor Tool
 editor.cmd.tool.floor.label = Floor Tool
-# noxsdl/src/editor/map_editor.cpp:1046
+# noxsdl/src/editor/map_editor.cpp:1051
 #@ 4c121819: Objects from the content browser (P2c).
 editor.cmd.tool.object.help = Objects from the content browser (P2c).
-# noxsdl/src/editor/map_editor.cpp:1046
+# noxsdl/src/editor/map_editor.cpp:1051
 #@ 4696b7c8: Object Tool
 editor.cmd.tool.object.label = Object Tool
-# noxsdl/src/editor/map_editor.cpp:1049
+# noxsdl/src/editor/map_editor.cpp:1054
 #@ e597a6f8: Draw polygons, drag, insert and delete their corners, move them.
 editor.cmd.tool.polygon.help = Draw polygons, drag, insert and delete their corners, move them.
-# noxsdl/src/editor/map_editor.cpp:1049
+# noxsdl/src/editor/map_editor.cpp:1054
 #@ a229c805: Polygon Tool
 editor.cmd.tool.polygon.label = Polygon Tool
-# noxsdl/src/editor/map_editor.cpp:1043
+# noxsdl/src/editor/map_editor.cpp:1048
 #@ 92cb2bf9: Click, Shift-click to add, Ctrl-click to remove; drag to box-select or move.
 editor.cmd.tool.select.help = Click, Shift-click to add, Ctrl-click to remove; drag to box-select or move.
-# noxsdl/src/editor/map_editor.cpp:1043
+# noxsdl/src/editor/map_editor.cpp:1048
 #@ 3e892b4d: Select
 editor.cmd.tool.select.label = Select
-# noxsdl/src/editor/map_editor.cpp:1050
+# noxsdl/src/editor/map_editor.cpp:1055
 #@ 97bbf1a0: Back to the tool used before.
 editor.cmd.tool.toggle.help = Back to the tool used before.
-# noxsdl/src/editor/map_editor.cpp:1050
+# noxsdl/src/editor/map_editor.cpp:1055
 #@ ec85c6e2: Previous Tool
 editor.cmd.tool.toggle.label = Previous Tool
-# noxsdl/src/editor/map_editor.cpp:1044
+# noxsdl/src/editor/map_editor.cpp:1049
 #@ edcab261: Draw, place, line, rectangle, outline and erase walls; wall properties.
 editor.cmd.tool.wall.help = Draw, place, line, rectangle, outline and erase walls; wall properties.
-# noxsdl/src/editor/map_editor.cpp:1044
+# noxsdl/src/editor/map_editor.cpp:1049
 #@ da7fe2c9: Wall Tool
 editor.cmd.tool.wall.label = Wall Tool
-# noxsdl/src/editor/map_editor.cpp:1047
+# noxsdl/src/editor/map_editor.cpp:1052
 #@ c5b7e004: Place waypoints, link them (one way or both), unlink, move.
 editor.cmd.tool.waypoint.help = Place waypoints, link them (one way or both), unlink, move.
-# noxsdl/src/editor/map_editor.cpp:1047
+# noxsdl/src/editor/map_editor.cpp:1052
 #@ 824e3808: Waypoint Tool
 editor.cmd.tool.waypoint.label = Waypoint Tool
 # noxsdl/src/editor/marker_tools.cpp:292
@@ -3620,121 +3620,121 @@ editor.cmd.view.ambient_preview.help = Fills each polygon with its ambient light
 # noxsdl/src/editor/marker_tools.cpp:292
 #@ f8a6fa3f: Polygons' Ambient Preview
 editor.cmd.view.ambient_preview.label = Polygons' Ambient Preview
-# noxsdl/src/editor/map_editor.cpp:1011
+# noxsdl/src/editor/map_editor.cpp:1016
 #@ a96947c3: Floor Edges
 editor.cmd.view.edges.label = Floor Edges
-# noxsdl/src/editor/map_editor.cpp:1024
+# noxsdl/src/editor/map_editor.cpp:1029
 #@ 2b08f262: Cycles the collision shapes shown.
 editor.cmd.view.extents.help = Cycles the collision shapes shown.
-# noxsdl/src/editor/map_editor.cpp:1024
+# noxsdl/src/editor/map_editor.cpp:1029
 #@ 7608d72e: Extents: Hidden / Colliding / All
 editor.cmd.view.extents.label = Extents: Hidden / Colliding / All
-# noxsdl/src/editor/map_editor.cpp:1021
+# noxsdl/src/editor/map_editor.cpp:1026
 #@ 6fb8e897: Facing Arrows
 editor.cmd.view.facing.label = Facing Arrows
-# noxsdl/src/editor/map_editor.cpp:1010
+# noxsdl/src/editor/map_editor.cpp:1015
 #@ 5ea410bd: Floor
 editor.cmd.view.floor.label = Floor
-# noxsdl/src/editor/map_editor.cpp:997
+# noxsdl/src/editor/map_editor.cpp:1002
 #@ 426707a8: Centre and zoom on the selection.
 editor.cmd.view.frame.help = Centre and zoom on the selection.
-# noxsdl/src/editor/map_editor.cpp:997
+# noxsdl/src/editor/map_editor.cpp:1002
 #@ 289e5924: Frame Selection
 editor.cmd.view.frame.label = Frame Selection
-# noxsdl/src/editor/map_editor.cpp:1001
+# noxsdl/src/editor/map_editor.cpp:1006
 #@ c6ef91db: Cycles the grid.
 editor.cmd.view.grid.help = Cycles the grid.
-# noxsdl/src/editor/map_editor.cpp:1001
+# noxsdl/src/editor/map_editor.cpp:1006
 #@ 23efee40: Grid: Off / Wall Cells / Floor Tiles
 editor.cmd.view.grid.label = Grid: Off / Wall Cells / Floor Tiles
-# noxsdl/src/editor/map_editor.cpp:1020
+# noxsdl/src/editor/map_editor.cpp:1025
 #@ 6ea96059: Labels: Extents
 editor.cmd.view.label_extents.label = Labels: Extents
-# noxsdl/src/editor/map_editor.cpp:1019
+# noxsdl/src/editor/map_editor.cpp:1024
 #@ d343d9a3: Labels: Script Names
 editor.cmd.view.label_script_names.label = Labels: Script Names
-# noxsdl/src/editor/map_editor.cpp:1018
+# noxsdl/src/editor/map_editor.cpp:1023
 #@ f00f9488: Labels: Type Names
 editor.cmd.view.label_types.label = Labels: Type Names
-# noxsdl/src/editor/map_editor.cpp:1005, noxsdl/src/editor/object_tools.cpp:131
+# noxsdl/src/editor/map_editor.cpp:1010, noxsdl/src/editor/object_tools.cpp:131
 #@ f0b8568a: Shows or hides this layer.
 editor.cmd.view.layer.help = Shows or hides this layer.
 # noxsdl/src/editor/object_tools.cpp:136
 #@ b3dc0a0c: Light Radius Rings
 editor.cmd.view.light_rings.label = Light Radius Rings
-# noxsdl/src/editor/map_editor.cpp:1016
+# noxsdl/src/editor/map_editor.cpp:1021
 #@ b01d477d: Lighting Preview
 editor.cmd.view.lighting.label = Lighting Preview
-# noxsdl/src/editor/map_editor.cpp:1022
+# noxsdl/src/editor/map_editor.cpp:1027
 #@ 80200a94: Mark Disabled Objects
 editor.cmd.view.mark_disabled.label = Mark Disabled Objects
-# noxsdl/src/editor/map_editor.cpp:1013
+# noxsdl/src/editor/map_editor.cpp:1018
 #@ 0828760b: Objects
 editor.cmd.view.objects.label = Objects
-# noxsdl/src/editor/map_editor.cpp:1026
+# noxsdl/src/editor/map_editor.cpp:1031
 #@ 0dfa8e37: Search every command by name.
 editor.cmd.view.palette.help = Search every command by name.
-# noxsdl/src/editor/map_editor.cpp:1026
+# noxsdl/src/editor/map_editor.cpp:1031
 #@ a49e4e11: Command Palette
 editor.cmd.view.palette.label = Command Palette
-# noxsdl/src/editor/map_editor.cpp:1081
+# noxsdl/src/editor/map_editor.cpp:1086
 #@ 949fabbb: In a session: the working copy as it will look once published.
 editor.cmd.view.pending_final.help = In a session: the working copy as it will look once published.
-# noxsdl/src/editor/map_editor.cpp:1081
+# noxsdl/src/editor/map_editor.cpp:1086
 #@ 1e62499b: Pending Changes: As Final
 editor.cmd.view.pending_final.label = Pending Changes: As Final
-# noxsdl/src/editor/map_editor.cpp:1082
+# noxsdl/src/editor/map_editor.cpp:1087
 #@ d0ffd1e4: In a session: only what the game has (the published map).
 editor.cmd.view.pending_hidden.help = In a session: only what the game has (the published map).
-# noxsdl/src/editor/map_editor.cpp:1082
+# noxsdl/src/editor/map_editor.cpp:1087
 #@ c2d34547: Pending Changes: Hidden
 editor.cmd.view.pending_hidden.label = Pending Changes: Hidden
-# noxsdl/src/editor/map_editor.cpp:1084
+# noxsdl/src/editor/map_editor.cpp:1089
 #@ 9d9a2f6c: In a session: flips between the published map (Pending Changes: Hidden) and the working copy as the setting had it.
 editor.cmd.view.pending_published.help = In a session: flips between the published map (Pending Changes: Hidden) and the working copy as the setting had it.
-# noxsdl/src/editor/map_editor.cpp:1083
+# noxsdl/src/editor/map_editor.cpp:1088
 #@ b241de45: Show Published / Working Copy
 editor.cmd.view.pending_published.label = Show Published / Working Copy
-# noxsdl/src/editor/map_editor.cpp:1080
+# noxsdl/src/editor/map_editor.cpp:1085
 #@ 0675f0bc: In a session: walls, floor and client-only things not yet published greyed; what they remove as ghosts.
 editor.cmd.view.pending_shaded.help = In a session: walls, floor and client-only things not yet published greyed; what they remove as ghosts.
-# noxsdl/src/editor/map_editor.cpp:1079
+# noxsdl/src/editor/map_editor.cpp:1084
 #@ bb9354d0: Pending Changes: Shaded
 editor.cmd.view.pending_shaded.label = Pending Changes: Shaded
-# noxsdl/src/editor/map_editor.cpp:1015
+# noxsdl/src/editor/map_editor.cpp:1020
 #@ 3c18cfae: Polygons
 editor.cmd.view.polygons.label = Polygons
-# noxsdl/src/editor/map_editor.cpp:1023
+# noxsdl/src/editor/map_editor.cpp:1028
 #@ 517abb36: Schematic Overlay
 editor.cmd.view.schematic.label = Schematic Overlay
-# noxsdl/src/editor/map_editor.cpp:1017
+# noxsdl/src/editor/map_editor.cpp:1022
 #@ ca1ee7a6: See-Through Walls Near the View Centre
 editor.cmd.view.see_through_walls.label = See-Through Walls Near the View Centre
-# noxsdl/src/editor/map_editor.cpp:1072
+# noxsdl/src/editor/map_editor.cpp:1077
 #@ 4ce7abde: Secret walls blue, breakable red, windows cyan.
 editor.cmd.view.special_walls.help = Secret walls blue, breakable red, windows cyan.
-# noxsdl/src/editor/map_editor.cpp:1072
+# noxsdl/src/editor/map_editor.cpp:1077
 #@ 59172c62: Tint Special Walls
 editor.cmd.view.special_walls.label = Tint Special Walls
 # noxsdl/src/editor/object_tools.cpp:135
 #@ cfe44eff: Trigger and Plate Boxes
 editor.cmd.view.triggers.label = Trigger and Plate Boxes
-# noxsdl/src/editor/map_editor.cpp:1012
+# noxsdl/src/editor/map_editor.cpp:1017
 #@ 13883432: Walls
 editor.cmd.view.walls.label = Walls
-# noxsdl/src/editor/map_editor.cpp:1014
+# noxsdl/src/editor/map_editor.cpp:1019
 #@ 1d756bcb: Waypoints
 editor.cmd.view.waypoints.label = Waypoints
-# noxsdl/src/editor/map_editor.cpp:998
+# noxsdl/src/editor/map_editor.cpp:1003
 #@ a3a7ea79: Zoom In
 editor.cmd.view.zoom_in.label = Zoom In
-# noxsdl/src/editor/map_editor.cpp:999
+# noxsdl/src/editor/map_editor.cpp:1004
 #@ 22e6669a: Zoom Out
 editor.cmd.view.zoom_out.label = Zoom Out
-# noxsdl/src/editor/map_editor.cpp:1000
+# noxsdl/src/editor/map_editor.cpp:1005
 #@ 82070f36: One screen pixel a world unit, as the game draws.
 editor.cmd.view.zoom_reset.help = One screen pixel a world unit, as the game draws.
-# noxsdl/src/editor/map_editor.cpp:1000
+# noxsdl/src/editor/map_editor.cpp:1005
 #@ 970fd7cc: Actual Size
 editor.cmd.view.zoom_reset.label = Actual Size
 # noxsdl/src/editor/marker_tools.cpp:284
@@ -3761,16 +3761,16 @@ editor.cmd.window.browser.help = Every object type by folder with thumbnails; fl
 # noxsdl/src/editor/object_tools.cpp:108
 #@ faf6f7ba: Content Browser
 editor.cmd.window.browser.label = Content Browser
-# noxsdl/src/editor/map_editor.cpp:1105
+# noxsdl/src/editor/map_editor.cpp:1110
 #@ 6abd0f0d: Shows or hides the Chat panel: the session's in-game chat, and a box to chat to the players.
 editor.cmd.window.chat.help = Shows or hides the Chat panel: the session's in-game chat, and a box to chat to the players.
-# noxsdl/src/editor/map_editor.cpp:1105
+# noxsdl/src/editor/map_editor.cpp:1110
 #@ 2279d8cb: Chat
 editor.cmd.window.chat.label = Chat
-# noxsdl/src/editor/map_editor.cpp:1071
+# noxsdl/src/editor/map_editor.cpp:1076
 #@ cc0bd203: Floor priorities and the edge each pair laps with.
 editor.cmd.window.edge_rules.help = Floor priorities and the edge each pair laps with.
-# noxsdl/src/editor/map_editor.cpp:1071
+# noxsdl/src/editor/map_editor.cpp:1076
 #@ ced447a7: Edge Rules...
 editor.cmd.window.edge_rules.label = Edge Rules...
 # noxsdl/src/editor/script_panel.cpp:290
@@ -3785,10 +3785,10 @@ editor.cmd.window.groups.help = Script groups of objects, waypoints, walls or gr
 # noxsdl/src/editor/marker_tools.cpp:265
 #@ f57f458d: Groups
 editor.cmd.window.groups.label = Groups
-# noxsdl/src/editor/map_editor.cpp:1103
+# noxsdl/src/editor/map_editor.cpp:1108
 #@ 7d96597f: History
 editor.cmd.window.history.label = History
-# noxsdl/src/editor/map_editor.cpp:1100
+# noxsdl/src/editor/map_editor.cpp:1105
 #@ bc7fe97f: Layers
 editor.cmd.window.layers.label = Layers
 # noxsdl/src/editor/marker_tools.cpp:260
@@ -3839,7 +3839,7 @@ editor.cmd.window.object_list.help = Every object on the map: search, sort, sele
 # noxsdl/src/editor/object_tools.cpp:110
 #@ b7ed2e7a: Object List
 editor.cmd.window.object_list.label = Object List
-# noxsdl/src/editor/map_editor.cpp:1097
+# noxsdl/src/editor/map_editor.cpp:1102
 #@ 82428fc0: Shows or hides the panel.
 editor.cmd.window.panel.help = Shows or hides the panel.
 # noxsdl/src/editor/marker_tools.cpp:263
@@ -3848,16 +3848,16 @@ editor.cmd.window.polygons.help = The polygons in their list order (the game's p
 # noxsdl/src/editor/marker_tools.cpp:263
 #@ 3c18cfae: Polygons
 editor.cmd.window.polygons.label = Polygons
-# noxsdl/src/editor/map_editor.cpp:1104
+# noxsdl/src/editor/map_editor.cpp:1109
 #@ f7f4eb9d: Problems
 editor.cmd.window.problems.label = Problems
-# noxsdl/src/editor/map_editor.cpp:1101
+# noxsdl/src/editor/map_editor.cpp:1106
 #@ 81c809fc: Properties
 editor.cmd.window.properties.label = Properties
-# noxsdl/src/editor/map_editor.cpp:1107
+# noxsdl/src/editor/map_editor.cpp:1112
 #@ 5dbd27f1: The panels back where they start.
 editor.cmd.window.reset_layout.help = The panels back where they start.
-# noxsdl/src/editor/map_editor.cpp:1107
+# noxsdl/src/editor/map_editor.cpp:1112
 #@ 7f14b926: Reset Layout
 editor.cmd.window.reset_layout.label = Reset Layout
 # noxsdl/src/editor/script_panel.cpp:279
@@ -3872,10 +3872,10 @@ editor.cmd.window.script_reference.help = Shows or hides the builtins, functions
 # noxsdl/src/editor/script_panel.cpp:286
 #@ b63657eb: Script Reference
 editor.cmd.window.script_reference.label = Script Reference
-# noxsdl/src/editor/map_editor.cpp:1108
+# noxsdl/src/editor/map_editor.cpp:1113
 #@ f2856af1: Interface scale, theme, autosave.
 editor.cmd.window.settings.help = Interface scale, theme, autosave.
-# noxsdl/src/editor/map_editor.cpp:1108
+# noxsdl/src/editor/map_editor.cpp:1113
 #@ 07887fc9: Editor Settings...
 editor.cmd.window.settings.label = Editor Settings...
 # noxsdl/src/editor/marker_tools.cpp:268
@@ -3884,7 +3884,7 @@ editor.cmd.window.strings.help = The game's string table (nox.csf): search label
 # noxsdl/src/editor/marker_tools.cpp:268
 #@ d699c517: Game Texts
 editor.cmd.window.strings.label = Game Texts
-# noxsdl/src/editor/map_editor.cpp:1102
+# noxsdl/src/editor/map_editor.cpp:1107
 #@ 85f71dc5: Tool Options
 editor.cmd.window.tool.label = Tool Options
 # noxsdl/src/editor/marker_tools.cpp:262
@@ -4358,7 +4358,7 @@ editor.error.cant_open = Can't open {path}:\n{error}
 # noxsdl/src/editor/map_editor.cpp:314
 #@ 8f0f5f4a: Can't save as "{name}": {why}
 editor.error.cant_save_as = Can't save as "{name}": {why}
-# noxsdl/src/editor/map_editor.cpp:335
+# noxsdl/src/editor/map_editor.cpp:340
 #@ b246e49b: Not saved:\n{error}
 editor.error.not_saved = Not saved:\n{error}
 # noxsdl/src/editor/marker_tools.cpp:2744
@@ -10547,25 +10547,25 @@ editor.settings.ui_scale = Interface scale
 # noxsdl/src/editor/map_editor_ui.cpp:1305
 #@ d18c8e65: On top of the display's own scale.
 editor.settings.ui_scale_help = On top of the display's own scale.
-# noxsdl/src/editor/map_editor.cpp:370
+# noxsdl/src/editor/map_editor.cpp:375
 #@ 8c39631a: Autosave failed: {error}
 editor.status.autosave_failed = Autosave failed: {error}
-# noxsdl/src/editor/map_editor.cpp:368
+# noxsdl/src/editor/map_editor.cpp:373
 #@ 9ac1a1e2: Autosaved a recovery copy
 editor.status.autosaved = Autosaved a recovery copy
 # noxsdl/src/editor/map_editor_view.cpp:197
 #@ aa357976: The map can't be drawn: {error}
 editor.status.cant_draw = The map can't be drawn: {error}
-# noxsdl/src/editor/map_editor.cpp:557
+# noxsdl/src/editor/map_editor.cpp:562
 #@ 5829b7c8: Can't redo: {why}
 editor.status.cant_redo = Can't redo: {why}
-# noxsdl/src/editor/map_editor.cpp:545
+# noxsdl/src/editor/map_editor.cpp:550
 #@ 0f594f61: Can't redo: {element} is being edited by {who}
 editor.status.cant_redo_held = Can't redo: {element} is being edited by {who}
-# noxsdl/src/editor/map_editor.cpp:510
+# noxsdl/src/editor/map_editor.cpp:515
 #@ 8b7ab356: Can't undo: {why}
 editor.status.cant_undo = Can't undo: {why}
-# noxsdl/src/editor/map_editor.cpp:496
+# noxsdl/src/editor/map_editor.cpp:501
 #@ 109019c3: Can't undo: {element} is being edited by {who}
 editor.status.cant_undo_held = Can't undo: {element} is being edited by {who}
 # noxsdl/src/editor/map_editor_view.cpp:583
@@ -10574,60 +10574,60 @@ editor.status.copied_area = Copied an area: {walls} walls, {tiles} tiles, {objec
 # noxsdl/src/editor/map_editor_view.cpp:588
 #@ 4e278e6a: ({n} skipped: being edited by others)
 editor.status.copied_area_skipped = ({n} skipped: being edited by others)
-# noxsdl/src/editor/map_editor.cpp:931
+# noxsdl/src/editor/map_editor.cpp:936
 #@ c22680fe: Copied extents: {list}
 editor.status.copied_extents = Copied extents: {list}
-# noxsdl/src/editor/map_editor.cpp:700
+# noxsdl/src/editor/map_editor.cpp:705
 #@ b6028b91: Copied {n} item | Copied {n} items
 editor.status.copied_items[one] = Copied {n} item
 editor.status.copied_items[other] = Copied {n} items
-# noxsdl/src/editor/map_editor.cpp:923, noxsdl/src/editor/map_editor_view.cpp:626, noxsdl/src/editor/marker_tools.cpp:2739
+# noxsdl/src/editor/map_editor.cpp:928, noxsdl/src/editor/map_editor_view.cpp:626, noxsdl/src/editor/marker_tools.cpp:2739
 #@ 7dfc2402: Copied {text}
 editor.status.copied_text = Copied {text}
-# noxsdl/src/editor/map_editor.cpp:939
+# noxsdl/src/editor/map_editor.cpp:944
 #@ e2e8f4f8: Copied waypoint ids: {list}
 editor.status.copied_waypoints = Copied waypoint ids: {list}
 # noxsdl/src/editor/map_editor_ui.cpp:468
 #@ 3601fa7a: (copy area)
 editor.status.copy_area = (copy area)
-# noxsdl/src/editor/map_editor.cpp:913
+# noxsdl/src/editor/map_editor.cpp:918
 #@ d9666974: Copy area: drag a box on the map (Escape cancels)
 editor.status.copy_area_armed = Copy area: drag a box on the map (Escape cancels)
-# noxsdl/src/editor/map_editor.cpp:962
+# noxsdl/src/editor/map_editor.cpp:967
 #@ 63b6ec16: Copy area cancelled
 editor.status.copy_area_cancelled = Copy area cancelled
 # noxsdl/src/editor/map_editor_view.cpp:579
 #@ 3c3f05ac: Copy area: nothing of the ticked layers in it
 editor.status.copy_area_empty = Copy area: nothing of the ticked layers in it
-# noxsdl/src/editor/map_editor.cpp:700
+# noxsdl/src/editor/map_editor.cpp:705
 #@ c3dcfbb9: Cut {n} item | Cut {n} items
 editor.status.cut_items[one] = Cut {n} item
 editor.status.cut_items[other] = Cut {n} items
 # noxsdl/src/editor/map_editor_view.cpp:142
 #@ f9926018: Drag cancelled
 editor.status.drag_cancelled = Drag cancelled
-# noxsdl/src/editor/map_editor.cpp:1068
+# noxsdl/src/editor/map_editor.cpp:1073
 #@ 2350a7ef: Edges: nothing to change
 editor.status.edges_unchanged = Edges: nothing to change
 # noxsdl/src/editor/map_editor.cpp:193
 #@ c96f8308: editor {n}
 editor.status.editor_n = editor {n}
-# noxsdl/src/editor/map_editor.cpp:473
+# noxsdl/src/editor/map_editor.cpp:478
 #@ d6f0234e: {action} failed: {error}
 editor.status.failed = {action} failed: {error}
-# noxsdl/src/editor/map_editor.cpp:653
+# noxsdl/src/editor/map_editor.cpp:658
 #@ d1857494: {element} is being edited by {who}
 editor.status.held_by = {element} is being edited by {who}
 # noxsdl/src/editor/map_editor_view.cpp:486
 #@ 8c642a36: Being edited by another editor
 editor.status.held_other = Being edited by another editor
-# noxsdl/src/editor/map_editor.cpp:1448
+# noxsdl/src/editor/map_editor.cpp:1453
 #@ cd34693c: Layout {name}
 editor.status.layout_loaded = Layout {name}
 # noxsdl/src/editor/map_editor_ui.cpp:307
 #@ b825e741: Layout saved as {name}
 editor.status.layout_saved = Layout saved as {name}
-# noxsdl/src/editor/map_editor.cpp:1450
+# noxsdl/src/editor/map_editor.cpp:1455
 #@ 8acb01ea: Layout {name} can't be read
 editor.status.layout_unreadable = Layout {name} can't be read
 # noxsdl/src/editor/map_editor_ui.cpp:493
@@ -10639,28 +10639,28 @@ editor.status.new_map_floor = Started a new map ({n} x {n} cells of floor)
 # noxsdl/src/editor/map_editor.cpp:235
 #@ 47ca0a6b: Started a new map (no floor)
 editor.status.new_map_no_floor = Started a new map (no floor)
-# noxsdl/src/editor/map_editor.cpp:885
+# noxsdl/src/editor/map_editor.cpp:890
 #@ bea34a55: No autosave to recover
 editor.status.no_autosave = No autosave to recover
 # noxsdl/src/editor/map_editor_ui.cpp:493
 #@ e2da1e45: No unsaved changes
 editor.status.no_unsaved = No unsaved changes
-# noxsdl/src/editor/map_editor.cpp:694
+# noxsdl/src/editor/map_editor.cpp:699
 #@ 1b8109d1: Nothing selected to copy
 editor.status.nothing_to_copy = Nothing selected to copy
-# noxsdl/src/editor/map_editor.cpp:736
+# noxsdl/src/editor/map_editor.cpp:741
 #@ d2feae9d: Nothing selected to duplicate
 editor.status.nothing_to_duplicate = Nothing selected to duplicate
-# noxsdl/src/editor/map_editor.cpp:718
+# noxsdl/src/editor/map_editor.cpp:723
 #@ f2571234: Nothing to paste
 editor.status.nothing_to_paste = Nothing to paste
-# noxsdl/src/editor/map_editor.cpp:563
+# noxsdl/src/editor/map_editor.cpp:568
 #@ 3c82a749: Nothing left to redo in {action}: {note}
 editor.status.nothing_to_redo = Nothing left to redo in {action}: {note}
-# noxsdl/src/editor/map_editor.cpp:839
+# noxsdl/src/editor/map_editor.cpp:844
 #@ a3313f1b: {where}: nothing on the map to show
 editor.status.nothing_to_show = {where}: nothing on the map to show
-# noxsdl/src/editor/map_editor.cpp:516
+# noxsdl/src/editor/map_editor.cpp:521
 #@ fd10a6b3: Nothing left to undo in {action}: {note}
 editor.status.nothing_to_undo = Nothing left to undo in {action}: {note}
 # noxsdl/src/editor/map_editor.cpp:245
@@ -10675,37 +10675,40 @@ editor.status.opened_rename = Opened {path} (its name doesn't fit the game's 8 c
 # noxsdl/src/editor/map_editor.cpp:269
 #@ 8b790a53: Opened {path} (a stock map: Save asks for a new name)
 editor.status.opened_stock = Opened {path} (a stock map: Save asks for a new name)
-# noxsdl/src/editor/map_editor.cpp:687
+# noxsdl/src/editor/map_editor.cpp:692
 #@ a41cad1b: Pick cancelled
 editor.status.pick_cancelled = Pick cancelled
 # noxsdl/src/editor/map_editor_view.cpp:1116
 #@ 3889d400: Nothing of that kind there: {prompt}
 editor.status.pick_nothing = Nothing of that kind there: {prompt}
-# noxsdl/src/editor/map_editor.cpp:680
+# noxsdl/src/editor/map_editor.cpp:685
 #@ b4e41bc7: {prompt} (right click or Escape cancels)
 editor.status.pick_prompt = {prompt} (right click or Escape cancels)
-# noxsdl/src/editor/map_editor.cpp:889
+# noxsdl/src/editor/map_editor.cpp:894
 #@ 040de769: Recovered {path}: Save asks for a name
 editor.status.recovered = Recovered {path}: Save asks for a name
-# noxsdl/src/editor/map_editor.cpp:566, noxsdl/src/editor/map_editor.cpp:570
+# noxsdl/src/editor/map_editor.cpp:571, noxsdl/src/editor/map_editor.cpp:575
 #@ 61e215dd: Redid {action}
 editor.status.redid = Redid {action}
-# noxsdl/src/editor/map_editor.cpp:567
+# noxsdl/src/editor/map_editor.cpp:572
 #@ 17895e90: Redid {action} ({note})
 editor.status.redid_note = Redid {action} ({note})
-# noxsdl/src/editor/map_editor.cpp:573
+# noxsdl/src/editor/map_editor.cpp:578
 #@ e2b5e004: Redo failed: {error}
 editor.status.redo_failed = Redo failed: {error}
-# noxsdl/src/editor/map_editor.cpp:463
+# noxsdl/src/editor/map_editor.cpp:468
 #@ 6c281a4f: {action} refused: {why}
 editor.status.refused = {action} refused: {why}
-# noxsdl/src/editor/map_editor.cpp:451
+# noxsdl/src/editor/map_editor.cpp:456
 #@ 9f9d18e0: {action} refused: {element} is being edited by {who}
 editor.status.refused_held = {action} refused: {element} is being edited by {who}
 # noxsdl/src/editor/map_editor.cpp:336
+#@ 8e652581: Saved {path}. Leftover save files are in {folder}.
+editor.status.save_cleanup = Saved {path}. Leftover save files are in {folder}.
+# noxsdl/src/editor/map_editor.cpp:341
 #@ 0685388d: Save failed
 editor.status.save_failed = Save failed
-# noxsdl/src/editor/map_editor.cpp:333
+# noxsdl/src/editor/map_editor.cpp:334
 #@ 45b405e1: Saved {path}
 editor.status.saved = Saved {path}
 # noxsdl/src/editor/map_editor_ui.cpp:489
@@ -10714,19 +10717,19 @@ editor.status.sending = ({n} sending)
 # noxsdl/src/editor/map_editor_ui.cpp:487
 #@ fa770f64: Session {name}
 editor.status.session = Session {name}
-# noxsdl/src/editor/map_editor.cpp:396
+# noxsdl/src/editor/map_editor.cpp:401
 #@ ad043fb6: In a session the map is the session's (leave the game to open another)
 editor.status.session_map = In a session the map is the session's (leave the game to open another)
-# noxsdl/src/editor/map_editor.cpp:1088
+# noxsdl/src/editor/map_editor.cpp:1093
 #@ ff75eca2: Showing the published map (G: the working copy)
 editor.status.showing_published = Showing the published map (G: the working copy)
-# noxsdl/src/editor/map_editor.cpp:1091
+# noxsdl/src/editor/map_editor.cpp:1096
 #@ d20ca99e: Showing the working copy (G: the published map)
 editor.status.showing_working = Showing the working copy (G: the published map)
 # noxsdl/src/editor/map_editor.cpp:262
 #@ 8a3f6a00: Sidecar ignored: {error}
 editor.status.sidecar_ignored = Sidecar ignored: {error}
-# noxsdl/src/editor/map_editor.cpp:637
+# noxsdl/src/editor/map_editor.cpp:642
 #@ 2a082f15: {n} item skipped: being edited by others | {n} items skipped: being edited by others
 editor.status.skipped[one] = {n} item skipped: being edited by others
 editor.status.skipped[other] = {n} items skipped: being edited by others
@@ -10736,10 +10739,10 @@ editor.status.the_host = the host
 # noxsdl/src/editor/map_editor_ui.cpp:477
 #@ 2b310ae0: tile {x},{y}
 editor.status.tile_cell = tile {x},{y}
-# noxsdl/src/editor/map_editor.cpp:670
+# noxsdl/src/editor/map_editor.cpp:675
 #@ 955d8372: Took over {element}
 editor.status.took_over = Took over {element}
-# noxsdl/src/editor/map_editor.cpp:669
+# noxsdl/src/editor/map_editor.cpp:674
 #@ 7a04d098: Took over {element} from {who}
 editor.status.took_over_from = Took over {element} from {who}
 # noxsdl/src/editor/map_editor_view.cpp:1191
@@ -10769,13 +10772,13 @@ editor.status.under_waypoint = waypoint {id}
 # noxsdl/src/editor/map_editor_view.cpp:1192
 #@ a172b7dd: window
 editor.status.under_window = window
-# noxsdl/src/editor/map_editor.cpp:519, noxsdl/src/editor/map_editor.cpp:523
+# noxsdl/src/editor/map_editor.cpp:524, noxsdl/src/editor/map_editor.cpp:528
 #@ 991214cf: Undid {action}
 editor.status.undid = Undid {action}
-# noxsdl/src/editor/map_editor.cpp:520
+# noxsdl/src/editor/map_editor.cpp:525
 #@ 22d942b2: Undid {action} ({note})
 editor.status.undid_note = Undid {action} ({note})
-# noxsdl/src/editor/map_editor.cpp:526
+# noxsdl/src/editor/map_editor.cpp:531
 #@ 764fc39e: Undo failed: {error}
 editor.status.undo_failed = Undo failed: {error}
 # noxsdl/src/editor/map_editor_ui.cpp:492
