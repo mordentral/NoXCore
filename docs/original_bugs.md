@@ -2810,3 +2810,20 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   left out, and goes after the 20 frames its count held (vanilla_deviations.md, VD-77);
   sound 9 at most once a second as useFireWand goes on to do (`fireWandUse` in
   `noxcore/src/server/items.cpp`).
+
+### OB-438: A saved creature's most health isn't saved
+- **Where:** MonsterXfer writes and reads a creature's current health alone (HealthData's first
+  word, from record version 0x31); its most health is the one the creature is made with
+  (monster.bin's HEALTH). A saved game's copy is read under switch-to-solo, where the read leaves
+  out monsterOnSpawnSpellcaster (outside game flag 0x200000), so nothing sets the most again.
+- **Effect:** a creature whose most health was raised in play comes back from a load or a map's
+  revisit with the health it had and monster.bin's most: past its most (1200 of 225 for
+  Hardcore Warrior's Ogre King, which War05B's MapInitialize sets with a memory trick), so no
+  healing or regeneration reaches it (both stop at the most); one lowered comes back with its
+  health under the type's most, and regenerates up to it. The stock maps' scripts can't
+  change a creature's most health (no builtin does), so only maps with memory tricks, and NoX
+  Core's mods (nox.setHealth), show it.
+- **Ours:** kept (the owner, 2026-11-22: match GAME.EXE). World::load's `savedCopy` (world.cpp:
+  the creatures' read skips `spawnFixup` under switch-to-solo outside 0x200000). The co-op
+  director takes the type's most again as the creature's own and puts the party's scale on top,
+  the health's share kept (modes/coop/src/coop_balance.cpp).

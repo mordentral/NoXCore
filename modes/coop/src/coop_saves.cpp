@@ -272,13 +272,37 @@ bool CoopDirector::save(const std::string& name, server::ServerObject* exit)
     }
     // The map's copy with its monsters' own health (the party's scale put back after): a load or a
     // revisit scales them from the game's numbers again, never on top of a scale.
+    // (Each one's health and most as they were, put back after: the scale's way down and up again
+    // rounds a hurt one's share down, and a save takes no health off, as the game's.)
     const float scale = scaledHealth_;
+    struct Was {
+        std::uint32_t extent;
+        std::uint16_t health;
+        std::uint16_t maxHealth;
+    };
+    std::vector<Was> was;
     if (host_ && scale != 1.0f) {
+        was.reserve(baseHealth_.size());
+        for (const auto& [ref, base] : baseHealth_) {
+            if (const server::ServerObject* o = world().byExtent(ref); o && !o->gone()) {
+                was.push_back({o->extent, o->health, o->maxHealth});
+            }
+        }
         applyScale(1.0f);
     }
     const bool ok = coreSave_ ? coreSave_(name, exit) : true;
     if (host_ && scale != 1.0f) {
         applyScale(scale);
+        for (const Was& w : was) {
+            server::ServerObject* o = world().byExtent(w.extent);
+            if (o && o->maxHealth == w.maxHealth && o->health != w.health) {
+                o->health = w.health;
+                o->touch();
+                if (o->monster) {
+                    o->monster->healthSeen.fill(o->health);
+                }
+            }
+        }
     }
     // Each NoX Core guest its campaign character to keep (the game saved: what it holds now).
     if (ok) {
