@@ -44,6 +44,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <utility>
@@ -275,7 +276,7 @@ private:
         return columns(ax, ay, bx, by, left, right, ColumnsFor{});
     }
     /// Improved culling: whether the screen point, outside the spans, is hidden only by the wall's
-    /// own arms or (a see-over wall) only by a sight-blocking object.
+    /// own arms or (a see-over wall) only by sight-blocking objects (inside the bare region's spans).
     bool excused(float sx, int row, const ColumnsFor& self) const;
     /// The interval of the sweep's list that holds the angle (the nearest occluder there).
     const Interval* occluderAt(int angle) const;
@@ -293,6 +294,12 @@ private:
     std::vector<Interval> list_;  ///< sorted by start angle
     std::vector<ScreenPoint> points_;
     std::vector<std::vector<int>> rows_; ///< per screen row, the polygon's crossings in x, sorted
+    /// Improved culling: the same sight without the sight-blocking objects, built when there are
+    /// some and a see-over wall in view (else null or stale: bareBuilt_). A see-over wall's base
+    /// hidden by an object counts as seen only where this region's spans hold it, so walls
+    /// behind other walls stay hidden whatever object stands in front of them.
+    std::unique_ptr<SightRegion> bare_;
+    bool bareBuilt_ = false;
 };
 
 /// A door's shut direction (0-31) from its map record's DoorXfer fields (`extra`): the third u32

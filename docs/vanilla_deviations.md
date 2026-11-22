@@ -337,7 +337,11 @@ Options switch unless noted.
     arm is drawn whole, not cut through its pillar at its hidden half;
   - nor a see-over wall (WALL flag 1 off) where only a sight-blocking object hides its base: the
     see-over walls behind a door's leaf are drawn whole over the door's dark wedge (the floor and
-    the things behind the door stay hidden);
+    the things behind the door stay hidden). "Only" is checked against the same sight worked out
+    without the objects (2026-11-22): a base that a wall hides as well stays hidden. Before, the
+    object being the nearest occluder was enough, so every fence or cage anywhere in an object's
+    wedge was drawn, floating in the dark past the room's walls (a Hardcore Warrior player's cages,
+    seen past a wall from beside a pillar);
   - a flat base (direction 2) is walked column by column like the sloped ones, so the game's quirk
     of drawing one wholly before a span from that span on is gone.
   Still the game's: which walls are reached at all (walls behind other walls stay hidden, and so do

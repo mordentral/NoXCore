@@ -380,7 +380,9 @@ bool SightRegion::excused(float sx, int row, const ColumnsFor& self) const
     if (o->kind == kWall) {
         return o->cellX == self.cellX && o->cellY == self.cellY;
     }
-    return self.seeOver && o->blocker >= 0;
+    // An object nearest: only when the sight without the objects reaches the point, so a wall
+    // behind it hides the see-over wall still.
+    return self.seeOver && o->blocker >= 0 && bareBuilt_ && bare_->spanContains(px, py);
 }
 
 std::array<float, 8> SightRegion::boxCorners(float width, float height)
@@ -694,6 +696,7 @@ void SightRegion::build(const View& view, std::span<const Wall> walls, std::span
     }
 
     // The walls, row by row over the even cells of the grid.
+    bool seeOverInView = false;
     for (int y = cellY0_; y < cellY0_ + cellsH_; ++y) {
         for (int x = cellX0_ + ((cellX0_ + y) & 1); x < cellX0_ + cellsW_; x += 2) {
             if (x < 0 || y < 0 || x >= 256 || y >= 256) {
@@ -714,6 +717,7 @@ void SightRegion::build(const View& view, std::span<const Wall> walls, std::span
                 state.seen = true;
                 state.front = ey < y * kCell;
                 state.seeOver = true;
+                seeOverInView = true;
                 continue;
             }
             if (w.window) {
@@ -746,6 +750,16 @@ void SightRegion::build(const View& view, std::span<const Wall> walls, std::span
     markShadowEdges();
     mergePoints();
     scanConvert();
+
+    // Improved culling: the same sight without the objects, which the see-over walls' excuse
+    // asks (excused). Only when an object could hide one of them.
+    bareBuilt_ = improved_ && seeOverInView && !blockers.empty();
+    if (bareBuilt_) {
+        if (!bare_) {
+            bare_ = std::make_unique<SightRegion>();
+        }
+        bare_->build(view, walls, {});
+    }
 }
 
 void SightRegion::sweep()
