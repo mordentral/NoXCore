@@ -132,7 +132,7 @@ void Effects::clear()
     vortexOrbs_.clear();
     rainOrbs_.clear();
     jiggle_ = 0;
-    whiteFlash_.reset();
+    whiteFlash_.clear();
     anchorsAtStep_.clear();
     frame_.reset();
     sortedFrames_ = {};
@@ -589,7 +589,7 @@ void Effects::spawn(const nox::client::FxEvent& fx, std::uint32_t frame)
         }
         break;
     case Op::FxWhiteFlash:
-        whiteFlash_ = frame;
+        whiteFlash_.trigger();
         break;
     case Op::FxArrowTrap:
         if (const auto* m = std::get_if<msg::FxArrowTrap>(&fx.fx)) {

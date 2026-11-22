@@ -2881,17 +2881,16 @@ SDL_AppResult SDL_AppIterate(void* appstate)
                                   app->camera.viewHeight);
     }
 
+    // The map not drawn (a cinematic's black, gameDisableMapDraw): the view black.
+    // Nor while it's held back for its HD images (holdMap).
+    const bool worldShown = (!app->cinematics || app->cinematics->mapDrawn()) && !(app->live && app->mapHeld);
     // A white-flash frame is all white: the game clears the screen and draws nothing else of the
-    // world that frame.
-    const bool whiteFlash =
-        app->live && app->effects->whiteFlash(gameFrame(*app));
+    // world that frame (one game frame's time, however long the game's clock stands: white_flash.hpp).
+    const bool whiteFlash = app->live && app->effects->whiteFlash(SDL_GetTicks(), app->view && worldShown);
     const std::uint8_t clear = whiteFlash ? 255 : 0;
     beginFrame(*app);
     SDL_SetRenderDrawColor(app->renderer, clear, clear, clear, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(app->renderer);
-    // The map not drawn (a cinematic's black, gameDisableMapDraw): the view black.
-    // Nor while it's held back for its HD images (holdMap).
-    const bool worldShown = (!app->cinematics || app->cinematics->mapDrawn()) && !(app->live && app->mapHeld);
     if (app->view && !whiteFlash && worldShown) {
         drawWorld(*app, extra, liveCodes);
     }

@@ -30,6 +30,7 @@
 #include "sight.hpp"
 #include "sprite_cache.hpp"
 #include "thing_art.hpp"
+#include "white_flash.hpp"
 
 #include "noxcore/client/fade.hpp"
 #include "noxcore/client/world.hpp"
@@ -139,9 +140,10 @@ public:
 
     /// Screen shake (MSG_FX_JIGGLE): world units to add to the camera's y this game frame.
     int jiggle() const { return jiggle_; }
-    /// Whether `frame` is a white-flash frame (MSG_FX_WHITE_FLASH): the game clears the whole
-    /// screen to white instead of drawing it.
-    bool whiteFlash(std::uint32_t frame) const { return whiteFlash_ && *whiteFlash_ == frame; }
+    /// Whether the frame drawn at `nowMs` is a white-flash frame (MSG_FX_WHITE_FLASH,
+    /// white_flash.hpp): the game clears the whole screen to white instead of drawing the world.
+    /// `worldDrawn`: the world would be drawn this frame.
+    bool whiteFlash(std::uint64_t nowMs, bool worldDrawn) { return whiteFlash_.frame(nowMs, worldDrawn); }
 
     /// This client's gamedata.bin (its own copy, as the game's client reads its own) as a game
     /// with `gameFlags` reads it: ManaBombOutRadius, the ring the mana bomb's sparks fill
@@ -556,7 +558,7 @@ private:
     std::uint32_t gameFlags_ = 0;
     bool numbersRead_ = false;
     int manaBombOutRadius_ = 0; ///< ManaBombOutRadius (whole units, as Math_FloatToInt chops it)
-    std::optional<std::uint32_t> whiteFlash_;
+    WhiteFlash whiteFlash_;
     const Anchors* anchors_ = nullptr; ///< the latest update()'s (owned by the caller)
     std::function<std::optional<SDL_FPoint>(std::uint16_t)> staticPoint_;
     std::function<std::optional<float>(int, int, std::optional<int>)> burstScaleAt_; ///< (setBurstScale's)

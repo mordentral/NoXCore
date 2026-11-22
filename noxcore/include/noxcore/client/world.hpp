@@ -139,7 +139,9 @@ struct PlayerEntry {
 /// The client's record of an NPC (g_cliNpcs, Cli_NewNpc-Cli_NpcAddEquipment), by its net code: what NPCDraw
 /// and MaidenDraw draw it with. MSG_REPORT_NPC makes it, or wipes it if
 /// there is one; the equip-class reports that follow without bit 15 fill its worn things.
-/// The table has kNpcSlots records, none freed in a session: with all taken a new code gets none.
+/// The table has kNpcSlots records: with all taken a new code gets none. The game frees none in a
+/// session (OB-145); ours frees one as its drawable goes out of sight or is destroyed (the server
+/// reports it again when it's back) and empties the table at each map's start (MSG_USE_MAP).
 inline constexpr std::size_t kNpcSlots = 64;
 struct NpcEntry {
     /// Materials 1-6, in order (Draw_MakeColorRGB of the message's six RGB triples).

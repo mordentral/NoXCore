@@ -1462,8 +1462,14 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   with none free it gets none.
 - **Effect:** after 64 different NPC codes in a session (net codes change from map to map), a new
   NPC / NPCWizard / Maiden isn't drawn at all (NPCDraw and MaidenDraw draw nothing without a
-  record) and its worn things and poison aren't kept.
-- **Ours:** the same (client::World, kNpcSlots).
+  record) and its worn things and poison aren't kept. The converted Hardcore Warrior campaign hits it
+  on its first maps (HW01A alone has 74 NPCs and Maidens): every NPC of a later map invisible till
+  the game is loaded again (2026-11-22 report).
+- **Ours:** the table holds 64 as the game's, but the client (client::World) frees an NPC's record
+  as its drawable goes out of sight or is destroyed (the server reports it again, colours and worn
+  things, when it's back in view) and empties the table at each map's start: only the NPCs known at
+  once count (VD-05). A stock client joined to us still has the bug.
+- **Fixed** 2026-11-22 by the owner's OK (VD-05).
 
 ### OB-146: NPCDraw and MaidenDraw leave the drawing colours set
 - **Where:** NPCDraw sets materials 1-6 and at its end sets 0-5 to white, so 6 keeps the

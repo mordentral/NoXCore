@@ -289,6 +289,16 @@ Options switch unless noted.
   where they'll be when our input reaches the server (their velocity times the smoothing delay
   plus the learnt input lag, ~9 frames live), so what we aim at is where a spell will land;
   vanilla draws them where the server last said. Newest draws them so (no smoothing delay).
+- **The white flash lasts a game frame's time** (MSG_FX_WHITE_FLASH; 2026-11-22, white_flash.hpp):
+  the original's handler sets a flag and its next drawn world frame is white, one frame at its 30
+  a second. noxsdl draws faster, so every frame begun within 30 ms of the first white one is
+  white (4 at 120 Hz, 2 at 60, 1 at 30), timed by the clock, not the game's frame, which stands
+  still through a solo level-up's 5 s pause. Always on.
+- **An NPC's record goes with its drawable** (OB-145; 2026-11-22, client::World): the original's
+  64 NPC records are freed only at a game's start, so after 64 NPC codes seen in a session no new
+  NPC is drawn. Ours free one at MSG_OBJECT_OUT_OF_SIGHT or MSG_DESTROY_OBJECT for it (the server
+  then reports it again when it's back) and all at MSG_USE_MAP: 64 known at once. Revert: drop
+  the `npcs_` erase and clear.
 - **Front walls are always translucent** (vanilla's TranslucentFrontWalls, an option there).
 - **A door standing on a wall cell is drawn, as the host draws it** (2026-11-21, OB-436): the
   original's host marks the cell each map door's leaf takes and never sweeps or draws a wall there;

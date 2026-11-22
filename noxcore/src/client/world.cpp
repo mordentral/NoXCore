@@ -622,6 +622,10 @@ void World::apply(std::span<const std::uint8_t> m, std::uint32_t frame)
         game_.statics.clear();
         bubbles_.clear();
         floaters_.clear();
+        // (noxcpp, OB-145: the NPC records go with the drawables. The game frees none till a game's
+        // start, so after 64 NPC codes seen in a session no new NPC is drawn. A map's NPCs are
+        // reported anew as they come into view.)
+        npcs_.clear();
         ++game_.wallsVersion;
         game_.flags.clear();
         game_.over = false; // (CliNet_OnPacket case 0x2B: Game_ClearFlags(8))
@@ -924,11 +928,16 @@ void World::apply(std::span<const std::uint8_t> m, std::uint32_t frame)
         break;
     }
     case Op::DestroyObject:
-        remove(u16At(m, 1), false);
+    case Op::ObjectOutOfSight: {
+        const std::uint16_t code = u16At(m, 1);
+        remove(code, m[0] == static_cast<std::uint8_t>(Op::ObjectOutOfSight));
+        // (noxcpp, OB-145: an NPC's record goes with its drawable. The server forgets it knows the
+        // NPC as it tells us so, and reports it again, colours and worn things, when it's back.)
+        if (!drawables_.contains(code)) {
+            npcs_.erase(code);
+        }
         break;
-    case Op::ObjectOutOfSight:
-        remove(u16At(m, 1), true);
-        break;
+    }
     case Op::ObjectInShadows:
         inShadows(u16At(m, 1), frame);
         break;
@@ -1138,8 +1147,9 @@ void World::apply(std::span<const std::uint8_t> m, std::uint32_t frame)
         }
         const std::uint16_t flags = u16At(m, 1);
         const auto code = static_cast<std::uint16_t>(flags & 0x7FFF);
-        // The table holds 64 (g_cliNpcs) and frees none till a game's start; full, a new code
-        // gets no record and isn't drawn (an original bug).
+        // The table holds 64 (g_cliNpcs); full, a new code gets no record and isn't drawn. The game
+        // frees none till a game's start (an original bug); ours frees an NPC's as it goes out of
+        // sight and empties the table at each map's start.
         if (!npcs_.contains(code) && kNpcSlots <= npcs_.size()) {
             break;
         }
