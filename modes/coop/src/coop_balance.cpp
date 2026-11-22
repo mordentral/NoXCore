@@ -69,16 +69,20 @@ void CoopDirector::applyScale(float health)
         // used again for a new thing: the base is that thing's only while its script id and type
         // are.)
         Base& b = baseHealth_[server::ObjectRef{o.extent}];
-        if (b.own == 0 || b.scriptId != o.scriptId || b.type != o.type) {
-            b = Base{o.scriptId, o.type, o.maxHealth};
+        if (b.own == 0 || b.scriptId != o.scriptId || b.type != o.type || o.maxHealth != b.left) {
+            // (Or its max health set since by someone else, a script's own: that's its own now, the
+            // scale on top of it, never back to the one it had.)
+            b = Base{o.scriptId, o.type, o.maxHealth, o.maxHealth};
         }
         const auto top = static_cast<std::uint16_t>(std::clamp(static_cast<int>(static_cast<float>(b.own) * health), 1, 0xFFFF));
+        b.left = top;
         if (top == o.maxHealth) {
             continue;
         }
-        // Whole stays whole; a hurt one keeps its share.
+        // Whole stays whole; a hurt one keeps its share, one past its most too (a saved game's
+        // creature, as the game's read leaves it).
         const int now = o.health == o.maxHealth ? top : static_cast<int>(static_cast<std::int64_t>(o.health) * top / o.maxHealth);
-        o.health = static_cast<std::uint16_t>(std::clamp(now, 1, static_cast<int>(top)));
+        o.health = static_cast<std::uint16_t>(std::clamp(now, 1, 0xFFFF));
         o.maxHealth = top;
         o.touch();
         if (o.monster) {

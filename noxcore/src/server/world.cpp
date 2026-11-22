@@ -1235,7 +1235,12 @@ static ServerObject readObject(const map::ObjectXfer& xfer, std::string_view typ
             if ((o.flags & ObjFlag::Dead) && o.typeName != "Zombie" && o.typeName != "VileZombie") {
                 o.flags |= ObjFlag::NoCollide; // (a body)
             }
-            spawnFixup(o, gameFlags); // (monsterOnSpawnSpellcaster)
+            // (monsterOnSpawnSpellcaster) Not for a saved game's copy (switch-to-solo, outside game
+            // flag 0x200000): its creatures keep the health the save had, even past their most, and
+            // the rest the record read.
+            if ((gameFlags & 0x200000u) || !w.switchToSolo) {
+                spawnFixup(o, gameFlags);
+            }
         });
     }
     if (o.updateFn == "SentryGlobeUpdate") {
@@ -1620,11 +1625,12 @@ void World::linkLive(World& w, const std::vector<std::uint32_t>& placed)
 
 World World::load(const map::MapFile& map, const things::ThingDb& things, std::uint32_t gameFlags, const things::GameData* gameData,
                   const things::ModifierDb* modifiers, const things::MonsterDb* monsterDb, std::int32_t nextScriptId, std::uint32_t frame,
-                  std::vector<std::uint32_t> reserved)
+                  std::vector<std::uint32_t> reserved, bool savedCopy)
 {
     World w;
     w.reservedExtents = std::move(reserved);
     w.gameFlags = gameFlags;
+    w.switchToSolo = savedCopy; // (the map load's switch-to-solo: the creatures' read tests it)
     w.gameData = gameData;
     w.monsterDb = monsterDb;
     w.modifierDb = modifiers;

@@ -2209,12 +2209,15 @@ public:
     /// Loads the map's objects, walls, waypoints and groups, made as a game with `gameFlags`
     /// and `gameData` makes them; the items' modifiers by `modifiers`' names (none without).
     /// The objects take script ids from `nextScriptId` on (the exe's counter, carried from map to
-    /// map) and are put in the world at `frame` (createAt's born frame and timer). Throws on a
+    /// map) and are put in the world at `frame` (createAt's born frame and timer). `savedCopy`:
+    /// the map is a saved game's copy, read under switch-to-solo (switchToSolo set from the
+    /// start: a saved creature keeps its health, as the game's read leaves it). Throws on a
     /// malformed map.
     static World load(const map::MapFile& map, const things::ThingDb& things,
                       std::uint32_t gameFlags = GameFlag::Network | GameFlag::Arena, const things::GameData* gameData = nullptr,
                       const things::ModifierDb* modifiers = nullptr, const things::MonsterDb* monsterDb = nullptr,
-                      std::int32_t nextScriptId = kFirstScriptId, std::uint32_t frame = 0, std::vector<std::uint32_t> reserved = {});
+                      std::int32_t nextScriptId = kFirstScriptId, std::uint32_t frame = 0, std::vector<std::uint32_t> reserved = {},
+                      bool savedCopy = false);
     /// noxcpp's map editor session (server/edit_session.hpp; never in a game the exe could host):
     /// objects added to the running world exactly as the map load reads and places them (each
     /// record's object, its inventory, a client-only one not placed, a door's wall), from a

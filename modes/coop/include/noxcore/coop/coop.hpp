@@ -541,7 +541,8 @@ private:
     struct Base {
         std::int32_t scriptId = 0;
         std::uint16_t type = 0;
-        std::uint16_t own = 0; ///< its own max health
+        std::uint16_t own = 0;  ///< its own max health
+        std::uint16_t left = 0; ///< the max health the scale last left it with (another: a script's own)
     };
     server::RefMap<Base> baseHealth_; ///< each monster's own max health (by extent)
     server::RefMap<std::uint8_t> copies_; ///< spell books put back (extent -> the level they're for)
