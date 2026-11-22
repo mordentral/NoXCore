@@ -1471,6 +1471,29 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   once count (VD-05). A stock client joined to us still has the bug.
 - **Fixed** 2026-11-22 by the owner's OK (VD-05).
 
+### OB-437: An NPC or Maiden made during play without colours or gear is never drawn
+- **Where:** an object starts with every player's report state clear. Only setNPCColor and
+  npcSetItemEquipFlags set an NPC's (state 0x400, owed MSG_REPORT_NPC). setNPCColor runs only in
+  NPCXfer and MonsterXfer (a map's load, a save's load) and for an escort carried through an exit.
+  npcSetItemEquipFlags runs when an NPC puts something on (NPCEquipWeapon / NPCEquipArmor). As a
+  player gets to know an object, netSendObjects2Plr owes it only the reports whose state is set.
+  So a map script's CreateObject / CreateObjectAt of an NPC or a Maiden gets no MSG_REPORT_NPC. So
+  does a generator's NPC whose template wears nothing (mobGeneratorSpawn copies the colours and
+  wears what the template wears) and a generator's Maiden. The client makes an NPC's record only
+  on MSG_REPORT_NPC (Cli_NewNpc in CliNet_OnPacket; the worn-thing reports need a record).
+  NPCDraw and MaidenDraw draw nothing without one.
+- **Effect:** such an NPC or Maiden is invisible until something sets a colour or makes it put
+  something on, or until the game is loaded again (the load's xfer reports it). Its corpse is
+  invisible too, and its poison isn't kept. Maps rely on this. The Hardcore Warrior maps make
+  Maidens as hidden helpers: HW07m's SpawnBall makes one, kills it at once and uses it as the
+  ball's collider, and HW10a-d's WarPullEnemy makes one, turns it off and uses it as a collider.
+  Their dying Maidens (HW03a, HW05B-C) are given colours, so they are drawn.
+- **Ours:** kept. The server owes the report from `ServerObject::npcState`, which only
+  `setNpcColor` and `npcSetItemEquipFlags` set (noxcore/src/server/npc.cpp). GameHost owes it to a
+  player newly in sight. client::World makes the record on MSG_REPORT_NPC. noxsdl's NPCDraw and
+  MaidenDraw draw nothing without one (noxsdl/src/live_scene.cpp). The console's `nx spawn` makes
+  them the same way. A mod can make one visible with nox.setNpcColors.
+
 ### OB-146: NPCDraw and MaidenDraw leave the drawing colours set
 - **Where:** NPCDraw sets materials 1-6 and at its end sets 0-5 to white, so 6 keeps the
   NPC's colour; it returns before that when the state has no frames or a helper it calls fails,
