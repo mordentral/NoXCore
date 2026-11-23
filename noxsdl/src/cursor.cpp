@@ -22,7 +22,7 @@ constexpr SDL_Color kYellow{255, 255, 0, 255};
 
 pick::Shape pickShape(const TypeArt& art)
 {
-    return pick::Shape{art.extentBox, art.extentRadius, art.extentWidth, art.extentHeight, art.zSizeMin, art.zSizeMax};
+    return art.hover;
 }
 
 bool underCursor(const TypeArt& art, float x, float y, float z, float cx, float cy)

@@ -2,13 +2,36 @@
 #include "cursor_pick.hpp"
 
 #include "noxcore/things/object_class.hpp"
+#include "noxcore/things/thing_db.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdlib>
+#include <string>
+#include <string_view>
 
 namespace noxsdl::pick {
 
 namespace {
+
+/// The numbers after a shape's word ("CIRCLE 12", "BOX 20 30"), each 0 when missing.
+std::array<float, 2> shapeSizes(std::string_view text)
+{
+    std::array<float, 2> out{};
+    const std::string s(text.substr(std::min(text.find(' '), text.size())));
+    const char* p = s.c_str();
+    for (float& v : out) {
+        char* end = nullptr;
+        v = std::strtof(p, &end);
+        if (end == p) {
+            v = 0;
+            break;
+        }
+        p = end;
+    }
+    return out;
+}
 
 /// A float to whole units as the game converts them: cut toward zero.
 int chop(float v)
@@ -22,6 +45,32 @@ constexpr float kHalfDiagonal = 0.35355339f;
 constexpr float kSideScale = 0.70710677f;
 
 } // namespace
+
+Shape shapeOf(const nox::things::ThingDef& def)
+{
+    Shape shape;
+    if (const auto extent = def.lastAttribute("EXTENT")) {
+        if (extent->starts_with("CIRCLE")) {
+            shape.radius = shapeSizes(*extent)[0];
+        } else if (extent->starts_with("BOX")) {
+            const auto wh = shapeSizes(*extent);
+            shape.box = true;
+            shape.width = wh[0];
+            shape.height = wh[1];
+        }
+    }
+    shape.zMin = kUnlistedZSizeMin;
+    shape.zMax = kUnlistedZSizeMax;
+    if (const auto zsize = def.lastAttribute("ZSIZE")) {
+        const std::string s(*zsize);
+        char* end = nullptr;
+        const long bottom = std::strtol(s.c_str(), &end, 10);
+        const long top = std::strtol(end, nullptr, 10);
+        shape.zMin = static_cast<float>(bottom);
+        shape.zMax = static_cast<float>(std::max(bottom, top));
+    }
+    return shape;
+}
 
 bool under(const Shape& shape, int x, int y, int z, int cx, int cy)
 {

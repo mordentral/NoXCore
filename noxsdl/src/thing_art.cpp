@@ -436,6 +436,7 @@ const std::optional<TypeArt>& ThingArt::entry(std::string_view name)
                     a.zSizeMin = static_cast<float>(mm[0]);
                     a.zSizeMax = static_cast<float>(std::max(mm[0], mm[1]));
                 }
+                a.hover = pick::shapeOf(*def);
                 if (const auto li = def->lastAttribute("LIGHTINTENSITY")) {
                     a.lightIntensity = std::strtof(std::string(*li).c_str(), nullptr);
                 }

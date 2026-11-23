@@ -5,6 +5,7 @@
 // when it's made and applied as it's drawn), and z is the drawable's current height.
 #pragma once
 
+#include "cursor_pick.hpp"
 #include "light_cone.hpp"
 
 #include "noxcore/map/objects.hpp"
@@ -94,6 +95,9 @@ struct TypeArt {
     float extentHeight = 0;
     float zSizeMin = 0;      ///< ZSIZE's bottom
     float zSizeMax = 0;      ///< ZSIZE's top: how tall it stands (enchantment effects sit by it)
+    /// What the mouse hovers (pick::shapeOf): EXTENT and ZSIZE as the client's drawables have
+    /// them, 0 to 30 high without a ZSIZE line.
+    pick::Shape hover;
     /// What its name says to the 3D view (view3d.hpp): "Shadow" or "Bridge" in it (laid in the
     /// floor), "Obelisk" (a box), "Shield" (held on the left).
     bool nameShadowOrBridge = false;

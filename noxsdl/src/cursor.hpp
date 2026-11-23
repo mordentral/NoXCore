@@ -8,7 +8,8 @@
 //              centre in 32 steps, the running arrows (+32) beyond 100 units or while running.
 //   labels     some carry a word in yellow (guicursor.c's PICKUP, SHOPKEEPER, ...).
 //   hover      the drawable under the mouse: its footprint (EXTENT circle, or a box turned 45
-//              degrees) stood up from ZSIZE's bottom to its top, as a capsule or prism, in whole
+//              degrees) stood up from ZSIZE's bottom to its top (0 to 30 for a type without a
+//              ZSIZE line, as the client's thing reader leaves it), as a capsule or prism, in whole
 //              world units; the one furthest forward (y + z + ZSIZE bottom) wins (cursor_pick.hpp).
 //              Only items, monsters, players and immobile things count, not us, observers, the
 //              dead or the unseen invisible. The cursor's own pick takes a Glyph only for a wizard.
