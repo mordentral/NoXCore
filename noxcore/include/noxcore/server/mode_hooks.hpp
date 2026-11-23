@@ -98,6 +98,18 @@ namespace ModeMark {
 /// Fumble, its holder's death, a deleted holder's drop), as an item whose DROP does nothing
 /// (nox.setDroppable). Any other holder (a chest, a thrown chakram in flight) drops it as any item.
 inline constexpr std::uint8_t KeptByHolder = 0x01;
+/// A script set its health and most health (nox.setHealth) since the co-op director last looked:
+/// the director takes its most as its own at its next pass, whatever the value, puts the party's
+/// scale on top and clears these three. Nothing else reads them; never saved.
+inline constexpr std::uint8_t ScriptMost = 0x02;
+/// ... and gave it a health other than the one it had: that health is the script's, its share of
+/// the script's most kept by the scale (as any creature's).
+inline constexpr std::uint8_t ScriptHealth = 0x04;
+/// ... or left its health as it was and changed only the most: that health is still the one the
+/// scale left it (the party's points, not the script's), taken back to its own scale first.
+/// (ScriptHealth wins when both are set.)
+inline constexpr std::uint8_t ScriptKeptHealth = 0x08;
+inline constexpr std::uint8_t ScriptHealthMarks = ScriptMost | ScriptHealth | ScriptKeptHealth;
 } // namespace ModeMark
 
 /// A map script's call of its mod (NoX Core's LuauCall / LuauCallReturn builtins: ModeHooks::mapCall).

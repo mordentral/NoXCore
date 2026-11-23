@@ -69,19 +69,35 @@ void CoopDirector::applyScale(float health)
         // used again for a new thing: the base is that thing's only while its script id and type
         // are.)
         Base& b = baseHealth_[server::ObjectRef{o.extent}];
-        if (b.own == 0 || b.scriptId != o.scriptId || b.type != o.type || o.maxHealth != b.left) {
+        const bool same = b.own != 0 && b.scriptId == o.scriptId && b.type == o.type;
+        // A script's health setter since the last pass (ModeMark): its most is its own now, whatever
+        // the value (the scaled one too).
+        const std::uint8_t marks = o.modeMarks & server::ModeMark::ScriptHealthMarks;
+        // Only its most changed by the script: its health is still the one the scale left it, at
+        // the scale it was last left at (own / left), taken back to its own first.
+        const bool kept = same && (marks & server::ModeMark::ScriptKeptHealth) && !(marks & server::ModeMark::ScriptHealth);
+        const std::uint16_t keptOwn = b.own, keptLeft = b.left;
+        if (marks != 0) {
+            o.modeMarks = static_cast<std::uint8_t>(o.modeMarks & ~server::ModeMark::ScriptHealthMarks);
+        }
+        if (!same || marks != 0 || o.maxHealth != b.left) {
             // (Or its max health set since by someone else, a script's own: that's its own now, the
             // scale on top of it, never back to the one it had.)
             b = Base{o.scriptId, o.type, o.maxHealth, o.maxHealth};
         }
         const auto top = static_cast<std::uint16_t>(std::clamp(static_cast<int>(static_cast<float>(b.own) * health), 1, 0xFFFF));
         b.left = top;
-        if (top == o.maxHealth) {
+        if (top == o.maxHealth && !kept) {
             continue;
         }
         // Whole stays whole; a hurt one keeps its share, one past its most too (a saved game's
         // creature, as the game's read leaves it).
-        const int now = o.health == o.maxHealth ? top : static_cast<int>(static_cast<std::int64_t>(o.health) * top / o.maxHealth);
+        const int now = o.health == o.maxHealth ? top
+                        : kept ? static_cast<int>(static_cast<std::int64_t>(o.health) * keptOwn * top / (static_cast<std::int64_t>(keptLeft) * o.maxHealth))
+                               : static_cast<int>(static_cast<std::int64_t>(o.health) * top / o.maxHealth);
+        if (top == o.maxHealth && now == o.health) {
+            continue;
+        }
         o.health = static_cast<std::uint16_t>(std::clamp(now, 1, 0xFFFF));
         o.maxHealth = top;
         o.touch();

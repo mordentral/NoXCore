@@ -539,8 +539,9 @@ struct ServerObject {
     /// or told to World::modeHooks for it alone. 0: none, as every object of the game's. (In the
     /// padding before `value`: the object's size is the same.)
     std::uint8_t modeEvents = 0;
-    /// noxcpp: what a mode set on it (ModeMark: nox.setDroppable). 0: nothing, as every object of
-    /// the game's. (In the same padding.)
+    /// noxcpp: what a mode set on it (ModeMark: nox.setDroppable, nox.setHealth's marks for the
+    /// co-op director). 0: nothing, as every object of the game's. Never saved. (In the same
+    /// padding.)
     std::uint8_t modeMarks = 0;
     int value = 0;           ///< its own number (a fist's or meteor's damage, a cloud's time)
     // Poison (its level; frames to its next fall, and a slowed one's; the

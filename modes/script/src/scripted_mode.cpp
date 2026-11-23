@@ -1626,6 +1626,15 @@ int noxSetHealth(lua_State* L)
     const int most = luaL_checkinteger(L, 3);
     luaL_argcheck(L, health >= 0 && health <= 65535, 2, "0-65535");
     luaL_argcheck(L, most >= 0 && most <= 65535, 3, "0-65535");
+    // Marked for the co-op director (ModeMark: the most its own whatever the value; the health
+    // the script's, or the scale's still when only the most changed). Read by nothing else.
+    std::uint8_t mark = server::ModeMark::ScriptMost;
+    if (health != o.health) {
+        mark |= server::ModeMark::ScriptHealth;
+    } else if (most != o.maxHealth) {
+        mark |= server::ModeMark::ScriptKeptHealth;
+    }
+    o.modeMarks |= mark;
     o.health = static_cast<std::uint16_t>(health);
     o.maxHealth = static_cast<std::uint16_t>(most);
     return 0;

@@ -140,6 +140,11 @@ declare nox: {
     --- A creature type's monster.bin numbers as { experience, health, questHealth, speed }; nil when none.
     monsterInfo: (thingType: string) -> NoxMonsterInfo?,
     --- Sets a thing's health and most health as fields (no report; nox.touch sends them).
+    --- In a co-op campaign the party's health scale goes on top: at its next pass (at once when
+    --- the party changes, else within 5 s) the director takes the most set here as the creature's
+    --- own base, whatever the value (the scaled number it had too), and keeps the health's share of
+    --- it. A health passed as the creature has it, with only the most changed, stays the party's
+    --- points (set the most every frame and the health doesn't grow).
     setHealth: (id: number, health: number, most: number) -> (),
     --- Marks every part of a thing to be sent to the clients again.
     touch: (id: number) -> (),
