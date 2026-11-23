@@ -87,21 +87,7 @@ void Effects::stepRain(const Anchor& a, const TypeArt& art, std::uint32_t frame)
     }
 
     if (draw == DrawFn::LevelUp || draw == DrawFn::OblivionUp) {
-        for (int i = 0; i < 2; ++i) {
-            RainOrb o;
-            o.blue = draw == DrawFn::OblivionUp;
-            o.x = random(-15, 15) + x;
-            o.y = random(-15, 15) + y;
-            // Starts as high as the drawable is below the view's top edge, so it drops in from the top.
-            o.z = o.prevZ = o.y - viewTop;
-            // Negative: falling, 8-12 units a frame.
-            o.velZ = -random(8, 12);
-            o.size = random(3, 10);  // glow radius size + 4, dot size / 3
-            o.targetX = x;
-            o.targetY = y;
-            o.fade = nox::client::madeAt(frame);
-            rainOrbs_.push_back(o);
-        }
+        addRainOrbs(a, draw == DrawFn::OblivionUp, frame);
     } else if (draw == DrawFn::BlueRain) {
         // (Not in games with flag 0x200000, which the effects don't see.)
         if (const SparkType* type = sparkType("BlueRainSpark")) {
@@ -121,6 +107,50 @@ void Effects::stepRain(const Anchor& a, const TypeArt& art, std::uint32_t frame)
     }
 }
 
+// LevelUpDraw / OblivionUpDraw, each frame it's drawn: two rain orbs over the drawable.
+void Effects::addRainOrbs(const Anchor& a, bool blue, std::uint32_t frame)
+{
+    const int x = static_cast<int>(a.x);
+    const int y = static_cast<int>(a.y);
+    for (int i = 0; i < 2; ++i) {
+        RainOrb o;
+        o.blue = blue;
+        o.x = random(-15, 15) + x;
+        o.y = random(-15, 15) + y;
+        // Starts as high as the drawable is below the view's top edge, so it drops in from the top.
+        o.z = o.prevZ = o.y - static_cast<int>(view_.y);
+        // Negative: falling, 8-12 units a frame.
+        o.velZ = -random(8, 12);
+        o.size = random(3, 10);  // glow radius size + 4, dot size / 3
+        o.targetX = x;
+        o.targetY = y;
+        o.fade = nox::client::madeAt(frame);
+        rainOrbs_.push_back(o);
+    }
+}
+
+// A drawn frame of the game we host standing paused (paused_draw.hpp): the level-up rain's draws,
+// run without a game frame. Client updates (other orbs' flight, a cloud's puffs) wait for the
+// game, as the game's update list does.
+void Effects::drawWhilePaused(std::uint64_t nowMs, bool paused)
+{
+    const int frames = pausedDraw_.frames(nowMs, paused);
+    if (frames == 0 || !anchors_) {
+        return;
+    }
+    const std::uint32_t frame = frame_.value_or(0);
+    for (int i = 0; i < frames; ++i) {
+        for (const auto& [netCode, a] : *anchors_) {
+            const TypeArt* art = art_.get(a.typeId);
+            if (art && (art->drawFn == DrawFn::LevelUp || art->drawFn == DrawFn::OblivionUp)) {
+                addRainOrbs(a, art->drawFn == DrawFn::OblivionUp, frame);
+            }
+        }
+        stepRainOrbs();          // RainOrbDraw
+        stepOrbs(frame, true);   // GlowOrbMoveDraw: the move orbs the landed ones became
+    }
+}
+
 // Moves the vortex and rain orbs one frame; landed rain orbs turn into move orbs.
 void Effects::stepRainEffects(std::uint32_t /*frame*/)
 {
@@ -136,6 +166,11 @@ void Effects::stepRainEffects(std::uint32_t /*frame*/)
         const bool onScreen = sx > view_.x && sx < view_.x + view_.w && sy > view_.y && sy < view_.y + view_.h;
         return o.radius <= 0 || (view_.w > 0 && !onScreen);  // until the view is known (w 0), only the radius ends it
     });
+    stepRainOrbs();
+}
+
+void Effects::stepRainOrbs()
+{
     // RainOrbDraw: falls at its own speed; on the ground it flies off as a move orb, away from
     // the player to 150 units out.
     std::vector<RainOrb> landed;
@@ -155,6 +190,7 @@ void Effects::stepRainEffects(std::uint32_t /*frame*/)
         const int ty = static_cast<int>(std::lround(std::sin(angle) * 150 + o.targetY));
         spawnOrb(o.blue ? "BlueMoveOrb" : "WhiteMoveOrb", o.x, o.y + 20, tx, ty, random(6, 8)); // (always adds one)
         orbs_.back().shrinkEvery = orbs_.back().shrinkCountdown = 1;  // shrinks every frame
+        orbs_.back().movesInDraw = true;                              // (GlowOrbMoveDraw)
     }
 }
 

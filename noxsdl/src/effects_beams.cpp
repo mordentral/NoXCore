@@ -423,11 +423,14 @@ void Effects::stepRays(std::uint32_t frame)
     }
 }
 
-void Effects::stepOrbs(std::uint32_t frame)
+void Effects::stepOrbs(std::uint32_t frame, bool drawnOnly)
 {
-    // LinearOrbUpdateDraw: `speed` units a frame toward the target; gone once within
-    // 10 units or past it.
+    // LinearOrbUpdateDraw (GlowOrbMoveDraw as it draws): `speed` units a frame toward the target;
+    // gone once within 10 units or past it.
     for (Orb& o : orbs_) {
+        if (drawnOnly && !o.movesInDraw) {
+            continue;
+        }
         o.prevX = o.x;
         o.prevY = o.y;
         if (o.spiral) {

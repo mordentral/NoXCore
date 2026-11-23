@@ -2840,6 +2840,9 @@ SDL_AppResult SDL_AppIterate(void* appstate)
             app->effects->setView(app->camera);
             app->effects->setGameData(&app->gameData, gameFlags(*app));
             app->effects->update(app->interpolator.gameTime(), app->anchors, app->sprites.get());
+            // The game we host paused (a solo game's: the level-up's 5 s): the level-up's orb rain
+            // falls on as the game draws (paused_draw.hpp).
+            app->effects->drawWhilePaused(SDL_GetTicks(), app->host && (app->host->gameFlags() & nox::server::GameFlag::Paused) != 0);
             app->effects->sceneSprites(*app->sprites, extra);
             // Screen shake moves the view down (Cli_SetCameraCenter adds it to the centre's y).
             app->camera.y += static_cast<float>(app->effects->jiggle());
