@@ -663,12 +663,7 @@ const MapEditor::TypeExtent& MapEditor::typeExtent(const std::string& type)
             t.b = t.haveA ? std::strtof(p1, &end) : 0;
             t.haveB = t.haveA && end != p1;
         }
-        if (const auto zs = def->lastAttribute("ZSIZE")) {
-            const std::string zt(*zs);
-            char* ze = nullptr;
-            std::strtof(zt.c_str(), &ze);
-            t.zTop = std::strtof(ze, nullptr);
-        }
+        t.zTop = nox::things::thingZSize(*def).top; // (0 to 30 without a ZSIZE line, as the game reads it)
     }
     return typeExtents_.emplace(type, t).first->second;
 }

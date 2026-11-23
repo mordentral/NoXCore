@@ -588,7 +588,7 @@ private:
         bool circle = false, box = false;
         bool haveA = false, haveB = false;
         float a = 0, b = 0;
-        std::optional<float> zTop; ///< ZSIZE's second number (the 3D extents' height)
+        std::optional<float> zTop; ///< ZSIZE's top (thingZSize: 30 without a line; the 3D extents' height)
     };
     std::map<std::string, TypeExtent, std::less<>> typeExtents_;
     const TypeExtent& typeExtent(const std::string& type);

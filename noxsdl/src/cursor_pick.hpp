@@ -5,10 +5,9 @@
 //            from its ZSIZE bottom to its top: it's hit inside the footprint at either level, or
 //            between the two levels within its sideways span. In whole world units: the cursor's
 //            point and the thing's spot whole, the levels, the radius and the box's corners cut
-//            toward zero. A type whose thing.bin record has no ZSIZE line stands 0 to 30 (the
-//            client's thing reader starts every type there before reading its lines): the NPC,
-//            the Wizard and the other creatures without one are hit up their bodies, not only
-//            at their feet.
+//            toward zero. A type whose thing.bin record has no ZSIZE line stands 0 to 30
+//            (nox::things::thingZSize): the NPC, the Wizard and the other creatures without one
+//            are hit up their bodies, not only at their feet.
 //   picks    of the things hit, the one furthest forward (y + z + ZSIZE bottom, whole units; 0 or
 //            less never) wins, the first one offered on a tie. Two picks are kept: the front one
 //            (the ring at its feet, the arrow's colour, the aim and the spells' target) and the
@@ -43,15 +42,9 @@ struct Shape {
     float zMax = 0;     ///< ZSIZE's top
 };
 
-/// The ZSIZE a type has when its record lists none: 0 to 30 (the client's thing reader sets it
-/// on every type before reading the type's lines; a ZSIZE line replaces it).
-inline constexpr float kUnlistedZSizeMin = 0;
-inline constexpr float kUnlistedZSizeMax = 30;
-
 /// A thing type's hover shape from its thing.bin record: the last EXTENT line's CIRCLE r or BOX
 /// w h (radius, width and height read as decimals; CENTER, NULL or none: no shape, never hit),
-/// and the last ZSIZE line's bottom and top (whole numbers, a top under the bottom raised to it),
-/// else kUnlistedZSizeMin to kUnlistedZSizeMax.
+/// and its ZSIZE as nox::things::thingZSize gives it (0 to 30 without a ZSIZE line).
 Shape shapeOf(const nox::things::ThingDef& def);
 
 /// Whether world point (cx, cy) is on a thing standing at (x, y), at height z.

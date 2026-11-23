@@ -10691,7 +10691,7 @@ editor.status.opened_stock = Opened {path} (a stock map: Save asks for a new nam
 # noxsdl/src/editor/map_editor.cpp:692
 #@ a41cad1b: Pick cancelled
 editor.status.pick_cancelled = Pick cancelled
-# noxsdl/src/editor/map_editor_view.cpp:1116
+# noxsdl/src/editor/map_editor_view.cpp:1111
 #@ 3889d400: Nothing of that kind there: {prompt}
 editor.status.pick_nothing = Nothing of that kind there: {prompt}
 # noxsdl/src/editor/map_editor.cpp:685
@@ -10758,31 +10758,31 @@ editor.status.took_over = Took over {element}
 # noxsdl/src/editor/map_editor.cpp:674
 #@ 7a04d098: Took over {element} from {who}
 editor.status.took_over_from = Took over {element} from {who}
-# noxsdl/src/editor/map_editor_view.cpp:1191
+# noxsdl/src/editor/map_editor_view.cpp:1186
 #@ 845eae30: breakable
 editor.status.under_breakable = breakable
-# noxsdl/src/editor/map_editor_view.cpp:1202
+# noxsdl/src/editor/map_editor_view.cpp:1197
 #@ c2f26e25: edges:
 editor.status.under_edges = edges:
-# noxsdl/src/editor/map_editor_view.cpp:1198
+# noxsdl/src/editor/map_editor_view.cpp:1193
 #@ 471a4e8a: floor {name} var {variant}
 editor.status.under_floor = floor {name} var {variant}
-# noxsdl/src/editor/map_editor_view.cpp:1175
+# noxsdl/src/editor/map_editor_view.cpp:1170
 #@ d3881d4a: {n} links
 editor.status.under_links = {n} links
-# noxsdl/src/editor/map_editor_view.cpp:1174
+# noxsdl/src/editor/map_editor_view.cpp:1169
 #@ 15d00057: (off)
 editor.status.under_off = (off)
-# noxsdl/src/editor/map_editor_view.cpp:1190
+# noxsdl/src/editor/map_editor_view.cpp:1185
 #@ 667c6911: secret
 editor.status.under_secret = secret
-# noxsdl/src/editor/map_editor_view.cpp:1186
+# noxsdl/src/editor/map_editor_view.cpp:1181
 #@ 450c9192: wall {material} dir {direction} var {variant}
 editor.status.under_wall = wall {material} dir {direction} var {variant}
-# noxsdl/src/editor/map_editor_view.cpp:1173
+# noxsdl/src/editor/map_editor_view.cpp:1168
 #@ 2d9dfd6d: waypoint {id}
 editor.status.under_waypoint = waypoint {id}
-# noxsdl/src/editor/map_editor_view.cpp:1192
+# noxsdl/src/editor/map_editor_view.cpp:1187
 #@ a172b7dd: window
 editor.status.under_window = window
 # noxsdl/src/editor/map_editor.cpp:524, noxsdl/src/editor/map_editor.cpp:528
@@ -11932,13 +11932,13 @@ editor.validate.waypoint_links = more than 255 links
 # noxcore/src/mapedit/validate.cpp:190
 #@ e03eb61e: two waypoints share the id
 editor.validate.waypoint_same_id = two waypoints share the id
-# noxsdl/src/editor/map_editor_view.cpp:1070
+# noxsdl/src/editor/map_editor_view.cpp:1065
 #@ 75becaed: [NoX Core]
 editor.view.client_noxcore = [NoX Core]
-# noxsdl/src/editor/map_editor_view.cpp:1070
+# noxsdl/src/editor/map_editor_view.cpp:1065
 #@ beadc373: [stock]
 editor.view.client_stock = [stock]
-# noxsdl/src/editor/map_editor_view.cpp:893
+# noxsdl/src/editor/map_editor_view.cpp:888
 #@ baaaeb9a: Copy area: drag a box (Escape cancels)
 editor.view.copy_area_hint = Copy area: drag a box (Escape cancels)
 # noxsdl/src/editor/map_editor_view.cpp:622
@@ -11950,13 +11950,13 @@ editor.view.following = Following {name}  (pan or Escape stops)
 # noxsdl/src/editor/map_editor_view.cpp:376
 #@ 06d4d918: being edited by {who}
 editor.view.held_tip = being edited by {who}
-# noxsdl/src/editor/map_editor_view.cpp:1069
+# noxsdl/src/editor/map_editor_view.cpp:1064
 #@ 75004e51: (observing)
 editor.view.observing = (observing)
 # noxsdl/src/editor/map_editor_view.cpp:613
 #@ 77b8fda6: Paste Here
 editor.view.paste_here = Paste Here
-# noxsdl/src/editor/map_editor_view.cpp:1131
+# noxsdl/src/editor/map_editor_view.cpp:1126
 #@ 63a2eb91: {prompt}  (right click or Escape cancels)
 editor.view.pick_hint = {prompt}  (right click or Escape cancels)
 # noxsdl/src/editor/map_editor_view.cpp:633

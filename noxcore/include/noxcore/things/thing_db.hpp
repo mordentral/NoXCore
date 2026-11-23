@@ -216,6 +216,18 @@ struct ThingDef {
     std::optional<Bits> bits;
 };
 
+/// A type's ZSIZE: the height it spans above its spot, bottom to top.
+struct ZSize {
+    float bottom = 0;
+    float top = 30;
+};
+
+/// A type's ZSIZE as the game's thing readers leave it (the client's and the server's alike): every
+/// type starts at 0 30; its last ZSIZE line's two whole numbers replace that, a top under the bottom
+/// raised to the bottom. (The client's drawable takes it from its type: the cursor's pick, the
+/// enchantments' effects, the damage numbers, the creature bar, the friend dot, the sight box.)
+ZSize thingZSize(const ThingDef& thing);
+
 /// All of thing.bin. Each list keeps file order, which is what the game's indices refer to.
 struct ThingDb {
     std::vector<FloorDef> floors;

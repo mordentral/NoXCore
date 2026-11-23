@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <string>
 
 namespace nox::things {
 
@@ -494,6 +496,20 @@ ThingDb parseThingDb(std::span<const std::uint8_t> plain)
 ThingDb loadThingDb(const std::filesystem::path& path)
 {
     return thingDbFromFile(readFileBytes(path), true);
+}
+
+ZSize thingZSize(const ThingDef& thing)
+{
+    ZSize z;
+    if (const auto line = thing.lastAttribute("ZSIZE")) {
+        const std::string s(*line);
+        char* end = nullptr;
+        const long bottom = std::strtol(s.c_str(), &end, 10);
+        const long top = std::strtol(end, nullptr, 10);
+        z.bottom = static_cast<float>(bottom);
+        z.top = static_cast<float>(std::max(bottom, top));
+    }
+    return z;
 }
 
 ThingDb thingDbFromFile(std::vector<std::uint8_t> data, bool contentPacks)

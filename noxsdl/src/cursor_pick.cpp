@@ -59,16 +59,9 @@ Shape shapeOf(const nox::things::ThingDef& def)
             shape.height = wh[1];
         }
     }
-    shape.zMin = kUnlistedZSizeMin;
-    shape.zMax = kUnlistedZSizeMax;
-    if (const auto zsize = def.lastAttribute("ZSIZE")) {
-        const std::string s(*zsize);
-        char* end = nullptr;
-        const long bottom = std::strtol(s.c_str(), &end, 10);
-        const long top = std::strtol(end, nullptr, 10);
-        shape.zMin = static_cast<float>(bottom);
-        shape.zMax = static_cast<float>(std::max(bottom, top));
-    }
+    const nox::things::ZSize z = nox::things::thingZSize(def);
+    shape.zMin = z.bottom;
+    shape.zMax = z.top;
     return shape;
 }
 

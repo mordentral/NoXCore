@@ -429,13 +429,11 @@ const std::optional<TypeArt>& ThingArt::entry(std::string_view name)
                         a.extentHeight = static_cast<float>(size[1]);
                     }
                 }
-                // ZSIZE min max: the height the thing spans (the cursor's hover test); a top under
-                // the bottom is read as the bottom.
-                if (const auto zsize = def->lastAttribute("ZSIZE")) {
-                    const auto mm = readInts<2>(*zsize);
-                    a.zSizeMin = static_cast<float>(mm[0]);
-                    a.zSizeMax = static_cast<float>(std::max(mm[0], mm[1]));
-                }
+                // ZSIZE: the height the thing spans, 0 to 30 without a ZSIZE line (thingZSize); the
+                // hover's shape stands on the same.
+                const nox::things::ZSize zsize = nox::things::thingZSize(*def);
+                a.zSizeMin = zsize.bottom;
+                a.zSizeMax = zsize.top;
                 a.hover = pick::shapeOf(*def);
                 if (const auto li = def->lastAttribute("LIGHTINTENSITY")) {
                     a.lightIntensity = std::strtof(std::string(*li).c_str(), nullptr);
