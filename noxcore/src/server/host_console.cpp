@@ -615,12 +615,12 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         return;
     }
     if (is(0, "load") && w.size() == 2) {
-        // not in a quest; a map of this mode (a network game's, not a solo map's;
-        // "NoMapLoadNewMode" for another mode's, but in a chat game); then it's loaded
-        // ("maploaded"). (noxcpp: a map this game doesn't find is looked for in the other
-        // installed mods' maps, "<mod id>/<name>" naming one (consoleMapOf); a solo map in a solo
-        // game whose mode takes the console's loads, a co-op campaign, is that mode's to load
-        // (Options::consoleLoad), the party moved as by a way on to it.)
+        // not in a quest; in a network game a map of this mode (a network game's, not a solo
+        // map's; "NoMapLoadNewMode" for another mode's, but in a chat game); out of one a solo
+        // map, with no mode test; then it's loaded ("maploaded"). (noxcpp: a map this game doesn't
+        // find is looked for in the other installed mods' maps, "<mod id>/<name>" naming one
+        // (consoleMapOf); a solo game's mode may hold a load off (Options::consoleLoad: a co-op
+        // campaign's party busy).)
         if (world.quest()) {
             return;
         }
@@ -635,12 +635,13 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
             return;
         }
         std::uint32_t types = 0;
+        map::MapFile file;
         try {
             if (pick.path.empty() || !fs::exists(resolveNoCase(pick.path))) {
                 print("CannotAccessMap", {name});
                 return;
             }
-            const auto file = map::loadMapFile(pick.path);
+            file = map::loadMapFile(pick.path);
             types = file.find(map::MapInfo::kName) ? map::decodeSection<map::MapInfo>(file).gameFlags : 0;
         } catch (const std::exception&) {
             print("CannotAccessMap", {name});
@@ -660,9 +661,18 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
                 }
             }
         };
-        if ((types & 1u) && (world.gameFlags & GameFlag::Solo) && options_.consoleLoad) {
+        if ((types & 1u) && !world.network()) {
+            // Out of a network game a solo map goes without the mode test, and its load is
+            // the map's own file: nothing saved first, a visited map's saved copy in WORKING
+            // neither read nor touched (no switch-to-solo), so the map starts anew (MapInitialize,
+            // its players at a player start), and no AUTOSAVE after it (mapLoadOrSaveMB(1)).
+            // (noxcpp) A map with the original game's memory tricks: refused here, nothing moved
+            // (the map load's refusal would load the map it's on again).
+            if (refusedForTricks(pick.name, file, "not loaded; the game stays on " + mapPath_.stem().string())) {
+                return;
+            }
             pin();
-            if (!options_.consoleLoad(*this, pick.name)) {
+            if (options_.consoleLoad && !options_.consoleLoad(*this, pick.name)) {
                 if (pinned) {
                     consoleMaps_.erase(util::lowered(pick.name));
                     pinnedMaps_->set(consoleMaps_);
@@ -672,6 +682,8 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
                                        {{"map", pick.name}}));
                 return;
             }
+            world.loadingSavedGame = true;
+            nextMap(pick.name);
             print("maploaded", {pick.name});
             return;
         }

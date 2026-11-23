@@ -299,10 +299,10 @@ public:
     void onMessage(server::GameHost& host, std::uint8_t peer, std::span<const std::uint8_t> m);
     /// A player's chat line: the host's "?skip" ends a chapter screen's wait (taken).
     bool onChat(server::GameHost& host, std::uint8_t peer, std::u16string_view text);
-    /// The host console's load of a solo map (GameHost::Options::consoleLoad): the party goes there
-    /// as through a way on to it (partyGoes, thawed; the WORKING save first, which keeps the guests'
-    /// characters, then the map: World::SaveRequest::map). False, nothing done: a save already asked
-    /// for or waiting, or no host on its feet.
+    /// The host console's load of a solo map (GameHost::Options::consoleLoad): the party made ready
+    /// to leave (partyGoes, thawed; no exit, no save); the console then loads the map as a solo
+    /// game's does (its own file, never a visited map's saved copy). False, nothing done: a save
+    /// already asked for or waiting, or no host on its feet.
     bool consoleLoad(server::GameHost& host, const std::string& map);
 
     /// A player in the party, in the order they came.

@@ -262,11 +262,11 @@ public:
         /// one's), before it's relayed: true takes it (not relayed; the mode's own answers and
         /// commands, as "?difficulty").
         std::function<bool(GameHost&, std::uint8_t peer, std::u16string_view text)> onChat;
-        /// (noxcpp: a NoX Core mode's) The host console's load of a solo map (its MapInfo's type 1:
-        /// a campaign's), which a solo game's mode refuses (NoMapLoadNewMode): the mode takes it in
-        /// that refusal's place (a co-op campaign's party goes there as through a way on to it, the
-        /// WORKING save first). `map`: the map's name as findMap finds it. Whether it's under way
-        /// (false: not now). None: refused as GAME.EXE's.
+        /// (noxcpp: a NoX Core mode's) Asked before the host console loads a solo map (its
+        /// MapInfo's type 1: a campaign's) in a solo game: the mode's last word and its own
+        /// preparation (a co-op campaign's party made ready to leave). `map`: the map's name as
+        /// findMap finds it. False: not now (nothing loaded). Either way the load itself is the
+        /// console's, as GAME.EXE's: the map's own file, no save first. None: loaded at once.
         std::function<bool(GameHost&, const std::string& map)> consoleLoad;
         /// noxcpp's own messages from a noxsdl client (one that identified itself; a stock
         /// client's are dropped), by their opcode: each NoX Core mode's set-up adds its own
@@ -1082,6 +1082,9 @@ private:
     void nextMap(std::optional<std::string> exitTo = std::nullopt);
     /// The load nextMap asked for, in the server's next frame (its load tick: Server's map-load hook).
     void loadNextMap();
+    /// (noxcpp) A map whose script uses the original game's memory tricks: logged (with `what` NoX
+    /// Core does about it) and everyone told why, true; any other: false.
+    bool refusedForTricks(const std::string& name, const map::MapFile& file, std::string_view what);
     std::optional<std::string> pendingExit_;
     /// (noxcpp) The maps the host console's load took from another installed mod (one this game's
     /// mode doesn't ship, the maps folder hasn't): by lower-case name, found by findMap after the

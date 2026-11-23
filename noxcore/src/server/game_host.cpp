@@ -4182,6 +4182,17 @@ void GameHost::scanMaps()
     server_.questMaps().build(list);
 }
 
+bool GameHost::refusedForTricks(const std::string& name, const map::MapFile& file, std::string_view what)
+{
+    const auto trick = memoryTricksOf(file);
+    if (!trick) {
+        return false;
+    }
+    logRefusedMap(name, *trick, what);
+    announce(strings::fromUtf8(script::memoryTricksNotice(name)));
+    return true;
+}
+
 void GameHost::nextMap(std::optional<std::string> exitTo)
 {
     const util::RoundingScope rounding(server_.exactMaths());
@@ -4259,10 +4270,7 @@ void GameHost::loadNextMap()
     // map it's on was checked as it loaded.)
     bool refused = false;
     if (next != mapPath_) {
-        if (const auto trick = memoryTricksOf(file)) {
-            const std::string name = next.stem().string();
-            logRefusedMap(name, *trick, "not loaded; the game stays on " + mapPath_.stem().string());
-            announce(strings::fromUtf8(script::memoryTricksNotice(name)));
+        if (refusedForTricks(next.stem().string(), file, "not loaded; the game stays on " + mapPath_.stem().string())) {
             refused = true;
             next = mapPath_;
             file = map::loadMapFile(next);

@@ -1628,28 +1628,31 @@ The engine's logic is the exe's; these are where the output differs.
 
 ### VD-80: The console's `load`: a co-op campaign's party to a campaign map; the installed mods' maps
 
-- **Vanilla:** the host console's `load <map>` (ParseCmd.c) loads a network map that allows the
-  mode being played. In a solo game every campaign map is refused ("NoMapLoadNewMode": the map's
-  type 1 isn't among the solo game's mode flags), so there's no way to jump to a campaign map. A
-  name not in the maps folder is "CannotAccessMap".
+- **Vanilla:** the host console's `load <map>` (ParseCmd.c, a cheat) loads a network map that
+  allows the mode being played. Out of a network game (a solo game) it takes a campaign map (type
+  1) instead, with no mode test: the map's own file from the maps folder, never a visited map's
+  saved copy in WORKING (no switch-to-solo), nothing saved first, the copy left as it is; the map
+  starts anew (MapInitialize, then MapEntry), the player at a player start, and no AUTOSAVE after
+  it (mapLoadOrSaveMB(1)). A map of the wrong kind (a solo map in a network game, a network map in
+  a solo game) is passed over without a word. A name not in the maps folder is "CannotAccessMap".
 - **Ours:**
-  - In a co-op campaign (stock or a campaign mod's, modes/coop: GameHost::Options::consoleLoad), a
-    campaign map (type 1) is the co-op director's to load: the party goes there as through a way
-    on to it (CoopDirector::consoleLoad: every talk closed, the glyphs on the ground gone, a
-    script's freeze let go; the WORKING save first, which keeps each guest's campaign character in
-    the Party folder and sends it to its client; then the map, a visited one's saved copy as a way
-    back to it gives). The save is at the host's place (no exit, so no exit's way out), and the map
-    named in the exit's place (World::SaveRequest::map). While a save is asked for or waiting (a
-    map's AUTOSAVE in its first second), or with the host down, it says it can't now and does
-    nothing. Network maps are refused there as before.
+  - The solo game's load is GAME.EXE's (a co-op campaign's too, stock or a campaign mod's). A map
+    of the wrong kind is refused with "NoMapLoadNewMode" rather than silently.
+  - In a co-op campaign (modes/coop: GameHost::Options::consoleLoad) the director is asked first
+    (CoopDirector::consoleLoad): while a save is asked for or waiting (a map's AUTOSAVE in its
+    first second), or with the host down, it says it can't now and nothing loads; else the party is
+    made ready to leave (every talk closed, the glyphs on the ground gone, a script's freeze let
+    go), then the console loads the map as above. (Until 2026-11-23 the party went as through a way
+    on: the WORKING save first and a visited map's saved copy, so a map passed through came back
+    as it was left with the party at its old way out: a Hardcore Warrior author's report.)
   - A name the game doesn't find (its mode's own maps, then the maps folder, as every lookup) is
     looked for in the other installed mods' maps (each mod's maps\, indexed as the mods are read).
     One mod's is loaded, and is this game's map of that name from then on (GameHost::findMap: its
     download, a way back to it); its .rul files are read beside it, never written. In two or more:
     it names them, and `load <mod id>/<map>` loads that one. A name the game has itself stays the
     game's (the mod's is refused, said so), and a mod with game data of its own is refused (its
-    maps want its tables: host that mod). Every refusal of the map's type stays as GAME.EXE's: a
-    plain network game still refuses a solo map, a mod's included.
+    maps want its tables: host that mod). Every refusal of the map's type stays as GAME.EXE's (said
+    as above): a plain network game still refuses a solo map, a mod's included.
   - The host's own client finds such a map's file as the host does (GameHost::hostMapLookup: the
     mode's maps, then those the console took from other mods, a copy shared under its own lock as
     the client reads it on its own thread), so it never downloads it from its own game; a mod
@@ -1658,7 +1661,8 @@ The engine's logic is the exe's; these are where the output differs.
   - For testing specific maps (the owner's request of 2026-11-22; the host's own client by the
     owner's decision of 2026-11-22).
 - **Revert:** host_console.cpp's `load` without consoleMapOf and Options::consoleLoad (CoopDirector
-  sets it in configure); the host's client's lookup without the pinned maps (hostMapLookup).
+  sets it in configure); the host's client's lookup without the pinned maps (hostMapLookup); the
+  wrong kind's refusal without its line.
 
 ### VD-81: A co-op campaign's guests need the sysop's password for the host's commands
 

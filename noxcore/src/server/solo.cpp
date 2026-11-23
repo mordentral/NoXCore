@@ -152,7 +152,6 @@ void requestSave(World& world, bool pending, std::uint32_t exit, std::uint32_t d
     world.saveRequest.delay = delay;
     world.saveRequest.at = frame;
     world.saveRequest.exit = exit;
-    world.saveRequest.map.clear(); // (noxcpp's: a map named in an exit's place is its asker's to set after)
     world.saveByExit = exit != 0;
     world.saveRequest.pending = pending;
     // (none asked: the client's save window's flag set to 0 too)

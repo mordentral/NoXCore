@@ -12,7 +12,7 @@ console.load.mod_data = {map} belongs to {mod}, which uses its own game data. Ho
 # noxcore/src/server/host_console.cpp:182
 #@ 2d012396: This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here.
 console.load.name_taken = This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here.
-# noxcore/src/server/host_console.cpp:670
+# noxcore/src/server/host_console.cpp:680
 #@ 5d738dbd: The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment.
 console.load.party_busy = The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment.
 
