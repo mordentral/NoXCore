@@ -32,6 +32,9 @@
 //              without it SpriteCache::pendingCopy makes the same look on the CPU.
 //   weather    nox.weather's rain, snow, storm and wind (weather.hpp). Optional: without it (and
 //              on SDL's usual renderer) no weather is drawn.
+//   fx_water   the Water floors at the floor target's resolution from their own tiles, their
+//              frames running smoothly (hd_water.hpp; HD Spell FX). Optional: without it the
+//              water floors are drawn as they are.
 //
 // The shaders are DXIL for Direct3D 12 (what the GPU renderer picks on Windows) and SPIR-V for
 // Vulkan (Linux), each built when the build finds its compiler (dxc, glslang). Otherwise, or on a
@@ -87,6 +90,9 @@ public:
     /// nox.weather's rain, snow, storm and wind (shaders/weather.frag.hlsl); null if it couldn't
     /// be made (no weather is drawn then).
     SDL_GPURenderState* weather() const { return weather_; }
+    /// HD Spell FX's water (shaders/fx_water.frag.hlsl): no render state of its own (HdWater makes
+    /// one, which binds the water's base as its second texture). Null if it couldn't be made.
+    SDL_GPUShader* water() const { return water_; }
 
 private:
     GpuShaders() = default;
@@ -111,6 +117,7 @@ private:
     SDL_GPURenderState* gamma_ = nullptr;
     SDL_GPURenderState* pending_ = nullptr;
     SDL_GPURenderState* weather_ = nullptr;
+    SDL_GPUShader* water_ = nullptr;
 };
 
 } // namespace noxsdl

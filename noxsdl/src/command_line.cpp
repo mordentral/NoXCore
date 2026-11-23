@@ -249,8 +249,17 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             opts.useGpu = true;
         } else if (a == "--no-gpu") {
             opts.useGpu = false;
-        } else if (a == "--stock-effects") {
-            opts.stockEffects = true;
+        } else if (a == "--stock-effects" || a == "--hd-spell-fx" || a == "--water-demo") {
+            // (One branch: the chain is as deep as the compiler takes.) --hd-spell-fx: Options'
+            // HD Spell FX on for this run (unless --stock-effects). --water-demo (the viewer,
+            // tests): made-up things wading, flying and falling into the water by the view's middle,
+            // through HD water's ripple feed (feedWaterRipples).
+            if (a == "--water-demo") {
+                app.waterDemo = true;
+                opts.hdSpellFx = true;
+            } else {
+                (a == "--stock-effects" ? opts.stockEffects : opts.hdSpellFx) = true;
+            }
         } else if (a == "--no-bloom") {
             opts.noBloom = true;
         } else if (a == "--no-smooth-motion") {
@@ -405,8 +414,15 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
 #endif
         } else if (a == "--sight") {
             app.lineOfSight = true; // line of sight from the camera centre, in the viewer too
-        } else if (a == "--shot-after") {
-            app.shotAfterSeconds = std::strtof(next(), nullptr);
+        } else if (a == "--shot-after" || a == "--shot-sequence") {
+            // (One branch: the chain is as deep as the compiler takes.) --shot-sequence N STEP:
+            // N shots STEP seconds apart (tests: an animation's frames).
+            if (a == "--shot-after") {
+                app.shotAfterSeconds = std::strtof(next(), nullptr);
+            } else {
+                app.shotSequence = std::clamp(std::atoi(next()), 1, 1000);
+                app.shotStep = std::max(0.0f, std::strtof(next(), nullptr));
+            }
         } else if (a == "--connect") {
             opts.connect = next();
         } else if (a == "--name") {

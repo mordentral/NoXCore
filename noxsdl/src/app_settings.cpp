@@ -524,10 +524,11 @@ void applyExtras(App& app, const OptionsWindow::Extras& e)
                            ? fxdraw::Smooth{app.white, app.shaders->disc(), app.shaders->rect(), app.shaders->glow(),
                                             app.shaders->puff(), app.shaders->glowLine()}
                            : fxdraw::Smooth{};
-    // HD Spell FX: the toxic cloud's puffs, the Force Field's sphere, the Reflective Shield's water.
-    fxdraw::spellFx() = e.hdSpellFx
-                            ? fxdraw::SpellFx{app.white, app.shaders->puff(), app.shaders->barrier(), app.shaders->ripple()}
-                            : fxdraw::SpellFx{};
+    // HD Spell FX: the toxic cloud's puffs, the Force Field's sphere, the Reflective Shield's water,
+    // the Water floors.
+    fxdraw::spellFx() = e.hdSpellFx ? fxdraw::SpellFx{app.white, app.shaders->puff(), app.shaders->barrier(),
+                                                      app.shaders->ripple(), app.shaders->water()}
+                                    : fxdraw::SpellFx{};
 }
 
 /// The game text's fonts to Original Style Fonts' faces (the HD Nox-style ones while the HD images

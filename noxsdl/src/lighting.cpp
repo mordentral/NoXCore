@@ -170,6 +170,32 @@ Rgb LightMap::sampleExact(float x, float y) const
     return {static_cast<std::uint8_t>(p.r), static_cast<std::uint8_t>(p.g), static_cast<std::uint8_t>(p.b)};
 }
 
+std::size_t LightMap::pointLights(float left, float top, float right, float bottom, std::span<PointLight> out) const
+{
+    std::size_t n = 0;
+    for (const Resolved& l : resolved_) {
+        if (l.anti || l.kite || l.radius <= 0 || l.x + l.radius < left || l.x - l.radius > right || l.y + l.radius < top ||
+            l.y - l.radius > bottom) {
+            continue;
+        }
+        // Kept widest first: in at its place, the narrowest falling off the end when full.
+        std::size_t at = n;
+        while (at > 0 && out[at - 1].radius < l.radius) {
+            --at;
+        }
+        if (at >= out.size()) {
+            continue;
+        }
+        const std::size_t last = std::min(n, out.size() - 1);
+        for (std::size_t i = last; i > at; --i) {
+            out[i] = out[i - 1];
+        }
+        out[at] = PointLight{l.x, l.y, l.radius, l.color};
+        n = std::min(n + 1, out.size());
+    }
+    return n;
+}
+
 void LightMap::drawPerPixel(SDL_Renderer* renderer, const Camera& camera)
 {
     const int w = camera.viewWidth;

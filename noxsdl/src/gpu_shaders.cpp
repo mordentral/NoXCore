@@ -94,6 +94,23 @@ std::unique_ptr<GpuShaders> GpuShaders::create(SDL_Renderer* renderer)
     } else {
         SDL_Log("gpu: material_split shader: %s (BC7 material sprites shaded on the CPU)", SDL_GetError());
     }
+    // HD Spell FX's water: on its own, its render state made with its base texture (HdWater).
+    // Without it the water floors are drawn as ever.
+    const ShaderCode waterCode = embeddedShader(ShaderId::fx_water, format);
+    SDL_GPUShaderCreateInfo water{};
+    water.code = waterCode.code;
+    water.code_size = waterCode.size;
+    water.entrypoint = waterCode.entrypoint;
+    water.format = format;
+    water.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    water.num_samplers = 2; // the water's weight SDL binds, the base
+    water.num_uniform_buffers = 1;
+    out->water_ = SDL_CreateGPUShader(device, &water);
+    if (out->water_) {
+        out->shaders_.push_back(out->water_);
+    } else {
+        SDL_Log("gpu: fx_water shader: %s (HD Spell FX draws the water floors as they are)", SDL_GetError());
+    }
     SDL_Log("gpu: shaders on %s", SDL_GetGPUDeviceDriver(device));
     return out;
 #else

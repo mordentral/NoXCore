@@ -89,6 +89,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -843,7 +844,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
                 extras.originalFonts = *opts.originalFonts;
             }
             extras.smoothEffects = extras.smoothEffects && !opts.stockEffects;
-            extras.hdSpellFx = extras.hdSpellFx && !opts.stockEffects;
+            extras.hdSpellFx = (extras.hdSpellFx || opts.hdSpellFx) && !opts.stockEffects;
             extras.perPixelLight = extras.perPixelLight && !opts.gridLight;
             extras.bloom = extras.bloom && !opts.noBloom;
             extras.frameRate = extras.frameRate && app->showFps;
@@ -2309,6 +2310,7 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
         });
     }
     updatePending(app); // (a map editor session's walls, floor and things not yet published: drawing only)
+    feedWaterRipples(app); // (HD water's ripples and splashes, from the drawables over it: drawing only)
     if (app.live && app.minimap && app.view3d.active()) {
         // (In 2D the scene's sort lists the obelisks it draws: liveSprites, drawnMarkers.)
         app.minimap->observe(app.live->client().world(), app.camera, sight); // obelisks seen
@@ -2340,7 +2342,11 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
             }
         }
         app.view->setCollectBloom(app.bloom != nullptr);
-        app.view->setTime(app.live ? app.interpolator.gameTime() : static_cast<double>(SDL_GetTicks()) * 30 / 1000);
+        // (The viewer's clock; a --shot-sequence's steps with its shots, so they're exactly the
+        // step apart however long each takes to save.)
+        const double viewerFrames = app.shotSequence > 1 ? static_cast<double>(app.shotAfterSeconds) * 30
+                                                         : static_cast<double>(SDL_GetTicks()) * 30 / 1000;
+        app.view->setTime(app.live ? app.interpolator.gameTime() : viewerFrames);
         if (app.effects) {
             // The effects' sort (the particles sorted into the scene, and the sight test of
             // the drawables drawn over it), with this frame's sight.
@@ -3033,6 +3039,19 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     endFrame(*app);
 
     // A screenshot run: the shot saved, then a game is left (the viewer just ends).
+    if (shotReady && app->shotSequence > 1) {
+        // --shot-sequence: each shot under its own number; the last ends the run as one shot does.
+        const std::string whole = app->screenshot;
+        const std::filesystem::path path(whole);
+        app->screenshot = (path.parent_path() / (path.stem().string() + std::format("_{:02}", app->shotIndex) + path.extension().string())).string();
+        const bool last = ++app->shotIndex >= app->shotSequence;
+        if (!last) {
+            saveScreenshot(*app);
+            app->screenshot = whole;
+            app->shotAfterSeconds += app->shotStep;
+            shotReady = false;
+        }
+    }
     if (shotReady) {
         app->shotTaken = true;
         const bool saved = saveScreenshot(*app);

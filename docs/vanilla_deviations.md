@@ -842,7 +842,7 @@ frames and sound are its decoder's (noxcore video/vqa.hpp). Where noxsdl differs
   bug, the slot looking castable while the server refuses the cast for want of mana.
 - **Revert:** drop the isSummonSpell branch in slotManaCost (the slot then reads thing.bin's 0).
 
-### VD-48: HD Spell FX: the poison cloud, Force Field and Reflective Shield drawn anew
+### VD-48: HD Spell FX: the poison cloud, Force Field, Reflective Shield and water drawn anew
 
 - **Vanilla:** the spells' looks are sprites. A toxic cloud puts a GreenPuff or GreenSmoke
   animation within its reach every other frame, rising and fading. The Force Field (the Shield
@@ -869,6 +869,22 @@ frames and sound are its decoder's (noxcore video/vqa.hpp). Where noxsdl differs
     against the original's (the back view was close); the Reflective Shield draws the original
     sprite whatever the switch (`kRippleShield` in effects_enchant.cpp) until it's reworked.
     The shader and the shapes stay in the code.
+  - the Water floors (Water, and WaterNoTeleport, which has Water's tiles) at the floor target's
+    resolution (noxsdl/src/hd_water.hpp, water_base.hpp; shaders/fx_water.frag.hlsl), in world
+    space, in the water's place in each tile (the whole tile, or its share where edges blend the
+    water in or out, as the HD floor composite mixes them), in place of the water's tiles whatever
+    the image source (the pack's own water tiles included). It is made from the
+    floor's own tiles (video.bag's, whatever the image source): the original's colours, murk and
+    flecks smoothly upsampled with a fine grain below the texel, kept within the tiles' own range.
+    The original draws only the first of the floor's six frames (FrameOffset stays 0 in 1.2b:
+    vanilla water stands still); ours runs the six frames smoothly one into the next, the loop in
+    4 s (`HdWater::kFramesPerSecond`). Over that murk, a water surface of our own: waves that bend
+    and shade it, a sheen off them from the game's lights, a band lapping at the shore with a little
+    foam, and ripples and splashes where the game's things are in the water (a creature standing or
+    wading, a missile ending over it, a thing falling into it, an item turning up in it, a creature
+    dying in it: water_ripples.hpp, from what the client already knows of its drawables). Off, the
+    floor is drawn as ever, from whatever the image source gives (the pack's tiles where it has
+    them).
   Smooth FX keeps the rest (sparks, rays, glows, lines and dots, and the smoke blast's soft dust).
   Both need the GPU renderer's shaders (greyed without). Purely what the client draws: nothing
   changes in the game, on the wire or at the server.

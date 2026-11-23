@@ -87,6 +87,18 @@ public:
     /// nothing else); `camera` is the screen's.
     void drawPerPixel(SDL_Renderer* renderer, const Camera& camera);
 
+    /// A light as the last build() worked it out (flicker in), for shader effects lit by it.
+    struct PointLight {
+        float x = 0;
+        float y = 0;
+        float radius = 0;
+        Rgb color{};
+    };
+    /// The last build()'s round lights (anti-lights and cones left out) reaching the world
+    /// rectangle, the widest first, up to out.size() of them; how many it wrote. (HD water's
+    /// sheen: hd_water.hpp.)
+    std::size_t pointLights(float left, float top, float right, float bottom, std::span<PointLight> out) const;
+
 private:
     struct Accum {
         float r = 0;

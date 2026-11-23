@@ -24,7 +24,9 @@
 #pragma once
 
 #include "camera.hpp"
+#include "hd_water.hpp"
 #include "lighting.hpp"
+#include "water_ripples.hpp"
 #include "polygon_ambient.hpp"
 #include "scene_order.hpp"
 #include "seen_walls.hpp"
@@ -184,6 +186,14 @@ public:
     /// The game frame drawScene animates the map's objects at (flames, torches: AnimateDraw), and
     /// the one Fade Objects' sort and fade go by.
     void setTime(double gameFrames) { time_ = gameFrames; }
+    /// The game frame setTime last gave.
+    double time() const { return time_; }
+    /// HD Spell FX's water (hd_water.hpp): whether this view draws it (on, its base made, the map
+    /// has water); whether world point (x, y) is on a tile with water in it (an index lookup);
+    /// and its ripples and splashes, fed each frame from the drawables in view (water_ripples.hpp).
+    bool hdWaterOn() const;
+    bool waterAt(float x, float y) const;
+    WaterRipples& waterRipples() { return ripples_; }
     /// Fade Objects (nox.cfg FadeObjects): the live drawables seen that leave sight linger a game
     /// second, fading out (SceneSprite::fade).
     void setFadeObjects(bool on) { fadeObjects_ = on; }
@@ -451,6 +461,13 @@ private:
         mutable int hdKeyScale = 0;
         mutable SpriteCache::CompositeHint hdHint;
         mutable SpriteCache::CompositeHint sdHint;
+        // HD water's (waterOf): -1 not looked yet, 0 no water, 1 all water (no edges), 2
+        // partly (its edges blend the water in or out); and its wet composite's key and hint
+        // (hdTile `wet`), as hdKey's.
+        mutable std::int8_t water = -1;
+        mutable std::string wetKey;
+        mutable int wetKeyScale = 0;
+        mutable SpriteCache::CompositeHint wetHint;
     };
     /// The tile's image indexes (Tile::baseIndex, edgeIndexes), worked out on its first call.
     void resolveTile(const Tile& tile, SpriteCache& sprites) const;
@@ -493,7 +510,21 @@ private:
     void drawPlate(SDL_Renderer* renderer, const Camera& camera, const Object& o) const;
 
     /// `hd`: the pack's upscaled tiles where it has them (drawFloor: not below sdFloorBelow_).
-    void drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCache& sprites, bool hd = true) const;
+    /// `water`: HD water drawn over the water tiles in view (prepareWater said so).
+    void drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCache& sprites, bool hd = true,
+                   bool water = false, const LightMap* light = nullptr) const;
+
+    // HD Spell FX's water (hd_water.hpp): the Water floors drawn through fx_water over the floor
+    // drawTiles has drawn, at the floor target's resolution. None of it runs with HD Spell FX off.
+    /// Whether HD water is drawn this frame: HD Spell FX on with its shader, the map has water,
+    /// and the base is made (once, from the water's own tiles: its first call with water about).
+    /// The map's tiles are looked over once (and again after setTile), never each frame.
+    bool prepareWater(SDL_Renderer* renderer, SpriteCache& sprites);
+    /// The tile's Tile::water, worked out on its first call.
+    std::int8_t waterOf(const Tile& tile) const;
+    /// The water tiles drawTiles drew wet (waterTiles_): fx_water added through each one's water
+    /// share, on `camera` (the floor target's), with `light`'s lights' sheen and the ripples.
+    void drawWater(SDL_Renderer* renderer, const Camera& camera, const LightMap* light) const;
     /// Draws a sprite whose origin (before its own offset) is at world (x, y), clipped to world
     /// columns [clipLeft, clipRight]. `look`: a session's pending look (its alpha, and the pending
     /// shader or, without it, the CPU's copy of video.bag image `image`). `scale`: drawn that much
@@ -509,8 +540,11 @@ private:
     void addMapLight(const TypeArt& art, const nox::map::ObjectXfer& xfer, std::size_t recordSize, bool clientLoaded);
     const Sprite* edgedTile(const Tile& tile, SpriteCache& sprites) const;
     /// The tile at the pack's upscaled floors' resolution, or nullptr (map_view.cpp); `waiting`
-    /// (if given) set when that's because its pixels or composite are on their way.
-    const Sprite* hdTile(const Tile& tile, SpriteCache& sprites, bool* waiting = nullptr) const;
+    /// (if given) set when that's because its pixels or composite are on their way. `wet` (HD
+    /// water, a tile with water in it): at 4x pack or none, the water's colour left out (black)
+    /// and its share of each pixel beside it (drawTiles draws the left half, drawWater adds
+    /// fx_water through the right).
+    const Sprite* hdTile(const Tile& tile, SpriteCache& sprites, bool* waiting = nullptr, bool wet = false) const;
     const nox::video::DecodedImage* floorImage(std::uint8_t floor, std::int16_t variant, SpriteCache& sprites) const;
     /// A floor's image for a tile variant, or an edge's for its direction (thing.bin's FLOR /
     /// EDGE); nullptr past their lists.
@@ -595,6 +629,20 @@ private:
     SDL_Texture* floorTarget_ = nullptr;
     int floorTargetWidth_ = 0;
     int floorTargetHeight_ = 0;
+    // HD water (prepareWater): the floors that are water (by FLOR index; empty till looked), the
+    // FLOR whose tiles make the base, whether the map has any, the base's offset for the map's
+    // anchor, and the frame's water tiles and geometry (kept for their memory).
+    std::vector<char> waterFloors_;
+    int waterBaseFloor_ = -1;
+    bool waterScanned_ = false;
+    bool hasWater_ = false;
+    bool hdWaterFailed_ = false;
+    std::pair<int, int> waterOffset_{};
+    std::unique_ptr<HdWater> hdWater_;
+    /// The tiles with water in them by full-grid place ((gy + 1) x 258 + gx), with the scan.
+    std::vector<std::uint8_t> waterGrid_;
+    WaterRipples ripples_;
+    mutable std::vector<std::pair<const Tile*, const Sprite*>> waterTiles_;
     SDL_FPoint centre_{};
 
     // A session's pending edits (setPending): all empty outside one.

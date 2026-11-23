@@ -163,6 +163,14 @@ struct App {
     std::string screenshot;
     bool shotTaken = false;
     float shotAfterSeconds = 0;
+    /// --shot-sequence N STEP (tests): N shots STEP seconds apart from --shot-after's, the path's
+    /// name numbered (shot_00.png...), the run going on between them; 1: the one shot.
+    int shotSequence = 1;
+    float shotStep = 0;
+    int shotIndex = 0;
+    /// --water-demo (the viewer, tests): made-up things wading, flying and falling into the water
+    /// by the view's middle, fed to HD water's ripples as a game's drawables are (feedWaterRipples).
+    bool waterDemo = false;
     std::uint64_t inGameSinceMs = 0;
     bool dragging = false;
     bool running = false; ///< live: right button held, running toward the cursor
@@ -938,6 +946,10 @@ void syncWalls(App& app);
 void sightBlockers(App& app, std::vector<SightMap::Blocker>& out);
 std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>& unsprited, std::vector<HealthBar>& bars);
 void fxDemo(App& app, std::uint32_t frame, std::vector<MapView::SceneSprite>& extra);
+/// HD water's ripples and splashes (water_ripples.hpp) fed from the game's drawables near the view:
+/// the creatures, missiles and items, where they are over the water. Nothing while the view draws
+/// no HD water.
+void feedWaterRipples(App& app);
 void soundLoops(App& app, const std::set<std::uint32_t>& liveCodes);
 std::vector<LightSource> frameLights(App& app, const std::set<std::uint32_t>& liveCodes);
 

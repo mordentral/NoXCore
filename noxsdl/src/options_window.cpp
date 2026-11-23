@@ -163,8 +163,10 @@ std::string_view extraTooltip(std::int32_t id)
                       "Spells drawn anew in place of the original's sprites:\n"
                       "the poison cloud as soft billowing clouds and Force Field\n"
                       "as a glass barrier, smooth at your screen's resolution.\n"
-                      "+ Detailed spell effects at any zoom.\n"
-                      "- Off: the original's sprites.\n"
+                      "Water as a moving surface over the original's murk, with\n"
+                      "ripples where things wade and splashes where they land.\n"
+                      "+ Detailed spell effects and water at any zoom.\n"
+                      "- Off: the original's sprites and water.\n"
                       "Sparks, rays and glows are Smooth FX (on the General page).");
     case kSmoothLabel:
     case kSmoothBox:

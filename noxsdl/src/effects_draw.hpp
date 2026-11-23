@@ -48,13 +48,14 @@ inline bool smoothOn()
 
 /// HD Spell FX (Options, apart from Smooth FX): the spell effects drawn as noxsdl's own shader
 /// effects in place of the game's sprites: the toxic cloud's puffs (fx_puff), the Force Field's
-/// sphere (fx_barrier) and the Reflective Shield's water disc (fx_ripple). All null (the game's
-/// sprites) unless main sets them.
+/// sphere (fx_barrier) and the Reflective Shield's water disc (fx_ripple); and the Water floors
+/// (fx_water: MapView, hd_water.hpp). All null (the game's sprites) unless main sets them.
 struct SpellFx {
     SDL_Texture* white = nullptr;
     SDL_GPURenderState* puff = nullptr;
     SDL_GPURenderState* barrier = nullptr;
     SDL_GPURenderState* ripple = nullptr;
+    SDL_GPUShader* water = nullptr; ///< (null: the water floors as they are, the shader missing)
 };
 /// The one shared set of HD Spell FX states.
 inline SpellFx& spellFx()

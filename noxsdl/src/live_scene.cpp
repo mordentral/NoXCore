@@ -1330,4 +1330,59 @@ std::vector<LightSource> frameLights(App& app, const std::set<std::uint32_t>& li
     return out;
 }
 
+void feedWaterRipples(App& app)
+{
+    if ((!app.live && !app.waterDemo) || !app.view || !app.view->hdWaterOn()) {
+        return;
+    }
+    namespace oc = nox::things::ObjectClass;
+    WaterRipples& ripples = app.view->waterRipples();
+    const double now = app.view->time() / 30.0; // (the clock the water is drawn at)
+    const Camera& c = app.camera;
+    if (!app.live) {
+        // --water-demo: round the view's middle, a creature wading round a circle, a missile
+        // flying over and ending in the water every 3 s, and a thing falling into it between.
+        const float cx = c.x;
+        const float cy = c.y;
+        const auto track = [&](std::uint32_t id, float x, float y, float z, WaterRipples::Kind kind) {
+            ripples.track(id, x, y, z, app.view->waterAt(x, y), kind, false, true, now);
+        };
+        const double a = now * 0.8;
+        track(1, cx + 70 * static_cast<float>(std::cos(a)), cy + 45 * static_cast<float>(std::sin(a)), 0, WaterRipples::kCreature);
+        const double cycle = std::fmod(now, 3.0);
+        if (cycle < 1.0) {
+            track(2, cx - 120 + static_cast<float>(cycle) * 150, cy - 30, 20, WaterRipples::kMissile);
+        }
+        if (cycle > 1.5 && cycle < 2.6) {
+            const float fall = static_cast<float>(std::max(0.0, 0.4 - (cycle - 1.5)) / 0.4);
+            track(3 + static_cast<std::uint32_t>(now / 3.0) * 2, cx - 40, cy + 50, 30 * fall, WaterRipples::kItem);
+        }
+        ripples.endFrame(now);
+        return;
+    }
+    constexpr float kNear = 120;  // drawables this far past the view are followed too
+    constexpr float kInner = 40;  // one gone this far inside the view ended there
+    for (const auto& [netCode, d] : app.live->client().world().drawables()) {
+        const TypeArt* a = app.art->get(d.typeId);
+        if (!a || !d.enabled || a->editorOnly) {
+            continue;
+        }
+        const WaterRipples::Kind kind = (a->classes & (oc::Monster | oc::Player)) ? WaterRipples::kCreature
+                                        : (a->classes & oc::Missile)               ? WaterRipples::kMissile
+                                        : (a->classes & oc::Pickup)                ? WaterRipples::kItem
+                                                                                   : WaterRipples::kOther;
+        if (kind == WaterRipples::kOther) {
+            continue; // (scenery and the like: still, or the map's own)
+        }
+        const auto p = app.interpolator.position(netCode, d);
+        if (p.x < c.left() - kNear || p.x > c.right() + kNear || p.y < c.top() - kNear || p.y > c.bottom() + kNear) {
+            continue;
+        }
+        const bool inner = p.x > c.left() + kInner && p.x < c.right() - kInner && p.y > c.top() + kInner && p.y < c.bottom() - kInner;
+        const bool dying = (a->classes & oc::Monster) && (d.animState == 9 || d.animState == 10);
+        ripples.track(netCode, p.x, p.y, p.z, app.view->waterAt(p.x, p.y), kind, dying, inner, now);
+    }
+    ripples.endFrame(now);
+}
+
 } // namespace noxsdl

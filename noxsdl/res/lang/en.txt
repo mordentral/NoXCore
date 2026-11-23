@@ -12260,44 +12260,44 @@ game.data.hosting_other = another game is hosted here
 # noxsdl/src/game_session.cpp:47
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2067
+# noxsdl/src/main.cpp:2068
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2040
+# noxsdl/src/main.cpp:2041
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2044
+# noxsdl/src/main.cpp:2045
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2075
+# noxsdl/src/main.cpp:2076
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2070
+# noxsdl/src/main.cpp:2071
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2054
+# noxsdl/src/main.cpp:2055
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2057
+# noxsdl/src/main.cpp:2058
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2069
+# noxsdl/src/main.cpp:2070
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
 #@ 00c5ff51: Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left | Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
 game.leaving.notice[one] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} second left
 game.leaving.notice[other] = Leaving the game: the server isn't answering.\n\nWaiting up to 20 seconds for it to confirm...\n\n{n} seconds left
-# noxsdl/src/main.cpp:1188
+# noxsdl/src/main.cpp:1189
 #@ 41598c12: {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
 game.load_failed.error_other = {error}\n\nGame folder: {folder}\nNox wasn't found where it's usually installed. Pass --game-dir (or set NOX_DATA) to the folder with GAME.EXE and thing.bin.
-# noxsdl/src/main.cpp:1184
+# noxsdl/src/main.cpp:1185
 #@ a52d10c8: {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.error_windows = {error}\n\nGame folder: {folder}\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:691
+# noxsdl/src/main.cpp:692
 #@ da4003ab: Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
 game.load_failed.no_game = Nox wasn't found.\n\nPut noxcore.exe (with its files) in your Nox folder, the one with GAME.EXE and thing.bin, or pass --game-dir (or set NOX_DATA) to that folder.
-# noxsdl/src/main.cpp:690, noxsdl/src/main.cpp:1193
+# noxsdl/src/main.cpp:691, noxsdl/src/main.cpp:1194
 #@ 28bae6e6: NoX Core: loading failed
 game.load_failed.title = NoX Core: loading failed
 # noxsdl/src/map_vote_window.cpp:175
@@ -13081,19 +13081,19 @@ options.display.fullscreen_windowed = Fullscreen Windowed
 # noxsdl/src/options_window.cpp:68
 #@ c0dc9b44: Windowed
 options.display.windowed = Windowed
-# noxsdl/src/options_window.cpp:597
+# noxsdl/src/options_window.cpp:599
 #@ 5a05d9b5: Display
 options.label.display = Display
-# noxsdl/src/options_window.cpp:596
+# noxsdl/src/options_window.cpp:598
 #@ c6f1b7e9: Smoothing
 options.label.smoothing = Smoothing
-# noxsdl/src/options_window.cpp:598
+# noxsdl/src/options_window.cpp:600
 #@ 48649149: Weather Effects
 options.label.weather = Weather Effects
-# noxsdl/src/options_window.cpp:320
+# noxsdl/src/options_window.cpp:322
 #@ 5be3bf27: Mouse x{speed}
 options.mouse_speed = Mouse x{speed}
-# noxsdl/src/options_window.cpp:319
+# noxsdl/src/options_window.cpp:321
 #@ 77911928: 3D Mouse x{speed}
 options.mouse_speed_3d = 3D Mouse x{speed}
 # noxsdl/src/options_window.cpp:65
@@ -13141,49 +13141,49 @@ options.switch.smooth_fx = Smooth FX
 # noxsdl/src/options_window.cpp:54
 #@ 2c8815e6: VSync
 options.switch.vsync = VSync
-# noxsdl/src/options_window.cpp:620
+# noxsdl/src/options_window.cpp:622
 #@ 5561fd0b: General
 options.tab.general = General
-# noxsdl/src/options_window.cpp:621
+# noxsdl/src/options_window.cpp:623
 #@ 4f34d900: More
 options.tab.more = More
 # noxsdl/src/options_window.cpp:148
 #@ 12b8f0f1: A soft glow round bright effects and lights.\n+ Spells and fire look brighter.\n- A little more work for the graphics card.
 options.tip.bloom = A soft glow round bright effects and lights.\n+ Spells and fire look brighter.\n- A little more work for the graphics card.
-# noxsdl/src/options_window.cpp:204
+# noxsdl/src/options_window.cpp:206
 #@ ae512a6f: How the game is shown: in a window, filling the screen\nas a borderless window, or fullscreen.
 options.tip.display = How the game is shown: in a window, filling the screen\nas a borderless window, or fullscreen.
-# noxsdl/src/options_window.cpp:216
+# noxsdl/src/options_window.cpp:218
 #@ beb47cbe: Fullscreen: the screen is the game's alone, at your\ndesktop's resolution and refresh rate.\n+ The least latency.\n- Alt+Tab switches the screen's mode.
 options.tip.display_fullscreen = Fullscreen: the screen is the game's alone, at your\ndesktop's resolution and refresh rate.\n+ The least latency.\n- Alt+Tab switches the screen's mode.
-# noxsdl/src/options_window.cpp:211
+# noxsdl/src/options_window.cpp:213
 #@ c1e2d944: Fullscreen Windowed: a borderless window the size of the screen.\n+ Alt+Tab is instant.\n- The desktop's compositor stays on.
 options.tip.display_fullscreen_windowed = Fullscreen Windowed: a borderless window the size of the screen.\n+ Alt+Tab is instant.\n- The desktop's compositor stays on.
-# noxsdl/src/options_window.cpp:208
+# noxsdl/src/options_window.cpp:210
 #@ 3f1590b0: Windowed: a window you can move and resize.
 options.tip.display_windowed = Windowed: a window you can move and resize.
-# noxsdl/src/options_window.cpp:247
+# noxsdl/src/options_window.cpp:249
 #@ 16e3ba88: Rounds the game's maths exactly as the original game did.\nOff, damage after armour, potion healing, carry capacity,\nexperience and wear can differ by a point now and then, and\nmovement, missile paths and sight edges very slightly.\n+ For campaign and map-script players who want the\n  original's exact behaviour.\nFor games you host and solo or campaign play, not games you join.\nTakes effect from the next game.
 options.tip.exact_maths = Rounds the game's maths exactly as the original game did.\nOff, damage after armour, potion healing, carry capacity,\nexperience and wear can differ by a point now and then, and\nmovement, missile paths and sight edges very slightly.\n+ For campaign and map-script players who want the\n  original's exact behaviour.\nFor games you host and solo or campaign play, not games you join.\nTakes effect from the next game.
 # noxsdl/src/options_window.cpp:145
 #@ 6404f6e7: The frame rate and frame time in the top right\n(with Smooth Motion, its delay too).
 options.tip.frame_rate = The frame rate and frame time in the top right\n(with Smooth Motion, its delay too).
-# noxsdl/src/options_window.cpp:228
+# noxsdl/src/options_window.cpp:230
 #@ f4b2b42c: Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.
 options.tip.hd_images = Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.
 # noxsdl/src/options_window.cpp:162
-#@ 52215f90: Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\n+ Detailed spell effects at any zoom.\n- Off: the original's sprites.\nSparks, rays and glows are Smooth FX (on the General page).
-options.tip.hd_spell_fx = Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\n+ Detailed spell effects at any zoom.\n- Off: the original's sprites.\nSparks, rays and glows are Smooth FX (on the General page).
-# noxsdl/src/options_window.cpp:231
+#@ feead26a: Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth FX (on the General page).
+options.tip.hd_spell_fx = Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth FX (on the General page).
+# noxsdl/src/options_window.cpp:233
 #@ 35ed71be: Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.
 options.tip.kill_feed = Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.
-# noxsdl/src/options_window.cpp:234
+# noxsdl/src/options_window.cpp:236
 #@ 8a4df3f1: Windows' pointer speed and acceleration (Enhance Pointer\nPrecision) on the mouse's raw movement.\nOff: the raw movement alone, one count a game pixel,\nas the original read it (at Mouse x1.00).
 options.tip.mouse_accel = Windows' pointer speed and acceleration (Enhance Pointer\nPrecision) on the mouse's raw movement.\nOff: the raw movement alone, one count a game pixel,\nas the original read it (at Mouse x1.00).
-# noxsdl/src/options_window.cpp:241
+# noxsdl/src/options_window.cpp:243
 #@ ea1d8231: How fast the cursor moves: x0.25 to x3. At x1.00 one count\nof the mouse moves the cursor one pixel of the game's screen,\nas the original. The cursor stays in the window while the\ngame has the focus, as the original's did.
 options.tip.mouse_speed = How fast the cursor moves: x0.25 to x3. At x1.00 one count\nof the mouse moves the cursor one pixel of the game's screen,\nas the original. The cursor stays in the window while the\ngame has the focus, as the original's did.
-# noxsdl/src/options_window.cpp:257
+# noxsdl/src/options_window.cpp:259
 #@ 64a812d6: The game's text in Nox-style fonts: the original's letters,\ndrawn smooth with Use HD Images.\nOff: Caudex, a book face, with Noto Sans for what it lacks.
 options.tip.original_fonts = The game's text in Nox-style fonts: the original's letters,\ndrawn smooth with Use HD Images.\nOff: Caudex, a book face, with Noto Sans for what it lacks.
 # noxsdl/src/options_window.cpp:151
@@ -13192,40 +13192,40 @@ options.tip.pixel_light = Lights shade every pixel, smoothly.\n+ Smooth lighting
 # noxsdl/src/options_window.cpp:154
 #@ 1f3e7699: Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD Spell FX\n(on the More page).
 options.tip.smooth_fx = Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD Spell FX\n(on the More page).
-# noxsdl/src/options_window.cpp:171
+# noxsdl/src/options_window.cpp:173
 #@ fa78311a: How movement between the server's 30 updates a second is drawn.\nOff: in the server's 30 steps a second, at your frame rate.\nSmooth Movement: each step spread over the frames between updates.\nSmooth Network: everything drawn between updates (adds latency).\nMatch Server: follow server updates; normally 60 FPS in solo play.
 options.tip.smoothing = How movement between the server's 30 updates a second is drawn.\nOff: in the server's 30 steps a second, at your frame rate.\nSmooth Movement: each step spread over the frames between updates.\nSmooth Network: everything drawn between updates (adds latency).\nMatch Server: follow server updates; normally 60 FPS in solo play.
-# noxsdl/src/options_window.cpp:197
+# noxsdl/src/options_window.cpp:199
 #@ 714d178d: Match Server: normally a 60 FPS lock in single-player.\nNo interpolation. Draw when a server update arrives,\nincluding extra movement updates (30-120 per second).\nMenus use their normal frame rate.
 options.tip.smoothing_match_server = Match Server: normally a 60 FPS lock in single-player.\nNo interpolation. Draw when a server update arrives,\nincluding extra movement updates (30-120 per second).\nMenus use their normal frame rate.
-# noxsdl/src/options_window.cpp:183
+# noxsdl/src/options_window.cpp:185
 #@ bfdbd3c2: Smooth Movement: when the server moves something, it glides\nthere over one update (~33 ms) instead of jumping.\n+ Smooth at any frame rate, never past where the server says.\n- About 17 ms behind on average (at most one update).
 options.tip.smoothing_movement = Smooth Movement: when the server moves something, it glides\nthere over one update (~33 ms) instead of jumping.\n+ Smooth at any frame rate, never past where the server says.\n- About 17 ms behind on average (at most one update).
-# noxsdl/src/options_window.cpp:189
+# noxsdl/src/options_window.cpp:191
 #@ ea25525c: Smooth Network: everything you see is drawn smoothly\nbetween the server's updates.\n+ The smoothest picture: best for roleplay, video capture\n  and for-fun servers.\n- Everything is shown about 50 ms late (adapts to your\n  connection), on top of your ping: lead moving targets.
 options.tip.smoothing_network = Smooth Network: everything you see is drawn smoothly\nbetween the server's updates.\n+ The smoothest picture: best for roleplay, video capture\n  and for-fun servers.\n- Everything is shown about 50 ms late (adapts to your\n  connection), on top of your ping: lead moving targets.
-# noxsdl/src/options_window.cpp:178
+# noxsdl/src/options_window.cpp:180
 #@ cd90c923: Off: everything is drawn where the server last said,\nin its 30 steps a second, with no added delay.\n- Above 30 FPS the steps can look uneven.
 options.tip.smoothing_off = Off: everything is drawn where the server last said,\nin its 30 steps a second, with no added delay.\n- Above 30 FPS the steps can look uneven.
-# noxsdl/src/options_window.cpp:280
+# noxsdl/src/options_window.cpp:282
 #@ 6c5b4e7e: The everyday settings.
 options.tip.tab_general = The everyday settings.
-# noxsdl/src/options_window.cpp:283
+# noxsdl/src/options_window.cpp:285
 #@ 424bf6d7: Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD Spell FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
 options.tip.tab_more = Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD Spell FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
-# noxsdl/src/options_window.cpp:222
+# noxsdl/src/options_window.cpp:224
 #@ 5806ae43: Frames wait for the screen's refresh.\n+ No tearing.\n- Up to a refresh's more latency.\nOff: as many frames as the computer can draw.
 options.tip.vsync = Frames wait for the screen's refresh.\n+ No tearing.\n- Up to a refresh's more latency.\nOff: as many frames as the computer can draw.
-# noxsdl/src/options_window.cpp:263
+# noxsdl/src/options_window.cpp:265
 #@ b33f1db0: Rain, snow, storms and wind that a mod's game turns on,\ndrawn over the world (they never change the game).\n- Greyed without the GPU renderer.
 options.tip.weather = Rain, snow, storms and wind that a mod's game turns on,\ndrawn over the world (they never change the game).\n- Greyed without the GPU renderer.
-# noxsdl/src/options_window.cpp:277
+# noxsdl/src/options_window.cpp:279
 #@ 3eeed6c9: Off: no weather is drawn.
 options.tip.weather_off = Off: no weather is drawn.
-# noxsdl/src/options_window.cpp:268
+# noxsdl/src/options_window.cpp:270
 #@ 065d0587: On: the weather as the mod sets it, with lightning\nflashes in storms.
 options.tip.weather_on = On: the weather as the mod sets it, with lightning\nflashes in storms.
-# noxsdl/src/options_window.cpp:272
+# noxsdl/src/options_window.cpp:274
 #@ 2a2e9967: Reduced: fewer raindrops and flakes, and soft, gentle\nlightning with no flicker.\n+ Easier on slow graphics cards and on the eyes.
 options.tip.weather_reduced = Reduced: fewer raindrops and flakes, and soft, gentle\nlightning with no flicker.\n+ Easier on slow graphics cards and on the eyes.
 # noxsdl/src/options_window.cpp:75

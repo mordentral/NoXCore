@@ -4,6 +4,7 @@
 
 #include "cursor.hpp"
 #include "draw_scale.hpp"
+#include "effects_draw.hpp"
 
 #include "pending_look.hpp"
 #include "player_art.hpp"
@@ -34,6 +35,12 @@ constexpr float kOddX = 12;
 constexpr float kOddY = -11;
 constexpr int kTilePixels = 46;
 constexpr float kWallCell = 23; ///< a wall cell's size, world units
+// HD water's tile composites (MapView::hdTile `wet`): at the pack's floors' 4x whether or not the
+// pack is in use, the water's share beside the tile past a clear gutter (so filtering one half
+// never reaches the other).
+constexpr int kWaterScale = 4;
+constexpr int kWaterGutter = 4;
+constexpr int kWaterGrid = 258; ///< MapView::waterGrid_'s side: the full grid's 256 and its -1 row
 
 /// Whether the tile cell with its corner at (x, y) reaches into the camera's view, widened by
 /// `margin` each way.
@@ -689,6 +696,7 @@ void MapView::setTile(int gx, int gy, const nox::map::FloorTile* tile)
     }
     const std::int32_t key = keyOf(gx, gy);
     const auto it = tileIndex_.find(key);
+    waterScanned_ = false; // (HD water's look over the tiles made again at the next draw)
     if (!tile) {
         if (it == tileIndex_.end()) {
             return;
@@ -1425,7 +1433,7 @@ void MapView::resolveTile(const Tile& tile, SpriteCache& sprites) const
     }
 }
 
-const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pending) const
+const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pending, bool wet) const
 {
     // With the image pack's upscaled floors (its Floors/, 4x): the tile composited at their
     // resolution as edgedTile does at the original's, each image from the pack where it has it
@@ -1453,6 +1461,9 @@ const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pend
             waiting = waiting || sprites.hdTilePending(mask);
         }
     }
+    if (wet) {
+        scale = std::max(scale, kWaterScale); // (HD water's composite: at the pack's 4x, pack or none)
+    }
     if (scale <= 1 || waiting) {
         if (pending && waiting) {
             *pending = true;
@@ -1463,17 +1474,26 @@ const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pend
     // Cached per tile (or edge stack) and scale, built on the sprite cache's workers (the SD tile
     // till then) and kept till the next map (one of the map's own). A session's pending tile is
     // composited greyed, under its own key (its look's suffix), and never kept. (The key made
-    // again only when the scale changes.)
-    if (tile.hdKeyScale != scale) {
+    // again only when the scale changes.) HD water's (`wet`): keyed apart, every tile all water
+    // sharing one (its colour is black whatever the variant).
+    if (wet) {
+        if (tile.wetKeyScale != scale) {
+            tile.wetKey = (tile.edges.empty() ? std::string("hdwater:plain") : "hdwater:" + tile.key) + "@x" + std::to_string(scale);
+            tile.wetKeyScale = scale;
+            tile.wetHint = {};
+        }
+    } else if (tile.hdKeyScale != scale) {
         tile.hdKey = (tile.key.empty() ? "tile:" + std::to_string(base) : tile.key) + "@x" + std::to_string(scale);
         tile.hdKeyScale = scale;
         tile.hdHint = {};
     }
-    const std::string& key = tile.hdKey;
+    const std::string& key = wet ? tile.wetKey : tile.hdKey;
+    const auto isWater = [&](std::uint8_t floor) { return wet && floor < waterFloors_.size() && waterFloors_[floor] != 0; };
+    const int width = wet ? 2 * n + kWaterGutter : n;
     const auto floorIndex = [&](std::size_t edge) { return tile.edgeIndexes[edge][0]; };
     const auto edgeIndex = [&](std::size_t edge) { return tile.edgeIndexes[edge][1]; };
     const auto look = static_cast<pending::Look>(tile.look);
-    const Sprite* s = sprites.compositeLater(key, n, n, [&]() -> SpriteCache::Builder {
+    const Sprite* s = sprites.compositeLater(key, width, n, [&]() -> SpriteCache::Builder {
         // What the build reads, its own: the HD pixels shared (nothing changes them), the
         // originals' (46 x 46) copied.
         struct Source {
@@ -1496,17 +1516,23 @@ const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pend
         struct Edge {
             Source mask; ///< the edge image: its pixels, and its mask (the original's edgeMask)
             Source blend;
+            bool water = false; ///< (wet) the floor it blends in is the water
         };
         Source baseSource = source(base);
         std::vector<Edge> edges;
         for (std::size_t e = 0; e < tile.edgeIndexes.size(); ++e) {
-            Edge edge{source(edgeIndex(e)), source(floorIndex(e))};
+            Edge edge{source(edgeIndex(e)), source(floorIndex(e)), e < tile.edges.size() && isWater(tile.edges[e].floor)};
             if (edge.mask.sd && edge.mask.sd->edgeMask.size() == static_cast<std::size_t>(kTilePixels) * kTilePixels) {
                 edges.push_back(std::move(edge));
             }
         }
-        return [n, scale, look, baseSource = std::move(baseSource), edges = std::move(edges)] {
+        const bool baseWater = isWater(tile.floor);
+        return [n, scale, look, wet, baseWater, baseSource = std::move(baseSource), edges = std::move(edges)] {
             std::vector<std::uint8_t> out(static_cast<std::size_t>(n) * n * 4, 0);
+            // HD water's (wet): the water's own colour left out (black, its alpha kept), and how
+            // much of each pixel is the water, mixed by the same weights.
+            std::vector<float> water(wet ? static_cast<std::size_t>(n) * n : 0, baseWater ? 1.0f : 0.0f);
+            constexpr std::uint8_t kBlack[4] = {0, 0, 0, 255};
             // An image's pixel at the HD (x, y): the pack's if it's upscaled to this size, else the
             // original's pixel it covers.
             const auto pixelOf = [&](const Source& src, int x, int y) -> const std::uint8_t* {
@@ -1522,7 +1548,11 @@ const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pend
             for (int y = 0; y < n; ++y) {
                 for (int x = 0; x < n; ++x) {
                     if (const std::uint8_t* src = pixelOf(baseSource, x, y)) {
-                        std::copy(src, src + 4, out.begin() + (static_cast<std::ptrdiff_t>(y) * n + x) * 4);
+                        const auto at = out.begin() + (static_cast<std::ptrdiff_t>(y) * n + x) * 4;
+                        std::copy(src, src + 4, at);
+                        if (baseWater) {
+                            std::fill(at, at + 3, std::uint8_t{0});
+                        }
                     }
                 }
             }
@@ -1569,12 +1599,17 @@ const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pend
                                                      : e.mask.hd ? pixelOf(e.mask, x, y)
                                                                  : &spread[(static_cast<std::size_t>(y / scale) * kTilePixels + static_cast<std::size_t>(x / scale)) * 4];
                         const std::uint8_t* blendPx = w2 > 0 ? pixelOf(e.blend, x, y) : nullptr;
+                        const std::uint8_t* blendColour = blendPx && e.water ? kBlack : blendPx;
                         // The colour: the tile's own less the weights taken, plus the edge's and the floor's shares.
+                        const float keep = std::max(0.0f, 1 - (edgePx ? w1 : 0) - (blendPx ? w2 : 0));
                         for (int c = 0; c < 3; ++c) {
-                            float value = static_cast<float>(dst[c]) * std::max(0.0f, 1 - (edgePx ? w1 : 0) - (blendPx ? w2 : 0));
+                            float value = static_cast<float>(dst[c]) * keep;
                             value += edgePx ? static_cast<float>(edgePx[c]) * w1 : 0;
-                            value += blendPx ? static_cast<float>(blendPx[c]) * w2 : 0;
+                            value += blendColour ? static_cast<float>(blendColour[c]) * w2 : 0;
                             dst[c] = static_cast<std::uint8_t>(std::clamp(value + 0.5f, 0.0f, 255.0f));
+                        }
+                        if (wet) {
+                            water[i] = water[i] * keep + (blendPx && e.water ? w2 : 0.0f);
                         }
                         const std::uint8_t m = maskAt(x / scale, y / scale);
                         const std::uint8_t* hard = m == 1 ? pixelOf(e.mask, x, y) : m == 2 ? pixelOf(e.blend, x, y) : nullptr;
@@ -1584,10 +1619,30 @@ const Sprite* MapView::hdTile(const Tile& tile, SpriteCache& sprites, bool* pend
                     }
                 }
             }
-            pending::applyFloor(out, n, look, scale);
-            return out;
+            if (!wet) {
+                pending::applyFloor(out, n, look, scale);
+                return out;
+            }
+            // Wet: the tile left (as drawn), a clear gutter, then the water's share of each pixel
+            // on the right (its alpha the share times the tile's alpha, its red the share alone,
+            // the shore's nearness): what fx_water adds through.
+            const int w = 2 * n + kWaterGutter;
+            std::vector<std::uint8_t> wide(static_cast<std::size_t>(w) * n * 4, 0);
+            for (int y = 0; y < n; ++y) {
+                const auto row = static_cast<std::size_t>(y) * n;
+                std::copy(out.begin() + static_cast<std::ptrdiff_t>(row * 4), out.begin() + static_cast<std::ptrdiff_t>((row + n) * 4),
+                          wide.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(y) * w * 4));
+                for (int x = 0; x < n; ++x) {
+                    std::uint8_t* p = &wide[(static_cast<std::size_t>(y) * w + n + kWaterGutter + x) * 4];
+                    const float share = std::clamp(water[row + x], 0.0f, 1.0f);
+                    p[0] = static_cast<std::uint8_t>(std::lround(share * 255));
+                    p[1] = p[2] = 255;
+                    p[3] = static_cast<std::uint8_t>(std::lround(share * out[(row + x) * 4 + 3]));
+                }
+            }
+            return wide;
         };
-    }, tile.look == 0, pending, &tile.hdHint);
+    }, tile.look == 0, pending, wet ? &tile.wetHint : &tile.hdHint);
     if (s) {
         s->scale = SDL_SCALEMODE_LINEAR;
     }
@@ -1641,9 +1696,10 @@ void MapView::drawFloor(SDL_Renderer* renderer, const Camera& screen, SpriteCach
                         SightMap* sight)
 {
     // The world rectangle in view, on whole units, and the target at 1 texel per unit (the
-    // resolution of the original tiles); with the image pack in use, as many as the screen
-    // shows a unit with (up to its floors' 4), for the upscaled floors.
-    const float kTexelsPerUnit = sprites.usingPack() ? std::clamp(std::ceil(screen.zoom), 1.0f, 4.0f) : 1.0f;
+    // resolution of the original tiles); with the image pack in use, or HD water to draw, as many
+    // as the screen shows a unit with (up to the pack's floors' 4), for the upscaled floors.
+    const bool water = prepareWater(renderer, sprites);
+    const float kTexelsPerUnit = sprites.usingPack() || water ? std::clamp(std::ceil(screen.zoom), 1.0f, 4.0f) : 1.0f;
     const float left = std::floor(screen.left());
     const float top = std::floor(screen.top());
     const int width = static_cast<int>(std::ceil(screen.right() - left)) + 1;
@@ -1695,7 +1751,7 @@ void MapView::drawFloor(SDL_Renderer* renderer, const Camera& screen, SpriteCach
             SDL_SetRenderTarget(renderer, floorTarget_);
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
             SDL_RenderClear(renderer);
-            drawTiles(renderer, local, sprites, hd);
+            drawTiles(renderer, local, sprites, hd, water, light);
             // A per-pixel light map goes on at the screen's resolution below; otherwise its overlay goes onto the floor target.
             if (light && !perPixel) {
                 light->drawOverlay(renderer, local);
@@ -1829,8 +1885,10 @@ bool MapView::prefetchOriginals(const Camera& camera, SpriteCache& sprites, std:
 // composite are on their way is drawn after the rest, once the workers have them (awaitAsked:
 // the SD tile is drawn only if they don't come in time); the tiles just past the view are asked
 // for after that, ahead of being seen, so walking rarely waits.
-void MapView::drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCache& sprites, bool hd) const
+void MapView::drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCache& sprites, bool hd, bool water,
+                        const LightMap* light) const
 {
+    waterTiles_.clear();
     constexpr float kAhead = 2 * kCell;       // asked for this far past the view
     constexpr std::uint64_t kWaitMs = 500;    // the frame's wait at most, all rounds (tiles' pixels, then composites)
     const bool pack = sprites.usingPack() && hd;
@@ -1850,7 +1908,16 @@ void MapView::drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCach
     // waits for a later frame.
     const std::uint64_t makeUntil = floorMakeBudgetMs_ > 0 ? SDL_GetTicksNS() + static_cast<std::uint64_t>(floorMakeBudgetMs_ * 1e6) : 0;
     const auto overBudget = [&] { return makeUntil != 0 && SDL_GetTicksNS() > makeUntil; };
-    const auto draw = [&](const Tile& t, const Sprite* s) {
+    const auto draw = [&](const Tile& t, const Sprite* s, bool wet = false) {
+        if (s && wet) {
+            // HD water's composite: the tile without the water's colour, the water added after
+            // (drawWater) through the share beside it.
+            const float n = s->rect.h;
+            const SDL_FRect dry{0, 0, n, n};
+            noxsdl::drawSprite(renderer, *s, &dry, camera.toScreen(t.x, t.y, kTilePixels, kTilePixels));
+            waterTiles_.emplace_back(&t, s);
+            return;
+        }
         if (s) {
             // (an upscaled tile, its texture larger than the 46 units it covers)
         } else if (t.edges.empty() && t.look == 0) {
@@ -1893,12 +1960,13 @@ void MapView::drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCach
             continue;
         }
         bool waiting = false;
-        const Sprite* s = pack ? hdTile(t, sprites, &waiting) : nullptr;
+        const bool wet = water && hd && waterOf(t) != 0;
+        const Sprite* s = pack || wet ? hdTile(t, sprites, &waiting, wet) : nullptr;
         if (!s && waiting && wait) {
             missed.push_back(&t);
             continue;
         }
-        draw(t, s);
+        draw(t, s, wet);
     }
     // A session's pending tiles over the places left out (not waited for: the SD composite till
     // the HD one is in).
@@ -1919,11 +1987,12 @@ void MapView::drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCach
     for (int round = 0; round < 3 && !missed.empty() && left() > 0 && sprites.awaitAsked(left()); ++round) {
         std::erase_if(missed, [&](const Tile* t) {
             bool waiting = false;
-            const Sprite* s = hdTile(*t, sprites, &waiting);
+            const bool wet = water && hd && waterOf(*t) != 0;
+            const Sprite* s = hdTile(*t, sprites, &waiting, wet);
             if (!s && waiting) {
                 return false;
             }
-            draw(*t, s);
+            draw(*t, s, wet);
             return true;
         });
     }
@@ -1932,8 +2001,165 @@ void MapView::drawTiles(SDL_Renderer* renderer, const Camera& camera, SpriteCach
     }
     drawDeferred();
     for (const Tile* t : soon) {
-        hdTile(*t, sprites); // (asked for, not waited for)
+        hdTile(*t, sprites, nullptr, water && hd && waterOf(*t) != 0); // (asked for, not waited for)
     }
+    if (water) {
+        drawWater(renderer, camera, light);
+    }
+}
+
+bool MapView::prepareWater(SDL_Renderer* renderer, SpriteCache& sprites)
+{
+    SDL_GPUShader* const shader = fxdraw::spellFx().water;
+    if (!shader || hdWaterFailed_) {
+        return false; // (HD Spell FX off: the floor exactly as ever)
+    }
+    if (waterFloors_.empty()) {
+        // The water floors: Water, and WaterNoTeleport when its tiles are Water's own.
+        waterFloors_.assign(things_.floors.size() + 1, 0);
+        for (std::size_t i = 0; i < things_.floors.size(); ++i) {
+            if (things_.floors[i].name == "Water") {
+                waterBaseFloor_ = static_cast<int>(i);
+                waterFloors_[i] = 1;
+                break;
+            }
+        }
+        if (waterBaseFloor_ >= 0) {
+            const auto& base = things_.floors[static_cast<std::size_t>(waterBaseFloor_)];
+            for (std::size_t i = 0; i < things_.floors.size(); ++i) {
+                const auto& f = things_.floors[i];
+                if (f.name != "WaterNoTeleport" || f.images.size() != base.images.size()) {
+                    continue;
+                }
+                bool same = true;
+                for (std::size_t k = 0; k < f.images.size() && same; ++k) {
+                    same = sprites.indexOf(f.images[k]) == sprites.indexOf(base.images[k]);
+                }
+                waterFloors_[i] = same ? 1 : 0;
+            }
+        }
+    }
+    if (waterBaseFloor_ < 0) {
+        return false;
+    }
+    const auto& base = things_.floors[static_cast<std::size_t>(waterBaseFloor_)];
+    if (!waterScanned_) {
+        // Once a map (and again after setTile): is there water, and the anchor its tiles follow.
+        waterScanned_ = true;
+        hasWater_ = false;
+        waterGrid_.assign(static_cast<std::size_t>(kWaterGrid) * kWaterGrid, 0);
+        std::vector<water::PlacedTile> placed;
+        for (const Tile& t : tiles_) {
+            if (waterOf(t) == 0) {
+                continue;
+            }
+            hasWater_ = true;
+            // (Full-grid place from the top-left (23 gx - 11, 23 gy + 12), one past for gy -1.)
+            const int gx = static_cast<int>(std::lround((t.x + 11) / kHalf));
+            const int gy = static_cast<int>(std::lround((t.y - 12) / kHalf)) + 1;
+            if (gx >= 0 && gy >= 0 && gx < kWaterGrid && gy < kWaterGrid) {
+                waterGrid_[static_cast<std::size_t>(gy) * kWaterGrid + static_cast<std::size_t>(gx)] = 1;
+            }
+            if (waterFloors_[t.floor]) {
+                placed.push_back({static_cast<int>(std::lround(t.x)), static_cast<int>(std::lround(t.y)), t.variant});
+            }
+        }
+        const auto [a, b] = water::learnAnchor(placed, base.cols, base.rows);
+        waterOffset_ = water::anchorOffset(a, b, water::kTile * base.cols);
+    }
+    if (!hasWater_) {
+        return false;
+    }
+    if (!hdWater_) {
+        // The base, once, from the water's own tiles (video.bag's, whatever the image source).
+        std::vector<const std::uint8_t*> images;
+        for (const auto& ref : base.images) {
+            const auto* img = sprites.decoded(sprites.indexOf(ref));
+            images.push_back(img && img->width == water::kTile && img->height == water::kTile ? img->rgba.data() : nullptr);
+        }
+        const auto made = water::buildBase(images, base.cols, base.rows, base.frames);
+        hdWater_ = made ? HdWater::create(renderer, shader, *made) : nullptr;
+        if (!hdWater_) {
+            SDL_Log("hd water: no base (%zu tiles, %d x %d x %d): the water drawn as it is", images.size(), base.cols,
+                    base.rows, base.frames);
+            hdWaterFailed_ = true;
+            return false;
+        }
+        SDL_Log("hd water: the base made from %s's %zu tiles (%d x %d, %d frames), offset %d,%d", base.name.c_str(),
+                images.size(), base.cols, base.rows, base.frames, waterOffset_.first, waterOffset_.second);
+    }
+    return true;
+}
+
+std::int8_t MapView::waterOf(const Tile& t) const
+{
+    if (t.water < 0) {
+        const auto isWater = [&](std::uint8_t floor) { return floor < waterFloors_.size() && waterFloors_[floor] != 0; };
+        const bool base = isWater(t.floor);
+        const bool edged = std::ranges::any_of(t.edges, [&](const nox::map::FloorEdge& e) { return isWater(e.floor); });
+        // (A session's pending tile keeps its greyed look: no water over it.)
+        t.water = t.look != 0 ? 0 : base && t.edges.empty() ? 1 : base || edged ? 2 : 0;
+    }
+    return t.water;
+}
+
+bool MapView::hdWaterOn() const
+{
+    return hdWater_ && hasWater_ && !hdWaterFailed_ && fxdraw::spellFx().water;
+}
+
+bool MapView::waterAt(float x, float y) const
+{
+    if (waterGrid_.empty()) {
+        return false;
+    }
+    // The diamond holding (x, y): their middles at (12, 35) + u (23, 23) + v (23, -23).
+    const float qx = x - 12;
+    const float qy = y - 35;
+    const int u = static_cast<int>(std::floor((qx + qy) / kCell + 0.5f));
+    const int v = static_cast<int>(std::floor((qx - qy) / kCell + 0.5f));
+    const int gx = u + v;
+    const int gy = u - v + 1;
+    return gx >= 0 && gy >= 0 && gx < kWaterGrid && gy < kWaterGrid &&
+           waterGrid_[static_cast<std::size_t>(gy) * kWaterGrid + static_cast<std::size_t>(gx)] != 0;
+}
+
+void MapView::drawWater(SDL_Renderer* renderer, const Camera& camera, const LightMap* light) const
+{
+    if (!hdWater_ || waterTiles_.empty()) {
+        waterTiles_.clear();
+        return;
+    }
+    // The lights round the view (their sheen) and the ripples in flight, in fixed arrays.
+    std::array<LightMap::PointLight, HdWater::kMaxLights> lights{};
+    const std::size_t lightCount =
+        light ? light->pointLights(camera.left(), camera.top(), camera.right(), camera.bottom(), lights) : 0;
+    std::array<float, HdWater::kMaxRipples * 4> rings{};
+    const double seconds = time_ / 30.0;
+    const int ringCount = ripples_.pack(seconds, rings);
+    hdWater_->setView(camera.left(), camera.top(), camera.zoom, seconds, waterOffset_,
+                      std::span(lights.data(), lightCount), std::span<const float>(rings.data(), static_cast<std::size_t>(ringCount) * 4));
+    // Added (the shader's alpha the water's share): drawTiles drew these tiles with the water's
+    // colour left out, so the sum is the tile with fx_water in the water's place, edges and all,
+    // over exactly the pixels the tile covers (the same rectangle, texture and filter).
+    SDL_SetGPURenderState(renderer, hdWater_->state());
+    for (const auto& [t, s] : waterTiles_) {
+        if (!s->ready()) {
+            continue;
+        }
+        const float n = s->rect.h;
+        const SDL_FRect share{n + kWaterGutter, 0, n, n};
+        const SDL_FRect from = s->source(&share);
+        SDL_SetTextureScaleMode(s->texture, s->scale);
+        SDL_SetTextureBlendMode(s->texture, SDL_BLENDMODE_ADD);
+        const SDL_FRect dst = camera.toScreen(t->x, t->y, kTilePixels, kTilePixels);
+        SDL_RenderTexture(renderer, s->texture, &from, &dst);
+    }
+    SDL_SetGPURenderState(renderer, nullptr);
+    for (const auto& [t, s] : waterTiles_) {
+        SDL_SetTextureBlendMode(s->texture, SDL_BLENDMODE_BLEND); // (the page's other sprites as ever)
+    }
+    waterTiles_.clear();
 }
 
 std::optional<MapView::Useable> MapView::useableAt(float cx, float cy, const SightMap* sight) const
