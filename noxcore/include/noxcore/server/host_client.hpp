@@ -82,6 +82,14 @@ public:
     };
     /// Not overridden: no window (the cells empty, no secondary weapon nor quiver).
     virtual InventoryWindow inventoryWindow() const { return {}; }
+    /// spellKeyPackSetSpell (the console's "cheat level" in a solo game): the spell bars' set in
+    /// use, slot `slot` (0-4), holding `id` (a warrior's ability) whatever was there, its tooltip
+    /// anew and sound 0x31A. Not overridden: nothing.
+    virtual void setBarSlot(int slot, std::uint32_t id)
+    {
+        (void)slot;
+        (void)id;
+    }
     /// plr_rwInventory's read in a solo game, after the things are worn again: the
     /// window's secondary weapon and last quiver cleared directly (Gui_Inv_SetSecondaryWeapon(0,
     /// 0): the cell and the previous one forgotten, nothing sent; Gui_Inv_SetLastQuiver(0)),

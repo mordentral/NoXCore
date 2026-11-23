@@ -470,6 +470,15 @@ void startCinematics(App& app)
                 app.live->client().clearInventoryWeapons();
             }
         };
+        hooks.setBarSlot = [&app](int slot, std::uint32_t id) {
+            // The set in use's slot written over (its target flag kept), the slot's sound. (A
+            // multiclass player's bars hold an ability tagged.)
+            if (slot < 0 || slot >= static_cast<int>(app.bars.current().size())) {
+                return;
+            }
+            app.bars.current()[static_cast<std::size_t>(slot)].id = multiclass(app) ? nox::client::kAbilityTag | id : id;
+            uiSound(app, 0x31A);
+        };
 
         // The minimap's memory (the exe's one wall grid and its client's marker list): only of the
         // view's map when it is the server's (not the old one before the client has the next).

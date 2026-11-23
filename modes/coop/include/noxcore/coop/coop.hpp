@@ -115,6 +115,12 @@ public:
             own->clearInventoryWeapons();
         }
     }
+    void setBarSlot(int slot, std::uint32_t id) override
+    {
+        if (own) {
+            own->setBarSlot(slot, id);
+        }
+    }
     bool wallDrawn(int x, int y) const override { return own && own->wallDrawn(x, y); }
     bool minimapMarked(std::uint16_t netCode) const override { return own && own->minimapMarked(netCode); }
     void saveStarting() override

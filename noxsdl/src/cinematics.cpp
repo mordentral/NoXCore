@@ -182,6 +182,12 @@ public:
             c_.hooks_.clearInventoryWeapons();
         }
     }
+    void setBarSlot(int slot, std::uint32_t id) override
+    {
+        if (c_.hooks_.setBarSlot) {
+            c_.hooks_.setBarSlot(slot, id);
+        }
+    }
 
     bool wallDrawn(int x, int y) const override { return c_.hooks_.wallDrawn && c_.hooks_.wallDrawn(x, y); }
     bool minimapMarked(std::uint16_t netCode) const override

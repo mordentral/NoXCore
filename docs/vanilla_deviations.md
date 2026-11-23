@@ -1973,6 +1973,18 @@ The engine's logic is the exe's; these are where the output differs.
   object again; nothing else changes. Four bytes an object.
 - **Revert:** in `setEnchantments` drop `o.enchantOwed |= o.enchantTold;`.
 
+### VD-82: "cheat re-enter" lasts the game it's typed in; "cheat level" past 127 takes no experience
+
+- **Vanilla:** the console's "cheat re-enter" (outside a network game) sets a global no game
+  clears: every later game of the run lets players shut out of play (status 0x100) back in. "cheat
+  level N" past 127 (its low byte, a signed char) reads XPTable before its start for the
+  experience (original_bugs.md, OB-440).
+- **Ours (`noxcore/src/server/host_console.cpp`):** World::reenterAllowed, kept from map to map
+  (Server's world setup) for the rest of the game being hosted, no further; such a level's
+  experience is 0. The rest of both cheats is the game's.
+- **Revert:** a process-wide switch for re-enter; nothing to take for the level (the game's value
+  is memory outside the table).
+
 ## Menus: Westwood Online (no effect on the wire)
 
 ### VD-25: The WOL connection is let go for a game, and made again after it

@@ -3,16 +3,16 @@
 # reads this file: it is the template for a new language (copy it to <code>.txt, translate
 # each entry and keep its #@ line) and what l10n.py check compares the languages with.
 
-# noxcore/src/server/host_console.cpp:174
+# noxcore/src/server/host_console.cpp:195
 #@ 590d8dc4: More than one mod has a map named {map} ({mods}). Name the one to load, for example: load {mod}/{map}
 console.load.ambiguous = More than one mod has a map named {map} ({mods}). Name the one to load, for example: load {mod}/{map}
-# noxcore/src/server/host_console.cpp:189
+# noxcore/src/server/host_console.cpp:210
 #@ 13d1f9bf: {map} belongs to {mod}, which uses its own game data. Host {mod} to play it.
 console.load.mod_data = {map} belongs to {mod}, which uses its own game data. Host {mod} to play it.
-# noxcore/src/server/host_console.cpp:182
+# noxcore/src/server/host_console.cpp:203
 #@ 2d012396: This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here.
 console.load.name_taken = This game already has its own map named {map}, so {mod}'s map of that name can't be loaded here.
-# noxcore/src/server/host_console.cpp:680
+# noxcore/src/server/host_console.cpp:701
 #@ 5d738dbd: The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment.
 console.load.party_busy = The party can't go to {map} right now (a save is under way, or the host is down). Try again in a moment.
 

@@ -393,6 +393,7 @@ void Server::takeOptions(World* old)
     world_.autoRespawn = old ? old->autoRespawn : options_.autoRespawn;
     world_.keepAutoRespawn = old ? old->keepAutoRespawn : options_.autoRespawn;
     world_.clanTeams = old ? old->clanTeams : false;
+    world_.reenterAllowed = old ? old->reenterAllowed : false;
     world_.wolGame = old ? old->wolGame : options_.wolGame;
     world_.leaveBones = old ? old->leaveBones : false;
     world_.gestures = old ? old->gestures : true;

@@ -1216,8 +1216,8 @@ void updateObserver(Fight& fight, ServerObject& unit)
                     continue;
                 }
                 mayRejoin = p.exitGate == 0 && p.questActive != 0;
-            } else if (!out) {  // out of a quest: no rejoining in clan games, under game flag 0x8000, or shut out (0x100) while anyone plays
-                mayRejoin = !(world.clanTeams || (world.gameFlags & 0x8000u) || ((p.statusFlags & 0x100u) && anyonePlaying(world)));
+            } else if (!out) {  // out of a quest: no rejoining in clan games, under game flag 0x8000, or shut out (0x100) while anyone plays (unless "cheat re-enter")
+                mayRejoin = !(world.clanTeams || (world.gameFlags & 0x8000u) || ((p.statusFlags & 0x100u) && !world.reenterAllowed && anyonePlaying(world)));
             }
             if (mayRejoin && watchingThing(unit)) {
                 observeClear(fight, unit);

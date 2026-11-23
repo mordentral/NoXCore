@@ -120,6 +120,9 @@ public:
         /// A solo .plr read clears the window's secondary weapon and last quiver
         /// (HostClient::clearInventoryWeapons).
         std::function<void()> clearInventoryWeapons;
+        /// The console's "cheat level" puts an ability in a slot of the bars' set in use
+        /// (HostClient::setBarSlot).
+        std::function<void(int slot, std::uint32_t id)> setBarSlot;
 
         /// The minimap's memory a solo save keeps (HostClient::wallDrawn / minimapMarked).
         std::function<bool(int x, int y)> wallDrawn;

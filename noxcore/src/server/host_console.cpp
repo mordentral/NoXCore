@@ -37,6 +37,7 @@
 #include <array>
 #include <cctype>
 #include <charconv>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 
@@ -80,6 +81,26 @@ int number(std::string_view s)
     int v = 0;
     std::from_chars(s.data(), s.data() + s.size(), v);
     return v;
+}
+
+/// wcstol(s, 0, 10) whole, as the cheats read their number: a sign taken, the digits up to the
+/// first that isn't one, past a 32-bit long's range its end; 0 for none.
+std::int32_t longNumber(std::string_view s)
+{
+    std::size_t i = 0;
+    while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i]))) {
+        ++i;
+    }
+    bool negative = false;
+    if (i < s.size() && (s[i] == '+' || s[i] == '-')) {
+        negative = s[i] == '-';
+        ++i;
+    }
+    std::int64_t v = 0;
+    for (; i < s.size() && s[i] >= '0' && s[i] <= '9'; ++i) {
+        v = std::min<std::int64_t>(v * 10 + (s[i] - '0'), 0x80000000LL);
+    }
+    return static_cast<std::int32_t>(std::clamp<std::int64_t>(negative ? -v : v, INT32_MIN, INT32_MAX));
 }
 
 // The words from index `from` on, joined by single spaces.
@@ -904,11 +925,49 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
         } else if (is(1, "mana")) {
             everyPlayer([&](ServerObject& o) { o.player->mana = static_cast<std::uint16_t>(std::min<int>(o.player->mana + 2000, o.player->maxMana)); });
         } else if (is(1, "level") && w.size() >= 3) {
-            const int level = number(w[2]);
+            // Each player at the level (the number's low byte; past 10, 10) with that level's
+            // experience (XPTable's, told), its numbers anew (a warrior's abilities to that level,
+            // untold). In a solo game a warrior's known abilities then go on the host's bar set in
+            // use, ability n in slot n (an award with nothing shown fills no slot), and its level-up
+            // moment comes (the first player's: the others' find it under way).
+            const bool solo = (world.gameFlags & GameFlag::Solo) != 0;
             everyPlayer([&](ServerObject& o) {
-                o.player->level = static_cast<std::uint8_t>(level);
+                auto level = static_cast<std::uint8_t>(longNumber(w[2]));
+                if (static_cast<std::int8_t>(level) > 10) {
+                    level = 10;
+                }
+                // (A level past 127, below 0 as the game compares it: the game reads before the
+                // table's start; no experience here.)
+                const auto index = static_cast<std::int8_t>(level);
+                o.experience = index < 0 ? 0.0f : world.number("XPTable", static_cast<std::size_t>(index));
+                reportExperience(world, o);
+                o.player->level = level;
                 readVals(world, o, false);
+                if (solo && o.player->classId == 0 && world.hostClient) {
+                    for (int a = 1; a < 6; ++a) {
+                        if (o.player->abilityLevel(static_cast<std::size_t>(a)) != 0) {
+                            world.hostClient->setBarSlot(a - 1, static_cast<std::uint32_t>(a));
+                        }
+                    }
+                }
+                if (solo) {
+                    levelUpMoment(f, &o, 0);
+                }
             });
+        } else if (is(1, "gold") && w.size() >= 3) {
+            // Each player's purse: the amount added, or (below 0) taken off as the game takes it, the
+            // amount read as unsigned (so any amount below 0 empties it).
+            const std::int32_t amount = longNumber(w[2]);
+            everyPlayer([&](ServerObject& o) {
+                if (amount < 0) {
+                    subGold(o, static_cast<std::uint32_t>(amount));
+                } else {
+                    addGold(o, amount);
+                }
+            });
+        } else if (is(1, "re-enter")) {
+            // Players shut out of play (status 0x100) may come back in from now on, in this game.
+            world.reenterAllowed = true;
         } else if (is(1, "spells") && w.size() >= 3) {
             const int level = std::clamp(number(w[2]), 1, 5);
             everyPlayer([&](ServerObject& o) { std::fill(o.player->spellLevels.begin(), o.player->spellLevels.end(), static_cast<std::uint8_t>(level)); });

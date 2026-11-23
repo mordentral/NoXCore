@@ -2827,3 +2827,20 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   the creatures' read skips `spawnFixup` under switch-to-solo outside 0x200000). The co-op
   director takes the type's most again as the creature's own and puts the party's scale on top,
   the health's share kept (modes/coop/src/coop_balance.cpp).
+
+### OB-439: "cheat gold" with an amount below 0 empties the purse
+- **Where:** the console's "cheat gold N" hands an N below 0 to playerSubGold as it is, which reads
+  it unsigned (4 billion and more) and so finds the purse short of it.
+- **Effect:** "cheat gold -100" leaves every player with no gold, not 100 less.
+- **Ours:** the same (host_console.cpp's "cheat gold").
+
+### OB-440: "cheat re-enter" outlives its game, and "cheat level" past 127 reads before XPTable
+- **Where:** "cheat re-enter" sets a global that nothing clears, read by the test of whether a
+  player shut out of play (status 0x100) may come back in. "cheat level N" keeps N's low byte,
+  compares it as a signed char (past 127 it's below 0, so not held to 10) and reads XPTable's entry
+  at that index, before the table's start.
+- **Effect:** once typed, any later game of the same run (a network game's sudden death among them)
+  lets shut-out players back in. A level of 128-255 takes whatever lies before the table as its
+  experience.
+- **Ours:** re-enter lasts the rest of the game being hosted (World::reenterAllowed, kept from map to
+  map), and such a level takes no experience (vanilla_deviations.md, VD-82).

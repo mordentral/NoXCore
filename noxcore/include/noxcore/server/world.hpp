@@ -1886,6 +1886,9 @@ public:
     std::array<std::uint16_t, 6> lessonLimits{};
     /// Teams by clan (a chat game whose settings' clan bit is set).
     bool clanTeams = false;
+    /// The console's "cheat re-enter" (outside a network game): a player shut out of play (status
+    /// 0x100) may come back in. Never cleared: kept from map to map for the rest of the game.
+    bool reenterAllowed = false;
     /// Each mode's time limit in minutes (the same order; 0 none), and the match timer
     /// (g_gameTimerRunning, g_gameTimerEndTicks: here the frame it ends).
     std::array<std::uint8_t, 6> timeLimits{};

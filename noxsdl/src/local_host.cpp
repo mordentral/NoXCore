@@ -134,6 +134,7 @@ public:
         return parked() ? client->inventoryWindow() : InventoryWindow{};
     }
     void clearInventoryWeapons() override { call([](HostClient& c) { c.clearInventoryWeapons(); }); }
+    void setBarSlot(int slot, std::uint32_t id) override { call([slot, id](HostClient& c) { c.setBarSlot(slot, id); }); }
     bool wallDrawn(int x, int y) const override { return parked() && client->wallDrawn(x, y); }
     bool minimapMarked(std::uint16_t netCode) const override { return parked() && client->minimapMarked(netCode); }
     void saveStarting() override
