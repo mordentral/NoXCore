@@ -105,6 +105,7 @@
 #pragma once
 
 #include "noxcore/modes/mode_frame.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -725,23 +726,18 @@ struct TextPiece {
 
 /// The kTextSet messages of one key's text: one, or a piece of up to kTextPieceBytes each (cut
 /// between UTF-8 characters), all but the last kTextMore. The key cut to kMaxTextKeyBytes, the
-/// text to kMaxTextValueBytes (between characters).
+/// text to kMaxTextValueBytes (between characters). (Bytes that aren't UTF-8, with no character's
+/// start in a piece's reach: that piece cut at its bytes, so every piece takes some.)
 inline std::vector<std::vector<std::uint8_t>> textSetMessages(std::string_view key, std::string_view text)
 {
-    const auto cutAt = [](std::string_view s, std::size_t most) {
-        std::size_t n = std::min(s.size(), most);
-        if (n < s.size()) {
-            while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) {
-                --n;
-            }
-        }
-        return n;
-    };
     key = key.substr(0, kMaxTextKeyBytes);
-    text = text.substr(0, cutAt(text, kMaxTextValueBytes));
+    text = text.substr(0, util::utf8CutLength(text, kMaxTextValueBytes));
     std::vector<std::vector<std::uint8_t>> out;
     do {
-        const std::size_t n = cutAt(text, kTextPieceBytes);
+        std::size_t n = util::utf8CutLength(text, kTextPieceBytes);
+        if (n == 0) {
+            n = std::min(text.size(), kTextPieceBytes);
+        }
         const bool more = n < text.size();
         Writer w;
         w.str(key);
@@ -802,11 +798,7 @@ inline constexpr std::size_t kMaxCharacterNoteBytes = 80;
 inline std::vector<std::uint8_t> characterNoteMessage(std::string_view line)
 {
     Writer w;
-    std::size_t n = std::min(line.size(), kMaxCharacterNoteBytes);
-    while (n > 0 && n < line.size() && (static_cast<unsigned char>(line[n]) & 0xC0) == 0x80) {
-        --n; // (cut between UTF-8 characters)
-    }
-    w.str(line.substr(0, n));
+    w.str(line.substr(0, util::utf8CutLength(line, kMaxCharacterNoteBytes))); // (cut between UTF-8 characters)
     return message(kCharacterNote, w.out);
 }
 

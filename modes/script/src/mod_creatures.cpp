@@ -41,13 +41,8 @@ server::ServerObject& creatureArg(lua_State* L, int idx)
     return o;
 }
 
-/// A finite number from `lo` to `hi`, as the nearest float (toolbox::toFloat).
-float floatIn(lua_State* L, int idx, double lo, double hi, const char* what)
-{
-    const double v = luaL_checknumber(L, idx);
-    luaL_argcheck(L, std::isfinite(v) && v >= lo && v <= hi, idx, what);
-    return toolbox::toFloat(v);
-}
+using toolbox::coordArg;
+using toolbox::floatArg; // (a finite number from lo to hi, as the nearest float)
 
 // ---- the record ------------------------------------------------------------------------------
 
@@ -170,6 +165,16 @@ std::string lineValue(lua_State* L, const RecordKey& k)
     }
 }
 
+/// The AI's copies a creature takes from its record when it's made (retreat and resume levels,
+/// status flags, flee range), taken from m.def again: its flags status.
+void aiFromRecord(server::ServerObject::Monster& m, decltype(server::ServerObject::Monster::status) status)
+{
+    m.retreatLevel = m.def->retreatRatio;
+    m.resumeLevel = m.def->resumeRatio;
+    m.status = status;
+    m.fleeRange = m.def->fleeRange;
+}
+
 int noxSetCreatureProfile(lua_State* L)
 {
     // nox.setCreatureProfile(id, profile, keepAi?): the creature reads `profile` as its monster.bin
@@ -190,10 +195,7 @@ int noxSetCreatureProfile(lua_State* L)
         const server::World& world = toolbox::worldOf(L);
         m.def = world.monsterDb ? world.monsterDb->find(o.typeName) : nullptr;
         if (!keepAi && m.def) {
-            m.retreatLevel = m.def->retreatRatio;
-            m.resumeLevel = m.def->resumeRatio;
-            m.status = m.def->status;
-            m.fleeRange = m.def->fleeRange;
+            aiFromRecord(m, m.def->status);
         }
         return 0;
     }
@@ -242,20 +244,13 @@ int noxSetCreatureProfile(lua_State* L)
     m.ownDef = std::make_shared<const things::MonsterDef>(std::move(def));
     m.def = m.ownDef.get();
     if (!keepAi) {
-        m.retreatLevel = m.def->retreatRatio;
-        m.resumeLevel = m.def->resumeRatio;
         // (Its flags all as given: the record keeps STATUS's 16 bits, as monster.bin's reader does.)
-        m.status = statusBits ? *statusBits : m.def->status;
-        m.fleeRange = m.def->fleeRange;
+        aiFromRecord(m, statusBits ? *statusBits : m.def->status);
     }
     return 0;
 }
 
-void setNumber(lua_State* L, const char* key, double v)
-{
-    lua_pushnumber(L, v);
-    lua_setfield(L, -2, key);
-}
+using toolbox::setField;
 
 void setString(lua_State* L, const char* key, const std::string& v)
 {
@@ -276,32 +271,32 @@ int noxCreatureProfile(lua_State* L)
     }
     lua_createtable(L, 0, 30);
     setString(L, "name", d->name);
-    setNumber(L, "EXPERIENCE", d->experience);
-    setNumber(L, "HEALTH", d->health);
-    setNumber(L, "QUESTHEALTH", d->questHealth);
-    setNumber(L, "SPEED", d->speed);
-    setNumber(L, "RETREAT_RATIO", d->retreatRatio);
-    setNumber(L, "RESUME_RATIO", d->resumeRatio);
-    setNumber(L, "FLEE_RANGE", d->fleeRange);
-    setNumber(L, "STATUS", d->status);
-    setNumber(L, "RUN_MULTIPLIER", d->runMultiplier);
-    setNumber(L, "MOVE_SOUND_FRAME_A", d->moveSoundFrameA);
-    setNumber(L, "MOVE_SOUND_FRAME_B", d->moveSoundFrameB);
-    setNumber(L, "MELEE_ATTACK_FRAME", d->meleeFrame);
-    setNumber(L, "MELEE_ATTACK_RANGE", d->meleeRange);
-    setNumber(L, "MELEE_ATTACK_DAMAGE", d->meleeDamage);
-    setNumber(L, "MELEE_ATTACK_IMPACT", d->meleeImpact);
-    setNumber(L, "MELEE_ATTACK_DAMAGE_TYPE", d->meleeDamageType);
-    setNumber(L, "MELEE_ATTACK_MIN_DELAY", d->meleeMinDelay);
-    setNumber(L, "MELEE_ATTACK_MAX_DELAY", d->meleeMaxDelay);
-    setNumber(L, "MELEE_ATTACK_POISON_CHANCE", d->poisonChance);
-    setNumber(L, "MELEE_ATTACK_POISON_STRENGTH", d->poisonStrength);
-    setNumber(L, "MELEE_ATTACK_POISON_MAX", d->poisonMax);
+    setField(L, "EXPERIENCE", d->experience);
+    setField(L, "HEALTH", d->health);
+    setField(L, "QUESTHEALTH", d->questHealth);
+    setField(L, "SPEED", d->speed);
+    setField(L, "RETREAT_RATIO", d->retreatRatio);
+    setField(L, "RESUME_RATIO", d->resumeRatio);
+    setField(L, "FLEE_RANGE", d->fleeRange);
+    setField(L, "STATUS", d->status);
+    setField(L, "RUN_MULTIPLIER", d->runMultiplier);
+    setField(L, "MOVE_SOUND_FRAME_A", d->moveSoundFrameA);
+    setField(L, "MOVE_SOUND_FRAME_B", d->moveSoundFrameB);
+    setField(L, "MELEE_ATTACK_FRAME", d->meleeFrame);
+    setField(L, "MELEE_ATTACK_RANGE", d->meleeRange);
+    setField(L, "MELEE_ATTACK_DAMAGE", d->meleeDamage);
+    setField(L, "MELEE_ATTACK_IMPACT", d->meleeImpact);
+    setField(L, "MELEE_ATTACK_DAMAGE_TYPE", d->meleeDamageType);
+    setField(L, "MELEE_ATTACK_MIN_DELAY", d->meleeMinDelay);
+    setField(L, "MELEE_ATTACK_MAX_DELAY", d->meleeMaxDelay);
+    setField(L, "MELEE_ATTACK_POISON_CHANCE", d->poisonChance);
+    setField(L, "MELEE_ATTACK_POISON_STRENGTH", d->poisonStrength);
+    setField(L, "MELEE_ATTACK_POISON_MAX", d->poisonMax);
     setString(L, "MISSILE_NAME", d->missile);
-    setNumber(L, "MISSILE_ATTACK_RANGE", d->missileRange);
-    setNumber(L, "MISSILE_ATTACK_FRAME", d->missileFrame);
-    setNumber(L, "MISSILE_ATTACK_MIN_DELAY", d->missileMinDelay);
-    setNumber(L, "MISSILE_ATTACK_MAX_DELAY", d->missileMaxDelay);
+    setField(L, "MISSILE_ATTACK_RANGE", d->missileRange);
+    setField(L, "MISSILE_ATTACK_FRAME", d->missileFrame);
+    setField(L, "MISSILE_ATTACK_MIN_DELAY", d->missileMinDelay);
+    setField(L, "MISSILE_ATTACK_MAX_DELAY", d->missileMaxDelay);
     setString(L, "MELEE_STRIKE_FUNCTION", d->strikeFn);
     setString(L, "DIE_FUNCTION", d->dieFn);
     setString(L, "DEAD_FUNCTION", d->deadFn);
@@ -328,9 +323,9 @@ int noxSetSpeed(lua_State* L)
     toolbox::refuseInsideAsked(L, "nox.setSpeed");
     server::ServerObject& o = toolbox::objectArg(L, 1);
     luaL_argcheck(L, (o.classes & (oc::Monster | oc::Player)) != 0, 1, "a creature or player");
-    o.speedBase = floatIn(L, 2, 0, 100, "a speed 0-100");
+    o.speedBase = floatArg(L, 2, 0, 100, "a speed 0-100");
     if (!lua_isnoneornil(L, 3)) {
-        o.speedCur = floatIn(L, 3, 0, 100, "a speed 0-100");
+        o.speedCur = floatArg(L, 3, 0, 100, "a speed 0-100");
     }
     return 0;
 }
@@ -340,7 +335,7 @@ int noxSetMass(lua_State* L)
     // nox.setMass(id, mass): its mass (how hard it is to push: thing.bin's MASS at first), above 0.
     toolbox::refuseInsideAsked(L, "nox.setMass");
     server::ServerObject& o = toolbox::objectArg(L, 1);
-    o.mass = floatIn(L, 2, 0.001, 1e6, "a mass above 0, at most 1000000");
+    o.mass = floatArg(L, 2, 0.001, 1e6, "a mass above 0, at most 1000000");
     return 0;
 }
 
@@ -443,8 +438,8 @@ int noxCreatureCast(lua_State* L)
     const std::uint32_t spell = spellOf(L, 2);
     // (A point on the map, as every point a script gives: one off it would reach the spell's
     // effects, the things it makes and the clients' messages.)
-    const float x = floatIn(L, 3, 0, 256.0 * 23.0, "a point on the map (0 to 5888)");
-    const float y = floatIn(L, 4, 0, 256.0 * 23.0, "a point on the map (0 to 5888)");
+    const float x = coordArg(L, 3);
+    const float y = coordArg(L, 4);
     server::Fight fight = toolbox::fightOf(L);
     server::ServerObject::Monster::Item* it = server::Monsters{fight}.push(o, server::MonsterAction::CastSpellOnLocation);
     if (it) {

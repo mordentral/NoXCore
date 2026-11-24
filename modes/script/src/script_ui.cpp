@@ -10,6 +10,7 @@
 #include "noxcore/things/object_class.hpp"
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
+#include "noxcore/util/text.hpp"
 #include "noxcore/video/nxz.hpp"
 
 #include "value_codec.hpp"
@@ -954,15 +955,7 @@ int uiPlayer(lua_State* L)
 /// `s` (n bytes) cut to `cap` bytes, at a whole letter.
 std::string cutText(const char* s, std::size_t n, std::size_t cap)
 {
-    if (n <= cap) {
-        return std::string(s, n);
-    }
-    // (The first byte left out inside a letter: the cut goes back to that letter's start.)
-    std::size_t end = cap;
-    while (end > 0 && (static_cast<unsigned char>(s[end]) & 0xC0) == 0x80) {
-        --end;
-    }
-    return std::string(s, end);
+    return std::string(s, util::utf8CutLength(std::string_view(s, n), cap));
 }
 
 /// A script's number as a float in [lo, hi] (NaN: `fallback`).

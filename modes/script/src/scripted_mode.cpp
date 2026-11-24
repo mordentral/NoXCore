@@ -299,10 +299,13 @@ struct ScriptedMode::Impl {
     }
     std::uint32_t revokedAt = ~0u;
     /// (Client level 15) The line each player's client was last sent (nox.characterNote: kCharacterNote),
-    /// by its unit: the same again isn't sent. Forgotten past kMaxNotesKept units (a long game's
-    /// many maps: a new unit each).
-    static constexpr std::size_t kMaxNotesKept = 64;
-    std::map<std::uint32_t, std::string> characterNotes;
+    /// by its peer, with the unit it was sent for: the same again to the same unit isn't sent
+    /// (a new map's unit is sent it again). Forgotten as the player leaves, and with the game.
+    struct SentNote {
+        std::uint32_t unit = 0;
+        std::string line;
+    };
+    std::map<std::uint8_t, SentNote> characterNotes;
     /// nox.lock's: the host's own Closed and allowed list, put back by nox.unlock. `lockChanged`:
     /// since the host last asked (ServerMode::takeLockChanged: a pool opens another lobby).
     bool locked = false;
@@ -898,17 +901,10 @@ server::ServerObject& unitArg(lua_State* L, int idx)
     return o;
 }
 
-/// The map's extent: 256 wall cells of 23.
-constexpr double kMapExtent = 256.0 * 23.0;
-
-/// A coordinate (or a distance) on the map: a number from 0 to the map's extent, never NaN or
-/// infinite (they would reach the engine's casts and every client).
-float coordArg(lua_State* L, int idx)
-{
-    const double v = luaL_checknumber(L, idx);
-    luaL_argcheck(L, v >= 0 && v <= kMapExtent, idx, "a point on the map (0 to 5888)");
-    return toolbox::toFloat(v);
-}
+using toolbox::coordArg;
+using toolbox::floatArg;
+using toolbox::kMapExtent;
+using toolbox::setField;
 
 /// A unit's peer (its player's), none for a unit without one (a test's, a bot's own).
 std::optional<std::uint8_t> peerOfUnit(const Impl& impl, std::uint32_t extent)
@@ -921,12 +917,6 @@ std::optional<std::uint8_t> peerOfUnit(const Impl& impl, std::uint32_t extent)
         }
     }
     return std::nullopt;
-}
-
-void setField(lua_State* L, const char* name, double v)
-{
-    lua_pushnumber(L, v);
-    lua_setfield(L, -2, name);
 }
 
 } // namespace
@@ -998,6 +988,11 @@ server::ServerObject& playerUnitArg(lua_State* L, int idx)
 bool hidden(lua_State* L, const server::ServerObject& o)
 {
     return implOf(L).hidden(o);
+}
+
+std::optional<std::uint8_t> peerOfUnit(lua_State* L, std::uint32_t extent)
+{
+    return script::peerOfUnit(implOf(L), extent);
 }
 
 void refuseInsideAsked(lua_State* L, const char* what)
@@ -1945,10 +1940,10 @@ int noxCallMapHandler(lua_State* L)
     if (lua_type(L, 1) == LUA_TSTRING) {
         const char* name = lua_tostring(L, 1);
         const auto f = mapScript->function(name);
-        if (!f || *f < 2) {
+        if (!f) {
             luaL_error(L, "callMapHandler: the map's script has no function %s", name);
         }
-        function = *f;
+        function = *f; // ("GLOBAL", 0 or 1, the variables' layouts: refused by callHandler, as by index)
     } else {
         const double v = luaL_checknumber(L, 1);
         luaL_argcheck(L, v >= 0 && v <= 4294967295.0 && v == std::floor(v), 1, "a map function's name or index");
@@ -2225,14 +2220,6 @@ int wholeArg(lua_State* L, int idx, double lo, double hi, const char* what)
     const double v = luaL_checknumber(L, idx);
     luaL_argcheck(L, v >= lo && v <= hi && v == std::floor(v), idx, what);
     return static_cast<int>(v);
-}
-
-/// A number from lo to hi as the float the engine takes: never NaN or infinite.
-float floatArg(lua_State* L, int idx, double lo, double hi, const char* what)
-{
-    const double v = luaL_checknumber(L, idx);
-    luaL_argcheck(L, v >= lo && v <= hi, idx, what);
-    return toolbox::toFloat(v);
 }
 
 /// A thing on the map (not in an inventory: moving one there would leave it in two places).
@@ -3334,15 +3321,13 @@ int noxCharacterNote(lua_State* L)
         return 1;
     }
     std::string line = ::nox::client::character_notes::cleanText(std::string_view(s, len), uimsg::kMaxCharacterNoteBytes);
-    if (const auto it = impl.characterNotes.find(u.extent); it != impl.characterNotes.end() && it->second == line) {
+    Impl::SentNote& sent = impl.characterNotes[*peer];
+    if (sent.unit == u.extent && sent.line == line) {
         lua_pushboolean(L, 1); // (sent already)
         return 1;
     }
-    if (impl.characterNotes.size() >= Impl::kMaxNotesKept) {
-        impl.characterNotes.clear();
-    }
     worldOf(L).broadcasts().push_back({uimsg::characterNoteMessage(line), true, u.extent});
-    impl.characterNotes[u.extent] = std::move(line);
+    sent = {u.extent, std::move(line)};
     lua_pushboolean(L, 1);
     return 1;
 }
@@ -4857,6 +4842,7 @@ void Impl::onLeave(std::uint8_t peer)
 {
     choices.erase(peer);
     ui.erase(peer);
+    characterNotes.erase(peer); // (a later player of the peer's number is sent its own)
     parts.weather.left(peer);
     parts.drawScales.left(peer);
     parts.abilities.left(peer);
@@ -5143,20 +5129,25 @@ public:
     // ---- In place of a watched item's own USE or pickup (nox.events.use, .pickup): at once, where
     // the game would run it (Items::use asks only for an item with the use bit; every pickup is
     // asked, so the bit is read here first).
+    // (A use or pickup of the item its own hook is being asked about, set off inside it (its
+    // nox.pickUp): not asked again, the hook's own doing; the engine checks the item again after.)
     bool mayUse(server::World&, server::ServerObject& user, server::ServerObject& item) override
     {
-        if (!impl_.parts.events.has().onUse || impl_.hidden(user)) {
+        if (!impl_.parts.events.has().onUse || impl_.hidden(user) || Asking::about(askingUse_, item)) {
             return true;
         }
+        const Asking asking{askingUse_, item};
         bool own = true;
         impl_.guarded("onUse", [&] { own = impl_.parts.events.use(impl_.vm->thread(), user, item); });
         return own;
     }
     bool mayPickUp(server::World&, server::ServerObject& taker, server::ServerObject& item) override
     {
-        if (!(item.modeEvents & server::ModeEvent::Pickup) || !impl_.parts.events.has().onTryPickup || impl_.hidden(taker)) {
+        if (!(item.modeEvents & server::ModeEvent::Pickup) || !impl_.parts.events.has().onTryPickup || impl_.hidden(taker) ||
+            Asking::about(askingPickup_, item)) {
             return true;
         }
+        const Asking asking{askingPickup_, item};
         bool take = true;
         impl_.guarded("onTryPickup", [&] { take = impl_.parts.events.tryPickup(impl_.vm->thread(), taker, item); });
         return take;
@@ -5175,7 +5166,21 @@ public:
     }
 
 private:
+    /// An item's hook running (onUse, onTryPickup): the item in its list till the hook returns.
+    struct Asking {
+        std::vector<std::uint32_t>& list;
+        Asking(std::vector<std::uint32_t>& l, const server::ServerObject& item) : list(l) { list.push_back(item.extent); }
+        ~Asking() { list.pop_back(); }
+        Asking(const Asking&) = delete;
+        Asking& operator=(const Asking&) = delete;
+        static bool about(const std::vector<std::uint32_t>& list, const server::ServerObject& item)
+        {
+            return !list.empty() && std::ranges::find(list, item.extent) != list.end();
+        }
+    };
+
     Impl& impl_;
+    std::vector<std::uint32_t> askingUse_, askingPickup_; ///< (the items being asked about, innermost last)
 };
 
 // ------------------------------------------------------------------------- ScriptedMode
@@ -5628,6 +5633,7 @@ void ScriptedMode::detach(server::GameHost& host)
     parts.anims.reset();
     releaseCameras(host); // (nox.observe's and nox.camera's holds let go: each player left watching, free to join)
     host.server().world().modeBusy.clear();
+    impl_->characterNotes.clear(); // (a game hosted again sends each player's line afresh)
     impl_->host = nullptr;
     impl_->dropAssets(); // (the mod's assets kept only while it's hosted)
 }

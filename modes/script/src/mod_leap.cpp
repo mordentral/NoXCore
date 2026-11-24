@@ -30,8 +30,6 @@ namespace {
 
 namespace oc = things::ObjectClass;
 
-/// The map's size (world units): a point a script gives is kept inside it.
-constexpr double kMapExtent = 5888;
 /// The most frames nox.setBusy takes (a minute).
 constexpr int kMaxBusyFrames = 30 * 60;
 
@@ -377,12 +375,7 @@ void Leaps::reset(server::World* world)
 
 namespace {
 
-float coordArg(lua_State* L, int idx)
-{
-    const double v = luaL_checknumber(L, idx);
-    luaL_argcheck(L, v >= 0 && v <= kMapExtent, idx, "a point on the map (0 to 5888)");
-    return toolbox::toFloat(v);
-}
+using toolbox::coordArg; // (a point a script gives is kept on the map)
 
 int noxSetBusy(lua_State* L)
 {

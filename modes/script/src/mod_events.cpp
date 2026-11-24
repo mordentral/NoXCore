@@ -23,21 +23,17 @@ void pushId(lua_State* L, std::uint32_t id)
     id ? lua_pushnumber(L, id) : lua_pushnil(L);
 }
 
-void setNumber(lua_State* L, const char* name, double v)
-{
-    lua_pushnumber(L, v);
-    lua_setfield(L, -2, name);
-}
+using toolbox::setField;
 
 /// {id, type, x, y}: a thing's facts as they were when the engine told them.
 void pushFacts(lua_State* L, std::uint32_t id, const server::Name& type, float x, float y)
 {
     lua_createtable(L, 0, 5);
-    setNumber(L, "id", id);
+    setField(L, "id", id);
     lua_pushlstring(L, type.data(), type.size());
     lua_setfield(L, -2, "type");
-    setNumber(L, "x", x);
-    setNumber(L, "y", y);
+    setField(L, "x", x);
+    setField(L, "y", y);
 }
 
 } // namespace
@@ -259,34 +255,36 @@ bool Events::castCost(lua_State* L, const server::ServerObject& caster, std::uin
     return priced;
 }
 
-bool Events::use(lua_State* L, const server::ServerObject& user, const server::ServerObject& item)
+namespace {
+
+/// An item's hook in place of its own function (onUse, onTryPickup) called with (unit, item):
+/// whether it answered true (the game's own goes on). None, or a failing one: true (the game's
+/// own, as every hook's).
+bool itemHook(lua_State* L, bool has, const char* hook, const server::ServerObject& unit, const server::ServerObject& item)
 {
-    if (!has_.onUse || !toolbox::beginHook(L, "onUse")) {
+    if (!has || !toolbox::beginHook(L, hook)) {
         return true;
     }
-    lua_pushnumber(L, user.extent);
+    lua_pushnumber(L, unit.extent);
     lua_pushnumber(L, item.extent);
-    if (!toolbox::callHook(L, "onUse", 2, 1)) {
-        return true; // (a failing hook: the game's own, as every hook's)
+    if (!toolbox::callHook(L, hook, 2, 1)) {
+        return true;
     }
-    const bool own = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+    const bool yes = lua_isboolean(L, -1) && lua_toboolean(L, -1);
     lua_pop(L, 1);
-    return own;
+    return yes;
+}
+
+} // namespace
+
+bool Events::use(lua_State* L, const server::ServerObject& user, const server::ServerObject& item)
+{
+    return itemHook(L, has_.onUse, "onUse", user, item);
 }
 
 bool Events::tryPickup(lua_State* L, const server::ServerObject& taker, const server::ServerObject& item)
 {
-    if (!has_.onTryPickup || !toolbox::beginHook(L, "onTryPickup")) {
-        return true;
-    }
-    lua_pushnumber(L, taker.extent);
-    lua_pushnumber(L, item.extent);
-    if (!toolbox::callHook(L, "onTryPickup", 2, 1)) {
-        return true;
-    }
-    const bool take = lua_isboolean(L, -1) && lua_toboolean(L, -1);
-    lua_pop(L, 1);
-    return take;
+    return itemHook(L, has_.onTryPickup, "onTryPickup", taker, item);
 }
 
 void Events::strike(lua_State* L, const server::ServerObject& victim, const server::ServerObject* attacker, const server::ServerObject& weapon)
@@ -330,7 +328,7 @@ void Events::deliver(lua_State* L)
             if (toolbox::beginHook(L, "onObjectKilled")) {
                 pushFacts(L, e.a, e.type, e.x, e.y);
                 if (e.b) {
-                    setNumber(L, "by", e.b);
+                    setField(L, "by", e.b);
                 }
                 toolbox::callHook(L, "onObjectKilled", 1, 0);
             }
@@ -383,10 +381,10 @@ void Events::deliver(lua_State* L)
                     lua_setfield(L, -2, "reason");
                 }
                 if (e.b) {
-                    setNumber(L, "target", e.b);
+                    setField(L, "target", e.b);
                 }
-                setNumber(L, "x", e.x);
-                setNumber(L, "y", e.y);
+                setField(L, "x", e.x);
+                setField(L, "y", e.y);
                 toolbox::callHook(L, "onAbility", 3, 0);
             }
             break;

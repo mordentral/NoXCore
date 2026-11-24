@@ -218,12 +218,23 @@ bool Items::pickUp(ServerObject& player, ServerObject& item, bool everyone)
 {
     // Obj_TryPickup: a creature (a player or a monster) with room, not dead; a live
     // item.
-    if (!(player.classes & (oc::Player | oc::Monster)) || player.carryCapacity == 0 || item.gone() || (item.flags & ObjFlag::Destroyed) ||
-        (player.flags & ObjFlag::Dead) || item.holder != 0 || world.disabledTypes.contains(item.typeName)) {
+    const auto mayTake = [&] {
+        return (player.classes & (oc::Player | oc::Monster)) && player.carryCapacity != 0 && !item.gone() && !(item.flags & ObjFlag::Destroyed) &&
+               !(player.flags & ObjFlag::Dead) && item.holder == 0 && !world.disabledTypes.contains(item.typeName);
+    };
+    if (!mayTake()) {
         return false;
     }
-    if (world.modeHooks && !world.modeHooks->mayPickUp(world, player, item)) {
-        return false; // (noxcpp: a mode's to leave)
+    if (world.modeHooks) {
+        const bool deleting = item.pendingDelete;
+        if (!world.modeHooks->mayPickUp(world, player, item)) {
+            return false; // (noxcpp: a mode's to leave)
+        }
+        // (noxcpp: a mode's yes may come after its own changes, the item taken or deleted, the
+        // taker killed: asked again what was asked before it.)
+        if (!mayTake() || (item.pendingDelete && !deleting)) {
+            return false;
+        }
     }
     const float fromX = item.x;
     const float fromY = item.y;
@@ -1098,8 +1109,19 @@ void Items::use(ServerObject& player, ServerObject& item)
     if (player.player && player.player->transfer) {
         return;
     }
-    if (world.modeHooks && (item.modeEvents & ModeEvent::Use) && !world.modeHooks->mayUse(world, player, item)) {
-        return; // (noxcpp: a mode's item, the mode's to use)
+    if (world.modeHooks && (item.modeEvents & ModeEvent::Use)) {
+        const std::uint32_t holder = item.holder;
+        const bool deleting = item.pendingDelete;
+        const bool dead = (player.flags & ObjFlag::Dead) != 0;
+        if (!world.modeHooks->mayUse(world, player, item)) {
+            return; // (noxcpp: a mode's item, the mode's to use)
+        }
+        // (noxcpp: a mode's yes may come after its own changes: the item gone to another, put
+        // down, deleted, the user killed or its .plr applied. The use goes on only as it was asked.)
+        if (item.gone() || item.holder != holder || (item.pendingDelete && !deleting) || player.gone() || ((player.flags & ObjFlag::Dead) && !dead) ||
+            (player.player && player.player->transfer)) {
+            return;
+        }
     }
     const auto usedUp = [&] { // (delayedDeleteObject: out of its inventory first)
         if (item.holder != 0) {

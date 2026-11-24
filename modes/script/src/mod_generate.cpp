@@ -103,17 +103,13 @@ Generation::Built build(const things::ThingDb* things, std::shared_ptr<const Gen
     return out;
 }
 
-void setNumber(lua_State* L, const char* name, double v)
-{
-    lua_pushnumber(L, v);
-    lua_setfield(L, -2, name);
-}
+using toolbox::setField;
 
 void pushPoint(lua_State* L, const mapgen::ArenaSpots::Point& p)
 {
     lua_createtable(L, 0, 2);
-    setNumber(L, "x", p.x);
-    setNumber(L, "y", p.y);
+    setField(L, "x", p.x);
+    setField(L, "y", p.y);
 }
 
 /// The arena builder's spots as a table: {end, centre = {...}, gates = {{type, at, sign}...},

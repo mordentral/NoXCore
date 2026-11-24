@@ -2,6 +2,7 @@
 #include "noxcore/coop/coop_proto.hpp"
 #include "noxcore/modes/mode_frame.hpp"
 #include "noxcore/util/bytes.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 
@@ -82,11 +83,8 @@ std::vector<std::uint8_t> helloMessage(const Hello& h)
     if (!h.campaignId.empty()) {
         // (A mod's campaign alone: the game's own's Hello stays its five bytes.)
         putText(r, h.campaignId, kCampaignIdMost);
-        std::string_view title = std::string_view(h.campaignTitle).substr(0, std::min(h.campaignTitle.size(), kCampaignTitleMost));
-        while (!title.empty() && title.size() < h.campaignTitle.size() && (static_cast<unsigned char>(h.campaignTitle[title.size()]) & 0xC0) == 0x80) {
-            title.remove_suffix(1); // (cut between UTF-8 characters)
-        }
-        putText(r, title, kCampaignTitleMost);
+        const std::string_view title = h.campaignTitle;
+        putText(r, title.substr(0, util::utf8CutLength(title, kCampaignTitleMost)), kCampaignTitleMost); // (cut between UTF-8 characters)
     }
     return framed(kHello, r);
 }

@@ -3,6 +3,7 @@
 
 #include "json.hpp"
 #include "noxcore/lobby/extended.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -104,17 +105,7 @@ OptionSpec optionOf(const json::Value& o, std::size_t index)
 /// name, as an exit names it).
 bool validMapName(std::string_view name)
 {
-    return !name.empty() && name.size() <= 31 && std::ranges::all_of(name, [](char ch) {
-        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-';
-    });
-}
-
-bool sameNoCase(std::string_view a, std::string_view b)
-{
-    return a.size() == b.size() && std::ranges::equal(a, b, [](char x, char y) {
-               const auto low = [](char ch) { return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch + 32) : ch; };
-               return low(x) == low(y);
-           });
+    return util::plainName(name, 31);
 }
 
 /// mode.json's "campaign": {"title", "firstMap", "classes", "maps"}.
@@ -161,12 +152,12 @@ CampaignInfo campaignOf(const json::Value& c, const std::string& modeName)
             if (!v.isString() || !validMapName(v.string)) {
                 throw Bad{"\"campaign\": each of \"maps\" is a map's name (1-31 of letters, digits, _ and -)"};
             }
-            if (std::ranges::any_of(k.maps, [&](const std::string& n) { return sameNoCase(n, v.string); })) {
+            if (std::ranges::any_of(k.maps, [&](const std::string& n) { return util::equalsNoCase(n, v.string); })) {
                 throw Bad{"\"campaign\": the map " + v.string + " is in \"maps\" twice"};
             }
             k.maps.push_back(v.string);
         }
-        if (!k.maps.empty() && std::ranges::none_of(k.maps, [&](const std::string& n) { return sameNoCase(n, k.firstMap); })) {
+        if (!k.maps.empty() && std::ranges::none_of(k.maps, [&](const std::string& n) { return util::equalsNoCase(n, k.firstMap); })) {
             throw Bad{"\"campaign\": \"firstMap\" " + k.firstMap + " isn't one of its \"maps\""};
         }
     }

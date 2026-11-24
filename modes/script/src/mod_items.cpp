@@ -98,11 +98,7 @@ void pushModifierName(lua_State* L, const things::ModifierDb* db, std::uint8_t i
     m ? (void)lua_pushlstring(L, m->name.data(), m->name.size()) : lua_pushnil(L);
 }
 
-void setNumber(lua_State* L, const char* name, double v)
-{
-    lua_pushnumber(L, v);
-    lua_setfield(L, -2, name);
-}
+using toolbox::setField;
 
 /// A string id's text (UTF-8) as field `name`; nothing for no id, no table or no such entry.
 void setText(lua_State* L, const strings::StringTable* table, const char* name, const std::string& id)
@@ -141,14 +137,14 @@ int noxItem(lua_State* L)
         pushModifierName(L, db, o->modifiers[i]);
         lua_setfield(L, -2, kSlots[i]);
     }
-    setNumber(L, "durability", o->health);
-    setNumber(L, "maxDurability", o->maxHealth);
-    setNumber(L, "charges", o->charges);
-    setNumber(L, "maxCharges", o->maxCharges);
+    setField(L, "durability", o->health);
+    setField(L, "maxDurability", o->maxHealth);
+    setField(L, "charges", o->charges);
+    setField(L, "maxCharges", o->maxCharges);
     lua_pushboolean(L, (o->flags & server::ObjFlag::Equipped) != 0);
     lua_setfield(L, -2, "worn");
     if (o->holder) {
-        setNumber(L, "holder", o->holder);
+        setField(L, "holder", o->holder);
     }
     return 1;
 }
@@ -170,11 +166,11 @@ int noxModifier(lua_State* L)
     lua_pushstring(L, m->allowedPosition == 1 ? "primary" : m->allowedPosition == 2 ? "secondary" : "any");
     lua_setfield(L, -2, "position");
     lua_createtable(L, 0, 3);
-    setNumber(L, "r", m->color[0]);
-    setNumber(L, "g", m->color[1]);
-    setNumber(L, "b", m->color[2]);
+    setField(L, "r", m->color[0]);
+    setField(L, "g", m->color[1]);
+    setField(L, "b", m->color[2]);
     lua_setfield(L, -2, "color");
-    setNumber(L, "worth", m->worth);
+    setField(L, "worth", m->worth);
     lua_pushlstring(L, m->desc.data(), m->desc.size());
     lua_setfield(L, -2, "desc");
     // Its words as the game shows them (the string table's: none without nox.csf), and its effects'
@@ -217,22 +213,22 @@ int noxItemStats(lua_State* L)
         lua_pushlstring(L, name.data(), name.size());
         lua_setfield(L, -2, "name");
     }
-    setNumber(L, "durability", o.maxHealth);
-    setNumber(L, "charges", o.maxCharges);
+    setField(L, "durability", o.maxHealth);
+    setField(L, "charges", o.maxCharges);
     // Its weapon or armour record (modifier.bin), by the class the game asks it by.
     const bool weaponLike = (o.classes & (oc::Weapon | oc::Wand | oc::Flag)) != 0;
     const things::EquipDef* equip = !mods ? nullptr : weaponLike ? mods->findWeapon(def->name) : (o.classes & oc::Armor) ? mods->findArmor(def->name) : nullptr;
     if (equip && weaponLike) {
-        setNumber(L, "damageMin", equip->damageMin);
-        setNumber(L, "damageCoefficient", equip->damageCoefficient);
-        setNumber(L, "requiredStrength", equip->requiredStrength);
-        setNumber(L, "range", equip->range);
+        setField(L, "damageMin", equip->damageMin);
+        setField(L, "damageCoefficient", equip->damageCoefficient);
+        setField(L, "requiredStrength", equip->requiredStrength);
+        setField(L, "range", equip->range);
         if (const auto type = server::meleeDamageType(things::weaponBitOf(def->name)); type && *type < kDamageTypes.size()) {
             lua_pushstring(L, kDamageTypes[*type]);
             lua_setfield(L, -2, "damageType");
         }
     } else if (equip) {
-        setNumber(L, "armor", equip->armorValue);
+        setField(L, "armor", equip->armorValue);
     }
     // Which class may use or wear it (a multiclass player: any).
     lua_createtable(L, 0, 3);
@@ -682,8 +678,8 @@ void addPlayerFacts(lua_State* L, const server::HostedPlayer& p, const server::S
         const std::uint8_t c = unit->player->classId;
         lua_pushstring(L, c < 3 ? kClasses[c] : "warrior");
         lua_setfield(L, -2, "class");
-        setNumber(L, "level", unit->player->level);
-        setNumber(L, "experience", unit->experience);
+        setField(L, "level", unit->player->level);
+        setField(L, "experience", unit->experience);
     }
 }
 

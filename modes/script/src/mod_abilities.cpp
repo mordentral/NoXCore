@@ -211,12 +211,8 @@ int stockAbility(lua_State* L, int idx);
 std::uint8_t peerArg(lua_State* L, int idx)
 {
     const server::ServerObject& u = toolbox::playerUnitArg(L, idx);
-    if (const server::GameHost* host = toolbox::hostOf(L)) {
-        for (const auto& [peer, p] : host->players()) {
-            if (p.extent == u.extent) {
-                return peer;
-            }
-        }
+    if (const auto peer = toolbox::peerOfUnit(L, u.extent)) {
+        return *peer;
     }
     luaL_argerror(L, idx, "a player in the game");
     return 0;

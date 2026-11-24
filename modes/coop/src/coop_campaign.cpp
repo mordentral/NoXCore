@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 namespace nox::coop {
@@ -84,34 +85,16 @@ std::filesystem::path CoopCampaign::configure(server::GameHost::Options& o)
 {
     (void)director_.configure(o);
     // What the co-op campaign's game is, kept: the script's configure may ask a game of its own (its
-    // map, a quest, a stock mode's look) as it would hosted alone.
-    const auto solo = o.solo;
-    const auto soloGuests = o.soloGuests;
-    const auto maxPlayers = o.maxPlayers;
-    const auto gameFlags = o.gameFlags;
-    const auto quest = o.quest;
-    const auto questScreens = o.questScreens;
-    const auto questSaves = o.questSaves;
-    const auto questMapsOnly = o.questMapsOnly;
-    const auto forceClass = o.forceClass; // (a quest's forced class: the party's is the host's)
-    const auto mapCycleOn = o.mapCycleOn;
-    const auto mapVote = o.mapVote;
-    const auto sandboxNoScoring = o.sandboxNoScoring;
-    const auto modeOwnsLimits = o.modeOwnsLimits;
+    // map, a quest, a stock mode's look) as it would hosted alone. (One list, read and put back:
+    // forceClass a quest's forced class, the party's the host's; sandboxNoScoring a stock mode's
+    // look, none here.)
+    const auto gameKind = [](server::GameHost::Options& of) {
+        return std::tie(of.solo, of.soloGuests, of.maxPlayers, of.gameFlags, of.quest, of.questScreens, of.questSaves, of.questMapsOnly,
+                        of.forceClass, of.mapCycleOn, of.mapVote, of.sandboxNoScoring, of.modeOwnsLimits);
+    };
+    const auto kept = std::apply([](const auto&... field) { return std::tuple(field...); }, gameKind(o));
     (void)script_->configure(o); // (its options, callbacks and the maps the mod ships: Options::modeMaps)
-    o.solo = solo;
-    o.soloGuests = soloGuests;
-    o.maxPlayers = maxPlayers;
-    o.gameFlags = gameFlags;
-    o.quest = quest;
-    o.questScreens = questScreens;
-    o.questSaves = questSaves;
-    o.questMapsOnly = questMapsOnly;
-    o.forceClass = forceClass;
-    o.mapCycleOn = mapCycleOn;
-    o.mapVote = mapVote;
-    o.sandboxNoScoring = sandboxNoScoring; // (a stock mode's look: none here)
-    o.modeOwnsLimits = modeOwnsLimits;
+    gameKind(o) = kept;
     o.modeName = campaign_.title; // (NoX Core lists' Mode column: the campaign, not "Co-op Campaign")
     return {};
 }

@@ -17,15 +17,7 @@ namespace nox::modes::script {
 
 namespace {
 
-/// The map's size (world units): a camera a script places is kept on it.
-constexpr double kMapExtent = 5888;
-
-float coordArg(lua_State* L, int idx)
-{
-    const double v = luaL_checknumber(L, idx);
-    luaL_argcheck(L, v >= 0 && v <= kMapExtent, idx, "a point on the map (0 to 5888)");
-    return toolbox::toFloat(v);
-}
+using toolbox::coordArg; // (a camera a script places is kept on the map)
 
 bool watching(const server::ServerObject& u)
 {

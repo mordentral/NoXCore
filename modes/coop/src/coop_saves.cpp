@@ -127,9 +127,7 @@ constexpr std::uintmax_t kSeenFileMost = 4u << 20; ///< (a whole campaign's is a
 /// A map's name as a report or a file gives it: letters, digits, '_' and '-' (a file's stem).
 bool plainMapName(std::string_view s)
 {
-    return !s.empty() && s.size() <= coopmsg::kNameMost && std::ranges::all_of(s, [](char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
-    });
+    return util::plainName(s, coopmsg::kNameMost);
 }
 
 } // namespace

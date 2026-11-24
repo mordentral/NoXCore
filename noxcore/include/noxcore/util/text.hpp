@@ -1,6 +1,6 @@
 // Text helpers shared across noxcore and its programs: lower-case copies, compares without case
 // (std::tolower's: the programs never change the C locale, so ASCII letters only), image names'
-// lookup keys, and UTF-16LE fields read to their NUL.
+// lookup keys, UTF-8 cut at a whole character and checked, and UTF-16LE fields read to their NUL.
 #pragma once
 
 #include <algorithm>
@@ -129,6 +129,70 @@ struct ImageNameEqual {
     bool operator()(RawImageName raw, std::string_view key) const noexcept { return NoCaseEqual{}(raw.stem(), key); }
     bool operator()(std::string_view key, RawImageName raw) const noexcept { return NoCaseEqual{}(raw.stem(), key); }
 };
+
+/// How many of `s`'s bytes, `most` at most, end at a whole UTF-8 character: all of it when it
+/// fits, else `most` taken back to the start of the character it would split. (0 when every byte
+/// from the start to the cut continues a character: bytes that aren't UTF-8.)
+constexpr std::size_t utf8CutLength(std::string_view s, std::size_t most) noexcept
+{
+    std::size_t n = std::min(s.size(), most);
+    if (n < s.size()) {
+        while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) {
+            --n;
+        }
+    }
+    return n;
+}
+
+/// Whether `s` is well-formed UTF-8 (overlong forms, surrogates and past U+10FFFF refused).
+constexpr bool validUtf8(std::string_view s) noexcept
+{
+    for (std::size_t i = 0; i < s.size();) {
+        const auto b = static_cast<unsigned char>(s[i]);
+        if (b < 0x80) {
+            ++i;
+            continue;
+        }
+        std::size_t n = 0;
+        char32_t c = 0;
+        if (b >= 0xC2 && b <= 0xDF) {
+            n = 1;
+            c = b & 0x1Fu;
+        } else if (b >= 0xE0 && b <= 0xEF) {
+            n = 2;
+            c = b & 0x0Fu;
+        } else if (b >= 0xF0 && b <= 0xF4) {
+            n = 3;
+            c = b & 0x07u;
+        } else {
+            return false;
+        }
+        if (i + n >= s.size()) {
+            return false;
+        }
+        for (std::size_t k = 1; k <= n; ++k) {
+            const auto t = static_cast<unsigned char>(s[i + k]);
+            if ((t & 0xC0) != 0x80) {
+                return false;
+            }
+            c = (c << 6) | (t & 0x3Fu);
+        }
+        if ((n == 2 && c < 0x800) || (n == 3 && (c < 0x10000 || c > 0x10FFFF)) || (c >= 0xD800 && c <= 0xDFFF)) {
+            return false;
+        }
+        i += n + 1;
+    }
+    return true;
+}
+
+/// Whether `s` is a plain name: 1 to `most` of A-Z, a-z, 0-9, '_' and '-' (a file's stem, a maps
+/// folder's name).
+inline bool plainName(std::string_view s, std::size_t most)
+{
+    return !s.empty() && s.size() <= most && std::ranges::all_of(s, [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
+    });
+}
 
 /// A text message's text appended as MSG_TEXT_MESSAGE carries it: each character a byte (narrow:
 /// its low byte) or UTF-16LE, then the NUL in the same width.

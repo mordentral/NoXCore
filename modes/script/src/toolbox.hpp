@@ -8,10 +8,12 @@
 #include "noxcore/modes/script/script_data.hpp"
 #include "noxcore/server/combat.hpp"
 
-#include <cstdint>
-#include <string>
+#include "lua.h"
+#include "lualib.h"
 
-struct lua_State;
+#include <cstdint>
+#include <optional>
+#include <string>
 
 namespace nox::server {
 class GameHost;
@@ -49,6 +51,9 @@ server::ServerObject& objectArg(lua_State* L, int idx);
 server::ServerObject& playerUnitArg(lua_State* L, int idx);
 /// Whether `o` is a held-out stock player's unit (the script never hears of it).
 bool hidden(lua_State* L, const server::ServerObject& o);
+/// A unit's peer (its player's), none for a unit without one (a test's, a bot's own) or a
+/// held-out stock player's.
+std::optional<std::uint8_t> peerOfUnit(lua_State* L, std::uint32_t extent);
 /// An error when called inside an asked hook (onDamage, onExit): `what` changes the world.
 void refuseInsideAsked(lua_State* L, const char* what);
 /// A script error reported (logged once in a while, kept in errors()).
@@ -66,6 +71,33 @@ bool callHook(lua_State* L, const char* what, int nargs, int nresults);
 inline float toFloat(double v) noexcept
 {
     return nearestFloat(v);
+}
+
+/// The map's extent: 256 wall cells of 23.
+inline constexpr double kMapExtent = 256.0 * 23.0;
+
+/// A coordinate (or a distance) on the map: a number from 0 to the map's extent, never NaN or
+/// infinite (they would reach the engine's casts and every client).
+inline float coordArg(lua_State* L, int idx)
+{
+    const double v = luaL_checknumber(L, idx);
+    luaL_argcheck(L, v >= 0 && v <= kMapExtent, idx, "a point on the map (0 to 5888)");
+    return toFloat(v);
+}
+
+/// A number from lo to hi as the float the engine takes: never NaN or infinite.
+inline float floatArg(lua_State* L, int idx, double lo, double hi, const char* what)
+{
+    const double v = luaL_checknumber(L, idx);
+    luaL_argcheck(L, v >= lo && v <= hi, idx, what);
+    return toFloat(v);
+}
+
+/// The table on top of the stack's field `name` set to the number `v`.
+inline void setField(lua_State* L, const char* name, double v)
+{
+    lua_pushnumber(L, v);
+    lua_setfield(L, -2, name);
 }
 
 } // namespace toolbox

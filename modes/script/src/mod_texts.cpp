@@ -13,6 +13,7 @@
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/object_class.hpp"
+#include "noxcore/util/text.hpp"
 
 #include "lua.h"
 #include "lualib.h"
@@ -26,13 +27,6 @@ namespace nox::modes::script {
 static_assert(Texts::kMaxKeys == uimsg::kMaxTextKeys, "a client keeps as many keys as a mode may set");
 
 namespace {
-
-std::string folded(std::string_view key)
-{
-    std::string out(key);
-    std::ranges::transform(out, out.begin(), [](char c) { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
-    return out;
-}
 
 /// The player's unit's extent (0: no such player, or no unit).
 std::uint32_t extentOf(const server::GameHost& host, std::uint8_t peer)
@@ -92,7 +86,7 @@ std::string Texts::languageOf(const server::GameHost& host, std::uint8_t peer)
 
 bool Texts::set(server::GameHost* host, const std::string& key, const Text* text)
 {
-    const std::string k = folded(key);
+    const std::string k = util::lowered(key);
     const auto it = table_.find(k);
     const std::size_t was = it != table_.end() ? it->second.key.size() + it->second.text.bytes() : 0;
     if (!text) {
@@ -150,7 +144,7 @@ bool Texts::set(server::GameHost* host, const std::string& key, const Text* text
 
 void Texts::clear(server::GameHost* host, std::string_view prefix)
 {
-    const std::string p = folded(prefix);
+    const std::string p = util::lowered(prefix);
     bool any = false;
     for (auto it = table_.begin(); it != table_.end();) {
         if (it->first.starts_with(p)) {
@@ -172,7 +166,7 @@ void Texts::clear(server::GameHost* host, std::string_view prefix)
 
 bool Texts::has(std::string_view key) const
 {
-    return table_.contains(folded(key));
+    return table_.contains(util::lowered(key));
 }
 
 const Texts::Text* Texts::find(std::string_view key) const
@@ -180,7 +174,7 @@ const Texts::Text* Texts::find(std::string_view key) const
     if (table_.empty()) {
         return nullptr;
     }
-    const auto it = table_.find(folded(key));
+    const auto it = table_.find(util::lowered(key));
     return it != table_.end() ? &it->second.text : nullptr;
 }
 
@@ -258,7 +252,7 @@ void Texts::sendKey(server::GameHost& host, std::uint8_t peer, const Entry& e, c
     // mode's keys that go on from it are sent again.)
     if (was && was->in(language)) {
         sendTo(host, peer, uimsg::textClearMessage(e.key));
-        const std::string k = folded(e.key);
+        const std::string k = util::lowered(e.key);
         for (const auto& [k2, e2] : table_) {
             if (k2.size() > k.size() && k2.starts_with(k)) {
                 sendKey(host, peer, e2);
@@ -270,7 +264,7 @@ void Texts::sendKey(server::GameHost& host, std::uint8_t peer, const Entry& e, c
 namespace {
 
 /// A key's text of nox.setText's argument at `idx`: a string, or a table of language code ->
-/// string; an argument error for anything else.
+/// string; an argument error for anything else (a text that isn't UTF-8 too).
 Texts::Text textArg(lua_State* L, int idx)
 {
     Texts::Text t;
@@ -278,6 +272,7 @@ Texts::Text textArg(lua_State* L, int idx)
         size_t n = 0;
         const char* s = lua_tolstring(L, idx, &n);
         luaL_argcheck(L, n <= uimsg::kMaxTextValueBytes, idx, "a text of 4096 bytes at most");
+        luaL_argcheck(L, util::validUtf8(std::string_view(s, n)), idx, "a text in UTF-8");
         t.all.assign(s, n);
         return t;
     }
@@ -304,6 +299,9 @@ Texts::Text textArg(lua_State* L, int idx)
         const char* s = lua_tolstring(L, -1, &n);
         if (n > uimsg::kMaxTextValueBytes) {
             luaL_argerror(L, idx, "a text of 4096 bytes at most");
+        }
+        if (!util::validUtf8(std::string_view(s, n))) {
+            luaL_argerror(L, idx, "a text in UTF-8");
         }
         t.byLanguage[code].assign(s, n);
         lua_pop(L, 1);
@@ -372,12 +370,7 @@ int noxTellStory(lua_State* L)
         lua_pushboolean(L, 0);
         return 1;
     }
-    std::optional<std::uint8_t> peer;
-    for (const auto& [p, hp] : host->players()) {
-        if (hp.extent == unit.extent) {
-            peer = p;
-        }
-    }
+    const std::optional<std::uint8_t> peer = toolbox::peerOfUnit(L, unit.extent);
     Texts& texts = toolbox::partsOf(L).texts;
     // A key of the mode's own: only to a client that shows the overlay (its set sent first); one
     // with no text in the player's language (others = "own") is its own nox.csf's, as any.
