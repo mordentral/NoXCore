@@ -32,8 +32,12 @@ constexpr int kScriptSourceVersion = 2;
 
 /// The sidecar's source, in today's language: one saved without the mark comes through
 /// script::migrateCallOrder (`migration`, when given, is set to what it did; left empty for a
-/// marked source).
+/// marked source). One whose mark is there but can't be read (sidecarScriptSourceVersion gives
+/// nothing) is given as saved, not turned round (sidecarScriptMarkNote says so).
 std::optional<std::string> sidecarScriptSource(const Sidecar& side, std::optional<script::CallOrderMigration>* migration = nullptr);
+/// The language version the sidecar's mark gives: 1 without a mark; nothing for a mark that isn't
+/// a whole number (a JSON number such as 2 or 2.0, or the same in quotes).
+std::optional<int> sidecarScriptSourceVersion(const Sidecar& side);
 /// What a migration did, for the Script panel's Problems: each note a warning (the user should
 /// look over those calls) or information; none when it changed nothing.
 struct SourceNote {
@@ -41,6 +45,9 @@ struct SourceNote {
     std::string text;
 };
 std::vector<SourceNote> callOrderMigrationNotes(const script::CallOrderMigration& migration);
+/// The warning for the Problems list when the sidecar has a source whose mark can't be read (it
+/// is shown as saved), else nothing.
+std::optional<SourceNote> sidecarScriptMarkNote(const Sidecar& side);
 std::optional<script::DebugInfo> sidecarScriptDebug(const Sidecar& side);
 /// Stores the source (none: the key removed) with the mark (kSidecarScriptSourceVersion), and
 /// the debug info (null: removed).
@@ -117,7 +124,8 @@ std::optional<std::uint32_t> documentMemoryTricks(const MapDocument& doc);
 /// tricks of the original game (documentMemoryTricks: whatever the setting), or it already uses
 /// object variables (a custom map's) and the editor's setting doesn't allow them, so it can't be
 /// compiled again; the map's script stays as it is (never stripped). Nothing when editable.
-std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool allowObjectVariables);
+/// `memoryTricks`, when given, is set to whether the reason is the memory tricks.
+std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool allowObjectVariables, bool* memoryTricks = nullptr);
 
 /// The op that sets the map's compiled script to `file` ("Compile script"); empty when the map
 /// already holds those bytes.

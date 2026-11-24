@@ -5,6 +5,7 @@
 #include <array>
 #include <bit>
 #include <cstdio>
+#include <span>
 
 namespace nox::script {
 
@@ -86,6 +87,28 @@ std::string quoted(std::string_view s)
     return out + "\"";
 }
 
+/// A function's code an instruction at a time: f(at, op, operands) for each whole one (its
+/// operandCount operands all there; an unknown opcode has none), in order, while f returns true.
+/// Returns where the walk ended: the code's end, the instruction f stopped at, or one cut short
+/// (operands past the end), which f isn't given.
+template <typename F>
+std::size_t eachInstruction(std::span<const std::uint32_t> code, F&& f)
+{
+    std::size_t at = 0;
+    while (at < code.size()) {
+        const std::uint32_t op = code[at];
+        const std::uint32_t n = operandCount(op);
+        if (n > 0 && at + n >= code.size()) {
+            break;
+        }
+        if (!f(at, op, code.subspan(at + 1, n))) {
+            break;
+        }
+        at += 1 + n;
+    }
+    return at;
+}
+
 } // namespace
 
 std::optional<std::string_view> opName(std::uint32_t op)
@@ -120,11 +143,8 @@ std::uint32_t operandCount(std::uint32_t op)
 
 std::string builtinName(std::uint32_t id)
 {
-    if (id == kLuauCall) {
-        return "LuauCall";
-    }
-    if (id == kLuauCallReturn) {
-        return "LuauCallReturn";
+    if (isNoxBuiltin(id)) {
+        return std::string(kNoxBuiltinNames[builtinPlace(id) - kBuiltinCount]);
     }
     return id < kBuiltinCount ? std::string(kBuiltinNames[id]) : "Builtin" + std::to_string(id);
 }
@@ -133,21 +153,15 @@ std::string disassemble(const ScriptFile& file, std::size_t function)
 {
     const Function& fn = file.functions.at(function);
     std::string out;
-    std::size_t at = 0;
     char line[64];
     // One instruction a line: its word index, name and operands.
-    while (at < fn.code.size()) {
-        const std::uint32_t op = fn.code[at];
-        const std::uint32_t n = operandCount(op);
+    const std::size_t end = eachInstruction(fn.code, [&](std::size_t at, std::uint32_t op, std::span<const std::uint32_t> args) {
+        const std::uint32_t n = static_cast<std::uint32_t>(args.size());
         std::snprintf(line, sizeof line, "%6zu  ", at);
         out += line;
-        if (n > 0 && at + n >= fn.code.size()) {
-            out += "(cut short)\n";
-            break;
-        }
         const auto name = opName(op);
         out += name ? std::string(*name) : "Op" + std::to_string(op);
-        const auto arg = [&](std::size_t i) { return fn.code[at + 1 + i]; };
+        const auto arg = [&](std::size_t i) { return args[i]; };
         switch (static_cast<Op>(op)) {
         case Op::LoadVarInt:
         case Op::LoadVarFloat:
@@ -179,7 +193,12 @@ std::string disassemble(const ScriptFile& file, std::size_t function)
             break;
         }
         out += '\n';
-        at += 1 + n;
+        return true;
+    });
+    if (end < fn.code.size()) {
+        std::snprintf(line, sizeof line, "%6zu  ", end);
+        out += line;
+        out += "(cut short)\n";
     }
     return out;
 }
@@ -190,18 +209,13 @@ std::optional<std::string> check(const ScriptFile& file, std::size_t function)
     const auto where = [&](std::size_t at, const std::string& what) {
         return fn.name + " at " + std::to_string(at) + ": " + what;
     };
-    std::size_t at = 0;
+    std::optional<std::string> wrong;
     // Walks the instructions as the disassembler does, checking each operand against the file.
-    while (at < fn.code.size()) {
-        const std::uint32_t op = fn.code[at];
+    const auto problem = [&](std::size_t at, std::uint32_t op, std::span<const std::uint32_t> args) -> std::optional<std::string> {
         if (op >= kOpCount) {
             return where(at, "unknown opcode " + std::to_string(op));
         }
-        const std::uint32_t n = operandCount(op);
-        if (at + n >= fn.code.size() && n > 0) {
-            return where(at, "cut short");
-        }
-        const auto arg = [&](std::size_t i) { return fn.code[at + 1 + i]; };
+        const auto arg = [&](std::size_t i) { return args[i]; };
         switch (static_cast<Op>(op)) {
         case Op::LoadVarInt:
         case Op::LoadVarFloat:
@@ -242,24 +256,30 @@ std::optional<std::string> check(const ScriptFile& file, std::size_t function)
         default:
             break;
         }
-        at += 1 + n;
+        return std::nullopt;
+    };
+    const std::size_t end = eachInstruction(fn.code, [&](std::size_t at, std::uint32_t op, std::span<const std::uint32_t> args) {
+        wrong = problem(at, op, args);
+        return !wrong;
+    });
+    if (!wrong && end < fn.code.size()) {
+        wrong = where(end, "cut short");
     }
-    return std::nullopt;
+    return wrong;
 }
 
 std::optional<std::uint32_t> memoryTrickBuiltin(const ScriptFile& file)
 {
     for (const Function& fn : file.functions) {
-        const auto& code = fn.code;
-        for (std::size_t at = 0; at < code.size();) {
-            const std::uint32_t op = code[at];
-            if (op == static_cast<std::uint32_t>(Op::CallBuiltin) && at + 1 < code.size()) {
-                const std::uint32_t id = code[at + 1];
-                if (id >= kBuiltinCount && !inNoxBuiltinRange(id)) {
-                    return id;
-                }
+        std::optional<std::uint32_t> trick;
+        eachInstruction(fn.code, [&](std::size_t, std::uint32_t op, std::span<const std::uint32_t> args) {
+            if (op == static_cast<std::uint32_t>(Op::CallBuiltin) && args[0] >= kBuiltinCount && !inNoxBuiltinRange(args[0])) {
+                trick = args[0];
             }
-            at += 1 + (op < kOpCount ? operandCount(op) : 0);
+            return !trick;
+        });
+        if (trick) {
+            return trick;
         }
     }
     return std::nullopt;

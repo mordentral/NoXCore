@@ -3,6 +3,7 @@
 // names off the words and turns the instructions back into operators.
 #pragma once
 
+#include "noxcore/script/builtins.hpp"
 #include "noxcore/script/opcodes.hpp"
 
 #include <string_view>
@@ -91,15 +92,35 @@ constexpr const AssignOperator* assignOperator(std::string_view text)
     return nullptr;
 }
 
+/// The binary operator `op` is an instruction of (nullptr for none), and the type that
+/// instruction takes: which of the row's three it is.
+struct BinaryInstruction {
+    const BinaryOperator* row = nullptr;
+    Type operands = Type::Int;
+    /// What it gives: an int for a comparison, else a value of the type it takes.
+    constexpr Type result() const { return row && row->compare ? Type::Int : operands; }
+};
+constexpr BinaryInstruction binaryInstruction(Op op)
+{
+    for (const BinaryOperator& o : kBinaryOperators) {
+        if (op == o.i) {
+            return {&o, Type::Int};
+        }
+        if (op != kNoOp && op == o.f) {
+            return {&o, Type::Float};
+        }
+        if (op != kNoOp && op == o.s) {
+            return {&o, Type::String};
+        }
+    }
+    return {};
+}
+
 /// The text of the binary operator `op` is an instruction of, or "?" for none.
 constexpr std::string_view binaryText(Op op)
 {
-    for (const BinaryOperator& o : kBinaryOperators) {
-        if (op == o.i || (op != kNoOp && (op == o.f || op == o.s))) {
-            return o.text;
-        }
-    }
-    return "?";
+    const BinaryInstruction b = binaryInstruction(op);
+    return b.row ? b.row->text : "?";
 }
 
 /// The text of the assignment `op` is a store of, or "?" for none.

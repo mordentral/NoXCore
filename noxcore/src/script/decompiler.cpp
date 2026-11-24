@@ -26,6 +26,7 @@
 #include "noxcore/script/opcodes.hpp"
 #include "noxcore/strings/l10n.hpp"
 
+#include "call_order_check.hpp"
 #include "language.hpp"
 
 #include <algorithm>
@@ -237,9 +238,15 @@ private:
         if (back.strings.empty() || file_.strings.empty()) {
             return false;
         }
-        ScriptFile same = back;
-        same.strings.front() = file_.strings.front();
-        return same.serialize() == file_.serialize();
+        // The bytes but string 0's: "SCRIPT03", "STRG" and the string count (16 bytes), then
+        // string 0 (a u32 length and its text), then the rest.
+        constexpr std::size_t kHead = 16;
+        const auto a = back.serialize();
+        const auto b = file_.serialize();
+        const std::size_t restA = kHead + 4 + back.strings.front().size();
+        const std::size_t restB = kHead + 4 + file_.strings.front().size();
+        return std::equal(a.begin(), a.begin() + kHead, b.begin(), b.begin() + kHead) &&
+               std::equal(a.begin() + static_cast<std::ptrdiff_t>(restA), a.end(), b.begin() + static_cast<std::ptrdiff_t>(restB), b.end());
     }
 
     /// An unmarked embedded source that doesn't compile back the same: if the old call order gives
@@ -252,17 +259,27 @@ private:
         if (!old.ok() || old.file->serialize() != file_.serialize()) {
             return;
         }
-        CallOrderMigration m = migrateCallOrder(res.source);
+        // (The check with the source kept, as here: the old source compiles by the old order to
+        // the script's bytes; the turned text must give the same but for string 0, which holds
+        // each one's own text. Every string constant's id is one past the one it would have
+        // without the kept source, the old source's and the turned text's alike, so it is the
+        // check migrateCallOrder makes without it.)
+        CompileResult now;
+        CallOrderMigration m = detail::migrateCallOrder(res.source, {
+            .beforeCompiles = [] { return true; },
+            .afterOptions = {.embedSource = true, .allowObjectVariables = true},
+            .same = [&](const ScriptFile& after) { return sameButSource(after); },
+            .after = &now,
+        });
         using Outcome = CallOrderMigration::Outcome;
         if (m.outcome == Outcome::Unchanged) {
             return; // (never: the two orders differ only on such calls)
         }
         if (m.outcome != Outcome::Failed) {
             // Same, or TypeErrors (the turned text shows a mixed-type call as the map runs it).
-            const auto now = compile(m.source, {.embedSource = true, .allowObjectVariables = true});
             res.source = m.source;
             res.compiles = now.ok();
-            res.identical = now.ok() && sameButSource(*now.file);
+            res.identical = m.outcome == Outcome::Same; // (it compiled, and sameButSource said so)
         }
         res.migration = std::move(m);
     }
@@ -752,20 +769,15 @@ private:
             case Op::Return:
                 break;
             default:
-                if (isBinary(o)) {
+                if (const detail::BinaryInstruction b = detail::binaryInstruction(o); b.row) {
                     const TEntry r = pop();
                     const TEntry l = pop();
-                    std::uint8_t m = kI;
-                    bool compare = false;
-                    switch (o) {
-                    case Op::FloatAdd: case Op::FloatSub: case Op::FloatMul: case Op::FloatDiv: m = kF; break;
-                    case Op::StringAdd: m = kS; break;
-                    case Op::IntEq: case Op::IntNeq: m = kI | kO; compare = true; break;
-                    case Op::FloatEq: case Op::FloatNeq: case Op::FloatLt: case Op::FloatGt: case Op::FloatLte: case Op::FloatGte: m = kF; compare = true; break;
-                    case Op::StringEq: case Op::StringNeq: case Op::StringLt: case Op::StringGt: case Op::StringLte: case Op::StringGte: m = kS; compare = true; break;
-                    case Op::IntLt: case Op::IntGt: case Op::IntLte: case Op::IntGte: compare = true; break;
-                    default: break;
-                    }
+                    // (An int == or != takes objects too: they are compared as ints.)
+                    const std::uint8_t m = b.operands == Type::Float    ? kF
+                                           : b.operands == Type::String ? kS
+                                           : o == Op::IntEq || o == Op::IntNeq ? static_cast<std::uint8_t>(kI | kO)
+                                                                               : kI;
+                    const bool compare = b.row->compare;
                     if (!l.addr && !r.addr) {
                         restrict(l.tv, m);
                         restrict(r.tv, m);
@@ -1678,25 +1690,8 @@ private:
         return Type::Int;
     }
     /// What a binary operator's code takes (operands) and gives.
-    static Type binaryOperands(Op o)
-    {
-        switch (o) {
-        case Op::FloatAdd: case Op::FloatSub: case Op::FloatMul: case Op::FloatDiv:
-        case Op::FloatEq: case Op::FloatNeq: case Op::FloatLt: case Op::FloatGt: case Op::FloatLte: case Op::FloatGte:
-            return Type::Float;
-        case Op::StringAdd:
-        case Op::StringEq: case Op::StringNeq: case Op::StringLt: case Op::StringGt: case Op::StringLte: case Op::StringGte:
-            return Type::String;
-        default:
-            return Type::Int;
-        }
-    }
-    static Type binaryResult(Op o)
-    {
-        return o == Op::FloatAdd || o == Op::FloatSub || o == Op::FloatMul || o == Op::FloatDiv ? Type::Float
-               : o == Op::StringAdd                                                               ? Type::String
-                                                                                                  : Type::Int;
-    }
+    static Type binaryOperands(Op o) { return detail::binaryInstruction(o).operands; }
+    static Type binaryResult(Op o) { return detail::binaryInstruction(o).result(); }
     /// A value used as an int where it is a float, or the other way round: its bits, cast.
     bool needsCast(const Node& n, Type want) const
     {

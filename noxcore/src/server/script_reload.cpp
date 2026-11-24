@@ -1,6 +1,7 @@
 // Hot reload of a running map script (script_reload.hpp): the map editor's only.
 #include "noxcore/server/script_reload.hpp"
 
+#include "noxcore/map/map_patch.hpp"
 #include "noxcore/map/sections.hpp"
 #include "noxcore/server/script_host.hpp"
 #include "noxcore/server/server.hpp"
@@ -26,14 +27,7 @@ public:
     static void storeScriptBytes(Server& s)
     {
         s.lastScriptCode_ = s.scriptFile_.serialize();
-        for (map::RawSection& section : s.mapFile_.sections) {
-            if (section.name == map::ScriptObject::kName) {
-                map::ScriptObject so = map::ScriptObject::parse(section.data);
-                so.code = s.lastScriptCode_;
-                section.data = so.serialize();
-                break;
-            }
-        }
+        map::replaceScriptObject(s.mapFile_, s.lastScriptCode_, map::MissingScriptObject::Skip);
     }
 };
 

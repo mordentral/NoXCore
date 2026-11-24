@@ -27,6 +27,7 @@
 #include "noxcore/script/opcodes.hpp"
 #include "noxcore/strings/l10n.hpp"
 
+#include "call_order_check.hpp"
 #include "language.hpp"
 
 #include <algorithm>
@@ -3043,6 +3044,20 @@ private:
 
 CallOrderMigration migrateCallOrder(std::string_view oldSource)
 {
+    // The check: what the old compiler makes of the old source, what today's makes of the new.
+    std::optional<CompileResult> before;
+    return detail::migrateCallOrder(oldSource, {
+        .beforeCompiles = [&] {
+            before = compile(oldSource, {.allowObjectVariables = true, .legacyCallOrder = true});
+            return before->ok();
+        },
+        .afterOptions = {.allowObjectVariables = true},
+        .same = [&](const ScriptFile& after) { return after.serialize() == before->file->serialize(); },
+    });
+}
+
+CallOrderMigration detail::migrateCallOrder(std::string_view oldSource, const CallOrderCheck& check)
+{
     CallOrderMigration out;
     out.source = std::string(oldSource);
     std::vector<Diagnostic> diags;
@@ -3057,16 +3072,16 @@ CallOrderMigration migrateCallOrder(std::string_view oldSource)
     }
     std::ranges::sort(found.calls, {}, [](const Expr* e) { return e->argSpans.front().first; });
     std::string turned = TurnRound(oldSource, found.calls).run();
-    // The check: what the old compiler made of the old source, what today's makes of the new.
-    const auto before = compile(oldSource, {.allowObjectVariables = true, .legacyCallOrder = true});
-    if (!before.ok()) {
+    if (!check.beforeCompiles()) {
         out.outcome = CallOrderMigration::Outcome::Unchecked;
         out.source = std::move(turned);
         out.calls = found.calls.size();
         return out;
     }
-    const auto after = compile(turned, {.allowObjectVariables = true});
-    if (after.ok() && after.file->serialize() != before.file->serialize()) {
+    CompileResult kept;
+    CompileResult& after = check.after ? *check.after : kept;
+    after = compile(turned, check.afterOptions);
+    if (after.ok() && !check.same(*after.file)) {
         out.outcome = CallOrderMigration::Outcome::Failed;
         return out;
     }

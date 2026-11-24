@@ -6,6 +6,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace nox::map {
@@ -39,6 +40,7 @@ struct MapFile {
 
     /// First section with this name, or nullptr.
     const RawSection* find(std::string_view name) const;
+    RawSection* find(std::string_view name) { return const_cast<RawSection*>(std::as_const(*this).find(name)); }
 };
 
 /// Parses a decrypted map. Throws FormatError.

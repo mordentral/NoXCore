@@ -240,8 +240,8 @@ const std::array<BuiltinSignature, kBuiltinCount> kTable{{    {"Wall", O, {I, I}
 // NoX Core's own (opcodes.hpp's kNoxBuiltinIds, in that order): the name a string, then four
 // values of any type as their words; all but the name may be left out (0 each).
 const std::array<BuiltinSignature, kNoxBuiltinCount> kNoxTable{{
-    {"LuauCall", V, {S, I, I, I, I}, 1, 1},       // kLuauCall
-    {"LuauCallReturn", I, {S, I, I, I, I}, 1, 1}, // kLuauCallReturn
+    {kNoxBuiltinNames[0], V, {S, I, I, I, I}, 1, 1}, // kLuauCall
+    {kNoxBuiltinNames[1], I, {S, I, I, I, I}, 1, 1}, // kLuauCallReturn
 }};
 
 } // namespace

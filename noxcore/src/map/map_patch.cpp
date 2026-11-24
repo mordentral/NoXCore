@@ -15,16 +15,6 @@ namespace nox::map {
 
 namespace {
 
-RawSection* findSection(MapFile& map, std::string_view name)
-{
-    for (auto& s : map.sections) {
-        if (s.name == name) {
-            return &s;
-        }
-    }
-    return nullptr;
-}
-
 constexpr std::string_view kExitXfer = "ExitXfer";
 
 /// The ObjectTOC ids of the map's exit types (their xfer ExitXfer), with each one's xfer and name.
@@ -80,10 +70,19 @@ std::string_view exitName(const xfer::Exit& x)
 
 } // namespace
 
-void replaceScriptObject(MapFile& map, std::span<const std::uint8_t> code)
+void replaceScriptObject(MapFile& map, std::span<const std::uint8_t> code, MissingScriptObject missing)
 {
-    RawSection* raw = findSection(map, ScriptObject::kName);
+    RawSection* raw = map.find(ScriptObject::kName);
     if (!raw) {
+        if (missing == MissingScriptObject::Skip) {
+            return;
+        }
+        if (missing == MissingScriptObject::Append) {
+            ScriptObject s;
+            s.code.assign(code.begin(), code.end());
+            map.sections.push_back({std::string(ScriptObject::kName), s.serialize()});
+            return;
+        }
         throw FormatError("map has no " + std::string(ScriptObject::kName) + " section");
     }
     ScriptObject s = ScriptObject::parse(raw->data);
@@ -116,7 +115,7 @@ std::size_t renameExits(MapFile& map, const things::ThingDb& things,
                         const std::function<std::optional<std::string>(std::string_view)>& rename)
 {
     const ExitTypes types = exitTypes(map, things);
-    RawSection* raw = findSection(map, ObjectData::kName);
+    RawSection* raw = map.find(ObjectData::kName);
     if (!raw) {
         throw FormatError("map has no " + std::string(ObjectData::kName) + " section");
     }

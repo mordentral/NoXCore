@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <set>
@@ -190,6 +191,44 @@ std::string stripNul(std::string s)
 
 } // namespace
 
+std::optional<int> sidecarScriptSourceVersion(const Sidecar& side)
+{
+    const auto v = side.other.find(std::string(kSidecarScriptSourceVersion));
+    if (v == side.other.end()) {
+        return 1;
+    }
+    // A JSON number (2, or 2.0 as another writer may put it), or the same in quotes.
+    std::string text = jsonUnquote(v->second).value_or(v->second);
+    std::string_view s = text;
+    const auto space = [](char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; };
+    while (!s.empty() && space(s.front())) {
+        s.remove_prefix(1);
+    }
+    while (!s.empty() && space(s.back())) {
+        s.remove_suffix(1);
+    }
+    double d = 0;
+    const auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), d);
+    if (ec != std::errc{} || end != s.data() + s.size() || !(d == std::floor(d)) || d < -1e9 || d > 1e9) {
+        return std::nullopt;
+    }
+    return static_cast<int>(d);
+}
+
+std::optional<SourceNote> sidecarScriptMarkNote(const Sidecar& side)
+{
+    if (!side.other.contains(std::string(kSidecarScriptSource)) || sidecarScriptSourceVersion(side)) {
+        return std::nullopt;
+    }
+    return SourceNote{true, l10n::format(NOX_TR("editor.script.migrated.bad_mark",
+                                                "the sidecar's mark of the language version the source was saved in ({mark}) isn't a "
+                                                "number: the source is shown as saved, not turned round for the old argument order (a "
+                                                "call's first argument to the function's last parameter); if it was written for that "
+                                                "order, its calls of the script's own functions with two or more arguments now bind the "
+                                                "other way round, so check them before compiling"),
+                                         {{"mark", side.other.at(std::string(kSidecarScriptSourceVersion))}})};
+}
+
 std::optional<std::string> sidecarScriptSource(const Sidecar& side, std::optional<script::CallOrderMigration>* migration)
 {
     if (migration) {
@@ -203,14 +242,10 @@ std::optional<std::string> sidecarScriptSource(const Sidecar& side, std::optiona
     if (!source) {
         return std::nullopt;
     }
-    int version = 1;
-    if (const auto v = side.other.find(std::string(kSidecarScriptSourceVersion)); v != side.other.end()) {
-        const std::string& raw = v->second;
-        if (std::from_chars(raw.data(), raw.data() + raw.size(), version).ec != std::errc{}) {
-            version = 1;
-        }
-    }
-    if (version >= kScriptSourceVersion) {
+    // (A mark that can't be read: the source as saved, never turned round on a guess; the
+    // Problems list says so, sidecarScriptMarkNote.)
+    const auto version = sidecarScriptSourceVersion(side);
+    if (!version || *version >= kScriptSourceVersion) {
         return source;
     }
     auto m = script::migrateCallOrder(*source);
@@ -450,9 +485,13 @@ std::optional<std::uint32_t> documentMemoryTricks(const MapDocument& doc)
     }
 }
 
-std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool allowObjectVariables)
+std::optional<std::string> scriptReadOnlyReason(const MapDocument& doc, bool allowObjectVariables, bool* memoryTricks)
 {
-    if (const auto trick = documentMemoryTricks(doc)) {
+    const auto trick = documentMemoryTricks(doc);
+    if (memoryTricks) {
+        *memoryTricks = trick.has_value();
+    }
+    if (trick) {
         return l10n::format(NOX_TR("editor.script.read_only_memory_tricks",
                                    "This map's script uses memory tricks of the original game that NoX Core does not run (it calls builtin "
                                    "{id}). The source is shown read-only and the map's script is kept as it is."),

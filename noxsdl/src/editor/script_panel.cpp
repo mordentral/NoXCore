@@ -634,11 +634,17 @@ void ScriptPanel::documentOpened()
     }
     sourceNotes_.clear();
     std::optional<sc::CallOrderMigration> migration;
-    if (const auto src = me::sidecarScriptSource(ed_.sidecar_, &migration); src && !ed_.doc_.scriptSource) {
-        // (The saved source, not a change: one saved for the old argument order comes turned
-        // round, the same bytes compiled; the next save writes it with the mark.)
-        ed_.doc_.scriptSource = *src;
-        noteMigration(migration);
+    if (!ed_.doc_.scriptSource) {
+        if (const auto src = me::sidecarScriptSource(ed_.sidecar_, &migration)) {
+            // (The saved source, not a change: one saved for the old argument order comes turned
+            // round, the same bytes compiled; the next save writes it with the mark.)
+            ed_.doc_.scriptSource = *src;
+            noteMigration(migration);
+            if (auto bad = me::sidecarScriptMarkNote(ed_.sidecar_)) {
+                sourceNotes_.push_back(std::move(*bad)); // (a mark it can't read: shown as saved)
+                ed_.showProblems_ = true;
+            }
+        }
     }
     good_ = me::sidecarScriptDebug(ed_.sidecar_);
     readOnlyRev_.reset();
@@ -863,8 +869,7 @@ const std::string* ScriptPanel::readOnlyReason()
     if (readOnlyRev_ != rev || readOnlyAllow_ != allow) {
         readOnlyRev_ = rev;
         readOnlyAllow_ = allow;
-        readOnly_ = me::scriptReadOnlyReason(ed_.doc_, allow);
-        readOnlyTricks_ = readOnly_ && me::documentMemoryTricks(ed_.doc_).has_value();
+        readOnly_ = me::scriptReadOnlyReason(ed_.doc_, allow, &readOnlyTricks_); // (one read of the script for both)
     }
     return readOnly_ ? &*readOnly_ : nullptr;
 }

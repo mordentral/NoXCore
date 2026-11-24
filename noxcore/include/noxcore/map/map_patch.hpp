@@ -22,10 +22,14 @@ struct ThingDb;
 
 namespace nox::map {
 
-/// Replaces the compiled script in the map's ScriptObject section (`code`: a script file's bytes,
-/// script::ScriptFile::serialize's), keeping the section's version and its place. Only that
-/// section changes. Throws FormatError when the map has no ScriptObject.
-void replaceScriptObject(MapFile& map, std::span<const std::uint8_t> code);
+/// What replaceScriptObject does with a map that has no ScriptObject section: throws FormatError,
+/// leaves the map as it is, or adds the section at the end (version 1).
+enum class MissingScriptObject : std::uint8_t { Throw, Skip, Append };
+
+/// Replaces the compiled script in the map's (first) ScriptObject section (`code`: a script file's
+/// bytes, script::ScriptFile::serialize's), keeping the section's version and its place. Only that
+/// section changes. A map without one: as `missing` says.
+void replaceScriptObject(MapFile& map, std::span<const std::uint8_t> code, MissingScriptObject missing = MissingScriptObject::Throw);
 
 /// The longest exit destination the game takes (its reader's buffer holds 80 bytes with the NUL).
 inline constexpr std::size_t kMaxExitMapName = 79;

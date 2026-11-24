@@ -121,6 +121,8 @@ constexpr std::uint32_t kLuauCallReturn = noxBuiltinId(1, 5, true); // 1051
 /// NoX Core's builtins this build has, in order.
 constexpr std::uint32_t kNoxBuiltinCount = 2;
 constexpr std::uint32_t kNoxBuiltinIds[kNoxBuiltinCount] = {kLuauCall, kLuauCallReturn};
+/// Their names, in the same order (builtinName; builtins.cpp's signatures).
+constexpr std::string_view kNoxBuiltinNames[kNoxBuiltinCount] = {"LuauCall", "LuauCallReturn"};
 /// Whether `id` is one of NoX Core's builtins this build has.
 constexpr bool isNoxBuiltin(std::uint32_t id) noexcept { return id == kLuauCall || id == kLuauCallReturn; }
 /// Whether `id` is a builtin this build has: the game's or NoX Core's.
