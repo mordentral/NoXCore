@@ -109,13 +109,7 @@ void characterPlayedHere(App& app)
         return; // (the co-op campaign: its Hello says which; no mode: nothing)
     }
     place.title = host.modeName;
-    // (one of our modes by that name: its id, so it's the same place as one hosted here)
-    for (const nox::modes::Mode* m : nox::modes::registry().all()) {
-        if (m && m->info.name == host.modeName) {
-            place.id = m->info.id;
-            break;
-        }
-    }
+    place.id = modeIdByName(host.modeName); // (one of our modes by that name: its id, so it's the same place as one hosted here)
     begin(app, std::move(place));
 }
 

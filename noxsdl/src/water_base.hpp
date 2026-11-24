@@ -52,10 +52,85 @@ struct PlacedTile {
     int y = 0;
     int variant = 0;
 };
+/// Whether floor index `floor` is one of the water floors (`waterFloors`: a flag by floor index;
+/// a map's tile may name a floor past the table's end: none).
+inline bool isWaterFloor(std::span<const char> waterFloors, std::uint8_t floor)
+{
+    return floor < waterFloors.size() && waterFloors[floor] != 0;
+}
 /// The variant rule's anchor (a, b) most of `tiles` follow ((0, 0) for none).
 std::pair<int, int> learnAnchor(std::span<const PlacedTile> tiles, int cols, int rows);
 /// What the base is sampled at for world point p: p plus this (mod the period), so the picture
 /// shows each tile's own variant under anchor (a, b).
 std::pair<int, int> anchorOffset(int a, int b, int period);
+
+/// Where a map's water is (MapView's, for HD water): the full-grid places holding a tile with
+/// water in it, whether any tile has, and the base's offset for the anchor the water floor's own
+/// tiles follow. Made by a scan of every tile; one tile changed (the editor's painting) is taken
+/// in without one, with the same result.
+class Coverage {
+public:
+    static constexpr int kGrid = 258; ///< the grid's side: the full grid's 256 and its -1 row
+    /// A tile as the coverage sees it.
+    struct Tile {
+        float x = 0;        ///< its top-left, world units (the game's (23 gx - 11, 23 gy + 12))
+        float y = 0;
+        bool wet = false;   ///< water in it, its own floor's or its edges'
+        bool base = false;  ///< its own floor is a water floor: the anchor is learnt from it
+        int variant = 0;
+    };
+
+    /// Every tile afresh: `each(fn)` calls fn(const Tile&) for each of the map's tiles; `cols` and
+    /// `rows` the water floor's variants.
+    template <class Each>
+    void scan(Each&& each, int cols, int rows)
+    {
+        grid_.assign(static_cast<std::size_t>(kGrid) * kGrid, 0);
+        wet_ = 0;
+        std::vector<PlacedTile> placed;
+        each([&](const Tile& t) {
+            mark(t, 1);
+            if (t.base) {
+                placed.push_back(placedOf(t));
+            }
+        });
+        learn(placed, cols, rows);
+    }
+    /// The tile at one place became `after` (nullopt: none there now) from `before` (nullopt: none
+    /// there). True: the anchor's tiles changed, so relearn() must be called (the grid and any()
+    /// are up to date already). Only after a scan().
+    bool change(const std::optional<Tile>& before, const std::optional<Tile>& after);
+    /// The anchor learnt again from every tile (`each` as scan's), the grid kept.
+    template <class Each>
+    void relearn(Each&& each, int cols, int rows)
+    {
+        std::vector<PlacedTile> placed;
+        each([&](const Tile& t) {
+            if (t.base) {
+                placed.push_back(placedOf(t));
+            }
+        });
+        learn(placed, cols, rows);
+    }
+
+    bool scanned() const { return !grid_.empty(); }
+    bool any() const { return wet_ > 0; }
+    /// Whether full-grid place (gx, gy + 1) has water (false outside the grid, or before a scan).
+    bool at(int gx, int gyPlusOne) const
+    {
+        return !grid_.empty() && gx >= 0 && gyPlusOne >= 0 && gx < kGrid && gyPlusOne < kGrid &&
+               grid_[static_cast<std::size_t>(gyPlusOne) * kGrid + static_cast<std::size_t>(gx)] != 0;
+    }
+    std::pair<int, int> offset() const { return offset_; }
+    const std::vector<std::uint8_t>& grid() const { return grid_; } ///< (the tests')
+
+private:
+    static PlacedTile placedOf(const Tile& t);
+    void mark(const Tile& t, int delta);
+    void learn(std::span<const PlacedTile> placed, int cols, int rows);
+    std::vector<std::uint8_t> grid_; ///< by (gy + 1) x kGrid + gx: the wet tiles there
+    std::size_t wet_ = 0;            ///< the wet tiles, in the grid or not
+    std::pair<int, int> offset_{};
+};
 
 } // namespace noxsdl::water

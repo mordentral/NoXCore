@@ -239,6 +239,54 @@ std::pair<int, int> learnAnchor(std::span<const PlacedTile> tiles, int cols, int
     return best;
 }
 
+PlacedTile Coverage::placedOf(const Tile& t)
+{
+    return {static_cast<int>(std::lround(t.x)), static_cast<int>(std::lround(t.y)), t.variant};
+}
+
+void Coverage::mark(const Tile& t, int delta)
+{
+    if (!t.wet) {
+        return;
+    }
+    wet_ = delta > 0 ? wet_ + 1 : wet_ - 1;
+    // (Full-grid place from the top-left (23 gx - 11, 23 gy + 12), one past for gy -1.)
+    constexpr float kHalf = static_cast<float>(kTile / 2);
+    const int gx = static_cast<int>(std::lround((t.x + 11) / kHalf));
+    const int gy = static_cast<int>(std::lround((t.y - 12) / kHalf)) + 1;
+    if (gx >= 0 && gy >= 0 && gx < kGrid && gy < kGrid) {
+        auto& cell = grid_[static_cast<std::size_t>(gy) * kGrid + static_cast<std::size_t>(gx)];
+        cell = static_cast<std::uint8_t>(cell + delta);
+    }
+}
+
+void Coverage::learn(std::span<const PlacedTile> placed, int cols, int rows)
+{
+    const auto [a, b] = learnAnchor(placed, cols, rows);
+    offset_ = anchorOffset(a, b, kTile * cols);
+}
+
+bool Coverage::change(const std::optional<Tile>& before, const std::optional<Tile>& after)
+{
+    if (before) {
+        mark(*before, -1);
+    }
+    if (after) {
+        mark(*after, 1);
+    }
+    const bool wasBase = before && before->base;
+    const bool isBase = after && after->base;
+    if (wasBase != isBase) {
+        return true;
+    }
+    if (!wasBase) {
+        return false; // (neither is one of the anchor's)
+    }
+    const PlacedTile b = placedOf(*before);
+    const PlacedTile a = placedOf(*after);
+    return b.x != a.x || b.y != a.y || b.variant != a.variant;
+}
+
 std::pair<int, int> anchorOffset(int a, int b, int period)
 {
     // (a, b) moves the variants a steps along u and -b along v: u is (23, 23) in the world, v (23, -23).

@@ -11,6 +11,7 @@
 
 #include "lighting.hpp"
 #include "water_base.hpp"
+#include "water_ripples.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -30,9 +31,10 @@ public:
     /// The body's frames per second: the frames run one into the next this fast (the six-frame
     /// loop in 4 s).
     static constexpr double kFramesPerSecond = 1.5;
-    /// The most lights and ripples the shader takes (its kMaxLights, kMaxRipples).
+    /// The most lights and ripples the shader takes (its kMaxLights, kMaxRipples): the ripples'
+    /// pool's rings in flight.
     static constexpr int kMaxLights = 8;
-    static constexpr int kMaxRipples = 24;
+    static constexpr int kMaxRipples = WaterRipples::kSources;
 
     SDL_GPURenderState* state() const { return state_; }
     /// The uniforms for a floor target whose top-left is world (left, top) at `texelsPerUnit`, at
@@ -44,7 +46,6 @@ public:
 
 private:
     HdWater() = default;
-    SDL_Renderer* renderer_ = nullptr;
     SDL_GPUDevice* device_ = nullptr;
     SDL_Texture* texture_ = nullptr; ///< the base (its GPU texture bound as the shader's second)
     SDL_GPUSampler* sampler_ = nullptr;

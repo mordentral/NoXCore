@@ -109,6 +109,10 @@ public:
     }
     /// Drops everything (a new map).
     void clear();
+    /// The app's thing.bin and gamedata.bin were replaced (a game's own, or the install's again:
+    /// game_data_swap.hpp): everything is dropped as by clear(), and so is all the effects looked
+    /// up in the old tables (types, images, spark types, numbers), looked up again as next needed.
+    void tablesChanged();
     /// The view this frame: rains start at its top, and vortex orbs go when they leave it.
     void setView(const Camera& camera)
     {

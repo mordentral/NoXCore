@@ -39,6 +39,9 @@ public:
     std::set<std::uint32_t> limited(const nox::client::World& world, const nox::things::GameData& gameData,
                                     std::uint32_t gameFlags, bool modeOwnsBook = false) const;
     void clear();
+    /// The app's thing.bin was replaced (game_data_swap.hpp): the tracked types worked out again by
+    /// the next update(), as the world's thing.bin is the same object with other contents.
+    void tablesChanged() { trackedOf_ = nullptr; }
     /// The power the server casts a spell of ours at (spellGetPower): 3 under game flags 0x570
     /// unless `modeOwnsBook`, else `level` (3 for 0: one it doesn't know).
     static int hintPower(std::uint32_t worldFlags, bool modeOwnsBook, int level);

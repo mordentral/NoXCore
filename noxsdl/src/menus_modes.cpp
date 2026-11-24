@@ -13,6 +13,7 @@
 #include "mode_list.hpp"
 #include "mode_ui.hpp"
 #include "mods_folder.hpp"
+#include "text_fit.hpp"
 
 #include "noxcore/modes/registry.hpp"
 #include "noxcore/strings/l10n.hpp"
@@ -100,21 +101,10 @@ std::vector<Row> buildRows(ModeListFor list)
     });
 }
 
-/// `s` cut with "..." to fit `w` (whole UTF-8 letters).
+/// `s` cut with "..." to fit `w` (text_fit.hpp).
 std::string fit(gui::Painter& p, std::string s, int w, bool large)
 {
-    if (p.textWidth(s, large) <= w) {
-        return s;
-    }
-    while (!s.empty() && p.textWidth(s + "...", large) > w) {
-        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) {
-            s.pop_back();
-        }
-        if (!s.empty()) {
-            s.pop_back();
-        }
-    }
-    return s + "...";
+    return fitText(std::move(s), w, [&](const std::string& t) { return p.textWidth(t, large); });
 }
 
 } // namespace

@@ -38,6 +38,25 @@ std::string builtInText(const std::string& en)
     return en;
 }
 
+/// A players column: "4", or "2-8".
+std::string playersText(int fewest, int most)
+{
+    return fewest == most ? std::to_string(most) : std::to_string(fewest) + "-" + std::to_string(most);
+}
+
+/// A Yes / No column.
+std::string yesNo(bool yes)
+{
+    return yes ? NOX_TR("menus.modes.yes", "Yes") : NOX_TR("menus.modes.no", "No");
+}
+
+/// The settings a mode shows in the lists (text settings: the dedicated server's command line
+/// only, for now).
+bool shownSetting(const nox::modes::OptionSpec& s)
+{
+    return s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text;
+}
+
 } // namespace
 
 std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Registry& registry, const nox::modes::ModsReport& report,
@@ -55,14 +74,13 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
         r.id = m->info.id;
         r.name = m->info.name;
         r.description = m->info.description;
-        r.players = m->info.minPlayers == m->info.maxPlayers ? std::to_string(m->info.maxPlayers)
-                                                             : std::to_string(m->info.minPlayers) + "-" + std::to_string(m->info.maxPlayers);
-        r.stock = m->info.stockClients ? NOX_TR("menus.modes.yes", "Yes") : NOX_TR("menus.modes.no", "No");
+        r.players = playersText(m->info.minPlayers, m->info.maxPlayers);
+        r.stock = yesNo(m->info.stockClients);
         r.levels = m->info.levels == nox::modes::ModeInfo::Levels::Generated ? NOX_TR("menus.modes.levels_generated", "Generated")
                                                                              : NOX_TR("menus.modes.levels_map_files", "Map files");
         for (const nox::modes::OptionSpec& s : m->info.options) {
-            if (s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text) {
-                r.options.push_back(s); // (text settings: the dedicated server's command line only, for now)
+            if (shownSetting(s)) {
+                r.options.push_back(s);
             }
         }
         if (!r.fromMods) {
@@ -82,7 +100,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     const auto campaignSettings = [](const nox::modes::Mode* c) {
         std::vector<nox::modes::OptionSpec> own;
         for (const nox::modes::OptionSpec& s : c->info.options) {
-            if (s.hostPanel && s.kind != nox::modes::OptionSpec::Kind::Text) {
+            if (shownSetting(s)) {
                 own.push_back(s);
                 own.back().key = c->info.id + "." + s.key;
             }
@@ -92,6 +110,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     // The mode a campaign's own row is started as: the first that runs campaigns (the co-op
     // campaign), in either list (Game Modes leaves its row out, not its campaigns'). None: no rows.
     const auto host = std::ranges::find_if(all, [](const nox::modes::Mode* m) { return m->info.runsCampaigns && m->makeServer; });
+    const ModeListRow hostRow = host != all.end() ? rowOf(*host) : ModeListRow{};
     for (const nox::modes::Mode* m : all) {
         if (m->info.campaign) {
             if (!m->makeServer || host == all.end()) {
@@ -100,15 +119,14 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
             // Its own row: the title, the mod's description, its mode's settings (not the Campaign
             // choice) then its own; started as its mode's row with it chosen.
             const nox::modes::Mode* h = *host;
-            const ModeListRow hostRow = rowOf(h);
             ModeListRow r = rowOf(m);
             r.name = m->info.campaign->title;
             r.campaignOf = h->info.id;
             r.hostName = hostRow.name;
             const int fewest = std::max(h->info.minPlayers, m->info.minPlayers);
             const int most = std::max(fewest, std::min(h->info.maxPlayers, m->info.maxPlayers));
-            r.players = fewest == most ? std::to_string(most) : std::to_string(fewest) + "-" + std::to_string(most);
-            r.stock = h->info.stockClients && m->info.stockClients ? NOX_TR("menus.modes.yes", "Yes") : NOX_TR("menus.modes.no", "No");
+            r.players = playersText(fewest, most);
+            r.stock = yesNo(h->info.stockClients && m->info.stockClients);
             r.levels = hostRow.levels;
             r.options = hostRow.options;
             std::ranges::move(campaignSettings(m), std::back_inserter(r.options));
@@ -138,8 +156,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
                     r.campaignTitles.push_back(c->info.campaign->title);
                     r.campaignAbout.push_back(c->info.description);
                     // (A mod that refuses stock clients refuses them in its co-op campaign too: its own rule.)
-                    r.campaignStock.push_back(m->info.stockClients && c->info.stockClients ? NOX_TR("menus.modes.yes", "Yes")
-                                                                                            : NOX_TR("menus.modes.no", "No"));
+                    r.campaignStock.push_back(yesNo(m->info.stockClients && c->info.stockClients));
                     choice.choices.push_back(c->info.campaign->title);
                     r.campaignOptions.push_back(campaignSettings(c)); // (as its own row shows them)
                 }
@@ -164,7 +181,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     quest.kind = ModeListRow::Kind::Quest;
     quest.name = NOX_TR("menus.modes.quest_name", "Quest");
     quest.description = NOX_TR("menus.modes.quest_description", "The original quest, stage after stage.");
-    quest.stock = NOX_TR("menus.modes.yes", "Yes");
+    quest.stock = yesNo(true);
     quest.levels = NOX_TR("menus.modes.levels_map_files", "Map files");
     rows.push_back(std::move(quest));
     ModeListRow editor;
@@ -175,7 +192,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
         // (A session is a live game: stock players play it as it's published, NoX Core's edit.)
         editor.description = NOX_TR("menus.modes.editor_description_hosted", "Build a map together with others.");
         editor.players = "1-32";
-        editor.stock = NOX_TR("menus.modes.yes", "Yes");
+        editor.stock = yesNo(true);
     } else {
         editor.description = NOX_TR("menus.modes.editor_description_local", "Build and edit your own maps.");
         editor.players = "1";

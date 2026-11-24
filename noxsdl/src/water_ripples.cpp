@@ -27,40 +27,85 @@ double fraction(std::uint32_t id)
 
 } // namespace
 
+WaterRipples::WaterRipples()
+{
+    index_.fill(-1);
+    resetFree();
+}
+
+void WaterRipples::resetFree()
+{
+    for (int i = 0; i < kTracked; ++i) {
+        free_[static_cast<std::size_t>(i)] = static_cast<std::uint8_t>(kTracked - 1 - i); // (slot 0 taken first)
+    }
+    freeCount_ = kTracked;
+}
+
+std::size_t WaterRipples::home(std::uint32_t id)
+{
+    return static_cast<std::size_t>((id * 0x9E3779B1u) >> 24) & (kIndexSize - 1);
+}
+
 WaterRipples::Tracked* WaterRipples::find(std::uint32_t id)
 {
-    for (Tracked& t : tracked_) {
-        if (t.used && t.id == id) {
-            return &t;
+    for (std::size_t h = home(id);; h = (h + 1) & (kIndexSize - 1)) {
+        const std::int16_t slot = index_[h];
+        if (slot < 0) {
+            return nullptr;
+        }
+        if (tracked_[static_cast<std::size_t>(slot)].id == id) {
+            return &tracked_[static_cast<std::size_t>(slot)];
         }
     }
-    return nullptr;
+}
+
+void WaterRipples::release(Tracked& t)
+{
+    // Out of the index (linear probing: the entries after it in its run moved back where they
+    // may), and its slot free again.
+    const auto slot = static_cast<std::int16_t>(&t - tracked_.data());
+    std::size_t h = home(t.id);
+    while (index_[h] != slot) {
+        h = (h + 1) & (kIndexSize - 1);
+    }
+    for (std::size_t next = (h + 1) & (kIndexSize - 1); index_[next] >= 0; next = (next + 1) & (kIndexSize - 1)) {
+        const std::size_t want = home(tracked_[static_cast<std::size_t>(index_[next])].id);
+        // (It may move back to the hole if the hole lies on its way from its home to where it is.)
+        if (((next - want) & (kIndexSize - 1)) >= ((next - h) & (kIndexSize - 1))) {
+            index_[h] = index_[next];
+            h = next;
+        }
+    }
+    index_[h] = -1;
+    t.used = false;
+    free_[static_cast<std::size_t>(freeCount_++)] = static_cast<std::uint8_t>(slot);
 }
 
 void WaterRipples::track(std::uint32_t id, float x, float y, float z, bool wet, Kind kind, bool dying, bool inner, double now)
 {
+    if (started_ < 0) {
+        started_ = now;
+    }
     Tracked* t = find(id);
     const bool fresh = t == nullptr;
     if (fresh) {
-        // A free slot, else the one seen longest ago.
-        t = &tracked_[0];
-        for (Tracked& c : tracked_) {
-            if (!c.used) {
-                t = &c;
-                break;
-            }
-            if (c.lastSeen < t->lastSeen) {
-                t = &c;
-            }
+        // Only one over the water is followed (once followed, it is while it's seen); none let go
+        // for it: with every slot taken by one seen this frame or the last, it isn't.
+        if (!wet || freeCount_ == 0) {
+            return;
         }
+        const std::uint8_t slot = free_[static_cast<std::size_t>(--freeCount_)];
+        t = &tracked_[slot];
         *t = Tracked{};
         t->id = id;
         t->used = true;
+        std::size_t h = home(id);
+        while (index_[h] >= 0) {
+            h = (h + 1) & (kIndexSize - 1);
+        }
+        index_[h] = static_cast<std::int16_t>(slot);
         const double every = kind == kCreature ? kStillEvery : kWakeEvery;
         t->lastRing = now - every * fraction(id); // (not all at once as they come into view)
-        if (started_ < 0) {
-            started_ = now;
-        }
         // An item come to be in the water well inside the view, once the view has settled: it was
         // dropped or thrown there (one scrolled into view comes in at the edge).
         if (kind == kItem && wet && inner && z <= kTouching && now - started_ > 1.0) {
@@ -113,7 +158,7 @@ void WaterRipples::endFrame(double now)
         if (t.wet && t.inner && now - t.lastSeen < 0.5 && (t.kind == kMissile || t.z > kFalling)) {
             add(t.x, t.y, t.kind == kMissile ? 0.75f : 0.9f, true, now);
         }
-        t.used = false;
+        release(t);
     }
 }
 
@@ -121,14 +166,6 @@ void WaterRipples::add(float x, float y, float strength, bool splash, double now
 {
     sources_[static_cast<std::size_t>(next_)] = Source{x, y, now, std::clamp(strength, 0.0f, 1.0f), splash};
     next_ = (next_ + 1) % kSources;
-}
-
-void WaterRipples::clear()
-{
-    sources_.fill(Source{});
-    tracked_.fill(Tracked{});
-    next_ = 0;
-    started_ = -1;
 }
 
 int WaterRipples::pack(double now, std::span<float> out) const

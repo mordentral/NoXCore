@@ -138,6 +138,16 @@ std::string campaignTitleOf(std::string_view campaign)
     return mode && mode->info.campaign ? mode->info.campaign->title : std::string();
 }
 
+std::string modeIdByName(std::string_view name)
+{
+    for (const nox::modes::Mode* m : nox::modes::registry().all()) {
+        if (m && m->info.name == name) {
+            return m->info.id;
+        }
+    }
+    return {};
+}
+
 std::filesystem::path campaignMapPath(const std::filesystem::path& gameDir, std::string_view campaign, const std::string& name)
 {
     // (The maps the mod ships, as its games find them: its package's index, GameHost::findMap's.)

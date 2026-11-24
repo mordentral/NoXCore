@@ -29,7 +29,6 @@ std::unique_ptr<HdWater> HdWater::create(SDL_Renderer* renderer, SDL_GPUShader* 
         return nullptr;
     }
     std::unique_ptr<HdWater> out(new HdWater);
-    out->renderer_ = renderer;
     out->device_ = device;
     out->period_ = base.period;
     out->frames_ = base.frames;

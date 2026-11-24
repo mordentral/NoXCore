@@ -31,6 +31,16 @@ void remakeFromTables(App& app)
     app.flagArt = {};
     app.glyphArt = {};
     app.mimicArt = {};
+    if (app.effects) {
+        app.effects->tablesChanged(); // (its images and spark types point into the tables that go)
+    }
+    if (app.hud) {
+        app.hud->tablesChanged();
+    }
+    if (app.minimap) {
+        app.minimap->tablesChanged();
+    }
+    app.spellLimits.tablesChanged();
     if (app.chant) {
         app.chant = std::make_unique<SpellChant>(app.things);
     }

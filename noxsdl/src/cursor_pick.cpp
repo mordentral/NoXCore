@@ -6,32 +6,16 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace noxsdl::pick {
 
 namespace {
-
-/// The numbers after a shape's word ("CIRCLE 12", "BOX 20 30"), each 0 when missing.
-std::array<float, 2> shapeSizes(std::string_view text)
-{
-    std::array<float, 2> out{};
-    const std::string s(text.substr(std::min(text.find(' '), text.size())));
-    const char* p = s.c_str();
-    for (float& v : out) {
-        char* end = nullptr;
-        v = std::strtof(p, &end);
-        if (end == p) {
-            v = 0;
-            break;
-        }
-        p = end;
-    }
-    return out;
-}
 
 /// A float to whole units as the game converts them: cut toward zero.
 int chop(float v)
@@ -46,18 +30,74 @@ constexpr float kSideScale = 0.70710677f;
 
 } // namespace
 
+Extent readExtent(std::string_view line)
+{
+    Extent e;
+    const std::size_t space = line.find(' ');
+    const std::string_view word = line.substr(0, space);
+    e.kind = word == "CIRCLE" ? Extent::Kind::Circle : word == "BOX" ? Extent::Kind::Box : Extent::Kind::None;
+    if (e.kind == Extent::Kind::None) {
+        return e;
+    }
+    e.spaced = space != std::string_view::npos;
+    if (!e.spaced) {
+        return e; // (no numbers: none read either way)
+    }
+    // The decimals: from the space on, as strtof reads each (whatever white space before it).
+    const std::string s(line.substr(space));
+    const char* p = s.c_str();
+    for (float& v : e.size) {
+        char* end = nullptr;
+        v = std::strtof(p, &end);
+        if (end == p) {
+            v = 0;
+            break;
+        }
+        p = end;
+    }
+    // The whole numbers: after the space, each spaces or tabs then an integer (from_chars: no
+    // sign but '-', no fraction), stopping at the first that isn't.
+    const std::string_view rest = line.substr(space + 1);
+    const char* q = rest.data();
+    const char* const qend = rest.data() + rest.size();
+    for (int& v : e.whole) {
+        while (q < qend && (*q == ' ' || *q == '\t')) {
+            ++q;
+        }
+        if (q >= qend) {
+            break;
+        }
+        const auto [next, ec] = std::from_chars(q, qend, v);
+        if (ec != std::errc{}) {
+            break;
+        }
+        q = next;
+    }
+    return e;
+}
+
+std::optional<Extent> extentOf(const nox::things::ThingDef& def)
+{
+    if (const auto extent = def.lastAttribute("EXTENT")) {
+        return readExtent(*extent);
+    }
+    return std::nullopt;
+}
+
 Shape shapeOf(const nox::things::ThingDef& def)
 {
+    return shapeOf(def, extentOf(def));
+}
+
+Shape shapeOf(const nox::things::ThingDef& def, const std::optional<Extent>& extent)
+{
     Shape shape;
-    if (const auto extent = def.lastAttribute("EXTENT")) {
-        if (extent->starts_with("CIRCLE")) {
-            shape.radius = shapeSizes(*extent)[0];
-        } else if (extent->starts_with("BOX")) {
-            const auto wh = shapeSizes(*extent);
-            shape.box = true;
-            shape.width = wh[0];
-            shape.height = wh[1];
-        }
+    if (extent && extent->kind == Extent::Kind::Circle) {
+        shape.radius = extent->size[0];
+    } else if (extent && extent->kind == Extent::Kind::Box) {
+        shape.box = true;
+        shape.width = extent->size[0];
+        shape.height = extent->size[1];
     }
     const nox::things::ZSize z = nox::things::thingZSize(def);
     shape.zMin = z.bottom;

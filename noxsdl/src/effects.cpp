@@ -138,6 +138,24 @@ void Effects::clear()
     sortedFrames_ = {};
 }
 
+void Effects::tablesChanged()
+{
+    clear(); // (the sparks hold their spark types, which go below)
+    sparkTypes_.clear();
+    tailArts_ = {};
+    rayArts_ = {};
+    particleArt_ = nullptr;
+    killerArt_ = {};
+    summonArt_ = {};
+    rainOrbArts_ = {};
+    vortexOrbArt_ = {};
+    reflectArts_ = {};
+    bubbleArts_ = {};
+    birdies_ = {};
+    shieldAnim_ = {};
+    numbersRead_ = false; // (setGameData reads the numbers again: the file is the same object, its contents not)
+}
+
 int Effects::random(int lo, int hi)
 {
     if (hi <= lo) {

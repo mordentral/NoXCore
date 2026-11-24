@@ -580,9 +580,11 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
         }
         settings.continueSlot = start.continueSlot;
         settings.characterFile = start.characterFile;
-        settings.loopbackOnly = app->hostLoopback;
-        if (app->menuHostPort != 0) {
-            settings.port = app->menuHostPort; // (--menu-host-port: tests, recordings)
+        {
+            // (--menu-host-port, --host-loopback: tests, recordings; normally the game's port.)
+            const MenuHostSocket socket = menuHostSocket({settings.port, settings.loopbackOnly}, app->menuHostPort, app->hostLoopback);
+            settings.port = socket.port;
+            settings.loopbackOnly = socket.loopbackOnly;
         }
         const bool listed = !local && !app->hostLoopback;
         try {
@@ -2310,6 +2312,13 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
         });
     }
     updatePending(app); // (a map editor session's walls, floor and things not yet published: drawing only)
+    // The view's clock this frame, before anything of the world's draw goes by it (the ripples'
+    // feed, the floor's water, the scene; the 3D view sets its own as it draws). (The viewer's
+    // clock; a --shot-sequence's steps with its shots, so they're exactly the step apart however
+    // long each takes to save.)
+    const double viewerFrames = app.shotSequence > 1 ? static_cast<double>(app.shotAfterSeconds) * 30
+                                                     : static_cast<double>(SDL_GetTicks()) * 30 / 1000;
+    app.view->setTime(app.live ? app.interpolator.gameTime() : viewerFrames);
     feedWaterRipples(app); // (HD water's ripples and splashes, from the drawables over it: drawing only)
     if (app.live && app.minimap && app.view3d.active()) {
         // (In 2D the scene's sort lists the obelisks it draws: liveSprites, drawnMarkers.)
@@ -2342,11 +2351,6 @@ void drawWorld(App& app, std::vector<MapView::SceneSprite>& extra, const std::se
             }
         }
         app.view->setCollectBloom(app.bloom != nullptr);
-        // (The viewer's clock; a --shot-sequence's steps with its shots, so they're exactly the
-        // step apart however long each takes to save.)
-        const double viewerFrames = app.shotSequence > 1 ? static_cast<double>(app.shotAfterSeconds) * 30
-                                                         : static_cast<double>(SDL_GetTicks()) * 30 / 1000;
-        app.view->setTime(app.live ? app.interpolator.gameTime() : viewerFrames);
         if (app.effects) {
             // The effects' sort (the particles sorted into the scene, and the sight test of
             // the drawables drawn over it), with this frame's sight.

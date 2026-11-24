@@ -190,6 +190,9 @@ std::filesystem::path campaignMapPath(const std::filesystem::path& gameDir, std:
 /// Mod `campaign`'s campaign title (mode.json's "campaign"); empty when it's none (or `campaign` is
 /// empty: the game's own).
 std::string campaignTitleOf(std::string_view campaign);
+/// The id of the first of our modes named `name` (its mode.json's "name", as a host's Hello sends
+/// it); empty when none is.
+std::string modeIdByName(std::string_view name);
 /// The game left, or its hosting failed: the solo saves' root back, no campaign title.
 void endSoloScreensHost(App& app);
 /// The game we host is a solo-screens mode's (a campaign mode hosted for guests, the co-op

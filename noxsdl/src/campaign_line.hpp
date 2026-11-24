@@ -17,6 +17,13 @@ namespace noxsdl {
 /// The line's window's id (none of the game's window files use it).
 inline constexpr std::int32_t kCampaignLineId = 4290;
 
+/// `def` (a screen's window file, loaded) with a USER window `id` added at `x`, `y` in the screen,
+/// `width` x `height`, drawn by its own draw: `clickable`, enabled (its clicks reach the screen);
+/// else it takes no input.
+void addUserWindow(nox::gui::WindowDef& def, std::int32_t id, int x, int y, int width, int height, bool clickable);
+/// `text` centred in `self` in the small font, the menus' gold (a line such window draws).
+void drawGoldLine(gui::Window& self, gui::Painter& p, const std::string& text);
+
 /// `def` (a screen's window file, loaded) with the line's window added: at `x`, `y` in the screen,
 /// `width` x `height`, taking no input. Nothing when `title` is empty.
 void addCampaignLine(nox::gui::WindowDef& def, const std::string& title, int x, int y, int width, int height);

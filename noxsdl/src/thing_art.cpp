@@ -418,23 +418,22 @@ const std::optional<TypeArt>& ThingArt::entry(std::string_view name)
                     a.hanging = airborne && noCollide && !a.editorOnly;
                 }
                 // EXTENT CIRCLE r, or BOX w h: the collision shape (a box's radius: half its larger side).
-                if (const auto extent = def->lastAttribute("EXTENT")) {
-                    const auto space = extent->find(' ');
-                    const std::string_view shape = extent->substr(0, space);
-                    if (space != std::string_view::npos && (shape == "CIRCLE" || shape == "BOX")) {
-                        const auto size = readInts<2>(extent->substr(space + 1));
-                        a.extentRadius = static_cast<float>(shape == "CIRCLE" ? size[0] : std::max(size[0], size[1]) / 2);
-                        a.extentBox = shape == "BOX";
-                        a.extentWidth = static_cast<float>(size[0]);
-                        a.extentHeight = static_cast<float>(size[1]);
-                    }
+                // (Its whole numbers: pick::Extent's; the hover's shape below takes its decimals.)
+                const std::optional<pick::Extent> extent = pick::extentOf(*def);
+                if (extent && extent->spaced && extent->kind != pick::Extent::Kind::None) {
+                    const bool circle = extent->kind == pick::Extent::Kind::Circle;
+                    const auto& size = extent->whole;
+                    a.extentRadius = static_cast<float>(circle ? size[0] : std::max(size[0], size[1]) / 2);
+                    a.extentBox = !circle;
+                    a.extentWidth = static_cast<float>(size[0]);
+                    a.extentHeight = static_cast<float>(size[1]);
                 }
                 // ZSIZE: the height the thing spans, 0 to 30 without a ZSIZE line (thingZSize); the
                 // hover's shape stands on the same.
                 const nox::things::ZSize zsize = nox::things::thingZSize(*def);
                 a.zSizeMin = zsize.bottom;
                 a.zSizeMax = zsize.top;
-                a.hover = pick::shapeOf(*def);
+                a.hover = pick::shapeOf(*def, extent);
                 if (const auto li = def->lastAttribute("LIGHTINTENSITY")) {
                     a.lightIntensity = std::strtof(std::string(*li).c_str(), nullptr);
                 }

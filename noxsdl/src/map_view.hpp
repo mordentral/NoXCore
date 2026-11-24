@@ -26,6 +26,7 @@
 #include "camera.hpp"
 #include "hd_water.hpp"
 #include "lighting.hpp"
+#include "water_base.hpp"
 #include "water_ripples.hpp"
 #include "polygon_ambient.hpp"
 #include "scene_order.hpp"
@@ -433,7 +434,7 @@ public:
     /// The HD floor round `camera`'s view asked for from the sprite cache's workers, nothing
     /// drawn (while the map is held back, so its first frame has them). Returns whether any in
     /// view is still on its way.
-    bool prefetchFloor(const Camera& camera, SpriteCache& sprites) const;
+    bool prefetchFloor(const Camera& camera, SpriteCache& sprites);
     /// Without the pack's workers: the original images round `camera`'s view made ahead (its
     /// floor tiles and their edge composites, then its walls, then the map's things), nothing
     /// drawn, until SDL_GetTicksNS() passes `untilNs`; while a live map is held back, so its
@@ -520,6 +521,9 @@ private:
     /// and the base is made (once, from the water's own tiles: its first call with water about).
     /// The map's tiles are looked over once (and again after setTile), never each frame.
     bool prepareWater(SDL_Renderer* renderer, SpriteCache& sprites);
+    /// prepareWater's look without the GPU: whether HD water will be drawn once its base is made
+    /// (HD Spell FX on, not failed, and the map has water).
+    bool scanWater(SpriteCache& sprites);
     /// The tile's Tile::water, worked out on its first call.
     std::int8_t waterOf(const Tile& tile) const;
     /// The water tiles drawTiles drew wet (waterTiles_): fx_water added through each one's water
@@ -634,13 +638,12 @@ private:
     // anchor, and the frame's water tiles and geometry (kept for their memory).
     std::vector<char> waterFloors_;
     int waterBaseFloor_ = -1;
-    bool waterScanned_ = false;
-    bool hasWater_ = false;
     bool hdWaterFailed_ = false;
-    std::pair<int, int> waterOffset_{};
     std::unique_ptr<HdWater> hdWater_;
-    /// The tiles with water in them by full-grid place ((gy + 1) x 258 + gx), with the scan.
-    std::vector<std::uint8_t> waterGrid_;
+    /// Where the water is and the base's offset (scanned once a map, kept by setTile).
+    water::Coverage water_;
+    water::Coverage::Tile coverageTile(const Tile& t) const;
+    void forEachWaterTile(const std::function<void(const water::Coverage::Tile&)>& fn) const;
     WaterRipples ripples_;
     mutable std::vector<std::pair<const Tile*, const Sprite*>> waterTiles_;
     SDL_FPoint centre_{};

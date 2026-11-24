@@ -111,6 +111,17 @@ std::optional<int> ctfIconAt(const nox::client::World& world, const Layout& l, f
 
 Hud::Hud(const nox::things::ThingDb& things, ThingArt& art) : things_(things), art_(art)
 {
+    lookUpNamed();
+}
+
+void Hud::tablesChanged()
+{
+    named_ = {};
+    lookUpNamed();
+}
+
+void Hud::lookUpNamed()
+{
     // The pictures draw() uses, by the names it used to build each frame.
     Named& n = named_;
     for (int i = 0; i < kSlots; ++i) {

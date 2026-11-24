@@ -179,6 +179,8 @@ public:
     /// A named image (thing.bin's images), for pictures drawn beside the HUD (the game-over
     /// banner's).
     const nox::things::ImageDef* image(const std::string& name) const;
+    /// The app's thing.bin was replaced (game_data_swap.hpp): its named images looked up again.
+    void tablesChanged();
 
 private:
     struct Bubble {
@@ -194,8 +196,9 @@ private:
 
     const nox::things::ThingDb& things_;
     ThingArt& art_;
-    /// The named images draw() uses, looked up once as the HUD is made (thing.bin's images never
-    /// change after that; nullptr: thing.bin has none by that name, drawn as nothing).
+    /// The named images draw() uses, looked up once as the HUD is made and again when the tables
+    /// are replaced (tablesChanged; nullptr: thing.bin has none by that name, drawn as nothing).
+    void lookUpNamed();
     struct Named {
         using Def = const nox::things::ImageDef*;
         std::array<Def, 5> nugget{}, nuggetLit{}, warriorNugget{}; ///< QuickBar(Warrior)Nugget1-5(Lit)

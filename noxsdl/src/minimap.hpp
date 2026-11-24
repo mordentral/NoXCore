@@ -51,6 +51,9 @@ public:
     explicit Minimap(const nox::things::ThingDb& things);
     /// The modifiers, for a flag's colour (its material).
     void setModifiers(const nox::things::ModifierDb* modifiers) { modifiers_ = modifiers; }
+    /// The app's thing.bin was replaced (game_data_swap.hpp): the invisible walls' materials and
+    /// the marker types worked out from it again.
+    void tablesChanged();
 
     /// ToggleMap (TAB, client_toggleMap).
     void toggle() { shown_ = !shown_; }

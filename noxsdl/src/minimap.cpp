@@ -201,13 +201,21 @@ struct Pen {
 Minimap::Minimap(const nox::things::ThingDb& things)
     : things_(things)
 {
-    for (std::size_t i = 0; i < things.walls.size(); ++i) {
-        if (things.walls[i].name == "InvisibleWallSet") {
+    tablesChanged();
+}
+
+void Minimap::tablesChanged()
+{
+    invisibleWall_ = -1;
+    invisibleBlockingWall_ = -1;
+    for (std::size_t i = 0; i < things_.walls.size(); ++i) {
+        if (things_.walls[i].name == "InvisibleWallSet") {
             invisibleWall_ = static_cast<int>(i);
-        } else if (things.walls[i].name == "InvisibleBlockingWallSet") {
+        } else if (things_.walls[i].name == "InvisibleBlockingWallSet") {
             invisibleBlockingWall_ = static_cast<int>(i);
         }
     }
+    markerTypes_.clear(); // (made again on the next draw)
 }
 
 void Minimap::zoom(bool in, bool out, std::uint64_t ms)

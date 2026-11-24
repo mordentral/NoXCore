@@ -9,6 +9,7 @@
 #include "console.hpp"
 #include "menu_rules.hpp"
 #include "mode_ui.hpp"
+#include "text_fit.hpp"
 #include "wol_screens.hpp"
 
 #include "noxcore/client/solo_menu.hpp"
@@ -465,22 +466,14 @@ void Menus::enter(State s)
         // campaign named between the heading and the lists: campaign_line.hpp.)
         nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / "SelChar.wnd");
         const std::string campaign = solo_ ? soloCampaignTitle() : std::string();
-        addCampaignLine(def, campaign, 108, 92, 400, 14);
+        // (In the strip the places use: a solo screen has no places.)
+        addCampaignLine(def, campaign, kCharPlacesRect.x, kCharPlacesRect.y, kCharPlacesRect.w, kCharPlacesRect.h);
         if (!solo_) {
             // (noxcpp: where the selected character was last played, above the lists; under the
             // buttons, when the game is a mode's, the switch between every character and that
             // mode's alone: character_labels.hpp. With no notes and no mode, nothing shows.)
             const auto add = [&def](std::int32_t id, const SDL_Rect& r, bool clickable) {
-                nox::gui::WindowDef w;
-                w.id = id;
-                w.x = r.x;
-                w.y = r.y;
-                w.width = r.w;
-                w.height = r.h;
-                w.typeName = "USER";
-                w.type = nox::gui::WindowType::User;
-                w.status = clickable ? (st::Enabled | st::NoFocus) : st::NoFocus;
-                def.children.push_back(std::move(w));
+                addUserWindow(def, id, r.x, r.y, r.w, r.h, clickable);
             };
             add(kCharPlaces, kCharPlacesRect, false);
             if (charTarget_.any) {
@@ -1904,10 +1897,10 @@ void Menus::arrangeCharacters()
     for (const Listed& l : listed_) {
         of.push_back(l.notes ? &*l.notes : nullptr);
     }
-    characters_.clear();
+    shown_.clear();
     shownNotes_.clear();
     for (const std::size_t i : nox::client::character_notes::order(of, charTarget_, characterModeOnly())) {
-        characters_.push_back(listed_[i].character);
+        shown_.push_back(i);
         shownNotes_.push_back(of[i]);
     }
 }
@@ -1958,13 +1951,7 @@ void Menus::targetFor(const std::string& host)
     if (name.empty()) {
         return;
     }
-    charTarget_ = {charnotes::Place::Kind::Mode, {}, name, true};
-    for (const nox::modes::Mode* m : nox::modes::registry().all()) {
-        if (m && m->info.name == name) {
-            charTarget_.id = m->info.id; // (one of ours by that name: its id)
-            break;
-        }
-    }
+    charTarget_ = {charnotes::Place::Kind::Mode, modeIdByName(name), name, true}; // (one of ours by that name: its id)
 }
 
 std::string Menus::fitToList(const std::string& text, const gui::Window& list)
@@ -1975,25 +1962,7 @@ std::string Menus::fitToList(const std::string& text, const gui::Window& list)
     gui::Painter measure(nullptr, gui_.resources(), 2.0f, 0.0f, 0.0f);
     measure.setLargeScale(list.largeScale);
     const int room = list.rect.w - 7 - 6;
-    if (measure.textWidth(text, list.largeFont) <= room) {
-        return text;
-    }
-    std::string cut = text;
-    while (!cut.empty()) {
-        do {
-            cut.pop_back(); // (a whole UTF-8 character)
-        } while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80);
-        if (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0xC0) {
-            cut.pop_back();
-        }
-        while (!cut.empty() && cut.back() == ' ') {
-            cut.pop_back();
-        }
-        if (measure.textWidth(cut + "...", list.largeFont) <= room) {
-            return cut + "...";
-        }
-    }
-    return {};
+    return fitText(text, room, [&](const std::string& t) { return measure.textWidth(t, list.largeFont); }, true);
 }
 
 void Menus::drawCharacterExtras()
@@ -2011,23 +1980,9 @@ void Menus::drawCharacterExtras()
             const std::string& text = placeLines_[static_cast<std::size_t>(sel)];
             if (text != from) {
                 from = text;
-                shown = text;
-                while (!shown.empty() && p.textWidth(shown, false) > self.rect.w - 4) {
-                    do {
-                        shown.pop_back();
-                    } while (!shown.empty() && (static_cast<unsigned char>(shown.back()) & 0xC0) == 0x80);
-                    if (!shown.empty() && (static_cast<unsigned char>(shown.back()) & 0xC0) == 0xC0) {
-                        shown.pop_back();
-                    }
-                    if (p.textWidth(shown + "...", false) <= self.rect.w - 4) {
-                        shown += "...";
-                        break;
-                    }
-                }
+                shown = fitText(text, self.rect.w - 4, [&](const std::string& t) { return p.textWidth(t, false); });
             }
-            const SDL_Point pos = self.screenPos();
-            const int tw = p.textWidth(shown, false);
-            p.text(shown, pos.x + (self.rect.w - tw) / 2, pos.y + (self.rect.h - p.fontHeight(false)) / 2, false, nox::gui::Color{240, 180, 42});
+            drawGoldLine(self, p, shown);
         };
     }
     // The switch: "Show all" and "<the mode> only" on a dark strip, the one chosen in the gold, the
@@ -2044,18 +1999,7 @@ void Menus::drawCharacterExtras()
                 // (a long mode name, a remote host's: its choice cut with "..." to the strip, once)
                 fitted = true;
                 const int room = self.rect.w - 4 - p.textWidth(all, false) - p.textWidth(bar, false);
-                while (!only.empty() && p.textWidth(only, false) > room) {
-                    do {
-                        only.pop_back(); // (a whole UTF-8 character)
-                    } while (!only.empty() && (static_cast<unsigned char>(only.back()) & 0xC0) == 0x80);
-                    if (!only.empty() && (static_cast<unsigned char>(only.back()) & 0xC0) == 0xC0) {
-                        only.pop_back();
-                    }
-                    if (p.textWidth(only + "...", false) <= room) {
-                        only += "...";
-                        break;
-                    }
-                }
+                only = fitText(std::move(only), room, [&](const std::string& t) { return p.textWidth(t, false); });
             }
             const int wa = p.textWidth(all, false), wb = p.textWidth(bar, false), wo = p.textWidth(only, false);
             int x = pos.x + std::max(2, (self.rect.w - (wa + wb + wo)) / 2);
@@ -2085,9 +2029,9 @@ void Menus::fillCharacterList()
     // character, " - " Noxworld.c:Stage " %d" (its stage, 0 shown as 1).
     const SDL_Color pc = paletteColor(14);
     const nox::gui::Color color{pc.r, pc.g, pc.b, false};
-    placeLines_.assign(characters_.size(), std::string());
-    for (std::size_t i = 0; i < characters_.size(); ++i) {
-        const auto& c = characters_[i];
+    placeLines_.assign(shown_.size(), std::string());
+    for (std::size_t i = 0; i < shown_.size(); ++i) {
+        const auto& c = shownCharacter(i);
         const auto cls = static_cast<std::size_t>(c.info.characterClass);
         const std::string className = gui_.text(std::string("nox.str:") + kClassNames[std::min<std::size_t>(cls, 2)]);
         lists->lines.push_back({" ", color});
@@ -2109,14 +2053,14 @@ void Menus::fillCharacterList()
         name->lines.push_back({line, color});
         kind->lines.push_back({what, color});
     }
-    const int selected = characters_.empty() ? -1 : 0;
+    const int selected = shown_.empty() ? -1 : 0;
     lists->selectedLine = kind->selectedLine = name->selectedLine = selected;
     // findAutosaves: Load and Delete with something to load; New with nothing, or out of a quest, or
     // with fewer than 14 quest characters (client_countPlayerFiles04).
-    enable(screen_, kCharLoad, !characters_.empty());
-    enable(screen_, kCharDelete, !characters_.empty());
+    enable(screen_, kCharLoad, !shown_.empty());
+    enable(screen_, kCharDelete, !shown_.empty());
     enable(screen_, kCharNew,
-           characters_.empty() || !questGame_ || nox::client::solo_menu::countQuestCharacters(saveDir_) < 14);
+           shown_.empty() || !questGame_ || nox::client::solo_menu::countQuestCharacters(saveDir_) < 14);
 }
 
 void Menus::chooseCharacter(const std::string& host)
@@ -2198,13 +2142,13 @@ bool Menus::onSelChar(gui::Window& from)
         }
         return true;
     case kCharLoad: {
-        if (selected < 0 || selected >= static_cast<int>(characters_.size())) {
+        if (selected < 0 || selected >= static_cast<int>(shown_.size())) {
             return true;
         }
         // 0x1F6: a record with no path NoCanDo; the file read again (failing,
         // nothing) and held. The character as saved: name, class, sex, colours
         // and clothes; its spell bars come from its file in the game.
-        const auto& record = characters_[static_cast<std::size_t>(selected)];
+        const auto& record = shownCharacter(static_cast<std::size_t>(selected));
         if (record.path.empty()) {
             gui_.resources().sound(0x39D); // NoCanDo
             return true;
@@ -2220,10 +2164,10 @@ bool Menus::onSelChar(gui::Window& from)
         return true;
     }
     case kCharDelete: {
-        if (selected < 0 || selected >= static_cast<int>(characters_.size())) {
+        if (selected < 0 || selected >= static_cast<int>(shown_.size())) {
             return true;
         }
-        const auto path = characters_[static_cast<std::size_t>(selected)].path;
+        const auto path = shownCharacter(static_cast<std::size_t>(selected)).path;
         if (path.empty()) {
             gui_.resources().sound(0x39D); // (0x1F7: a record with no path, NoCanDo)
             return true;

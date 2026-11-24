@@ -23,14 +23,32 @@
 //            solo game's pause) or our player is dying or dead: the move cursor stays.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 namespace nox::things {
 struct ThingDef;
 }
 
 namespace noxsdl::pick {
+
+/// A thing.bin record's EXTENT line, read in one place for all that use it: its shape (the word
+/// before the first space: CIRCLE r or BOX w h; any other, CENTER, NULL: none) and its numbers,
+/// as decimals (the hover's shape: each as strtof reads it from the first space on, 0 from the
+/// first that doesn't read) and as whole numbers (the drawing's extent, TypeArt's: each a run of
+/// spaces or tabs then an integer, 0 from the first that isn't one, so "12.5 20" reads 12 0).
+struct Extent {
+    enum class Kind : std::uint8_t { None, Circle, Box };
+    Kind kind = Kind::None;
+    bool spaced = false;         ///< a space after the word (without, no numbers: TypeArt takes no extent)
+    std::array<float, 2> size{}; ///< decimals
+    std::array<int, 2> whole{};  ///< whole numbers
+};
+Extent readExtent(std::string_view line);
+/// The record's last EXTENT line read (readExtent); nullopt without one.
+std::optional<Extent> extentOf(const nox::things::ThingDef& def);
 
 /// A thing's hover shape: thing.bin's EXTENT and ZSIZE.
 struct Shape {
@@ -46,6 +64,8 @@ struct Shape {
 /// w h (radius, width and height read as decimals; CENTER, NULL or none: no shape, never hit),
 /// and its ZSIZE as nox::things::thingZSize gives it (0 to 30 without a ZSIZE line).
 Shape shapeOf(const nox::things::ThingDef& def);
+/// The same with its EXTENT read already (extentOf).
+Shape shapeOf(const nox::things::ThingDef& def, const std::optional<Extent>& extent);
 
 /// Whether world point (cx, cy) is on a thing standing at (x, y), at height z.
 bool under(const Shape& shape, int x, int y, int z, int cx, int cy);
