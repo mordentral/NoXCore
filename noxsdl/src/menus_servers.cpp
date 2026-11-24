@@ -1,5 +1,6 @@
 // One address per action: the saved-address dropdown is independent of discovery results.
 #include "menus.hpp"
+#include "text_fit.hpp"
 
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/strings/string_table.hpp"
@@ -67,10 +68,8 @@ void Menus::serverDialog()
     // These helpers only operate on this dialog. The underlying addresses are never shortened.
     const auto label = [this](std::string address) {
         gui::Painter painter(nullptr, gui_.resources(), 640, 480);
-        if (painter.textWidth(address, false) <= kLabelWidth) return address;
-        auto text = nox::strings::fromUtf8(address);
-        while (!text.empty() && painter.textWidth(nox::strings::toUtf8(text) + "...", false) > kLabelWidth) text.pop_back();
-        return nox::strings::toUtf8(text) + "...";
+        // (Cut a whole letter at a time: never half a character.)
+        return fitText(std::move(address), kLabelWidth, [&](const std::string& t) { return painter.textWidth(t, false); });
     };
     const auto scroll = [this, state](int to) {
         auto* list = dialog_->find(kList);

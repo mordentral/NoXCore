@@ -361,7 +361,7 @@ ContentIndex ContentIndex::build(const GameFiles& files)
                 const auto& e = es[i];
                 std::string first = e.variants.empty() ? std::string() : nox::strings::toUtf8(e.variants.front().text);
                 if (first.size() > 60) {
-                    first = first.substr(0, 57) + "...";
+                    first = first.substr(0, nox::util::utf8CutLength(first, 57)) + "..."; // (between letters)
                 }
                 s.records.push_back(make(FileKind::Strings, RecordList::String, i, e.label, first));
                 const auto colon = e.label.find(':');

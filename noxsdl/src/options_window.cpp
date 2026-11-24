@@ -46,8 +46,8 @@ constexpr std::array<Switch, 11> kSwitches{{
     {kFrameRate, NOX_TRK("options.switch.frame_rate", "Frame Rate"), &Extras::frameRate},
     {kBloom, NOX_TRK("options.switch.bloom", "Bloom"), &Extras::bloom},
     {kPerPixelLight, NOX_TRK("options.switch.pixel_light", "Pixel Light"), &Extras::perPixelLight},
-    {kSmoothEffects, NOX_TRK("options.switch.smooth_fx", "Smooth FX"), &Extras::smoothEffects},
-    {kHdSpellFx, NOX_TRK("options.switch.hd_spell_fx", "HD Spell FX"), &Extras::hdSpellFx},
+    {kSmoothEffects, NOX_TRK("options.switch.smooth_fx", "Smooth Spell FX"), &Extras::smoothEffects},
+    {kHdSpellFx, NOX_TRK("options.switch.hd_spell_fx", "HD FX"), &Extras::hdSpellFx},
     {kHdImages, NOX_TRK("options.switch.hd_images", "Use HD Images"), &Extras::hdImages},
     {kKillFeed, NOX_TRK("options.switch.kill_feed", "Kill Feed"), &Extras::killFeed},
     {kMouseAccel, NOX_TRK("options.switch.mouse_accel", "Win Mouse Accel"), &Extras::mouseAccel},
@@ -156,7 +156,7 @@ std::string_view extraTooltip(std::int32_t id)
                       "your screen's resolution, and a smoke blast as soft dust.\n"
                       "+ Cleaner sparks, rays and glows.\n"
                       "- Off: the original's pixel shapes.\n"
-                      "The poison cloud and Force Field are HD Spell FX\n"
+                      "The poison cloud and Force Field are HD FX\n"
                       "(on the More page).");
     case kHdSpellFx:
         return NOX_TR("options.tip.hd_spell_fx",
@@ -167,7 +167,7 @@ std::string_view extraTooltip(std::int32_t id)
                       "ripples where things wade and splashes where they land.\n"
                       "+ Detailed spell effects and water at any zoom.\n"
                       "- Off: the original's sprites and water.\n"
-                      "Sparks, rays and glows are Smooth FX (on the General page).");
+                      "Sparks, rays and glows are Smooth Spell FX (on the General page).");
     case kSmoothLabel:
     case kSmoothBox:
         return NOX_TR("options.tip.smoothing",
@@ -284,7 +284,7 @@ std::string_view extraTooltip(std::int32_t id)
     case kTabMore:
         return NOX_TR("options.tip.tab_more",
                       "Settings seldom changed: the line of sight's soft edge,\n"
-                      "Fade Objects, the HUD, the frame-rate counter, HD Spell FX,\n"
+                      "Fade Objects, the HUD, the frame-rate counter, HD FX,\n"
                       "the original's exact maths for games you host, the\n"
                       "weather effects and the original style fonts.");
     default:

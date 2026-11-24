@@ -3066,7 +3066,7 @@ editor.chat.disconnected = Disconnected
 # noxsdl/src/editor/chat_log.cpp:67
 #@ 67c2b098: Disconnected: {why}
 editor.chat.disconnected_why = Disconnected: {why}
-# noxsdl/src/editor/chat_panel.cpp:74
+# noxsdl/src/editor/chat_panel.cpp:75
 #@ 77922a02: The game's chat shows here: what players say (team lines too), who comes and goes.
 editor.chat.empty = The game's chat shows here: what players say (team lines too), who comes and goes.
 # noxsdl/src/editor/chat_log.cpp:56
@@ -3075,37 +3075,37 @@ editor.chat.joined = {name} joined the game
 # noxsdl/src/editor/chat_log.cpp:62
 #@ d20b211c: {name} left the game
 editor.chat.left = {name} left the game
-# noxsdl/src/editor/chat_panel.cpp:105
+# noxsdl/src/editor/chat_panel.cpp:106
 #@ b05c3e10: Not in the game
 editor.chat.not_in_game = Not in the game
-# noxsdl/src/editor/chat_panel.cpp:105
+# noxsdl/src/editor/chat_panel.cpp:106
 #@ 9d627132: Say something to the players...
 editor.chat.say_hint = Say something to the players...
-# noxsdl/src/editor/chat_panel.cpp:111
+# noxsdl/src/editor/chat_panel.cpp:112
 #@ f28e14cf: Send
 editor.chat.send = Send
-# noxsdl/src/editor/chat_panel.cpp:87
+# noxsdl/src/editor/chat_panel.cpp:88
 #@ cbacf9bb: Someone
 editor.chat.someone = Someone
 # noxsdl/src/editor/chat_log.cpp:61
 #@ 11801477: Someone left the game
 editor.chat.someone_left = Someone left the game
-# noxsdl/src/editor/chat_panel.cpp:26
+# noxsdl/src/editor/chat_panel.cpp:27
 #@ 1111740e: Chat - {line}
 editor.chat.status = Chat - {line}
-# noxsdl/src/editor/chat_panel.cpp:25
+# noxsdl/src/editor/chat_panel.cpp:26
 #@ 49b7f1e1: Chat - {line}  (Window > Chat)
 editor.chat.status_closed = Chat - {line}  (Window > Chat)
-# noxsdl/src/editor/chat_panel.cpp:109
+# noxsdl/src/editor/chat_panel.cpp:110
 #@ 2329c92c: Team
 editor.chat.team = Team
-# noxsdl/src/editor/chat_panel.cpp:86
+# noxsdl/src/editor/chat_panel.cpp:87
 #@ f6d9a2a7: (team)\s
 editor.chat.team_mark = (team)\s
-# noxsdl/src/editor/chat_panel.cpp:38
+# noxsdl/src/editor/chat_panel.cpp:39
 #@ 2279d8cb: Chat
 editor.chat.title = Chat
-# noxsdl/src/editor/chat_panel.cpp:37
+# noxsdl/src/editor/chat_panel.cpp:38
 #@ 11595df4: Chat ({n})
 editor.chat.title_unread = Chat ({n})
 # noxsdl/src/editor/map_editor.cpp:1060
@@ -12244,7 +12244,7 @@ editor.window.script = Script
 # noxsdl/src/editor/map_editor_ui.cpp:172, noxsdl/src/editor/script_panel.cpp:1735
 #@ b63657eb: Script Reference
 editor.window.script_reference = Script Reference
-# noxsdl/src/editor/chat_panel.cpp:57, noxsdl/src/editor/map_editor_ui.cpp:180, noxsdl/src/editor/session_panel.cpp:351 ...
+# noxsdl/src/editor/chat_panel.cpp:58, noxsdl/src/editor/map_editor_ui.cpp:180, noxsdl/src/editor/session_panel.cpp:351 ...
 #@ 2048cc97: Session
 editor.window.session = Session
 # noxsdl/src/editor/map_editor_ui.cpp:168, noxsdl/src/editor/map_editor_ui.cpp:780
@@ -12562,10 +12562,10 @@ menus.characters.place_note = {place} · {note}
 # noxsdl/src/character_labels.hpp:71
 #@ 04c83daf: Show all
 menus.characters.show_all = Show all
-# noxsdl/src/menus_modes.cpp:76, noxsdl/src/menus_servers.cpp:219
+# noxsdl/src/menus_modes.cpp:76, noxsdl/src/menus_servers.cpp:218
 #@ 35afca3b: Cancel
 menus.common.cancel = Cancel
-# noxsdl/src/menus_servers.cpp:216
+# noxsdl/src/menus_servers.cpp:215
 #@ cd86acc3: Close
 menus.common.close = Close
 # noxsdl/src/menus.cpp:177, noxsdl/src/quit_menu.cpp:84, noxsdl/src/quit_menu.cpp:105
@@ -12697,7 +12697,7 @@ menus.save_failed.body = Check that your save folder is writable and has free sp
 # noxsdl/src/menus.cpp:2512
 #@ 0685388d: Save failed
 menus.save_failed.title = Save failed
-# noxsdl/src/menus_servers.cpp:151, noxsdl/src/menus_servers.cpp:213
+# noxsdl/src/menus_servers.cpp:150, noxsdl/src/menus_servers.cpp:212
 #@ 9dc3aa14: Add
 menus.servers.add = Add
 # noxsdl/src/menus.cpp:642
@@ -12706,31 +12706,31 @@ menus.servers.add_remove = Add/Remove
 # noxsdl/src/menus.cpp:644
 #@ 06e309b3: Add or remove saved server addresses
 menus.servers.add_remove_tip = Add or remove saved server addresses
-# noxsdl/src/menus_servers.cpp:184
+# noxsdl/src/menus_servers.cpp:183
 #@ 858b3346: Server added.
 menus.servers.added = Server added.
 # noxsdl/src/menus.cpp:2067
 #@ aa489a85: Address not found. Refresh to try again.
 menus.servers.address_not_found_refresh = Address not found. Refresh to try again.
-# noxsdl/src/menus_servers.cpp:211
+# noxsdl/src/menus_servers.cpp:210
 #@ d43e01fa: Hostname or IPv4 address, optional :port (default 18590)
 menus.servers.address_tip = Hostname or IPv4 address, optional :port (default 18590)
-# noxsdl/src/menus_servers.cpp:274
+# noxsdl/src/menus_servers.cpp:273
 #@ 499a4e6e: Address is too long. Paste a hostname or IPv4 address with an optional port.
 menus.servers.address_too_long = Address is too long. Paste a hostname or IPv4 address with an optional port.
-# noxsdl/src/menus_servers.cpp:183
+# noxsdl/src/menus_servers.cpp:182
 #@ ea360d6e: Already saved.
 menus.servers.already_saved = Already saved.
-# noxsdl/src/menus_servers.cpp:139
+# noxsdl/src/menus_servers.cpp:138
 #@ 3ac0a5c9: Enter a hostname or IPv4 address; optional port: 1-65535.
 menus.servers.bad_address = Enter a hostname or IPv4 address; optional port: 1-65535.
-# noxsdl/src/menus_servers.cpp:146
+# noxsdl/src/menus_servers.cpp:145
 #@ 61a44e84: Add this server?
 menus.servers.confirm_add = Add this server?
-# noxsdl/src/menus_servers.cpp:147
+# noxsdl/src/menus_servers.cpp:146
 #@ e7d25a43: Remove saved address?
 menus.servers.confirm_remove = Remove saved address?
-# noxsdl/src/menus_servers.cpp:98
+# noxsdl/src/menus_servers.cpp:97
 #@ 435c2969: Add/Remove Servers
 menus.servers.dialog_title = Add/Remove Servers
 # noxsdl/src/menus.cpp:654, noxsdl/src/menus_modes.cpp:477
@@ -12742,22 +12742,22 @@ menus.servers.info_saved_server = Saved server
 # noxsdl/src/menus.cpp:1359
 #@ 6d7302f2: Server
 menus.servers.info_server = Server
-# noxsdl/src/menus_servers.cpp:117
+# noxsdl/src/menus_servers.cpp:116
 #@ 149980d9: No saved addresses
 menus.servers.no_saved = No saved addresses
-# noxsdl/src/menus_servers.cpp:111
+# noxsdl/src/menus_servers.cpp:110
 #@ a7b91e6b: Could not read servers.txt. Close and try again.
 menus.servers.read_failed = Could not read servers.txt. Close and try again.
-# noxsdl/src/menus_servers.cpp:151, noxsdl/src/menus_servers.cpp:214
+# noxsdl/src/menus_servers.cpp:150, noxsdl/src/menus_servers.cpp:213
 #@ 21a5901d: Remove
 menus.servers.remove = Remove
-# noxsdl/src/menus_servers.cpp:185
+# noxsdl/src/menus_servers.cpp:184
 #@ 8746f8ca: Saved address removed.
 menus.servers.removed = Saved address removed.
-# noxsdl/src/menus_servers.cpp:118
+# noxsdl/src/menus_servers.cpp:117
 #@ f4699abe: Select saved address
 menus.servers.select_saved = Select saved address
-# noxsdl/src/menus_servers.cpp:189
+# noxsdl/src/menus_servers.cpp:188
 #@ b10cbd09: Could not change servers.txt. Check that it is writable and try again.
 menus.servers.write_failed = Could not change servers.txt. Check that it is writable and try again.
 # noxsdl/src/campaign_line.cpp:46, modes/coop/ui/coop_ui.cpp:274
@@ -13124,8 +13124,8 @@ options.switch.frame_rate = Frame Rate
 #@ 406cb922: Use HD Images
 options.switch.hd_images = Use HD Images
 # noxsdl/src/options_window.cpp:50
-#@ ef5d3c23: HD Spell FX
-options.switch.hd_spell_fx = HD Spell FX
+#@ b1f4af7d: HD FX
+options.switch.hd_spell_fx = HD FX
 # noxsdl/src/options_window.cpp:52
 #@ 1c97fc67: Kill Feed
 options.switch.kill_feed = Kill Feed
@@ -13139,8 +13139,8 @@ options.switch.original_fonts = Original Style Fonts
 #@ 32e553bf: Pixel Light
 options.switch.pixel_light = Pixel Light
 # noxsdl/src/options_window.cpp:49
-#@ e88c25fb: Smooth FX
-options.switch.smooth_fx = Smooth FX
+#@ 640ca085: Smooth Spell FX
+options.switch.smooth_fx = Smooth Spell FX
 # noxsdl/src/options_window.cpp:54
 #@ 2c8815e6: VSync
 options.switch.vsync = VSync
@@ -13175,8 +13175,8 @@ options.tip.frame_rate = The frame rate and frame time in the top right\n(with S
 #@ f4b2b42c: Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.
 options.tip.hd_images = Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.
 # noxsdl/src/options_window.cpp:162
-#@ feead26a: Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth FX (on the General page).
-options.tip.hd_spell_fx = Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth FX (on the General page).
+#@ 1a1bdd28: Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth Spell FX (on the General page).
+options.tip.hd_spell_fx = Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth Spell FX (on the General page).
 # noxsdl/src/options_window.cpp:233
 #@ 35ed71be: Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.
 options.tip.kill_feed = Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.
@@ -13193,8 +13193,8 @@ options.tip.original_fonts = The game's text in Nox-style fonts: the original's 
 #@ 46422cf8: Lights shade every pixel, smoothly.\n+ Smooth lighting with no blocky edges.\n- Off: the original's coarser light grid.
 options.tip.pixel_light = Lights shade every pixel, smoothly.\n+ Smooth lighting with no blocky edges.\n- Off: the original's coarser light grid.
 # noxsdl/src/options_window.cpp:154
-#@ 1f3e7699: Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD Spell FX\n(on the More page).
-options.tip.smooth_fx = Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD Spell FX\n(on the More page).
+#@ a39596a7: Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD FX\n(on the More page).
+options.tip.smooth_fx = Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD FX\n(on the More page).
 # noxsdl/src/options_window.cpp:173
 #@ fa78311a: How movement between the server's 30 updates a second is drawn.\nOff: in the server's 30 steps a second, at your frame rate.\nSmooth Movement: each step spread over the frames between updates.\nSmooth Network: everything drawn between updates (adds latency).\nMatch Server: follow server updates; normally 60 FPS in solo play.
 options.tip.smoothing = How movement between the server's 30 updates a second is drawn.\nOff: in the server's 30 steps a second, at your frame rate.\nSmooth Movement: each step spread over the frames between updates.\nSmooth Network: everything drawn between updates (adds latency).\nMatch Server: follow server updates; normally 60 FPS in solo play.
@@ -13214,8 +13214,8 @@ options.tip.smoothing_off = Off: everything is drawn where the server last said,
 #@ 6c5b4e7e: The everyday settings.
 options.tip.tab_general = The everyday settings.
 # noxsdl/src/options_window.cpp:285
-#@ 424bf6d7: Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD Spell FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
-options.tip.tab_more = Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD Spell FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
+#@ 8562dc65: Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
+options.tip.tab_more = Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
 # noxsdl/src/options_window.cpp:224
 #@ 5806ae43: Frames wait for the screen's refresh.\n+ No tearing.\n- Up to a refresh's more latency.\nOff: as many frames as the computer can draw.
 options.tip.vsync = Frames wait for the screen's refresh.\n+ No tearing.\n- Up to a refresh's more latency.\nOff: as many frames as the computer can draw.

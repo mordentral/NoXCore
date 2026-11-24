@@ -5,6 +5,7 @@
 #include "editor/theme_colours.hpp"
 
 #include "noxcore/strings/l10n.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <imgui.h>
 #include <imgui_internal.h> // (a layout without the panel: docked beside History)
@@ -21,7 +22,7 @@ void MapEditor::addChat(editor::ChatLine line)
     // Closed (or outside a session, where the panel isn't shown): a short line in the status bar.
     if (!showChat_ || !session_) {
         std::string said = line.speaker.empty() || line.kind == editor::ChatLine::Kind::System ? line.text : line.speaker + ": " + line.text;
-        if (said.size() > 90) said = said.substr(0, 87) + "...";
+        if (said.size() > 90) said = said.substr(0, nox::util::utf8CutLength(said, 87)) + "..."; // (between letters)
         status(nox::l10n::format(session_ ? NOX_TR("editor.chat.status_closed", "Chat - {line}  (Window > Chat)")
                                           : NOX_TR("editor.chat.status", "Chat - {line}"),
                                  {{"line", said}}));

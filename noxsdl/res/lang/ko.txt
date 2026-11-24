@@ -8723,8 +8723,8 @@ options.switch.exact_maths = 원작 계산 그대로
 options.switch.frame_rate = 프레임 레이트
 #@ 406cb922 mt: Use HD Images
 options.switch.hd_images = HD 이미지 사용
-#@ ef5d3c23 mt: HD Spell FX
-options.switch.hd_spell_fx = HD 주문 효과
+#@ b1f4af7d mt: HD FX
+options.switch.hd_spell_fx = HD 효과
 #@ 1c97fc67 mt: Kill Feed
 options.switch.kill_feed = 킬 피드
 #@ f25d4a26 mt: Win Mouse Accel
@@ -8733,8 +8733,8 @@ options.switch.mouse_accel = Windows 마우스 가속
 options.switch.original_fonts = 원작 스타일 글꼴
 #@ 32e553bf mt: Pixel Light
 options.switch.pixel_light = 픽셀 조명
-#@ e88c25fb mt: Smooth FX
-options.switch.smooth_fx = 부드러운 효과
+#@ 640ca085 mt: Smooth Spell FX
+options.switch.smooth_fx = 부드러운 주문 효과
 #@ 2c8815e6 mt: VSync
 options.switch.vsync = 수직 동기화
 #@ 5561fd0b mt: General
@@ -8757,8 +8757,8 @@ options.tip.exact_maths = 게임의 계산을 원작 게임과 똑같이 반올�
 options.tip.frame_rate = 오른쪽 위에 프레임 레이트와 프레임 시간을 표시합니다\n(움직임 보정 사용 시 그 지연 시간도).
 #@ f4b2b42c mt: Images from the HD image pack (video_hd.nxp) where it has them.\n- Greyed without a pack.
 options.tip.hd_images = HD 이미지 팩(video_hd.nxp)에 있는 이미지를 사용합니다.\n- 팩이 없으면 비활성화됩니다.
-#@ feead26a mt: Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth FX (on the General page).
-options.tip.hd_spell_fx = 원작의 스프라이트 대신 새로 그린 주문 효과:\n독구름은 부드럽게 피어오르는 구름으로, 역장은\n유리 장벽으로, 화면 해상도에 맞춰 매끄럽게 그립니다.\n물은 원작의 탁한 물 위로 움직이는 수면으로 그리며,\n무언가 지나가면 물결이, 떨어지면 물보라가 입니다.\n+ 어떤 확대 배율에서도 세밀한 주문 효과와 물.\n- 끄면: 원작의 스프라이트와 물.\n불꽃, 광선, 빛은 부드러운 효과(일반 탭)에 있습니다.
+#@ 1a1bdd28 mt: Spells drawn anew in place of the original's sprites:\nthe poison cloud as soft billowing clouds and Force Field\nas a glass barrier, smooth at your screen's resolution.\nWater as a moving surface over the original's murk, with\nripples where things wade and splashes where they land.\n+ Detailed spell effects and water at any zoom.\n- Off: the original's sprites and water.\nSparks, rays and glows are Smooth Spell FX (on the General page).
+options.tip.hd_spell_fx = 원작의 스프라이트 대신 새로 그린 주문 효과:\n독구름은 부드럽게 피어오르는 구름으로, 역장은\n유리 장벽으로, 화면 해상도에 맞춰 매끄럽게 그립니다.\n물은 원작의 탁한 물 위로 움직이는 수면으로 그리며,\n무언가 지나가면 물결이, 떨어지면 물보라가 입니다.\n+ 어떤 확대 배율에서도 세밀한 주문 효과와 물.\n- 끄면: 원작의 스프라이트와 물.\n불꽃, 광선, 빛은 부드러운 주문 효과(일반 탭)에 있습니다.
 #@ 35ed71be mt: Who killed whom and with what, centred at the top of the\nscreen for a few seconds, as the original shows it.\nOff: in the console only.
 options.tip.kill_feed = 누가 누구를 무엇으로 처치했는지 화면 위쪽 가운데에\n몇 초 동안 원작처럼 표시합니다.\n끄면: 콘솔에만 표시.
 #@ 8a4df3f1 mt: Windows' pointer speed and acceleration (Enhance Pointer\nPrecision) on the mouse's raw movement.\nOff: the raw movement alone, one count a game pixel,\nas the original read it (at Mouse x1.00).
@@ -8769,8 +8769,8 @@ options.tip.mouse_speed = 커서 이동 속도: x0.25~x3. x1.00이면 마우스 
 options.tip.original_fonts = 게임 텍스트를 Nox 스타일 글꼴로 표시합니다: 원작의 글자를\nHD 이미지 사용 시 매끄럽게 그립니다.\n끄면: 책 글꼴인 Caudex와, 부족한 문자는 Noto Sans.
 #@ 46422cf8 mt: Lights shade every pixel, smoothly.\n+ Smooth lighting with no blocky edges.\n- Off: the original's coarser light grid.
 options.tip.pixel_light = 조명이 모든 픽셀을 매끄럽게 비춥니다.\n+ 계단 현상 없는 부드러운 조명.\n- 끄면: 원작의 거친 조명 격자.
-#@ 1f3e7699 mt: Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD Spell FX\n(on the More page).
-options.tip.smooth_fx = 불꽃, 광선, 빛, 선, 점을 화면 해상도에 맞춰\n매끄럽게 그리고, 연기 폭발은 부드러운 먼지로 그립니다.\n+ 더 깔끔한 불꽃, 광선, 빛.\n- 끄면: 원작의 픽셀 모양.\n독구름과 역장은 HD 주문 효과에 있습니다\n(기타 탭).
+#@ a39596a7 mt: Sparks, rays, glows, lines and dots drawn smooth at\nyour screen's resolution, and a smoke blast as soft dust.\n+ Cleaner sparks, rays and glows.\n- Off: the original's pixel shapes.\nThe poison cloud and Force Field are HD FX\n(on the More page).
+options.tip.smooth_fx = 불꽃, 광선, 빛, 선, 점을 화면 해상도에 맞춰\n매끄럽게 그리고, 연기 폭발은 부드러운 먼지로 그립니다.\n+ 더 깔끔한 불꽃, 광선, 빛.\n- 끄면: 원작의 픽셀 모양.\n독구름과 역장은 HD 효과에 있습니다\n(기타 탭).
 #@ fa78311a mt: How movement between the server's 30 updates a second is drawn.\nOff: in the server's 30 steps a second, at your frame rate.\nSmooth Movement: each step spread over the frames between updates.\nSmooth Network: everything drawn between updates (adds latency).\nMatch Server: follow server updates; normally 60 FPS in solo play.
 options.tip.smoothing = 서버의 초당 30회 업데이트 사이의 움직임을 그리는 방식.\n끔: 서버의 초당 30단계 그대로, 내 프레임 레이트로 그림.\n부드러운 이동: 각 단계를 업데이트 사이의 프레임에 나눠 그림.\n부드러운 네트워크: 업데이트 사이의 모든 것을 그림(지연 추가).\n서버에 맞춤: 서버 업데이트를 따름. 솔로 플레이에서는 보통 60 FPS.
 #@ 714d178d mt: Match Server: normally a 60 FPS lock in single-player.\nNo interpolation. Draw when a server update arrives,\nincluding extra movement updates (30-120 per second).\nMenus use their normal frame rate.
@@ -8783,8 +8783,8 @@ options.tip.smoothing_network = 부드러운 네트워크: 보이는 모든 것�
 options.tip.smoothing_off = 끔: 모든 것을 서버가 마지막으로 알려 준 위치에\n초당 30단계로, 추가 지연 없이 그립니다.\n- 30 FPS를 넘으면 단계가 고르지 않게 보일 수 있습니다.
 #@ 6c5b4e7e mt: The everyday settings.
 options.tip.tab_general = 자주 쓰는 설정.
-#@ 424bf6d7 mt: Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD Spell FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
-options.tip.tab_more = 자주 바꾸지 않는 설정: 시야의 부드러운 경계,\n오브젝트 흐리게, HUD, 프레임 레이트 표시, HD 주문 효과,\n호스팅하는 게임의 원작 계산 그대로,\n날씨 효과, 원작 스타일 글꼴.
+#@ 8562dc65 mt: Settings seldom changed: the line of sight's soft edge,\nFade Objects, the HUD, the frame-rate counter, HD FX,\nthe original's exact maths for games you host, the\nweather effects and the original style fonts.
+options.tip.tab_more = 자주 바꾸지 않는 설정: 시야의 부드러운 경계,\n오브젝트 흐리게, HUD, 프레임 레이트 표시, HD 효과,\n호스팅하는 게임의 원작 계산 그대로,\n날씨 효과, 원작 스타일 글꼴.
 #@ 5806ae43 mt: Frames wait for the screen's refresh.\n+ No tearing.\n- Up to a refresh's more latency.\nOff: as many frames as the computer can draw.
 options.tip.vsync = 프레임이 화면 새로 고침을 기다립니다.\n+ 화면 찢김 없음.\n- 최대 한 번의 새로 고침만큼 지연이 늘어납니다.\n끄면: 컴퓨터가 그릴 수 있는 만큼 프레임을 그립니다.
 #@ b33f1db0 mt: Rain, snow, storms and wind that a mod's game turns on,\ndrawn over the world (they never change the game).\n- Greyed without the GPU renderer.

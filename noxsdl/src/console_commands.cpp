@@ -544,7 +544,7 @@ std::vector<Console::Command> consoleCommands(App& app)
              extras([grid](OptionsWindow::Extras& e) { e.perPixelLight = !grid; });
              says("gridlight", !app.light.perPixel());
          }},
-        {"stockeffects", Console::kNoxsdl, "[on|off]: the effects' pixel shapes and sprites: Smooth FX and HD Spell FX off (--stock-effects)",
+        {"stockeffects", Console::kNoxsdl, "[on|off]: the effects' pixel shapes and sprites: Smooth Spell FX and HD FX off (--stock-effects)",
          [onOff, says, extras](const Args& a) {
              const bool stock = onOff(a, !fxdraw::smoothOn() && !fxdraw::spellFxOn());
              extras([stock](OptionsWindow::Extras& e) {
