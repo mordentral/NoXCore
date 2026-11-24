@@ -94,21 +94,16 @@ std::filesystem::path modeSaveRoot(const std::filesystem::path& soloRoot, std::s
     if (!e || !e->soloScreens) {
         return soloRoot;
     }
-    std::filesystem::path root = soloRoot / e->soloScreens->saves;
-    if (!campaign.empty()) {
-        // A mod's campaign: its players' saves in its own folder (registry.hpp's
-        // campaignSavesFolder); where that can't be written (a read-only install), beside the
-        // mode's Save\ as before (never one of its slots), said once.
-        const nox::modes::Mode* mod = nox::modes::installedCampaign(nox::modes::registry(), campaign);
-        if (std::filesystem::path own = mod ? nox::modes::campaignSavesFolder(*mod) : std::filesystem::path(); !own.empty()) {
-            root = std::move(own);
-        } else {
-            root /= std::filesystem::path("Mods") / std::string(campaign);
-            static std::set<std::string, std::less<>> told;
-            if (told.insert(std::string(campaign)).second) {
-                SDL_Log("%.*s: its saves can't go in its mod folder's saves (not there, or not writable): %s instead",
-                        static_cast<int>(campaign.size()), campaign.data(), nox::pathUtf8(root).c_str());
-            }
+    // A mod's campaign: its players' saves in its own folder (campaign_mod.hpp's campaignSaveRoot);
+    // where that can't be written (a read-only install), beside the mode's Save\ as before (never
+    // one of its slots), said once. An id that names no installed campaign mod: the mode's own.
+    const CampaignSaveRoot saves = campaignSaveRoot(soloRoot / e->soloScreens->saves, campaign);
+    const std::filesystem::path& root = saves.root;
+    if (saves.fellBack) {
+        static std::set<std::string, std::less<>> told;
+        if (told.insert(std::string(campaign)).second) {
+            SDL_Log("%.*s: its saves can't go in its mod folder's saves (not there, or not writable): %s instead",
+                    static_cast<int>(campaign.size()), campaign.data(), nox::pathUtf8(root).c_str());
         }
     }
     std::error_code ec;
@@ -132,12 +127,6 @@ void beginSoloScreensHost(App& app, std::string_view modeId, std::uint8_t player
     }
 }
 
-std::string campaignTitleOf(std::string_view campaign)
-{
-    const nox::modes::Mode* mode = campaign.empty() ? nullptr : nox::modes::registry().find(campaign);
-    return mode && mode->info.campaign ? mode->info.campaign->title : std::string();
-}
-
 std::string modeIdByName(std::string_view name)
 {
     for (const nox::modes::Mode* m : nox::modes::registry().all()) {
@@ -146,18 +135,6 @@ std::string modeIdByName(std::string_view name)
         }
     }
     return {};
-}
-
-std::filesystem::path campaignMapPath(const std::filesystem::path& gameDir, std::string_view campaign, const std::string& name)
-{
-    // (The maps the mod ships, as its games find them: its package's index, GameHost::findMap's.)
-    const nox::modes::Mode* mode = campaign.empty() ? nullptr : nox::modes::registry().find(campaign);
-    if (mode && mode->maps) {
-        if (const nox::server::ModeMaps::Entry* e = mode->maps->find(name)) {
-            return e->map;
-        }
-    }
-    return gameDir / "maps" / name / (name + ".map");
 }
 
 void endSoloScreensHost(App& app)

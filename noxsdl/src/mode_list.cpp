@@ -113,7 +113,9 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
     const ModeListRow hostRow = host != all.end() ? rowOf(*host) : ModeListRow{};
     for (const nox::modes::Mode* m : all) {
         if (m->info.campaign) {
-            if (!m->makeServer || host == all.end()) {
+            // (One that isn't an installed campaign mod, registry.hpp's rule: no row at all, never
+            // a campaign the save folders and hosting wouldn't take as one.)
+            if (!nox::modes::isInstalledCampaign(*m) || !m->makeServer || host == all.end()) {
                 continue;
             }
             // Its own row: the title, the mod's description, its mode's settings (not the Campaign
@@ -143,7 +145,7 @@ std::vector<ModeListRow> modeListRows(ModeListFor list, const nox::modes::Regist
         if (m->info.runsCampaigns) {
             nox::modes::OptionSpec choice{.key = "campaign", .label = NOX_TR("modes.coop.campaign", "Campaign"), .kind = nox::modes::OptionSpec::Kind::Choice};
             for (const nox::modes::Mode* c : all) {
-                if (c->info.campaign && c->makeServer) {
+                if (nox::modes::isInstalledCampaign(*c) && c->makeServer) {
                     if (r.campaigns.empty()) {
                         r.campaigns.emplace_back();
                         r.campaignTitles.emplace_back();

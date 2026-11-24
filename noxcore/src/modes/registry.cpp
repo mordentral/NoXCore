@@ -108,12 +108,26 @@ Registry& registry()
     return r;
 }
 
+namespace {
+
+/// A plain mode id: 1-24 of a-z, 0-9 and _ (a mod's, by its manifest's rule).
+bool plainModeId(std::string_view id)
+{
+    return !id.empty() && id.size() <= 24 &&
+           std::ranges::all_of(id, [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; });
+}
+
+} // namespace
+
+bool isInstalledCampaign(const Mode& mode)
+{
+    return mode.info.campaign && !mode.folder.empty() && plainModeId(mode.info.id);
+}
+
 const Mode* installedCampaign(const Registry& registry, std::string_view id)
 {
-    const bool plain = !id.empty() && id.size() <= 24 &&
-                       std::ranges::all_of(id, [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; });
-    const Mode* m = plain ? registry.find(id) : nullptr;
-    return m && m->info.campaign && !m->folder.empty() && m->info.id == id ? m : nullptr;
+    const Mode* m = plainModeId(id) ? registry.find(id) : nullptr;
+    return m && m->info.id == id && isInstalledCampaign(*m) ? m : nullptr;
 }
 
 std::shared_ptr<const server::ModeData> gameDataFor(const Registry& registry, const Mode& mode, const OptionValues& options)

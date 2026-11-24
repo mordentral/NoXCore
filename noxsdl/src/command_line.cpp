@@ -1,6 +1,7 @@
 // The command line (command_line.hpp).
 #include "command_line.hpp"
 
+#include "campaign_mod.hpp"
 #include "log_output.hpp"
 #include "mods_folder.hpp"
 
@@ -82,7 +83,7 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             // Tests: --host-coop with mod ID's campaign (its row's Campaign choice), from its first map.
             hosting().solo = true;
             app.hostSoloScreensTest = "coop";
-            app.hostCoopCampaignTest = next();
+            app.hostCoopCampaignTest = typedCampaignId(next()); // (as typed, in any case: a mod's id is lowercase)
             if (opts.hostSettings->map == "Estate") {
                 opts.hostSettings->map.clear();
             }

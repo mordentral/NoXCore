@@ -866,12 +866,8 @@ std::string Menus::soloCampaignTitle() const
 
 const nox::modes::CampaignInfo* Menus::soloCampaignInfo() const
 {
-    const std::string id = soloCampaign();
-    if (id.empty()) {
-        return nullptr;
-    }
-    const nox::modes::Mode* m = nox::modes::registry().find(id);
-    return m && m->info.campaign ? &*m->info.campaign : nullptr;
+    const nox::modes::Mode* m = campaignMod(soloCampaign()); // (the save folders' and hosting's rule)
+    return m ? &*m->info.campaign : nullptr;
 }
 
 void Menus::startSolo(const SoloStart& start)

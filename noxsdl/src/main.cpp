@@ -604,10 +604,10 @@ Menus::Callbacks menusCallbacks(App* app, const StartOptions& opts)
             return;
         }
         // (Its end back to the game list it was hosted from, as the other hosted modes'.)
-        const nox::modes::Mode* campaignMode = campaign.empty() ? nullptr : nox::modes::registry().find(campaign);
-        const std::string what = campaignMode && campaignMode->info.campaign ? campaignMode->info.campaign->title
-                                 : how.what                                 ? how.what(start.profile.playerClass)
-                                                                            : modeId;
+        const std::string campaignTitle = campaignTitleOf(campaign);
+        const std::string what = !campaignTitle.empty() ? campaignTitle
+                                 : how.what             ? how.what(start.profile.playerClass)
+                                                        : modeId;
         SDL_Log("%s: hosting %s at %s%s", how.logTag.c_str(), what.c_str(),
                 settings.map.c_str(), start.continueSlot.empty() ? "" : (", continuing " + start.continueSlot).c_str());
         SDL_Log("%s", hostListingLog(menusHostListing(*app, listed), how.logTag, app->host->port()).c_str());
@@ -1023,10 +1023,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         }
         if (opts.hostSettings) {
             // Our own game: the server here on its port, and we join it like anyone else.
+            const nox::modes::Mode* campaign = campaignMod(app->hostCoopCampaignTest);
+            if (!app->hostCoopCampaignTest.empty() && !campaign) {
+                // (--host-coop-campaign naming no installed campaign mod: refused as the co-op mode
+                // refuses it, before anything's saved or hosted.)
+                throw std::runtime_error("--host-coop-campaign: no campaign \"" + app->hostCoopCampaignTest + "\" among the mods");
+            }
             if (opts.hostSettings->solo && opts.hostSettings->map.empty()) {
-                const nox::modes::Mode* campaign =
-                    app->hostCoopCampaignTest.empty() ? nullptr : nox::modes::registry().find(app->hostCoopCampaignTest);
-                opts.hostSettings->map = campaign && campaign->info.campaign // (--host-coop-campaign: its first map, the one it ships)
+                opts.hostSettings->map = campaign // (--host-coop-campaign: its first map, the one it ships)
                                              ? campaignMapPath(app->gameDir, campaign->info.id, campaign->info.campaign->firstMap).string()
                                              : std::string(nox::client::solo_menu::firstMap(opts.profile.playerClass));
             }

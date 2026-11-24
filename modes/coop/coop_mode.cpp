@@ -50,8 +50,9 @@ void registerMode_coop(Registry& registry)
         }
         o.seed = ctx.seed;
         if (const auto c = option(ctx.options, "campaign"); c && !c->empty()) {
-            const Mode* mod = nox::modes::registry().find(*c); // (the process's: the mods loaded)
-            if (!mod || !mod->info.campaign) {
+            // (The process's mods loaded; exactly its id, as the game data and the saves take it.)
+            const Mode* mod = installedCampaign(nox::modes::registry(), *c);
+            if (!mod) {
                 throw std::runtime_error("no campaign \"" + std::string(*c) + "\" among the mods");
             }
             return std::make_unique<coop::CoopCampaign>(*mod, ctx, coop::campaignOptions(*mod->info.campaign, mod->info.maxPlayers, o));

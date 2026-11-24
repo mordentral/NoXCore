@@ -41,10 +41,13 @@ private:
 /// The process's registry.
 Registry& registry();
 
-/// The installed campaign mod `id` names (an id from anywhere, a host's message too: it must be a
-/// plain mode id, 1-24 of a-z, 0-9 and _, of a mod in `registry` that declares a campaign and has a
-/// folder); null: none.
+/// (The one rule for "is it a mod's campaign") The installed campaign mod `id` names (an id from
+/// anywhere, a host's message too: it must be exactly a plain mode id, 1-24 of a-z, 0-9 and _, of a
+/// mod in `registry` that declares a campaign and has a folder; another case is none); null: none.
+/// Every place that asks, the menus, the save folders, hosting, a guest's side, asks this.
 const Mode* installedCampaign(const Registry& registry, std::string_view id);
+/// The same rule for a mode in hand (the mode lists): a campaign, a folder, a plain id.
+bool isInstalledCampaign(const Mode& mode);
 
 /// (The one place that says where) Where campaign mod `mod`'s players' saves go: its own folder's
 /// saves\ (kModSavesFolder), made as it's asked for. Empty when it has no folder, declares no
