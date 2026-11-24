@@ -96,13 +96,40 @@ void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name)
     if (m.size() < 0x60) {
         return;
     }
-    bool ended = false;
-    for (std::size_t i = 0; i < 31; ++i) {
-        const char16_t c = !ended && i < name.size() ? name[i] : u'\0';
-        ended = ended || c == u'\0';
-        m[0x22 + 2 * i] = static_cast<std::uint8_t>(c);
-        m[0x23 + 2 * i] = static_cast<std::uint8_t>(c >> 8);
+    putWideField(m, 0x22, name, 31);
+}
+
+void putWideField(std::vector<std::uint8_t>& m, std::size_t at, std::u16string_view text, std::size_t letters)
+{
+    if (m.size() < at + 2 * letters) {
+        m.resize(at + 2 * letters, 0);
     }
+    bool ended = false;
+    for (std::size_t i = 0; i < letters; ++i) {
+        const char16_t c = !ended && i < text.size() ? text[i] : u'\0';
+        ended = ended || c == u'\0';
+        m[at + 2 * i] = static_cast<std::uint8_t>(c);
+        m[at + 2 * i + 1] = static_cast<std::uint8_t>(c >> 8);
+    }
+}
+
+std::optional<std::u16string> modeNpcTitle(const World& world, const ServerObject& player, std::string_view label, std::size_t letters)
+{
+    if (!world.modeHooks) {
+        return std::nullopt;
+    }
+    std::optional<std::u16string> name = world.modeHooks->playerText(world, player, label);
+    if (name) {
+        *name = fitDialogTitle(std::move(*name), letters);
+    }
+    return name;
+}
+
+std::u16string npcTitleFor(const World& world, const ServerObject& player, const ServerObject& npc, std::size_t letters)
+{
+    const std::string label = npcNameLabel(npc);
+    std::optional<std::u16string> own = modeNpcTitle(world, player, label, letters);
+    return own ? std::move(*own) : world.text(label);
 }
 
 std::u16string fitDialogTitle(std::u16string name, std::size_t letters)
@@ -162,12 +189,8 @@ void openNpcDialog(Fight& fight, ServerObject* player, ServerObject* npc, std::u
     // (noxcpp: no speaker given, a mode's own text for the NPC's name label, the player's; none
     // without a mode, the string table's as the game's.)
     std::optional<std::u16string> modeName;
-    if (!name && world.modeHooks) {
-        modeName = world.modeHooks->playerText(world, *player, npcNameLabel(*npc));
-        if (modeName) {
-            *modeName = fitDialogTitle(std::move(*modeName));
-            name = &*modeName;
-        }
+    if (!name && world.modeHooks && (modeName = modeNpcTitle(world, *player, npcNameLabel(*npc)))) {
+        name = &*modeName;
     }
     world.broadcasts().push_back({npcDialogMessage(world, *npc, sound, textId, name), true, player->extent});
     freezeUnit(fight, *player, 0);

@@ -331,11 +331,6 @@ void parseSoundSets(const std::string& text, std::size_t contentEnd, std::vector
 
 // --- modifier.bin: parseModifierDb's lines -------------------------------------------------
 
-bool modifierSection(std::string_view s)
-{
-    return s == "WEAPON_DEFINITIONS" || s == "ARMOR_DEFINITIONS" || s == "EFFECTIVENESS" || s == "MATERIAL" || s == "ENCHANTMENT";
-}
-
 /// A line trimmed as the reader trims it (spaces, tabs, '\r' and '\0').
 TextSpan modTrim(const std::string& text, std::size_t b, std::size_t e)
 {
@@ -393,7 +388,7 @@ void parseModifiers(const std::string& text, std::size_t contentEnd, std::vector
         const std::string_view s(text.data() + line.begin, line.size());
         switch (where) {
         case Where::Top:
-            if (!modifierSection(s)) {
+            if (!isModifierSection(s)) {
                 throw FormatError("modifier.bin line " + std::to_string(lineNo) + ": unknown section");
             }
             section = std::string(s);
@@ -917,11 +912,6 @@ bool keyTaken(const TextTable& base, std::string_view section, std::string_view 
 
 namespace {
 
-bool hasId(std::string_view section)
-{
-    return section == "EFFECTIVENESS" || section == "MATERIAL" || section == "ENCHANTMENT";
-}
-
 /// A modifier.bin patch's `NEW <name> LIKE <record>` into `base` as a copy of that record (its name
 /// line its own); its index, or nullopt with why in `problems`.
 std::optional<std::size_t> addLike(TextTable& base, const TableRecord& pr, bool allowed, std::vector<std::string>& problems)
@@ -941,11 +931,11 @@ std::optional<std::size_t> addLike(TextTable& base, const TableRecord& pr, bool 
         problems.push_back(label + ": modifier.bin has no " + pr.like + " in " + pr.section + " to make it like");
         return std::nullopt;
     }
-    if (std::ranges::any_of(base.records(), [&](const TableRecord& r) { return r.name == pr.name && (r.section == pr.section || (hasId(r.section) && hasId(pr.section))); })) {
+    if (std::ranges::any_of(base.records(), [&](const TableRecord& r) { return r.name == pr.name && (r.section == pr.section || (isModifierIdSection(r.section) && isModifierIdSection(pr.section))); })) {
         problems.push_back(label + ": modifier.bin has a record of that name already");
         return std::nullopt;
     }
-    if (hasId(pr.section) && std::ranges::count_if(base.records(), [](const TableRecord& r) { return hasId(r.section); }) >= 255) {
+    if (isModifierIdSection(pr.section) && std::ranges::count_if(base.records(), [](const TableRecord& r) { return isModifierIdSection(r.section); }) >= 255) {
         problems.push_back(label + ": modifier.bin has 255 modifiers already (an id is one byte, 0xFF none)");
         return std::nullopt;
     }

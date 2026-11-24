@@ -25,7 +25,7 @@
 // noxcpp's co-op downloads (a solo game with guests, GameHost::Options::soloGuests): the exe's solo
 // game loads nothing to send, so a guest's request reads the map's .nxz then, or makes it from the
 // .map when the map ships none (mapSendLoadForGuests). A mode's own maps (Options::modeMaps) are
-// sent from its folder (mapSendFile).
+// sent from its folder (mapSendFile), made from the .map there too when it ships no .nxz.
 #include "noxcore/server/game_host.hpp"
 
 #include "noxcore/io/file.hpp"
@@ -54,7 +54,9 @@ bool GameHost::mapSendLoadMap()
     // what was loaded ("ForceCopy"); then, the map's file name not empty, maps\<map>\<map>.nxz read
     // whole. (Its "not the one loaded" check compares the name's first letter with a byte
     // which nothing writes: never the same, an original bug.) Not there: "CompressFail", what was
-    // loaded stays.
+    // loaded stays. (noxcpp: a mode's own map, or one the console pinned from another mod, that
+    // ships no .nxz is sent as made from its .map, as a co-op guest's download is: nxzFromMap. A
+    // maps folder's map as the exe's.)
     if (mapSendsInProgress_ != 0) {
         for (auto& [peer, s] : mapSenders_) {
             if (s.state == 1) {
@@ -67,12 +69,21 @@ bool GameHost::mapSendLoadMap()
     }
     const std::string current = mapFile_;
     if (!current.empty()) {
-        const std::filesystem::path nxz = mapSendFile(mapPath_.stem().string());
-        std::ifstream in(resolveNoCase(nxz), std::ios::binary); // (any case, as on Windows)
-        if (!nxz.empty() && in) {
-            mapSendData_.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-            mapSendName_ = current;
-            return true;
+        const std::string stem = mapPath_.stem().string();
+        if (const std::filesystem::path nxz = mapSendFile(stem); !nxz.empty()) {
+            std::ifstream in(resolveNoCase(nxz), std::ios::binary); // (any case, as on Windows)
+            if (in) {
+                mapSendData_.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                mapSendName_ = current;
+                return true;
+            }
+        }
+        if (const ModeMaps::Entry* own = mapEntry(stem)) {
+            if (std::vector<std::uint8_t> made = nxzFromMap(own->map); !made.empty()) {
+                mapSendData_ = std::move(made);
+                mapSendName_ = current;
+                return true;
+            }
         }
     }
     mapSendPrint("mapsend.c:CompressFail");
@@ -84,17 +95,25 @@ std::filesystem::path GameHost::mapSendFile(const std::string& stem) const
     // (noxcpp) A mode's own map's beside it, as its index found it (checked inside the mode's
     // folder then), or another mod's map the host console loaded (consoleMaps_, from its mod's
     // index likewise); else the maps folder's, as the exe's.
-    if (options_.modeMaps) {
-        if (const ModeMaps::Entry* own = options_.modeMaps->find(stem)) {
-            return own->nxz;
-        }
-    }
-    if (!consoleMaps_.empty()) {
-        if (const auto it = consoleMaps_.find(util::lowered(stem)); it != consoleMaps_.end()) {
-            return it->second.nxz;
-        }
+    if (const ModeMaps::Entry* e = mapEntry(stem)) {
+        return e->nxz;
     }
     return mapsDir() / stem / (stem + ".nxz");
+}
+
+std::vector<std::uint8_t> GameHost::nxzFromMap(const std::filesystem::path& map)
+{
+    try {
+        const std::vector<std::uint8_t> stored = readFileBytes(resolveNoCase(map));
+        const auto size = static_cast<std::uint32_t>(stored.size());
+        std::vector<std::uint8_t> out{static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8), static_cast<std::uint8_t>(size >> 16),
+                                      static_cast<std::uint8_t>(size >> 24)};
+        const std::vector<std::uint8_t> packed = video::nxzCompress(stored);
+        out.insert(out.end(), packed.begin(), packed.end());
+        return out;
+    } catch (const std::exception&) {
+        return {};
+    }
 }
 
 bool GameHost::mapSendLoadForGuests()
@@ -117,16 +136,7 @@ bool GameHost::mapSendLoadForGuests()
         }
     }
     if (mapSendData_.empty()) {
-        try {
-            const std::vector<std::uint8_t> stored = readFileBytes(resolveNoCase(findMap(stem)));
-            const auto size = static_cast<std::uint32_t>(stored.size());
-            mapSendData_ = {static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8), static_cast<std::uint8_t>(size >> 16),
-                            static_cast<std::uint8_t>(size >> 24)};
-            const std::vector<std::uint8_t> packed = video::nxzCompress(stored);
-            mapSendData_.insert(mapSendData_.end(), packed.begin(), packed.end());
-        } catch (const std::exception&) {
-            mapSendData_.clear();
-        }
+        mapSendData_ = nxzFromMap(findMap(stem));
     }
     if (mapSendData_.empty()) {
         mapSendPrint("mapsend.c:CompressFail");

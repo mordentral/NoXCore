@@ -15,9 +15,11 @@
 
 #include "noxcore/things/data_files.hpp"
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -50,5 +52,40 @@ private:
     std::vector<things::DataFileBytes> files_;
     std::uint32_t hash_ = 0;
 };
+
+/// The install's tables a program has read already (noxsdl's), for hostTables. Null modifiers: the
+/// install has no modifier.bin.
+struct InstallTables {
+    const things::ThingDb* things = nullptr;
+    const things::ModifierDb* modifiers = nullptr;
+    const things::GameData* gameData = nullptr;
+};
+
+/// The tables a hosted game reads (a dedicated host's and noxsdl's alike): its mod's own where the
+/// mod's data has them, the install's for the rest.
+struct HostTables {
+    /// The mod's; else, with a mod's data, a copy of the install's given (its game's own); else
+    /// what was read from the install's file (no install given); none: the install's given.
+    std::optional<things::ThingDb> things;
+    std::optional<things::ModifierDb> modifiers; ///< as `things` (none either way: no modifier.bin)
+    std::optional<things::GameData> gameData;    ///< as `things`
+    /// The mod's, else the install's monster.bin (when it's there), its records kept to `things`'
+    /// types (MonsterDb::keepThingTypes); its `problems` (a modded file's: the shipped one has
+    /// none) for the host to log.
+    std::optional<things::MonsterDb> monsters;
+    std::optional<things::SoundSets> soundSets; ///< the mod's, else the install's soundset.bin (when it's there)
+    /// Each override's merged check (DataTables::merged): what each client's merge must give.
+    std::array<std::uint32_t, things::kDataTableCount> merged{};
+    /// Whether the mod's added types' stock types are now the process's (things::useAddedTypeBases:
+    /// a mod's thing table, the last thing done here); the program sets the content packs' back
+    /// once the game is left, or isn't made after all.
+    bool addedBases = false;
+};
+/// A hosted game's tables: `modeData`'s (null: none; ModeData::tables, `solo` its numbers', its
+/// overrides over `gameDir`'s files), then for each table it hasn't the install's: `install`'s
+/// (null: read from `gameDir`: thing.bin and gamedata.bin, which must be there, and modifier.bin when
+/// it is), monster.bin (`solo` its numbers) and soundset.bin from `gameDir` when they're there.
+/// Throws as ModeData::tables and the readers do (nothing set then).
+HostTables hostTables(const ModeData* modeData, bool solo, const std::filesystem::path& gameDir, const InstallTables* install);
 
 } // namespace nox::server

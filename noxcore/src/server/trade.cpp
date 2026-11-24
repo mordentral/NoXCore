@@ -270,21 +270,10 @@ void sendStartShop(World& world, const TradeSession& s)
     // (noxcpp: a mode's own text for that label for this player first, ModeHooks::playerText,
     // cut at a whole character to the field's 24 letters; without a mode, or when it has none,
     // the string table's as the game's.)
-    const std::string label = npcNameLabel(*keeper);
-    std::optional<std::u16string> modeName;
-    if (world.modeHooks) {
-        modeName = world.modeHooks->playerText(world, *player, label);
-    }
-    const std::u16string text = modeName ? fitDialogTitle(std::move(*modeName), 24) : world.text(label);
+    const std::u16string text = npcTitleFor(world, *player, *keeper, 24);
     std::vector<std::uint8_t> m = {0xC9, 0x0D, lo(keeper->type), hi(keeper->type)};
     // (wcsncpy of 24 letters, the rest zeros, then the 25th a zero.)
-    bool ended = false;
-    for (std::size_t i = 0; i < 25; ++i) {
-        const char16_t c = !ended && i < 24 && i < text.size() ? text[i] : u'\0';
-        ended = ended || c == u'\0';
-        m.push_back(static_cast<std::uint8_t>(c));
-        m.push_back(static_cast<std::uint8_t>(c >> 8));
-    }
+    putWideField(m, m.size(), std::u16string_view(text).substr(0, 24), 25);
     const std::string greeting = keeper->shopkeeper ? keeper->shopkeeper->greeting : std::string{};
     for (std::size_t i = 0; i < 32; ++i) {
         m.push_back(i < greeting.size() && i < 31 ? static_cast<std::uint8_t>(greeting[i]) : std::uint8_t{0});

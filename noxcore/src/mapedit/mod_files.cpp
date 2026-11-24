@@ -1,6 +1,7 @@
 // A mod folder's files for a collaborative session (mod_files.hpp).
 #include "noxcore/mapedit/mod_files.hpp"
 
+#include "noxcore/io/file.hpp"
 #include "noxcore/mapedit/session_proto.hpp"
 #include "noxcore/modes/mode.hpp"
 #include "noxcore/util/text.hpp"
@@ -232,21 +233,9 @@ bool writeModFile(const fs::path& folder, std::string_view rel, std::span<const 
             error = "\"" + std::string(rel) + "\" leads out of the mod";
             return false; // (checked again with its folders made: nothing on the way leads out)
         }
-        fs::path tmp = *p;
-        tmp += ".saving";
-        {
-            std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-            out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-            if (!out) {
-                error = "can't write " + std::string(rel);
-                fs::remove(tmp, ec);
-                return false;
-            }
-        }
-        fs::rename(tmp, *p, ec);
-        if (ec) {
-            error = "can't write " + std::string(rel) + ": " + ec.message();
-            fs::remove(tmp, ec);
+        ReplaceFailure why;
+        if (!tryReplaceFileBytes(*p, bytes, ".saving", &why)) {
+            error = "can't write " + std::string(rel) + (why.moving ? ": " + why.error.message() : std::string());
             return false;
         }
         return true;

@@ -4,6 +4,7 @@
 #include "noxcore/util/x87.hpp"
 
 #include "noxcore/content/content_pack.hpp"
+#include "noxcore/content/text_table.hpp"
 #include "noxcore/crypto/noxcrypt.hpp"
 #include "noxcore/io/byte_reader.hpp"
 #include "noxcore/io/file.hpp"
@@ -537,8 +538,7 @@ ModifierDb parseModifierDb(std::string_view text)
         }
         switch (where) {
         case Where::Top:
-            if (line != "WEAPON_DEFINITIONS" && line != "ARMOR_DEFINITIONS" && line != "EFFECTIVENESS" &&
-                line != "MATERIAL" && line != "ENCHANTMENT") {
+            if (!content::isModifierSection(line)) {
                 throw FormatError("modifier.bin line " + std::to_string(lineNo) + ": unknown section");
             }
             section = line;

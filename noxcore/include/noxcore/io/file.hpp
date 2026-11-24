@@ -6,6 +6,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace nox {
@@ -16,6 +17,28 @@ std::vector<std::uint8_t> readFileBytes(const std::filesystem::path& path);
 
 /// Writes (replacing) a whole file. Throws std::system_error on failure.
 void writeFileBytes(const std::filesystem::path& path, std::span<const std::uint8_t> data);
+
+/// Writes a whole file by way of another beside it (`path` + `tempSuffix`: ".tmp", ".part"...),
+/// written whole and then moved over `path`, so a failed write never leaves half a file; the
+/// temporary file is removed when either step fails. Throws std::system_error (the write's, as
+/// writeFileBytes) or std::filesystem::filesystem_error (the move's).
+void replaceFileBytes(const std::filesystem::path& path, std::span<const std::uint8_t> data, std::string_view tempSuffix = ".tmp");
+/// Why a tryReplaceFileBytes failed: in its write of the temporary file, or in its move over the
+/// file (`error` the move's).
+struct ReplaceFailure {
+    bool moving = false;
+    std::error_code error;
+};
+/// replaceFileBytes without a throw: false when it failed (`why`, when given, says where).
+bool tryReplaceFileBytes(const std::filesystem::path& path, std::span<const std::uint8_t> data, std::string_view tempSuffix = ".tmp",
+                         ReplaceFailure* why = nullptr) noexcept;
+
+/// Whether `st` (a symlink_status, never followed) is a link of some kind: a symbolic link, or on
+/// Windows a junction too. A folder a program reads as its own never follows one out.
+bool isLinkStatus(const std::filesystem::file_status& st) noexcept;
+/// Whether `path`, every link in it resolved (std::filesystem::canonical: it must be there), is
+/// inside `root` (itself resolved already) and isn't `root` itself.
+bool resolvesInside(const std::filesystem::path& path, const std::filesystem::path& root);
 
 /// `dir / name` if it exists, else the entry of `dir` whose name matches ignoring case (the game
 /// ran on a case-insensitive file system), else `dir / name`. `name` may be a relative path

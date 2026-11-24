@@ -1581,18 +1581,7 @@ void HeadlessClient::onGameData(std::span<const std::uint8_t> m)
         const std::filesystem::path path = gameDataCachePath(mapCache_, f.kind, f.crc);
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
-        const std::filesystem::path part = std::filesystem::path(path).concat(".part");
-        bool written = false;
-        {
-            std::ofstream out(part, std::ios::binary | std::ios::trunc);
-            out.write(reinterpret_cast<const char*>(f.bytes.data()), static_cast<std::streamsize>(f.bytes.size()));
-            written = static_cast<bool>(out);
-        }
-        if (written) {
-            std::filesystem::rename(part, path, ec);
-        }
-        if (!written || ec) {
-            std::filesystem::remove(part, ec);
+        if (!tryReplaceFileBytes(path, f.bytes, ".part")) {
             event(ClientEvent::Kind::Log, "this mod's " + name + " not kept in the download cache (it can't be written)");
         }
     }

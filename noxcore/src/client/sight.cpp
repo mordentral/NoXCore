@@ -2,6 +2,7 @@
 // soft shadow edge take from it.
 #include "noxcore/client/sight.hpp"
 
+#include "noxcore/util/bytes.hpp"
 #include "noxcore/util/x87.hpp"
 
 #include <algorithm>
@@ -1654,14 +1655,10 @@ std::optional<SightRegion::WallDraw> SightRegion::wallDraw(int x, int y, std::ui
 
 std::uint8_t doorShutDirection(std::uint16_t xferVersion, std::span<const std::uint8_t> extra)
 {
-    const auto u32At = [&](std::size_t at) {
-        return static_cast<std::uint32_t>(extra[at]) | static_cast<std::uint32_t>(extra[at + 1]) << 8 |
-               static_cast<std::uint32_t>(extra[at + 2]) << 16 | static_cast<std::uint32_t>(extra[at + 3]) << 24;
-    };
     if (extra.size() < 8) {
         return 0;
     }
-    return static_cast<std::uint8_t>((xferVersion >= 0x29 && extra.size() >= 12 ? u32At(8) : u32At(0)) & 31);
+    return static_cast<std::uint8_t>((xferVersion >= 0x29 && extra.size() >= 12 ? util::u32At(extra, 8) : util::u32At(extra, 0)) & 31);
 }
 
 std::optional<std::pair<int, int>> doorWallCell(float x, float y, std::uint8_t shut)

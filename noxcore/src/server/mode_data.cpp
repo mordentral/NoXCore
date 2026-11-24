@@ -16,29 +16,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-/// A symbolic link, or on Windows a junction: never followed out of the folder.
-bool isLink(const fs::file_status& st)
-{
-#ifdef _MSC_VER
-    if (st.type() == fs::file_type::junction) {
-        return true;
-    }
-#endif
-    return fs::is_symlink(st);
-}
-
-/// Whether `p`, every link in it resolved, is inside `root` (itself resolved) and not `root`.
-bool resolvesInside(const fs::path& p, const fs::path& root)
-{
-    std::error_code ec;
-    const fs::path real = fs::canonical(p, ec);
-    if (ec) {
-        return false;
-    }
-    const auto [r, _] = std::mismatch(root.begin(), root.end(), real.begin(), real.end());
-    return r == root.end() && real != root;
-}
-
 /// FNV-1a over each file's kind, size, CRC and SHA-256 (never 0).
 std::uint32_t setHash(const std::vector<things::DataFileBytes>& files)
 {
@@ -106,7 +83,7 @@ std::shared_ptr<const ModeData> ModeData::read(const fs::path& dir, std::string&
     if (ec || !fs::exists(dirStatus)) {
         return nullptr; // (no data\: the install's files, as any mod's)
     }
-    if (isLink(dirStatus) || !fs::is_directory(dirStatus)) {
+    if (isLinkStatus(dirStatus) || !fs::is_directory(dirStatus)) {
         why = "data\\ isn't a folder of the mod's own";
         return nullptr;
     }
@@ -136,7 +113,7 @@ std::shared_ptr<const ModeData> ModeData::read(const fs::path& dir, std::string&
             }
             continue;
         }
-        if (isLink(st) || !fs::is_regular_file(st) || !resolvesInside(e.path(), root)) {
+        if (isLinkStatus(st) || !fs::is_regular_file(st) || !resolvesInside(e.path(), root)) {
             why = "data\\" + name + " isn't a file of the mod's own (a link, or a folder)";
             return nullptr;
         }
@@ -184,6 +161,63 @@ std::size_t ModeData::bytes() const noexcept
 things::DataTables ModeData::tables(bool solo, const fs::path& installDir) const
 {
     return things::readDataTables(files_, solo, installDir);
+}
+
+HostTables hostTables(const ModeData* modeData, bool solo, const fs::path& gameDir, const InstallTables* install)
+{
+    HostTables out;
+    std::optional<things::DataTables> mod;
+    if (modeData) {
+        mod = modeData->tables(solo, gameDir); // (throws: a file that won't read, an override that won't apply)
+        out.merged = mod->merged;
+    }
+    const bool modThings = mod && mod->things;
+    // (Each the mod's; else, without the install's given, its file's; else in a mod's game a copy
+    // of the install's, so every table the game reads is its own.)
+    if (modThings) {
+        out.things = std::move(*mod->things);
+    } else if (!install) {
+        out.things = things::loadThingDb(gameDir / "thing.bin");
+    } else if (mod) {
+        out.things = *install->things;
+    }
+    if (mod && mod->modifiers) {
+        out.modifiers = std::move(*mod->modifiers);
+    } else if (!install) {
+        if (fs::exists(resolveNoCase(gameDir / "modifier.bin"))) {
+            out.modifiers = things::loadModifierDb(gameDir / "modifier.bin");
+        }
+    } else if (mod && install->modifiers) {
+        out.modifiers = *install->modifiers;
+    }
+    if (mod && mod->gameData) {
+        out.gameData = std::move(*mod->gameData);
+    } else if (!install) {
+        // (No game runs without the game's numbers: a missing gamedata.bin stops it as a missing
+        // thing.bin does.)
+        out.gameData = things::loadGameData(gameDir / "gamedata.bin");
+    } else if (mod) {
+        out.gameData = *install->gameData;
+    }
+    if (mod && mod->monsters) {
+        out.monsters = std::move(*mod->monsters); // (read for this game's numbers: `solo`)
+    } else if (fs::exists(resolveNoCase(gameDir / "monster.bin"))) {
+        out.monsters = things::loadMonsterDb(gameDir / "monster.bin", solo);
+    }
+    if (out.monsters) {
+        out.monsters->keepThingTypes(out.things ? *out.things : *install->things);
+    }
+    if (mod && mod->soundSets) {
+        out.soundSets = std::move(*mod->soundSets);
+    } else if (fs::exists(resolveNoCase(gameDir / "soundset.bin"))) {
+        out.soundSets = things::loadSoundSets(gameDir / "soundset.bin");
+    }
+    if (modThings) {
+        // (things::useAddedTypeBases' for a set with a thing table: its table moved out above.)
+        things::setAddedTypeBases(std::move(mod->addedBases));
+        out.addedBases = true;
+    }
+    return out;
 }
 
 } // namespace nox::server

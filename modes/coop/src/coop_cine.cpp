@@ -423,7 +423,7 @@ void CoopDirector::showSceneDialog(const server::ServerObject& host, std::size_t
     // one of others = "own", the string table's, as its own talk would have it.)
     server::ModeHooks* const hooks = world().modeHooks;
     const std::string label = hooks ? server::npcNameLabel(*npc) : std::string();
-    const bool hostsOwn = hooks && hooks->playerText(world(), host, label).has_value();
+    const bool hostsOwn = hooks && server::modeNpcTitle(world(), host, label).has_value();
     for (const Member& m : party_) {
         if (m.host) {
             continue;
@@ -432,8 +432,8 @@ void CoopDirector::showSceneDialog(const server::ServerObject& host, std::size_t
             sceneViewers_.emplace(u->extent);
             std::vector<std::uint8_t> theirs = bytes;
             if (hooks) {
-                if (std::optional<std::u16string> own = hooks->playerText(world(), *u, label)) {
-                    server::putDialogTitle(theirs, server::fitDialogTitle(std::move(*own)));
+                if (const std::optional<std::u16string> own = server::modeNpcTitle(world(), *u, label)) {
+                    server::putDialogTitle(theirs, *own);
                 } else if (hostsOwn) {
                     server::putDialogTitle(theirs, world().text(label));
                 }

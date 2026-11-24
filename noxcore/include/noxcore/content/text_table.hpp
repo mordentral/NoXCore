@@ -29,6 +29,25 @@ const char* tableFileName(TableFormat format);
 /// The Blowfish key the game reads it with.
 crypto::FileKey tableKey(TableFormat format);
 
+/// modifier.bin's sections, named as its reader names them (things/modifier.cpp).
+inline constexpr std::string_view kModifierSections[] = {"WEAPON_DEFINITIONS", "ARMOR_DEFINITIONS", "EFFECTIVENESS", "MATERIAL", "ENCHANTMENT"};
+/// Whether `s` is one of them, case counting (as the reader compares).
+constexpr bool isModifierSection(std::string_view s) noexcept
+{
+    for (const std::string_view name : kModifierSections) {
+        if (s == name) {
+            return true;
+        }
+    }
+    return false;
+}
+/// Whether a modifier.bin section's records are modifiers, each with an id (EFFECTIVENESS,
+/// MATERIAL, ENCHANTMENT: their records counted in file order), case counting.
+constexpr bool isModifierIdSection(std::string_view s) noexcept
+{
+    return s == "EFFECTIVENESS" || s == "MATERIAL" || s == "ENCHANTMENT";
+}
+
 /// [begin, end) in the text.
 struct TextSpan {
     std::size_t begin = 0;

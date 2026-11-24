@@ -108,6 +108,80 @@ void writeFileBytes(const std::filesystem::path& path, std::span<const std::uint
     }
 }
 
+namespace {
+
+/// A failed replace's temporary file removed (a file only: never a folder of that name).
+void removeTemp(const std::filesystem::path& temp) noexcept
+{
+    std::error_code ec;
+    if (std::filesystem::is_regular_file(std::filesystem::symlink_status(temp, ec))) {
+        std::filesystem::remove(temp, ec);
+    }
+}
+
+} // namespace
+
+void replaceFileBytes(const std::filesystem::path& path, std::span<const std::uint8_t> data, std::string_view tempSuffix)
+{
+    std::filesystem::path temp = path;
+    temp += std::string(tempSuffix);
+    try {
+        writeFileBytes(temp, data);
+    } catch (...) {
+        removeTemp(temp);
+        throw;
+    }
+    std::error_code ec;
+    std::filesystem::rename(temp, path, ec);
+    if (ec) {
+        removeTemp(temp);
+        throw std::filesystem::filesystem_error("cannot replace the file", temp, path, ec);
+    }
+}
+
+bool tryReplaceFileBytes(const std::filesystem::path& path, std::span<const std::uint8_t> data, std::string_view tempSuffix,
+                         ReplaceFailure* why) noexcept
+{
+    try {
+        replaceFileBytes(path, data, tempSuffix);
+        return true;
+    } catch (const std::filesystem::filesystem_error& e) { // (the move's: the write throws std::system_error)
+        if (why) {
+            *why = {true, e.code()};
+        }
+    } catch (const std::system_error& e) {
+        if (why) {
+            *why = {false, e.code()};
+        }
+    } catch (...) {
+        if (why) {
+            *why = {};
+        }
+    }
+    return false;
+}
+
+bool isLinkStatus(const std::filesystem::file_status& st) noexcept
+{
+#ifdef _MSC_VER
+    if (st.type() == std::filesystem::file_type::junction) {
+        return true;
+    }
+#endif
+    return std::filesystem::is_symlink(st);
+}
+
+bool resolvesInside(const std::filesystem::path& path, const std::filesystem::path& root)
+{
+    std::error_code ec;
+    const std::filesystem::path real = std::filesystem::canonical(path, ec);
+    if (ec) {
+        return false;
+    }
+    const auto [r, _] = std::mismatch(root.begin(), root.end(), real.begin(), real.end());
+    return r == root.end() && real != root;
+}
+
 std::filesystem::path findNoCase(const std::filesystem::path& dir, const std::filesystem::path& name)
 {
     std::filesystem::path at = dir;

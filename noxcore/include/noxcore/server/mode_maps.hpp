@@ -48,4 +48,9 @@ private:
     std::vector<std::string> keys_; ///< (each entry's name in lower case)
 };
 
+/// Whether `name` (a map's folder name) is a solo map's: wiz, war or con (any case), then a digit.
+/// The game's map lists leave such a name out (GameHost's scan of the maps folder, a mode's own
+/// maps alike), so the map editor saves under none.
+bool isSoloMapName(std::string_view name) noexcept;
+
 } // namespace nox::server

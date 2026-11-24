@@ -11761,178 +11761,178 @@ editor.undo_skip.moved = moved since
 # noxcore/src/mapedit/session_merge.cpp:718, noxcore/src/mapedit/session_merge.cpp:744
 #@ cc9d3edc: its owner was deleted since
 editor.undo_skip.owner_deleted = its owner was deleted since
-# noxcore/src/mapedit/validate.cpp:349
+# noxcore/src/mapedit/validate.cpp:350
 #@ 2a4d2e4a: can't be written: {error}
 editor.validate.cant_write = can't be written: {error}
-# noxcore/src/mapedit/validate.cpp:217
+# noxcore/src/mapedit/validate.cpp:218
 #@ 8da2b50f: key longer than 79 bytes
 editor.validate.debug_key = key longer than 79 bytes
-# noxcore/src/mapedit/validate.cpp:218
+# noxcore/src/mapedit/validate.cpp:219
 #@ 7c376845: value longer than 255 bytes
 editor.validate.debug_value = value longer than 255 bytes
-# noxcore/src/mapedit/validate.cpp:127
+# noxcore/src/mapedit/validate.cpp:128
 #@ 6d9ab7ef: edge {n} is not in thing.bin
 editor.validate.edge = edge {n} is not in thing.bin
-# noxcore/src/mapedit/validate.cpp:135
+# noxcore/src/mapedit/validate.cpp:136
 #@ ed1a68bf: edge direction {n} is past {name}'s {images} images (the game reads past them)
 editor.validate.edge_direction_images = edge direction {n} is past {name}'s {images} images (the game reads past them)
-# noxcore/src/mapedit/validate.cpp:138
+# noxcore/src/mapedit/validate.cpp:139
 #@ 69319fa9: edge direction {n} is past {name}'s {shapes} shapes (draws another frame's image)
 editor.validate.edge_direction_shapes = edge direction {n} is past {name}'s {shapes} shapes (draws another frame's image)
-# noxcore/src/mapedit/validate.cpp:125
+# noxcore/src/mapedit/validate.cpp:126
 #@ 53cad6c1: edge floor {n} is not in thing.bin
 editor.validate.edge_floor = edge floor {n} is not in thing.bin
-# noxcore/src/mapedit/validate.cpp:181
+# noxcore/src/mapedit/validate.cpp:182
 #@ 159bebd5: {n} floor records with no tile in them; the game skips them; kept as stored until the pair is edited
 editor.validate.empty_floor_records = {n} floor records with no tile in them; the game skips them; kept as stored until the pair is edited
-# noxcore/src/mapedit/validate.cpp:276
+# noxcore/src/mapedit/validate.cpp:277
 #@ 173a2309: the map name is longer than the game's 79 bytes (it runs over the exit's point: OB-207)
 editor.validate.exit_map_name = the map name is longer than the game's 79 bytes (it runs over the exit's point: OB-207)
-# noxcore/src/mapedit/validate.cpp:311
+# noxcore/src/mapedit/validate.cpp:312
 #@ 2fce8400: {n} objects share it (links and groups name extents)
 editor.validate.extent_shared = {n} objects share it (links and groups name extents)
-# noxcore/src/mapedit/validate.cpp:288
+# noxcore/src/mapedit/validate.cpp:289
 #@ 330068cf: {type} (a monster it makes) carries an item whose type id {id} names no type
 editor.validate.generator_item = {type} (a monster it makes) carries an item whose type id {id} names no type
-# noxcore/src/mapedit/validate.cpp:278
+# noxcore/src/mapedit/validate.cpp:279
 #@ 6323fb2b: more than 5 glyph spells: the game's glyph holds 5 and the rest run over its data (OB-024)
 editor.validate.glyph_spells = more than 5 glyph spells: the game's glyph holds 5 and the rest run over its data (OB-024)
-# noxcore/src/mapedit/validate.cpp:232
+# noxcore/src/mapedit/validate.cpp:233
 #@ 7299e6ae: an empty group of groups: the game's for-each on it crashes
 editor.validate.group_empty = an empty group of groups: the game's for-each on it crashes
-# noxcore/src/mapedit/validate.cpp:246
+# noxcore/src/mapedit/validate.cpp:247
 #@ a369404d: member extent {n} is no object
 editor.validate.group_member_extent = member extent {n} is no object
-# noxcore/src/mapedit/validate.cpp:234
+# noxcore/src/mapedit/validate.cpp:235
 #@ f189f420: member group id {id} is no group
 editor.validate.group_member_group = member group id {id} is no group
-# noxcore/src/mapedit/validate.cpp:251
+# noxcore/src/mapedit/validate.cpp:252
 #@ ab2e061d: member wall {x},{y} has no wall
 editor.validate.group_member_wall = member wall {x},{y} has no wall
-# noxcore/src/mapedit/validate.cpp:248
+# noxcore/src/mapedit/validate.cpp:249
 #@ 2b78db6b: member {n} is no waypoint
 editor.validate.group_member_waypoint = member {n} is no waypoint
-# noxcore/src/mapedit/validate.cpp:239
+# noxcore/src/mapedit/validate.cpp:240
 #@ dda4f3e9: name longer than 75 bytes
 editor.validate.group_name_long = name longer than 75 bytes
-# noxcore/src/mapedit/validate.cpp:241
+# noxcore/src/mapedit/validate.cpp:242
 #@ 96e2a031: name stored without its NUL (an old editor's group): the game reads whatever follows it in its buffer; renaming the group stores it properly
 editor.validate.group_name_unterminated = name stored without its NUL (an old editor's group): the game reads whatever follows it in its buffer; renaming the group stores it properly
-# noxcore/src/mapedit/validate.cpp:228
+# noxcore/src/mapedit/validate.cpp:229
 #@ acc780ff: its id {id} is another group's too: scripts reach only one of them
 editor.validate.group_same_id = its id {id} is another group's too: scripts reach only one of them
-# noxcore/src/mapedit/validate.cpp:106
+# noxcore/src/mapedit/validate.cpp:107
 #@ 125797e0: entry at {x},{y} has no wall
 editor.validate.list_no_wall = entry at {x},{y} has no wall
-# noxcore/src/mapedit/validate.cpp:380
+# noxcore/src/mapedit/validate.cpp:381
 #@ 1ed70f71: map names use printable ASCII characters without spaces
 editor.validate.map_name_ascii = map names use printable ASCII characters without spaces
-# noxcore/src/mapedit/validate.cpp:381
+# noxcore/src/mapedit/validate.cpp:382
 #@ 752a2339: map names can't hold \\ / : * ? " < > |
 editor.validate.map_name_chars = map names can't hold \\ / : * ? " < > |
-# noxcore/src/mapedit/validate.cpp:390
+# noxcore/src/mapedit/validate.cpp:391
 #@ 5a056e61: {name} is a name Windows keeps for a device
 editor.validate.map_name_device = {name} is a name Windows keeps for a device
-# noxcore/src/mapedit/validate.cpp:383
+# noxcore/src/mapedit/validate.cpp:384
 #@ ccf7c642: a map name can't start or end with '.'
 editor.validate.map_name_dot = a map name can't start or end with '.'
-# noxcore/src/mapedit/validate.cpp:368
+# noxcore/src/mapedit/validate.cpp:369
 #@ 340d399f: a map needs a name
 editor.validate.map_name_empty = a map needs a name
-# noxcore/src/mapedit/validate.cpp:373
+# noxcore/src/mapedit/validate.cpp:374
 #@ 1b13274b: map names are at most 8 characters, as the game's: its map lists cut a longer name short and don't find the map
 editor.validate.map_name_long = map names are at most 8 characters, as the game's: its map lists cut a longer name short and don't find the map
-# noxcore/src/mapedit/validate.cpp:398
+# noxcore/src/mapedit/validate.cpp:396
 #@ 7dd046a1: wiz, war or con followed by a digit names a solo map: the game's map lists leave it out
 editor.validate.map_name_solo = wiz, war or con followed by a digit names a solo map: the game's map lists leave it out
-# noxcore/src/mapedit/validate.cpp:392
+# noxcore/src/mapedit/validate.cpp:393
 #@ 726095b9: {name} is a map that ships with the game: save your edits under a new name
 editor.validate.map_name_stock = {name} is a map that ships with the game: save your edits under a new name
-# noxcore/src/mapedit/validate.cpp:314
+# noxcore/src/mapedit/validate.cpp:315
 #@ 76d3e722: no PlayerStart: nobody can join
 editor.validate.no_player_start = no PlayerStart: nobody can join
-# noxcore/src/mapedit/validate.cpp:271
+# noxcore/src/mapedit/validate.cpp:272
 #@ ca803fcc: header version {n}
 editor.validate.object_header_version = header version {n}
-# noxcore/src/mapedit/validate.cpp:273
+# noxcore/src/mapedit/validate.cpp:274
 #@ a8c439b3: inventory owner is gone
 editor.validate.object_owner_gone = inventory owner is gone
-# noxcore/src/mapedit/validate.cpp:272
+# noxcore/src/mapedit/validate.cpp:273
 #@ 9fbd8dde: script name longer than 255 bytes
 editor.validate.object_script_name = script name longer than 255 bytes
-# noxcore/src/mapedit/validate.cpp:207
+# noxcore/src/mapedit/validate.cpp:208
 #@ 4c55bb11: corner {id} is not a point
 editor.validate.polygon_corner = corner {id} is not a point
-# noxcore/src/mapedit/validate.cpp:213
+# noxcore/src/mapedit/validate.cpp:214
 #@ 5e2558e7: the quest intro's picture is longer than 31 bytes
 editor.validate.quest_picture = the quest intro's picture is longer than 31 bytes
-# noxcore/src/mapedit/validate.cpp:212
+# noxcore/src/mapedit/validate.cpp:213
 #@ a8b3e88b: the quest intro's title is longer than 31 bytes
 editor.validate.quest_title = the quest intro's title is longer than 31 bytes
-# noxcore/src/mapedit/validate.cpp:325
+# noxcore/src/mapedit/validate.cpp:326
 #@ c6acc588: NoX Core doesn't run this map: its script uses memory tricks of the original game (it calls builtin {id})
 editor.validate.script_memory_tricks = NoX Core doesn't run this map: its script uses memory tricks of the original game (it calls builtin {id})
-# noxcore/src/mapedit/validate.cpp:331
+# noxcore/src/mapedit/validate.cpp:332
 #@ 122a92af: this map needs a NoX Core server: its script uses object variables, a NoX Core-only feature the original game crashes on (OB-210)
 editor.validate.script_object_vars = this map needs a NoX Core server: its script uses object variables, a NoX Core-only feature the original game crashes on (OB-210)
-# noxcore/src/mapedit/validate.cpp:336
+# noxcore/src/mapedit/validate.cpp:337
 #@ 435e8ca5: the game can't parse it: {error}
 editor.validate.script_unparsed = the game can't parse it: {error}
-# noxcore/src/mapedit/validate.cpp:283
+# noxcore/src/mapedit/validate.cpp:284
 #@ 94d700b2: its spawn mode is 0: it never spawns
 editor.validate.spawn_mode = its spawn mode is 0: it never spawns
-# noxcore/src/mapedit/validate.cpp:281
+# noxcore/src/mapedit/validate.cpp:282
 #@ b0174ed3: a spawn rate past 4: the game takes an address as the interval and never spawns (OB-206)
 editor.validate.spawn_rate = a spawn rate past 4: the game takes an address as the interval and never spawns (OB-206)
-# noxcore/src/mapedit/validate.cpp:123
+# noxcore/src/mapedit/validate.cpp:124
 #@ 02c1fa79: more than 255 edges
 editor.validate.tile_edges = more than 255 edges
-# noxcore/src/mapedit/validate.cpp:122
+# noxcore/src/mapedit/validate.cpp:123
 #@ 0d1e6ffe: floor {n} is not in thing.bin
 editor.validate.tile_floor = floor {n} is not in thing.bin
-# noxcore/src/mapedit/validate.cpp:165
+# noxcore/src/mapedit/validate.cpp:166
 #@ d8fa5e28: two floor records for one tile pair, with different tiles; the game uses the later one (each tile from the last record that has it), which is what the editor shows; editing the pair stores it once
 editor.validate.tile_pair_differ = two floor records for one tile pair, with different tiles; the game uses the later one (each tile from the last record that has it), which is what the editor shows; editing the pair stores it once
-# noxcore/src/mapedit/validate.cpp:174
+# noxcore/src/mapedit/validate.cpp:175
 #@ 4390d427: {n} tile pairs have two floor records for one tile pair (the same tiles: an old editor's output); the game uses the later one; kept as stored until the pair is edited
 editor.validate.tile_pairs_agree = {n} tile pairs have two floor records for one tile pair (the same tiles: an old editor's output); the game uses the later one; kept as stored until the pair is edited
-# noxcore/src/mapedit/validate.cpp:295
+# noxcore/src/mapedit/validate.cpp:296
 #@ 89d3ef92: a size past 60 (the server takes 60; the client draws it as stored) or below 0
 editor.validate.trigger_size = a size past 60 (the server takes 60; the client draws it as stored) or below 0
-# noxcore/src/mapedit/validate.cpp:304
+# noxcore/src/mapedit/validate.cpp:305
 #@ 443c4cf1: type data doesn't read back the same
 editor.validate.type_data_differs = type data doesn't read back the same
-# noxcore/src/mapedit/validate.cpp:307
+# noxcore/src/mapedit/validate.cpp:308
 #@ 6855ef3b: type data: {error}
 editor.validate.type_data_error = type data: {error}
-# noxcore/src/mapedit/validate.cpp:80
+# noxcore/src/mapedit/validate.cpp:81
 #@ cced8fc7: version 0 (the game reads 1 and up)
 editor.validate.version_0 = version 0 (the game reads 1 and up)
-# noxcore/src/mapedit/validate.cpp:66
+# noxcore/src/mapedit/validate.cpp:67
 #@ f5c4583b: version {v} (the game reads up to {limit})
 editor.validate.version_past = version {v} (the game reads up to {limit})
-# noxcore/src/mapedit/validate.cpp:101
+# noxcore/src/mapedit/validate.cpp:102
 #@ 0a9afb5c: direction {n} has no image in {name}
 editor.validate.wall_direction = direction {n} has no image in {name}
-# noxcore/src/mapedit/validate.cpp:95
+# noxcore/src/mapedit/validate.cpp:96
 #@ 82f21f7b: material {n} is not in thing.bin
 editor.validate.wall_material = material {n} is not in thing.bin
-# noxcore/src/mapedit/validate.cpp:93
+# noxcore/src/mapedit/validate.cpp:94
 #@ 243031ba: x + y is odd: the game's wall lookups never find it
 editor.validate.wall_odd = x + y is odd: the game's wall lookups never find it
-# noxcore/src/mapedit/validate.cpp:91
+# noxcore/src/mapedit/validate.cpp:92
 #@ db8f683c: x 255 ends the wall list
 editor.validate.wall_x_255 = x 255 ends the wall list
-# noxcore/src/mapedit/validate.cpp:197
+# noxcore/src/mapedit/validate.cpp:198
 #@ c23a8bd4: flag bit 1 is set: the game never files it in the map grid (searches miss it)
 editor.validate.waypoint_bit1 = flag bit 1 is set: the game never files it in the map grid (searches miss it)
-# noxcore/src/mapedit/validate.cpp:200
+# noxcore/src/mapedit/validate.cpp:201
 #@ 721a8c24: link to missing waypoint {id}
 editor.validate.waypoint_link_missing = link to missing waypoint {id}
-# noxcore/src/mapedit/validate.cpp:194
+# noxcore/src/mapedit/validate.cpp:195
 #@ 4caf183a: more than 255 links
 editor.validate.waypoint_links = more than 255 links
-# noxcore/src/mapedit/validate.cpp:190
+# noxcore/src/mapedit/validate.cpp:191
 #@ e03eb61e: two waypoints share the id
 editor.validate.waypoint_same_id = two waypoints share the id
 # noxsdl/src/editor/map_editor_view.cpp:1065

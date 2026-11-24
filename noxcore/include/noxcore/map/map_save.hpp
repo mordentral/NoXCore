@@ -41,8 +41,9 @@ struct EncodedMapFiles {
 EncodedMapFiles encodeMapBytes(std::vector<std::uint8_t> plain);
 
 /// Writes a whole file beside `path` (<path>.tmp), then moves it over the old one: a failed write
-/// never leaves half a file. Throws FormatError ("<who>: can't write <path>.tmp") when the write
-/// fails.
+/// never leaves half a file, nor its .tmp (io/file.hpp's replaceFileBytes). Throws std::system_error
+/// (a std::filesystem::filesystem_error when the move fails), its text naming the file; `who` is
+/// kept for its callers.
 void writeFileReplacing(const std::filesystem::path& path, std::span<const std::uint8_t> bytes, std::string_view who);
 /// Writes the pair as <mapsDir>\<name>\<name>.map and .nxz (each writeFileReplacing), creating
 /// the folder. Returns the .map's path. The generators' write (Delve and Undead Tide levels, a

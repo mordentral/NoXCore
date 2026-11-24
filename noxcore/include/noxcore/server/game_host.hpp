@@ -47,6 +47,10 @@
 #include <string_view>
 #include <vector>
 
+namespace nox::things {
+struct DataFileBytes; // (data_files.hpp)
+}
+
 namespace nox::server {
 
 class ModeData; // (mode_data.hpp)
@@ -1397,8 +1401,9 @@ private:
     // client asked for (kWant), sent a chunk at a time while its reliable queue has room. None
     // kept in any game without the data.
     struct DataSender {
-        std::vector<std::uint8_t> kinds; ///< (things::DataFile) the files still to go, in order
-        std::uint32_t offset = 0;        ///< in the first of them
+        /// The files still to go, in order (Options::modeData's own: the set is the game's to its end).
+        std::vector<const things::DataFileBytes*> files;
+        std::uint32_t offset = 0; ///< in the first of them
     };
     std::map<std::uint8_t, DataSender> dataSenders_; ///< by peer
     /// The join's kSet to an identified `peer` (before its USE_MAP), when the game has client files.
@@ -1412,6 +1417,13 @@ private:
     /// (noxcpp) The .nxz a download of the map `stem` sends: <mapsDir>\<stem>\<stem>.nxz, or the
     /// one its mode ships beside its own map (none: empty).
     std::filesystem::path mapSendFile(const std::string& stem) const;
+    /// (noxcpp) The map `name`'s entry when it isn't the maps folder's: its mode's own
+    /// (Options::modeMaps), else one the host console pinned from another mod (consoleMaps_); null:
+    /// the maps folder's. (findMap's and mapSendFile's lookup.)
+    const ModeMaps::Entry* mapEntry(std::string_view name) const;
+    /// (noxcpp) A map's download stream made from its .map as stored (u32 its size, then the NXZ
+    /// stream of those bytes: the .nxz layout every client reads); empty when it can't be read.
+    static std::vector<std::uint8_t> nxzFromMap(const std::filesystem::path& map);
     /// (noxcpp) A solo game with guests (Options::soloGuests) loads nothing for downloads as its
     /// maps load, as the exe's solo game doesn't: a guest's request reads the map's .nxz then, or
     /// makes it from the .map when none is shipped (the campaign's maps have none). Whether there's

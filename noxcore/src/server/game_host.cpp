@@ -2076,10 +2076,11 @@ void GameHost::onNoxcppGameData(std::uint8_t peer, std::span<const std::uint8_t>
     }
     DataSender s;
     for (const things::DataFile k : *kinds) {
-        if (!things::clientReadsDataFile(k) || !options_.modeData->find(k)) {
+        const things::DataFileBytes* f = things::clientReadsDataFile(k) ? options_.modeData->find(k) : nullptr;
+        if (!f) {
             return;
         }
-        s.kinds.push_back(static_cast<std::uint8_t>(k));
+        s.files.push_back(f);
     }
     dataSenders_.emplace(peer, std::move(s));
     // The player watches its download, as a map request's does (watchForDownload: back in play as
@@ -2094,12 +2095,8 @@ void GameHost::dataSendFrame()
     for (auto it = dataSenders_.begin(); it != dataSenders_.end();) {
         const std::uint8_t peer = it->first;
         DataSender& s = it->second;
-        for (int sent = 0; sent < 16 && !s.kinds.empty() && queuedReliable(peer) < 24 && reliableBulkRoom(peer) > 0; ++sent) {
-            const things::DataFileBytes* f = options_.modeData ? options_.modeData->find(static_cast<things::DataFile>(s.kinds.front())) : nullptr;
-            if (!f) {
-                s.kinds.clear();
-                break;
-            }
+        for (int sent = 0; sent < 16 && !s.files.empty() && queuedReliable(peer) < 24 && reliableBulkRoom(peer) > 0; ++sent) {
+            const things::DataFileBytes* f = s.files.front();
             const std::size_t n = std::min<std::size_t>(net::gamedata::kChunkBytes, f->bytes.size() - s.offset);
             if (!sendToIdentified(peer, net::gamedata::encodeChunk(f->kind, s.offset,
                                                                   std::span<const std::uint8_t>(f->bytes).subspan(s.offset, n)))) {
@@ -2107,11 +2104,11 @@ void GameHost::dataSendFrame()
             }
             s.offset += static_cast<std::uint32_t>(n);
             if (s.offset >= f->bytes.size()) {
-                s.kinds.erase(s.kinds.begin());
+                s.files.erase(s.files.begin());
                 s.offset = 0;
             }
         }
-        it = s.kinds.empty() ? dataSenders_.erase(it) : std::next(it);
+        it = s.files.empty() ? dataSenders_.erase(it) : std::next(it);
     }
 }
 
@@ -3785,17 +3782,25 @@ std::filesystem::path GameHost::mapsDir() const
     return !options_.mapsDir.empty() ? options_.mapsDir : mapPath_.parent_path().parent_path();
 }
 
-std::filesystem::path GameHost::findMap(std::string_view name) const
+const ModeMaps::Entry* GameHost::mapEntry(std::string_view name) const
 {
     if (options_.modeMaps) {
         if (const ModeMaps::Entry* own = options_.modeMaps->find(name)) {
-            return own->map;
+            return own;
         }
     }
     if (!consoleMaps_.empty()) {
         if (const auto it = consoleMaps_.find(util::lowered(name)); it != consoleMaps_.end()) {
-            return it->second.map; // (another mod's the console loaded: a name the maps folder hasn't)
+            return &it->second; // (another mod's the console loaded: a name the maps folder hasn't)
         }
+    }
+    return nullptr;
+}
+
+std::filesystem::path GameHost::findMap(std::string_view name) const
+{
+    if (const ModeMaps::Entry* e = mapEntry(name)) {
+        return e->map;
     }
     const std::string n(name);
     return mapsDir() / n / (n + ".map");
@@ -4133,16 +4138,7 @@ void GameHost::scanMaps()
             continue;
         }
         std::string name = e.path().filename().string();
-        const auto prefix = [&](const char* p) {
-            for (int i = 0; i < 3; ++i) {
-                if (std::tolower(static_cast<unsigned char>(i < static_cast<int>(name.size()) ? name[static_cast<std::size_t>(i)] : '\0')) != p[i]) {
-                    return false;
-                }
-            }
-            return true;
-        };
-        const bool solo = (prefix("wiz") || prefix("war") || prefix("con")) && 3 < name.size() && '0' <= name[3] && name[3] <= '9';
-        if (solo || name == "." || name == "..") {
+        if (isSoloMapName(name) || name == "." || name == "..") {
             continue;
         }
         name = name.substr(0, 8);
@@ -4155,9 +4151,7 @@ void GameHost::scanMaps()
         std::vector<std::string> own;
         addModeMapNames(own, options_.modeMaps.get());
         for (std::string& name : own) {
-            const bool solo = name.size() > 3 && '0' <= name[3] && name[3] <= '9' &&
-                              (util::equalsNoCase(name.substr(0, 3), "wiz") || util::equalsNoCase(name.substr(0, 3), "war") ||
-                               util::equalsNoCase(name.substr(0, 3), "con"));
+            const bool solo = isSoloMapName(name);
             name = name.substr(0, 8);
             if (!solo && mapModesOf(name) != 0 &&
                 std::ranges::none_of(names, [&](const std::string& n) { return util::equalsNoCase(n, name); })) {

@@ -10,6 +10,7 @@
 #include "noxcore/script/compiler.hpp"
 #include "noxcore/script/opcodes.hpp"
 #include "noxcore/script/script_file.hpp"
+#include "noxcore/server/mode_maps.hpp"
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/thing_db.hpp"
 
@@ -391,12 +392,8 @@ std::optional<std::string> mapNameProblem(std::string_view name, IssueText text)
     }
     if (isStockMapName(name)) return format(say(text, NOX_TRK("editor.validate.map_name_stock", "{name} is a map that ships with the game: save your edits under a new name")), {{"name", name}});
     // The scan also leaves out the solo maps' names (wiz, war or con, then a digit), whatever case.
-    const auto lower = [&](std::size_t i) { return static_cast<char>(std::tolower(static_cast<unsigned char>(name[i]))); };
-    if (name.size() > 3 && name[3] >= '0' && name[3] <= '9') {
-        const std::string p{lower(0), lower(1), lower(2)};
-        if (p == "wiz" || p == "war" || p == "con") {
-            return say(text, NOX_TRK("editor.validate.map_name_solo", "wiz, war or con followed by a digit names a solo map: the game's map lists leave it out"));
-        }
+    if (server::isSoloMapName(name)) {
+        return say(text, NOX_TRK("editor.validate.map_name_solo", "wiz, war or con followed by a digit names a solo map: the game's map lists leave it out"));
     }
     return std::nullopt;
 }

@@ -8,8 +8,6 @@
 #include <algorithm>
 #include <cerrno>
 #include <exception>
-#include <fstream>
-#include <iterator>
 #include <map>
 #include <mutex>
 #include <string>
@@ -83,45 +81,22 @@ void markWritten(const fs::path& path)
 /// `bytes` as the whole of `path`: written to "<path>.tmp", then put in its place.
 bool replaceWith(const fs::path& path, std::span<const std::uint8_t> bytes)
 {
-    fs::path temp = path;
-    temp += ".tmp";
-    std::error_code ec;
-    {
-        std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            return false;
-        }
-        out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        out.close();
-        if (!out) {
-            fs::remove(temp, ec);
-            return false;
-        }
-    }
-    fs::rename(temp, path, ec);
-    if (ec) {
-        fs::remove(temp, ec);
-        return false;
-    }
-    return true;
+    return tryReplaceFileBytes(path, bytes, ".tmp");
 }
 
-/// `path`'s bytes as they are on disk; none when it can't be read.
+/// `path`'s bytes as they are on disk; none when it can't be read. (The file itself: a file there
+/// as named, so readFileBytes never looks for another of its name in another case.)
 std::optional<std::vector<std::uint8_t>> bytesOf(const fs::path& path)
 {
     std::error_code ec;
     if (!fs::is_regular_file(path, ec)) {
         return std::nullopt;
     }
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
+    try {
+        return readFileBytes(path);
+    } catch (const std::exception&) {
         return std::nullopt;
     }
-    std::vector<std::uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-    if (in.bad()) {
-        return std::nullopt;
-    }
-    return out;
 }
 
 void section(ByteWriter& w, std::uint32_t id, std::span<const std::uint8_t> data)

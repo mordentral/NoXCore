@@ -2,6 +2,7 @@
 #include "noxcore/net/game_data_proto.hpp"
 
 #include "noxcore/net/messages.hpp"
+#include "noxcore/util/bytes.hpp"
 
 #include <algorithm>
 
@@ -9,23 +10,9 @@ namespace nox::net::gamedata {
 
 namespace {
 
-void put16(std::vector<std::uint8_t>& out, std::uint32_t v)
-{
-    out.push_back(static_cast<std::uint8_t>(v));
-    out.push_back(static_cast<std::uint8_t>(v >> 8));
-}
-
-void put32(std::vector<std::uint8_t>& out, std::uint32_t v)
-{
-    put16(out, v);
-    put16(out, v >> 16);
-}
-
-std::uint32_t get32(std::span<const std::uint8_t> b, std::size_t at)
-{
-    return static_cast<std::uint32_t>(b[at]) | (static_cast<std::uint32_t>(b[at + 1]) << 8) | (static_cast<std::uint32_t>(b[at + 2]) << 16) |
-           (static_cast<std::uint32_t>(b[at + 3]) << 24);
-}
+using util::putU16;
+using util::putU32;
+using util::u32At;
 
 /// {0xF9, sub, u16 length, body}.
 std::vector<std::uint8_t> frame(std::uint8_t sub, const std::vector<std::uint8_t>& body)
@@ -34,7 +21,7 @@ std::vector<std::uint8_t> frame(std::uint8_t sub, const std::vector<std::uint8_t
     out.reserve(4 + body.size());
     out.push_back(static_cast<std::uint8_t>(Op::NoxcppGameData));
     out.push_back(sub);
-    put16(out, static_cast<std::uint32_t>(body.size()));
+    putU16(out, static_cast<std::uint16_t>(body.size()));
     out.insert(out.end(), body.begin(), body.end());
     return out;
 }
@@ -52,13 +39,13 @@ std::optional<things::DataFile> kindOf(std::uint8_t b)
 std::vector<std::uint8_t> encodeSet(const Set& set)
 {
     std::vector<std::uint8_t> body;
-    put32(body, set.hash);
+    putU32(body, set.hash);
     body.push_back(static_cast<std::uint8_t>(set.files.size()));
     for (const SetEntry& f : set.files) {
         body.push_back(static_cast<std::uint8_t>(f.kind));
-        put32(body, f.size);
-        put32(body, f.crc);
-        put32(body, f.merged);
+        putU32(body, f.size);
+        putU32(body, f.crc);
+        putU32(body, f.merged);
         body.insert(body.end(), f.digest.begin(), f.digest.end());
     }
     return frame(kSet, body);
@@ -79,7 +66,7 @@ std::vector<std::uint8_t> encodeChunk(things::DataFile kind, std::uint32_t offse
     std::vector<std::uint8_t> body;
     body.reserve(5 + bytes.size());
     body.push_back(static_cast<std::uint8_t>(kind));
-    put32(body, offset);
+    putU32(body, offset);
     body.insert(body.end(), bytes.begin(), bytes.end());
     return frame(kChunk, body);
 }
@@ -102,7 +89,7 @@ std::optional<Set> decodeSet(std::span<const std::uint8_t> rest)
         return std::nullopt;
     }
     Set s;
-    s.hash = get32(rest, 0);
+    s.hash = u32At(rest, 0);
     const std::size_t count = rest[4];
     constexpr std::size_t kEntry = 13 + 32; // (kind, size, CRC, merged, SHA-256)
     if (count == 0 || count > things::kDataFileCount || rest.size() != 5 + kEntry * count) {
@@ -116,7 +103,7 @@ std::optional<Set> decodeSet(std::span<const std::uint8_t> rest)
         if (!kind || std::ranges::any_of(s.files, [&](const SetEntry& e) { return things::dataTableOf(e.kind) == things::dataTableOf(*kind); })) {
             return std::nullopt;
         }
-        SetEntry e{*kind, get32(rest, at + 1), get32(rest, at + 5), get32(rest, at + 9), {}};
+        SetEntry e{*kind, u32At(rest, at + 1), u32At(rest, at + 5), u32At(rest, at + 9), {}};
         std::copy_n(rest.begin() + static_cast<std::ptrdiff_t>(at + 13), e.digest.size(), e.digest.begin());
         if (e.size == 0 || e.size > things::dataFileMaxBytes(e.kind)) {
             return std::nullopt;
@@ -155,7 +142,7 @@ std::optional<Chunk> decodeChunk(std::span<const std::uint8_t> rest)
     if (!kind) {
         return std::nullopt;
     }
-    return Chunk{*kind, get32(rest, 1), rest.subspan(5)};
+    return Chunk{*kind, u32At(rest, 1), rest.subspan(5)};
 }
 
 } // namespace nox::net::gamedata

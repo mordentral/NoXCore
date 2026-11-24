@@ -13,30 +13,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-/// Whether `st` is a link of some kind (a symbolic link; on Windows a junction too): never
-/// followed out of the folder.
-bool isLink(const fs::file_status& st)
-{
-#ifdef _MSC_VER
-    if (st.type() == fs::file_type::junction) {
-        return true;
-    }
-#endif
-    return fs::is_symlink(st);
-}
-
-/// Whether `p`, every link in it resolved, is inside `root` (itself resolved) and not `root`.
-bool resolvesInside(const fs::path& p, const fs::path& root)
-{
-    std::error_code ec;
-    const fs::path real = fs::canonical(p, ec);
-    if (ec) {
-        return false;
-    }
-    const auto [r, _] = std::mismatch(root.begin(), root.end(), real.begin(), real.end());
-    return r == root.end() && real != root;
-}
-
 /// The entry of `folder` named `want` ignoring case that is a real file inside `root`; empty: none.
 fs::path realFileIn(const fs::path& folder, const std::string& want, const fs::path& root)
 {
@@ -46,7 +22,7 @@ fs::path realFileIn(const fs::path& folder, const std::string& want, const fs::p
             continue;
         }
         const fs::file_status st = e.symlink_status(ec);
-        if (ec || isLink(st) || !fs::is_regular_file(st) || !resolvesInside(e.path(), root)) {
+        if (ec || isLinkStatus(st) || !fs::is_regular_file(st) || !resolvesInside(e.path(), root)) {
             return {};
         }
         return e.path();
@@ -85,7 +61,7 @@ std::shared_ptr<const ModeMaps> ModeMaps::index(const fs::path& dir, std::vector
             ec.clear();
             continue;
         }
-        if (!fs::is_directory(st) && !isLink(st)) {
+        if (!fs::is_directory(st) && !isLinkStatus(st)) {
             continue; // (a loose file: not a map's folder)
         }
         // A map's name names a folder and its file anywhere a map is found by name, and exits
@@ -94,7 +70,7 @@ std::shared_ptr<const ModeMaps> ModeMaps::index(const fs::path& dir, std::vector
             problem(name, "not a plain map name");
             continue;
         }
-        if (isLink(st) || !resolvesInside(e.path(), root)) {
+        if (isLinkStatus(st) || !resolvesInside(e.path(), root)) {
             problem(name, "a link, not a folder of the mod's own");
             continue;
         }
@@ -122,6 +98,15 @@ std::shared_ptr<const ModeMaps> ModeMaps::index(const fs::path& dir, std::vector
     }
     out->entries_ = std::move(found);
     return out;
+}
+
+bool isSoloMapName(std::string_view name) noexcept
+{
+    if (name.size() <= 3 || name[3] < '0' || name[3] > '9') {
+        return false;
+    }
+    const std::string_view prefix = name.substr(0, 3);
+    return util::equalsNoCase(prefix, "wiz") || util::equalsNoCase(prefix, "war") || util::equalsNoCase(prefix, "con");
 }
 
 const ModeMaps::Entry* ModeMaps::find(std::string_view name) const

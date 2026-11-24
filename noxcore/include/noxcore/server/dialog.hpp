@@ -20,7 +20,9 @@
 #include "noxcore/server/monsters.hpp" // (freezeUnit / unfreezeUnit: the dialog's freeze)
 #include "noxcore/server/world.hpp"
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -46,6 +48,16 @@ void putDialogTitle(std::vector<std::uint8_t>& m, std::u16string_view name);
 /// speaker (strings::fromUtf8Cut) is. The string table's names are written as they are. `letters`:
 /// another field's length (the shop window's title, 24).
 std::u16string fitDialogTitle(std::u16string name, std::size_t letters = 31);
+/// `text` written as a field of `letters` UTF-16 letters at `at` in `m` (wcsncpy's: its letters up
+/// to its first NUL, then zeros), `m` grown to hold it where it's shorter.
+void putWideField(std::vector<std::uint8_t>& m, std::size_t at, std::u16string_view text, std::size_t letters);
+/// (noxcpp) A NoX Core mode's own text for an NPC's name label (npcNameLabel) for this player
+/// (World::modeHooks' playerText), fitted to `letters` (fitDialogTitle); none without a mode, or
+/// when it has none.
+std::optional<std::u16string> modeNpcTitle(const World& world, const ServerObject& player, std::string_view label, std::size_t letters = 31);
+/// (noxcpp) The NPC's name as a window opened for this player titles it: modeNpcTitle, else the
+/// string table's (World::text of its label), as the game's.
+std::u16string npcTitleFor(const World& world, const ServerObject& player, const ServerObject& npc, std::size_t letters = 31);
 /// MSG_DIALOG 3 as SrvNet_OpenNpcDialog builds it (135 bytes; what the exe leaves of its stack
 /// as zeros): its text's id at +2, the NPC's name at +0x22 (Str_GetString("NPC:" + its script
 /// name after any ':' without '_', or its type's), 31 UTF-16 letters), 0 at +0x60, the sound at

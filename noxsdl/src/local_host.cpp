@@ -240,19 +240,12 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
             modeData_ = nox::modes::gameDataFor(nox::modes::registry(), *m, settings.modeOptions);
         }
     }
-    std::optional<nox::things::DataTables> modTables;
-    if (modeData_) {
-        modTables = modeData_->tables(settings.solo, gameDir); // (throws: a file that won't read or an override that won't apply: the game not hosted)
-        ownThings_ = modTables->things ? std::move(*modTables->things) : installThings;
-        if (modTables->modifiers) {
-            ownModifiers_ = std::move(*modTables->modifiers);
-        } else if (installModifiers) {
-            ownModifiers_ = *installModifiers;
-        }
-        ownGameData_ = modTables->gameData ? std::move(*modTables->gameData) : installGameData;
-        SDL_Log("hosting: the mod's own game data (%zu files, %zu bytes) in place of the install's", modeData_->files().size(),
-                modeData_->bytes());
-    }
+    // (Its tables, nox::server::hostTables, a dedicated host's too: the mod's where it has them, for its
+    // game the install's copied; the install's monster.bin (a solo or network game's numbers) and
+    // soundset.bin where it hasn't. Throws: a file that won't read or an override that won't
+    // apply: the game not hosted.)
+    const nox::server::InstallTables install{&installThings, installModifiers, &installGameData};
+    nox::server::HostTables tables = nox::server::hostTables(modeData_.get(), settings.solo, gameDir, &install);
     // The mod's new types' stock types (a whole thing.bin's: none): its game's, till it's left
     // (game_data_swap.hpp's useInstallData); a game that isn't made after all gives the content
     // packs' back at once, before anything else reads them.
@@ -265,9 +258,20 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
             }
         }
     } basesBack;
-    if (modTables && modTables->things) {
-        nox::things::useAddedTypeBases(*modTables);
-        basesBack.armed = true;
+    basesBack.armed = tables.addedBases;
+    ownThings_ = std::move(tables.things);
+    ownModifiers_ = std::move(tables.modifiers);
+    ownGameData_ = std::move(tables.gameData);
+    monsterDb_ = std::move(tables.monsters);
+    soundSets_ = std::move(tables.soundSets);
+    if (modeData_) {
+        SDL_Log("hosting: the mod's own game data (%zu files, %zu bytes) in place of the install's", modeData_->files().size(),
+                modeData_->bytes());
+    }
+    if (monsterDb_) {
+        for (const std::string& p : monsterDb_->problems) { // (a modded file's: the shipped one has none)
+            SDL_Log("%s", p.c_str());
+        }
     }
     const nox::things::ThingDb& things = ownThings_ ? *ownThings_ : installThings;
     const nox::things::ModifierDb* modifiers = ownModifiers_ ? &*ownModifiers_ : installModifiers;
@@ -297,30 +301,15 @@ LocalHost::LocalHost(const nox::things::ThingDb& installThings, const nox::thing
     if (!generated && !settings.editSession && !fs::exists(nox::resolveNoCase(path))) {
         throw std::runtime_error("no map " + settings.map);
     }
-    if (modTables && modTables->monsters) {
-        monsterDb_ = std::move(modTables->monsters); // (the mod's: read for this game's numbers)
-    } else if (fs::exists(nox::resolveNoCase(gameDir / "monster.bin"))) {
-        monsterDb_ = nox::things::loadMonsterDb(gameDir / "monster.bin", settings.solo); // (a solo or network game's numbers)
-    }
-    if (monsterDb_) {
-        monsterDb_->keepThingTypes(things);
-        for (const std::string& p : monsterDb_->problems) { // (a modded file's: the shipped one has none)
-            SDL_Log("%s", p.c_str());
-        }
-    }
-    if (modTables && modTables->soundSets) {
-        soundSets_ = std::move(modTables->soundSets);
-    } else if (fs::exists(nox::resolveNoCase(gameDir / "soundset.bin"))) {
-        soundSets_ = nox::things::loadSoundSets(gameDir / "soundset.bin");
-    }
+
     nox::server::GameHost::Options o;
     o.serverName = settings.name;
     o.maxPlayers = settings.maxPlayers;
     o.password = settings.password;
     o.gameFlags = (o.gameFlags & ~0x17F0u) | settings.mode;  // the game-type bits cleared, then the chosen mode
     o.gameData = &gameData;
-    if (modTables) {
-        o.modeDataMerged = modTables->merged; // (each client's merge of the mod's overrides must give these)
+    if (modeData_) {
+        o.modeDataMerged = tables.merged; // (each client's merge of the mod's overrides must give these)
     }
     o.modifiers = modifiers;
     o.monsterDb = monsterDb_ ? &*monsterDb_ : nullptr;

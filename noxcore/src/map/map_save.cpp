@@ -18,7 +18,6 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
-#include <fstream>
 #include <map>
 #include <string>
 
@@ -231,30 +230,14 @@ EncodedMapFiles encodeMapBytes(std::vector<std::uint8_t> plain)
     return out;
 }
 
+void writeFileReplacing(const std::filesystem::path& path, std::span<const std::uint8_t> bytes, std::string_view /*who*/)
+{
+    replaceFileBytes(path, bytes, ".tmp"); // (its error names the file)
+}
+
 namespace {
 
 namespace fs = std::filesystem;
-
-void writeWhole(const fs::path& path, std::span<const std::uint8_t> bytes, std::string_view who)
-{
-    std::ofstream out(path, std::ios::binary | std::ios::trunc);
-    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    out.close(); // (a write that fails only as the file closes is a failed write too)
-    if (!out) {
-        throw FormatError(std::string(who) + ": can't write " + pathUtf8(path));
-    }
-}
-
-} // namespace
-
-void writeFileReplacing(const std::filesystem::path& path, std::span<const std::uint8_t> bytes, std::string_view who)
-{
-    const auto tmp = std::filesystem::path(path).concat(".tmp");
-    writeWhole(tmp, bytes, who);
-    std::filesystem::rename(tmp, path);
-}
-
-namespace {
 
 // An editor save's staging folder, in the map's folder: the lock, and one numbered folder per
 // save with its new files (<file>.new), the old ones (<file>.old) and the commit mark, put there
@@ -461,9 +444,9 @@ PublishedMapFolder publishMapFolder(const std::filesystem::path& mapsDir, std::s
                     fs::copy_file(dir / f.name, keep);
                 }
             }
-            writeWhole(newFile(attempt, f.name), f.bytes, who);
+            writeFileBytes(newFile(attempt, f.name), f.bytes);
         }
-        writeWhole(attempt / kCommitMark, {}, who);
+        writeFileBytes(attempt / kCommitMark, {});
     } catch (...) {
         std::error_code ec;
         fs::remove_all(attempt, ec);

@@ -63,44 +63,52 @@ std::uint32_t thingsCheck(const ThingDb& db)
     return v == 0 ? 1u : v;
 }
 
+/// A text table kept in its slot of `out` when it has a record; "" or why not.
+std::string keepTable(ModifierDb db, DataTables& out)
+{
+    if (db.weapons.empty() && db.armor.empty() && db.modifiers.empty()) {
+        return "no records";
+    }
+    out.modifiers = std::move(db);
+    return {};
+}
+
+std::string keepTable(GameData data, DataTables& out)
+{
+    if (data.entries.empty()) {
+        return "no records";
+    }
+    out.gameData = std::move(data);
+    return {};
+}
+
+std::string keepTable(MonsterDb db, DataTables& out)
+{
+    if (db.monsters.empty()) {
+        return "no records";
+    }
+    out.monsters = std::move(db);
+    return {};
+}
+
+std::string keepTable(SoundSets sets, DataTables& out)
+{
+    if (sets.sets.empty()) {
+        return "no records";
+    }
+    out.soundSets = std::move(sets);
+    return {};
+}
+
 /// The table read from a game file's decrypted text into its slot of `out`; "" or why not.
 std::string readText(DataFile table, std::string_view text, bool solo, DataTables& out)
 {
     switch (table) {
-    case DataFile::Modifiers: {
-        ModifierDb db = parseModifierDb(text);
-        if (db.weapons.empty() && db.armor.empty() && db.modifiers.empty()) {
-            return "no records";
-        }
-        out.modifiers = std::move(db);
-        return {};
-    }
-    case DataFile::GameData: {
-        GameData data = parseGameData(text);
-        if (data.entries.empty()) {
-            return "no records";
-        }
-        out.gameData = std::move(data);
-        return {};
-    }
-    case DataFile::Monsters: {
-        MonsterDb db = parseMonsterDb(text, solo);
-        if (db.monsters.empty()) {
-            return "no records";
-        }
-        out.monsters = std::move(db);
-        return {};
-    }
-    case DataFile::SoundSets: {
-        SoundSets sets = parseSoundSets(text);
-        if (sets.sets.empty()) {
-            return "no records";
-        }
-        out.soundSets = std::move(sets);
-        return {};
-    }
-    default:
-        return "not a text table";
+    case DataFile::Modifiers: return keepTable(parseModifierDb(text), out);
+    case DataFile::GameData: return keepTable(parseGameData(text), out);
+    case DataFile::Monsters: return keepTable(parseMonsterDb(text, solo), out);
+    case DataFile::SoundSets: return keepTable(parseSoundSets(text), out);
+    default: return "not a text table";
     }
 }
 
@@ -117,20 +125,41 @@ std::string readThings(ThingDb db, DataTables& out)
     return {};
 }
 
-/// A whole file read into `out` (no content pack); "" or why not.
+/// A whole file read into `out` (its own reader, no content pack); "" or why not.
 std::string readWhole(DataFile file, std::vector<std::uint8_t> bytes, bool solo, DataTables& out)
 {
     try {
-        if (file == DataFile::Things) {
-            return readThings(thingDbFromFile(std::move(bytes), false), out);
+        switch (file) {
+        case DataFile::Things: return readThings(thingDbFromFile(std::move(bytes), false), out);
+        case DataFile::Modifiers: return keepTable(modifierDbFromFile(std::move(bytes), false), out);
+        case DataFile::GameData: return keepTable(gameDataFromFile(std::move(bytes), false), out);
+        case DataFile::Monsters: return keepTable(monsterDbFromFile(std::move(bytes), solo, false), out);
+        case DataFile::SoundSets: return keepTable(soundSetsFromFile(std::move(bytes), false), out);
+        default: return "not a text table";
         }
-        crypto::cipherForKey(content::tableKey(tableFormat(file))).decrypt(bytes);
-        return readText(file, std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()), solo, out);
     } catch (const std::exception& ex) {
         return ex.what();
     }
 }
 
+/// What's checked of a file before its reader: its kind, its size (not empty, at most its cap) and,
+/// a whole file, its cipher's whole blocks; "" or why not.
+std::string checkSize(DataFile file, std::span<const std::uint8_t> bytes)
+{
+    if (static_cast<std::size_t>(file) >= kDataFileCount) {
+        return "not a game data file";
+    }
+    if (bytes.empty()) {
+        return "empty";
+    }
+    if (bytes.size() > info(file).maxBytes) {
+        return "over " + std::to_string(info(file).maxBytes >> 20) + " MB";
+    }
+    if (!isDataPatch(file) && bytes.size() % 8 != 0) {
+        return "not whole cipher blocks (its size isn't a multiple of 8)";
+    }
+    return {};
+}
 /// An override read alone (its structure); "" or its first problem.
 std::string checkPatch(DataFile file, std::span<const std::uint8_t> bytes)
 {
@@ -172,7 +201,7 @@ std::string checkPatch(DataFile file, std::span<const std::uint8_t> bytes)
             last = std::string(line);
             ends += util::equalsNoCase(line, "END") ? 1 : 0;
             if (format == content::TableFormat::Modifier) {
-                for (const std::string_view s : {"WEAPON_DEFINITIONS", "ARMOR_DEFINITIONS", "EFFECTIVENESS", "MATERIAL", "ENCHANTMENT"}) {
+                for (const std::string_view s : content::kModifierSections) { // (case aside, unlike the reader)
                     sections += util::equalsNoCase(line, s) ? 1 : 0;
                 }
             }
@@ -231,7 +260,7 @@ std::string mergeDataFile(DataFile table, std::span<const std::uint8_t> patchByt
             content::TextTable merged = content::TextTable::load(format, base);
             // (The install's modifiers: every one a mod's patch adds comes after them.)
             const auto installIds = static_cast<std::size_t>(std::ranges::count_if(merged.records(), [](const content::TableRecord& rec) {
-                return rec.section == "EFFECTIVENESS" || rec.section == "MATERIAL" || rec.section == "ENCHANTMENT";
+                return content::isModifierIdSection(rec.section);
             }));
             const content::TextTable patch = content::TextTable::parsePatch(format, text);
             const content::PatchResult r = content::applyPatch(merged, patch, true); // (a mod's: new modifiers too)
@@ -317,20 +346,11 @@ bool clientReadsDataFile(DataFile file) noexcept
 
 std::string checkDataFile(DataFile file, std::span<const std::uint8_t> bytes)
 {
-    if (static_cast<std::size_t>(file) >= kDataFileCount) {
-        return "not a game data file";
-    }
-    if (bytes.empty()) {
-        return "empty";
-    }
-    if (bytes.size() > info(file).maxBytes) {
-        return "over " + std::to_string(info(file).maxBytes >> 20) + " MB";
+    if (std::string why = checkSize(file, bytes); !why.empty()) {
+        return why;
     }
     if (isDataPatch(file)) {
         return checkPatch(file, bytes);
-    }
-    if (bytes.size() % 8 != 0) {
-        return "not whole cipher blocks (its size isn't a multiple of 8)";
     }
     DataTables scratch;
     return readWhole(file, std::vector<std::uint8_t>(bytes.begin(), bytes.end()), false, scratch);
@@ -346,10 +366,17 @@ DataTables readDataTables(std::span<const DataFileBytes> files, bool solo, const
         if (clientOnly && !clientReadsDataFile(f.kind)) {
             continue;
         }
-        std::string why = checkDataFile(f.kind, f.bytes);
-        if (why.empty()) {
-            why = isDataPatch(f.kind) ? mergeDataFile(dataTableOf(f.kind), f.bytes, installDir, solo, f.merged, out)
-                                      : readWhole(f.kind, f.bytes, solo, out);
+        // checkDataFile's checks, each file read once: a whole file's reader is its check (the
+        // solo numbers' read finds every record a network game's does), an override's structure
+        // is checked before it's applied (its END lines: the merge takes a file cut short).
+        std::string why = checkSize(f.kind, f.bytes);
+        if (why.empty() && isDataPatch(f.kind)) {
+            why = checkPatch(f.kind, f.bytes);
+            if (why.empty()) {
+                why = mergeDataFile(dataTableOf(f.kind), f.bytes, installDir, solo, f.merged, out);
+            }
+        } else if (why.empty()) {
+            why = readWhole(f.kind, f.bytes, solo, out);
         }
         if (!why.empty()) {
             throw std::runtime_error(std::string(dataFileName(f.kind)) + ": " + why);
