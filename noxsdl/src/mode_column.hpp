@@ -11,6 +11,8 @@
 #include "noxcore/lobby/listing.hpp"
 #include "noxcore/strings/l10n.hpp"
 
+#include "text_fit.hpp"
+
 #include <string>
 #include <string_view>
 
@@ -112,12 +114,7 @@ std::string fitModeText(std::string_view text, float room, Measure&& measure)
     }
     std::string cut = whole;
     while (!cut.empty() && measure(cut) > room) {
-        // (the last character whole: its continuation bytes and its lead)
-        std::size_t n = cut.size() - 1;
-        while (n > 0 && (static_cast<unsigned char>(cut[n]) & 0xC0) == 0x80) {
-            --n;
-        }
-        cut.resize(n);
+        popLetter(cut); // (the last character whole)
     }
     return cut;
 }

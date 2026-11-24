@@ -452,54 +452,9 @@ std::u16string toWire(std::u16string_view s, LegacyText text)
     return out;
 }
 
-namespace {
-
-/// Whether `s` is well-formed UTF-8 (overlong forms and surrogates refused).
-bool isUtf8(std::string_view s)
-{
-    for (std::size_t i = 0; i < s.size();) {
-        const auto b = static_cast<unsigned char>(s[i]);
-        std::size_t n = 0;
-        char32_t c = 0;
-        if (b < 0x80) {
-            ++i;
-            continue;
-        }
-        if (b >= 0xC2 && b <= 0xDF) {
-            n = 1;
-            c = b & 0x1Fu;
-        } else if (b >= 0xE0 && b <= 0xEF) {
-            n = 2;
-            c = b & 0x0Fu;
-        } else if (b >= 0xF0 && b <= 0xF4) {
-            n = 3;
-            c = b & 0x07u;
-        } else {
-            return false;
-        }
-        if (i + n >= s.size()) {
-            return false;
-        }
-        for (std::size_t k = 1; k <= n; ++k) {
-            const auto t = static_cast<unsigned char>(s[i + k]);
-            if ((t & 0xC0) != 0x80) {
-                return false;
-            }
-            c = (c << 6) | (t & 0x3Fu);
-        }
-        if ((n == 2 && c < 0x800) || (n == 3 && (c < 0x10000 || c > 0x10FFFF)) || (c >= 0xD800 && c <= 0xDFFF)) {
-            return false;
-        }
-        i += n + 1;
-    }
-    return true;
-}
-
-} // namespace
-
 std::string wire8ToUtf8(std::string_view bytes)
 {
-    if (isUtf8(bytes)) {
+    if (util::validUtf8(bytes)) {
         return std::string(bytes); // (ASCII, or a NoX Core peer's UTF-8)
     }
     std::u16string wide;

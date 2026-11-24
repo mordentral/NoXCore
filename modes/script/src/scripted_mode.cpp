@@ -3577,10 +3577,8 @@ int noxExitTo(lua_State* L)
     size_t len = 0;
     const char* s = luaL_checklstring(L, 1, &len);
     const std::string_view name(s, len);
-    luaL_argcheck(L, name.size() > 4 && name.size() <= 36 && name.ends_with(".map") && std::ranges::all_of(name.substr(0, name.size() - 4), [](char c) {
-                         return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-';
-                     }),
-                  1, "a map's name (Name.map: letters, digits, _ and -)");
+    luaL_argcheck(L, name.ends_with(".map") && util::plainName(name.substr(0, name.size() - 4), 32), 1,
+                  "a map's name (Name.map: letters, digits, _ and -)");
     worldOf(L).exitTo = std::string(name);
     return 0;
 }

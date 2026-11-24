@@ -3,6 +3,7 @@
 
 #include "noxcore/crypto/sha256.hpp"
 #include "noxcore/util/bytes.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 #include <string_view>
@@ -253,9 +254,7 @@ std::vector<std::uint8_t> encodeExtendedReply(std::uint32_t token, const Extende
             if (const auto sep = packs.substr(0, n).rfind(", "); sep != std::string_view::npos && sep > 0) {
                 n = sep;
             } else {
-                while (n > 0 && (static_cast<unsigned char>(packs[n]) & 0xC0) == 0x80) {
-                    --n;
-                }
+                n = util::utf8CutLength(packs, n);
             }
         }
         out.push_back(static_cast<std::uint8_t>(n));
@@ -271,12 +270,7 @@ std::vector<std::uint8_t> encodeExtendedReply(std::uint32_t token, const Extende
     if (modeName) {
         // At most kModeNameBytes: cut between UTF-8 characters, never inside one.
         const std::string_view name = server.modeName;
-        std::size_t n = std::min(name.size(), kModeNameBytes);
-        if (n < name.size()) {
-            while (n > 0 && (static_cast<unsigned char>(name[n]) & 0xC0) == 0x80) {
-                --n;
-            }
-        }
+        const std::size_t n = util::utf8CutLength(name, kModeNameBytes);
         out.push_back(static_cast<std::uint8_t>(n));
         out.insert(out.end(), name.begin(), name.begin() + static_cast<std::ptrdiff_t>(n));
     }

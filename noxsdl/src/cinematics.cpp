@@ -7,6 +7,7 @@
 
 #include "console.hpp"
 #include "menu_rules.hpp"
+#include "text_fit.hpp"
 
 #include "noxcore/client/movies.hpp"
 #include "noxcore/client/text_fields.hpp"
@@ -1400,11 +1401,7 @@ void Cinematics::drawQuestResults(gui::Painter& p)
         const int limit = (290 - 120) - 16 + x;
         // Shortened a character at a time while too wide, keeping at least 6.
         while (limit <= p.textWidth(name, true) + x && utf8Length(name) >= 6) {
-            // (the last character off)
-            while ((static_cast<unsigned char>(name.back()) & 0xC0) == 0x80) {
-                name.pop_back();
-            }
-            name.pop_back();
+            popLetter(name); // (the last character off)
         }
         p.text(p.firstLine(name, true, column - 8), x, y, true, kQuestOrange);
         y += step / 2 + step;

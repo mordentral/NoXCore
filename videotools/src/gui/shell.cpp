@@ -385,9 +385,7 @@ void Shell::packPopups()
         }
         const bool enter = ImGui::InputText("##id", newPackBuf_, sizeof newPackBuf_, ImGuiInputTextFlags_CharsNoBlank | ImGuiInputTextFlags_EnterReturnsTrue);
         const std::string id = newPackBuf_;
-        const bool valid = !id.empty() && std::ranges::all_of(id, [](char c) {
-            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
-        });
+        const bool valid = nox::util::plainName(id, sizeof newPackBuf_); // (the box holds fewer)
         std::error_code ec;
         const bool exists = valid && fs::exists(modsDir_ / id, ec);
         if (exists) {

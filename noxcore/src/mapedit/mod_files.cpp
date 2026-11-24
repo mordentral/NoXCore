@@ -30,50 +30,6 @@ std::string u8text(const fs::path& p)
     return std::string(reinterpret_cast<const char*>(s.data()), s.size());
 }
 
-/// Well-formed UTF-8: no stray continuation bytes, no overlong forms, no surrogates, nothing past
-/// U+10FFFF (a name Windows can't map is refused before a path is ever made of it).
-bool wellFormedUtf8(std::string_view s)
-{
-    for (std::size_t i = 0; i < s.size();) {
-        const auto b = static_cast<unsigned char>(s[i]);
-        if (b < 0x80) {
-            ++i;
-            continue;
-        }
-        std::size_t n = 0;
-        std::uint32_t cp = 0;
-        if ((b & 0xE0) == 0xC0) {
-            n = 1;
-            cp = b & 0x1F;
-        } else if ((b & 0xF0) == 0xE0) {
-            n = 2;
-            cp = b & 0x0F;
-        } else if ((b & 0xF8) == 0xF0) {
-            n = 3;
-            cp = b & 0x07;
-        } else {
-            return false;
-        }
-        for (std::size_t k = 1; k <= n; ++k) {
-            if (i + k >= s.size()) {
-                return false;
-            }
-            const auto c = static_cast<unsigned char>(s[i + k]);
-            if ((c & 0xC0) != 0x80) {
-                return false;
-            }
-            cp = (cp << 6) | (c & 0x3F);
-        }
-        static constexpr std::uint32_t kLeast[] = {0, 0x80, 0x800, 0x10000};
-        if (cp < kLeast[n] || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
-            return false;
-        }
-        i += n + 1;
-    }
-    return true;
-}
-
-
 /// A name Windows keeps for a device (CON, PRN, AUX, NUL, COM0-9, LPT0-9), whatever follows its
 /// first dot ("aux.luau" is the device on older Windows).
 bool reservedName(std::string_view part)
@@ -90,7 +46,8 @@ bool reservedName(std::string_view part)
 
 bool modPathValid(std::string_view rel)
 {
-    if (rel.empty() || rel.size() > kMaxModPath || rel.front() == '/' || rel.back() == '/' || !wellFormedUtf8(rel)) {
+    // (Well-formed UTF-8 only: a name Windows can't map is refused before a path is ever made of it.)
+    if (rel.empty() || rel.size() > kMaxModPath || rel.front() == '/' || rel.back() == '/' || !util::validUtf8(rel)) {
         return false;
     }
     std::size_t parts = 0;

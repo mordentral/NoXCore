@@ -67,52 +67,52 @@ content.changes.col_reach = Reach
 # videotools/src/gui/bottom_panels.cpp:24
 #@ 0815494f: What
 content.changes.col_what = What
-# videotools/src/gui/shell.cpp:1038
+# videotools/src/gui/shell.cpp:1036
 #@ 6eb96562: HD pack #{index}  {name}
 content.changes.hd_pack_image = HD pack #{index}  {name}
-# videotools/src/gui/shell.cpp:1039
+# videotools/src/gui/shell.cpp:1037
 #@ 63682680: HD image put in
 content.changes.hd_put_in = HD image put in
-# videotools/src/gui/shell.cpp:1039
+# videotools/src/gui/shell.cpp:1037
 #@ 97dc79d4: HD image removed
 content.changes.hd_removed = HD image removed
-# videotools/src/gui/shell.cpp:1021
+# videotools/src/gui/shell.cpp:1019
 #@ 830bcdba: image replaced
 content.changes.image_replaced = image replaced
-# videotools/src/gui/shell.cpp:941
+# videotools/src/gui/shell.cpp:939
 #@ a4a0c790: made like {name}
 content.changes.made_like = made like {name}
-# videotools/src/gui/shell.cpp:895
+# videotools/src/gui/shell.cpp:893
 #@ 91c36aee: \s(+{n} more)
 content.changes.more_variants = \s(+{n} more)
-# videotools/src/gui/shell.cpp:940
+# videotools/src/gui/shell.cpp:938
 #@ ad95e233: thing.bin  new type {name}
 content.changes.new_type = thing.bin  new type {name}
 # videotools/src/gui/bottom_panels.cpp:15
 #@ 6357b919: No changes: everything is as the game's files have it.
 content.changes.none = No changes: everything is as the game's files have it.
-# videotools/src/gui/shell.cpp:893
+# videotools/src/gui/shell.cpp:891
 #@ 3ff7ffdb: removed
 content.changes.removed = removed
 # videotools/src/gui/bottom_panels.cpp:26, videotools/src/gui/bottom_panels.cpp:44, videotools/src/gui/table_form.cpp:320 ...
 #@ a5822da3: Revert
 content.changes.revert = Revert
-# videotools/src/gui/shell.cpp:920
+# videotools/src/gui/shell.cpp:918
 #@ e93c4415: from {file}
 content.changes.sound_from = from {file}
-# videotools/src/gui/shell.cpp:919
+# videotools/src/gui/shell.cpp:917
 #@ c9a3dba6: in the pack
 content.changes.sound_in_pack = in the pack
-# videotools/src/gui/shell.cpp:918
+# videotools/src/gui/shell.cpp:916
 #@ 71a94017: taken out of the pack
 content.changes.sound_taken_out = taken out of the pack
-# videotools/src/gui/shell.cpp:959
+# videotools/src/gui/shell.cpp:957
 #@ f4c7bf9c: (new type)
 content.changes.stock_new_type = (new type)
-# videotools/src/gui/shell.cpp:959, videotools/src/gui/shell.cpp:962, videotools/src/gui/shell.cpp:989 ...
+# videotools/src/gui/shell.cpp:957, videotools/src/gui/shell.cpp:960, videotools/src/gui/shell.cpp:987 ...
 #@ 90458a20: (none)
 content.changes.stock_none = (none)
-# videotools/src/gui/shell.cpp:966, videotools/src/gui/shell.cpp:996
+# videotools/src/gui/shell.cpp:964, videotools/src/gui/shell.cpp:994
 #@ 6599b006: {stock} -> removed
 content.changes.value_removed = {stock} -> removed
 # videotools/src/gui/character_form.cpp:46
@@ -253,7 +253,7 @@ content.check.unknown_sound = '{name}' isn't one of the game's sound names: it w
 # videotools/src/content/schema.cpp:474
 #@ 146517bb: '{word}' isn't a number (the game reads 0)
 content.check.word_not_number = '{word}' isn't a number (the game reads 0)
-# videotools/src/gui/session.cpp:548, videotools/src/gui/shell.cpp:425, videotools/src/gui/shell.cpp:749 ...
+# videotools/src/gui/session.cpp:548, videotools/src/gui/shell.cpp:423, videotools/src/gui/shell.cpp:747 ...
 #@ 35afca3b: Cancel
 content.common.cancel = Cancel
 # videotools/src/gui/character_form.cpp:377, videotools/src/gui/text_form.cpp:122
@@ -1553,91 +1553,91 @@ content.label.volume = Volume
 # videotools/src/gui/bottom_panels.cpp:80
 #@ d9b71d16: Nothing yet.
 content.log.empty = Nothing yet.
-# videotools/src/gui/shell.cpp:509
+# videotools/src/gui/shell.cpp:507
 #@ ab68d67a: Close HD pack
 content.menu.close_hd_pack = Close HD pack
-# videotools/src/gui/shell.cpp:539
+# videotools/src/gui/shell.cpp:537
 #@ c2c76cb1: Edit
 content.menu.edit = Edit
-# videotools/src/gui/shell.cpp:527
+# videotools/src/gui/shell.cpp:525
 #@ 28a92bab: Export whole files...
 content.menu.export_whole = Export whole files...
-# videotools/src/gui/shell.cpp:530
+# videotools/src/gui/shell.cpp:528
 #@ cc7055ed: The changed files written whole, in the game's own format (encrypted), into a folder you pick: for use outside NoX Core.
 content.menu.export_whole_tip = The changed files written whole, in the game's own format (encrypted), into a folder you pick: for use outside NoX Core.
-# videotools/src/gui/shell.cpp:493
+# videotools/src/gui/shell.cpp:491
 #@ 2b183663: File
 content.menu.file = File
-# videotools/src/gui/shell.cpp:587
+# videotools/src/gui/shell.cpp:585
 #@ 02ae74c6: Floating panels
 content.menu.floating = Floating panels
-# videotools/src/gui/shell.cpp:591
+# videotools/src/gui/shell.cpp:589
 #@ 1cddf891: Panels dragged out of the window become windows of their own (onto another monitor).
 content.menu.floating_tip = Panels dragged out of the window become windows of their own (onto another monitor).
-# videotools/src/gui/shell.cpp:597
+# videotools/src/gui/shell.cpp:595
 #@ b89df01a: Help
 content.menu.help = Help
-# videotools/src/gui/shell.cpp:601
+# videotools/src/gui/shell.cpp:599
 #@ 22d8362a: Original files are never written: saves go to new files.
 content.menu.help_never_written = Original files are never written: saves go to new files.
-# videotools/src/gui/shell.cpp:599
+# videotools/src/gui/shell.cpp:597
 #@ 3d20a9ee: Opens the game's files: thing.bin, modifier.bin, gamedata.bin,
 content.menu.help_opens = Opens the game's files: thing.bin, modifier.bin, gamedata.bin,
-# videotools/src/gui/shell.cpp:578
+# videotools/src/gui/shell.cpp:576
 #@ f3ba6d21: Interface size
 content.menu.interface_size = Interface size
-# videotools/src/gui/shell.cpp:521
+# videotools/src/gui/shell.cpp:519
 #@ 6831d871: New content pack...
 content.menu.new_content_pack = New content pack...
-# videotools/src/gui/shell.cpp:505
+# videotools/src/gui/shell.cpp:503
 #@ 22215328: New HD pack
 content.menu.new_hd_pack = New HD pack
-# videotools/src/gui/shell.cpp:494
+# videotools/src/gui/shell.cpp:492
 #@ 0ef1e04b: Open game folder...
 content.menu.open_game = Open game folder...
-# videotools/src/gui/shell.cpp:501
+# videotools/src/gui/shell.cpp:499
 #@ 429f0ae6: Open HD pack...
 content.menu.open_hd_pack = Open HD pack...
-# videotools/src/gui/shell.cpp:532
+# videotools/src/gui/shell.cpp:530
 #@ c7b3d356: Quit
 content.menu.quit = Quit
-# videotools/src/gui/shell.cpp:497
+# videotools/src/gui/shell.cpp:495
 #@ acc5fed2: Reload game folder
 content.menu.reload_game = Reload game folder
-# videotools/src/gui/shell.cpp:592
+# videotools/src/gui/shell.cpp:590
 #@ 3686d606: Reset layout
 content.menu.reset_layout = Reset layout
-# videotools/src/gui/shell.cpp:546
+# videotools/src/gui/shell.cpp:544
 #@ fc5cc3c3: Revert every image edit
 content.menu.revert_images = Revert every image edit
-# videotools/src/gui/shell.cpp:548
+# videotools/src/gui/shell.cpp:546
 #@ 2de0f3a8: Drop all {n} image edits?
 content.menu.revert_images_ask = Drop all {n} image edits?
-# videotools/src/gui/shell.cpp:547
+# videotools/src/gui/shell.cpp:545
 #@ 2d9a19f1: Revert everything?
 content.menu.revert_images_title = Revert everything?
-# videotools/src/gui/shell.cpp:540
+# videotools/src/gui/shell.cpp:538
 #@ a9e2444f: Revert every pack change
 content.menu.revert_pack = Revert every pack change
-# videotools/src/gui/shell.cpp:542
+# videotools/src/gui/shell.cpp:540
 #@ 3eb78ec5: Drop all {n} changes in the content pack (back to the game's own values)?
 content.menu.revert_pack_ask = Drop all {n} changes in the content pack (back to the game's own values)?
-# videotools/src/gui/shell.cpp:541
+# videotools/src/gui/shell.cpp:539
 #@ c0efac82: Revert the pack?
 content.menu.revert_pack_title = Revert the pack?
-# videotools/src/gui/shell.cpp:514
+# videotools/src/gui/shell.cpp:512
 #@ 053b9a59: Save video.bag as...
 content.menu.save_bag_as = Save video.bag as...
-# videotools/src/gui/shell.cpp:524
+# videotools/src/gui/shell.cpp:522
 #@ c3c33b72: Save content pack
 content.menu.save_content_pack = Save content pack
-# videotools/src/gui/shell.cpp:517
+# videotools/src/gui/shell.cpp:515
 #@ 5a438103: Save pack as...
 content.menu.save_pack_as = Save pack as...
-# videotools/src/gui/shell.cpp:568
+# videotools/src/gui/shell.cpp:566
 #@ 4eaf7c92: Theme
 content.menu.theme = Theme
-# videotools/src/gui/shell.cpp:562
+# videotools/src/gui/shell.cpp:560
 #@ 5e4baa18: View
 content.menu.view = View
 # videotools/src/gui/mod_form.cpp:133
@@ -1787,7 +1787,7 @@ content.pack.type_name_taken = there's a type of that name already
 # videotools/src/gui/shell.cpp:68
 #@ 7ec50eea: Changes
 content.panel.changes = Changes
-# videotools/src/gui/shell.cpp:1195
+# videotools/src/gui/shell.cpp:1193
 #@ 4d1c416d: Changes ({n})
 content.panel.changes_count = Changes ({n})
 # videotools/src/gui/shell.cpp:62
@@ -1805,7 +1805,7 @@ content.panel.preview = Preview
 # videotools/src/gui/shell.cpp:69
 #@ f7f4eb9d: Problems
 content.panel.problems = Problems
-# videotools/src/gui/shell.cpp:1203
+# videotools/src/gui/shell.cpp:1201
 #@ 28521946: Problems ({n})
 content.panel.problems_count = Problems ({n})
 # videotools/src/gui/shell.cpp:63
@@ -1878,37 +1878,37 @@ content.preview.used_in_no_map = used in no map
 # videotools/src/gui/bottom_panels.cpp:63
 #@ 21918751: error
 content.problems.error = error
-# videotools/src/gui/shell.cpp:1099
+# videotools/src/gui/shell.cpp:1097
 #@ 1ba871b2: {field}: NoX Core doesn't read this key
 content.problems.key_unread = {field}: NoX Core doesn't read this key
-# videotools/src/gui/shell.cpp:1120
+# videotools/src/gui/shell.cpp:1118
 #@ 14688bbd: {field}: nothing in the game reads this name (only a game-mode mod could)
 content.problems.name_unread = {field}: nothing in the game reads this name (only a game-mode mod could)
-# videotools/src/gui/shell.cpp:1080
+# videotools/src/gui/shell.cpp:1078
 #@ a7729923: The pack adds {n} object types: a game hosted with it lets in only NoX Core games with the same pack (stock players can't join it), and a game with it joins only hosts with the same pack or none that adds types
 content.problems.new_types = The pack adds {n} object types: a game hosted with it lets in only NoX Core games with the same pack (stock players can't join it), and a game with it joins only hosts with the same pack or none that adds types
-# videotools/src/gui/shell.cpp:1058
+# videotools/src/gui/shell.cpp:1056
 #@ 9a416241: Can't open the game's video.bag: {error} (set the game folder at the top and press Open)
 content.problems.no_bag = Can't open the game's video.bag: {error} (set the game folder at the top and press Open)
-# videotools/src/gui/shell.cpp:1124
+# videotools/src/gui/shell.cpp:1122
 #@ fcdbcafc: {field}: {file} has no such key
 content.problems.no_such_key = {field}: {file} has no such key
-# videotools/src/gui/shell.cpp:1122
+# videotools/src/gui/shell.cpp:1120
 #@ ef93cace: {field}: {file} has no such key (the game stops reading the file there)
 content.problems.no_such_key_stops = {field}: {file} has no such key (the game stops reading the file there)
-# videotools/src/gui/shell.cpp:1094
+# videotools/src/gui/shell.cpp:1092
 #@ cbb5a425: thing.bin has no type {name} (a new one is added with New type like this...)
 content.problems.no_type = thing.bin has no type {name} (a new one is added with New type like this...)
 # videotools/src/gui/bottom_panels.cpp:57
 #@ 7c05eff4: No problems.
 content.problems.none = No problems.
-# videotools/src/gui/shell.cpp:1135
+# videotools/src/gui/shell.cpp:1133
 #@ 85afd744: The HD pack was made for another video.idx: NoX Core won't use it with this one until it's stamped for it (Save pack as...).
 content.problems.pack_other_idx = The HD pack was made for another video.idx: NoX Core won't use it with this one until it's stamped for it (Save pack as...).
-# videotools/src/gui/shell.cpp:1101
+# videotools/src/gui/shell.cpp:1099
 #@ ef632550: {field}: every player needs this pack: {docs}
 content.problems.structural = {field}: every player needs this pack: {docs}
-# videotools/src/gui/shell.cpp:1075
+# videotools/src/gui/shell.cpp:1073
 #@ d954b3c3: thing.patch: {problem} (NoX Core would leave the whole file out)
 content.problems.thing_patch = thing.patch: {problem} (NoX Core would leave the whole file out)
 # videotools/src/gui/bottom_panels.cpp:63
@@ -2296,10 +2296,10 @@ content.session.stamp_open = the open game folder's video.idx ({crc})
 # videotools/src/gui/session.cpp:532
 #@ ce6454bb: the video.bag saved last ({crc})
 content.session.stamp_saved = the video.bag saved last ({crc})
-# videotools/src/gui/shell.cpp:637
+# videotools/src/gui/shell.cpp:635
 #@ 8a22440f: Browse##game
 content.shell.browse_game = Browse##game
-# videotools/src/gui/shell.cpp:778
+# videotools/src/gui/shell.cpp:776
 #@ e0b439b7: Browse##out
 content.shell.browse_out = Browse##out
 # videotools/src/gui/shell.cpp:353
@@ -2308,85 +2308,85 @@ content.shell.cant_export = Can't export: {error}
 # videotools/src/gui/shell.cpp:337
 #@ 5b30f194: Can't save the content pack: {error}
 content.shell.cant_save_pack = Can't save the content pack: {error}
-# videotools/src/gui/shell.cpp:686
+# videotools/src/gui/shell.cpp:684
 #@ 2add69e4: Close##pack
 content.shell.close_pack = Close##pack
-# videotools/src/gui/shell.cpp:471
+# videotools/src/gui/shell.cpp:469
 #@ 12553b33: Opening a game folder drops the edits that aren't saved. Go on?
 content.shell.drop_edits = Opening a game folder drops the edits that aren't saved. Go on?
-# videotools/src/gui/shell.cpp:470
+# videotools/src/gui/shell.cpp:468
 #@ 896b9b6b: Drop the edits?
 content.shell.drop_edits_title = Drop the edits?
-# videotools/src/gui/shell.cpp:693
+# videotools/src/gui/shell.cpp:691
 #@ 67c72dda: The open pack has edits that aren't saved. Close it anyway?
 content.shell.drop_pack_close = The open pack has edits that aren't saved. Close it anyway?
-# videotools/src/gui/shell.cpp:677
+# videotools/src/gui/shell.cpp:675
 #@ 614d2a18: The open pack has edits that aren't saved. Start a new one anyway?
 content.shell.drop_pack_new = The open pack has edits that aren't saved. Start a new one anyway?
-# videotools/src/gui/shell.cpp:621
+# videotools/src/gui/shell.cpp:619
 #@ 4d1450fc: The open pack has edits that aren't saved. Open another anyway?
 content.shell.drop_pack_open = The open pack has edits that aren't saved. Open another anyway?
-# videotools/src/gui/shell.cpp:620, videotools/src/gui/shell.cpp:676, videotools/src/gui/shell.cpp:692
+# videotools/src/gui/shell.cpp:618, videotools/src/gui/shell.cpp:674, videotools/src/gui/shell.cpp:690
 #@ 6722be4c: Drop the pack's edits?
 content.shell.drop_pack_title = Drop the pack's edits?
-# videotools/src/gui/shell.cpp:805
+# videotools/src/gui/shell.cpp:803
 #@ e86349d3: Export
 content.shell.export = Export
-# videotools/src/gui/shell.cpp:801
+# videotools/src/gui/shell.cpp:799
 #@ 0e266c15: Export every category ({n} images, counting images used more than once) to
 content.shell.export_everything_ask = Export every category ({n} images, counting images used more than once) to
-# videotools/src/gui/shell.cpp:789
+# videotools/src/gui/shell.cpp:787
 #@ f14d503a: Export everything...
 content.shell.export_everything_button = Export everything...
-# videotools/src/gui/shell.cpp:804
+# videotools/src/gui/shell.cpp:802
 #@ a2c8cf14: This takes a few minutes and a few gigabytes.
 content.shell.export_everything_cost = This takes a few minutes and a few gigabytes.
-# videotools/src/gui/shell.cpp:790, videotools/src/gui/shell.cpp:795
+# videotools/src/gui/shell.cpp:788, videotools/src/gui/shell.cpp:793
 #@ 7a682fa4: Export everything
 content.shell.export_everything_title = Export everything
-# videotools/src/gui/shell.cpp:794
+# videotools/src/gui/shell.cpp:792
 #@ b3c3ccde: PNG frames + animation.json per animation, from video.bag as saved on disk
 content.shell.export_everything_what = PNG frames + animation.json per animation, from video.bag as saved on disk
-# videotools/src/gui/shell.cpp:773
+# videotools/src/gui/shell.cpp:771
 #@ e63cd9f8: Export to
 content.shell.export_to = Export to
 # videotools/src/gui/shell.cpp:351
 #@ 4234af7d: Exported {n} whole files to {folder}
 content.shell.exported = Exported {n} whole files to {folder}
-# videotools/src/gui/shell.cpp:631
+# videotools/src/gui/shell.cpp:629
 #@ 6548551d: Game folder
 content.shell.game_folder = Game folder
-# videotools/src/gui/shell.cpp:647
+# videotools/src/gui/shell.cpp:645
 #@ 55587836: HD pack
 content.shell.hd_pack = HD pack
-# videotools/src/gui/shell.cpp:651
+# videotools/src/gui/shell.cpp:649
 #@ ea16e302: new (not saved yet)
 content.shell.hd_pack_new = new (not saved yet)
-# videotools/src/gui/shell.cpp:650
+# videotools/src/gui/shell.cpp:648
 #@ ada7afdb: none
 content.shell.hd_pack_none = none
-# videotools/src/gui/shell.cpp:659
+# videotools/src/gui/shell.cpp:657
 #@ 87a4e11b: (made for another video.idx)
 content.shell.hd_pack_other_idx = (made for another video.idx)
-# videotools/src/gui/shell.cpp:660
+# videotools/src/gui/shell.cpp:658
 #@ 0793a693: NoX Core uses a pack only with the video.idx it was made for. Stamp it when you save it.
 content.shell.hd_pack_other_idx_tip = NoX Core uses a pack only with the video.idx it was made for. Stamp it when you save it.
-# videotools/src/gui/shell.cpp:670
+# videotools/src/gui/shell.cpp:668
 #@ e1c1d4ca: New##pack
 content.shell.new_pack = New##pack
-# videotools/src/gui/shell.cpp:395
+# videotools/src/gui/shell.cpp:393
 #@ 0f709f11: mods\\{id} is there already: its pack is opened (its changes join yours).
 content.shell.new_pack_exists = mods\\{id} is there already: its pack is opened (its changes join yours).
-# videotools/src/gui/shell.cpp:398
+# videotools/src/gui/shell.cpp:396
 #@ 486bedcf: Make
 content.shell.new_pack_make = Make
 # videotools/src/gui/shell.cpp:382
 #@ 6bb2c665: Its name (letters, digits, - and _):
 content.shell.new_pack_name = Its name (letters, digits, - and _):
-# videotools/src/gui/shell.cpp:398
+# videotools/src/gui/shell.cpp:396
 #@ 538b10e9: Open
 content.shell.new_pack_open = Open
-# videotools/src/gui/shell.cpp:682
+# videotools/src/gui/shell.cpp:680
 #@ 910d9d8b: An empty pack for this video.bag, to add HD images to
 content.shell.new_pack_tip = An empty pack for this video.bag, to add HD images to
 # videotools/src/gui/shell.cpp:375, videotools/src/gui/shell.cpp:379
@@ -2395,22 +2395,22 @@ content.shell.new_pack_title = New content pack
 # videotools/src/gui/shell.cpp:380
 #@ 63a0c5d8: A content pack is a folder in the mods folder:
 content.shell.new_pack_where = A content pack is a folder in the mods folder:
-# videotools/src/gui/shell.cpp:1167
+# videotools/src/gui/shell.cpp:1165
 #@ df590c31: No video.bag is open.
 content.shell.no_bag_open = No video.bag is open.
-# videotools/src/gui/shell.cpp:732
+# videotools/src/gui/shell.cpp:730
 #@ 0798352b: no changes
 content.shell.no_changes = no changes
-# videotools/src/gui/shell.cpp:760
+# videotools/src/gui/shell.cpp:758
 #@ 713a842f: Open folder
 content.shell.open_folder = Open folder
-# videotools/src/gui/shell.cpp:641
+# videotools/src/gui/shell.cpp:639
 #@ 59fe8a4d: Open##game
 content.shell.open_game = Open##game
-# videotools/src/gui/shell.cpp:782
+# videotools/src/gui/shell.cpp:780
 #@ a1de4259: Open##out
 content.shell.open_out = Open##out
-# videotools/src/gui/shell.cpp:664
+# videotools/src/gui/shell.cpp:662
 #@ a7a566d6: Open...##pack
 content.shell.open_pack = Open...##pack
 # videotools/src/gui/shell.cpp:235
@@ -2419,16 +2419,16 @@ content.shell.opened = Opened {folder}: {n} records
 # videotools/src/gui/shell.cpp:236
 #@ 0c9d25ee: , {n} files missing or broken (see Problems)
 content.shell.opened_failed = , {n} files missing or broken (see Problems)
-# videotools/src/gui/shell.cpp:438
+# videotools/src/gui/shell.cpp:436
 #@ ca32d500: Pack
 content.shell.pack_label = Pack
-# videotools/src/gui/shell.cpp:453
+# videotools/src/gui/shell.cpp:451
 #@ 1324771c: New pack...
 content.shell.pack_new_item = New pack...
-# videotools/src/gui/shell.cpp:441
+# videotools/src/gui/shell.cpp:439
 #@ 90458a20: (none)
 content.shell.pack_none = (none)
-# videotools/src/gui/shell.cpp:443
+# videotools/src/gui/shell.cpp:441
 #@ 88f29542: (none: no pack open)
 content.shell.pack_none_item = (none: no pack open)
 # videotools/src/gui/shell.cpp:320
@@ -2440,7 +2440,7 @@ content.shell.pack_problem = content pack {id}: {problem}
 # videotools/src/gui/shell.cpp:333
 #@ e60b9135: Saved content pack {id}: {n} changes in {folder}
 content.shell.pack_saved = Saved content pack {id}: {n} changes in {folder}
-# videotools/src/gui/shell.cpp:458
+# videotools/src/gui/shell.cpp:456
 #@ 5274d89a: The content pack being edited: mods\\<name>\\content\\ (patch files of the changes; installed by hand, never downloaded)
 content.shell.pack_tip = The content pack being edited: mods\\<name>\\content\\ (patch files of the changes; installed by hand, never downloaded)
 # videotools/src/gui/shell.cpp:295
@@ -2452,25 +2452,25 @@ content.shell.quit_pack = The content pack's changes aren't saved. Quit anyway?
 # videotools/src/gui/shell.cpp:293
 #@ 06965d71: Quit without saving?
 content.shell.quit_title = Quit without saving?
-# videotools/src/gui/shell.cpp:725
+# videotools/src/gui/shell.cpp:723
 #@ 3ad99b86: Reach:
 content.shell.reach = Reach:
-# videotools/src/gui/shell.cpp:703
+# videotools/src/gui/shell.cpp:701
 #@ 053b9a59: Save video.bag as...
 content.shell.save_bag_as = Save video.bag as...
-# videotools/src/gui/shell.cpp:708
+# videotools/src/gui/shell.cpp:706
 #@ 5afdc22a: Writes a new video.bag and video.idx (never the game's own)
 content.shell.save_bag_tip = Writes a new video.bag and video.idx (never the game's own)
-# videotools/src/gui/shell.cpp:712
+# videotools/src/gui/shell.cpp:710
 #@ 5a438103: Save pack as...
 content.shell.save_hd_pack_as = Save pack as...
-# videotools/src/gui/shell.cpp:717
+# videotools/src/gui/shell.cpp:715
 #@ 3955a59c: Writes a new .nxp (never over the open one)
 content.shell.save_hd_pack_tip = Writes a new .nxp (never over the open one)
-# videotools/src/gui/shell.cpp:461
+# videotools/src/gui/shell.cpp:459
 #@ 712617f9: Save pack
 content.shell.save_pack = Save pack
-# videotools/src/gui/shell.cpp:461
+# videotools/src/gui/shell.cpp:459
 #@ 0baf54a3: Save pack *
 content.shell.save_pack_dirty = Save pack *
 # videotools/src/gui/catalog_view.cpp:622, videotools/src/gui/catalog_view.cpp:648
@@ -8644,236 +8644,236 @@ editor.script.allow_noxcore_help = Turns on Editor Settings > "Allow NoX Core-on
 # noxsdl/src/editor/script_panel.cpp:734
 #@ 6524b655: Another editor
 editor.script.another_editor = Another editor
-# noxcore/src/script/arg_values.cpp:232
+# noxcore/src/script/arg_values.cpp:231
 #@ 3f24bb8b: class bit {bit}
 editor.script.args.class_bit = class bit {bit}
-# noxcore/src/script/arg_values.cpp:229
+# noxcore/src/script/arg_values.cpp:228
 #@ 97e262b1: class bit {bit}, {n} thing type | class bit {bit}, {n} thing types
 editor.script.args.class_bit_types[one] = class bit {bit}, {n} thing type
 editor.script.args.class_bit_types[other] = class bit {bit}, {n} thing types
-# noxcore/src/script/arg_values.cpp:624
+# noxcore/src/script/arg_values.cpp:623
 #@ 3fbe0160: ; did you mean {list}?
 editor.script.args.did_you_mean = ; did you mean {list}?
-# noxcore/src/script/arg_values.cpp:129
+# noxcore/src/script/arg_values.cpp:128
 #@ 195b242e: burst at (x1, y1); x2 its size
 editor.script.args.effect_burst = burst at (x1, y1); x2 its size
-# noxcore/src/script/arg_values.cpp:154
+# noxcore/src/script/arg_values.cpp:153
 #@ 8d940cc3: the original sends it from leftover coordinates (OB-055); NoX Core sends nothing
 editor.script.args.effect_leftover = the original sends it from leftover coordinates (OB-055); NoX Core sends nothing
-# noxcore/src/script/arg_values.cpp:155
+# noxcore/src/script/arg_values.cpp:154
 #@ becb22b6: it is in the game's list of effects, but Effect doesn't send it
 editor.script.args.effect_not_sent = it is in the game's list of effects, but Effect doesn't send it
-# noxcore/src/script/arg_values.cpp:127
+# noxcore/src/script/arg_values.cpp:126
 #@ 2291764a: point at (x1, y1)
 editor.script.args.effect_point = point at (x1, y1)
-# noxcore/src/script/arg_values.cpp:130
+# noxcore/src/script/arg_values.cpp:129
 #@ 7acc7f23: screen shake round (x1, y1); x2 its strength
 editor.script.args.effect_quake = screen shake round (x1, y1); x2 its strength
-# noxcore/src/script/arg_values.cpp:128
+# noxcore/src/script/arg_values.cpp:127
 #@ 574000ec: ray from (x1, y1) to (x2, y2)
 editor.script.args.effect_ray = ray from (x1, y1) to (x2, y2)
-# noxcore/src/script/arg_values.cpp:611
+# noxcore/src/script/arg_values.cpp:610
 #@ 74bab18a: an empty {kind} name matches nothing
 editor.script.args.empty_name = an empty {kind} name matches nothing
-# noxcore/src/script/arg_values.cpp:201
+# noxcore/src/script/arg_values.cpp:200
 #@ 085856c1: an empty slot
 editor.script.args.empty_slot = an empty slot
-# noxcore/src/script/arg_values.cpp:295
+# noxcore/src/script/arg_values.cpp:294
 #@ ce1f3786: (empty text)
 editor.script.args.empty_text = (empty text)
-# noxcore/src/script/arg_values.cpp:213
+# noxcore/src/script/arg_values.cpp:212
 #@ b3e87ba1: from {spell}
 editor.script.args.enchant_from = from {spell}
-# noxcore/src/script/arg_values.cpp:215
+# noxcore/src/script/arg_values.cpp:214
 #@ e8e4eaaf: no spell gives it
 editor.script.args.enchant_no_spell = no spell gives it
-# noxcore/src/script/arg_values.cpp:622
+# noxcore/src/script/arg_values.cpp:621
 #@ 974282b2: \sor\s
 editor.script.args.list_or = \sor\s
-# noxcore/src/script/arg_values.cpp:318
+# noxcore/src/script/arg_values.cpp:317
 #@ 3018b0da: portrait
 editor.script.args.portrait = portrait
-# noxcore/src/script/arg_values.cpp:318
+# noxcore/src/script/arg_values.cpp:317
 #@ 7d59edff: animated portrait
 editor.script.args.portrait_animated = animated portrait
-# noxcore/src/script/arg_values.cpp:338
+# noxcore/src/script/arg_values.cpp:337
 #@ 8736f9a3: no class is named {name} (case counts): HasClass then returns nothing at all (an original bug)
 editor.script.args.problem_class = no class is named {name} (case counts): HasClass then returns nothing at all (an original bug)
-# noxcore/src/script/arg_values.cpp:340
+# noxcore/src/script/arg_values.cpp:339
 #@ 81ba69a3: no dialog type is named {name} (case counts): it counts as NORMAL
 editor.script.args.problem_dialog = no dialog type is named {name} (case counts): it counts as NORMAL
-# noxcore/src/script/arg_values.cpp:332
+# noxcore/src/script/arg_values.cpp:331
 #@ 7f2b2dc8: no effect is named {name}, so nothing shows
 editor.script.args.problem_effect = no effect is named {name}, so nothing shows
-# noxcore/src/script/arg_values.cpp:330
+# noxcore/src/script/arg_values.cpp:329
 #@ 823a2237: Effect doesn't send {name}, so nothing shows ({why})
 editor.script.args.problem_effect_inert = Effect doesn't send {name}, so nothing shows ({why})
-# noxcore/src/script/arg_values.cpp:337
+# noxcore/src/script/arg_values.cpp:336
 #@ e1cadaec: no enchantment is named {name} (case counts), so nothing happens
 editor.script.args.problem_enchant = no enchantment is named {name} (case counts), so nothing happens
-# noxcore/src/script/arg_values.cpp:342
+# noxcore/src/script/arg_values.cpp:341
 #@ 228920a6: the string table (nox.csf) has no journal text Journal:{name}: the entry shows as missing text
 editor.script.args.problem_journal = the string table (nox.csf) has no journal text Journal:{name}: the entry shows as missing text
-# noxcore/src/script/arg_values.cpp:344
+# noxcore/src/script/arg_values.cpp:343
 #@ 04cde3cd: no object on the map is named {name}
 editor.script.args.problem_object = no object on the map is named {name}
-# noxcore/src/script/arg_values.cpp:346
+# noxcore/src/script/arg_values.cpp:345
 #@ 851f4d9c: no object group on the map is named {name}
 editor.script.args.problem_object_group = no object group on the map is named {name}
-# noxcore/src/script/arg_values.cpp:343
+# noxcore/src/script/arg_values.cpp:342
 #@ ab22195d: no portrait image is named {name} (case counts): the dialog shows no picture
 editor.script.args.problem_portrait = no portrait image is named {name} (case counts): the dialog shows no picture
-# noxcore/src/script/arg_values.cpp:333
+# noxcore/src/script/arg_values.cpp:332
 #@ 4007dbf7: no sound is named {name}, so nothing plays
 editor.script.args.problem_sound = no sound is named {name}, so nothing plays
-# noxcore/src/script/arg_values.cpp:335
+# noxcore/src/script/arg_values.cpp:334
 #@ e00fdf47: no spell is named {name} (case counts), so nothing happens
 editor.script.args.problem_spell = no spell is named {name} (case counts), so nothing happens
-# noxcore/src/script/arg_values.cpp:339
+# noxcore/src/script/arg_values.cpp:338
 #@ 2ce48c6d: no subclass is named {name} (case counts): HasSubclass then returns nothing at all (an original bug)
 editor.script.args.problem_subclass = no subclass is named {name} (case counts): HasSubclass then returns nothing at all (an original bug)
-# noxcore/src/script/arg_values.cpp:341
+# noxcore/src/script/arg_values.cpp:340
 #@ a9e8ace7: the string table (nox.csf) has no text named {name}: the game shows MISSING:'{name}' instead
 editor.script.args.problem_text = the string table (nox.csf) has no text named {name}: the game shows MISSING:'{name}' instead
-# noxcore/src/script/arg_values.cpp:334
+# noxcore/src/script/arg_values.cpp:333
 #@ a3ed9261: no thing type is named {name} (case counts), so nothing is made
 editor.script.args.problem_thing = no thing type is named {name} (case counts), so nothing is made
-# noxcore/src/script/arg_values.cpp:336
+# noxcore/src/script/arg_values.cpp:335
 #@ 826ec4e5: no spell is named {name} (case counts): the slot stays empty
 editor.script.args.problem_trap_spell = no spell is named {name} (case counts): the slot stays empty
-# noxcore/src/script/arg_values.cpp:350
+# noxcore/src/script/arg_values.cpp:349
 #@ e9f968bb: not a known value
 editor.script.args.problem_unknown = not a known value
-# noxcore/src/script/arg_values.cpp:348
+# noxcore/src/script/arg_values.cpp:347
 #@ 4137842d: no wall group on the map is named {name}
 editor.script.args.problem_wall_group = no wall group on the map is named {name}
-# noxcore/src/script/arg_values.cpp:345
+# noxcore/src/script/arg_values.cpp:344
 #@ f1512d11: no waypoint on the map is named {name}
 editor.script.args.problem_waypoint = no waypoint on the map is named {name}
-# noxcore/src/script/arg_values.cpp:347
+# noxcore/src/script/arg_values.cpp:346
 #@ 76350348: no waypoint group on the map is named {name}
 editor.script.args.problem_waypoint_group = no waypoint group on the map is named {name}
-# noxcore/src/script/arg_values.cpp:376
+# noxcore/src/script/arg_values.cpp:375
 #@ ab3e0bff: class
 editor.script.args.set_name.class = class
-# noxcore/src/script/arg_values.cpp:378
+# noxcore/src/script/arg_values.cpp:377
 #@ 35a7dbc3: dialog type
 editor.script.args.set_name.dialog_type = dialog type
-# noxcore/src/script/arg_values.cpp:370
+# noxcore/src/script/arg_values.cpp:369
 #@ 6e6e8d54: effect
 editor.script.args.set_name.effect = effect
-# noxcore/src/script/arg_values.cpp:375
+# noxcore/src/script/arg_values.cpp:374
 #@ 495e05e2: enchantment
 editor.script.args.set_name.enchant = enchantment
-# noxcore/src/script/arg_values.cpp:380
+# noxcore/src/script/arg_values.cpp:379
 #@ 5d48b60c: journal entry
 editor.script.args.set_name.journal_entry = journal entry
-# noxcore/src/script/arg_values.cpp:382
+# noxcore/src/script/arg_values.cpp:381
 #@ b8c60cba: object
 editor.script.args.set_name.object = object
-# noxcore/src/script/arg_values.cpp:384
+# noxcore/src/script/arg_values.cpp:383
 #@ 5ad3ea61: object group
 editor.script.args.set_name.object_group = object group
-# noxcore/src/script/arg_values.cpp:381
+# noxcore/src/script/arg_values.cpp:380
 #@ 3018b0da: portrait
 editor.script.args.set_name.portrait = portrait
-# noxcore/src/script/arg_values.cpp:371
+# noxcore/src/script/arg_values.cpp:370
 #@ 0e0d9594: sound
 editor.script.args.set_name.sound = sound
-# noxcore/src/script/arg_values.cpp:373
+# noxcore/src/script/arg_values.cpp:372
 #@ a96fc6c9: spell
 editor.script.args.set_name.spell = spell
-# noxcore/src/script/arg_values.cpp:377
+# noxcore/src/script/arg_values.cpp:376
 #@ 1afa3e2f: subclass
 editor.script.args.set_name.subclass = subclass
-# noxcore/src/script/arg_values.cpp:379
+# noxcore/src/script/arg_values.cpp:378
 #@ c95c9071: text key
 editor.script.args.set_name.text_key = text key
-# noxcore/src/script/arg_values.cpp:372
+# noxcore/src/script/arg_values.cpp:371
 #@ c31c1555: thing type
 editor.script.args.set_name.thing_type = thing type
-# noxcore/src/script/arg_values.cpp:374
+# noxcore/src/script/arg_values.cpp:373
 #@ a96fc6c9: spell
 editor.script.args.set_name.trap_spell = spell
-# noxcore/src/script/arg_values.cpp:388
+# noxcore/src/script/arg_values.cpp:387
 #@ 425ed3ca: value
 editor.script.args.set_name.value = value
-# noxcore/src/script/arg_values.cpp:386
+# noxcore/src/script/arg_values.cpp:385
 #@ 0d27d056: wall group
 editor.script.args.set_name.wall_group = wall group
-# noxcore/src/script/arg_values.cpp:383
+# noxcore/src/script/arg_values.cpp:382
 #@ b36abf7a: waypoint
 editor.script.args.set_name.waypoint = waypoint
-# noxcore/src/script/arg_values.cpp:385
+# noxcore/src/script/arg_values.cpp:384
 #@ b02b4fa1: waypoint group
 editor.script.args.set_name.waypoint_group = waypoint group
-# noxcore/src/script/arg_values.cpp:400
+# noxcore/src/script/arg_values.cpp:399
 #@ 48257984: Class names (HasClass's table)
 editor.script.args.set_title.class = Class names (HasClass's table)
-# noxcore/src/script/arg_values.cpp:402
+# noxcore/src/script/arg_values.cpp:401
 #@ 2c1bc0b0: Dialog types
 editor.script.args.set_title.dialog_type = Dialog types
-# noxcore/src/script/arg_values.cpp:394
+# noxcore/src/script/arg_values.cpp:393
 #@ 21161065: Effect names (the ones Effect sends)
 editor.script.args.set_title.effect = Effect names (the ones Effect sends)
-# noxcore/src/script/arg_values.cpp:399
+# noxcore/src/script/arg_values.cpp:398
 #@ 4656dfa2: Enchantment names
 editor.script.args.set_title.enchant = Enchantment names
-# noxcore/src/script/arg_values.cpp:404
+# noxcore/src/script/arg_values.cpp:403
 #@ a2ff82d3: Journal entries (nox.csf's Journal: texts)
 editor.script.args.set_title.journal_entry = Journal entries (nox.csf's Journal: texts)
-# noxcore/src/script/arg_values.cpp:406
+# noxcore/src/script/arg_values.cpp:405
 #@ afcf00cc: Objects on this map (their script names)
 editor.script.args.set_title.object = Objects on this map (their script names)
-# noxcore/src/script/arg_values.cpp:408
+# noxcore/src/script/arg_values.cpp:407
 #@ 2f89808f: Object groups on this map
 editor.script.args.set_title.object_group = Object groups on this map
-# noxcore/src/script/arg_values.cpp:405
+# noxcore/src/script/arg_values.cpp:404
 #@ b72ab59c: Portraits (thing.bin's named images)
 editor.script.args.set_title.portrait = Portraits (thing.bin's named images)
-# noxcore/src/script/arg_values.cpp:395
+# noxcore/src/script/arg_values.cpp:394
 #@ 708a6d81: Sound names (the game's sound table)
 editor.script.args.set_title.sound = Sound names (the game's sound table)
-# noxcore/src/script/arg_values.cpp:397
+# noxcore/src/script/arg_values.cpp:396
 #@ 1cce7cd9: Spell names
 editor.script.args.set_title.spell = Spell names
-# noxcore/src/script/arg_values.cpp:401
+# noxcore/src/script/arg_values.cpp:400
 #@ c49e82d1: Subclass names (HasSubclass's tables)
 editor.script.args.set_title.subclass = Subclass names (HasSubclass's tables)
-# noxcore/src/script/arg_values.cpp:403
+# noxcore/src/script/arg_values.cpp:402
 #@ 2d621e8c: Text keys (the string table, nox.csf)
 editor.script.args.set_title.text_key = Text keys (the string table, nox.csf)
-# noxcore/src/script/arg_values.cpp:396
+# noxcore/src/script/arg_values.cpp:395
 #@ bd9d4754: Thing types (thing.bin)
 editor.script.args.set_title.thing_type = Thing types (thing.bin)
-# noxcore/src/script/arg_values.cpp:398
+# noxcore/src/script/arg_values.cpp:397
 #@ f5afbe28: Spell names, or NULL for an empty slot
 editor.script.args.set_title.trap_spell = Spell names, or NULL for an empty slot
-# noxcore/src/script/arg_values.cpp:412
+# noxcore/src/script/arg_values.cpp:411
 #@ 8d4d225b: Values
 editor.script.args.set_title.values = Values
-# noxcore/src/script/arg_values.cpp:410
+# noxcore/src/script/arg_values.cpp:409
 #@ 639576fa: Wall groups on this map
 editor.script.args.set_title.wall_group = Wall groups on this map
-# noxcore/src/script/arg_values.cpp:407
+# noxcore/src/script/arg_values.cpp:406
 #@ e20ddce6: Waypoints on this map
 editor.script.args.set_title.waypoint = Waypoints on this map
-# noxcore/src/script/arg_values.cpp:409
+# noxcore/src/script/arg_values.cpp:408
 #@ 69f0f64f: Waypoint groups on this map
 editor.script.args.set_title.waypoint_group = Waypoint groups on this map
-# noxcore/src/script/arg_values.cpp:183
+# noxcore/src/script/arg_values.cpp:182
 #@ 85f58447: sound {id}
 editor.script.args.sound = sound {id}
-# noxcore/src/script/arg_values.cpp:181
+# noxcore/src/script/arg_values.cpp:180
 #@ fa5c0654: sound {id}, heard to {range} units
 editor.script.args.sound_range = sound {id}, heard to {range} units
-# noxcore/src/script/arg_values.cpp:180
+# noxcore/src/script/arg_values.cpp:179
 #@ 6efea0c0: sound {id}, no sound files: plays nothing
 editor.script.args.sound_silent = sound {id}, no sound files: plays nothing
-# noxcore/src/script/arg_values.cpp:246
+# noxcore/src/script/arg_values.cpp:245
 #@ 9911aea1: {what} subclass, bit {bit}
 editor.script.args.subclass_bit = {what} subclass, bit {bit}
-# noxcore/src/script/arg_values.cpp:297
+# noxcore/src/script/arg_values.cpp:296
 #@ 63dcef9c: ({n} variants)
 editor.script.args.variants = ({n} variants)
 # noxsdl/src/editor/script_panel.cpp:1619
@@ -12436,112 +12436,112 @@ lobby.xwis.servserv_failed = XWIS: servserv failed ({why}), using {name}
 #@ 23ce7883: XWIS: {name} skipped (the address just asked)
 lobby.xwis.skipped = XWIS: {name} skipped (the address just asked)
 
-# noxsdl/src/browser_screen.cpp:108
+# noxsdl/src/browser_screen.cpp:109
 #@ 44e3b331: Cannot read saved servers: {error}
 menus.browser.cannot_read_saved = Cannot read saved servers: {error}
-# noxsdl/src/browser_screen.cpp:529
+# noxsdl/src/browser_screen.cpp:526
 #@ 48cedef4: \s(closed)
 menus.browser.closed_mark = \s(closed)
-# noxsdl/src/browser_screen.cpp:459
+# noxsdl/src/browser_screen.cpp:460
 #@ 18743595: From
 menus.browser.col_from = From
-# noxsdl/src/browser_screen.cpp:457
+# noxsdl/src/browser_screen.cpp:458
 #@ 44a7f051: Map
 menus.browser.col_map = Map
-# noxsdl/src/browser_screen.cpp:458
+# noxsdl/src/browser_screen.cpp:459
 #@ 534e7732: Mode
 menus.browser.col_mode = Mode
-# noxsdl/src/browser_screen.cpp:457
+# noxsdl/src/browser_screen.cpp:458
 #@ 0fe07306: Name
 menus.browser.col_name = Name
-# noxsdl/src/browser_screen.cpp:459
+# noxsdl/src/browser_screen.cpp:460
 #@ 7fb7f0a9: Ping
 menus.browser.col_ping = Ping
-# noxsdl/src/browser_screen.cpp:458
+# noxsdl/src/browser_screen.cpp:459
 #@ 18dd36a9: Players
 menus.browser.col_players = Players
-# noxsdl/src/mode_column.hpp:45
+# noxsdl/src/mode_column.hpp:47
 #@ 0cfb5881: list
 menus.browser.from_list = list
-# noxsdl/src/mode_column.hpp:45
+# noxsdl/src/mode_column.hpp:47
 #@ 8a6979e4: Saved
 menus.browser.from_saved = Saved
-# noxsdl/src/browser_screen.cpp:395
+# noxsdl/src/browser_screen.cpp:396
 #@ 6cfd3ac3: \s    Enter / double-click: join     R: refresh     Esc: quit
 menus.browser.keys_hint = \s    Enter / double-click: join     R: refresh     Esc: quit
-# noxsdl/src/browser_screen.cpp:281
+# noxsdl/src/browser_screen.cpp:282
 #@ 31e9ae78: \sand\s
 menus.browser.list_and = \sand\s
-# noxsdl/src/browser_screen.cpp:281
+# noxsdl/src/browser_screen.cpp:282
 #@ 89d000f1: ,\s
 menus.browser.list_comma = ,\s
-# noxsdl/src/mode_column.hpp:72
+# noxsdl/src/mode_column.hpp:74
 #@ 65bba5e8: arena
 menus.browser.mode.arena = arena
-# noxsdl/src/mode_column.hpp:71
+# noxsdl/src/mode_column.hpp:73
 #@ a24bf9ab: chat
 menus.browser.mode.chat = chat
-# noxsdl/src/mode_column.hpp:75
+# noxsdl/src/mode_column.hpp:77
 #@ e43e17d8: coop
 menus.browser.mode.coop = coop
-# noxsdl/src/mode_column.hpp:69
+# noxsdl/src/mode_column.hpp:71
 #@ 0654085c: ctf
 menus.browser.mode.ctf = ctf
-# noxsdl/src/mode_column.hpp:76
+# noxsdl/src/mode_column.hpp:78
 #@ 2057306e: custom
 menus.browser.mode.custom = custom
-# noxsdl/src/mode_column.hpp:73
+# noxsdl/src/mode_column.hpp:75
 #@ 8ef9edfa: elimination
 menus.browser.mode.elimination = elimination
-# noxsdl/src/mode_column.hpp:70
+# noxsdl/src/mode_column.hpp:72
 #@ 2ab0775a: flagball
 menus.browser.mode.flagball = flagball
-# noxsdl/src/mode_column.hpp:68
+# noxsdl/src/mode_column.hpp:70
 #@ a016ccf9: kotr
 menus.browser.mode.kotr = kotr
-# noxsdl/src/mode_column.hpp:74
+# noxsdl/src/mode_column.hpp:76
 #@ 09d0cf3d: quest
 menus.browser.mode.quest = quest
-# noxsdl/src/browser_screen.cpp:532
+# noxsdl/src/browser_screen.cpp:529
 #@ 6a175148: \s(NoX Core only)
 menus.browser.noxcore_only_mark = \s(NoX Core only)
-# noxsdl/src/browser_screen.cpp:568
+# noxsdl/src/browser_screen.cpp:565
 #@ f79070b7: {ms} ms
 menus.browser.ping_ms = {ms} ms
-# noxsdl/src/browser_screen.cpp:270
+# noxsdl/src/browser_screen.cpp:271
 #@ 97b53adf: the LAN
 menus.browser.place_lan = the LAN
-# noxsdl/src/browser_screen.cpp:273
+# noxsdl/src/browser_screen.cpp:274
 #@ 1ffe0e03: your server list
 menus.browser.place_server_list = your server list
-# noxsdl/src/browser_screen.cpp:257
+# noxsdl/src/browser_screen.cpp:258
 #@ aed8abfe: {status}. Refresh to try again.
 menus.browser.refresh_to_retry = {status}. Refresh to try again.
-# noxsdl/src/browser_screen.cpp:276
+# noxsdl/src/browser_screen.cpp:277
 #@ a889b573: Searching...
 menus.browser.searching = Searching...
-# noxsdl/src/browser_screen.cpp:285
+# noxsdl/src/browser_screen.cpp:286
 #@ 769c6d31: Searching {places}...
 menus.browser.searching_places = Searching {places}...
-# noxsdl/src/browser_screen.cpp:74
+# noxsdl/src/browser_screen.cpp:75
 #@ 7d86feae: {n} server(s)
 menus.browser.server_count = {n} server(s)
-# noxsdl/src/browser_screen.cpp:150
+# noxsdl/src/browser_screen.cpp:151
 #@ e626f2f5: Checking...
 menus.browser.status_checking = Checking...
-# noxsdl/src/browser_screen.cpp:150
+# noxsdl/src/browser_screen.cpp:151
 #@ 8c2c37b1: No response
 menus.browser.status_no_response = No response
-# noxsdl/src/browser_screen.cpp:149
+# noxsdl/src/browser_screen.cpp:150
 #@ 24d54f56: Address not found
 menus.browser.status_not_found = Address not found
-# noxsdl/src/browser_screen.cpp:148
+# noxsdl/src/browser_screen.cpp:149
 #@ bc3b88aa: Online
 menus.browser.status_online = Online
-# noxsdl/src/browser_screen.cpp:393
+# noxsdl/src/browser_screen.cpp:394
 #@ 75792b09: Nox games
 menus.browser.title = Nox games
-# noxsdl/src/browser_screen.cpp:534
+# noxsdl/src/browser_screen.cpp:531
 #@ 644d5488: \s(Update needed)
 menus.browser.update_needed_mark = \s(Update needed)
 # noxsdl/src/character_labels.hpp:35

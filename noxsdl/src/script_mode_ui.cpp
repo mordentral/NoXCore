@@ -41,6 +41,7 @@
 #include "spellbook.hpp"
 #include "sprite_cache.hpp"
 #include "summon_window.hpp"
+#include "text_fit.hpp"
 #include "thing_art.hpp"
 #include "trade_screens.hpp"
 
@@ -935,12 +936,7 @@ private:
     std::string fitted(std::string s, float width, int px) const
     {
         while (s.size() > 1 && app_.font->measure(s, px) > width) {
-            while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) {
-                s.pop_back(); // (a letter's trailing bytes, then its lead)
-            }
-            if (!s.empty()) {
-                s.pop_back();
-            }
+            popLetter(s);
         }
         return s;
     }

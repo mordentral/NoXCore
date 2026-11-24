@@ -13,6 +13,7 @@
 #include "noxcore/strings/string_table.hpp"
 #include "noxcore/things/spell_ids.hpp"
 #include "noxcore/things/thing_db.hpp"
+#include "noxcore/util/text.hpp"
 
 #include <algorithm>
 #include <map>
@@ -45,9 +46,7 @@ std::string firstLine(std::string_view text, std::size_t most = 90)
     while (!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r')) line.remove_suffix(1);
     std::string out(line);
     if (out.size() > most) {
-        std::size_t cut = most;
-        while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) --cut;
-        out = out.substr(0, cut) + "...";
+        out = out.substr(0, util::utf8CutLength(out, most)) + "...";
     } else if (nl != std::string_view::npos) {
         out += " ...";
     }

@@ -1,5 +1,6 @@
 // The game's console (console.hpp): its lines, typing, history, and the command table's parse.
 #include "console.hpp"
+#include "text_fit.hpp"
 
 #include "noxcore/gui/window_file.hpp"
 #include "noxcore/util/text.hpp"
@@ -255,14 +256,7 @@ bool Console::handleEvent(SDL_Window* window, const SDL_Event& event)
             return true;
         }
         case SDLK_BACKSPACE:
-            // A whole UTF-8 character off the end.
-            while (!input_.empty()) {
-                const auto c = static_cast<unsigned char>(input_.back());
-                input_.pop_back();
-                if ((c & 0xC0) != 0x80) {  // stop once a lead byte (not a 10xxxxxx continuation byte) is gone
-                    break;
-                }
-            }
+            popLetter(input_); // (a whole UTF-8 character off the end)
             return true;
         // Up/Down walk the history; past the newest entry the line is emptied again.
         case SDLK_UP:
