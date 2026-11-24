@@ -1656,8 +1656,10 @@ The engine's logic is the exe's; these are where the output differs.
   - The host's own client finds such a map's file as the host does (GameHost::hostMapLookup: the
     mode's maps, then those the console took from other mods, a copy shared under its own lock as
     the client reads it on its own thread), so it never downloads it from its own game; a mod
-    that ships no .nxz is played by the host as well (its guests can't download it in a network
-    game, as a mode's own map without one).
+    that ships no .nxz is played by the host as well, and since 2026-11-24 its guests download it
+    in a network game too: a mode's own map or a console-pinned one without a .nxz is sent built
+    from its .map (GameHost::mapSendLoadMap; a maps-folder map without one is still CompressFail,
+    as GAME.EXE).
   - For testing specific maps (the owner's request of 2026-11-22; the host's own client by the
     owner's decision of 2026-11-22).
 - **Revert:** host_console.cpp's `load` without consoleMapOf and Options::consoleLoad (CoopDirector
