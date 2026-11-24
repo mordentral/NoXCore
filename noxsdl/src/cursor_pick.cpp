@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <string>
@@ -33,6 +34,32 @@ constexpr float kSideScale = 0.70710677f;
 Extent readExtent(std::string_view line)
 {
     Extent e;
+    // The hover's: the game's client reader takes a line that starts with CIRCLE or BOX as that
+    // shape ("CIRCLES 9" a circle too), then its decimals after the first word ("%*s %f %f": the
+    // word ends at any white space), each as strtof reads it, 0 from the first that doesn't read.
+    e.hoverKind = line.starts_with("CIRCLE") ? Extent::Kind::Circle : line.starts_with("BOX") ? Extent::Kind::Box : Extent::Kind::None;
+    if (e.hoverKind != Extent::Kind::None) {
+        const auto white = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
+        std::size_t at = 0;
+        while (at < line.size() && white(line[at])) {
+            ++at;
+        }
+        while (at < line.size() && !white(line[at])) {
+            ++at;
+        }
+        const std::string s(line.substr(at));
+        const char* p = s.c_str();
+        for (float& v : e.size) {
+            char* end = nullptr;
+            v = std::strtof(p, &end);
+            if (end == p) {
+                v = 0;
+                break;
+            }
+            p = end;
+        }
+    }
+    // The drawing's: the word before the first space, CIRCLE or BOX whole.
     const std::size_t space = line.find(' ');
     const std::string_view word = line.substr(0, space);
     e.kind = word == "CIRCLE" ? Extent::Kind::Circle : word == "BOX" ? Extent::Kind::Box : Extent::Kind::None;
@@ -41,19 +68,7 @@ Extent readExtent(std::string_view line)
     }
     e.spaced = space != std::string_view::npos;
     if (!e.spaced) {
-        return e; // (no numbers: none read either way)
-    }
-    // The decimals: from the space on, as strtof reads each (whatever white space before it).
-    const std::string s(line.substr(space));
-    const char* p = s.c_str();
-    for (float& v : e.size) {
-        char* end = nullptr;
-        v = std::strtof(p, &end);
-        if (end == p) {
-            v = 0;
-            break;
-        }
-        p = end;
+        return e; // (no numbers)
     }
     // The whole numbers: after the space, each spaces or tabs then an integer (from_chars: no
     // sign but '-', no fraction), stopping at the first that isn't.
@@ -92,9 +107,9 @@ Shape shapeOf(const nox::things::ThingDef& def)
 Shape shapeOf(const nox::things::ThingDef& def, const std::optional<Extent>& extent)
 {
     Shape shape;
-    if (extent && extent->kind == Extent::Kind::Circle) {
+    if (extent && extent->hoverKind == Extent::Kind::Circle) {
         shape.radius = extent->size[0];
-    } else if (extent && extent->kind == Extent::Kind::Box) {
+    } else if (extent && extent->hoverKind == Extent::Kind::Box) {
         shape.box = true;
         shape.width = extent->size[0];
         shape.height = extent->size[1];

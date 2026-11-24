@@ -928,9 +928,12 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
             // Each player at the level (the number's low byte; past 10, 10) with that level's
             // experience (XPTable's, told), its numbers anew (a warrior's abilities to that level,
             // untold). In a solo game a warrior's known abilities then go on the host's bar set in
-            // use, ability n in slot n (an award with nothing shown fills no slot), and its level-up
-            // moment comes (the first player's: the others' find it under way).
+            // use, ability n in slot n (an award with nothing shown fills no slot): the host's own
+            // player's only, as the game's one player is its client's (a co-op guest's are its
+            // own client's to show). Then its level-up moment comes (the first player's: the
+            // others' find it under way).
             const bool solo = (world.gameFlags & GameFlag::Solo) != 0;
+            const ServerObject* hostUnit = solo ? hostPlayer(world) : nullptr;
             everyPlayer([&](ServerObject& o) {
                 auto level = static_cast<std::uint8_t>(longNumber(w[2]));
                 if (static_cast<std::int8_t>(level) > 10) {
@@ -943,7 +946,7 @@ void GameHost::runConsole(std::string_view line, std::uint32_t issuer)
                 reportExperience(world, o);
                 o.player->level = level;
                 readVals(world, o, false);
-                if (solo && o.player->classId == 0 && world.hostClient) {
+                if (solo && &o == hostUnit && o.player->classId == 0 && world.hostClient) {
                     for (int a = 1; a < 6; ++a) {
                         if (o.player->abilityLevel(static_cast<std::size_t>(a)) != 0) {
                             world.hostClient->setBarSlot(a - 1, static_cast<std::uint32_t>(a));

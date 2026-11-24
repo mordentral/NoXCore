@@ -2844,3 +2844,15 @@ differences from the original are in [vanilla_deviations.md](vanilla_deviations.
   experience.
 - **Ours:** re-enter lasts the rest of the game being hosted (World::reenterAllowed, kept from map to
   map), and such a level takes no experience (vanilla_deviations.md, VD-82).
+
+### OB-441: A thing.bin ZSIZE or EXTENT line short of a number reads leftover memory
+- **Where:** the client's thing reader reads ZSIZE with "%d %d" into a local for the bottom and,
+  for the top, into the variable that held the line's own address; with one number the top is that
+  address, with none the bottom is whatever the stack held. Its EXTENT reader reads CIRCLE's
+  radius ("%*s %f") and BOX's sides ("%*s %f %f") into stack space nothing cleared first.
+- **Effect:** a type whose ZSIZE line has one number stands as tall as a memory address (hovered
+  far above it); a CIRCLE or BOX without its numbers takes a leftover size. No shipped type has
+  such a line, and a mod's thing.patch can't write one (its EXTENT and ZSIZE need their numbers);
+  only a mod's whole thing.bin could.
+- **Ours:** a number missing reads 0 (ZSIZE's top then raised to its bottom): nox::things::thingZSize
+  and noxsdl's pick::readExtent. The game's values are memory, nothing to match.
