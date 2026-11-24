@@ -1034,8 +1034,21 @@ bool ServerOptions::handleEvent(SDL_Window* sdlWindow, const SDL_Event& event, i
             gui_.setFocus(nullptr);
         }
         break;
-    case SDL_EVENT_MOUSE_BUTTON_UP:
     case SDL_EVENT_MOUSE_WHEEL:
+        // (noxcpp) The wheel over the map list, its slider or its arrows scrolls the list a line a
+        // notch, as its arrows do.
+        if (const gui::Window* h = gui_.hovered();
+            h && event.wheel.y != 0 && (h->id == kMapList || h->id == kMapSlider || h->id == kMapUp || h->id == kMapDown)) {
+            if (const gui::Window* list = window_->find(kMapList); list && !list->hidden()) {
+                const int notches = static_cast<int>(event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -event.wheel.y : event.wheel.y);
+                scrollMaps(list->scroll - notches);
+                took = true;
+                break;
+            }
+        }
+        took = gui_.handleEvent(event, width, height);
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_UP:
         took = gui_.handleEvent(event, width, height);
         break;
     default:
