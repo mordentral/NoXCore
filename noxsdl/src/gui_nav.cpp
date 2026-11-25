@@ -7,6 +7,7 @@
 #include <climits>
 #include <cstdlib>
 #include <iterator>
+#include <utility>
 
 namespace noxsdl::gui {
 
@@ -21,6 +22,7 @@ struct Coordinator {
     bool inUse = false;
     Gui* owner = nullptr;   ///< last frame's claim
     Gui* claimed = nullptr; ///< this frame's, so far
+    std::optional<PadTyping> typing; ///< an entry field the pad's A just gave the typing focus
 };
 Coordinator coordinator;
 
@@ -160,6 +162,19 @@ void navForget(const Gui* gui)
     if (coordinator.claimed == gui) {
         coordinator.claimed = nullptr;
     }
+    if (coordinator.typing && coordinator.typing->gui == gui) {
+        coordinator.typing.reset();
+    }
+}
+
+void notePadTyping(Gui* gui, Window* field)
+{
+    coordinator.typing = PadTyping{gui, field};
+}
+
+std::optional<PadTyping> takePadTyping()
+{
+    return std::exchange(coordinator.typing, std::nullopt);
 }
 
 // ------------------------------------------------------------------------------- geometry

@@ -4,7 +4,8 @@
 // --pad-script's made-up pad.
 //
 // Where a pad's event goes (main.cpp's SDL_AppEvent):
-//  - first of all padEventFirst: the pads kept (GamepadManager), and, while a menu or a window that
+//  - first of all padEventFirst: the pads kept (GamepadManager); while the on-screen keyboard is up
+//    (pad/osk_game.cpp) every press is its own; while a menu or a window that
 //    owns Escape has the input (padHasMenus), MenuBack's button (East, Start) sent on as Escape;
 //  - a release reaches padRelease with the keys' releases, whatever has the input;
 //  - a press that nothing above the game's own controls took reaches padPress, which fires its
@@ -153,7 +154,7 @@ bool savePadConfig(const App& app)
 
 bool padGameInput(const App& app)
 {
-    return app.live && !app.joinWaiting && app.padFocused && !editorHasInput(app) && !(app.movie && app.movie->active()) &&
+    return app.live && !app.joinWaiting && app.padFocused && !oskOpen(app) && !editorHasInput(app) && !(app.movie && app.movie->active()) &&
            !(app.quitMenu && app.quitMenu->isOpen()) && !(app.chat && app.chat->isOpen()) &&
            !(app.console && app.console->isOpen()) && !(app.options && app.options->isOpen()) &&
            !(app.inputConfig && app.inputConfig->isOpen());
@@ -186,6 +187,10 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
     const auto edge = app.pads.handleEvent(event);
     if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
         releasePadHeld(app); // (its releases won't come)
+        return std::nullopt;
+    }
+    // The on-screen keyboard, while it's up, has the pad's presses (pad/osk_game.cpp).
+    if (oskOpen(app) && oskEvent(app, event, edge)) {
         return std::nullopt;
     }
     if (!edge) {

@@ -59,6 +59,32 @@ void ChatEntry::draw(SDL_Renderer* renderer, int width, int height)
     gui_.draw(renderer, width, height);
 }
 
+std::string ChatEntry::text() const
+{
+    return field_ ? nox::strings::toUtf8(field_->entry) : std::string{};
+}
+
+void ChatEntry::enter(SDL_Window* window)
+{
+    const std::string text = nox::strings::toUtf8(field_->entry);
+    const bool team = team_;
+    close(window);
+    // Leading spaces skipped; nothing sent for a blank line (CliNet_SendChatText).
+    const auto start = text.find_first_not_of(' ');
+    if (start != std::string::npos && send_) {
+        send_(text.substr(start), team);
+    }
+}
+
+void ChatEntry::sendLine(SDL_Window* window, const std::string& line)
+{
+    if (!open_ || !field_) {
+        return;
+    }
+    field_->entry = nox::strings::fromUtf8(line);
+    enter(window);
+}
+
 bool ChatEntry::handleEvent(SDL_Window* window, const SDL_Event& event, int width, int height)
 {
     if (!open_) {
@@ -66,14 +92,7 @@ bool ChatEntry::handleEvent(SDL_Window* window, const SDL_Event& event, int widt
     }
     if (event.type == SDL_EVENT_KEY_DOWN) {
         if (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) {
-            const std::string text = nox::strings::toUtf8(field_->entry);
-            const bool team = team_;
-            close(window);
-            // Leading spaces skipped; nothing sent for a blank line (CliNet_SendChatText).
-            const auto start = text.find_first_not_of(' ');
-            if (start != std::string::npos && send_) {
-                send_(text.substr(start), team);
-            }
+            enter(window);
             return true;
         }
         if (event.key.key == SDLK_ESCAPE) {

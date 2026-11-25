@@ -17,6 +17,29 @@ bool shellFlag = false;
 
 } // namespace
 
+bool typeInto(Window& field, std::string_view utf8)
+{
+    bool typed = false;
+    for (const char16_t c : nox::strings::fromUtf8(utf8)) {
+        // Printable characters only, one fewer than the field's limit as the game's edit box
+        // (its last place is the terminator: 8 for the login's 9, 9 for the nick's 10).
+        if (c >= 0x20 && field.entry.size() + 1 < field.entryMax) {
+            field.entry.push_back(c);
+            typed = true;
+        }
+    }
+    return typed;
+}
+
+bool eraseLast(Window& field)
+{
+    if (field.entry.empty()) {
+        return false;
+    }
+    field.entry.pop_back();
+    return true;
+}
+
 int fontLine(const Window& w)
 {
     return w.largeFont ? static_cast<int>(std::lround(16.0f * w.largeScale)) : 10;

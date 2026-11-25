@@ -110,6 +110,9 @@ public:
     /// The mouse id of the free cursor's made-up mouse events (pad/pad_play.cpp): the pad's own,
     /// so they never hand the device back to the mouse.
     static constexpr SDL_MouseID kPadMouse = 0x50AD0001u;
+    /// The keyboard id of the on-screen keyboard's made-up keys (pad/osk_game.cpp: Backspace, Enter,
+    /// Escape): the pad's own too.
+    static constexpr SDL_KeyboardID kPadKeys = 0x50AD0002u;
 
 private:
     struct Pad {

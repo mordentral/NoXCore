@@ -161,7 +161,8 @@ bool knownAction(std::string_view name);
 /// The defaults: the settings, and the bindings by the default layout (left stick moves, RT
 /// attacks, A interacts, X Y B RB LB the five slots, L3 jumps, R3 the free cursor, the D-pad's up
 /// and down the potions, its left and right the spell sets, View the inventory, Start the game's
-/// menu; with LT held: Up cure poison, Down swap weapons, View the spellbook, Start the map; in the
+/// menu; with LT held: Up cure poison, Down swap weapons, View the spellbook, Start the map, Right
+/// chat, Left team chat, R3 the console; in the
 /// menus A accepts, B and Start go back, LB / RB the tabs).
 PadConfig defaultPadConfig();
 

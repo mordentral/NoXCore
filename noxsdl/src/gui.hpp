@@ -305,6 +305,13 @@ inline void setGreyed(Window* w, bool greyed)
     }
 }
 
+/// An entry field's typing (the keyboard's text, and the pad's on-screen keyboard's through it):
+/// printable characters of `utf8` added while there's room, one fewer than entryMax as in the game.
+/// Whether any went in.
+bool typeInto(Window& field, std::string_view utf8);
+/// Backspace in an entry field: its last character off; false when it's empty.
+bool eraseLast(Window& field);
+
 /// A window's font's line in layout units: 10, or the large font's 16 at its largeScale.
 int fontLine(const Window& w);
 /// A list box's line height: its DATA's, raised to its font's line (gui_newScrollListBox).
@@ -399,6 +406,10 @@ private:
     float offsetX_ = 0, offsetY_ = 0;
     float largeScale_ = 1;
 };
+
+/// A BORDER window's frame round the rectangle (layout units): the game's border pieces 10 out
+/// from its edges, and its corners.
+void drawFrame(Painter& p, int x, int y, int width, int height);
 
 /// A window sliding in from `from` to its place, and back out when asked (gui_makeAnimation).
 struct Slide {

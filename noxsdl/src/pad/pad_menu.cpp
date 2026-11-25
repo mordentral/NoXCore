@@ -119,13 +119,15 @@ void padMenuFrame(App& app)
         if (std::exchange(wasConnected, false)) {
             gui::navFrame(false, false);
             repeat = {};
+            oskFrame(app); // (the on-screen keyboard closes)
         }
         return;
     }
     wasConnected = true;
     gui::navFrame(true, app.pads.padInUse());
+    oskFrame(app);
     const std::uint64_t now = SDL_GetTicks();
-    if (!padMenusUp(app)) {
+    if (oskOpen(app) || !padMenusUp(app)) { // (the on-screen keyboard has the pad's directions)
         repeat = {};
         return;
     }

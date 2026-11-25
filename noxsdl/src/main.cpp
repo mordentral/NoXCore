@@ -1880,6 +1880,7 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
                 pointerSourceName(pointerSource(app.testMouse.has_value(), app.playTestMouse.has_value(), false)), mouse.x, mouse.y,
                 SDL_GetWindowRelativeMouseMode(app.window) ? "on" : "off", SDL_CursorVisible() ? "shown" : "hidden");
     }
+    drawOsk(app); // ((noxcpp) the pad's on-screen keyboard, while it's up)
     // The menus' pointer, at their 640 x 480 layout's scale.
     drawCursor(app, CursorType::Select,
                std::min(static_cast<float>(app.camera.viewWidth) / 640.0f,
@@ -3055,6 +3056,7 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     }
     drawFps(*app);
     drawKillFeed(*app);
+    drawOsk(*app); // ((noxcpp) the pad's on-screen keyboard, while it's up)
     drawCursor(*app, app->live && !briefing ? app->cursorType : CursorType::Select, app->camera.zoom);
     if (app->live && app->cinematics && !app->live->client().downloadPercent()) {
         // The fades over everything, the pointer too (mainloop's fades' draw with 1). Not while a

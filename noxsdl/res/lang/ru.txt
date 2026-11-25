@@ -8912,6 +8912,71 @@ options.weather.on = Вкл.
 #@ 8dc6c6d9 mt: Reduced
 options.weather.reduced = Ослаблено
 
+#@ 812746a9 mt: Circle
+osk.button.circle = Круг
+#@ b663d53b mt: Cross
+osk.button.cross = Крест
+#@ fac98c66 mt: Square
+osk.button.square = Квадрат
+#@ e58886a5 mt: Triangle
+osk.button.triangle = Треугольник
+#@ 2bf1f0ff mt: caps lock
+osk.hint.caps = Caps Lock
+#@ 27cb3b23 mt: close
+osk.hint.close = закрыть
+#@ 67c2444a mt: delete
+osk.hint.delete = стереть
+#@ ddfde10d mt: enter
+osk.hint.enter = ввод
+#@ 236bc992 mt: quick chat
+osk.hint.quick = быстрый чат
+#@ 54019347 mt: shift
+osk.hint.shift = Shift
+#@ 3553e285 mt: space
+osk.hint.space = пробел
+#@ 5127f14d mt: type
+osk.hint.type = набрать
+#@ cd86acc3 mt: Close
+osk.key.close = Закрыть
+#@ 5797ea6a mt: Delete
+osk.key.delete = Стереть
+#@ aff863ad mt: Enter
+osk.key.enter = Ввод
+#@ 9cf5355c mt: Quick
+osk.key.quick = Чат
+#@ f9bd04e7 mt: Shift
+osk.key.shift = Shift
+#@ c1c43225 mt: Space
+osk.key.space = Пробел
+#@ ec928265 mt: Follow me!
+osk.quick.follow = За мной!
+#@ 3a206ab3 mt: gg
+osk.quick.gg = gg
+#@ dba12ce1 mt: Help!
+osk.quick.help = Помогите!
+#@ 325d0001 mt: Hi!
+osk.quick.hi = Привет!
+#@ 393fd21b mt: (Laugh)
+osk.quick.laugh = (Смех)
+#@ d6475888 mt: Good luck!
+osk.quick.luck = Удачи!
+#@ fcbd4f0b mt: Nice one!
+osk.quick.nice = Отлично!
+#@ 85e4b82f mt: OK
+osk.quick.ok = OK
+#@ 9a3274d2 mt: (Point)
+osk.quick.point = (Указать)
+#@ 62558b51 mt: Sorry!
+osk.quick.sorry = Извини!
+#@ be3160cc mt: (Taunt)
+osk.quick.taunt = (Насмешка)
+#@ d3a24563 mt: Thanks!
+osk.quick.thanks = Спасибо!
+#@ 618d1132 mt: Quick chat
+osk.quick.title = Быстрый чат
+#@ 8151f533 mt: Wait!
+osk.quick.wait = Подожди!
+
 #@ db79a3a6 mt: {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
 script.memory_tricks = {map} использует трюки с памятью оригинальной игры, которые NoX Core не выполняет. Поищите версию этой карты для NoX Core.
 

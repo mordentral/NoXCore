@@ -487,7 +487,11 @@ bool Gui::navigate(NavInput input)
     if (sliding()) {
         return true; // (no clicks reach a screen while it slides: no pad either)
     }
-    return nav_.input(input, scene(), hover_, focus_, tabs_);
+    const bool took = nav_.input(input, scene(), hover_, focus_, tabs_);
+    if (input == NavInput::Accept && focus_ && focus_ == nav_.focus() && focus_->type == WindowType::EntryField) {
+        notePadTyping(this, focus_); // (the pad's on-screen keyboard opens on it)
+    }
+    return took;
 }
 
 void Gui::drawWindow(Window& w, Painter& p)
@@ -515,14 +519,14 @@ void Gui::drawWindow(Window& w, Painter& p)
 
 void Gui::drawBorder(Window& w, Painter& p)
 {
-    // 20-unit edge pieces round the rectangle 10 out, 10-unit pieces to finish, and
-    // the corners. (List boxes and entry fields frame a slightly different rectangle,
-    // the plain rectangle here.)
+    // (List boxes and entry fields frame a slightly different rectangle, the plain rectangle here.)
     const SDL_Point pos = w.screenPos();
-    const int x = pos.x;
-    const int y = pos.y;
-    const int width = w.rect.w;
-    const int height = w.rect.h;
+    drawFrame(p, pos.x, pos.y, w.rect.w, w.rect.h);
+}
+
+void drawFrame(Painter& p, int x, int y, int width, int height)
+{
+    // 20-unit edge pieces round the rectangle 10 out, 10-unit pieces to finish, and the corners.
     const int top = y - 10;
     const int bottom = y - 10 + height;
     int i = x + 10;
@@ -1091,13 +1095,7 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
         if (!focus_ || !focus_->enabled() || !event.text.text) {
             return false;
         }
-        for (const char16_t c : nox::strings::fromUtf8(event.text.text)) {
-            // Printable characters only, one fewer than the field's limit as the game's edit box
-            // (its last place is the terminator: 8 for the login's 9, 9 for the nick's 10).
-            if (c >= 0x20 && focus_->entry.size() + 1 < focus_->entryMax) {
-                focus_->entry.push_back(c);
-            }
-        }
+        typeInto(*focus_, event.text.text); // (printable ones, up to its limit: gui_window.cpp)
         return true;
     }
     case SDL_EVENT_KEY_DOWN: {
@@ -1105,9 +1103,7 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
             return false;
         }
         if (event.key.key == SDLK_BACKSPACE) {
-            if (!focus_->entry.empty()) {
-                focus_->entry.pop_back();
-            }
+            eraseLast(*focus_);
             return true;
         }
         if ((event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) && !event.key.repeat &&

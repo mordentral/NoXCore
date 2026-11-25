@@ -25,12 +25,20 @@ public:
     void open(SDL_Window* window, bool team);
     void close(SDL_Window* window);
     bool isOpen() const { return open_; }
+    /// (noxcpp) The line typed so far (UTF-8), and whether it goes to the team (the pad's keyboard
+    /// shows it).
+    std::string text() const;
+    bool team() const { return team_; }
+    /// (noxcpp) `line` sent in place of what's typed, as Enter sends a line (the pad's quick chat).
+    void sendLine(SDL_Window* window, const std::string& line);
 
     void draw(SDL_Renderer* renderer, int width, int height);
     /// While open it takes the keyboard (and typing); returns whether it took the event.
     bool handleEvent(SDL_Window* window, const SDL_Event& event, int width, int height);
 
 private:
+    void enter(SDL_Window* window);
+
     gui::Gui gui_;
     std::function<void(const std::string&, bool)> send_;
     gui::Window* window_ = nullptr;

@@ -17,6 +17,7 @@
 //   pad/pad_game.cpp      the game controller: the pads, noxcore_controller.cfg, its buttons routed
 //   (pad/pad_play.cpp     the pad in a game: aim, targets, interact, its pointer: pad/pad_play.hpp)
 //   (pad/pad_panels.cpp   the pad's snap cursor on the game's panels: pad/pad_panels.hpp)
+//   (pad/osk_game.cpp     the pad's on-screen keyboard: entry fields, chat, the console)
 // main.cpp has SDL's callbacks, the frame and the input's routing; command_line.hpp the
 // command line's reading.
 #pragma once
@@ -65,6 +66,7 @@
 #include "pad/gamepad_manager.hpp"
 #include "pad/pad_bindings.hpp"
 #include "pad/pad_panels_state.hpp"
+#include "pad/osk_state.hpp"
 #include "pad/pad_play_state.hpp"
 #include "pad/virtual_pad.hpp"
 #include "pencil_icon.hpp"
@@ -451,6 +453,7 @@ struct App {
     std::optional<pad::StickVec> padAim; ///< the way the left stick last leaned (one long), while the pad's in use
     pad::PlayState padPlay;            ///< the pad in a game: aim, target, pointer, free cursor (pad/pad_play.hpp)
     pad::PanelState padPanels;         ///< the pad's snap cursor on the game's panels (pad/pad_panels.hpp)
+    pad::OskState osk;                 ///< the pad's on-screen keyboard (pad/osk_game.cpp)
     /// The view in a game, as the game's Options set it: how much of the world shows (one of its
     /// screen resolutions: one screen pixel was one world unit), and the game window's size in
     /// percent (VideoSize, 40-100; Page Up / Page Down step it by 2, draw_setCutSize). The resolution's
@@ -1062,6 +1065,18 @@ void padMenuFrame(App& app);
 /// it last leaned (Holds: the facing and cursor point sent); None: the mouse's as ever.
 enum class PadSteer : std::uint8_t { None, Holds, Moves };
 PadSteer padSteer(App& app);
+// (pad/osk_game.cpp: the pad's on-screen keyboard)
+/// Whether the on-screen keyboard is up (it has the pad then).
+bool oskOpen(const App& app);
+/// Every event, from padEventFirst while the keyboard is up: a pad button's press is the
+/// keyboard's (true: `event` is made nobody's), a real key or the input method's typing closes it.
+bool oskEvent(App& app, SDL_Event& event, const std::optional<pad::PadEdge>& edge);
+/// Each frame with a pad connected (padMenuFrame): opens it on an entry field the pad's A gave the
+/// typing (the chat line, the console opened with the pad in use), closes it when that's gone, the
+/// held D-pad and the left stick.
+void oskFrame(App& app);
+/// Drawn over everything but the pointer while it's up.
+void drawOsk(App& app);
 /// --pad-script's steps due `elapsedMs` in (after joining, or from start-up in the menus).
 void runPadScript(App& app, std::uint64_t elapsedMs);
 std::vector<App::ScriptedPad> parsePadScript(std::string_view script);

@@ -73,6 +73,15 @@ void navClaim(Gui* gui);
 /// A Gui going: never the owner after.
 void navForget(const Gui* gui);
 
+/// The pad's A gave an entry field the typing focus (Gui::navigate): noted for the on-screen
+/// keyboard (pad/osk_game.cpp), which takes it once.
+struct PadTyping {
+    Gui* gui = nullptr;
+    Window* field = nullptr;
+};
+void notePadTyping(Gui* gui, Window* field);
+std::optional<PadTyping> takePadTyping();
+
 /// The rectangle a window is on the 640 x 480 screen.
 SDL_Rect screenRect(const Window& w);
 /// The nearest of `candidates` from `from` the way `dir` (Up, Down, Left, Right) goes: its middle

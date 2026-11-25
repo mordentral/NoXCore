@@ -81,6 +81,8 @@ public:
     void toggle(SDL_Window* window);
     void close(SDL_Window* window);
     bool isOpen() const { return open_; }
+    /// (noxcpp) The line being typed (the pad's keyboard shows it).
+    const std::string& input() const { return input_; }
 
     void print(std::string_view text, ConsoleColor color = White);
     /// A string-table text (or the id itself if there's none), with %s / %d filled in order.

@@ -297,6 +297,9 @@ PadConfig defaultPadConfig()
     bind("SwapWeapons", B::DpadDown, true);
     bind("ToggleBook", B::View, true);
     bind("ToggleMap", B::Start, true);
+    bind("Chat", B::DpadRight, true); // (the on-screen keyboard opens with the line)
+    bind("TeamChat", B::DpadLeft, true);
+    bind("ToggleConsole", B::RightStick, true);
     bind("MenuAccept", B::South);
     bind("MenuBack", B::East);
     bind("MenuBack", B::Start);

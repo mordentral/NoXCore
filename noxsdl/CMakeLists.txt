@@ -139,6 +139,9 @@ add_executable(noxsdl WIN32
     src/options_window.cpp
     src/overlays.cpp
     src/pad/gamepad_manager.cpp
+    src/pad/hangul.cpp
+    src/pad/osk.cpp
+    src/pad/osk_game.cpp
     src/pad/pad_aim.cpp
     src/pad/pad_bindings.cpp
     src/pad/pad_game.cpp

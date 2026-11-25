@@ -275,7 +275,7 @@ std::optional<PadEdge> GamepadManager::handleEvent(const SDL_Event& event)
         }
         return std::nullopt;
     case SDL_EVENT_KEY_DOWN:
-        if (!event.key.repeat) {
+        if (!event.key.repeat && event.key.which != kPadKeys) {
             setDevice(InputDevice::MouseKeyboard);
         }
         return std::nullopt;

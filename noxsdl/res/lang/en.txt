@@ -12263,28 +12263,28 @@ game.data.hosting_other = another game is hosted here
 # noxsdl/src/game_session.cpp:48
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2081
+# noxsdl/src/main.cpp:2082
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2054
+# noxsdl/src/main.cpp:2055
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2058
+# noxsdl/src/main.cpp:2059
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2089
+# noxsdl/src/main.cpp:2090
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2084
+# noxsdl/src/main.cpp:2085
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2068
+# noxsdl/src/main.cpp:2069
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2071
+# noxsdl/src/main.cpp:2072
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2083
+# noxsdl/src/main.cpp:2084
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
@@ -13264,6 +13264,103 @@ options.weather.on = On
 # noxsdl/src/options_window.cpp:74
 #@ 8dc6c6d9: Reduced
 options.weather.reduced = Reduced
+
+# noxsdl/src/pad/osk_game.cpp:194
+#@ 812746a9: Circle
+osk.button.circle = Circle
+# noxsdl/src/pad/osk_game.cpp:193
+#@ b663d53b: Cross
+osk.button.cross = Cross
+# noxsdl/src/pad/osk_game.cpp:195
+#@ fac98c66: Square
+osk.button.square = Square
+# noxsdl/src/pad/osk_game.cpp:196
+#@ e58886a5: Triangle
+osk.button.triangle = Triangle
+# noxsdl/src/pad/osk_game.cpp:227
+#@ 2bf1f0ff: caps lock
+osk.hint.caps = caps lock
+# noxsdl/src/pad/osk_game.cpp:226
+#@ 27cb3b23: close
+osk.hint.close = close
+# noxsdl/src/pad/osk_game.cpp:224
+#@ 67c2444a: delete
+osk.hint.delete = delete
+# noxsdl/src/pad/osk_game.cpp:225
+#@ ddfde10d: enter
+osk.hint.enter = enter
+# noxsdl/src/pad/osk_game.cpp:230
+#@ 236bc992: quick chat
+osk.hint.quick = quick chat
+# noxsdl/src/pad/osk_game.cpp:227
+#@ 54019347: shift
+osk.hint.shift = shift
+# noxsdl/src/pad/osk_game.cpp:225
+#@ 3553e285: space
+osk.hint.space = space
+# noxsdl/src/pad/osk_game.cpp:224
+#@ 5127f14d: type
+osk.hint.type = type
+# noxsdl/src/pad/osk_game.cpp:222
+#@ cd86acc3: Close
+osk.key.close = Close
+# noxsdl/src/pad/osk_game.cpp:219
+#@ 5797ea6a: Delete
+osk.key.delete = Delete
+# noxsdl/src/pad/osk_game.cpp:220
+#@ aff863ad: Enter
+osk.key.enter = Enter
+# noxsdl/src/pad/osk_game.cpp:221
+#@ 9cf5355c: Quick
+osk.key.quick = Quick
+# noxsdl/src/pad/osk_game.cpp:217
+#@ f9bd04e7: Shift
+osk.key.shift = Shift
+# noxsdl/src/pad/osk_game.cpp:218
+#@ c1c43225: Space
+osk.key.space = Space
+# noxsdl/src/pad/osk_game.cpp:241
+#@ ec928265: Follow me!
+osk.quick.follow = Follow me!
+# noxsdl/src/pad/osk_game.cpp:240
+#@ 3a206ab3: gg
+osk.quick.gg = gg
+# noxsdl/src/pad/osk_game.cpp:241
+#@ dba12ce1: Help!
+osk.quick.help = Help!
+# noxsdl/src/pad/osk_game.cpp:240
+#@ 325d0001: Hi!
+osk.quick.hi = Hi!
+# noxsdl/src/pad/osk_game.cpp:247
+#@ 393fd21b: (Laugh)
+osk.quick.laugh = (Laugh)
+# noxsdl/src/pad/osk_game.cpp:243
+#@ d6475888: Good luck!
+osk.quick.luck = Good luck!
+# noxsdl/src/pad/osk_game.cpp:243
+#@ fcbd4f0b: Nice one!
+osk.quick.nice = Nice one!
+# noxsdl/src/pad/osk_game.cpp:242
+#@ 85e4b82f: OK
+osk.quick.ok = OK
+# noxsdl/src/pad/osk_game.cpp:248
+#@ 9a3274d2: (Point)
+osk.quick.point = (Point)
+# noxsdl/src/pad/osk_game.cpp:242
+#@ 62558b51: Sorry!
+osk.quick.sorry = Sorry!
+# noxsdl/src/pad/osk_game.cpp:246
+#@ be3160cc: (Taunt)
+osk.quick.taunt = (Taunt)
+# noxsdl/src/pad/osk_game.cpp:240
+#@ d3a24563: Thanks!
+osk.quick.thanks = Thanks!
+# noxsdl/src/pad/osk_game.cpp:232
+#@ 618d1132: Quick chat
+osk.quick.title = Quick chat
+# noxsdl/src/pad/osk_game.cpp:242
+#@ 8151f533: Wait!
+osk.quick.wait = Wait!
 
 # noxsdl/src/menus.cpp:392, noxsdl/src/editor/map_editor.cpp:275
 #@ db79a3a6: {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.

@@ -8818,6 +8818,71 @@ options.weather.on = 켬
 #@ 8dc6c6d9 mt: Reduced
 options.weather.reduced = 줄임
 
+#@ 812746a9 mt: Circle
+osk.button.circle = 동그라미
+#@ b663d53b mt: Cross
+osk.button.cross = 엑스
+#@ fac98c66 mt: Square
+osk.button.square = 네모
+#@ e58886a5 mt: Triangle
+osk.button.triangle = 세모
+#@ 2bf1f0ff mt: caps lock
+osk.hint.caps = 대문자 고정
+#@ 27cb3b23 mt: close
+osk.hint.close = 닫기
+#@ 67c2444a mt: delete
+osk.hint.delete = 지우기
+#@ ddfde10d mt: enter
+osk.hint.enter = 엔터
+#@ 236bc992 mt: quick chat
+osk.hint.quick = 빠른 채팅
+#@ 54019347 mt: shift
+osk.hint.shift = Shift
+#@ 3553e285 mt: space
+osk.hint.space = 띄어쓰기
+#@ 5127f14d mt: type
+osk.hint.type = 입력
+#@ cd86acc3 mt: Close
+osk.key.close = 닫기
+#@ 5797ea6a mt: Delete
+osk.key.delete = 지우기
+#@ aff863ad mt: Enter
+osk.key.enter = 엔터
+#@ 9cf5355c mt: Quick
+osk.key.quick = 채팅
+#@ f9bd04e7 mt: Shift
+osk.key.shift = Shift
+#@ c1c43225 mt: Space
+osk.key.space = 스페이스
+#@ ec928265 mt: Follow me!
+osk.quick.follow = 따라와!
+#@ 3a206ab3 mt: gg
+osk.quick.gg = gg
+#@ dba12ce1 mt: Help!
+osk.quick.help = 도와줘!
+#@ 325d0001 mt: Hi!
+osk.quick.hi = 안녕!
+#@ 393fd21b mt: (Laugh)
+osk.quick.laugh = (웃기)
+#@ d6475888 mt: Good luck!
+osk.quick.luck = 행운을 빌어!
+#@ fcbd4f0b mt: Nice one!
+osk.quick.nice = 나이스!
+#@ 85e4b82f mt: OK
+osk.quick.ok = OK
+#@ 9a3274d2 mt: (Point)
+osk.quick.point = (가리키기)
+#@ 62558b51 mt: Sorry!
+osk.quick.sorry = 미안!
+#@ be3160cc mt: (Taunt)
+osk.quick.taunt = (도발)
+#@ d3a24563 mt: Thanks!
+osk.quick.thanks = 고마워!
+#@ 618d1132 mt: Quick chat
+osk.quick.title = 빠른 채팅
+#@ 8151f533 mt: Wait!
+osk.quick.wait = 기다려!
+
 #@ db79a3a6 mt: {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
 script.memory_tricks = {map}은(는) NoX Core가 실행하지 않는 원작 게임의 메모리 트릭을 씁니다. 이 맵의 NoX Core 버전을 찾아보세요.
 
