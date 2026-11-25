@@ -27,7 +27,19 @@ constexpr std::int32_t kDepth8 = 331, kDepth16 = 332;
 constexpr std::int32_t kInputConfig = 341;
 constexpr std::int32_t kController = 342; ///< (noxsdl's) under Input Config, kControllerGap below it
 constexpr std::int32_t kControllerArt = 343; ///< (noxsdl's) its art: Input Config's, from OptionsBG
-constexpr int kControllerGap = 4;
+/// Input Config's rim in OptionsBG lies outside its window: 5 px out on the left, right and top, 4
+/// below and a row of shadow under that, its corners rounded. Its rows in bands: from the window's
+/// top (its height 20), and how far in from the rim's sides (kRimSide out) the art starts and ends.
+struct RimBand {
+    int top, bottom; ///< rows [top, bottom) from the window's top
+    int left, right; ///< in from the rim's left and right sides
+};
+constexpr int kRimSide = 5;
+constexpr std::array<RimBand, 9> kRimBands{{{-5, -4, 3, 3}, {-4, -3, 3, 2}, {-3, -2, 1, 1}, {-2, -1, 1, 0}, {-1, 21, 0, 0},
+                                            {21, 22, 2, 1}, {22, 23, 1, 2}, {23, 24, 3, 3}, {24, 25, 1, 1}}};
+/// From Input Config's window to Controller's: Controller's rim 3 px under Input Config's shadow,
+/// as the colour depth buttons are apart.
+constexpr int kControllerGap = 12;
 constexpr int kControllerShift = 20 + kControllerGap; ///< how far below Input Config (its height and the gap)
 constexpr std::int32_t kFxVolume = 351, kDialogVolume = 352, kMusicVolume = 353;
 constexpr std::int32_t kFxOn = 361, kDialogOn = 362, kMusicOn = 363;
@@ -441,7 +453,8 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
                                    std::make_move_iterator(items.end()));
     }
     // (noxcpp) Controller: under Input Config, Input Config's own button again: its art (the part of
-    // OptionsBG it sits on, under it as a window that takes no click), its lit image and its text.
+    // OptionsBG it sits on with its rim, under it as a window that takes no click), its lit image and
+    // its text. (On the wooden bar below the panel's boxes: the rim fits on it, clear of its foot.)
     if (const auto input = std::ranges::find(optionsDef.children, kInputConfig, &nox::gui::WindowDef::id);
         input != optionsDef.children.end()) {
         nox::gui::WindowDef pad = *input;
@@ -467,19 +480,27 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
         w->text = NOX_TR("options.controller", "Controller");
     }
     if (gui::Window* art = window_->find(kControllerArt)) {
-        // OptionsBG moved so Input Config's place on it lands here, clipped to the button.
+        // OptionsBG moved so Input Config's place on it lands here, clipped to the button and its
+        // rim (band by band, the rounded corners leaving the art under them as it is).
         art->draw = [](gui::Window& self, gui::Painter& p) {
             const SDL_Point at = self.screenPos();
             const SDL_Point from = self.parent ? self.parent->screenPos() : SDL_Point{};
-            const SDL_FRect clipF = p.toOutput(at.x, at.y, self.rect.w, self.rect.h);
-            const SDL_Rect clip{static_cast<int>(std::floor(clipF.x)), static_cast<int>(std::floor(clipF.y)),
-                                static_cast<int>(std::ceil(clipF.w)), static_cast<int>(std::ceil(clipF.h))};
+            static const std::string kOptionsBG = "OptionsBG";
+            const std::string& image = self.parent ? self.parent->backgroundImage : kOptionsBG;
             SDL_Renderer* r = p.renderer();
             SDL_Rect was{};
             const bool clipped = SDL_RenderClipEnabled(r);
             SDL_GetRenderClipRect(r, &was);
-            SDL_SetRenderClipRect(r, &clip);
-            p.image(self.parent ? self.parent->backgroundImage : std::string("OptionsBG"), from.x, from.y + kControllerShift);
+            for (const RimBand& b : kRimBands) {
+                const int x = at.x - kRimSide + b.left;
+                const SDL_FRect clipF =
+                    p.toOutput(x, at.y + b.top, self.rect.w + 2 * kRimSide - b.left - b.right, b.bottom - b.top);
+                const int x0 = static_cast<int>(std::lround(clipF.x)), y0 = static_cast<int>(std::lround(clipF.y));
+                const SDL_Rect clip{x0, y0, static_cast<int>(std::lround(clipF.x + clipF.w)) - x0,
+                                    static_cast<int>(std::lround(clipF.y + clipF.h)) - y0};
+                SDL_SetRenderClipRect(r, &clip);
+                p.image(image, from.x, from.y + kControllerShift);
+            }
             SDL_SetRenderClipRect(r, clipped ? &was : nullptr);
         };
     }
