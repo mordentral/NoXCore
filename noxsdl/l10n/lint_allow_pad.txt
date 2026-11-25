@@ -3,3 +3,7 @@
 file noxsdl/src/pad/pad_bindings.cpp   # noxcore_controller.cfg's keywords and header (a settings file's names, English as nox.cfg's)
 noxsdl/src/pad/pad_game.cpp: "NoX Core script pad"
 noxsdl/src/pad/virtual_pad.hpp: "NoX Core test pad"
+# (the game's control names and the pad's action names, as InputBindings and noxcore_controller.cfg take them; a pointer source's name in the log)
+noxsdl/src/pad/pad_play.cpp: "Action"
+noxsdl/src/pad/pad_play.cpp: "Interact"
+noxsdl/src/mouse_handover.hpp: "the game controller"

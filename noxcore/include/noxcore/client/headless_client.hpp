@@ -331,6 +331,11 @@ public:
     /// carries its y for the cursor's (CliNet_QueuePlayerInput): what's aimed at is where
     /// it stands, not where it's drawn (a flying bat, a player's body).
     void setCursorSprite(std::optional<std::uint16_t> netCode) { cursorSprite_ = netCode; }
+    /// noxcpp: the cursor's MSG_MOUSE queued now, in the game, if it has moved since it was last
+    /// sent, so what's queued next (a TRY_SPELL at a new target) reaches the server behind it in
+    /// the same datagram rather than a frame ahead of it; the next frame's input then doesn't send
+    /// it again. The same message the frame's input sends. Whether one was queued.
+    bool flushCursor();
     /// Casts a spell slot (MSG_TRY_SPELL, CliNet_SendSpellCast): up to 5 spell ids,
     /// cast in order, and the slot's target flag.
     void castSpells(std::span<const std::uint32_t> spells, bool targetFlag = false);

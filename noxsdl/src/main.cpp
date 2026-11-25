@@ -1679,34 +1679,20 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
             break; // (releases reached the bindings above)
         }
         if (app->cursorType == CursorType::Use && (app->cursorUseable || app->cursorHovered)) {
-            // Action with the Use hand (Cli_ProcessControlEvents, cursor 0xD): MSG_TRY_COLLIDE for
-            // the cursor's pick, a map object's net code being its extent with bit 15, a drawable's
-            // its own, with bit 15 for an IMMOBILE or CLIENT_PERSIST one (CliNet_SendTryCollide).
+            // Action with the Use hand: MSG_TRY_COLLIDE for the cursor's pick (useWithHand).
             pressWithHand(*app, *code, [app] {
-                if (app->cursorUseable) {
-                    app->live->client().collide(static_cast<std::uint16_t>(app->cursorUseable->extent | 0x8000));
-                } else if (app->cursorHovered) {
-                    const auto* d = app->live->client().world().drawable(*app->cursorHovered);
-                    const TypeArt* a = d ? app->art->get(d->typeId) : nullptr;
-                    constexpr std::uint32_t kStatic = nox::things::ObjectClass::Immobile | nox::things::ObjectClass::ClientPersist;
-                    const bool fixed = a && (a->classes & kStatic);
-                    app->live->client().collide(static_cast<std::uint16_t>(*app->cursorHovered | (fixed ? 0x8000 : 0)));
-                }
+                useWithHand(*app, app->cursorUseable ? std::optional<std::uint32_t>(app->cursorUseable->extent) : std::nullopt,
+                            app->cursorHovered);
             });
             break;
         }
         if ((app->cursorType == CursorType::Talk || app->cursorType == CursorType::Trade) && app->cursorHovered) {
-            // Action with the Talk or Trade hand (Cli_ProcessControlEvents' cursor 4 / 3):
-            // MSG_DIALOG start (CliNet_SendDialogStart) or MSG_TRADE open shop (CliNet_SendOpenShop).
+            // Action with the Talk or Trade hand: a dialog or the shop (talkOrTrade).
             pressWithHand(*app, *code, [app] {
                 if (!app->cursorHovered) {
                     return;
                 }
-                if (app->cursorType == CursorType::Talk) {
-                    app->live->client().dialogStart(*app->cursorHovered);
-                } else {
-                    app->live->client().openShop(*app->cursorHovered);
-                }
+                talkOrTrade(*app, app->cursorType == CursorType::Talk, *app->cursorHovered);
             });
             break;
         }

@@ -15,6 +15,7 @@
 #include "app.hpp"
 #include "backend_hooks.hpp"
 #include "cursor_pick.hpp"
+#include "pad/pad_play.hpp"
 
 #include "noxcore/io/file.hpp"
 
@@ -73,6 +74,7 @@ void releasePadHeld(App& app)
     }
     app.padRouter.dropAll();
     app.padEscapes = 0;
+    padActionsDropped(app);
 }
 
 /// InputBindings forgot what's held since we last looked: so does the pad.
@@ -211,6 +213,9 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
 void padRelease(App& app, const pad::PadEdge& edge)
 {
     followReleases(app);
+    if (padPlayRelease(app, edge)) {
+        return; // (the free cursor's button)
+    }
     const auto e = app.padRouter.release(edge.button);
     if (e.code && app.input) {
         app.input->release(e.code);
@@ -228,8 +233,16 @@ void padPress(App& app, const pad::PadEdge& edge)
     if (!padGameInput(app) || !app.input) {
         return;
     }
+    if (padPlayPress(app, edge)) {
+        return; // (the free cursor's click)
+    }
     const auto modifier = app.padRouter.modifier();
     const auto e = app.padRouter.press(edge.button, modifier && app.pads.isDown(*modifier));
+    const std::vector<std::string> controls = e.code ? app.input->press(e.code) : std::vector<std::string>{};
+    // (A spell waiting for its target fired instead; a slot's cast aimed first: pad_play.cpp.)
+    if (padPlayControls(app, e.actions, controls)) {
+        return;
+    }
     for (std::size_t a = 0; a < pad::kPadActionCount; ++a) {
         if (e.actions.has(static_cast<PadAction>(a))) {
             padAction(app, static_cast<PadAction>(a), true);
@@ -237,22 +250,20 @@ void padPress(App& app, const pad::PadEdge& edge)
     }
     if (e.code) {
         // The game's controls, as a key's: the held ones (Action...) act each frame while it's down.
-        liveControls(app, app.input->press(e.code));
+        liveControls(app, controls);
     }
 }
 
-void padAction(App& /*app*/, pad::PadAction action, bool down)
+void padAction(App& app, pad::PadAction action, bool down)
 {
-    // The pad's own game actions. Not handled yet: Interact, TargetNext / TargetPrevious and
-    // FreeCursor; Modifier is the router's own (held: the second layer). A handler acts on `down`
-    // (its press) and lets go on its release; what's held is let go through padActionsDropped too.
-    (void)action;
-    (void)down;
+    // The pad's own game actions (Interact, TargetNext / TargetPrevious, FreeCursor: pad_play.cpp);
+    // Modifier is the router's own (held: the second layer).
+    padPlayAction(app, action, down);
 }
 
-void padActionsDropped(App& /*app*/)
+void padActionsDropped(App& app)
 {
-    // (What the pad's own actions hold, let go with everything held: nothing yet.)
+    padPlayDropped(app); // (the free cursor's buttons)
 }
 
 void padMenuAction(App& /*app*/, pad::PadAction action)
@@ -264,47 +275,26 @@ void padMenuAction(App& /*app*/, pad::PadAction action)
 PadSteer padSteer(App& app)
 {
     if (!app.pads.connected()) {
+        if (app.padPlay.hasPointer || app.padPlay.collecting) {
+            padPlayIdle(app); // (the last pad gone)
+        }
         return PadSteer::None;
     }
     app.pads.sample(SDL_GetTicksNS());
     followReleases(app);
     if (!app.pads.padInUse()) {
         app.padAim.reset();
-    }
-    auto& client = app.live->client();
-    const auto at = client.position();
-    if (!padGameInput(app) || app.view3d.active() || !at) {
-        app.padRunning = false;
+        padPlayIdle(app);
         return PadSteer::None;
     }
-    const float fromX = static_cast<float>(at->first);
-    const float fromY = static_cast<float>(at->second);
-    const pad::StickVec left = app.pads.frame().left;
-    const float tilt = left.length();
-    if (tilt <= 0) {
-        app.padRunning = false;
-        if (!app.padAim) {
-            return PadSteer::None;
-        }
-        // At rest, with the pad in use: the cursor point held a walk's length the way it last
-        // went, so we keep facing that way (and a swing goes there) rather than turning to the mouse.
-        const float x = fromX + app.padAim->x * pad::kWalkReach;
-        const float y = fromY + app.padAim->y * pad::kWalkReach;
-        client.face(pick::facing(fromX, fromY, x, y, std::nullopt));
-        client.setCursor(static_cast<int>(x), static_cast<int>(y));
-        client.setCursorSprite(std::nullopt);
-        return PadSteer::Holds;
+    const auto at = app.live->client().position();
+    if (!padGameInput(app) || app.view3d.active() || !at || (app.cinematics && app.cinematics->screenUp())) {
+        padPlayIdle(app); // (a briefing's screen: the mouse's pointer, as it has the mouse)
+        return PadSteer::None;
     }
-    // The cursor point short of us (a walk) or long (a run), the way the stick leans: moving there.
-    app.padRunning = pad::stickRuns(tilt, app.padRunning);
-    const float reach = pad::stickReach(app.padRunning);
-    app.padAim = pad::StickVec{left.x / tilt, left.y / tilt};
-    const float x = fromX + app.padAim->x * reach;
-    const float y = fromY + app.padAim->y * reach;
-    client.move(pick::facing(fromX, fromY, x, y, std::nullopt));
-    client.setCursor(static_cast<int>(x), static_cast<int>(y));
-    client.setCursorSprite(std::nullopt);
-    return PadSteer::Moves;
+    // The stick's walk (its cursor point out by its tilt), the aim and the target, the pointer
+    // (pad_play.cpp).
+    return padPlaySteer(app, static_cast<float>(at->first), static_cast<float>(at->second));
 }
 
 void runPadScript(App& app, std::uint64_t elapsedMs)

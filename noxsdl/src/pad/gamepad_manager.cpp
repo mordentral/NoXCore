@@ -257,7 +257,7 @@ std::optional<PadEdge> GamepadManager::handleEvent(const SDL_Event& event)
         return std::nullopt;
     }
     case SDL_EVENT_MOUSE_MOTION:
-        if (device_ == InputDevice::Pad) {
+        if (device_ == InputDevice::Pad && event.motion.which != kPadMouse) {
             mouseTravel_ += std::abs(event.motion.xrel) + std::abs(event.motion.yrel);
             if (mouseTravel_ > kMouseHandBack) {
                 setDevice(InputDevice::MouseKeyboard);
@@ -265,8 +265,14 @@ std::optional<PadEdge> GamepadManager::handleEvent(const SDL_Event& event)
         }
         return std::nullopt;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        if (event.button.which != kPadMouse) {
+            setDevice(InputDevice::MouseKeyboard);
+        }
+        return std::nullopt;
     case SDL_EVENT_MOUSE_WHEEL:
-        setDevice(InputDevice::MouseKeyboard);
+        if (event.wheel.which != kPadMouse) {
+            setDevice(InputDevice::MouseKeyboard);
+        }
         return std::nullopt;
     case SDL_EVENT_KEY_DOWN:
         if (!event.key.repeat) {

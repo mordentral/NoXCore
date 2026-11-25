@@ -107,6 +107,9 @@ public:
 
     /// Mouse travel (in window pixels, summed) that hands the device back to the mouse.
     static constexpr float kMouseHandBack = 6;
+    /// The mouse id of the free cursor's made-up mouse events (pad/pad_play.cpp): the pad's own,
+    /// so they never hand the device back to the mouse.
+    static constexpr SDL_MouseID kPadMouse = 0x50AD0001u;
 
 private:
     struct Pad {

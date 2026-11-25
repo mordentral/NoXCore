@@ -8194,6 +8194,22 @@ game.map_vote.title_called = 맵 투표: 과반수가 찬성하면 지금 맵이
 game.map_vote.title_next = 다음 맵 투표
 #@ a69381cf mt: {n} vote | {n} votes
 game.map_vote.votes[other] = {n}표
+#@ 812746a9 mt: Circle
+game.pad.button.circle = 원
+#@ b663d53b mt: Cross
+game.pad.button.cross = 엑스
+#@ fac98c66 mt: Square
+game.pad.button.square = 네모
+#@ e58886a5 mt: Triangle
+game.pad.button.triangle = 세모
+#@ 5b12cc35 mt: Pick up
+game.pad.prompt.pickup = 줍기
+#@ 96d3996f mt: Talk
+game.pad.prompt.talk = 대화
+#@ f6f1dff9 mt: Trade
+game.pad.prompt.trade = 거래
+#@ ba1c5c94 mt: Use
+game.pad.prompt.use = 사용
 #@ 67a1e1af mt: Vote Map
 game.quit_menu.vote_map = 맵 투표
 #@ 1c3df593 mt: screenshot: couldn't write {path}

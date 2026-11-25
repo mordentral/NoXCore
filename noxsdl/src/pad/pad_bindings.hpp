@@ -109,12 +109,18 @@ enum class AimAssist : std::uint8_t { Off, Weak, Normal, Strong };
 /// turns (retarget). LockMode = held / retarget.
 enum class LockMode : std::uint8_t { WhileHeld, Retarget };
 
+/// RunThreshold's range: the left stick's tilt (past the dead zone) where its cursor point
+/// reaches the server's run distance.
+inline constexpr float kMinRunThreshold = 0.3f;
+inline constexpr float kMaxRunThreshold = 0.95f;
+
 /// The file's settings.
 struct PadSettings {
     float deadZone = 0.18f;         ///< DeadZone: the sticks' inner dead zone (0-0.9)
     float outerDeadZone = 0.95f;    ///< OuterDeadZone: full tilt from here (above DeadZone, to 1)
     float triggerThreshold = 0.35f; ///< TriggerThreshold: a trigger's press (0.05-0.95)
     float sensitivity = 1.0f;       ///< Sensitivity: the aim and the free cursor's speed (0.25-4)
+    float runThreshold = 0.65f;     ///< RunThreshold: the left stick's tilt that runs (0.3-0.95)
     AimAssist aimAssist = AimAssist::Normal;
     LockMode lockMode = LockMode::WhileHeld;
     bool invertY = false; ///< InvertY: the right stick's up and down swapped

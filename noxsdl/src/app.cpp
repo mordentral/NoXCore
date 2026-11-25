@@ -63,10 +63,14 @@ SDL_FPoint mousePos(const App& app)
     // input: anywhere else a stale one froze the drawn pointer (the menus' buttons still lit under
     // the real mouse).
     const bool heldShown = app.editor && app.live && (app.playTestEmbedded || app.sessionEmbedded) && !app.playTestCaptured;
-    switch (pointerSource(app.testMouse.has_value(), app.playTestMouse.has_value(), heldShown)) {
+    // (noxcpp) The game controller's pointer while it's in use in a game: in the game's pixels already.
+    const bool padPoint = app.padPlay.hasPointer && app.live && app.pads.padInUse();
+    switch (pointerSource(app.testMouse.has_value(), app.playTestMouse.has_value(), heldShown, padPoint)) {
     case PointerSource::Test:
         m = *app.testMouse;
         break;
+    case PointerSource::Pad:
+        return SDL_FPoint{app.padPlay.pointerX, app.padPlay.pointerY};
     case PointerSource::Held:
         m = *app.playTestMouse; // (a play-test in the editor's Map panel, the input the editor's: where the game had it)
         break;

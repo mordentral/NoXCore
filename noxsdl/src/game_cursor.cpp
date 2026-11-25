@@ -4,6 +4,7 @@
 
 #include "app.hpp"
 #include "book_award.hpp"
+#include "pad/pad_play.hpp"
 
 #include "noxcore/lobby/extended.hpp"
 #include "noxcore/things/object_class.hpp"
@@ -103,13 +104,25 @@ void chooseCursor(App& app, bool inGame)
             }
         }
     }
-    const auto* me = ownPlayer(client);
     if (!inGame || !playing(client) || (!app.cursorHovered && !app.cursorUseable)) {
         return;
     }
+    if (const auto hand = handCursor(app, app.cursorHovered, app.cursorUseable ? &*app.cursorUseable : nullptr)) {
+        app.cursorType = *hand;
+    }
+}
+
+std::optional<CursorType> handCursor(App& app, std::optional<std::uint16_t> drawable, const MapView::Useable* useable)
+{
+    namespace oc = nox::things::ObjectClass;
+    const auto& client = app.live->client();
+    const auto* me = ownPlayer(client);
+    if (!drawable && !useable) {
+        return std::nullopt;
+    }
     const auto self = app.anchors.find(client.netCode());
     if (self == app.anchors.end()) {
-        return;
+        return std::nullopt;
     }
     // cursorUpdate, on the cursor's pick (cursor_pick.hpp's worldCursor): how far it is from us
     // in whole units, what it is, whether we're in a dialog or a shop or dragging an item.
@@ -123,21 +136,21 @@ void chooseCursor(App& app, bool inGame)
     situation.busy = client.world().dialog().open || (app.tradeScreens && app.tradeScreens->shopOpen());
     situation.dragging = app.inventory && app.inventory->dragging();
     pick::Target target;
-    if (app.cursorUseable) {
+    if (useable) {
         // A useable map object (enabled: useableAt takes no other).
-        const TypeArt* a = app.cursorUseable->art;
+        const TypeArt* a = useable->art;
         if (!a) {
-            return;
+            return std::nullopt;
         }
         target.classes = a->classes;
         target.subclasses = a->subclasses;
-        target.dist2 = dist2(app.cursorUseable->x, app.cursorUseable->y);
+        target.dist2 = dist2(useable->x, useable->y);
     } else {
-        const auto* d = client.world().drawable(*app.cursorHovered);
+        const auto* d = client.world().drawable(*drawable);
         const TypeArt* a = d ? app.art->get(d->typeId) : nullptr;
-        const auto there = app.anchors.find(*app.cursorHovered);
+        const auto there = app.anchors.find(*drawable);
         if (!a || there == app.anchors.end()) {
-            return;
+            return std::nullopt;
         }
         target.classes = a->classes;
         target.subclasses = a->subclasses;
@@ -167,20 +180,26 @@ void chooseCursor(App& app, bool inGame)
         }
     }
     switch (pick::worldCursor(target, situation)) {
-    case pick::WorldCursor::Pickup: app.cursorType = CursorType::Pickup; break;
-    case pick::WorldCursor::PickupFar: app.cursorType = CursorType::PickupFar; break;
-    case pick::WorldCursor::Caution: app.cursorType = CursorType::Caution; break;
-    case pick::WorldCursor::Talk: app.cursorType = CursorType::Talk; break;
-    case pick::WorldCursor::Trade: app.cursorType = CursorType::Trade; break;
-    case pick::WorldCursor::Use: app.cursorType = CursorType::Use; break;
+    case pick::WorldCursor::Pickup: return CursorType::Pickup;
+    case pick::WorldCursor::PickupFar: return CursorType::PickupFar;
+    case pick::WorldCursor::Caution: return CursorType::Caution;
+    case pick::WorldCursor::Talk: return CursorType::Talk;
+    case pick::WorldCursor::Trade: return CursorType::Trade;
+    case pick::WorldCursor::Use: return CursorType::Use;
     case pick::WorldCursor::None: break;
     }
+    return std::nullopt;
 }
 
 /// Draws the game's cursor at the mouse (not when the mouse is outside the window).
 void drawCursor(App& app, CursorType type, float scale)
 {
-    if (!app.cursor || (!app.testMouse && SDL_GetMouseFocus() != app.window)) {
+    if (padHidesPointer(app)) {
+        drawPadOverlay(app, scale); // (noxcpp: the pad aims; its reticle and prompt instead of the pointer)
+        return;
+    }
+    const bool padPointer = app.live && app.padPlay.hasPointer && app.pads.padInUse(); // (the free cursor: mousePos's)
+    if (!app.cursor || (!app.testMouse && !padPointer && SDL_GetMouseFocus() != app.window)) {
         return;
     }
     if (gameInPanel(app) && !app.playTestCaptured) {

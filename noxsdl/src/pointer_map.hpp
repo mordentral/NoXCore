@@ -35,4 +35,19 @@ inline void toGame(float& x, float& y, float density, const Area& area, bool let
     }
 }
 
+/// The other way: a point in the game's output pixels as a window point (toGame gives it back,
+/// for a point on the game's area). For events made up in the game's pixels (the game
+/// controller's free cursor), which go through toGame as the mouse's do.
+inline void toWindow(float& x, float& y, float density, const Area& area, bool letterboxed)
+{
+    if (letterboxed) {
+        x += area.x;
+        y += area.y;
+    }
+    if (density != 1.0f && density > 0) {
+        x /= density;
+        y /= density;
+    }
+}
+
 } // namespace noxsdl::pointermap

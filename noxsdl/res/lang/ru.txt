@@ -8286,6 +8286,22 @@ game.map_vote.title_next = Голосуйте за следующую карту
 game.map_vote.votes[one] = {n} голос
 game.map_vote.votes[few] = {n} голоса
 game.map_vote.votes[many] = {n} голосов
+#@ 812746a9 mt: Circle
+game.pad.button.circle = Круг
+#@ b663d53b mt: Cross
+game.pad.button.cross = Крест
+#@ fac98c66 mt: Square
+game.pad.button.square = Квадрат
+#@ e58886a5 mt: Triangle
+game.pad.button.triangle = Треугольник
+#@ 5b12cc35 mt: Pick up
+game.pad.prompt.pickup = Поднять
+#@ 96d3996f mt: Talk
+game.pad.prompt.talk = Говорить
+#@ f6f1dff9 mt: Trade
+game.pad.prompt.trade = Торговать
+#@ ba1c5c94 mt: Use
+game.pad.prompt.use = Использовать
 #@ 67a1e1af mt: Vote Map
 game.quit_menu.vote_map = Голосование за карту
 #@ 1c3df593 mt: screenshot: couldn't write {path}

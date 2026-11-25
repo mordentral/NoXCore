@@ -5,6 +5,7 @@
 #include "draw_scale.hpp"
 #include "friend_dot.hpp"
 #include "name_plate.hpp"
+#include "pad/pad_play.hpp"
 #include "player_art.hpp"
 #include "team_colors.hpp"
 
@@ -573,6 +574,11 @@ std::vector<MapView::SceneSprite> liveSprites(App& app, std::vector<SDL_FPoint>&
             // The one furthest forward wins (in the mouse look, the one nearest its foot).
             const float depth = look3d ? 10 - fromFoot : hoverDepth(*a, p.y, p.z);
             hover.offer(netCode, depth, a == glyphArt ? glyphRole : pick::CursorRole::Any);
+        }
+        // (noxcpp) The game controller's aim and A: the creatures and the things near us in sight.
+        if (app.padPlay.collecting && padWants(app, d, *a) && hoverable(netCode, d, *a) &&
+            (!sight || sight->drawableSeen(*a, SightMap::liveKey(netCode), p.x, p.y, p.z, d.special.value_or(0), d.drawn))) {
+            padNoteSeen(app, netCode, d, *a);
         }
 
         if (a->drawFn == DrawFn::NPC) {

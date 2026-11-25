@@ -1,5 +1,5 @@
 // (noxcpp) The game controller's numbers: a stick's dead zones, a trigger read as a button, the
-// stick's tilt as a walk or a run. Pure functions (no SDL), so the tests check them as they are.
+// stick's tilt as the walk's or run's cursor point. Pure functions (no SDL), so the tests check them as they are.
 //
 // A stick is read as one point, not two axes: inside the inner dead zone it's at rest; past it the
 // tilt is scaled again from 0 there to 1 at the outer dead zone (so a small push past the dead zone
@@ -67,24 +67,27 @@ inline bool triggerHeld(bool wasHeld, float value, float threshold)
 }
 
 /// Walking with the stick: the game walks while the cursor point is under 100 units from the
-/// player and runs past that, so the stick puts it short or long of the player by its tilt.
-inline constexpr float kWalkReach = 60;
+/// player and runs past that (and, once running, till the player stops), so the stick puts the
+/// point out from the player by its tilt, as the mouse's distance does: from kNearReach at the
+/// dead zone's edge out to the run distance at the run threshold (noxcore_controller.cfg's
+/// RunThreshold), then on to kRunReach at full tilt, a straight line each side.
+inline constexpr float kNearReach = 24;
+inline constexpr float kRunDistance = 100;
 inline constexpr float kRunReach = 160;
-/// The tilt (after the dead zone) that starts a run, and the one under which a run goes back to
-/// a walk: apart, so a tilt near the line doesn't flick between the two.
-inline constexpr float kRunTilt = 0.65f;
-inline constexpr float kWalkTilt = 0.55f;
+/// The point at rest, while the pad is in use: a walk's length the way the stick last leaned.
+inline constexpr float kWalkReach = 60;
+inline constexpr float kDefaultRunThreshold = 0.65f;
 
-/// Whether the stick's tilt runs, given whether it ran the frame before.
-inline bool stickRuns(float tilt, bool wasRunning)
+/// The cursor point's distance from the player for a tilt (0 to 1, after the dead zone; 0 at
+/// its edge) and the run threshold (kept within 0.3 to 0.95).
+inline float stickReach(float tilt, float runThreshold = kDefaultRunThreshold)
 {
-    return wasRunning ? tilt >= kWalkTilt : tilt >= kRunTilt;
-}
-
-/// The cursor point's distance from the player for a walk or a run.
-inline float stickReach(bool running)
-{
-    return running ? kRunReach : kWalkReach;
+    const float t = std::clamp(tilt, 0.0f, 1.0f);
+    const float th = std::clamp(runThreshold, 0.3f, 0.95f);
+    if (t <= th) {
+        return kNearReach + (kRunDistance - kNearReach) * (t / th);
+    }
+    return kRunDistance + (kRunReach - kRunDistance) * ((t - th) / (1.0f - th));
 }
 
 } // namespace noxsdl::pad

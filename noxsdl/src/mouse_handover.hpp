@@ -103,17 +103,22 @@ constexpr std::optional<MouseMode> mouseModeChange(MouseMode applied, bool relat
 /// Where the drawn pointer's place comes from.
 enum class PointerSource {
     Test,   ///< a test's --mouse / --mouse-script point
+    Pad,    ///< (noxcpp) the game controller's: its aim point, or its free cursor, while it's in use in a game
     Held,   ///< where the panel's game had it (the editor has the input)
     Mouse,  ///< the mouse's own place (SDL_GetMouseState)
 };
 
 /// `testPoint`: a test's point is set; `held`: a held place is kept; `heldShown`: a game is in the
 /// editor's Map panel without the input now (the only time a held place is drawn: anywhere else a
-/// stale one froze the pointer while the buttons still lit under the real mouse).
-constexpr PointerSource pointerSource(bool testPoint, bool held, bool heldShown)
+/// stale one froze the pointer while the buttons still lit under the real mouse); `padPoint`: the
+/// game controller is in use in a game and has its pointer (pad/pad_play.hpp).
+constexpr PointerSource pointerSource(bool testPoint, bool held, bool heldShown, bool padPoint = false)
 {
     if (testPoint) {
         return PointerSource::Test;
+    }
+    if (padPoint) {
+        return PointerSource::Pad;
     }
     if (held && heldShown) {
         return PointerSource::Held;
@@ -125,6 +130,7 @@ constexpr const char* pointerSourceName(PointerSource s)
 {
     switch (s) {
     case PointerSource::Test: return "test point";
+    case PointerSource::Pad: return "the game controller";
     case PointerSource::Held: return "held";
     case PointerSource::Mouse: return "the mouse";
     }

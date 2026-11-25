@@ -12254,7 +12254,7 @@ editor.window.tool_options = Tool Options
 #@ 1d756bcb: Waypoints
 editor.window.waypoints = Waypoints
 
-# noxsdl/src/app.cpp:113
+# noxsdl/src/app.cpp:117
 #@ 2329c92c: Team
 game.chat.team = Team
 # noxsdl/src/game_data_swap.cpp:105
@@ -12263,28 +12263,28 @@ game.data.hosting_other = another game is hosted here
 # noxsdl/src/game_session.cpp:47
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
-# noxsdl/src/main.cpp:2095
+# noxsdl/src/main.cpp:2081
 #@ 418078d1: Couldn't join {host}
 game.join.couldnt_join = Couldn't join {host}
-# noxsdl/src/main.cpp:2068
+# noxsdl/src/main.cpp:2054
 #@ 816435c2: Couldn't join {host} (see noxcore-log.txt)
 game.join.couldnt_join_log = Couldn't join {host} (see noxcore-log.txt)
-# noxsdl/src/main.cpp:2072
+# noxsdl/src/main.cpp:2058
 #@ 7c8e565d: Couldn't join {host}: {why}
 game.join.couldnt_join_why = Couldn't join {host}: {why}
-# noxsdl/src/main.cpp:2103
+# noxsdl/src/main.cpp:2089
 #@ 1b57fb62: Left {host}
 game.join.left = Left {host}
-# noxsdl/src/main.cpp:2098
+# noxsdl/src/main.cpp:2084
 #@ f23ced59: Couldn't join {host}: it asks for a password
 game.join.needs_password = Couldn't join {host}: it asks for a password
-# noxsdl/src/main.cpp:2082
+# noxsdl/src/main.cpp:2068
 #@ 7db65b67: Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
 game.join.packs_differ = Couldn't join {host}: its content packs ({packs}) add object types, and yours add other ones. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2085
+# noxsdl/src/main.cpp:2071
 #@ a65b206e: Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
 game.join.packs_missing = Couldn't join {host}: its content packs ({packs}) add object types. Install the same packs in the mods folder to join.
-# noxsdl/src/main.cpp:2097
+# noxsdl/src/main.cpp:2083
 #@ 8eb8d1c3: Couldn't join {host}: the password was wrong
 game.join.wrong_password = Couldn't join {host}: the password was wrong
 # noxsdl/src/leaving_notice.hpp:44
@@ -12331,6 +12331,30 @@ game.map_vote.title_next = Vote for the next map
 #@ a69381cf: {n} vote | {n} votes
 game.map_vote.votes[one] = {n} vote
 game.map_vote.votes[other] = {n} votes
+# noxsdl/src/pad/pad_play.cpp:718
+#@ 812746a9: Circle
+game.pad.button.circle = Circle
+# noxsdl/src/pad/pad_play.cpp:717
+#@ b663d53b: Cross
+game.pad.button.cross = Cross
+# noxsdl/src/pad/pad_play.cpp:719
+#@ fac98c66: Square
+game.pad.button.square = Square
+# noxsdl/src/pad/pad_play.cpp:720
+#@ e58886a5: Triangle
+game.pad.button.triangle = Triangle
+# noxsdl/src/pad/pad_play.cpp:742
+#@ 5b12cc35: Pick up
+game.pad.prompt.pickup = Pick up
+# noxsdl/src/pad/pad_play.cpp:743
+#@ 96d3996f: Talk
+game.pad.prompt.talk = Talk
+# noxsdl/src/pad/pad_play.cpp:744
+#@ f6f1dff9: Trade
+game.pad.prompt.trade = Trade
+# noxsdl/src/pad/pad_play.cpp:745
+#@ ba1c5c94: Use
+game.pad.prompt.use = Use
 # noxsdl/src/quit_menu.cpp:102
 #@ 67a1e1af: Vote Map
 game.quit_menu.vote_map = Vote Map

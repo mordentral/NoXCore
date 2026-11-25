@@ -63,6 +63,7 @@ void freshGameState(App& app)
     app.trapHitMs = 0;
     app.lastTargetFlag = false;
     app.inGameSinceMs = 0;
+    app.padPlay = {}; // (noxcpp: the game controller's aim, pointer and free cursor)
 }
 
 } // namespace noxsdl

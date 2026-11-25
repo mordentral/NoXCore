@@ -732,6 +732,20 @@ std::optional<std::pair<int, int>> HeadlessClient::cursorToSend() const
     return c;
 }
 
+bool HeadlessClient::flushCursor()
+{
+    if (stage_ != Stage::InGame) {
+        return false;
+    }
+    const auto cursor = cursorToSend();
+    if (!cursor || cursor == sentCursor_) {
+        return false;
+    }
+    queueMouse(cursor->first, cursor->second);
+    sentCursor_ = cursor;
+    return true;
+}
+
 void HeadlessClient::castSpells(std::span<const std::uint32_t> spells, bool targetFlag)
 {
     // Nothing if the first spell is empty.

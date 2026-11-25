@@ -406,6 +406,21 @@ public:
     };
     /// With `sight`, only those its drawable sight test sees (as the hover tests each).
     std::optional<Useable> useableAt(float cx, float cy, const SightMap* sight = nullptr) const;
+    /// (noxcpp) Each enabled USEABLE map object within `reach` of world point (x, y) that `sight`
+    /// sees, to `fn(const Useable&)` (the game controller's A: what's in front of the player).
+    template <class Fn>
+    void useablesNear(float x, float y, float reach, const SightMap* sight, Fn&& fn) const
+    {
+        for (const std::size_t index : useableObjects_) {
+            const Object& o = objects_[index];
+            const float dx = o.x - x;
+            const float dy = o.y - y;
+            if (!o.enabled || dx * dx + dy * dy > reach * reach || !objectSeen(index, sight)) {
+                continue;
+            }
+            fn(Useable{o.extent, o.x, o.y, 0, o.art});
+        }
+    }
     /// The whole view's ambient light with its centre at (x, y), called once a frame, as the game's
     /// polygonDrawColor works it out: when the centre (whole units) has moved, or nothing is
     /// known yet, the polygon it's in (the one it was in last tested first, then the rest in list

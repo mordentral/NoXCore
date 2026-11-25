@@ -116,7 +116,7 @@ constexpr std::string_view kLockNames[] = {"held", "retarget"};
 bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
 {
     if (sameName(name, "DeadZone") || sameName(name, "OuterDeadZone") || sameName(name, "TriggerThreshold") ||
-        sameName(name, "Sensitivity")) {
+        sameName(name, "Sensitivity") || sameName(name, "RunThreshold")) {
         const auto f = number(value);
         if (!f) {
             return false;
@@ -127,6 +127,8 @@ bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
             s.outerDeadZone = std::clamp(*f, 0.1f, 1.0f);
         } else if (sameName(name, "TriggerThreshold")) {
             s.triggerThreshold = std::clamp(*f, 0.05f, 0.95f);
+        } else if (sameName(name, "RunThreshold")) {
+            s.runThreshold = std::clamp(*f, kMinRunThreshold, kMaxRunThreshold);
         } else {
             s.sensitivity = std::clamp(*f, 0.25f, 4.0f);
         }
@@ -163,7 +165,7 @@ bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
 
 bool isSettingName(std::string_view name)
 {
-    for (const std::string_view n : {"DeadZone", "OuterDeadZone", "TriggerThreshold", "Sensitivity", "AimAssist", "LockMode", "InvertY", "Rumble"}) {
+    for (const std::string_view n : {"DeadZone", "OuterDeadZone", "TriggerThreshold", "Sensitivity", "RunThreshold", "AimAssist", "LockMode", "InvertY", "Rumble"}) {
         if (sameName(name, n)) {
             return true;
         }
@@ -380,6 +382,7 @@ std::string formatPadConfig(const PadConfig& c)
     out += "OuterDeadZone = " + numberText(s.outerDeadZone) + "\n";
     out += "TriggerThreshold = " + numberText(s.triggerThreshold) + "\n";
     out += "Sensitivity = " + numberText(s.sensitivity) + "\n";
+    out += "RunThreshold = " + numberText(s.runThreshold) + "\n";
     out += "AimAssist = " + std::string(kAimNames[static_cast<std::size_t>(s.aimAssist)]) + "\n";
     out += "LockMode = " + std::string(kLockNames[static_cast<std::size_t>(s.lockMode)]) + "\n";
     out += std::string("InvertY = ") + (s.invertY ? "1" : "0") + "\n";

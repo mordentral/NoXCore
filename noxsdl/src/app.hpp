@@ -15,6 +15,7 @@
 //   game_cursor.cpp       the game's cursor: which one this frame shows, and its draw
 //   editor_glue.cpp      the map editor's glue: opening it, its play-test and edit sessions
 //   pad/pad_game.cpp      the game controller: the pads, noxcore_controller.cfg, its buttons routed
+//   (pad/pad_play.cpp     the pad in a game: aim, targets, interact, its pointer: pad/pad_play.hpp)
 // main.cpp has SDL's callbacks, the frame and the input's routing; command_line.hpp the
 // command line's reading.
 #pragma once
@@ -62,6 +63,7 @@
 #include "options_window.hpp"
 #include "pad/gamepad_manager.hpp"
 #include "pad/pad_bindings.hpp"
+#include "pad/pad_play_state.hpp"
 #include "pad/virtual_pad.hpp"
 #include "pencil_icon.hpp"
 #include "port_mapper.hpp"
@@ -444,8 +446,8 @@ struct App {
     std::uint32_t padReleasesSeen = 0; ///< input->releases() as the pad's layer last saw it
     std::uint32_t padEscapes = 0;      ///< a bit per PadButton: its press went on as Escape (padEventFirst)
     bool padFocused = true;            ///< the window has the focus (its focus events; a hidden one never gets any)
-    bool padRunning = false;           ///< the left stick ran last frame (padSteer)
     std::optional<pad::StickVec> padAim; ///< the way the left stick last leaned (one long), while the pad's in use
+    pad::PlayState padPlay;            ///< the pad in a game: aim, target, pointer, free cursor (pad/pad_play.hpp)
     /// The view in a game, as the game's Options set it: how much of the world shows (one of its
     /// screen resolutions: one screen pixel was one world unit), and the game window's size in
     /// percent (VideoSize, 40-100; Page Up / Page Down step it by 2, draw_setCutSize). The resolution's
@@ -1001,6 +1003,11 @@ void drawTooltip(App& app, bool below = false);
 // live_controls.cpp
 /// Picks up `netCode` (MSG_TRY_GET) unless there's no room for it (CliNet_SendPickup).
 void tryPickup(App& app, std::uint16_t netCode);
+/// Live: the Use hand's Action (MSG_TRY_COLLIDE) on a useable map object (its extent) or else a
+/// drawable: the mouse's click with that hand, and the pad's A.
+void useWithHand(App& app, std::optional<std::uint32_t> useableExtent, std::optional<std::uint16_t> drawable);
+/// Live: the Talk hand's Action (MSG_DIALOG start) or the Trade hand's (MSG_TRADE open shop) on `netCode`.
+void talkOrTrade(App& app, bool talk, std::uint16_t netCode);
 /// Live: what a control does when its key is pressed; whether it did anything.
 bool liveControl(App& app, std::string_view control);
 /// The controls a key or button press fired; whether there were any.
@@ -1064,6 +1071,10 @@ SDL_AppResult showMovie(App& app, bool shotReady);
 // game_cursor.cpp
 /// The cursor update's gate on its world part, as a pick::Situation (pick::worldSkipped's fields).
 pick::Situation worldGate(App& app);
+/// The hand a drawable or a useable map object (that first) gives, measured from us (cursorUpdate's
+/// world part: pick::worldCursor); nullopt for the arrow. The cursor's pick's (chooseCursor) and
+/// the pad's A's.
+std::optional<CursorType> handCursor(App& app, std::optional<std::uint16_t> drawable, const MapView::Useable* useable);
 void chooseCursor(App& app, bool inGame);
 void drawCursor(App& app, CursorType type, float scale);
 

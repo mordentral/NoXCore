@@ -32,6 +32,34 @@ void tryPickup(App& app, std::uint16_t netCode)
     client.pickup(netCode);
 }
 
+/// The Use hand's Action (Cli_ProcessControlEvents, cursor 0xD): MSG_TRY_COLLIDE, a map object's
+/// net code being its extent with bit 15, a drawable's its own, with bit 15 for an IMMOBILE or
+/// CLIENT_PERSIST one (CliNet_SendTryCollide).
+void useWithHand(App& app, std::optional<std::uint32_t> useableExtent, std::optional<std::uint16_t> drawable)
+{
+    auto& client = app.live->client();
+    if (useableExtent) {
+        client.collide(static_cast<std::uint16_t>(*useableExtent | 0x8000));
+    } else if (drawable) {
+        const auto* d = client.world().drawable(*drawable);
+        const TypeArt* a = d ? app.art->get(d->typeId) : nullptr;
+        constexpr std::uint32_t kStatic = nox::things::ObjectClass::Immobile | nox::things::ObjectClass::ClientPersist;
+        const bool fixed = a && (a->classes & kStatic);
+        client.collide(static_cast<std::uint16_t>(*drawable | (fixed ? 0x8000 : 0)));
+    }
+}
+
+/// The Talk or Trade hand's Action (Cli_ProcessControlEvents' cursor 4 / 3): MSG_DIALOG start
+/// (CliNet_SendDialogStart) or MSG_TRADE open shop (CliNet_SendOpenShop).
+void talkOrTrade(App& app, bool talk, std::uint16_t netCode)
+{
+    if (talk) {
+        app.live->client().dialogStart(netCode);
+    } else {
+        app.live->client().openShop(netCode);
+    }
+}
+
 /// Live: what a control does when its key is pressed (Cli_ProcessControlEvents and its
 /// local actions). The held ones (MoveForward, Action, the map zoom) act every frame instead, in
 /// SDL_AppIterate. Returns whether it did anything.

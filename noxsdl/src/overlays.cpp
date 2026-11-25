@@ -2,6 +2,7 @@
 // feed, names and flag labels, the game-over banner, health bars, friend dots, damage numbers,
 // chat bubbles and tooltips.
 #include "app.hpp"
+#include "pad/pad_play.hpp"
 #include "player_art.hpp"
 #include "team_colors.hpp"
 
@@ -108,6 +109,9 @@ std::optional<View3D::Ring> hoverRing(App& app)
     if (!app.live || !app.renderGui) {
         return std::nullopt;
     }
+    if (padHidesPointer(app)) {
+        return padTargetRing(app); // (noxcpp: the game controller aims: its target's ring, none under its pointer)
+    }
     namespace oc = nox::things::ObjectClass;
     float wx = 0;
     float wy = 0;
@@ -150,13 +154,29 @@ std::optional<View3D::Ring> hoverRing(App& app)
     return View3D::Ring{wx, wy, r, paletteColor(color)};
 }
 
-/// Draws hoverRing's ring on the 2D view's floor, in screen pixels.
+namespace {
+
+void drawFloorRing(App& app, const View3D::Ring* ring);
+
+} // namespace
+
+/// Draws hoverRing's ring on the 2D view's floor, in screen pixels (and, noxcpp, the game
+/// controller's ring under what its A takes).
 void drawHoverRing(App& app)
 {
     const auto ring = hoverRing(app);
-    if (!ring) {
-        return;
+    if (ring) {
+        drawFloorRing(app, &*ring);
     }
+    if (const auto use = padInteractRing(app)) {
+        drawFloorRing(app, &*use);
+    }
+}
+
+namespace {
+
+void drawFloorRing(App& app, const View3D::Ring* ring)
+{
     const float r = ring->radius;
     const SDL_Color c = ring->colour;
     const float cx = (ring->x - app.camera.left()) * app.camera.zoom;
@@ -197,6 +217,8 @@ void drawHoverRing(App& app)
     band(r - 0.5f, r + 0.5f, 255);
     band(r + 0.5f, r + 1.5f, 0x80);
 }
+
+} // namespace
 
 /// The kill feed, as the game draws it: the kills of the last 91 frames,
 /// a row each from the top of the screen, 36 game pixels tall, as many as a quarter of the screen
