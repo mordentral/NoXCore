@@ -38,7 +38,7 @@ struct NavBox {
 /// is never picked), nullopt with none that way.
 std::optional<std::size_t> navPick(std::span<const NavBox> spots, const NavBox& from, NavDir dir);
 /// The right stick's jump: the spot `dir` goes to from `from` among those of another group than
-/// `fromGroup` (`groups[i]` is spot i's: the tray, the doll, a button column, a bar...), as navPick
+/// `fromGroup` (`groups[i]` is spot i's: the tray, a button column, a bar...), as navPick
 /// picks; nullopt with none outside the group that way.
 std::optional<std::size_t> navJump(std::span<const NavBox> spots, std::span<const int> groups, const NavBox& from, int fromGroup,
                                    NavDir dir);
@@ -101,6 +101,9 @@ std::optional<NavDir> dpadDir(PadButton b);
 /// before.
 enum class PanelPress : std::uint8_t { None, Accept, Back, Drop, Move, Secondary, PreviousPage };
 PanelPress panelPress(PadButton b);
+/// Whether a press stays the game's whatever panel is open: the modifier itself, and any button
+/// while the modifier is held (its layer: LT + View the book, LT + Up cure poison...).
+bool modifierLayerPress(PadButton b, std::optional<PadButton> modifier, bool modifierHeld);
 
 /// The inventory drag's end (inventory_grid.hpp) a pad action stands for on an item: A a quick
 /// click (use, wear, take off), X out of the panel (dropped), RB onto the secondary box; Y's place

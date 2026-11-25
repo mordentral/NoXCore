@@ -387,7 +387,7 @@ void step(App& app, NavDir dir)
     log(app, "to", *s.at);
 }
 
-/// The right stick's jump `dir`: out of the selected spot's group (the tray, the doll, a column...)
+/// The right stick's jump `dir`: out of the selected spot's group (the tray, a column, a bar...)
 /// to the nearest spot of another that way; none on the panels that way, the shop's (the dialog's,
 /// the trade's) windows when they're that way. Nothing else that way: nothing.
 void jump(App& app, NavDir dir)
@@ -678,7 +678,7 @@ bool padPanelsPress(App& app, const pad::PadEdge& edge)
         return false;
     }
     // The modifier and its layer stay the game's (LT + View the book, LT + Up cure poison...).
-    if (const auto mod = app.padRouter.modifier(); mod && (edge.button == *mod || app.pads.isDown(*mod))) {
+    if (const auto mod = app.padRouter.modifier(); pad::modifierLayerPress(edge.button, mod, mod && app.pads.isDown(*mod))) {
         return false;
     }
     const PadButton b = edge.button;

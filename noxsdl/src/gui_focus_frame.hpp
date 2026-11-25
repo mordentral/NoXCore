@@ -1,8 +1,9 @@
 // (noxcpp) How the game controller's focus is marked, one look everywhere (the menus' and the game
 // windows' focus, the shop's and the trade's cells, the panels' snap cursor, the on-screen
-// keyboard's key): a thin antique-gold frame at low alpha with brighter corner pieces, a dark edge
-// outside it so it reads on bright art, and a faint warm wash inside. A widget that lights itself
-// when pointed at (a button's lit image) gets a fainter frame and no wash: its own light leads.
+// keyboard's key): an antique-gold frame about a layout pixel thick (two output pixels at least)
+// with brighter corner pieces, a dark edge outside it and a faint one inside so it reads on dark
+// art and bright alike, and a faint warm wash inside. A widget that lights itself when pointed at
+// (a button's lit image) gets a softer frame and no wash: its own light leads.
 #pragma once
 
 #include <SDL3/SDL.h>

@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace noxsdl::pad {
 
@@ -313,10 +314,13 @@ float drawGlyph(SDL_Renderer* r, Font* font, const ButtonLabel& l, float x, floa
         break;
     }
     case Glyph::Dpad: {
-        const float a = h * 0.34f, half = h / 2;
-        shape::roundBoxPoints(pts, cx - a / 2, cy - half, a, h, a * 0.2f);
+        // The cross on a disc as the face buttons' (so it reads as a button on any art, never as
+        // a lone blob), the arm meant in the ink.
+        disc();
+        const float half = h * 0.36f, a = h * 0.26f;
+        shape::roundBoxPoints(pts, cx - a / 2, cy - half, a, 2 * half, a * 0.2f);
         shape::fill(r, pts, ink.dim);
-        shape::roundBoxPoints(pts, cx - half, cy - a / 2, h, a, a * 0.2f);
+        shape::roundBoxPoints(pts, cx - half, cy - a / 2, 2 * half, a, a * 0.2f);
         shape::fill(r, pts, ink.dim);
         switch (l.button) {
         case PadButton::DpadUp: shape::roundBoxPoints(pts, cx - a / 2, cy - half, a, half - a / 2, a * 0.2f); break;
@@ -340,14 +344,20 @@ float drawGlyph(SDL_Renderer* r, Font* font, const ButtonLabel& l, float x, floa
     return w;
 }
 
+float promptHeight(const PromptLabels& prompt, float h)
+{
+    return prompt.modifier ? std::max(h, kMinPairHeight) : h;
+}
+
 float promptWidth(Font* font, const PromptLabels& prompt, float h)
 {
     if (!prompt.button) {
         return 0;
     }
+    h = promptHeight(prompt, h);
     float w = glyphWidth(font, *prompt.button, h);
     if (prompt.modifier) {
-        w += glyphWidth(font, *prompt.modifier, h) + h * 0.45f;
+        w += glyphWidth(font, *prompt.modifier, h) + h * 0.5f;
     }
     return w;
 }
@@ -357,11 +367,17 @@ float drawPrompt(SDL_Renderer* r, Font* font, const PromptLabels& prompt, float 
     if (!prompt.button) {
         return 0;
     }
+    h = promptHeight(prompt, h);
     float at = x;
     if (prompt.modifier) {
         at += drawGlyph(r, font, *prompt.modifier, at, cy, h, ink);
-        centredText(font, "+", at + h * 0.225f, cy, textSize(h, 0.55f), ink.ink);
-        at += h * 0.45f;
+        // The "+" drawn, not typed (a font's at this size is a dot): two bars on a dark edge.
+        const float px = at + h * 0.25f, arm = h * 0.2f, width = std::max(1.5f, h * 0.12f);
+        for (const auto& [w, c] : {std::pair{width + 2.0f, ink.fill}, std::pair{width, ink.ink}}) {
+            shape::line(r, {px - arm - (w - width) / 2, cy}, {px + arm + (w - width) / 2, cy}, w, c);
+            shape::line(r, {px, cy - arm - (w - width) / 2}, {px, cy + arm + (w - width) / 2}, w, c);
+        }
+        at += h * 0.5f;
     }
     at += drawGlyph(r, font, *prompt.button, at, cy, h, ink);
     return at - x;

@@ -322,6 +322,15 @@ void padPress(App& app, const pad::PadEdge& edge)
     const auto modifier = app.padRouter.modifier();
     const auto e = app.padRouter.press(edge.button, modifier && app.pads.isDown(*modifier));
     const std::vector<std::string> controls = e.code ? app.input->press(e.code) : std::vector<std::string>{};
+    if (app.scriptPad && !e.isModifier) {
+        // (--pad-script runs: the layer a press took and what it fired, for the test's log)
+        std::string fired;
+        for (const auto& c : controls) {
+            fired += (fired.empty() ? "" : ", ") + c;
+        }
+        SDL_Log("pad: %s%s%s: %s", e.modifierLayer ? std::string(pad::padButtonName(*modifier)).c_str() : "", e.modifierLayer ? " + " : "",
+                std::string(pad::padButtonName(edge.button)).c_str(), fired.empty() ? "no game control" : fired.c_str());
+    }
     // (A spell waiting for its target fired instead; a slot's cast aimed first: pad_play.cpp.)
     if (padPlayControls(app, e.actions, controls)) {
         return;

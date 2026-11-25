@@ -112,6 +112,14 @@ struct DragFacts {
     /// weapon or wand, armour of its kind).
     bool cellSwaps = false;
 };
+/// (noxcpp) The game controller never stops on the doll (a worn piece is in the tray too): a pad
+/// action ending at `end` on a worn item in its cell stands for the drag from the doll where only
+/// that one does something else, RB's onto the secondary box (the worn weapon put away, where a
+/// cell's own drag there asks nothing). The rest end as the cell's (A takes it off, X drops it).
+constexpr bool padActsFromDoll(DragEnd end, bool equipped)
+{
+    return equipped && end == DragEnd::SecondaryBox;
+}
 /// What a drag's end asks (Inventory::Actions): Use, Equip, Unequip, Drop (on the ground), the
 /// Secondary weapon, PutAwayWeapon (the worn weapon put away on the secondary box), EquipThere
 /// (the cell's item worn in the dragged one's place), Move (within the grid: nothing asked), None.

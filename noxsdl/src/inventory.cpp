@@ -1395,16 +1395,6 @@ void Inventory::toggleIdentify()
 
 // ------------------------------------------------------------------- the game controller
 
-namespace {
-
-/// The doll's slots as the pad's spots (from the doll's corner, x0, y0, x1, y1): kDollSlots', but
-/// the weapon's and the shield's, which take the doll's sides under the others, only the parts
-/// of them the others don't cover.
-constexpr std::array<SDL_Rect, 9> kPadDollSlots{{kDollSlots[0], kDollSlots[1], kDollSlots[2], kDollSlots[3], kDollSlots[4],
-                                                 kDollSlots[5], kDollSlots[6], {0, 20, 62, 180}, {151, 20, 200, 180}}};
-
-} // namespace
-
 void Inventory::padSpots(int w, int h, const nox::client::World& world, bool holding, std::vector<PadSpot>& out) const
 {
     out.clear();
@@ -1444,16 +1434,8 @@ void Inventory::padSpots(int w, int h, const nox::client::World& world, bool hol
             }
         }
     }
+    // (The doll's slots aren't stops: every worn piece is in the tray too.)
     if (!stats_ && !identify_) {
-        for (int i = 0; i < static_cast<int>(kPadDollSlots.size()); ++i) {
-            const SDL_Rect& r = kPadDollSlots[static_cast<std::size_t>(i)];
-            const float x0 = static_cast<float>(11 + r.x), y0 = static_cast<float>(15 + r.y);
-            const float x1 = static_cast<float>(12 + r.w), y1 = static_cast<float>(16 + r.h);
-            if (!holding && !wornAt(world, (x0 + x1) / 2, (y0 + y1) / 2)) {
-                continue; // (nothing worn there: what a click at its middle takes is nothing)
-            }
-            add(PadSpotKind::Doll, i, x0, y0, x1, y1);
-        }
         if (holding || world.self().secondaryWeapon != 0) {
             add(PadSpotKind::Secondary, 0, kSecondaryBox.x, kSecondaryBox.y, kSecondaryBox.w + 1, kSecondaryBox.h + 1);
         }
@@ -1496,14 +1478,6 @@ std::optional<Inventory::Drag> Inventory::padGrab(const PadSpot& spot, int w, in
         sound(0x317); // InventoryPickup
         return Drag{*nc, typeId, spot.index, p, nowMs, *nc == world.self().secondaryWeapon};
     }
-    if (spot.kind == PadSpotKind::Doll && !stats_) {
-        const auto nc = wornAt(world, p.x, p.y);
-        if (!nc) {
-            return std::nullopt;
-        }
-        sound(0x317);
-        return Drag{*nc, inv.at(*nc).typeId, std::nullopt, p, nowMs};
-    }
     return std::nullopt;
 }
 
@@ -1512,6 +1486,19 @@ bool Inventory::padItemAction(const PadSpot& spot, DragEnd end, int w, int h, SD
 {
     if (drag_) {
         return false; // (one's held: Y's place first)
+    }
+    if (spot.kind == PadSpotKind::Cell && state_ == 2 && !journal_ && !identify_ && shopMode_ == ShopMode::None) {
+        // A worn piece in its cell, where the doll's drag does something else (padActsFromDoll:
+        // the worn weapon onto the box, put away): that, the item left in its cell.
+        const auto& c = grid_.cell(spot.index);
+        const auto& inv = world.self().inventory;
+        if (!c.items.empty() && inv.count(c.items.front()) && padActsFromDoll(end, inv.at(c.items.front()).equipped)) {
+            const std::uint16_t nc = c.items.front();
+            sound(0x317); // InventoryPickup
+            endDrag(Drag{nc, inv.at(nc).typeId, std::nullopt, {}, 0}, end, std::nullopt,
+                    SDL_FPoint{spot.box.x + spot.box.w / 2, spot.box.y + spot.box.h / 2}, ground, world, actions);
+            return true;
+        }
     }
     const auto d = padGrab(spot, w, h, world, 0);
     if (!d) {
@@ -1569,11 +1556,6 @@ bool Inventory::padAccept(const PadSpot& spot, int w, int h, SDL_Point ground, c
         }
         break;
     }
-    case PadSpotKind::Doll:
-        if (identify_ || shopMode_ != ShopMode::None) {
-            return true; // (the mouse's press takes nothing there then)
-        }
-        break;
     }
     return padItemAction(spot, DragEnd::QuickClick, w, h, ground, world, actions);
 }
@@ -1597,8 +1579,8 @@ bool Inventory::padPlace(const PadSpot& spot, const nox::client::World& world, c
     if (!world.self().inventory.count(d.netCode)) {
         return true;
     }
-    // As the mouse's release on the spot: a cell moves it there, the doll wears it, the secondary
-    // box makes it the secondary; elsewhere on the panel it goes back.
+    // As the mouse's release on the spot: a cell moves it there, the secondary box makes it the
+    // secondary; elsewhere on the panel it goes back.
     DragEnd end = DragEnd::Panel;
     std::optional<int> cell;
     switch (spot.kind) {
@@ -1607,9 +1589,6 @@ bool Inventory::padPlace(const PadSpot& spot, const nox::client::World& world, c
             end = DragEnd::Cell;
             cell = spot.index;
         }
-        break;
-    case PadSpotKind::Doll:
-        end = DragEnd::Doll;
         break;
     case PadSpotKind::Secondary:
         end = DragEnd::SecondaryBox;

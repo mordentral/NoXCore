@@ -4,11 +4,13 @@
 // between their spots (pad_panel_nav.hpp), the pointer sits on the one selected (so tooltips and
 // the cursor follow it), the face buttons act there; a highlight marks it.
 //
-//   inventory  A uses / wears / takes off (a shop's sell or repair mode: asks the shop); X drops
-//              (a stack asks how many); Y picks it up, Y (or A) again puts it down where the cursor
-//              is (a cell, the doll, the secondary box); RB makes it the secondary weapon; A on the
-//              secondary box swaps weapons; B puts a held item back, else closes (as Escape). The
-//              tray scrolls as the cursor walks off its top or bottom row.
+//   inventory  the tray's items (the worn ones among them), the secondary box, the special column,
+//              the page buttons; never the doll's slots. A uses / wears / takes off (a shop's sell
+//              or repair mode: asks the shop); X drops (a stack asks how many); Y picks it up, Y (or
+//              A) again puts it down where the cursor is (a cell, the secondary box); RB makes it the
+//              secondary weapon (the worn weapon: put away there); A on the secondary box swaps
+//              weapons; B puts a held item back, else closes (as Escape). The tray scrolls as the
+//              cursor walks off its top or bottom row.
 //   book       a slot button (X Y B RB LB as bound) on an entry or the page's icon puts it on that
 //              slot of the set in use; A clicks (turns to the entry's page, casts the icon's spell,
 //              the arrows, the tabs); LB / RB turn the page elsewhere; walking off its side too.

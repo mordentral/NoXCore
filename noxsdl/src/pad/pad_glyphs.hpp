@@ -45,6 +45,11 @@ struct GlyphInk {
 float glyphWidth(Font* font, const ButtonLabel& label, float h);
 /// Draws `label` `h` tall, its left edge at x, its middle at cy; returns its width.
 float drawGlyph(SDL_Renderer* r, Font* font, const ButtonLabel& label, float x, float cy, float h, const GlyphInk& ink);
+/// A pair's least height (output pixels): the modifier's glyph, the "+" and the button's must read
+/// as three things wherever the prompt is drawn small (a knob, a tab).
+inline constexpr float kMinPairHeight = 16.0f;
+/// The height a prompt draws at for `h`: a pair's at least kMinPairHeight.
+float promptHeight(const PromptLabels& prompt, float h);
 /// A prompt (the modifier's glyph, a "+", the button's), as drawGlyph; 0 wide with no button.
 float promptWidth(Font* font, const PromptLabels& prompt, float h);
 float drawPrompt(SDL_Renderer* r, Font* font, const PromptLabels& prompt, float x, float cy, float h, const GlyphInk& ink);

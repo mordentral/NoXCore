@@ -182,6 +182,11 @@ PanelPress panelPress(PadButton b)
     }
 }
 
+bool modifierLayerPress(PadButton b, std::optional<PadButton> modifier, bool modifierHeld)
+{
+    return modifier && (b == *modifier || modifierHeld);
+}
+
 std::optional<DragEnd> padDragEnd(PanelPress p)
 {
     switch (p) {

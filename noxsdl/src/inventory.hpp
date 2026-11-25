@@ -223,10 +223,10 @@ public:
     Hover hoverAt(float x, float y, int w, int h, const nox::client::World& world) const;
 
     /// (noxcpp) The game controller's snap cursor (pad/pad_panels.cpp): the open panel's spots,
-    /// and its direct actions, which end as the mouse's gestures do (dragAsk).
+    /// and its direct actions, which end as the mouse's gestures do (dragAsk). The doll's slots are
+    /// no stops: what's worn is in the tray too (marked), and taken off or put away from there.
     enum class PadSpotKind : std::uint8_t {
         Cell,          ///< a tray cell in view (`index` its InventoryGrid index)
-        Doll,          ///< one of the doll's 9 slots (`index` 0-8)
         Secondary,     ///< the secondary weapon's box
         Special,       ///< the gold / identify / map column's squares (`index` 0-2)
         Journal,       ///< the journal's page (in the tray's place)
@@ -239,10 +239,10 @@ public:
         SDL_FRect box{}; ///< output pixels
     };
     /// The spots of the panel while it's fully open (none else), into `out` (cleared first): the
-    /// cells in view, the doll's slots and the secondary box (the doll page, not identifying), the
-    /// special column (or the journal's page), the page buttons (not while identifying). Only the
-    /// cells, doll slots and secondary box that hold something, unless `holding` (an item carried:
-    /// every place it can be put down).
+    /// cells in view, the secondary box (the doll page, not identifying), the special column (or
+    /// the journal's page), the page buttons (not while identifying). Only the cells and the
+    /// secondary box that hold something, unless `holding` (an item carried: every place it can be
+    /// put down).
     void padSpots(int w, int h, const nox::client::World& world, bool holding, std::vector<PadSpot>& out) const;
     /// The tray's first row in view, and the last holding anything (-1: none).
     int trayFirstRow() const { return scroll_ / kCellSize; }
@@ -261,16 +261,16 @@ public:
     /// buttons and the magnifier pressed. Whether it did anything.
     bool padAccept(const PadSpot& spot, int w, int h, SDL_Point ground, const nox::client::World& world,
                    const Actions& actions);
-    /// The item at an item spot (a cell or the doll) taken and its drag ended at `end` at once:
-    /// QuickClick (A), Outside (X: dropped at world point `ground`, a stack asking how many),
-    /// SecondaryBox (RB: the secondary weapon, a worn one put away). Whether there was one.
+    /// The item in a cell taken and its drag ended at `end` at once: QuickClick (A), Outside (X:
+    /// dropped at world point `ground`, a stack asking how many), SecondaryBox (RB: the secondary
+    /// weapon; the worn weapon put away, as its drag from the doll does). Whether there was one.
     bool padItemAction(const PadSpot& spot, DragEnd end, int w, int h, SDL_Point ground, const nox::client::World& world,
                        const Actions& actions);
-    /// Y: the item at an item spot taken onto the cursor, as the mouse's press takes it (the drag;
+    /// Y: the item in a cell taken onto the cursor, as the mouse's press takes it (the drag;
     /// cancelDrag puts it back). Whether there was one.
     bool padTake(const PadSpot& spot, int w, int h, const nox::client::World& world, std::uint32_t nowMs);
     /// Y again: the item on the cursor let go at a spot, as the mouse's release there (a cell
-    /// moves it, the doll wears it, the secondary box makes it the secondary); whether one was held.
+    /// moves it, the secondary box makes it the secondary); whether one was held.
     bool padPlace(const PadSpot& spot, const nox::client::World& world, const Actions& actions);
 
 private:
@@ -295,7 +295,7 @@ private:
     /// amount box's), `ground` the world point (a drop's). The item must still be ours.
     void endDrag(const Drag& d, DragEnd end, std::optional<int> toCell, SDL_FPoint at, SDL_Point ground,
                  const nox::client::World& world, const Actions& actions);
-    /// The item at a pad item spot as the mouse's press would take it (a cell's first taken out of
+    /// The item in a pad cell as the mouse's press would take it (the cell's first taken out of
     /// it), nullopt with none or where the press takes nothing (identifying, a shop's mode).
     std::optional<Drag> padGrab(const PadSpot& spot, int w, int h, const nox::client::World& world, std::uint32_t nowMs);
     /// The page buttons' and the magnifier's presses (the mouse's and the pad's).

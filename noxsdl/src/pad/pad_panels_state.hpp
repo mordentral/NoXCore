@@ -27,15 +27,15 @@ struct Spot {
 };
 
 /// The group a spot is in, for the right stick's jump out of it (navJump): a panel's spots of one
-/// kind together (the inventory's tray, its doll with the secondary box, its special column with the
-/// journal's page, its page buttons; the book's entries with its icon, its arrows, its tabs), a
-/// bar set, the trap tray, the cage's creatures or its list, a window's cards.
+/// kind together (the inventory's tray, its secondary box, its special column with the journal's
+/// page, its page buttons; the book's entries with its icon, its arrows, its tabs), a bar set, the
+/// trap tray, the cage's creatures or its list, a window's cards.
 inline int spotGroup(const Spot& s)
 {
     const int panel = static_cast<int>(s.panel) * 16;
     switch (s.panel) {
     case Panel::Inventory: {
-        static constexpr int kInventory[] = {0, 1, 1, 2, 2, 3, 3}; // Cell, Doll, Secondary, Special, Journal, the two buttons
+        static constexpr int kInventory[] = {0, 1, 2, 2, 3, 3}; // Cell, Secondary, Special, Journal, the two buttons
         return panel + (s.kind < std::size(kInventory) ? kInventory[s.kind] : 4);
     }
     case Panel::Book: {
