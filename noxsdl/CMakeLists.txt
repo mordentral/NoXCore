@@ -109,6 +109,7 @@ add_executable(noxsdl WIN32
     src/move_predictor.cpp
     src/input.cpp
     src/input_config_window.cpp
+    src/input_mode_ask.cpp
     src/controller_window.cpp
     src/inventory.cpp
     src/inventory_grid.cpp
@@ -150,6 +151,7 @@ add_executable(noxsdl WIN32
     src/pad/pad_glyphs.cpp
     src/pad/pad_labels.cpp
     src/pad/pad_menu.cpp
+    src/pad/pad_mode.cpp
     src/pad/pad_picture.cpp
     src/pad/pad_panel_nav.cpp
     src/pad/pad_panels.cpp

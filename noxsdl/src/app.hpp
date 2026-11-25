@@ -18,6 +18,7 @@
 //   (pad/pad_play.cpp     the pad in a game: aim, targets, interact, its pointer: pad/pad_play.hpp)
 //   (pad/pad_panels.cpp   the pad's snap cursor on the game's panels: pad/pad_panels.hpp)
 //   (pad/osk_game.cpp     the pad's on-screen keyboard: entry fields, chat, the console)
+//   (pad/pad_mode.cpp     the input mode, the pad's or the mouse's, and the question which)
 // main.cpp has SDL's callbacks, the frame and the input's routing; command_line.hpp the
 // command line's reading.
 #pragma once
@@ -44,6 +45,7 @@
 #include "hud.hpp"
 #include "input.hpp"
 #include "input_config_window.hpp"
+#include "input_mode_ask.hpp"
 #include "interpolator.hpp"
 #include "inventory.hpp"
 #include "item_names.hpp"
@@ -65,6 +67,7 @@
 #include "net_stat.hpp"
 #include "options_window.hpp"
 #include "pad/gamepad_manager.hpp"
+#include "pad/input_mode.hpp"
 #include "pad/pad_bindings.hpp"
 #include "pad/pad_panels_state.hpp"
 #include "pad/osk_state.hpp"
@@ -452,8 +455,14 @@ struct App {
     std::uint32_t padReleasesSeen = 0; ///< input->releases() as the pad's layer last saw it
     std::uint32_t padEscapes = 0;      ///< a bit per PadButton: its press went on as Escape (padEventFirst)
     bool padFocused = true;            ///< the window has the focus (its focus events; a hidden one never gets any)
-    std::optional<pad::StickVec> padAim; ///< the way the left stick last leaned (one long), while the pad's in use
-    pad::PlayState padPlay;            ///< the pad in a game: aim, target, pointer, free cursor (pad/pad_play.hpp)
+    std::optional<pad::StickVec> padAim; ///< the way last aimed (one long: a stick's lean), while the pad's in use
+    pad::PlayState padPlay;            ///< the pad in a game: aim, target, pointer (pad/pad_play.hpp)
+    pad::InputModeChoice padModeChoice; ///< when to ask which to play with (pad/pad_mode.cpp)
+    std::unique_ptr<InputModeAsk> padModeAsk; ///< the question, while it's up
+    std::function<void()> padModeThen;  ///< the start-up's first screen, once answered
+    std::uint64_t padModeWaitUntilMs = 0; ///< the start-up waiting a moment for a pad SDL is still finding
+    std::optional<pad::InputDevice> padModeForced; ///< --input-mode pad / mouse (tests); ask: none, padModeAskForced
+    bool padModeAskForced = false;      ///< --input-mode ask: asked even in a test run
     pad::PromptCache padPrompts;       ///< the HUD's pad prompts, made again when the config or the pad changes
     pad::RumbleWatch padRumble;        ///< our health and level as last seen (the rumble's cue)
     pad::PanelState padPanels;         ///< the pad's snap cursor on the game's panels (pad/pad_panels.hpp)
@@ -1053,14 +1062,12 @@ void padRelease(App& app, const pad::PadEdge& edge);
 /// A pad button's press that reached the game's controls (gated by padGameInput): its controls
 /// fired (liveControls), the pad's own actions told to padAction.
 void padPress(App& app, const pad::PadEdge& edge);
-/// The pad's own game actions (Interact, TargetNext / TargetPrevious, FreeCursor), pressed or let go.
+/// The pad's own game actions (Interact, TargetNext / TargetPrevious), pressed or let go.
 void padAction(App& app, pad::PadAction action, bool down);
 /// The HUD's pad prompts (the slots' and potions' buttons) while the pad is the device in use, else null.
 const pad::HudPrompts* padHudPrompts(App& app);
 /// An action's prompt (its button, after the modifier's when it's on that layer), as named now.
 pad::PromptLabels padPrompt(const App& app, std::string_view action);
-/// What the pad's own actions hold let go (InputBindings::releaseAll's moments).
-void padActionsDropped(App& app);
 // (pad/pad_menu.cpp: the pad in the menus and the game's windows)
 /// A pad button's press while a menu or a game window has the pad (padMenusUp): the D-pad, MenuAccept
 /// and the tabs go on as a nav event (gui::navEvent: `event` becomes it), for the Gui that has the
@@ -1091,6 +1098,26 @@ void drawOsk(App& app);
 /// --pad-script's steps due `elapsedMs` in (after joining, or from start-up in the menus).
 void runPadScript(App& app, std::uint64_t elapsedMs);
 std::vector<App::ScriptedPad> parsePadScript(std::string_view script);
+// (pad/pad_mode.cpp: the input mode, the pad's or the mouse and keyboard's, and the question)
+/// The start-up's first screen: `start` (the movies and the legal screen, or the main menu) runs
+/// once the player has said which to play with when a pad is connected (asked before anything
+/// else), at once with none.
+void padModeStart(App& app, std::function<void()> start);
+/// Every event, after padEventFirst: the question's while it's up, a pad coming or going; in the
+/// pad's mode the mouse's events dropped. True: taken (nothing else sees it).
+bool padModeEvent(App& app, const SDL_Event& event);
+/// Whether the pad's presses are heard in the mouse's mode now (the question is up, the Controller
+/// screen waits for a button).
+bool padModeHearsPad(const App& app);
+/// Each frame (menus and game): the question shown once it's due and something may ask it.
+void padModeFrame(App& app);
+/// The question over everything (menus and game), while it's up.
+void drawPadModeAsk(App& app);
+/// Whether it's up (the mouse's pointer is drawn for it whatever the mode).
+bool padModeAsking(const App& app);
+/// The input mode: the pad's (the mouse's pointer never drawn, the mouse ignored) or the mouse and
+/// keyboard's (the pad ignored). Not kept between runs.
+void setInputMode(App& app, bool pad);
 
 // test_drive.cpp
 void pickupTest(App& app);

@@ -78,12 +78,12 @@ Side creatureSide(const CreatureFacts& c, std::uint32_t ownTeam, std::uint32_t g
 AimTuning aimTuning(AimAssist a)
 {
     switch (a) {
-    case AimAssist::Off: return {0, 0, 0, 0};
-    case AimAssist::Weak: return {20, 7, 24, 8};
-    case AimAssist::Normal: return {35, 12, 40, 14};
-    case AimAssist::Strong: return {50, 12, 56, 14};
+    case AimAssist::Off: return {0, 0};
+    case AimAssist::Weak: return {20, 7};
+    case AimAssist::Normal: return {35, 12};
+    case AimAssist::Strong: return {50, 12};
     }
-    return {35, 12, 40, 14};
+    return {35, 12};
 }
 
 std::optional<float> coneScore(const AimCandidate& c, WorldPoint from, StickVec dir, const AimTuning& t, float reach, bool idle)
@@ -106,16 +106,6 @@ std::optional<float> coneScore(const AimCandidate& c, WorldPoint from, StickVec 
         return std::nullopt;
     }
     return 0.65f * angle / limit + 0.35f * d / reach;
-}
-
-std::optional<float> reticleScore(const AimCandidate& c, WorldPoint reticle, const AimTuning& t)
-{
-    const float snap = c.player ? t.playerSnap : t.snap;
-    const float d = distance(reticle, c.at);
-    if (snap <= 0 || d > snap) {
-        return std::nullopt;
-    }
-    return d / snap;
 }
 
 void Targeter::clear()
@@ -195,9 +185,7 @@ std::optional<std::uint16_t> Targeter::update(const TargetFrame& f)
         return std::nullopt;
     }
     const AimTuning t = aimTuning(f.assist);
-    const auto score = [&](const AimCandidate& c) {
-        return f.reticle ? reticleScore(c, *f.reticle, t) : coneScore(c, f.from, f.dir, t, f.reach, f.idle);
-    };
+    const auto score = [&](const AimCandidate& c) { return coneScore(c, f.from, f.dir, t, f.reach, f.idle); };
     // Held by the attack or a slot button: a monster stays (players get the soft rule's short keep).
     if (cur && f.lockHeld && f.lockMode == LockMode::WhileHeld && !cur->player && distance(f.from, cur->at) <= f.reach * 1.5f) {
         held_ = true;
@@ -230,24 +218,17 @@ std::optional<std::uint16_t> Targeter::update(const TargetFrame& f)
     return current_;
 }
 
-RightStickFrame RightStick::update(StickVec v, float seconds, float sensitivity)
+RightStickFrame RightStick::update(StickVec v, float seconds)
 {
     RightStickFrame out;
     const float m = v.length();
     switch (phase_) {
     case Phase::Idle:
-    case Phase::Lingering:
         if (m > 0) {
             phase_ = Phase::Pending;
             t_ = 0;
             peak_ = m;
             peakDir_ = {v.x / m, v.y / m};
-        } else if (phase_ == Phase::Lingering) {
-            t_ += seconds;
-            if (t_ >= kReticleLinger) {
-                phase_ = Phase::Idle;
-                shown_ = false;
-            }
         }
         break;
     case Phase::Pending:
@@ -260,30 +241,42 @@ RightStickFrame RightStick::update(StickVec v, float seconds, float sensitivity)
             if (peak_ >= kFlickTilt) {
                 out.flick = peakDir_;
             }
-            phase_ = shown_ ? Phase::Lingering : Phase::Idle;
-            t_ = 0;
+            phase_ = Phase::Idle;
         } else if (t_ >= kFlickSeconds) {
             phase_ = Phase::Aiming;
-            shown_ = true;
-            offset_ = v;
+            way_ = {v.x / m, v.y / m};
         }
         break;
     case Phase::Aiming:
         if (m <= 0) {
-            phase_ = Phase::Lingering;
-            t_ = 0;
-        } else if (m >= kReticleHoldTilt) {
-            // (eased toward the stick, so it glides; let go, it stays where it was aimed)
-            const float k = std::clamp(seconds * 14.0f * std::clamp(sensitivity, 0.25f, 4.0f), 0.0f, 1.0f);
-            offset_.x += (v.x - offset_.x) * k;
-            offset_.y += (v.y - offset_.y) * k;
+            phase_ = Phase::Idle; // (let go: the way it was held is the caller's last way)
+        } else if (m >= kAimHoldTilt) {
+            way_ = {v.x / m, v.y / m};
         }
         break;
     }
-    if (shown_) {
-        out.reticle = offset_;
+    if (phase_ == Phase::Aiming) {
+        out.aim = way_;
     }
     return out;
+}
+
+StickVec aimWay(std::optional<StickVec> right, StickVec left, std::optional<StickVec> last, StickVec fallback)
+{
+    const auto unit = [](StickVec v) -> std::optional<StickVec> {
+        const float l = v.length();
+        return l > 0 ? std::optional<StickVec>(StickVec{v.x / l, v.y / l}) : std::nullopt;
+    };
+    if (const auto r = right ? unit(*right) : std::nullopt) {
+        return *r;
+    }
+    if (const auto l = unit(left)) {
+        return *l;
+    }
+    if (const auto k = last ? unit(*last) : std::nullopt) {
+        return *k;
+    }
+    return unit(fallback).value_or(StickVec{1, 0});
 }
 
 SpellAim spellAim(std::uint32_t spellFlags, bool onSelf)
@@ -302,17 +295,13 @@ SpellAim abilityAim(std::uint32_t ability)
     return ability == 1 || ability == 3 ? SpellAim::Point : SpellAim::Self;
 }
 
-std::optional<WorldPoint> castPoint(SpellAim kind, std::optional<WorldPoint> target, std::optional<WorldPoint> reticle,
-                                    WorldPoint from, StickVec dir)
+std::optional<WorldPoint> castPoint(SpellAim kind, std::optional<WorldPoint> target, WorldPoint from, StickVec dir)
 {
     if (kind == SpellAim::Self) {
         return std::nullopt;
     }
     if (target) {
         return target;
-    }
-    if (reticle) {
-        return reticle;
     }
     const float l = dir.length();
     const StickVec d = l > 0 ? StickVec{dir.x / l, dir.y / l} : StickVec{1, 0};
@@ -338,7 +327,12 @@ std::optional<std::size_t> bestInteract(std::span<const InteractOption> options,
             if (angle > 120.0f) {
                 continue;
             }
-            const float s = 0.55f * d / kTalkReach + 0.45f * angle / 180.0f; // (one scale for all: the nearer wins)
+            // (One scale for all, the angle weighing more than the distance: what's in front wins
+            // over what's nearer but off to the side; someone to talk to in front more so.)
+            float s = 0.4f * d / kTalkReach + 0.6f * angle / 180.0f;
+            if (o.talks && angle <= kFacingCone) {
+                s -= kTalkPreference;
+            }
             if (!best || s < bestScore) {
                 best = i;
                 bestScore = s;
@@ -350,19 +344,6 @@ std::optional<std::size_t> bestInteract(std::span<const InteractOption> options,
         return b;
     }
     return skip.empty() ? std::nullopt : pick(false);
-}
-
-StickVec freeCursorStep(StickVec v, float seconds, float sensitivity, float scale, float& heldFor)
-{
-    const float m = v.length();
-    if (m <= 0) {
-        heldFor = 0;
-        return {};
-    }
-    heldFor = m > 0.9f ? heldFor + seconds : 0.0f;
-    const float accel = 1.0f + 1.5f * std::min(heldFor, 1.0f);
-    const float speed = kFreeCursorSpeed * std::clamp(sensitivity, 0.25f, 4.0f) * std::max(scale, 0.25f) * m * accel; // (m * |v| = tilt squared)
-    return {v.x * speed * seconds, v.y * speed * seconds};
 }
 
 } // namespace noxsdl::pad

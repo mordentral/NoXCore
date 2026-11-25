@@ -460,6 +460,17 @@ void Gui::padFocus(Window* w)
     }
 }
 
+std::optional<SDL_FPoint> Gui::navFocusPoint(int width, int height) const
+{
+    const Window* w = nav_.focus();
+    if (!w) {
+        return std::nullopt;
+    }
+    const SDL_Rect r = screenRect(*w);
+    const SDL_FRect o = painter(nullptr, width, height).toOutput(r.x, r.y, r.w, r.h);
+    return SDL_FPoint{o.x + o.w / 2, o.y + o.h / 2};
+}
+
 bool Gui::stepTabs(std::span<Window* const> tabs, int step)
 {
     const int n = static_cast<int>(tabs.size());

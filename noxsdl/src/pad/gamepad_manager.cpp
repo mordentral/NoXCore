@@ -76,6 +76,7 @@ void GamepadManager::open(SDL_JoystickID id)
     if (active_ == 0) {
         active_ = id;
     }
+    setDevice(mode_); // (the pad's mode in effect again once there's a pad)
     const char* name = SDL_GetGamepadName(g);
     const char* kind = SDL_GetGamepadStringForType(SDL_GetGamepadType(g));
     SDL_Log("game controller %u: %s (%s)", static_cast<unsigned>(id), name ? name : "?", kind ? kind : "unknown");
@@ -96,19 +97,23 @@ void GamepadManager::close(SDL_JoystickID id)
     if (pads_.empty()) {
         frame_ = {};
         lastSampleNs_ = 0;
+        if (mode_ == InputDevice::Pad) {
+            mode_ = InputDevice::MouseKeyboard; // (the last pad gone: the mouse's mode by itself)
+            fellBack_ = true;
+        }
         setDevice(InputDevice::MouseKeyboard);
     }
 }
 
-void GamepadManager::touched(SDL_JoystickID id)
+void GamepadManager::setMode(InputDevice d)
 {
-    active_ = id;
-    setDevice(InputDevice::Pad);
+    mode_ = d;
+    fellBack_ = false;
+    setDevice(pads_.empty() ? InputDevice::MouseKeyboard : d);
 }
 
 void GamepadManager::setDevice(InputDevice d)
 {
-    mouseTravel_ = 0;
     if (d != device_) {
         device_ = d;
         ++deviceChanges_;
@@ -216,7 +221,7 @@ std::optional<PadEdge> GamepadManager::trigger(Pad& p, SDL_GamepadAxis axis, Sin
     const PadButton b = left ? PadButton::LeftTrigger : PadButton::RightTrigger;
     p.down.set(static_cast<std::size_t>(b), now);
     if (now) {
-        touched(p.id);
+        active_ = p.id; // (the pad last touched is the one played with)
     }
     return PadEdge{b, now, p.id};
 }
@@ -240,7 +245,7 @@ std::optional<PadEdge> GamepadManager::handleEvent(const SDL_Event& event)
         const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
         p->down.set(static_cast<std::size_t>(*b), down);
         if (down) {
-            touched(p->id);
+            active_ = p->id;
         }
         return PadEdge{*b, down, p->id};
     }
@@ -253,40 +258,17 @@ std::optional<PadEdge> GamepadManager::handleEvent(const SDL_Event& event)
         if (axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) {
             return trigger(*p, axis, event.gaxis.value);
         }
-        // A stick past its dead zone touches the pad (its other axis as it stands).
+        // A stick past its dead zone makes its pad the one played with (its other axis as it stands).
         const bool leftStick = axis == SDL_GAMEPAD_AXIS_LEFTX || axis == SDL_GAMEPAD_AXIS_LEFTY;
         const SDL_GamepadAxis xAxis = leftStick ? SDL_GAMEPAD_AXIS_LEFTX : SDL_GAMEPAD_AXIS_RIGHTX;
         const SDL_GamepadAxis yAxis = leftStick ? SDL_GAMEPAD_AXIS_LEFTY : SDL_GAMEPAD_AXIS_RIGHTY;
         const float x = axisUnit(axis == xAxis ? event.gaxis.value : SDL_GetGamepadAxis(p->gamepad, xAxis));
         const float y = axisUnit(axis == yAxis ? event.gaxis.value : SDL_GetGamepadAxis(p->gamepad, yAxis));
         if (std::hypot(x, y) > (leftStick ? settings_.deadZone : settings_.rightDeadZone)) {
-            touched(p->id);
+            active_ = p->id;
         }
         return std::nullopt;
     }
-    case SDL_EVENT_MOUSE_MOTION:
-        if (device_ == InputDevice::Pad && event.motion.which != kPadMouse) {
-            mouseTravel_ += std::abs(event.motion.xrel) + std::abs(event.motion.yrel);
-            if (mouseTravel_ > kMouseHandBack) {
-                setDevice(InputDevice::MouseKeyboard);
-            }
-        }
-        return std::nullopt;
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        if (event.button.which != kPadMouse) {
-            setDevice(InputDevice::MouseKeyboard);
-        }
-        return std::nullopt;
-    case SDL_EVENT_MOUSE_WHEEL:
-        if (event.wheel.which != kPadMouse) {
-            setDevice(InputDevice::MouseKeyboard);
-        }
-        return std::nullopt;
-    case SDL_EVENT_KEY_DOWN:
-        if (!event.key.repeat && event.key.which != kPadKeys) {
-            setDevice(InputDevice::MouseKeyboard);
-        }
-        return std::nullopt;
     default:
         return std::nullopt;
     }

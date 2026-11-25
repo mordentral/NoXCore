@@ -31,7 +31,7 @@ constexpr std::pair<std::string_view, PadButton> kButtonAliases[] = {
 };
 
 constexpr std::array<std::string_view, kPadActionCount> kActionNames{
-    "Interact", "TargetNext", "TargetPrevious", "FreeCursor", "Modifier", "MenuAccept", "MenuBack", "TabPrevious", "TabNext",
+    "Interact", "TargetNext", "TargetPrevious", "Modifier", "MenuAccept", "MenuBack", "TabPrevious", "TabNext",
 };
 
 /// The game's controls' names, then the pad's: made once.
@@ -117,7 +117,7 @@ constexpr std::string_view kPromptNames[] = {"auto", "xbox", "playstation", "swi
 bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
 {
     if (sameName(name, "DeadZone") || sameName(name, "RightDeadZone") || sameName(name, "OuterDeadZone") ||
-        sameName(name, "TriggerThreshold") || sameName(name, "Sensitivity") || sameName(name, "RunThreshold")) {
+        sameName(name, "TriggerThreshold") || sameName(name, "RunThreshold")) {
         const auto f = number(value);
         if (!f) {
             return false;
@@ -130,10 +130,8 @@ bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
             s.outerDeadZone = std::clamp(*f, 0.1f, 1.0f);
         } else if (sameName(name, "TriggerThreshold")) {
             s.triggerThreshold = std::clamp(*f, 0.05f, 0.95f);
-        } else if (sameName(name, "RunThreshold")) {
-            s.runThreshold = std::clamp(*f, kMinRunThreshold, kMaxRunThreshold);
         } else {
-            s.sensitivity = std::clamp(*f, kMinSensitivity, kMaxSensitivity);
+            s.runThreshold = std::clamp(*f, kMinRunThreshold, kMaxRunThreshold);
         }
         return true;
     }
@@ -177,7 +175,7 @@ bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
 
 bool isSettingName(std::string_view name)
 {
-    for (const std::string_view n : {"DeadZone", "RightDeadZone", "OuterDeadZone", "TriggerThreshold", "Sensitivity", "RunThreshold",
+    for (const std::string_view n : {"DeadZone", "RightDeadZone", "OuterDeadZone", "TriggerThreshold", "RunThreshold",
                                      "AimAssist", "LockMode", "InvertY", "Rumble", "Prompts"}) {
         if (sameName(name, n)) {
             return true;
@@ -298,7 +296,6 @@ PadConfig defaultPadConfig()
     bind("InvokeSlot4", B::RightShoulder);
     bind("InvokeSlot5", B::LeftShoulder);
     bind("Jump", B::LeftStick);
-    bind("FreeCursor", B::RightStick);
     bind("QuickHealth", B::DpadUp);
     bind("QuickMana", B::DpadDown);
     bind("PreviousSpellSet", B::DpadLeft);
@@ -398,7 +395,6 @@ std::string formatPadConfig(const PadConfig& c)
     out += "RightDeadZone = " + numberText(s.rightDeadZone) + "\n";
     out += "OuterDeadZone = " + numberText(s.outerDeadZone) + "\n";
     out += "TriggerThreshold = " + numberText(s.triggerThreshold) + "\n";
-    out += "Sensitivity = " + numberText(s.sensitivity) + "\n";
     out += "RunThreshold = " + numberText(s.runThreshold) + "\n";
     out += "AimAssist = " + std::string(kAimNames[static_cast<std::size_t>(s.aimAssist)]) + "\n";
     out += "LockMode = " + std::string(kLockNames[static_cast<std::size_t>(s.lockMode)]) + "\n";

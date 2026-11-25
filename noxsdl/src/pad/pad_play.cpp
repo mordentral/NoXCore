@@ -5,7 +5,6 @@
 #include "cursor_pick.hpp"
 #include "friend_dot.hpp"
 #include "pad/pad_panels.hpp"
-#include "pointer_map.hpp"
 
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/things/object_class.hpp"
@@ -100,71 +99,6 @@ WorldPoint ahead(WorldPoint from, StickVec dir, float by)
     return {from.x + dir.x * by, from.y + dir.y * by};
 }
 
-// ------------------------------------------------------------------ the free cursor's mouse
-
-/// A made-up mouse event at the free cursor (in window points, as SDL's are: the event's way
-/// through SDL_AppEvent maps it into the game's pixels as the mouse's), the pad's mouse id.
-void pushFreeMouse(App& app, Uint32 type, Uint8 button, float dx = 0, float dy = 0)
-{
-    float x = app.padPlay.freeX;
-    float y = app.padPlay.freeY;
-    pointermap::toWindow(x, y, app.pixelDensity, pointermap::Area{app.gameArea.x, app.gameArea.y, app.gameArea.w, app.gameArea.h},
-                         app.letterboxed);
-    SDL_Event e{};
-    e.type = type;
-    if (type == SDL_EVENT_MOUSE_MOTION) {
-        e.motion.which = pad::GamepadManager::kPadMouse;
-        e.motion.x = x;
-        e.motion.y = y;
-        e.motion.xrel = dx;
-        e.motion.yrel = dy;
-        e.motion.state = (app.padPlay.freeButtons & 1 ? SDL_BUTTON_LMASK : 0u) | (app.padPlay.freeButtons & 2 ? SDL_BUTTON_RMASK : 0u);
-    } else {
-        e.button.which = pad::GamepadManager::kPadMouse;
-        e.button.button = button;
-        e.button.down = type == SDL_EVENT_MOUSE_BUTTON_DOWN;
-        e.button.clicks = 1;
-        e.button.x = x;
-        e.button.y = y;
-    }
-    SDL_PushEvent(&e);
-}
-
-void releaseFreeButtons(App& app)
-{
-    auto& s = app.padPlay;
-    if (s.freeButtons & 1) {
-        s.freeButtons &= ~1u;
-        pushFreeMouse(app, SDL_EVENT_MOUSE_BUTTON_UP, SDL_BUTTON_LEFT);
-    }
-    if (s.freeButtons & 2) {
-        s.freeButtons &= ~2u;
-        pushFreeMouse(app, SDL_EVENT_MOUSE_BUTTON_UP, SDL_BUTTON_RIGHT);
-    }
-}
-
-/// The free cursor moved by the right stick (its motion sent on as the mouse's).
-void moveFreeCursor(App& app, StickVec right, float seconds)
-{
-    auto& s = app.padPlay;
-    const float scale = static_cast<float>(app.camera.viewHeight) / 480.0f;
-    const StickVec step = pad::freeCursorStep(right, seconds, app.padConfig.settings.sensitivity, scale, s.freeHeld);
-    if (step.x != 0 || step.y != 0) {
-        const float x = std::clamp(s.freeX + step.x, 0.0f, std::max(static_cast<float>(app.camera.viewWidth) - 1, 0.0f));
-        const float y = std::clamp(s.freeY + step.y, 0.0f, std::max(static_cast<float>(app.camera.viewHeight) - 1, 0.0f));
-        const float dx = x - s.freeX;
-        const float dy = y - s.freeY;
-        s.freeX = x;
-        s.freeY = y;
-        if (dx != 0 || dy != 0) {
-            pushFreeMouse(app, SDL_EVENT_MOUSE_MOTION, 0, dx, dy);
-        }
-    }
-    s.hasPointer = true;
-    s.pointerX = s.freeX;
-    s.pointerY = s.freeY;
-}
-
 // ------------------------------------------------------------------------- interact
 
 float extentRing(const TypeArt* art)
@@ -212,8 +146,9 @@ void pickInteract(App& app, WorldPoint from, StickVec dir)
         }
         const auto* d = client.world().drawable(n.netCode);
         const TypeArt* a = d ? app.art->get(d->typeId) : nullptr;
+        // (Talk and Trade within the mouse's hand's 125; the pickup hands' 75.)
         const bool talk = *hand == CursorType::Talk || *hand == CursorType::Trade;
-        options.push_back({n.netCode, n.at, talk ? 125.0f : 75.0f});
+        options.push_back({n.netCode, n.at, talk ? 125.0f : 75.0f, talk});
         what.push_back({static_cast<std::uint8_t>(*hand), n.netCode, 0, n.at, extentRing(a)});
     }
     if (app.view) {
@@ -239,6 +174,9 @@ void pickInteract(App& app, WorldPoint from, StickVec dir)
 void interact(App& app)
 {
     auto& s = app.padPlay;
+    if (!s.interact && s.collecting) {
+        pickInteract(app, s.from, s.dir); // (none picked this frame yet: from what last frame saw)
+    }
     if (!s.interact) {
         return;
     }
@@ -300,7 +238,7 @@ void aimCast(App& app, pad::SpellAim kind, std::uint32_t spell)
     }
     const WorldPoint from{static_cast<float>(at->first), static_cast<float>(at->second)};
     const auto target = kind == pad::SpellAim::Self ? std::nullopt : s.targetAt;
-    const auto point = pad::castPoint(kind, target, s.reticle, from, s.dir);
+    const auto point = pad::castPoint(kind, target, from, s.dir);
     if (!point) {
         return;
     }
@@ -374,9 +312,6 @@ bool isSlotControl(const std::string& c)
 void padPlayIdle(App& app)
 {
     auto& s = app.padPlay;
-    if (s.freeButtons) {
-        releaseFreeButtons(app);
-    }
     s.dropAim();
     s.collecting = false;
     s.enemies.clear();
@@ -392,9 +327,6 @@ PadSteer padPlaySteer(App& app, float fromX, float fromY)
     const WorldPoint from{fromX, fromY};
     const StickVec left = frame.left;
     const float tilt = left.length();
-    if (tilt > 0) {
-        app.padAim = StickVec{left.x / tilt, left.y / tilt};
-    }
     s.from = from;
     // (What liveSprites gathered last frame is used below, then gathered again.)
     const auto regather = [&] {
@@ -402,43 +334,25 @@ PadSteer padPlaySteer(App& app, float fromX, float fromY)
         s.near.clear();
         s.collecting = true;
     };
-    // The free cursor: the right stick moves it, the mouse's ways take it (the hover, the facing,
-    // the cursor point at rest); the left stick still walks.
-    if (s.freeCursor) {
-        const bool had = s.hasPointer;
-        s.dropAim();
-        s.hasPointer = had;
-        moveFreeCursor(app, frame.right, frame.seconds);
-        s.enemies.clear();
-        s.near.clear();
-        s.collecting = false;
-        if (tilt <= 0) {
-            return PadSteer::None;
-        }
-        const WorldPoint p = ahead(from, *app.padAim, pad::stickReach(tilt, settings.runThreshold));
-        client.move(facingTo(from, p));
-        client.setCursor(static_cast<int>(p.x), static_cast<int>(p.y));
-        client.setCursorSprite(std::nullopt);
-        return PadSteer::Moves;
+    // The aim: the right stick's way while it's held, else the left stick's, else the way last
+    // aimed, kept (app.padAim): letting the sticks go never turns the player.
+    // (A game window or a panel that has the pad has the right stick too, its jumps between groups:
+    // no aim from it then.)
+    const bool rightIsMenus = padMenusUp(app) || app.padPanels.active;
+    const StickVec rightStick = rightIsMenus ? StickVec{} : frame.right;
+    const pad::RightStickFrame r = s.right.update(rightStick, frame.seconds);
+    const std::optional<StickVec> lean = tilt > 0 ? std::optional<StickVec>(StickVec{left.x / tilt, left.y / tilt}) : std::nullopt;
+    if (r.aim) {
+        app.padAim = *r.aim;
+    } else if (lean) {
+        app.padAim = *lean;
     }
-    // The aim: the right stick's reticle, else the left stick's way, else the way we last went.
-    const pad::RightStickFrame r = s.right.update(frame.right, frame.seconds, settings.sensitivity);
-    s.reticle.reset();
-    StickVec dir = app.padAim ? *app.padAim : ownFacingWay(app);
-    if (r.reticle) {
-        const float halfW = static_cast<float>(app.camera.viewWidth) / 2 / app.camera.zoom;
-        const float halfH = static_cast<float>(app.camera.viewHeight) / 2 / app.camera.zoom;
-        s.reticle = WorldPoint{from.x + r.reticle->x * halfW, from.y + r.reticle->y * halfH};
-        if (pad::distance(from, *s.reticle) > 4) {
-            dir = pad::wayTo(from, *s.reticle);
-        }
-    }
+    const StickVec dir = pad::aimWay(r.aim, left, app.padAim, ownFacingWay(app));
     s.dir = dir;
     pad::TargetFrame tf;
     tf.from = from;
     tf.dir = dir;
-    tf.reticle = s.reticle;
-    tf.idle = tilt <= 0 && !r.reticle && frame.right.length() <= 0;
+    tf.idle = tilt <= 0 && !r.aim && rightStick.length() <= 0;
     tf.enemies = s.enemies;
     tf.assist = settings.aimAssist;
     tf.lockMode = settings.lockMode;
@@ -469,7 +383,7 @@ PadSteer padPlaySteer(App& app, float fromX, float fromY)
         s.castAt.reset();
         s.castTarget.reset();
     }
-    const WorldPoint aim = castAim ? *castAim : s.targetAt ? *s.targetAt : s.reticle ? *s.reticle : ahead(from, dir, pad::kWalkReach);
+    const WorldPoint aim = castAim ? *castAim : s.targetAt ? *s.targetAt : ahead(from, dir, pad::kWalkReach);
     const std::optional<std::uint16_t> sprite = castAim ? castSprite : s.targetAt ? s.target : std::nullopt;
     s.aimAt = aim;
     const auto hadInteract = interactKey(s.interact);
@@ -481,30 +395,54 @@ PadSteer padPlaySteer(App& app, float fromX, float fromY)
     }
     setPointer(app, aim);
     regather();
-    if (tilt > 0) {
+    if (lean) {
         // Moving: the cursor point out the stick's way by its tilt (walk or run), unless a chant's
         // aim holds it; with the attack held, a target close by and ahead is gone for.
-        WorldPoint p = ahead(from, *app.padAim, pad::stickReach(tilt, settings.runThreshold));
+        WorldPoint p = ahead(from, *lean, pad::stickReach(tilt, settings.runThreshold));
         std::uint8_t way = facingTo(from, p);
         std::optional<std::uint16_t> pSprite;
         static const int kAction = InputBindings::control("Action");
         const bool attacking = app.input && app.input->held(kAction);
+        bool goingFor = false;
         if (castAim) {
             p = *castAim;
             pSprite = castSprite;
+            goingFor = true;
         } else if (attacking && s.targetAt && pad::distance(from, *s.targetAt) < pad::kRunDistance &&
-                   pad::angleBetween(*app.padAim, pad::wayTo(from, *s.targetAt)) < 90) {
+                   pad::angleBetween(*lean, pad::wayTo(from, *s.targetAt)) < 90) {
             p = *s.targetAt;
             pSprite = s.target;
             way = facingTo(from, p);
+            goingFor = true;
+        }
+        // Running, the stick leaned back to a walk: the server keeps a run till the player stops
+        // (the mouse's way: let the button go), so the move is let go till the run has ended
+        // (our RUN gone), then it walks on at the lean's distance.
+        const std::uint64_t now = SDL_GetTicks();
+        const bool running = ownAnimState(app) == 6;
+        const bool walkAgain = running && !goingFor && pad::walkAgain(tilt, settings.runThreshold);
+        if (s.walkAgainUntilMs == 0 && walkAgain && now >= s.walkAgainNotBeforeMs) {
+            s.walkAgainUntilMs = now + 300; // (at most: the server's word that the run ended comes sooner)
+        }
+        if (s.walkAgainUntilMs != 0) {
+            if (walkAgain && now < s.walkAgainUntilMs) {
+                client.face(way);
+                client.setCursor(static_cast<int>(p.x), static_cast<int>(p.y));
+                client.setCursorSprite(std::nullopt);
+                return PadSteer::Holds; // (sendGameInput lets the move go)
+            }
+            if (walkAgain) {
+                s.walkAgainNotBeforeMs = now + 1000; // (still running: not asked again at once)
+            }
+            s.walkAgainUntilMs = 0;
         }
         client.move(way);
         client.setCursor(static_cast<int>(p.x), static_cast<int>(p.y));
         client.setCursorSprite(pSprite);
         return PadSteer::Moves;
     }
-    // At rest: facing the aim point (the target, the reticle, or the way we last went), the
-    // cursor point on it.
+    s.walkAgainUntilMs = 0;
+    // At rest: facing the aim point (the target, or the way last aimed), the cursor point on it.
     client.face(facingTo(from, aim));
     client.setCursor(static_cast<int>(aim.x), static_cast<int>(aim.y));
     client.setCursorSprite(sprite);
@@ -513,39 +451,9 @@ PadSteer padPlaySteer(App& app, float fromX, float fromY)
 
 // ---------------------------------------------------------------------------- buttons
 
-bool padPlayPress(App& app, const pad::PadEdge& edge)
-{
-    auto& s = app.padPlay;
-    if (!s.freeCursor || app.view3d.active()) {
-        return false;
-    }
-    const std::uint8_t bit = edge.button == pad::PadButton::South ? 1 : edge.button == pad::PadButton::West ? 2 : 0;
-    if (bit == 0) {
-        return false;
-    }
-    if (!(s.freeButtons & bit)) {
-        s.freeButtons |= bit;
-        pushFreeMouse(app, SDL_EVENT_MOUSE_BUTTON_DOWN, bit == 1 ? SDL_BUTTON_LEFT : SDL_BUTTON_RIGHT);
-    }
-    return true;
-}
-
-bool padPlayRelease(App& app, const pad::PadEdge& edge)
-{
-    auto& s = app.padPlay;
-    const std::uint8_t bit = edge.button == pad::PadButton::South ? 1 : edge.button == pad::PadButton::West ? 2 : 0;
-    if (bit == 0 || !(s.freeButtons & bit)) {
-        return false;
-    }
-    s.freeButtons &= static_cast<std::uint8_t>(~bit);
-    pushFreeMouse(app, SDL_EVENT_MOUSE_BUTTON_UP, bit == 1 ? SDL_BUTTON_LEFT : SDL_BUTTON_RIGHT);
-    return true;
-}
-
 bool padPlayControls(App& app, const pad::PadActionSet& actions, const std::vector<std::string>& controls)
 {
-    auto& s = app.padPlay;
-    if (s.freeCursor || app.view3d.active() || !app.pads.padInUse()) {
+    if (app.view3d.active() || !app.pads.padInUse()) {
         return false;
     }
     const bool slot = std::ranges::any_of(controls, isSlotControl);
@@ -576,41 +484,15 @@ void padPlayAction(App& app, pad::PadAction action, bool down)
     }
     switch (action) {
     case pad::PadAction::Interact:
-        if (!s.freeCursor) {
-            interact(app);
-        }
+        interact(app);
         break;
     case pad::PadAction::TargetNext:
     case pad::PadAction::TargetPrevious:
         s.pendingStep = action == pad::PadAction::TargetNext ? 1 : -1;
         break;
-    case pad::PadAction::FreeCursor:
-        if (s.freeCursor) {
-            releaseFreeButtons(app);
-            s.freeCursor = false;
-            s.hasPointer = false;
-        } else {
-            // From where the pad's pointer is (the aim point), else the view's middle.
-            s.freeX = s.hasPointer ? s.pointerX : static_cast<float>(app.camera.viewWidth) / 2;
-            s.freeY = s.hasPointer ? s.pointerY : static_cast<float>(app.camera.viewHeight) / 2;
-            s.freeHeld = 0;
-            s.freeCursor = true;
-            s.dropAim();
-            s.hasPointer = true;
-            s.pointerX = s.freeX;
-            s.pointerY = s.freeY;
-            pushFreeMouse(app, SDL_EVENT_MOUSE_MOTION, 0);
-        }
-        uiSound(app, 0x399); // ShellClick
-        break;
     default:
         break;
     }
-}
-
-void padPlayDropped(App& app)
-{
-    releaseFreeButtons(app);
 }
 
 // ----------------------------------------------------------------------- the drawables
@@ -663,7 +545,7 @@ void padNoteSeen(App& app, std::uint16_t netCode, const nox::client::Drawable& d
 
 bool padHidesPointer(const App& app)
 {
-    return app.live && app.pads.padInUse() && app.padPlay.hasPointer && !app.padPlay.freeCursor && !app.view3d.active();
+    return app.live && app.pads.padInUse() && !app.view3d.active();
 }
 
 std::optional<View3D::Ring> padTargetRing(App& app)
@@ -702,15 +584,10 @@ std::optional<View3D::Ring> padInteractRing(App& app)
     return View3D::Ring{at.x, at.y, s.interact->radius, paletteColor(color)};
 }
 
-void drawPadOverlay(App& app, float scale)
+void drawPadOverlay(App& app)
 {
     drawPadPanels(app); // (the panels' snap cursor, pad_panels.cpp)
     const auto& s = app.padPlay;
-    // The reticle while the right stick aims (and a moment after).
-    if (s.reticle && app.cursor) {
-        const SDL_FPoint at = toScreen(app, *s.reticle);
-        app.cursor->draw(app.renderer, CursorType::Target, at.x, at.y, std::max(scale, 1.0f));
-    }
     // A's prompt over what it takes.
     if (s.interact && app.font && app.renderGui) {
         std::string_view word;

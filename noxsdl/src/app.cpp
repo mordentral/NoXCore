@@ -65,6 +65,16 @@ SDL_FPoint mousePos(const App& app)
     const bool heldShown = app.editor && app.live && (app.playTestEmbedded || app.sessionEmbedded) && !app.playTestCaptured;
     // (noxcpp) The game controller's pointer while it's in use in a game: in the game's pixels already.
     const bool padPoint = app.padPlay.hasPointer && app.live && app.pads.padInUse();
+    if (!padPoint && app.pads.padInUse() && !app.testMouse && !heldShown && !app.editor && !padModeAsking(app)) {
+        // The pad's mode with no pointer of its own: where its focus is (a tooltip, a hover follow
+        // it), else nowhere on the screen; never where the mouse was left.
+        if (const gui::Gui* owner = gui::navOwner()) {
+            if (const auto p = owner->navFocusPoint(app.camera.viewWidth, app.camera.viewHeight)) {
+                return *p;
+            }
+        }
+        return SDL_FPoint{-1, -1};
+    }
     switch (pointerSource(app.testMouse.has_value(), app.playTestMouse.has_value(), heldShown, padPoint)) {
     case PointerSource::Test:
         m = *app.testMouse;

@@ -4,12 +4,12 @@
 // It opens when the pad gives an entry field the typing focus (A on it: Gui::navigate notes it), when
 // the chat line (Chat, TeamChat) or the console opens with the pad the device in use; it closes once
 // that's gone (the field left or hidden, the line sent, the console shut), on B, when a real key is
-// pressed or the mouse is used (the keyboard's and mouse's again), and when the last pad goes.
+// pressed (the keyboard types instead), and when the last pad goes.
 //
 // What it types goes the way the keyboard's typing does: SDL text events and Backspace / Enter /
 // Escape key events pushed into SDL's queue, so the field's own screen, the chat line and the console
 // take them through their own handling (the field's limit, its screen's Enter). Its keys say they're
-// the pad's (GamepadManager::kPadKeys), so they never hand the device back to the keyboard. SDL's
+// the pad's (GamepadManager::kPadKeys), so they're told from a real key's. SDL's
 // text input stays as the screen set it; where the system has a screen keyboard of its own (a Steam
 // Deck's), that one is kept shut while ours is used.
 //

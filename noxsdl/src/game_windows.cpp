@@ -241,6 +241,8 @@ void makeGameWindows(App* app, const gui::Resources& res)
     };
     padCallbacks.saved = [app] { return readPadConfig(*app); };
     padCallbacks.onClose = [app] { openOptions(*app); };
+    padCallbacks.padMode = [app] { return app->pads.padInUse(); };
+    padCallbacks.onPadMode = [app](bool pad) { setInputMode(*app, pad); };
     app->controllerWindow = std::make_unique<ControllerWindow>(res, gameDir / "window", app->pads, std::move(padCallbacks));
 
     // The console (F1), with the game's commands and noxsdl's debug switches.

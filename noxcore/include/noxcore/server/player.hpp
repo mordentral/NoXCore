@@ -43,6 +43,10 @@
 
 namespace nox::server {
 
+/// A moving player runs while its cursor (MSG_MOUSE) is further than this from it, and once
+/// running till it stops; nearer, it walks.
+inline constexpr float kRunCursorDistance = 100;
+
 /// How long each player animation runs: frames and the frames each lasts less one, by
 /// kPlayerStates index (the server's table at which the thing reader fills from
 /// PlayerDraw; animPlayerGetFrameRange reads it).

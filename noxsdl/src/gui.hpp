@@ -457,6 +457,9 @@ public:
 
     /// (noxcpp) The game controller's focus (gui_nav.hpp), or null.
     Window* navFocus() const { return nav_.focus(); }
+    /// (noxcpp) Its middle in a width x height output's pixels (where the pad points, for what
+    /// follows the pointer: tooltips), or null with no focus.
+    std::optional<SDL_FPoint> navFocusPoint(int width, int height) const;
     /// The pad's focus put on `w` (pointing at it as the mouse would), only while the pad is the
     /// device in use: a screen's choice of where the pad goes next (a drop-down's button once
     /// it's shut) never moves the mouse's pointing.

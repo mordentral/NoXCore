@@ -194,12 +194,16 @@ std::optional<CursorType> handCursor(App& app, std::optional<std::uint16_t> draw
 /// Draws the game's cursor at the mouse (not when the mouse is outside the window).
 void drawCursor(App& app, CursorType type, float scale)
 {
-    if (padHidesPointer(app)) {
-        drawPadOverlay(app, scale); // (noxcpp: the pad aims; its reticle and prompt instead of the pointer)
+    // (noxcpp) The game controller's mode: no pointer at all, in the menus too (the focus's outline
+    // shows where the pad is); in a game the pad's prompts and snap cursor instead. The question
+    // which to play with keeps the mouse's (it may be clicked).
+    if (app.pads.padInUse() && !app.editor && !padModeAsking(app)) {
+        if (padHidesPointer(app)) {
+            drawPadOverlay(app);
+        }
         return;
     }
-    const bool padPointer = app.live && app.padPlay.hasPointer && app.pads.padInUse(); // (the free cursor: mousePos's)
-    if (!app.cursor || (!app.testMouse && !padPointer && SDL_GetMouseFocus() != app.window)) {
+    if (!app.cursor || (!app.testMouse && SDL_GetMouseFocus() != app.window)) {
         return;
     }
     if (gameInPanel(app) && !app.playTestCaptured) {

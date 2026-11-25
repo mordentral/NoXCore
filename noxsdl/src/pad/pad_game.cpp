@@ -77,7 +77,6 @@ void releasePadHeld(App& app)
     }
     app.padRouter.dropAll();
     app.padEscapes = 0;
-    padActionsDropped(app);
 }
 
 /// InputBindings forgot what's held since we last looked: so does the pad.
@@ -87,7 +86,6 @@ void followReleases(App& app)
         app.padReleasesSeen = app.input->releases();
         app.padRouter.dropAll();
         app.padEscapes = 0;
-        padActionsDropped(app);
     }
 }
 
@@ -134,6 +132,15 @@ void startPads(App& app)
             app.scriptPad.reset();
             app.padScript.clear();
         }
+    }
+    // A test run never asks which to play with (unless --input-mode ask): --input-mode's mode, else
+    // a --pad-script run plays with its pad and any other with the mouse.
+    const bool testRun = !app.screenshot.empty() || !app.mouseScript.empty() || app.scriptPad;
+    if (!app.padModeForced && testRun && !app.padModeAskForced) {
+        app.padModeForced = app.scriptPad ? pad::InputDevice::Pad : pad::InputDevice::MouseKeyboard;
+    }
+    if (app.padModeForced) {
+        setInputMode(app, *app.padModeForced == pad::InputDevice::Pad);
     }
 }
 
@@ -251,6 +258,11 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
         releasePadHeld(app); // (its releases won't come)
         return std::nullopt;
     }
+    // The mouse's mode: the pad's presses are nobody's, as before there was pad support (the
+    // question of which to use, and the Controller screen's wait for a button, aside).
+    if (edge && !app.pads.padInUse() && !padModeHearsPad(app)) {
+        return std::nullopt;
+    }
     // The on-screen keyboard, while it's up, has the pad's presses (pad/osk_game.cpp).
     if (oskOpen(app) && oskEvent(app, event, edge)) {
         return std::nullopt;
@@ -290,9 +302,6 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
 void padRelease(App& app, const pad::PadEdge& edge)
 {
     followReleases(app);
-    if (padPlayRelease(app, edge)) {
-        return; // (the free cursor's button)
-    }
     const auto e = app.padRouter.release(edge.button);
     if (e.code && app.input) {
         app.input->release(e.code);
@@ -309,9 +318,6 @@ void padPress(App& app, const pad::PadEdge& edge)
     followReleases(app);
     if (!padGameInput(app) || !app.input) {
         return;
-    }
-    if (padPlayPress(app, edge)) {
-        return; // (the free cursor's click)
     }
     const auto modifier = app.padRouter.modifier();
     const auto e = app.padRouter.press(edge.button, modifier && app.pads.isDown(*modifier));
@@ -333,14 +339,9 @@ void padPress(App& app, const pad::PadEdge& edge)
 
 void padAction(App& app, pad::PadAction action, bool down)
 {
-    // The pad's own game actions (Interact, TargetNext / TargetPrevious, FreeCursor: pad_play.cpp);
-    // Modifier is the router's own (held: the second layer).
+    // The pad's own game actions (Interact, TargetNext / TargetPrevious: pad_play.cpp); Modifier is
+    // the router's own (held: the second layer).
     padPlayAction(app, action, down);
-}
-
-void padActionsDropped(App& app)
-{
-    padPlayDropped(app); // (the free cursor's buttons)
 }
 
 PadSteer padSteer(App& app)
@@ -352,18 +353,21 @@ PadSteer padSteer(App& app)
         padPanelsIdle(app);
         return PadSteer::None;
     }
-    app.pads.sample(SDL_GetTicksNS());
-    followReleases(app);
-    padRumbleFrame(app);
     if (!app.pads.padInUse()) {
+        // (The mouse's mode: the pad not even read.)
         app.padAim.reset();
-        padPlayIdle(app);
+        if (app.padPlay.hasPointer || app.padPlay.collecting) {
+            padPlayIdle(app);
+        }
         padPanelsIdle(app);
         return PadSteer::None;
     }
+    app.pads.sample(SDL_GetTicksNS());
+    followReleases(app);
+    padRumbleFrame(app);
     const auto at = app.live->client().position();
     if (!padGameInput(app) || app.view3d.active() || !at || (app.cinematics && app.cinematics->screenUp())) {
-        padPlayIdle(app); // (a briefing's screen: the mouse's pointer, as it has the mouse)
+        padPlayIdle(app); // (a briefing's screen, chat, a menu: the facing stays as it was)
         padPanelsIdle(app);
         return PadSteer::None;
     }
@@ -377,6 +381,18 @@ PadSteer padSteer(App& app)
     const PadSteer steer = padPlaySteer(app, static_cast<float>(at->first), static_cast<float>(at->second));
     if (panels == PanelFrame::Dpad) {
         padPanelsPointer(app); // (on the window's spot, over the aim)
+    }
+    if (app.scriptPad) {
+        // (--pad-script runs: the facing and the move as they change, and our animation, for the
+        // test's log)
+        static std::uint32_t logged = 0xFFFFFFFFu;
+        const auto& in = app.live->client().lastInput();
+        const std::uint32_t now = in.facing | (in.move ? 0x100u : 0u) | (static_cast<std::uint32_t>(ownAnimState(app) & 0xFF) << 16);
+        if (now != logged) {
+            logged = now;
+            SDL_Log("pad: facing %u%s, animation %d, tilt %.2f", static_cast<unsigned>(in.facing), in.move ? " moving" : "",
+                    ownAnimState(app), app.pads.frame().left.length());
+        }
     }
     return steer;
 }

@@ -63,6 +63,16 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             app.padScript = parsePadScript(next()); // (noxcpp) a made-up pad's steps (App::ScriptedPad)
             continue;
         }
+        if (a == "--input-mode") {
+            // (noxcpp, tests) pad / mouse: that input mode, not asked; ask: asked even in a test run
+            const std::string_view m = next();
+            if (m == "ask") {
+                app.padModeAskForced = true;
+            } else {
+                app.padModeForced = m == "pad" ? pad::InputDevice::Pad : pad::InputDevice::MouseKeyboard;
+            }
+            continue;
+        }
         if (a == "--fake-dialog-text") {
             app.fakeScreen = 2; // --fake-dialog with this string id's line (tests)
             app.fakeDialogText = next();

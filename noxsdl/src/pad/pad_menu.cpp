@@ -117,7 +117,7 @@ void padMenuInput(App& app, const pad::PadEdge& edge, SDL_Event& event)
 
 void padMenuFrame(App& app)
 {
-    const bool connected = app.pads.connected();
+    const bool connected = app.pads.connected() && app.pads.padInUse(); // (the mouse's mode: as with none)
     if (!connected) {
         if (std::exchange(wasConnected, false)) {
             gui::navFrame(false, false);

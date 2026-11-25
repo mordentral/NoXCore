@@ -39,8 +39,8 @@ public:
     /// click was over it (so goes no further); everything else goes on to the game.
     bool handleEvent(const SDL_Event& event, const State& vote, int w, int h, float scale, std::optional<int>& choice);
     /// (noxcpp) The game controller's snap cursor: the cards of an open vote for the next map (the
-    /// big ones at a match's end; a vote called in a match is left to the mouse, the free cursor and
-    /// the chat, out of the fight's way), into `out` (cleared first).
+    /// big ones at a match's end; a vote called in a match is left to the mouse and the chat, out
+    /// of the fight's way), into `out` (cleared first).
     void padCards(const State& vote, int w, int h, float scale, std::vector<SDL_FRect>& out) const;
 
 private:

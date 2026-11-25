@@ -23,12 +23,12 @@ using Color = nox::gui::Color;
 // The windows (made here, not from a file).
 constexpr std::int32_t kPanel = 7200, kPicture = 7201, kLayerBox = 7202, kTabButtons = 7203, kTabSettings = 7204;
 constexpr std::int32_t kButtonsPage = 7210, kList = 7211, kSettingsPage = 7220;
-constexpr std::int32_t kSlider = 7240;   ///< 7240-7243: the left and right dead zones, the run's tilt, the speed
-constexpr std::int32_t kDropBox = 7254;  ///< 7254-7256: aim assist, the lock, the buttons' names
-constexpr std::int32_t kDropItem = 7260; ///< 7260 + 10 * drop-down + choice (to 7283)
-constexpr std::int32_t kInvert = 7285, kRumble = 7286;
-constexpr std::int32_t kDefaults = 7290, kReset = 7291, kBack = 7292;
-constexpr std::int32_t kPopup = 7300;
+constexpr std::int32_t kSlider = 7240;   ///< 7240-7242: the left and right dead zones, the run's tilt
+constexpr std::int32_t kDropBox = 7254;  ///< 7254-7257: aim assist, the lock, the buttons' names, Use
+constexpr std::int32_t kDropItem = 7260; ///< 7260 + 10 * drop-down + choice (to 7291)
+constexpr std::int32_t kInvert = 7300, kRumble = 7301;
+constexpr std::int32_t kDefaults = 7310, kReset = 7311, kBack = 7312;
+constexpr std::int32_t kPopup = 7320;
 // The donors of the game's look: AdVidOpt.wnd's check box and button, servopts.wnd's tab.
 constexpr std::int32_t kCheckTemplate = 2040, kButtonTemplate = 2099, kTabTemplate = 10160;
 
@@ -42,9 +42,21 @@ constexpr int kCell0 = 140, kCell1 = 196, kCellW = 54;
 /// The settings: a row each, its label over its control.
 constexpr int kRowY0 = 6, kRowStep = 34, kControlX = 6, kControlY = 13, kControlW = 238;
 
-constexpr int kSliderCount = 4, kDropCount = 3;
-constexpr std::array<std::pair<int, int>, kSliderCount> kSliderRange{{{0, 50}, {0, 50}, {30, 95}, {25, 400}}};
-constexpr std::array<int, kDropCount> kDropChoices{4, 2, 4};
+constexpr int kSliderCount = 3, kDropCount = 4;
+constexpr std::array<std::pair<int, int>, kSliderCount> kSliderRange{{{0, 50}, {0, 50}, {30, 95}}};
+constexpr std::array<int, kDropCount> kDropChoices{4, 2, 4, 2};
+/// The drop-down saying which the player plays with (the input mode: not in the file).
+constexpr int kUseDrop = 3;
+/// The settings' rows, top down: Use, the sliders, the other drop-downs.
+constexpr int sliderRow(int i)
+{
+    return 1 + i;
+}
+constexpr int dropRow(int i)
+{
+    return i == kUseDrop ? 0 : 1 + kSliderCount + i;
+}
+constexpr int kRowCount = kSliderCount + kDropCount;
 
 const Color kGold{240, 180, 42};
 const Color kDim{150, 128, 96};
@@ -175,7 +187,6 @@ std::string ControllerWindow::actionTitle(std::string_view action) const
         case pad::PadAction::Interact: return NOX_TR("controller.action.interact", "Interact");
         case pad::PadAction::TargetNext: return NOX_TR("controller.action.target_next", "Next Target");
         case pad::PadAction::TargetPrevious: return NOX_TR("controller.action.target_previous", "Previous Target");
-        case pad::PadAction::FreeCursor: return NOX_TR("controller.action.free_cursor", "Free Cursor");
         case pad::PadAction::Modifier: return NOX_TR("controller.action.modifier", "Second Layer (hold)");
         case pad::PadAction::MenuAccept: return NOX_TR("controller.action.menu_accept", "Accept");
         case pad::PadAction::MenuBack: return NOX_TR("controller.action.menu_back", "Back");
@@ -285,7 +296,7 @@ void ControllerWindow::build()
     std::vector<nox::gui::WindowDef> choices;
     for (int i = 0; i < kSliderCount; ++i) {
         nox::gui::WindowDef s = plainDef(kSlider + i, nox::gui::WindowType::HorzSlider, "HORZSLIDER", kControlX,
-                                         kRowY0 + kRowStep * i + kControlY + 1, kControlW, 13);
+                                         kRowY0 + kRowStep * sliderRow(i) + kControlY + 1, kControlW, 13);
         s.style = sy::HorzSlider | sy::MouseTrack;
         s.data = nox::gui::SliderData{kSliderRange[static_cast<std::size_t>(i)].first, kSliderRange[static_cast<std::size_t>(i)].second};
         s.enabledColor = {150, 110, 40};
@@ -296,7 +307,7 @@ void ControllerWindow::build()
         settings.children.push_back(std::move(s));
     }
     for (int i = 0; i < kDropCount; ++i) {
-        const int y = kRowY0 + kRowStep * (kSliderCount + i) + kControlY;
+        const int y = kRowY0 + kRowStep * dropRow(i) + kControlY;
         settings.children.push_back(boxDef(kDropBox + i, kControlX, y, kControlW, 17));
         for (int k = 0; k < kDropChoices[static_cast<std::size_t>(i)]; ++k) {
             nox::gui::WindowDef item = boxDef(kDropItem + 10 * i + k, kControlX, y + 17 * (k + 1), kControlW, 17);
@@ -304,7 +315,7 @@ void ControllerWindow::build()
             choices.push_back(std::move(item));
         }
     }
-    const int checks = kRowY0 + kRowStep * (kSliderCount + kDropCount) + 4;
+    const int checks = kRowY0 + kRowStep * kRowCount + 4;
     settings.children.push_back(checkBox(kInvert, 6, checks, kPageW - 8));
     settings.children.push_back(checkBox(kRumble, 6, checks + 22, kPageW - 8));
     settings.children.insert(settings.children.begin(), std::make_move_iterator(choices.begin()), std::make_move_iterator(choices.end()));
@@ -477,13 +488,20 @@ void ControllerWindow::setConfig(const pad::PadConfig& c)
 int ControllerWindow::dropValue(int which) const
 {
     const auto& s = config_.settings;
+    if (which == kUseDrop) {
+        return callbacks_.padMode && callbacks_.padMode() ? 0 : 1;
+    }
     return which == 0 ? static_cast<int>(s.aimAssist) : which == 1 ? static_cast<int>(s.lockMode) : static_cast<int>(s.prompts);
 }
 
 void ControllerWindow::setDropValue(int which, int value)
 {
     auto& s = config_.settings;
-    if (which == 0) {
+    if (which == kUseDrop) {
+        if (callbacks_.onPadMode) {
+            callbacks_.onPadMode(value == 0); // (the input mode: the program's, not the file's)
+        }
+    } else if (which == 0) {
         s.aimAssist = static_cast<pad::AimAssist>(value);
     } else if (which == 1) {
         s.lockMode = static_cast<pad::LockMode>(value);
@@ -505,6 +523,9 @@ std::string ControllerWindow::dropName(int which, int value) const
     if (which == 1) {
         return value == 0 ? NOX_TR("controller.lock.held", "Kept While Held") : NOX_TR("controller.lock.retarget", "Picked Again");
     }
+    if (which == kUseDrop) {
+        return value == 0 ? NOX_TR("input_mode.controller", "Controller") : NOX_TR("input_mode.mouse", "Mouse and Keyboard");
+    }
     switch (value) {
     case 0: return NOX_TR("controller.prompts.auto", "As the Controller");
     case 1: return "Xbox";
@@ -520,8 +541,7 @@ void ControllerWindow::syncSettings()
     }
     const auto& s = config_.settings;
     const std::array<int, kSliderCount> values{static_cast<int>(std::lround(s.deadZone * 100)), static_cast<int>(std::lround(s.rightDeadZone * 100)),
-                                               static_cast<int>(std::lround(s.runThreshold * 100)),
-                                               static_cast<int>(std::lround(s.sensitivity * 100))};
+                                               static_cast<int>(std::lround(s.runThreshold * 100))};
     for (int i = 0; i < kSliderCount; ++i) {
         if (gui::Window* w = panel_->find(kSlider + i)) {
             const auto [lo, hi] = kSliderRange[static_cast<std::size_t>(i)];
@@ -682,13 +702,7 @@ bool ControllerWindow::onMessage(int message, gui::Window& from)
         switch (from.id - kSlider) {
         case 0: s.deadZone = static_cast<float>(v) / 100.0f; break;
         case 1: s.rightDeadZone = static_cast<float>(v) / 100.0f; break;
-        case 2: s.runThreshold = static_cast<float>(v) / 100.0f; break;
-        default: {
-            const int speed = std::clamp((v + 2) / 5 * 5, kSliderRange[3].first, kSliderRange[3].second); // (in fives: x1 easy to find again)
-            from.sliderValue = speed;
-            s.sensitivity = static_cast<float>(speed) / 100.0f;
-            break;
-        }
+        default: s.runThreshold = static_cast<float>(v) / 100.0f; break;
         }
         apply();
         return true;
@@ -860,40 +874,55 @@ std::string ControllerWindow::tooltip() const
     if (!open_ || page_ != 1 || wait_.active()) {
         return {};
     }
-    // The settings' rows by where the mouse is.
-    const float rowY = mouse_.y - static_cast<float>(kPageY + kRowY0);
-    if (mouse_.x < kPageX || mouse_.x > kPageX + kPageW || rowY < 0) {
+    // The settings' rows by where the mouse is (in the pad's mode, where its focus is).
+    SDL_FPoint at = mouse_;
+    if (pads_.padInUse()) {
+        const gui::Window* focus = gui_.navFocus();
+        if (!focus) {
+            return {};
+        }
+        const SDL_Rect r = gui::screenRect(*focus);
+        at = {static_cast<float>(r.x) + static_cast<float>(r.w) / 2, static_cast<float>(r.y) + static_cast<float>(r.h) / 2};
+    }
+    const float rowY = at.y - static_cast<float>(kPageY + kRowY0);
+    if (at.x < kPageX || at.x > kPageX + kPageW || rowY < 0) {
         return {};
     }
-    switch (static_cast<int>(rowY) / kRowStep) {
-    case 0:
-    case 1:
+    const int row = static_cast<int>(rowY) / kRowStep;
+    if (row == dropRow(kUseDrop)) {
+        return NOX_TR("controller.tip.use",
+                      "What you play with. Controller: the mouse is ignored and\n"
+                      "its pointer hidden. Mouse and Keyboard: the controller is\n"
+                      "ignored. Asked at each start while a controller is connected.");
+    }
+    if (row == sliderRow(0) || row == sliderRow(1)) {
         return NOX_TR("controller.tip.dead_zone",
                       "How far the stick must lean before it counts.\n"
                       "Raise it if the player creeps or the aim drifts\n"
                       "with the stick let go.");
-    case 2:
+    }
+    if (row == sliderRow(2)) {
         return NOX_TR("controller.tip.run",
                       "How far the left stick leans before the player runs\n"
                       "(less than that walks, as a near mouse pointer does).");
-    case 3:
-        return NOX_TR("controller.tip.speed",
-                      "How fast the right stick moves the aim and the free cursor.");
-    case 4:
+    }
+    if (row == dropRow(0)) {
         return NOX_TR("controller.tip.aim_assist",
                       "How strongly attacks and spells turn to the enemy you aim\n"
                       "near. Other players get only a light pull at any setting.");
-    case 5:
+    }
+    if (row == dropRow(1)) {
         return NOX_TR("controller.tip.lock",
                       "Kept While Held: the target stays while the attack or spell\n"
                       "button is held. Picked Again: the best target as you turn.");
-    case 6:
+    }
+    if (row == dropRow(2)) {
         return NOX_TR("controller.tip.prompts",
                       "The names and symbols shown for the buttons, on this\n"
                       "screen and on the spell bar: as the connected controller's,\n"
                       "or always one family's.");
-    default: return {};
     }
+    return {};
 }
 
 // ------------------------------------------------------------------------------------ pointing
@@ -1223,17 +1252,17 @@ void ControllerWindow::drawSettings(gui::Window& self, gui::Painter& p)
         std::snprintf(buf, sizeof buf, "%d%%", static_cast<int>(std::lround(f * 100)));
         return std::string(buf);
     };
-    std::snprintf(buf, sizeof buf, "%.2f", s.sensitivity);
-    const std::string speed = buf;
-    const std::array<std::string, kSliderCount + kDropCount> labels{
+    // (Each row's label over its control, top down: Use, the sliders, the other drop-downs.)
+    const std::array<std::string, kRowCount> labels{
+        NOX_TR("controller.setting.use", "Play With"),
         nox::l10n::format(NOX_TR("controller.setting.left_dead_zone", "Left Stick Dead Zone {value}"), {{"value", percent(s.deadZone)}}),
         nox::l10n::format(NOX_TR("controller.setting.right_dead_zone", "Right Stick Dead Zone {value}"), {{"value", percent(s.rightDeadZone)}}),
         nox::l10n::format(NOX_TR("controller.setting.run", "Run From a Lean of {value}"), {{"value", percent(s.runThreshold)}}),
-        nox::l10n::format(NOX_TR("controller.setting.speed", "Aim Speed x{value}"), {{"value", speed}}),
         NOX_TR("controller.setting.aim_assist", "Aim Assist"),
         NOX_TR("controller.setting.lock", "Target Lock"),
         NOX_TR("controller.setting.prompts", "Button Names"),
     };
+    static_assert(dropRow(kUseDrop) == 0 && sliderRow(0) == 1 && dropRow(0) == 1 + kSliderCount);
     for (std::size_t i = 0; i < labels.size(); ++i) {
         fittedText(p, labels[i], static_cast<float>(at.x + 6), static_cast<float>(at.y + kRowY0 + kRowStep * static_cast<int>(i)),
                    kControlW, 1, kGold);

@@ -1841,8 +1841,6 @@ content.text_form.save_as_tip = 새 파일을 씁니다(이 파일을 덮어쓰�
 #@ a29f3abb mt: What the game reads
 content.text_form.what_game_reads = 게임이 읽는 내용
 
-#@ 708e1acb mt: Free Cursor
-controller.action.free_cursor = 자유 커서
 #@ 1e2eb9ef mt: Interact
 controller.action.interact = 상호작용
 #@ 50b26149 mt: Accept
@@ -1919,8 +1917,8 @@ controller.setting.right_dead_zone = 오른쪽 스틱 데드존 {value}
 controller.setting.rumble = 진동 (피해를 입을 때와 레벨 업)
 #@ 228bfdd5 mt: Run From a Lean of {value}
 controller.setting.run = {value} 기울이면 달리기
-#@ ccebaaea mt: Aim Speed x{value}
-controller.setting.speed = 조준 속도 x{value}
+#@ 93b5ca6d mt: Play With
+controller.setting.use = 플레이 방식
 #@ 5acb3098 mt: Show the {button} Layer
 controller.show_layer = {button} 레이어 보기
 #@ 014251c6 mt: Buttons
@@ -1937,8 +1935,8 @@ controller.tip.lock = 누르는 동안 유지: 공격이나 주문 버튼을 누
 controller.tip.prompts = 이 화면과 주문 막대에 표시되는 버튼의 이름과\n기호: 연결된 컨트롤러에 맞추거나\n항상 한 계열로.
 #@ ec799022 mt: How far the left stick leans before the player runs\n(less than that walks, as a near mouse pointer does).
 controller.tip.run = 캐릭터가 달리기 시작하는 왼쪽 스틱의 기울기\n(그보다 적으면 걷기, 마우스 포인터가 가까울 때처럼).
-#@ ac682598 mt: How fast the right stick moves the aim and the free cursor.
-controller.tip.speed = 오른쪽 스틱이 조준과 자유 커서를 움직이는 속도.
+#@ b236dfd3 mt: What you play with. Controller: the mouse is ignored and\nits pointer hidden. Mouse and Keyboard: the controller is\nignored. Asked at each start while a controller is connected.
+controller.tip.use = 무엇으로 플레이할지 정합니다. 컨트롤러: 마우스는 무시되고\n포인터가 숨겨집니다. 마우스와 키보드: 컨트롤러는\n무시됩니다. 컨트롤러가 연결되어 있으면 시작할 때마다 묻습니다.
 #@ a15e8ea1 mt: Controller
 controller.title = 컨트롤러
 
@@ -8338,6 +8336,17 @@ game.screenshot.saved = 스크린샷: {path}
 hud.quickbar.spell_set = 주문 세트 {n}
 #@ f7fa068e mt: Trap Set {n}
 hud.quickbar.trap_set = 함정 세트 {n}
+
+#@ a15e8ea1 mt: Controller
+input_mode.controller = 컨트롤러
+#@ 0f61c058 mt: A game controller is connected: open the game's menu to choose it.
+input_mode.later = 게임 컨트롤러가 연결되었습니다: 선택하려면 게임 메뉴를 여세요.
+#@ 3265ecc6 mt: Mouse and Keyboard
+input_mode.mouse = 마우스와 키보드
+#@ 7bed204a mt: A game controller is connected. Which will you play with?
+input_mode.text = 게임 컨트롤러가 연결되었습니다. 무엇으로 플레이하시겠습니까?
+#@ 36e491e1 mt: Game Controller
+input_mode.title = 게임 컨트롤러
 
 #@ 37c3069e mt: ping {to}: {error}
 lobby.browser.ping_failed = 핑 {to}: {error}

@@ -34,7 +34,8 @@ namespace nox::server {
 
 namespace {
 
-constexpr float kRunDistance2 = 10000; // (100 units)
+constexpr float kRunDistance2 = kRunCursorDistance * kRunCursorDistance; // (10000)
+static_assert(kRunDistance2 == 10000.0f);
 
 /// Plr_UpdateState's run test: the cursor (FILD) less the place, each squared and summed on the
 /// x87 (53 bits) and compared with the float 10000; past it, a run.

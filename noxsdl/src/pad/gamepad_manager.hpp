@@ -8,9 +8,11 @@
 // pad's button, and a trigger crossing its threshold, into a PadEdge. The sticks and triggers are
 // read once a frame (sample) through the dead zones, with the pad layer's own frame time.
 //
-// The device in use (activeDevice): the pad once it's touched (a button, a trigger, a stick past
-// its dead zone); the mouse and keyboard again once the mouse moves a few pixels or a key or mouse
-// button is pressed. Both work at once whichever it is: it only says what to show (cursor, prompts).
+// The device in use (activeDevice) is the input mode the player chose (setMode): the pad, or the
+// mouse and keyboard. Nothing the player does hands it from one to the other (a mouse nudged on
+// the desk never takes the game from the pad): only setMode does, and the last pad going (back to
+// the mouse by itself). Which events each mode ignores is the program's (pad/pad_mode.cpp): the
+// pad's in the mouse's mode, the mouse's in the pad's (the keys always type).
 //
 // Nothing here costs a frame while no pad is connected.
 #pragma once
@@ -92,9 +94,13 @@ public:
     /// pad's own labels; by place with no pad.
     ButtonLabel label(PadButton b, PromptStyle style) const;
 
-    /// The device the player last touched.
+    /// The device in use: the mode chosen (the pad's only while one is connected).
     InputDevice activeDevice() const { return device_; }
     bool padInUse() const { return device_ == InputDevice::Pad; }
+    /// The input mode: the pad's takes effect only with a pad connected (none: the mouse's).
+    void setMode(InputDevice d);
+    /// Whether the last pad's going put the mode back to the mouse's (till setMode).
+    bool fellBack() const { return fellBack_; }
     /// How many times the device in use has changed (a reader that keeps the last value sees a change).
     std::uint32_t deviceChanges() const { return deviceChanges_; }
 
@@ -109,10 +115,8 @@ public:
     static SDL_GamepadButton sdlButton(PadButton b);
     static std::optional<PadButton> fromSdlButton(Uint8 button);
 
-    /// Mouse travel (in window pixels, summed) that hands the device back to the mouse.
-    static constexpr float kMouseHandBack = 6;
-    /// The mouse id of the free cursor's made-up mouse events (pad/pad_play.cpp): the pad's own,
-    /// so they never hand the device back to the mouse.
+    /// The mouse id of the pad's made-up clicks (a mode's window, the panels: pad/pad_panels.cpp):
+    /// the pad's own, so the pad's mode lets them through.
     static constexpr SDL_MouseID kPadMouse = 0x50AD0001u;
     /// The keyboard id of the on-screen keyboard's made-up keys (pad/osk_game.cpp: Backspace, Enter,
     /// Escape): the pad's own too.
@@ -130,7 +134,6 @@ private:
     const Pad* find(SDL_JoystickID id) const;
     void open(SDL_JoystickID id);
     void close(SDL_JoystickID id);
-    void touched(SDL_JoystickID id);
     void setDevice(InputDevice d);
     std::optional<PadEdge> trigger(Pad& p, SDL_GamepadAxis axis, Sint16 value);
 
@@ -138,9 +141,10 @@ private:
     std::vector<Pad> pads_;
     SDL_JoystickID active_ = 0;
     PadSettings settings_;
-    InputDevice device_ = InputDevice::MouseKeyboard;
+    InputDevice mode_ = InputDevice::MouseKeyboard;   ///< the mode chosen
+    InputDevice device_ = InputDevice::MouseKeyboard; ///< in effect (the mouse's with no pad)
+    bool fellBack_ = false;
     std::uint32_t deviceChanges_ = 0;
-    float mouseTravel_ = 0;
     PadFrame frame_;
     std::uint64_t lastSampleNs_ = 0;
 };

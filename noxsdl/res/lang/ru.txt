@@ -1855,8 +1855,6 @@ content.text_form.save_as_tip = Записывает новый файл (ник
 #@ a29f3abb mt: What the game reads
 content.text_form.what_game_reads = Что читает игра
 
-#@ 708e1acb mt: Free Cursor
-controller.action.free_cursor = Свободный курсор
 #@ 1e2eb9ef mt: Interact
 controller.action.interact = Взаимодействие
 #@ 50b26149 mt: Accept
@@ -1933,8 +1931,8 @@ controller.setting.right_dead_zone = Мёртвая зона правого ст
 controller.setting.rumble = Вибрация (при ранении и новом уровне)
 #@ 228bfdd5 mt: Run From a Lean of {value}
 controller.setting.run = Бег с наклона {value}
-#@ ccebaaea mt: Aim Speed x{value}
-controller.setting.speed = Скорость прицела x{value}
+#@ 93b5ca6d mt: Play With
+controller.setting.use = Играть с помощью
 #@ 5acb3098 mt: Show the {button} Layer
 controller.show_layer = Показать слой {button}
 #@ 014251c6 mt: Buttons
@@ -1951,8 +1949,8 @@ controller.tip.lock = Пока зажата: цель держится, пока
 controller.tip.prompts = Названия и значки кнопок на этом экране и на панели\nзаклинаний: как у подключённого контроллера\nили всегда одного семейства.
 #@ ec799022 mt: How far the left stick leans before the player runs\n(less than that walks, as a near mouse pointer does).
 controller.tip.run = Насколько наклонить левый стик, чтобы персонаж побежал\n(меньше — шаг, как с близким указателем мыши).
-#@ ac682598 mt: How fast the right stick moves the aim and the free cursor.
-controller.tip.speed = Как быстро правый стик двигает прицел и свободный курсор.
+#@ b236dfd3 mt: What you play with. Controller: the mouse is ignored and\nits pointer hidden. Mouse and Keyboard: the controller is\nignored. Asked at each start while a controller is connected.
+controller.tip.use = Чем вы играете. Контроллер: мышь не действует,\nеё указатель скрыт. Мышь и клавиатура: контроллер\nне действует. Спрашивается при каждом запуске, если контроллер подключён.
 #@ a15e8ea1 mt: Controller
 controller.title = Контроллер
 
@@ -8430,6 +8428,17 @@ game.screenshot.saved = снимок экрана: {path}
 hud.quickbar.spell_set = Набор заклинаний {n}
 #@ f7fa068e mt: Trap Set {n}
 hud.quickbar.trap_set = Набор ловушек {n}
+
+#@ a15e8ea1 mt: Controller
+input_mode.controller = Контроллер
+#@ 0f61c058 mt: A game controller is connected: open the game's menu to choose it.
+input_mode.later = Подключён игровой контроллер: откройте меню игры, чтобы выбрать его.
+#@ 3265ecc6 mt: Mouse and Keyboard
+input_mode.mouse = Мышь и клавиатура
+#@ 7bed204a mt: A game controller is connected. Which will you play with?
+input_mode.text = Подключён игровой контроллер. Чем вы будете играть?
+#@ 36e491e1 mt: Game Controller
+input_mode.title = Игровой контроллер
 
 #@ 37c3069e mt: ping {to}: {error}
 lobby.browser.ping_failed = пинг {to}: {error}

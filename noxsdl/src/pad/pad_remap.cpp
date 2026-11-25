@@ -10,7 +10,7 @@ namespace {
 /// The rows the pad uses most, first, in this order.
 constexpr std::string_view kFirstRows[] = {
     "Action",       "Interact",       "InvokeSlot1",     "InvokeSlot2",      "InvokeSlot3",  "InvokeSlot4",
-    "InvokeSlot5",  "Jump",           "FreeCursor",      "TargetNext",       "TargetPrevious", "QuickHealth",
+    "InvokeSlot5",  "Jump",           "TargetNext",       "TargetPrevious", "QuickHealth",
     "QuickMana",    "QuickCurePoison", "PreviousSpellSet", "NextSpellSet",   "SwapWeapons",  "ToggleInventory",
     "ToggleBook",   "ToggleMap",      "ToggleQuitMenu",  "Modifier",
 };

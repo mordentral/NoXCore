@@ -76,7 +76,13 @@ inline constexpr float kRunDistance = 100;
 inline constexpr float kRunReach = 160;
 /// The point at rest, while the pad is in use: a walk's length the way the stick last leaned.
 inline constexpr float kWalkReach = 60;
-inline constexpr float kDefaultRunThreshold = 0.65f;
+/// RunThreshold's default: running from three quarters of the stick's lean past the dead zone
+/// (about three quarters of its travel at the default dead zone).
+inline constexpr float kDefaultRunThreshold = 0.75f;
+/// Once running, the server keeps the run till the player stops (as the mouse's held button does).
+/// The stick leaned back under the threshold by this much asks for a walk: the move let go for the
+/// moment the server takes to end the run (padPlaySteer).
+inline constexpr float kWalkAgainBelow = 0.1f;
 
 /// The cursor point's distance from the player for a tilt (0 to 1, after the dead zone; 0 at
 /// its edge) and the run threshold (kept within 0.3 to 0.95).
@@ -88,6 +94,12 @@ inline float stickReach(float tilt, float runThreshold = kDefaultRunThreshold)
         return kNearReach + (kRunDistance - kNearReach) * (t / th);
     }
     return kRunDistance + (kRunReach - kRunDistance) * ((t - th) / (1.0f - th));
+}
+
+/// Whether a lean asks to walk again while running (kWalkAgainBelow under the run threshold).
+inline bool walkAgain(float tilt, float runThreshold = kDefaultRunThreshold)
+{
+    return tilt > 0 && tilt < std::clamp(runThreshold, 0.3f, 0.95f) - kWalkAgainBelow;
 }
 
 /// The rumble's cue (noxcore_controller.cfg's Rumble): the player's health and level as last seen,

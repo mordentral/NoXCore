@@ -13,9 +13,10 @@
 //                 button", modal): it goes in the cell and leaves the cells it was in. The menus'
 //                 Back buttons bind on a short press; held they cancel; so does Escape. A right click
 //                 empties a cell.
-//   Settings tab  the left and right sticks' dead zones, the run's tilt, the aim's and free cursor's
-//                 speed (sliders); aim assist, the lock, the buttons' names (drop-downs); invert the
-//                 right stick, rumble (check boxes).
+//   Settings tab  what the player plays with (Use: Controller / Mouse and Keyboard, the input mode,
+//                 not written to the file); the left and right sticks' dead zones, the run's tilt
+//                 (sliders); aim assist, the lock, the buttons' names (drop-downs); invert the right
+//                 stick, rumble (check boxes).
 //   buttons       Defaults: the default layout and settings; Reset: what the file has; Back (or
 //                 Escape, or the pad's B): kept and written. Every change is in use at once.
 //
@@ -48,6 +49,8 @@ public:
         std::function<void(const pad::PadConfig&)> onSave;  ///< Back: in use, and written
         std::function<pad::PadConfig()> saved;              ///< the file's (Reset)
         std::function<void()> onClose;                      ///< gone: Options comes back
+        std::function<bool()> padMode;                      ///< (Use) the pad's input mode in use
+        std::function<void(bool pad)> onPadMode;            ///< (Use) chosen: in use at once, not written
     };
 
     ControllerWindow(gui::Resources res, std::filesystem::path windowDir, const pad::GamepadManager& pads, Callbacks callbacks);

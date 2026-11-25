@@ -103,7 +103,7 @@ constexpr std::optional<MouseMode> mouseModeChange(MouseMode applied, bool relat
 /// Where the drawn pointer's place comes from.
 enum class PointerSource {
     Test,   ///< a test's --mouse / --mouse-script point
-    Pad,    ///< (noxcpp) the game controller's: its aim point, or its free cursor, while it's in use in a game
+    Pad,    ///< (noxcpp) the game controller's: its aim point, or a panel's spot, while it's in use in a game
     Held,   ///< where the panel's game had it (the editor has the input)
     Mouse,  ///< the mouse's own place (SDL_GetMouseState)
 };

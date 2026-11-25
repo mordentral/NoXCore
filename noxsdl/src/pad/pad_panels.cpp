@@ -68,12 +68,12 @@ void log(const App& app, const char* what, const Spot& s)
 }
 
 /// Whether the snap cursor may have the pad now: in a game the pad drives (no menu, chat, console,
-/// briefing's screen, 3D view, free cursor, spell waiting for its target, amount box), and no
-/// other window system screen has the pad.
+/// briefing's screen, 3D view, spell waiting for its target, amount box), and no other window
+/// system screen has the pad.
 bool allowed(const App& app)
 {
-    if (!app.live || !app.pads.padInUse() || !padGameInput(app) || padHasMenus(app) || app.view3d.active() ||
-        app.padPlay.freeCursor || app.armed || (app.cinematics && app.cinematics->screenUp())) {
+    if (!app.live || !app.pads.padInUse() || !padGameInput(app) || padHasMenus(app) || app.view3d.active() || app.armed ||
+        (app.cinematics && app.cinematics->screenUp())) {
         return false;
     }
     if (app.tradeScreens && app.tradeScreens->modalUp()) {

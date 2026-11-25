@@ -12,7 +12,7 @@
 //     ToggleConsole = None     (no button)
 //
 // An action is one of the game's controls (nox.cfg's: InvokeSlot1-5, Action, Jump, QuickHealth...)
-// or one the pad alone has (PadAction: Interact, TargetNext, FreeCursor, Modifier, the menus').
+// or one the pad alone has (PadAction: Interact, TargetNext, Modifier, the menus').
 // An action may have several lines (several buttons); one the file doesn't name keeps its default
 // buttons; a line the file has that isn't understood is kept as it is and written back. The first
 // name of a "X + Y" pair is the modifier as the file was written; the pair binds Y on the
@@ -24,6 +24,8 @@
 // button goes down and kept till it comes up, so letting the modifier go first doesn't leave a held
 // action stuck, or start the other one.
 #pragma once
+
+#include "pad/pad_math.hpp"
 
 #include "noxcore/config/nox_config.hpp"
 
@@ -80,7 +82,6 @@ enum class PadAction : std::uint8_t {
     Interact,       ///< pick up, talk, trade, use, open what's in front of the player
     TargetNext,     ///< the next target
     TargetPrevious, ///< the one before
-    FreeCursor,     ///< the mouse-like cursor on or off
     Modifier,       ///< held: the second layer
     MenuAccept,     ///< the menus' A
     MenuBack,       ///< the menus' B / Start: Escape
@@ -117,10 +118,8 @@ enum class PromptStyle : std::uint8_t { Auto, Xbox, PlayStation, Switch };
 /// reaches the server's run distance.
 inline constexpr float kMinRunThreshold = 0.3f;
 inline constexpr float kMaxRunThreshold = 0.95f;
-/// The inner dead zones' and Sensitivity's ranges (as the file is read).
+/// The inner dead zones' range (as the file is read).
 inline constexpr float kMaxDeadZone = 0.9f;
-inline constexpr float kMinSensitivity = 0.25f;
-inline constexpr float kMaxSensitivity = 4.0f;
 
 /// The file's settings.
 struct PadSettings {
@@ -128,8 +127,7 @@ struct PadSettings {
     float rightDeadZone = 0.18f;    ///< RightDeadZone: the right stick's (0-0.9)
     float outerDeadZone = 0.95f;    ///< OuterDeadZone: full tilt from here (above DeadZone, to 1)
     float triggerThreshold = 0.35f; ///< TriggerThreshold: a trigger's press (0.05-0.95)
-    float sensitivity = 1.0f;       ///< Sensitivity: the aim and the free cursor's speed (0.25-4)
-    float runThreshold = 0.65f;     ///< RunThreshold: the left stick's tilt that runs (0.3-0.95)
+    float runThreshold = kDefaultRunThreshold; ///< RunThreshold: the left stick's tilt that runs (0.3-0.95)
     AimAssist aimAssist = AimAssist::Normal;
     LockMode lockMode = LockMode::WhileHeld;
     bool invertY = false; ///< InvertY: the right stick's up and down swapped
@@ -169,7 +167,7 @@ std::span<const std::string_view> padActionNames();
 bool knownAction(std::string_view name);
 
 /// The defaults: the settings, and the bindings by the default layout (left stick moves, RT
-/// attacks, A interacts, X Y B RB LB the five slots, L3 jumps, R3 the free cursor, the D-pad's up
+/// attacks, A interacts, X Y B RB LB the five slots, L3 jumps, R3 nothing alone, the D-pad's up
 /// and down the potions, its left and right the spell sets, View the inventory, Start the game's
 /// menu; with LT held: Up cure poison, Down swap weapons, View the spellbook, Start the map, Right
 /// chat, Left team chat, R3 the console; in the

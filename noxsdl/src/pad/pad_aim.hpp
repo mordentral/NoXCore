@@ -1,13 +1,14 @@
 // (noxcpp) The game controller's aim: who a creature is to us, the target the pad's cursor point
-// goes to (soft target, lock, the right stick's flick and reticle), where a spell of each kind
-// goes, what A takes, and the free cursor's speed. Pure (no SDL, no App), so the tests check it
-// as it is; pad_play.cpp feeds it the frame's world.
+// goes to (soft target, lock, the right stick's flick and held way), where a spell of each kind
+// goes and what A takes. Pure (no SDL, no App), so the tests check it as it is; pad_play.cpp feeds
+// it the frame's world.
 //
 // Aiming is the client putting its cursor point on what it chose: the server takes a spell's or
-// a wand's creature from the cursor (the thing at it), so nothing new goes on the wire.
+// a wand's creature from the cursor (the thing at it), so nothing new goes on the wire. The pad
+// never steers a free point: the sticks give ways, the point follows from them.
 //
-//   aim       the right stick's way while it aims, else the left stick's while it moves, else the
-//             way the player last went.
+//   aim       the right stick's way while it's held, else the left stick's while it moves, else the
+//             way the player last went (aimWay).
 //   soft      enemies in sight, scored by their angle to the aim (a cone, 35 degrees at Normal,
 //             twice that within kCloseRange; with both sticks at rest any monster within
 //             kIdleRange) and their distance (to kTargetReach). A new one must
@@ -19,11 +20,11 @@
 //             steps to the nearest enemy that way (from the one locked, or from us); kept till it
 //             dies, leaves sight or goes out of reach, or another flick. TargetNext / Previous
 //             step round us the same way.
-//   reticle   the right stick held: a point the stick puts round the player (to the view's edge),
-//             kept kReticleLinger after it's let go; an enemy near it (the snap) is the target.
+//   held      the right stick held past a flick's time: only a way (the aim, the soft target's
+//             cone turned with it), never a point the stick moves about.
 //   players   a narrower pull (12 degrees at Normal), never locked past kPlayerKeepSeconds,
 //             never flicked onto. Allies, our summons and the neutral are never candidates.
-//   Off       no soft target, no snap: the aim point is straight ahead (a flick still locks).
+//   Off       no soft target: the aim point is straight ahead (a flick still locks).
 #pragma once
 
 #include "pad/pad_bindings.hpp"
@@ -70,8 +71,6 @@ struct AimCandidate {
 struct AimTuning {
     float coneDeg = 0;   ///< a monster's cone, each side of the aim
     float playerDeg = 0; ///< a player's pull
-    float snap = 0;      ///< the reticle's pull onto a monster, world units
-    float playerSnap = 0;
 };
 AimTuning aimTuning(AimAssist a);
 
@@ -88,14 +87,11 @@ inline constexpr float kFlickConeDeg = 60;      ///< a flick takes an enemy with
 inline constexpr float kIdleRange = 100;
 std::optional<float> coneScore(const AimCandidate& c, WorldPoint from, StickVec dir, const AimTuning& t, float reach,
                                bool idle = false);
-/// Against the reticle: its distance over the snap; nullopt beyond the snap.
-std::optional<float> reticleScore(const AimCandidate& c, WorldPoint reticle, const AimTuning& t);
 
 /// One frame's look for a target.
 struct TargetFrame {
     WorldPoint from;                    ///< us
     StickVec dir{1, 0};                 ///< the aim, one long
-    std::optional<WorldPoint> reticle;  ///< the right stick's point, while it's shown
     bool idle = false;                  ///< neither stick leans (the aim is the way we last went)
     std::span<const AimCandidate> enemies; ///< the enemies in sight
     float reach = kTargetReach;
@@ -124,33 +120,37 @@ private:
     float outFor_ = 0; ///< seconds the target has been out of its cone
 };
 
-/// The right stick: a flick, or a reticle while it's held (and a while after).
+/// The right stick: a flick, or a way while it's held.
 inline constexpr float kFlickTilt = 0.6f;
-inline constexpr float kFlickBack = 0.25f;     ///< back under this: let go
-inline constexpr float kFlickSeconds = 0.25f;  ///< held longer than this: the reticle, not a flick
-inline constexpr float kReticleLinger = 0.75f;
-inline constexpr float kReticleHoldTilt = 0.3f; ///< under this the reticle stays (the stick going home)
+inline constexpr float kFlickBack = 0.25f;    ///< back under this: let go
+inline constexpr float kFlickSeconds = 0.25f; ///< held longer than this: a way, not a flick
+inline constexpr float kAimHoldTilt = 0.3f;   ///< under this the way stays as it was (the stick going home)
 
 struct RightStickFrame {
-    std::optional<StickVec> flick;   ///< a flick's way this frame
-    std::optional<StickVec> reticle; ///< the reticle's place, -1 to 1 each way of the view, while shown
+    std::optional<StickVec> flick; ///< a flick's way this frame
+    std::optional<StickVec> aim;   ///< the way it's held, one long, while it's held past a flick's time
 };
 
 class RightStick {
 public:
-    RightStickFrame update(StickVec v, float seconds, float sensitivity = 1.0f);
+    RightStickFrame update(StickVec v, float seconds);
     void clear() { *this = RightStick{}; }
     bool aiming() const { return phase_ == Phase::Aiming; }
 
 private:
-    enum class Phase : std::uint8_t { Idle, Pending, Aiming, Lingering };
+    enum class Phase : std::uint8_t { Idle, Pending, Aiming };
     Phase phase_ = Phase::Idle;
-    bool shown_ = false;  ///< the reticle is up (through a push that may yet be a flick)
     float t_ = 0;
     float peak_ = 0;
     StickVec peakDir_{};
-    StickVec offset_{};
+    StickVec way_{};
 };
+
+/// The aim's way this frame: the right stick's while it's held, else the left stick's while it
+/// leans, else the way last aimed (`last`, which the caller keeps: the way the player last went or
+/// aimed, so letting the sticks go never turns the player), else `fallback` (the way the player
+/// faces before the pad has leaned). All one long.
+StickVec aimWay(std::optional<StickVec> right, StickVec left, std::optional<StickVec> last, StickVec fallback);
 
 /// A spell's (or ability's) aim: on us, at a creature, or at a point.
 enum class SpellAim : std::uint8_t { Self, Creature, Point };
@@ -159,30 +159,27 @@ enum class SpellAim : std::uint8_t { Self, Creature, Point };
 SpellAim spellAim(std::uint32_t spellFlags, bool onSelf);
 /// A warrior's ability: Berserker Charge (1) and the harpoon (3) are aimed, the rest go at once.
 SpellAim abilityAim(std::uint32_t ability);
-/// Where a cast of that kind goes: the target's spot, else the reticle, else kCastAhead ahead;
-/// nothing for one on us.
+/// Where a cast of that kind goes: the target's spot (the target in the aim's cone), else
+/// kCastAhead along the aim; nothing for one on us.
 inline constexpr float kCastAhead = 120;
-std::optional<WorldPoint> castPoint(SpellAim kind, std::optional<WorldPoint> target, std::optional<WorldPoint> reticle,
-                                    WorldPoint from, StickVec dir);
+std::optional<WorldPoint> castPoint(SpellAim kind, std::optional<WorldPoint> target, WorldPoint from, StickVec dir);
 
 /// A thing A may take (an item, an NPC, a lever...), by its key.
 struct InteractOption {
     std::uint32_t key = 0;
     WorldPoint at;
-    float reach = 75; ///< its hand's reach
+    float reach = 75;  ///< its hand's reach
+    bool talks = false; ///< someone to talk or trade with (an NPC, a shopkeeper)
 };
 /// The best in front of us (within its own reach): by distance and the angle to the aim, within 120
-/// degrees of it (anything within kUnderfoot whatever the angle); those in `skip` left out unless
-/// every one is (a pile taken in turn starts again).
+/// degrees of it (anything within kUnderfoot whatever the angle); someone to talk or trade with
+/// within kFacingCone of the aim is preferred (kTalkPreference) over things off to the side; those
+/// in `skip` left out unless every one is (a pile taken in turn starts again).
 inline constexpr float kUnderfoot = 30;
+inline constexpr float kFacingCone = 40;
+inline constexpr float kTalkPreference = 0.15f;
 std::optional<std::size_t> bestInteract(std::span<const InteractOption> options, WorldPoint from, StickVec dir,
                                         std::span<const std::uint32_t> skip = {});
-
-/// The free cursor's move this frame, in pixels: the stick's tilt squared (fine near the
-/// middle) times kFreeCursorSpeed, Sensitivity and `scale` (the view's height over 480), faster
-/// the longer it's held near full tilt (`heldFor`, kept by the caller).
-inline constexpr float kFreeCursorSpeed = 420;
-StickVec freeCursorStep(StickVec v, float seconds, float sensitivity, float scale, float& heldFor);
 
 /// The angle between two ways, in degrees (0 to 180).
 float angleBetween(StickVec a, StickVec b);

@@ -1,6 +1,6 @@
 // (noxcpp) What the game controller keeps from frame to frame in a game (App::padPlay): the aim
-// (pad_aim.hpp), what the frame's drawables gave it, the pad's pointer and the free cursor. The
-// functions that use it are pad_play.hpp's.
+// (pad_aim.hpp), what the frame's drawables gave it and the pad's pointer. The functions that use it
+// are pad_play.hpp's.
 #pragma once
 
 #include "pad/pad_aim.hpp"
@@ -31,21 +31,17 @@ struct PlayState {
     float pointerX = 0;
     float pointerY = 0;
 
-    /// The free cursor (FreeCursor): on, its place (output pixels), how long it's been pushed
-    /// hard, and its buttons held (bit 0 left, bit 1 right).
-    bool freeCursor = false;
-    float freeX = 0;
-    float freeY = 0;
-    float freeHeld = 0;
-    std::uint8_t freeButtons = 0;
-
-    /// This frame's aim: the target (and where it is), the reticle, the aim point, the way.
+    /// This frame's aim: the target (and where it is), the aim point, the way.
     std::optional<std::uint16_t> target;
     std::optional<WorldPoint> targetAt;
-    std::optional<WorldPoint> reticle;
     std::optional<WorldPoint> aimAt;
     StickVec dir{1, 0};
     int pendingStep = 0; ///< TargetNext / Previous pressed since the last frame
+
+    /// The stick leaned back to a walk while running: the move let go till the server's run has
+    /// ended (our RUN animation gone), at most till then; not asked again before the second.
+    std::uint64_t walkAgainUntilMs = 0;
+    std::uint64_t walkAgainNotBeforeMs = 0;
 
     /// A cast's aim held through its chant (the server takes the cursor when it goes off).
     std::uint64_t castUntilMs = 0;
@@ -66,16 +62,16 @@ struct PlayState {
     std::size_t triedCount = 0;
     std::uint64_t triedUntilMs = 0;
 
-    /// Everything aimed or held forgotten (the pad put down, a game left); the free cursor kept.
+    /// Everything aimed or held forgotten (the pad put down, a game left).
     void dropAim()
     {
         targeter.clear();
         right.clear();
         target.reset();
         targetAt.reset();
-        reticle.reset();
         aimAt.reset();
         pendingStep = 0;
+        walkAgainUntilMs = 0;
         castUntilMs = 0;
         castAt.reset();
         castTarget.reset();

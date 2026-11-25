@@ -1151,9 +1151,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             } else if (!opts.movieArg.empty()) {
                 app->movie->play(opts.movieArg, movies::Skip::AnyInput, [app] { startMainMenu(*app); });
             } else if (automated) {
-                startMainMenu(*app);
+                padModeStart(*app, [app] { startMainMenu(*app); });
             } else {
-                startUp(*app);
+                padModeStart(*app, [app] { startUp(*app); }); // ((noxcpp) a pad there: which to play with, asked first)
             }
             app->menus->queueClicks(std::move(opts.menuClicks));
             SDL_Log("noxsdl %s: menus", nox::version());
@@ -1230,6 +1230,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
     // (noxcpp) The game controllers first: the pads kept, the device in use; a pad button's edge
     // for the bindings below (or, with a menu up, its MenuBack as Escape: the event is that key's).
     const std::optional<pad::PadEdge> padEdge = padEventFirst(*app, *event);
+    if (padModeEvent(*app, *event)) {
+        return SDL_APP_CONTINUE; // ((noxcpp) the question which to play with, or the mouse in the pad's mode)
+    }
     if (event->type == SDL_EVENT_KEYMAP_CHANGED && app->input) {
         app->input->layoutChanged(); // (another keyboard layout: the keys' labels as it prints them)
     }
@@ -1841,7 +1844,7 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
     SDL_RenderClear(app.renderer);
     if (app.legal) {
         app.legal->draw(app.renderer, app.camera.viewWidth, app.camera.viewHeight);
-    } else {
+    } else if (!app.padModeThen) { // ((noxcpp) the start-up's question which to play with: on black, before anything)
         app.menus->draw(app.renderer, app.camera.viewWidth, app.camera.viewHeight);
     }
     if (app.options) {
@@ -1899,6 +1902,7 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
                 SDL_GetWindowRelativeMouseMode(app.window) ? "on" : "off", SDL_CursorVisible() ? "shown" : "hidden");
     }
     drawOsk(app); // ((noxcpp) the pad's on-screen keyboard, while it's up)
+    drawPadModeAsk(app); // ((noxcpp) which to play with, while it's asked)
     // The menus' pointer, at their 640 x 480 layout's scale.
     drawCursor(app, CursorType::Select,
                std::min(static_cast<float>(app.camera.viewWidth) / 640.0f,
@@ -2258,6 +2262,9 @@ void sendGameInput(App& app)
     // (noxcpp) The left stick first: moving the way it leans (its move and cursor point sent), or
     // at rest with the pad in use facing the way it last went; else the mouse's, as ever.
     const PadSteer steer = padSteer(app);
+    // (noxcpp) In the pad's mode the mouse never turns us or moves the cursor point, even when the
+    // pad isn't steering (chat, a menu up): the facing stays the pad's last.
+    const bool mouseAims = !app.pads.padInUse() || app.view3d.active();
     const bool attacking3d = keysFree && app.input && app.input->held(kAction); // (the 3D view faces the crosshair while attacking)
     const bool moving = steer == PadSteer::Moves ||
                         (keysFree && ((app.input && app.input->held(kMoveForward)) || app.view3d.walking(attacking3d)));
@@ -2269,7 +2276,7 @@ void sendGameInput(App& app)
         if (app.running) {
             client.move(std::nullopt);
         }
-        if (steer == PadSteer::None) {
+        if (steer == PadSteer::None && mouseAims) {
             client.face(facingToMouse(app));
         }
     }
@@ -2289,7 +2296,7 @@ void sendGameInput(App& app)
             uiSound(app, 0x399);
         }
     }
-    if (steer == PadSteer::None) { // (the pad's cursor point is padSteer's)
+    if (steer == PadSteer::None && mouseAims) { // (the pad's cursor point is padSteer's)
         const SDL_FPoint m = mousePos(app);
         client.setCursor(static_cast<int>(app.camera.left() + m.x / app.camera.zoom),
                          static_cast<int>(app.camera.top() + m.y / app.camera.zoom));
@@ -3094,6 +3101,7 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     drawFps(*app);
     drawKillFeed(*app);
     drawOsk(*app); // ((noxcpp) the pad's on-screen keyboard, while it's up)
+    drawPadModeAsk(*app); // ((noxcpp) which to play with, while it's asked)
     drawCursor(*app, app->live && !briefing ? app->cursorType : CursorType::Select, app->camera.zoom);
     if (app->live && app->cinematics && !app->live->client().downloadPercent()) {
         // The fades over everything, the pointer too (mainloop's fades' draw with 1). Not while a
