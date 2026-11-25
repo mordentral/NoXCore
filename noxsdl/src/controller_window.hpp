@@ -98,7 +98,6 @@ private:
     void finishCapture(pad::PadButton b);
     void bringRowIntoView(pad::PadButton b);
     pad::ButtonLabel label(pad::PadButton b) const;
-    std::string actionTitle(std::string_view action) const;
     /// The button the picture lights now, and whether the modifier's layer shows.
     std::optional<pad::PadButton> litButton() const;
     bool layerShown() const;

@@ -1841,14 +1841,72 @@ content.text_form.save_as_tip = 새 파일을 씁니다(이 파일을 덮어쓰�
 #@ a29f3abb mt: What the game reads
 content.text_form.what_game_reads = 게임이 읽는 내용
 
+#@ 0a77a91f mt: Action
+controller.action.action = 행동
+#@ bd2ae345 mt: Quick Auto Load
+controller.action.auto_load = 빠른 불러오기
+#@ b25b5a3c mt: Quick Auto Save
+controller.action.auto_save = 빠른 저장
+#@ 2279d8cb mt: Chat
+controller.action.chat = 채팅
+#@ 43a4d598 mt: Decrease Gamma
+controller.action.decrease_gamma = 감마 낮추기
+#@ c7ab4580 mt: Decrease Window Size
+controller.action.decrease_window_size = 창 크기 줄이기
+#@ 1e0b5aec mt: Increase Gamma
+controller.action.increase_gamma = 감마 높이기
+#@ e1fe06fc mt: Increase Window Size
+controller.action.increase_window_size = 창 크기 늘리기
 #@ 1e2eb9ef mt: Interact
 controller.action.interact = 상호작용
+#@ 4f7b37e0 mt: Invert Spell Target
+controller.action.invert_spell_target = 주문 대상 반전
+#@ 43d2e3a0 mt: Invoke Slot 1
+controller.action.invoke_slot1 = 슬롯 1 사용
+#@ 46d2e859 mt: Invoke Slot 2
+controller.action.invoke_slot2 = 슬롯 2 사용
+#@ 45d2e6c6 mt: Invoke Slot 3
+controller.action.invoke_slot3 = 슬롯 3 사용
+#@ 48d2eb7f mt: Invoke Slot 4
+controller.action.invoke_slot4 = 슬롯 4 사용
+#@ 47d2e9ec mt: Invoke Slot 5
+controller.action.invoke_slot5 = 슬롯 5 사용
+#@ 0e1ef32d mt: Jump
+controller.action.jump = 점프
+#@ 5c52d15e mt: Laugh
+controller.action.laugh = 웃기
+#@ 841485db mt: Map Zoom In
+controller.action.map_zoom_in = 맵 확대
+#@ bbfb0488 mt: Map Zoom Out
+controller.action.map_zoom_out = 맵 축소
 #@ 50b26149 mt: Accept
 controller.action.menu_accept = 확인
 #@ c2954bc2 mt: Back
 controller.action.menu_back = 뒤로
 #@ 4eddf33c mt: Second Layer (hold)
 controller.action.modifier = 두 번째 레이어 (누르고 있기)
+#@ a38f0461 mt: Move Forward
+controller.action.move_forward = 앞으로 이동
+#@ f39ed8ce mt: Next Spell Set
+controller.action.next_spell_set = 다음 주문 세트
+#@ 38aaa757 mt: Place Trap/Bomber
+controller.action.place_trap_bomber = 함정/폭탄병 설치
+#@ eaa8ef31 mt: Point
+controller.action.point = 가리키기
+#@ 005c500e mt: Previous Spell Set
+controller.action.previous_spell_set = 이전 주문 세트
+#@ 04205517 mt: Quick Cure Poison
+controller.action.quick_cure_poison = 빠른 해독
+#@ eedcc302 mt: Quick Health
+controller.action.quick_health = 빠른 체력 회복
+#@ 2ef43133 mt: Quick Mana
+controller.action.quick_mana = 빠른 마나 회복
+#@ 12e8a9c4 mt: Save Screen Shot
+controller.action.screen_shot = 스크린샷 저장
+#@ 103f00af mt: Select Spell Set
+controller.action.select_spell_set = 주문 세트 선택
+#@ f9c8c15b mt: Swap Weapons
+controller.action.swap_weapons = 무기 교체
 #@ 29436cfe mt: Tab Right
 controller.action.tab_next = 오른쪽 탭
 #@ 49dda025 mt: Tab Left
@@ -1857,6 +1915,28 @@ controller.action.tab_previous = 왼쪽 탭
 controller.action.target_next = 다음 대상
 #@ ba70c761 mt: Previous Target
 controller.action.target_previous = 이전 대상
+#@ 4b85aa03 mt: Taunt
+controller.action.taunt = 도발
+#@ e1a1bf62 mt: Team Chat
+controller.action.team_chat = 팀 채팅
+#@ b0feccda mt: Toggle Book
+controller.action.toggle_book = 주문서
+#@ 63d2a1c4 mt: Toggle Console
+controller.action.toggle_console = 콘솔
+#@ b44abbaa mt: Toggle GUI
+controller.action.toggle_gui = 인터페이스 켜기/끄기
+#@ d89cd561 mt: Toggle Inventory
+controller.action.toggle_inventory = 인벤토리
+#@ 0c0052ff mt: Toggle Map
+controller.action.toggle_map = 맵
+#@ b435c2aa mt: Toggle NetGraph
+controller.action.toggle_netstat = 네트워크 그래프
+#@ ade5443f mt: Toggle Quit Menu
+controller.action.toggle_quit_menu = 종료 메뉴
+#@ 646ab6dc mt: Toggle Ranking GUI
+controller.action.toggle_rank = 순위표
+#@ 7ae4abf3 mt: Toggle Server Menu
+controller.action.toggle_server_menu = 서버 메뉴
 #@ 58de2772 mt: Normal
 controller.aim.normal = 보통
 #@ 0dc6b4aa mt: Off
@@ -1865,6 +1945,12 @@ controller.aim.off = 끄기
 controller.aim.strong = 강하게
 #@ 6de87ae9 mt: Weak
 controller.aim.weak = 약하게
+#@ c2954bc2 mt: Back
+controller.button.back = 뒤로
+#@ c29fa477 mt: Defaults
+controller.button.defaults = 기본값
+#@ 0ac8a560 mt: Reset
+controller.button.reset = 초기화
 #@ 1e9d32c2 mt: With {button} held
 controller.caption.layer = {button}을(를) 누른 상태
 #@ b84fa13e mt: Left stick: walk, and run when leant far

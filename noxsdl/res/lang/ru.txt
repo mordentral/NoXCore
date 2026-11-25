@@ -1855,14 +1855,72 @@ content.text_form.save_as_tip = Записывает новый файл (ник
 #@ a29f3abb mt: What the game reads
 content.text_form.what_game_reads = Что читает игра
 
+#@ 0a77a91f mt: Action
+controller.action.action = Действие
+#@ bd2ae345 mt: Quick Auto Load
+controller.action.auto_load = Быстрая загрузка
+#@ b25b5a3c mt: Quick Auto Save
+controller.action.auto_save = Быстрое сохранение
+#@ 2279d8cb mt: Chat
+controller.action.chat = Чат
+#@ 43a4d598 mt: Decrease Gamma
+controller.action.decrease_gamma = Уменьшить гамму
+#@ c7ab4580 mt: Decrease Window Size
+controller.action.decrease_window_size = Уменьшить окно
+#@ 1e0b5aec mt: Increase Gamma
+controller.action.increase_gamma = Увеличить гамму
+#@ e1fe06fc mt: Increase Window Size
+controller.action.increase_window_size = Увеличить окно
 #@ 1e2eb9ef mt: Interact
-controller.action.interact = Взаимодействие
+controller.action.interact = Использовать
+#@ 4f7b37e0 mt: Invert Spell Target
+controller.action.invert_spell_target = Обратить цель заклинания
+#@ 43d2e3a0 mt: Invoke Slot 1
+controller.action.invoke_slot1 = Применить слот 1
+#@ 46d2e859 mt: Invoke Slot 2
+controller.action.invoke_slot2 = Применить слот 2
+#@ 45d2e6c6 mt: Invoke Slot 3
+controller.action.invoke_slot3 = Применить слот 3
+#@ 48d2eb7f mt: Invoke Slot 4
+controller.action.invoke_slot4 = Применить слот 4
+#@ 47d2e9ec mt: Invoke Slot 5
+controller.action.invoke_slot5 = Применить слот 5
+#@ 0e1ef32d mt: Jump
+controller.action.jump = Прыжок
+#@ 5c52d15e mt: Laugh
+controller.action.laugh = Смех
+#@ 841485db mt: Map Zoom In
+controller.action.map_zoom_in = Карта: приблизить
+#@ bbfb0488 mt: Map Zoom Out
+controller.action.map_zoom_out = Карта: отдалить
 #@ 50b26149 mt: Accept
 controller.action.menu_accept = Принять
 #@ c2954bc2 mt: Back
 controller.action.menu_back = Назад
 #@ 4eddf33c mt: Second Layer (hold)
 controller.action.modifier = Второй слой (удерживать)
+#@ a38f0461 mt: Move Forward
+controller.action.move_forward = Идти вперёд
+#@ f39ed8ce mt: Next Spell Set
+controller.action.next_spell_set = След. набор заклинаний
+#@ 38aaa757 mt: Place Trap/Bomber
+controller.action.place_trap_bomber = Ловушка/бомбер
+#@ eaa8ef31 mt: Point
+controller.action.point = Указать
+#@ 005c500e mt: Previous Spell Set
+controller.action.previous_spell_set = Пред. набор заклинаний
+#@ 04205517 mt: Quick Cure Poison
+controller.action.quick_cure_poison = Быстрое лечение яда
+#@ eedcc302 mt: Quick Health
+controller.action.quick_health = Быстрое здоровье
+#@ 2ef43133 mt: Quick Mana
+controller.action.quick_mana = Быстрая мана
+#@ 12e8a9c4 mt: Save Screen Shot
+controller.action.screen_shot = Снимок экрана
+#@ 103f00af mt: Select Spell Set
+controller.action.select_spell_set = Выбор набора заклинаний
+#@ f9c8c15b mt: Swap Weapons
+controller.action.swap_weapons = Сменить оружие
 #@ 29436cfe mt: Tab Right
 controller.action.tab_next = Вкладка вправо
 #@ 49dda025 mt: Tab Left
@@ -1871,6 +1929,28 @@ controller.action.tab_previous = Вкладка влево
 controller.action.target_next = Следующая цель
 #@ ba70c761 mt: Previous Target
 controller.action.target_previous = Предыдущая цель
+#@ 4b85aa03 mt: Taunt
+controller.action.taunt = Насмешка
+#@ e1a1bf62 mt: Team Chat
+controller.action.team_chat = Командный чат
+#@ b0feccda mt: Toggle Book
+controller.action.toggle_book = Книга заклинаний
+#@ 63d2a1c4 mt: Toggle Console
+controller.action.toggle_console = Консоль
+#@ b44abbaa mt: Toggle GUI
+controller.action.toggle_gui = Интерфейс вкл./выкл.
+#@ d89cd561 mt: Toggle Inventory
+controller.action.toggle_inventory = Инвентарь
+#@ 0c0052ff mt: Toggle Map
+controller.action.toggle_map = Карта
+#@ b435c2aa mt: Toggle NetGraph
+controller.action.toggle_netstat = График сети
+#@ ade5443f mt: Toggle Quit Menu
+controller.action.toggle_quit_menu = Меню выхода
+#@ 646ab6dc mt: Toggle Ranking GUI
+controller.action.toggle_rank = Таблица рейтинга
+#@ 7ae4abf3 mt: Toggle Server Menu
+controller.action.toggle_server_menu = Меню сервера
 #@ 58de2772 mt: Normal
 controller.aim.normal = Обычная
 #@ 0dc6b4aa mt: Off
@@ -1879,6 +1959,12 @@ controller.aim.off = Выкл.
 controller.aim.strong = Сильная
 #@ 6de87ae9 mt: Weak
 controller.aim.weak = Слабая
+#@ c2954bc2 mt: Back
+controller.button.back = Назад
+#@ c29fa477 mt: Defaults
+controller.button.defaults = По умолчанию
+#@ 0ac8a560 mt: Reset
+controller.button.reset = Сброс
 #@ 1e9d32c2 mt: With {button} held
 controller.caption.layer = С зажатой {button}
 #@ b84fa13e mt: Left stick: walk, and run when leant far

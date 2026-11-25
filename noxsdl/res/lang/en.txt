@@ -2763,151 +2763,280 @@ content.text_form.save_as_tip = Writes a new file (never over this one, never in
 #@ a29f3abb: What the game reads
 content.text_form.what_game_reads = What the game reads
 
-# noxsdl/src/controller_window.cpp:187
+# noxsdl/src/pad/pad_remap.cpp:21
+#@ 0a77a91f: Action
+controller.action.action = Action
+# noxsdl/src/pad/pad_remap.cpp:51
+#@ bd2ae345: Quick Auto Load
+controller.action.auto_load = Quick Auto Load
+# noxsdl/src/pad/pad_remap.cpp:50
+#@ b25b5a3c: Quick Auto Save
+controller.action.auto_save = Quick Auto Save
+# noxsdl/src/pad/pad_remap.cpp:42
+#@ 2279d8cb: Chat
+controller.action.chat = Chat
+# noxsdl/src/pad/pad_remap.cpp:58
+#@ 43a4d598: Decrease Gamma
+controller.action.decrease_gamma = Decrease Gamma
+# noxsdl/src/pad/pad_remap.cpp:56
+#@ c7ab4580: Decrease Window Size
+controller.action.decrease_window_size = Decrease Window Size
+# noxsdl/src/pad/pad_remap.cpp:57
+#@ 1e0b5aec: Increase Gamma
+controller.action.increase_gamma = Increase Gamma
+# noxsdl/src/pad/pad_remap.cpp:55
+#@ e1fe06fc: Increase Window Size
+controller.action.increase_window_size = Increase Window Size
+# noxsdl/src/pad/pad_remap.cpp:60
 #@ 1e2eb9ef: Interact
 controller.action.interact = Interact
-# noxsdl/src/controller_window.cpp:191
+# noxsdl/src/pad/pad_remap.cpp:36
+#@ 4f7b37e0: Invert Spell Target
+controller.action.invert_spell_target = Invert Spell Target
+# noxsdl/src/pad/pad_remap.cpp:28
+#@ 43d2e3a0: Invoke Slot 1
+controller.action.invoke_slot1 = Invoke Slot 1
+# noxsdl/src/pad/pad_remap.cpp:29
+#@ 46d2e859: Invoke Slot 2
+controller.action.invoke_slot2 = Invoke Slot 2
+# noxsdl/src/pad/pad_remap.cpp:30
+#@ 45d2e6c6: Invoke Slot 3
+controller.action.invoke_slot3 = Invoke Slot 3
+# noxsdl/src/pad/pad_remap.cpp:31
+#@ 48d2eb7f: Invoke Slot 4
+controller.action.invoke_slot4 = Invoke Slot 4
+# noxsdl/src/pad/pad_remap.cpp:32
+#@ 47d2e9ec: Invoke Slot 5
+controller.action.invoke_slot5 = Invoke Slot 5
+# noxsdl/src/pad/pad_remap.cpp:22
+#@ 0e1ef32d: Jump
+controller.action.jump = Jump
+# noxsdl/src/pad/pad_remap.cpp:54
+#@ 5c52d15e: Laugh
+controller.action.laugh = Laugh
+# noxsdl/src/pad/pad_remap.cpp:27
+#@ 841485db: Map Zoom In
+controller.action.map_zoom_in = Map Zoom In
+# noxsdl/src/pad/pad_remap.cpp:26
+#@ bbfb0488: Map Zoom Out
+controller.action.map_zoom_out = Map Zoom Out
+# noxsdl/src/pad/pad_remap.cpp:64
 #@ 50b26149: Accept
 controller.action.menu_accept = Accept
-# noxsdl/src/controller_window.cpp:192
+# noxsdl/src/pad/pad_remap.cpp:65
 #@ c2954bc2: Back
 controller.action.menu_back = Back
-# noxsdl/src/controller_window.cpp:190
+# noxsdl/src/pad/pad_remap.cpp:63
 #@ 4eddf33c: Second Layer (hold)
 controller.action.modifier = Second Layer (hold)
-# noxsdl/src/controller_window.cpp:194
+# noxsdl/src/pad/pad_remap.cpp:20
+#@ a38f0461: Move Forward
+controller.action.move_forward = Move Forward
+# noxsdl/src/pad/pad_remap.cpp:34
+#@ f39ed8ce: Next Spell Set
+controller.action.next_spell_set = Next Spell Set
+# noxsdl/src/pad/pad_remap.cpp:37
+#@ 38aaa757: Place Trap/Bomber
+controller.action.place_trap_bomber = Place Trap/Bomber
+# noxsdl/src/pad/pad_remap.cpp:53
+#@ eaa8ef31: Point
+controller.action.point = Point
+# noxsdl/src/pad/pad_remap.cpp:33
+#@ 005c500e: Previous Spell Set
+controller.action.previous_spell_set = Previous Spell Set
+# noxsdl/src/pad/pad_remap.cpp:41
+#@ 04205517: Quick Cure Poison
+controller.action.quick_cure_poison = Quick Cure Poison
+# noxsdl/src/pad/pad_remap.cpp:39
+#@ eedcc302: Quick Health
+controller.action.quick_health = Quick Health
+# noxsdl/src/pad/pad_remap.cpp:40
+#@ 2ef43133: Quick Mana
+controller.action.quick_mana = Quick Mana
+# noxsdl/src/pad/pad_remap.cpp:59
+#@ 12e8a9c4: Save Screen Shot
+controller.action.screen_shot = Save Screen Shot
+# noxsdl/src/pad/pad_remap.cpp:35
+#@ 103f00af: Select Spell Set
+controller.action.select_spell_set = Select Spell Set
+# noxsdl/src/pad/pad_remap.cpp:38
+#@ f9c8c15b: Swap Weapons
+controller.action.swap_weapons = Swap Weapons
+# noxsdl/src/pad/pad_remap.cpp:67
 #@ 29436cfe: Tab Right
 controller.action.tab_next = Tab Right
-# noxsdl/src/controller_window.cpp:193
+# noxsdl/src/pad/pad_remap.cpp:66
 #@ 49dda025: Tab Left
 controller.action.tab_previous = Tab Left
-# noxsdl/src/controller_window.cpp:188
+# noxsdl/src/pad/pad_remap.cpp:61
 #@ a06512a1: Next Target
 controller.action.target_next = Next Target
-# noxsdl/src/controller_window.cpp:189
+# noxsdl/src/pad/pad_remap.cpp:62
 #@ ba70c761: Previous Target
 controller.action.target_previous = Previous Target
-# noxsdl/src/controller_window.cpp:519
+# noxsdl/src/pad/pad_remap.cpp:52
+#@ 4b85aa03: Taunt
+controller.action.taunt = Taunt
+# noxsdl/src/pad/pad_remap.cpp:43
+#@ e1a1bf62: Team Chat
+controller.action.team_chat = Team Chat
+# noxsdl/src/pad/pad_remap.cpp:24
+#@ b0feccda: Toggle Book
+controller.action.toggle_book = Toggle Book
+# noxsdl/src/pad/pad_remap.cpp:44
+#@ 63d2a1c4: Toggle Console
+controller.action.toggle_console = Toggle Console
+# noxsdl/src/pad/pad_remap.cpp:49
+#@ b44abbaa: Toggle GUI
+controller.action.toggle_gui = Toggle GUI
+# noxsdl/src/pad/pad_remap.cpp:23
+#@ d89cd561: Toggle Inventory
+controller.action.toggle_inventory = Toggle Inventory
+# noxsdl/src/pad/pad_remap.cpp:25
+#@ 0c0052ff: Toggle Map
+controller.action.toggle_map = Toggle Map
+# noxsdl/src/pad/pad_remap.cpp:48
+#@ b435c2aa: Toggle NetGraph
+controller.action.toggle_netstat = Toggle NetGraph
+# noxsdl/src/pad/pad_remap.cpp:45
+#@ ade5443f: Toggle Quit Menu
+controller.action.toggle_quit_menu = Toggle Quit Menu
+# noxsdl/src/pad/pad_remap.cpp:47
+#@ 646ab6dc: Toggle Ranking GUI
+controller.action.toggle_rank = Toggle Ranking GUI
+# noxsdl/src/pad/pad_remap.cpp:46
+#@ 7ae4abf3: Toggle Server Menu
+controller.action.toggle_server_menu = Toggle Server Menu
+# noxsdl/src/controller_window.cpp:499
 #@ 58de2772: Normal
 controller.aim.normal = Normal
-# noxsdl/src/controller_window.cpp:517
+# noxsdl/src/controller_window.cpp:497
 #@ 0dc6b4aa: Off
 controller.aim.off = Off
-# noxsdl/src/controller_window.cpp:520
+# noxsdl/src/controller_window.cpp:500
 #@ 0dad409a: Strong
 controller.aim.strong = Strong
-# noxsdl/src/controller_window.cpp:518
+# noxsdl/src/controller_window.cpp:498
 #@ 6de87ae9: Weak
 controller.aim.weak = Weak
-# noxsdl/src/controller_window.cpp:1176
+# noxsdl/src/controller_window.cpp:373
+#@ c2954bc2: Back
+controller.button.back = Back
+# noxsdl/src/controller_window.cpp:371
+#@ c29fa477: Defaults
+controller.button.defaults = Defaults
+# noxsdl/src/controller_window.cpp:372
+#@ 0ac8a560: Reset
+controller.button.reset = Reset
+# noxsdl/src/controller_window.cpp:1156
 #@ 1e9d32c2: With {button} held
 controller.caption.layer = With {button} held
-# noxsdl/src/controller_window.cpp:1170
+# noxsdl/src/controller_window.cpp:1150
 #@ b84fa13e: Left stick: walk, and run when leant far
 controller.caption.left_stick = Left stick: walk, and run when leant far
-# noxsdl/src/controller_window.cpp:1172
+# noxsdl/src/controller_window.cpp:1152
 #@ cf5d2702: Right stick: aim; a flick picks the next target
 controller.caption.right_stick = Right stick: aim; a flick picks the next target
-# noxsdl/src/controller_window.cpp:1003
+# noxsdl/src/controller_window.cpp:983
 #@ 0a77a91f: Action
 controller.header.action = Action
-# noxsdl/src/controller_window.cpp:1004, noxsdl/src/controller_window.cpp:1200
+# noxsdl/src/controller_window.cpp:984, noxsdl/src/controller_window.cpp:1180
 #@ 33881a91: Button
 controller.header.button = Button
-# noxsdl/src/controller_window.cpp:1201
+# noxsdl/src/controller_window.cpp:1181
 #@ 5ce477a4: Or
 controller.header.second = Or
-# noxsdl/src/controller_window.cpp:415
+# noxsdl/src/controller_window.cpp:395
 #@ c52bff6d: In the menus
 controller.list.menus = In the menus
-# noxsdl/src/controller_window.cpp:524
+# noxsdl/src/controller_window.cpp:504
 #@ 201a7a8b: Kept While Held
 controller.lock.held = Kept While Held
-# noxsdl/src/controller_window.cpp:524
+# noxsdl/src/controller_window.cpp:504
 #@ 8db969e1: Picked Again
 controller.lock.retarget = Picked Again
-# noxsdl/src/controller_window.cpp:995
+# noxsdl/src/controller_window.cpp:975
 #@ b986d834: No controller connected: the buttons are named by place.
 controller.none = No controller connected: the buttons are named by place.
-# noxsdl/src/controller_window.cpp:656
+# noxsdl/src/controller_window.cpp:636
 #@ 2fac5a23: Taken from {actions}.
 controller.notice.moved = Taken from {actions}.
-# noxsdl/src/controller_window.cpp:647
+# noxsdl/src/controller_window.cpp:627
 #@ 92ddfd57: That button can't go there.
 controller.notice.refused = That button can't go there.
-# noxsdl/src/controller_window.cpp:660
+# noxsdl/src/controller_window.cpp:640
 #@ 58e09c50: Swapped with {actions}.
 controller.notice.swapped = Swapped with {actions}.
-# noxsdl/src/controller_window.cpp:1296
+# noxsdl/src/controller_window.cpp:1276
 #@ 15d528af: Hold {button} to leave it as it is, or press Escape.
 controller.popup.cancel = Hold {button} to leave it as it is, or press Escape.
-# noxsdl/src/controller_window.cpp:1298
+# noxsdl/src/controller_window.cpp:1278
 #@ f50675e4: Escape leaves it as it is.
 controller.popup.cancel_key = Escape leaves it as it is.
-# noxsdl/src/controller_window.cpp:1283
+# noxsdl/src/controller_window.cpp:1263
 #@ 21ddb45c: {action}, with {button} held
 controller.popup.layer = {action}, with {button} held
-# noxsdl/src/controller_window.cpp:1277
+# noxsdl/src/controller_window.cpp:1257
 #@ 85283a00: Press a button on the controller for
 controller.popup.press = Press a button on the controller for
-# noxsdl/src/controller_window.cpp:530
+# noxsdl/src/controller_window.cpp:510
 #@ 2d49b726: As the Controller
 controller.prompts.auto = As the Controller
-# noxsdl/src/controller_window.cpp:1261
+# noxsdl/src/controller_window.cpp:1241
 #@ 5095b20d: Aim Assist
 controller.setting.aim_assist = Aim Assist
-# noxsdl/src/controller_window.cpp:394
+# noxsdl/src/controller_window.cpp:374
 #@ 0db04146: Invert the Right Stick's Up and Down
 controller.setting.invert = Invert the Right Stick's Up and Down
-# noxsdl/src/controller_window.cpp:1258
+# noxsdl/src/controller_window.cpp:1238
 #@ fdafe205: Left Stick Dead Zone {value}
 controller.setting.left_dead_zone = Left Stick Dead Zone {value}
-# noxsdl/src/controller_window.cpp:1262
+# noxsdl/src/controller_window.cpp:1242
 #@ fdc42ecf: Target Lock
 controller.setting.lock = Target Lock
-# noxsdl/src/controller_window.cpp:1263
+# noxsdl/src/controller_window.cpp:1243
 #@ ff943461: Button Names
 controller.setting.prompts = Button Names
-# noxsdl/src/controller_window.cpp:1259
+# noxsdl/src/controller_window.cpp:1239
 #@ 3239c498: Right Stick Dead Zone {value}
 controller.setting.right_dead_zone = Right Stick Dead Zone {value}
-# noxsdl/src/controller_window.cpp:395
+# noxsdl/src/controller_window.cpp:375
 #@ 3abf931c: Rumble (when hurt and on a level up)
 controller.setting.rumble = Rumble (when hurt and on a level up)
-# noxsdl/src/controller_window.cpp:1260
+# noxsdl/src/controller_window.cpp:1240
 #@ 228bfdd5: Run From a Lean of {value}
 controller.setting.run = Run From a Lean of {value}
-# noxsdl/src/controller_window.cpp:1257
+# noxsdl/src/controller_window.cpp:1237
 #@ 93b5ca6d: Play With
 controller.setting.use = Play With
-# noxsdl/src/controller_window.cpp:443, noxsdl/src/controller_window.cpp:663
+# noxsdl/src/controller_window.cpp:423, noxsdl/src/controller_window.cpp:643
 #@ 5acb3098: Show the {button} Layer
 controller.show_layer = Show the {button} Layer
-# noxsdl/src/controller_window.cpp:389
+# noxsdl/src/controller_window.cpp:369
 #@ 014251c6: Buttons
 controller.tab.buttons = Buttons
-# noxsdl/src/controller_window.cpp:390
+# noxsdl/src/controller_window.cpp:370
 #@ 4b058728: Settings
 controller.tab.settings = Settings
-# noxsdl/src/controller_window.cpp:910
+# noxsdl/src/controller_window.cpp:890
 #@ 290fb48a: How strongly attacks and spells turn to the enemy you aim\nnear. Other players get only a light pull at any setting.
 controller.tip.aim_assist = How strongly attacks and spells turn to the enemy you aim\nnear. Other players get only a light pull at any setting.
-# noxsdl/src/controller_window.cpp:899
+# noxsdl/src/controller_window.cpp:879
 #@ a3d002b1: How far the stick must lean before it counts.\nRaise it if the player creeps or the aim drifts\nwith the stick let go.
 controller.tip.dead_zone = How far the stick must lean before it counts.\nRaise it if the player creeps or the aim drifts\nwith the stick let go.
-# noxsdl/src/controller_window.cpp:915
+# noxsdl/src/controller_window.cpp:895
 #@ f64dc3eb: Kept While Held: the target stays while the attack or spell\nbutton is held. Picked Again: the best target as you turn.
 controller.tip.lock = Kept While Held: the target stays while the attack or spell\nbutton is held. Picked Again: the best target as you turn.
-# noxsdl/src/controller_window.cpp:920
+# noxsdl/src/controller_window.cpp:900
 #@ ad7275d7: The names and symbols shown for the buttons, on this\nscreen and on the spell bar: as the connected controller's,\nor always one family's.
 controller.tip.prompts = The names and symbols shown for the buttons, on this\nscreen and on the spell bar: as the connected controller's,\nor always one family's.
-# noxsdl/src/controller_window.cpp:905
+# noxsdl/src/controller_window.cpp:885
 #@ ec799022: How far the left stick leans before the player runs\n(less than that walks, as a near mouse pointer does).
 controller.tip.run = How far the left stick leans before the player runs\n(less than that walks, as a near mouse pointer does).
-# noxsdl/src/controller_window.cpp:893
+# noxsdl/src/controller_window.cpp:873
 #@ b236dfd3: What you play with. Controller: the mouse is ignored and\nits pointer hidden. Mouse and Keyboard: the controller is\nignored. Asked at each start while a controller is connected.
 controller.tip.use = What you play with. Controller: the mouse is ignored and\nits pointer hidden. Mouse and Keyboard: the controller is\nignored. Asked at each start while a controller is connected.
-# noxsdl/src/controller_window.cpp:994
+# noxsdl/src/controller_window.cpp:974
 #@ a15e8ea1: Controller
 controller.title = Controller
 
@@ -12544,13 +12673,13 @@ hud.quickbar.spell_set = Spell Set {n}
 #@ f7fa068e: Trap Set {n}
 hud.quickbar.trap_set = Trap Set {n}
 
-# noxsdl/src/controller_window.cpp:527, noxsdl/src/input_mode_ask.cpp:118
+# noxsdl/src/controller_window.cpp:507, noxsdl/src/input_mode_ask.cpp:118
 #@ a15e8ea1: Controller
 input_mode.controller = Controller
 # noxsdl/src/pad/pad_mode.cpp:121
 #@ 0f61c058: A game controller is connected: open the game's menu to choose it.
 input_mode.later = A game controller is connected: open the game's menu to choose it.
-# noxsdl/src/controller_window.cpp:527, noxsdl/src/input_mode_ask.cpp:119
+# noxsdl/src/controller_window.cpp:507, noxsdl/src/input_mode_ask.cpp:119
 #@ 3265ecc6: Mouse and Keyboard
 input_mode.mouse = Mouse and Keyboard
 # noxsdl/src/input_mode_ask.cpp:115

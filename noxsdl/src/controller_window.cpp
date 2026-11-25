@@ -180,26 +180,6 @@ pad::ButtonLabel ControllerWindow::label(PadButton b) const
     return pads_.label(b, config_.settings.prompts);
 }
 
-std::string ControllerWindow::actionTitle(std::string_view action) const
-{
-    if (const auto a = pad::padActionFromName(action)) {
-        switch (*a) {
-        case pad::PadAction::Interact: return NOX_TR("controller.action.interact", "Interact");
-        case pad::PadAction::TargetNext: return NOX_TR("controller.action.target_next", "Next Target");
-        case pad::PadAction::TargetPrevious: return NOX_TR("controller.action.target_previous", "Previous Target");
-        case pad::PadAction::Modifier: return NOX_TR("controller.action.modifier", "Second Layer (hold)");
-        case pad::PadAction::MenuAccept: return NOX_TR("controller.action.menu_accept", "Accept");
-        case pad::PadAction::MenuBack: return NOX_TR("controller.action.menu_back", "Back");
-        case pad::PadAction::TabPrevious: return NOX_TR("controller.action.tab_previous", "Tab Left");
-        case pad::PadAction::TabNext: return NOX_TR("controller.action.tab_next", "Tab Right");
-        default: break;
-        }
-    }
-    const std::string id = "bindevent:" + std::string(action);
-    std::string t = gui_.text(id);
-    return t.empty() || t == id ? std::string(action) : t;
-}
-
 // ------------------------------------------------------------------------------------ building
 
 void ControllerWindow::build()
@@ -388,9 +368,9 @@ void ControllerWindow::build()
     };
     setText(kTabButtons, NOX_TR("controller.tab.buttons", "Buttons"));
     setText(kTabSettings, NOX_TR("controller.tab.settings", "Settings"));
-    setText(kDefaults, gui_.text("InputCfg.wnd:DefaultsButton"));
-    setText(kReset, gui_.text("InputCfg.wnd:ResetButton"));
-    setText(kBack, gui_.text("WindowDir:Back"));
+    setText(kDefaults, NOX_TR("controller.button.defaults", "Defaults"));
+    setText(kReset, NOX_TR("controller.button.reset", "Reset"));
+    setText(kBack, NOX_TR("controller.button.back", "Back"));
     setText(kInvert, NOX_TR("controller.setting.invert", "Invert the Right Stick's Up and Down"));
     setText(kRumble, NOX_TR("controller.setting.rumble", "Rumble (when hurt and on a level up)"));
 
@@ -414,7 +394,7 @@ void ControllerWindow::fillLines()
             menus = true;
             lines_.push_back({"", NOX_TR("controller.list.menus", "In the menus")});
         }
-        lines_.push_back({std::string(a), actionTitle(a)});
+        lines_.push_back({std::string(a), pad::actionTitle(a)});
     }
     if (list_) {
         list_->lines.assign(lines_.size(), gui::Window::Line{" ", kGold});
@@ -649,7 +629,7 @@ void ControllerWindow::finishCapture(PadButton b)
     }
     std::vector<std::string> moved, swapped;
     for (const auto& a : r.movedFrom) {
-        (std::ranges::find(r.swapped, a) != r.swapped.end() ? swapped : moved).push_back(actionTitle(a));
+        (std::ranges::find(r.swapped, a) != r.swapped.end() ? swapped : moved).push_back(pad::actionTitle(a));
     }
     notice_.clear();
     if (!moved.empty()) {
@@ -1143,12 +1123,12 @@ void ControllerWindow::drawPicture(gui::Window&, gui::Painter& p)
         // What it does: the game's actions on it on that layer (the modifier says so).
         std::string what;
         if (mod && c.button == *mod) {
-            what = actionTitle(pad::padActionName(pad::PadAction::Modifier));
+            what = pad::actionTitle(pad::padActionName(pad::PadAction::Modifier));
         } else {
             for (const auto& bnd : config_.bindings) {
                 if (bnd.button == c.button && bnd.withModifier == layer && !pad::menuRow(bnd.action) &&
                     bnd.action != pad::padActionName(pad::PadAction::Modifier)) {
-                    const std::string t = actionTitle(bnd.action);
+                    const std::string& t = pad::actionTitle(bnd.action);
                     if (what.find(t) == std::string::npos) {
                         what += (what.empty() ? "" : ", ") + t;
                     }

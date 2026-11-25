@@ -35,6 +35,10 @@ std::span<const std::string_view> remapRows();
 /// Whether an action is the menus' (MenuAccept, MenuBack, the tabs): buttons of their own, apart from
 /// the game's, and no modifier's layer.
 bool menuRow(std::string_view action);
+/// An action's name wherever the controller's screens show it (the rows, the picture's labels, the
+/// notices), in the player's language whatever language nox.csf is in. The game's controls read as
+/// the English game names them. Empty for a name that isn't an action.
+const std::string& actionTitle(std::string_view action);
 /// Whether a cell takes a button (the Modifier's second doesn't).
 bool cellUsable(std::string_view action, int cell);
 /// Whether a button can be bound (not Guide).

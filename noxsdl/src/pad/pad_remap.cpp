@@ -1,11 +1,71 @@
 // (noxcpp) The Controller screen's changes to the pad's buttons (pad_remap.hpp).
 #include "pad/pad_remap.hpp"
 
+#include "noxcore/strings/l10n.hpp"
+
 #include <algorithm>
+#include <array>
+#include <iterator>
 
 namespace noxsdl::pad {
 
 namespace {
+
+/// Every action's title: the game's controls in their table's order, then the pad's own.
+struct Title {
+    std::string_view action;
+    nox::l10n::Key key;
+};
+constexpr Title kTitles[] = {
+    {"MoveForward", NOX_TRK("controller.action.move_forward", "Move Forward")},
+    {"Action", NOX_TRK("controller.action.action", "Action")},
+    {"Jump", NOX_TRK("controller.action.jump", "Jump")},
+    {"ToggleInventory", NOX_TRK("controller.action.toggle_inventory", "Toggle Inventory")},
+    {"ToggleBook", NOX_TRK("controller.action.toggle_book", "Toggle Book")},
+    {"ToggleMap", NOX_TRK("controller.action.toggle_map", "Toggle Map")},
+    {"MapZoomOut", NOX_TRK("controller.action.map_zoom_out", "Map Zoom Out")},
+    {"MapZoomIn", NOX_TRK("controller.action.map_zoom_in", "Map Zoom In")},
+    {"InvokeSlot1", NOX_TRK("controller.action.invoke_slot1", "Invoke Slot 1")},
+    {"InvokeSlot2", NOX_TRK("controller.action.invoke_slot2", "Invoke Slot 2")},
+    {"InvokeSlot3", NOX_TRK("controller.action.invoke_slot3", "Invoke Slot 3")},
+    {"InvokeSlot4", NOX_TRK("controller.action.invoke_slot4", "Invoke Slot 4")},
+    {"InvokeSlot5", NOX_TRK("controller.action.invoke_slot5", "Invoke Slot 5")},
+    {"PreviousSpellSet", NOX_TRK("controller.action.previous_spell_set", "Previous Spell Set")},
+    {"NextSpellSet", NOX_TRK("controller.action.next_spell_set", "Next Spell Set")},
+    {"SelectSpellSet", NOX_TRK("controller.action.select_spell_set", "Select Spell Set")},
+    {"InvertSpellTarget", NOX_TRK("controller.action.invert_spell_target", "Invert Spell Target")},
+    {"PlaceTrapBomber", NOX_TRK("controller.action.place_trap_bomber", "Place Trap/Bomber")},
+    {"SwapWeapons", NOX_TRK("controller.action.swap_weapons", "Swap Weapons")},
+    {"QuickHealth", NOX_TRK("controller.action.quick_health", "Quick Health")},
+    {"QuickMana", NOX_TRK("controller.action.quick_mana", "Quick Mana")},
+    {"QuickCurePoison", NOX_TRK("controller.action.quick_cure_poison", "Quick Cure Poison")},
+    {"Chat", NOX_TRK("controller.action.chat", "Chat")},
+    {"TeamChat", NOX_TRK("controller.action.team_chat", "Team Chat")},
+    {"ToggleConsole", NOX_TRK("controller.action.toggle_console", "Toggle Console")},
+    {"ToggleQuitMenu", NOX_TRK("controller.action.toggle_quit_menu", "Toggle Quit Menu")},
+    {"ToggleServerMenu", NOX_TRK("controller.action.toggle_server_menu", "Toggle Server Menu")},
+    {"ToggleRank", NOX_TRK("controller.action.toggle_rank", "Toggle Ranking GUI")},
+    {"ToggleNetstat", NOX_TRK("controller.action.toggle_netstat", "Toggle NetGraph")},
+    {"ToggleGUI", NOX_TRK("controller.action.toggle_gui", "Toggle GUI")},
+    {"AutoSave", NOX_TRK("controller.action.auto_save", "Quick Auto Save")},
+    {"AutoLoad", NOX_TRK("controller.action.auto_load", "Quick Auto Load")},
+    {"Taunt", NOX_TRK("controller.action.taunt", "Taunt")},
+    {"Point", NOX_TRK("controller.action.point", "Point")},
+    {"Laugh", NOX_TRK("controller.action.laugh", "Laugh")},
+    {"IncreaseWindowSize", NOX_TRK("controller.action.increase_window_size", "Increase Window Size")},
+    {"DecreaseWindowSize", NOX_TRK("controller.action.decrease_window_size", "Decrease Window Size")},
+    {"IncreaseGamma", NOX_TRK("controller.action.increase_gamma", "Increase Gamma")},
+    {"DecreaseGamma", NOX_TRK("controller.action.decrease_gamma", "Decrease Gamma")},
+    {"ScreenShot", NOX_TRK("controller.action.screen_shot", "Save Screen Shot")},
+    {"Interact", NOX_TRK("controller.action.interact", "Interact")},
+    {"TargetNext", NOX_TRK("controller.action.target_next", "Next Target")},
+    {"TargetPrevious", NOX_TRK("controller.action.target_previous", "Previous Target")},
+    {"Modifier", NOX_TRK("controller.action.modifier", "Second Layer (hold)")},
+    {"MenuAccept", NOX_TRK("controller.action.menu_accept", "Accept")},
+    {"MenuBack", NOX_TRK("controller.action.menu_back", "Back")},
+    {"TabPrevious", NOX_TRK("controller.action.tab_previous", "Tab Left")},
+    {"TabNext", NOX_TRK("controller.action.tab_next", "Tab Right")},
+};
 
 /// The rows the pad uses most, first, in this order.
 constexpr std::string_view kFirstRows[] = {
@@ -78,6 +138,25 @@ std::span<const std::string_view> remapRows()
         return v;
     }();
     return rows;
+}
+
+const std::string& actionTitle(std::string_view action)
+{
+    // (Each title's slot found once; a slot's text follows the language in use.)
+    static const auto slots = [] {
+        std::array<const nox::l10n::Slot*, std::size(kTitles)> s{};
+        for (std::size_t i = 0; i < s.size(); ++i) {
+            s[i] = &nox::l10n::slotOf(kTitles[i].key);
+        }
+        return s;
+    }();
+    for (std::size_t i = 0; i < slots.size(); ++i) {
+        if (kTitles[i].action == action) {
+            return slots[i]->text;
+        }
+    }
+    static const std::string none;
+    return none;
 }
 
 bool menuRow(std::string_view action)
