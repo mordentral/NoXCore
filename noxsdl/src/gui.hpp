@@ -20,8 +20,11 @@
 //              A clicked entry field takes the focus and gets the typing (text input events,
 //              Backspace), up to its maximum length.
 //   animation  the menus slide in and out (gui_makeAnimation).
+//   the pad    (noxcpp) a game controller's navigation focus, apart from the typing focus
+//              (gui_nav.hpp): it points as the mouse does, A clicks what it's on, an outline marks it.
 #pragma once
 
+#include "gui_nav.hpp"
 #include "sprite_cache.hpp"
 #include "text.hpp"
 
@@ -59,6 +62,9 @@ enum Message : int {
     Clicked = 0x4007,
     SliderChanged = 0x4009, ///< a slider's value moved (Window::sliderValue)
     EntryEntered = 0x401F,  ///< Enter in an entry field (wndEditProc)
+    /// (noxcpp) The pad moved a list's line out of view and scrolled it (Window::scroll changed):
+    /// a screen whose slider or other lists go with the list follows.
+    PadScrolled = 0x7F01,
 };
 
 /// State bits (the window's draw data word 0).
@@ -134,6 +140,8 @@ using DrawFn = std::function<void(Window& self, Painter& painter)>;
 class Window {
 public:
     Window(const nox::gui::WindowDef& def, Window* parent, const Resources& res);
+    /// The same with only the string table its texts come from (null: the ids as they are).
+    Window(const nox::gui::WindowDef& def, Window* parent, const nox::strings::StringTable* strings);
 
     std::int32_t id = 0;
     SDL_Rect rect{};         ///< relative to the parent
@@ -194,6 +202,22 @@ public:
     /// make): a disabled window draws as the exe's does, often no different from an enabled one.
     bool dimDisabled = false;
 
+    /// (noxcpp) The game controller's focus (gui_nav.hpp): Auto goes to the kinds that take a
+    /// click (navKind), On to this one too (a window drawn and clicked as a button by its screen),
+    /// Off never to it or anything in it.
+    enum class Nav : std::uint8_t { Auto, On, Off };
+    Nav nav = Nav::Auto;
+    /// (noxcpp) The pad's input while the focus is on it, before the window system's own (a list
+    /// drawn by its screen, a picker): true when it took it.
+    std::function<bool(Window& self, NavInput input)> padInput;
+    /// (noxcpp) A top-level window kept apart by the pad (the menus' Options / Back bar under every
+    /// screen): its focus goes into it only when nothing else is that way, and out of it only when
+    /// nothing more of its own is.
+    bool navApart = false;
+    /// (noxcpp) A list whose line the pad's up and down move clicks the line as it goes (as a click
+    /// would); off, only the pad's A clicks it (a list whose click does more than choose).
+    bool navLineClicks = true;
+
     /// (noxcpp) How its text fits its box (Gui::fitText): worked out when the text, the box, the
     /// fonts or the scale change, kept till then. AsDrawn: as the game draws it (it fits: one line,
     /// or wrapped within the box); else the small font on one line, the small font wrapped (the box
@@ -227,6 +251,11 @@ public:
     /// Tells the parent, as the exe's widgets do (the draw data's owner window).
     void notify(int message);
 };
+
+/// A window and its children built from a definition, depth first; every USER window in it gets
+/// `proc` (Gui::load's, without a Gui: the tests').
+std::unique_ptr<Window> buildWindowTree(const nox::gui::WindowDef& def, Window* parent,
+                                        const nox::strings::StringTable* strings, const Proc& proc);
 
 /// A check box or button (if there is one) checked (pressed: kPressed) or not.
 inline void setChecked(Window* w, bool on)
@@ -385,6 +414,9 @@ struct Slide {
 class Gui {
 public:
     explicit Gui(Resources res) : res_(std::move(res)) {}
+    ~Gui() { navForget(this); }
+    Gui(const Gui&) = delete;
+    Gui& operator=(const Gui&) = delete;
 
     /// Loads a window file as a new top-level window; every USER window in it gets `proc`.
     Window* load(const std::filesystem::path& file, Proc proc);
@@ -408,6 +440,25 @@ public:
     /// The window the left button's press went to (the enabled one under it), till its release.
     Window* pressed() const { return pressed_; }
     void setFocus(Window* w) { focus_ = w; }
+
+    /// (noxcpp) The game controller's focus (gui_nav.hpp), or null.
+    Window* navFocus() const { return nav_.focus(); }
+    /// The pad's focus put on `w` (pointing at it as the mouse would), only while the pad is the
+    /// device in use: a screen's choice of where the pad goes next (a drop-down's button once
+    /// it's shut) never moves the mouse's pointing.
+    void padFocus(Window* w);
+    /// Where the pad's focus starts when it's settled next (a screen's default button).
+    void setNavDefault(Window* w) { nav_.setDefault(w); }
+    /// The screen's tabs for the pad's LB / RB (-1 the one before, +1 after; true when it switched).
+    void setNavTabs(std::function<bool(int step)> tabs) { tabs_ = std::move(tabs); }
+    /// A screen's tabs (in their order; null and greyed or hidden ones passed over): the one after
+    /// (step +1) or before (-1) the one that's on (checked), round to the first or the last,
+    /// clicked as the mouse would and given the pad's focus. False with none to go to.
+    bool stepTabs(std::span<Window* const> tabs, int step);
+    /// Off: this Gui never takes the pad (a window the game plays on under, the chat's line).
+    void setPadNavigation(bool on) { padNav_ = on; }
+    /// The pad's input taken here (Gui::handleEvent's nav events, by the owner alone).
+    bool navigate(NavInput input);
 
     /// Starts a slide (the window is moved to `from` now); returns it for slideOut.
     Slide* slideIn(Window* window, SDL_Point from, SDL_Point speedIn, SDL_Point speedOut);
@@ -444,11 +495,12 @@ private:
     const Window::TextFit& fitText(Window& w, Painter& p, int width, int height);
     void drawByType(Window& w, Painter& p);
     void drawBorder(Window& w, Painter& p);
-    /// The window at (x, y); `press`: only ENABLED ones (a click's), else any (the hover's).
-    Window* hit(Window& w, int x, int y, bool press);
     void dragSlider(Window& w, SDL_Point at);
     Window* hitTop(int x, int y, bool press);
-    std::unique_ptr<Window> build(const nox::gui::WindowDef& def, Window* parent, const Proc& proc);
+    Scene scene() const { return {tops_, modal_}; }
+    /// While a pad is connected: claims the pad when there's something to go to; as the pad's owner
+    /// with the pad in use, settles the focus and outlines it.
+    void drawNav(Painter& p);
 
     Resources res_;
     std::vector<std::unique_ptr<Window>> tops_;
@@ -457,6 +509,9 @@ private:
     Window* pressed_ = nullptr;
     Window* modal_ = nullptr;
     Window* focus_ = nullptr;
+    Navigator nav_;
+    std::function<bool(int)> tabs_;
+    bool padNav_ = true;
     std::uint64_t lastStepMs_ = 0;
     Placement placement_;
     Painter painter(SDL_Renderer* renderer, int width, int height) const;

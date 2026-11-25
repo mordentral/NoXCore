@@ -62,6 +62,8 @@ constexpr std::int32_t kCharNew = 501, kCharLoad = 502, kCharDelete = 503, kChar
 // character's places, above the lists where the game's layout is empty; the switch, under the
 // buttons. None of the game's window files use these ids.
 constexpr std::int32_t kCharPlaces = 4291, kCharSwitch = 4292;
+// (noxcpp) The game list's window for the game controller's focus (padGameList).
+constexpr std::int32_t kPadGameList = 4293;
 constexpr SDL_Rect kCharPlacesRect{108, 92, 400, 14}, kCharSwitchRect{140, 399, 336, 15};
 // dlg.wnd
 constexpr std::int32_t kDlgOk = 4001, kDlgCancel = 4002, kDlgText = 4004, kDlgTitle = 4005, kDlgNo = 4006,
@@ -148,6 +150,7 @@ Menus::Menus(gui::Resources res, std::filesystem::path gameDir, BrowserScreen& b
                           [this](gui::Window&, int message, gui::Window& from) {
                               return shellSound(message) && message == gui::Clicked && onOptsBack(from);
                           });
+    optsBack_->navApart = true; // ((noxcpp) the pad goes to the bar once a screen has nothing more that way)
     // The game list's R / F5 as its Refresh button.
     browser_.setRefreshHandler([this](std::uint64_t nowMs) {
         nowMs_ = nowMs;
@@ -481,6 +484,15 @@ void Menus::enter(State s)
             }
         }
         screen_ = gui_.load(def, [this](gui::Window&, int message, gui::Window& from) {
+            if (message == gui::PadScrolled) {
+                // (noxcpp) The game controller scrolled the lists' line into view: the three together.
+                for (const auto id : {kCharLists, kCharKind, kCharName}) {
+                    if (gui::Window* l = screen_->find(id)) {
+                        l->scroll = from.scroll;
+                    }
+                }
+                return true;
+            }
             return shellSound(message) && message == gui::Clicked && onSelChar(from);
         });
         drawCampaignLine(screen_, campaign);
@@ -490,6 +502,14 @@ void Menus::enter(State s)
         slides_.push_back(gui_.slideIn(screen_, {0, -440}, {0, 20}, {0, -40}));
         if (gui::Window* lists = screen_->find(kCharLists)) {
             lists->proc = screen_->proc; // wndSetProc: the lists' clicks reach the screen
+            // (noxcpp) The game controller goes to the three lists as one (the first, round them;
+            // it takes no click itself).
+            lists->nav = gui::Window::Nav::On;
+            for (const auto id : {kCharKind, kCharName}) {
+                if (gui::Window* l = lists->find(id)) {
+                    l->nav = gui::Window::Nav::Off;
+                }
+            }
         }
         if (gui::Window* label = screen_->find(kCharLabel)) {
             label->text = gui_.text(solo_ ? "LoadLabel" : "LoadCharLabel", "SelChar.c");
@@ -567,6 +587,15 @@ void Menus::enter(State s)
                 pickClass(only);
             }
         }
+        // (noxcpp) The game controller starts on the class picked, else the first offered (its
+        // focus points as the mouse does: the class it's on is picked).
+        std::int32_t start = chosenClass_;
+        for (std::int32_t id = kClassFirst; start < 0 && id <= kClassLast; ++id) {
+            if (classOffered(id - kClassFirst)) {
+                start = id;
+            }
+        }
+        gui_.setNavDefault(start >= 0 ? screen_->find(start) : nullptr);
         optsBack_->show(true);
         break;
     }
@@ -603,8 +632,12 @@ void Menus::enter(State s)
         }
         break;
     case State::Browser: {
-        // game_showGameSel: the whole screen from 480 above. It has its own Back.
-        screen_ = gui_.load(windowDir_ / "noxworld.wnd", [this](gui::Window&, int message, gui::Window& from) {
+        // game_showGameSel: the whole screen from 480 above. It has its own Back. (noxcpp: a window
+        // over our game list for the game controller's focus, taking no click: padGameList.)
+        nox::gui::WindowDef def = nox::gui::loadWindowFile(windowDir_ / "noxworld.wnd");
+        addUserWindow(def, kPadGameList, kListFrame.x, kListFrame.y, kListFrame.w, kListFrame.h, true);
+        def.children.back().status |= st::NoInput;
+        screen_ = gui_.load(def, [this](gui::Window&, int message, gui::Window& from) {
             // Its procedure (windowMultiplayerSub) clicks with ButtonPress (but for 10035 / 10036 / 10043 /
             // 10044) and makes no sound on pointing.
             if (message == gui::SliderChanged && from.id == kInfoSlider) {
@@ -661,6 +694,20 @@ void Menus::enter(State s)
                                 p.toOutput(pos.x + kListFrame.x, pos.y + kListFrame.y, kListFrame.w, kListFrame.h),
                                 p.pixelSize(false));
         };
+        if (gui::Window* list = screen_->find(kPadGameList)) {
+            padGameList(*list);
+        }
+        if (gui::Window* info = screen_->find(kInfoList)) {
+            // (noxcpp) The description box's lines scrolled by the pad's up and down, as its arrows.
+            info->padInput = [this](gui::Window& self, gui::NavInput in) {
+                if (in != gui::NavInput::Up && in != gui::NavInput::Down) {
+                    return false;
+                }
+                const int was = self.scroll;
+                scrollGameInfo(self.scroll + (in == gui::NavInput::Down ? 1 : -1));
+                return self.scroll != was;
+            };
+        }
         if (!std::exchange(keepList_, false)) { // (the join's wait: the list as it was)
             refreshGames();
         }
@@ -1367,6 +1414,7 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
         infoServer_ = BrowserScreen::rowKey(entry);
         box->show(true);
         gui_.setModal(box);
+        gui_.setNavDefault(box->find(kJoin)); // ((noxcpp) the pad on its Join)
         return;
     }
     title("Name");
@@ -1465,6 +1513,42 @@ void Menus::showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, in
     infoServer_ = BrowserScreen::address(g);
     box->show(true);
     gui_.setModal(box);
+    gui_.setNavDefault(box->find(kJoin)); // ((noxcpp) the pad on its Join)
+}
+
+void Menus::padGameList(gui::Window& list)
+{
+    // Our game list for the game controller: up and down its rows (the list's own arrow keys),
+    // off its ends to the buttons; A a click on the row (the description box, its Join).
+    list.draw = [](gui::Window&, gui::Painter&) {}; // (the screen draws the list)
+    list.nav = gui::Window::Nav::On;
+    list.padInput = [this](gui::Window&, gui::NavInput in) {
+        const int rows = static_cast<int>(browser_.gameCount());
+        const int row = browser_.selectedRow();
+        switch (in) {
+        case gui::NavInput::Up:
+        case gui::NavInput::Down: {
+            const bool down = in == gui::NavInput::Down;
+            if (rows == 0 || (down ? row >= rows - 1 : row <= 0)) {
+                return false; // (off its end)
+            }
+            SDL_Event key{};
+            key.type = SDL_EVENT_KEY_DOWN;
+            key.key.key = down ? SDLK_DOWN : SDLK_UP;
+            key.key.down = true;
+            browser_.handleEvent(key, nowMs_);
+            return true;
+        }
+        case gui::NavInput::Accept:
+            if (const nox::lobby::ServerEntry* entry = browser_.selectedEntry()) {
+                const nox::lobby::ServerEntry chosen = *entry;
+                showGameInfo(chosen, browser_.selectedRowPoint(), outputSize_.x, outputSize_.y);
+            }
+            return true;
+        default:
+            return false;
+        }
+    };
 }
 
 void Menus::scrollGameInfo(int first)
@@ -1834,6 +1918,8 @@ void Menus::dialog(const std::string& title, const std::string& text, std::uint3
         b->text = noText;
     }
     gui_.setModal(dialog_);
+    // (noxcpp) The game controller starts on No when it asks, else on OK.
+    gui_.setNavDefault(dialog_->find((flags & 0x10) ? kDlgNo : (flags & 1) ? kDlgOk : (flags & 8) ? kDlgYes : kDlgCancel));
 }
 
 void Menus::wolDialog(const std::string& title, const std::string& text, std::uint32_t flags, std::function<void()> onOk,
@@ -2415,7 +2501,12 @@ bool Menus::onSelColor(gui::Window& from)
     // The looks screen's procedure.
     const std::int32_t id = from.id;
     if (id >= kColorSkin && id <= kColorShoes2) {
-        openPicker(id, mouse_);
+        // (noxcpp: the game controller's A opens it beside the button, on the colour it has.)
+        const SDL_Point pos = from.screenPos();
+        openPicker(id, gui::navPadInUse() ? SDL_Point{pos.x - 4, pos.y + from.rect.h / 2} : mouse_);
+        if (picker_ && (from.userData & 0xFFFF) == pickerTable_) {
+            gui_.setNavDefault(picker_->find(kSwatchFirst + static_cast<std::int32_t>(from.userData >> 16)));
+        }
     } else if (id >= kToggleFirst && id <= kToggleLast) {
         // Facial hair (and hair) on or off.
         if (gui::Window* label = screen_->find(id - 20)) {
@@ -2632,6 +2723,7 @@ void Menus::drawOverAll(SDL_Renderer* renderer, int width, int height) const
 void Menus::handleEvent(const SDL_Event& event, int width, int height, std::uint64_t nowMs)
 {
     nowMs_ = nowMs;
+    outputSize_ = {width, height};
     // The mouse kept in layout units (640 x 480) for the picker and the test steps.
     if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
         event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
@@ -2674,6 +2766,10 @@ void Menus::handleEvent(const SDL_Event& event, int width, int height, std::uint
                 wol_.reset(); // (and gives up a login under "Connecting...")
                 wolLoggingIn_ = false;
             }
+            return;
+        }
+        if (infoServer_ && gui::padEscape(event)) {
+            closeGameInfo(); // ((noxcpp) the game controller's Back shuts the description box alone)
             return;
         }
         // Escape is Back (on the game list: the description box shut first).

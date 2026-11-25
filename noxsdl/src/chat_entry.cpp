@@ -20,6 +20,7 @@ ChatEntry::ChatEntry(gui::Resources res, const std::filesystem::path& windowDir,
     window_ = gui_.load(windowDir / "GuiChat.wnd", nullptr);
     field_ = window_->find(kField);
     window_->show(false);
+    gui_.setPadNavigation(false); // ((noxcpp) the line has the keys alone: no pad focus on it)
 }
 
 void ChatEntry::open(SDL_Window* window, bool team)

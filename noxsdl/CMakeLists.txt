@@ -95,6 +95,8 @@ add_executable(noxsdl WIN32
     src/gpu_shader_code.cpp
     src/gpu_shaders.cpp
     src/gui.cpp
+    src/gui_nav.cpp
+    src/gui_window.cpp
     src/hd_video.cpp
     src/hd_water.cpp
     src/water_base.cpp
@@ -140,6 +142,7 @@ add_executable(noxsdl WIN32
     src/pad/pad_aim.cpp
     src/pad/pad_bindings.cpp
     src/pad/pad_game.cpp
+    src/pad/pad_menu.cpp
     src/pad/pad_play.cpp
     src/pad/virtual_pad.cpp
     src/minimap.cpp

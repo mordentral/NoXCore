@@ -1041,8 +1041,16 @@ void padPress(App& app, const pad::PadEdge& edge);
 void padAction(App& app, pad::PadAction action, bool down);
 /// What the pad's own actions hold let go (InputBindings::releaseAll's moments).
 void padActionsDropped(App& app);
-/// The menus' MenuAccept and tabs pressed while a menu has the pad.
-void padMenuAction(App& app, pad::PadAction action);
+// (pad/pad_menu.cpp: the pad in the menus and the game's windows)
+/// A pad button's press while a menu or a game window has the pad (padMenusUp): the D-pad, MenuAccept
+/// and the tabs go on as a nav event (gui::navEvent: `event` becomes it), for the Gui that has the
+/// pad; the edge is still padPress's when no window takes it.
+void padMenuInput(App& app, const pad::PadEdge& edge, SDL_Event& event);
+/// Whether a menu (padHasMenus) or a game window with somewhere for the pad to go has it.
+bool padMenusUp(const App& app);
+/// Each frame (beginFrame), with a pad connected: which Gui has the pad (gui::navFrame), and a held
+/// D-pad direction or the left stick (in the menus) repeating.
+void padMenuFrame(App& app);
 /// The left stick this frame (sendGameInput, first): the pads read; walking or running the way it
 /// leans (Moves: the move and the cursor point sent), or at rest with the pad in use, facing the way
 /// it last leaned (Holds: the facing and cursor point sent); None: the mouse's as ever.

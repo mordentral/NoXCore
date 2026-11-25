@@ -55,7 +55,10 @@ bool MapDownload::handleEvent(const SDL_Event& event, int width, int height)
         }
         return true;
     }
-    gui_.handleEvent(event, width, height);
+    const bool took = gui_.handleEvent(event, width, height);
+    if (gui::isNavEvent(event)) {
+        return took; // ((noxcpp) the pad's, when it went to Cancel)
+    }
     return event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP ||
            event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_MOUSE_MOTION;
 }

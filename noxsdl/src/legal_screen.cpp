@@ -97,8 +97,9 @@ void LegalScreen::handleEvent(const SDL_Event& event, int width, int height)
     if (over_) {
         return;
     }
-    // A key (window message 0x15, state 2) once the count is under 0x10F.
-    if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+    // A key (window message 0x15, state 2) once the count is under 0x10F. ((noxcpp) A game
+    // controller's button too: its Back comes as Escape, its other buttons as the menus' input.)
+    if ((event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) || gui::isNavEvent(event)) {
         if (count_ < kInputFrom) {
             leave();
         }

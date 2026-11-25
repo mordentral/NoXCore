@@ -671,6 +671,7 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
             s->status |= st::Image;
             s->enabledImage = "OptionsVolumeSlider";
             s->hiliteImage = "OptionsVolumeSliderLit";
+            s->nav = gui::Window::Nav::On; // ((noxcpp) upright, yet no list's scroll bar: the pad steps it)
             s->sliderValue = std::clamp(number(config_.setting(name), 0x4000), 0, 0x4000);
         }
     }
@@ -707,6 +708,12 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
     }
 
     showPage(0); // (it opens on General)
+    // (noxcpp) The game controller's LB / RB: the panel's tabs.
+    gui_.setNavTabs([this](int step) {
+        const std::array<gui::Window*, 2> tabs{advanced_ ? advanced_->find(kTabGeneral) : nullptr,
+                                               advanced_ ? advanced_->find(kTabMore) : nullptr};
+        return gui_.stepTabs(tabs, step);
+    });
 
     // Centred across, at the top (game_initOptionsInGame), the advanced panel in its place in it.
     window_->rect.x = 0;
@@ -894,11 +901,14 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
                 showDrop(other, false);
             }
             showDrop(d, opening);
+            // ((noxcpp) the pad goes to the choice in use, and back to the button once it's shut)
+            gui_.padFocus(opening ? advanced_->find(d.item + extras_.*d.value) : &from);
             return true;
         }
         if (from.id >= d.item && from.id < d.item + static_cast<std::int32_t>(d.names.size())) {
             extras_.*d.value = from.id - d.item;
             showDrop(d, false);
+            gui_.padFocus(advanced_->find(d.box));
             setDropText(d);
             if (callbacks_.onExtras) {
                 callbacks_.onExtras(extras_);
@@ -913,12 +923,15 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
     // config at once, a click anywhere else shuts it.
     if (from.id == kResBox) {
         const gui::Window* first = window_->find(kResItem);
-        showResolutions(resolution_, first && (first->status & st::Hidden));
+        const bool opening = first && (first->status & st::Hidden);
+        showResolutions(resolution_, opening);
+        gui_.padFocus(opening ? window_->find(kResItem + std::max(resolution_, 0)) : &from);
         return true;
     }
     if (from.id >= kResItem && from.id < kResItem + static_cast<std::int32_t>(kResolutions.size())) {
         const Resolution& r = kResolutions[static_cast<std::size_t>(from.id - kResItem)];
         showResolutions(from.id - kResItem, false);
+        gui_.padFocus(window_->find(kResBox));
         setting("VideoMode", std::to_string(r.width) + " " + std::to_string(r.height) + " 16");
         return true;
     }
@@ -985,6 +998,21 @@ bool OptionsWindow::handleEvent(const SDL_Event& event, int width, int height)
     }
     if (life_.closing()) {
         return true; // (sliding out: nothing more to press)
+    }
+    if (gui::padEscape(event) && !event.key.repeat) {
+        // (noxcpp) The game controller's Back with a drop-down open: it shut, the pad on its button.
+        if (const gui::Window* first = window_ ? window_->find(kResItem) : nullptr; first && !first->hidden()) {
+            showResolutions(resolution_, false);
+            gui_.padFocus(window_->find(kResBox));
+            return true;
+        }
+        for (const DropDown& d : drops()) {
+            if (const gui::Window* first = advanced_ ? advanced_->find(d.item) : nullptr; first && !first->hidden()) {
+                showDrop(d, false);
+                gui_.padFocus(advanced_->find(d.box));
+                return true;
+            }
+        }
     }
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
         close();

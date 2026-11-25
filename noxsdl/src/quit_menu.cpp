@@ -270,6 +270,7 @@ void QuitMenu::ask(const std::string& title, const std::string& text, std::funct
         }
     }
     gui_.setModal(dialog_);
+    gui_.setNavDefault(dialog_->find(kDlgNo)); // ((noxcpp) the game controller starts on No)
 }
 
 void QuitMenu::update(std::uint64_t nowMs)

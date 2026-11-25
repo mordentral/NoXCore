@@ -343,6 +343,8 @@ private:
     void showGameInfo(const nox::lobby::ServerEntry& entry, SDL_FPoint at, int width, int height);
     void closeGameInfo();
     void scrollGameInfo(int first);
+    /// (noxcpp) The game list's window for the game controller (its rows, A a click on one).
+    void padGameList(gui::Window& list);
     void loadCharacters();
     /// (noxcpp) The list shown from listed_: those played at the game's mode first (character_notes'
     /// order), the rest after unless the switch is on.
@@ -516,6 +518,7 @@ private:
     std::vector<std::string> clicks_;
     std::uint64_t clickWaitMs_ = 0; ///< a "+ms" step's end
     SDL_Point mouse_{}; ///< in the 640 x 480 layout
+    SDL_Point outputSize_{640, 480}; ///< (noxcpp) the output's size as the last event saw it (the pad's A on a game)
 
     // Character creation.
     const nox::things::ModifierDb& modifiers_;

@@ -256,7 +256,21 @@ void Menus::modeList(ModeListFor list)
         state->scroll = std::clamp(state->chosen - kVisibleRows + 1, 0, std::max(0, static_cast<int>(state->rows.size()) - kVisibleRows));
     };
 
-    dialog_ = gui_.load(def, [this, state, chosenRow, choose, start, refresh](gui::Window&, int message, gui::Window& from) {
+    // A setting's value stepped back (-1) or on (+1).
+    const auto stepOption = [this, chosenRow](std::size_t k, int dir) {
+        const Row* row = chosenRow();
+        if (!row) {
+            return;
+        }
+        nox::modes::OptionValues& set = modeSettings_[row->id];
+        const nox::modes::OptionSpec* s = shownOption(*row, set, k); // (a campaign's own after the row's)
+        if (!s) {
+            return;
+        }
+        set[s->key] = std::to_string(stepModeOption(*s, modeOptionValue(set, *s), dir));
+        gui_.resources().sound(0x398);
+    };
+    dialog_ = gui_.load(def, [this, state, chosenRow, choose, start, refresh, stepOption](gui::Window&, int message, gui::Window& from) {
         if (message != gui::Clicked) {
             return false;
         }
@@ -277,21 +291,10 @@ void Menus::modeList(ModeListFor list)
             return true;
         }
         if (from.id >= kOptionId && from.id < kOptionId + kVisibleOptions) {
-            const Row* row = chosenRow();
-            const std::size_t k = static_cast<std::size_t>(from.id - kOptionId);
-            if (!row) {
-                return true;
-            }
-            nox::modes::OptionValues& set = modeSettings_[row->id];
-            const nox::modes::OptionSpec* s = shownOption(*row, set, k); // (a campaign's own after the row's)
-            if (!s) {
-                return true;
-            }
             // The value's left half goes back, the rest on.
             const SDL_Point pos = from.screenPos();
             const bool back = mouse_.x < pos.x + kOptionLabelW + kOptionValueW / 2;
-            set[s->key] = std::to_string(stepModeOption(*s, modeOptionValue(set, *s), back ? -1 : 1));
-            gui_.resources().sound(0x398);
+            stepOption(static_cast<std::size_t>(from.id - kOptionId), back ? -1 : 1);
             return true;
         }
         switch (from.id - kButtonId) {
@@ -498,6 +501,78 @@ void Menus::modeList(ModeListFor list)
     };
     dialogKeysOf_ = dialog_;
     gui_.setModal(dialog_);
+
+    // (noxcpp) The game controller: up and down the rows choose (as the arrow keys), off the list's
+    // ends to the settings and the buttons; A on the chosen row starts it (Enter), on another
+    // chooses it; left and right step a setting (A steps it on). The rows and settings with
+    // nothing in them are passed over.
+    gui::Window* const dlg = dialog_;
+    const auto markShown = [state, chosenRow, settingsOf, dlg] {
+        for (int i = 0; i < kVisibleRows; ++i) {
+            if (gui::Window* w = dlg->find(kRowId + i)) {
+                w->nav = state->scroll + i < static_cast<int>(state->rows.size()) ? gui::Window::Nav::Auto : gui::Window::Nav::Off;
+            }
+        }
+        const Row* row = chosenRow();
+        for (int k = 0; k < kVisibleOptions; ++k) {
+            if (gui::Window* w = dlg->find(kOptionId + k)) {
+                const bool shown = row && row->kind == Row::Kind::Mode && shownOption(*row, settingsOf(*row), static_cast<std::size_t>(k));
+                w->nav = shown ? gui::Window::Nav::Auto : gui::Window::Nav::Off;
+            }
+        }
+    };
+    for (int i = 0; i < kVisibleRows; ++i) {
+        if (gui::Window* w = dlg->find(kRowId + i)) {
+            w->padInput = [this, state, choose, start, markShown, dlg, i](gui::Window&, gui::NavInput in) {
+                const int row = state->scroll + i;
+                const int n = static_cast<int>(state->rows.size());
+                if (in == gui::NavInput::Accept) {
+                    if (row == state->chosen) {
+                        start();
+                    } else if (row < n) {
+                        choose(row, true);
+                        markShown();
+                    }
+                    return true;
+                }
+                if (in != gui::NavInput::Up && in != gui::NavInput::Down) {
+                    return false;
+                }
+                const int to = row + (in == gui::NavInput::Down ? 1 : -1);
+                if (to < 0 || to >= n) {
+                    return false; // (off the list's end)
+                }
+                choose(to, true);
+                markShown();
+                gui_.padFocus(dlg->find(kRowId + state->chosen - state->scroll));
+                return true;
+            };
+        }
+    }
+    for (int k = 0; k < kVisibleOptions; ++k) {
+        if (gui::Window* w = dlg->find(kOptionId + k)) {
+            w->padInput = [stepOption, k](gui::Window&, gui::NavInput in) {
+                if (in != gui::NavInput::Left && in != gui::NavInput::Right && in != gui::NavInput::Accept) {
+                    return false;
+                }
+                stepOption(static_cast<std::size_t>(k), in == gui::NavInput::Left ? -1 : 1);
+                return true;
+            };
+        }
+    }
+    markShown();
+    if (gui::Window* canvas = dlg->find(kCanvasId)) {
+        // (kept up with the mouse's and the keys' choices and Refresh too, while there's a pad)
+        canvas->draw = [draw = std::move(canvas->draw), markShown](gui::Window& w, gui::Painter& p) {
+            if (gui::navConnected()) {
+                markShown();
+            }
+            if (draw) {
+                draw(w, p);
+            }
+        };
+    }
+    gui_.setNavDefault(dlg->find(kRowId + std::max(state->chosen - state->scroll, 0)));
 }
 
 } // namespace noxsdl

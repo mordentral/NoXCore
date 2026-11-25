@@ -12358,10 +12358,10 @@ game.pad.prompt.use = Use
 # noxsdl/src/quit_menu.cpp:102
 #@ 67a1e1af: Vote Map
 game.quit_menu.vote_map = Vote Map
-# noxsdl/src/frame.cpp:134
+# noxsdl/src/frame.cpp:135
 #@ 1c3df593: screenshot: couldn't write {path}
 game.screenshot.failed = screenshot: couldn't write {path}
-# noxsdl/src/frame.cpp:133
+# noxsdl/src/frame.cpp:134
 #@ 0941a2e6: screenshot: {path}
 game.screenshot.saved = screenshot: {path}
 
@@ -12393,16 +12393,16 @@ lobby.browser.xwis_logging_in = XWIS: logging in as {nick}
 # noxcore/src/lobby/browser.cpp:283
 #@ a1d5c981: XWIS: timed out
 lobby.browser.xwis_timed_out = XWIS: timed out
-# noxsdl/src/menus.cpp:1103
+# noxsdl/src/menus.cpp:1150
 #@ 639e2803: Log in to XWIS (a new name makes a new account with this password)
 lobby.login.go_tip = Log in to XWIS (a new name makes a new account with this password)
 # noxsdl/src/wol_screens.hpp:35
 #@ 7d20314c: Log in with your XWIS account. A new name becomes your account with the password you type; for a name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a game you host is listed under a generated one).
 lobby.login.help = Log in with your XWIS account. A new name becomes your account with the password you type; for a name registered at xwis.net, use the game password from xwis.net/ga. Skip Login plays with no name (a game you host is listed under a generated one).
-# noxsdl/src/menus.cpp:1098
+# noxsdl/src/menus.cpp:1145
 #@ 68ee0803: Skip Login
 lobby.login.skip = Skip Login
-# noxsdl/src/menus.cpp:1099
+# noxsdl/src/menus.cpp:1146
 #@ f4f63f02: Go to the game list with no login name (a game you host is listed on XWIS under a generated one)
 lobby.login.skip_tip = Go to the game list with no login name (a game you host is listed on XWIS under a generated one)
 # noxcore/src/lobby/servserv.cpp:282, noxcore/src/lobby/servserv.cpp:293, noxcore/src/lobby/servserv.cpp:430
@@ -12463,25 +12463,25 @@ lobby.xwis.skipped = XWIS: {name} skipped (the address just asked)
 # noxsdl/src/browser_screen.cpp:109
 #@ 44e3b331: Cannot read saved servers: {error}
 menus.browser.cannot_read_saved = Cannot read saved servers: {error}
-# noxsdl/src/browser_screen.cpp:526
+# noxsdl/src/browser_screen.cpp:533
 #@ 48cedef4: \s(closed)
 menus.browser.closed_mark = \s(closed)
-# noxsdl/src/browser_screen.cpp:460
+# noxsdl/src/browser_screen.cpp:467
 #@ 18743595: From
 menus.browser.col_from = From
-# noxsdl/src/browser_screen.cpp:458
+# noxsdl/src/browser_screen.cpp:465
 #@ 44a7f051: Map
 menus.browser.col_map = Map
-# noxsdl/src/browser_screen.cpp:459
+# noxsdl/src/browser_screen.cpp:466
 #@ 534e7732: Mode
 menus.browser.col_mode = Mode
-# noxsdl/src/browser_screen.cpp:458
+# noxsdl/src/browser_screen.cpp:465
 #@ 0fe07306: Name
 menus.browser.col_name = Name
-# noxsdl/src/browser_screen.cpp:460
+# noxsdl/src/browser_screen.cpp:467
 #@ 7fb7f0a9: Ping
 menus.browser.col_ping = Ping
-# noxsdl/src/browser_screen.cpp:459
+# noxsdl/src/browser_screen.cpp:466
 #@ 18dd36a9: Players
 menus.browser.col_players = Players
 # noxsdl/src/mode_column.hpp:47
@@ -12490,7 +12490,7 @@ menus.browser.from_list = list
 # noxsdl/src/mode_column.hpp:47
 #@ 8a6979e4: Saved
 menus.browser.from_saved = Saved
-# noxsdl/src/browser_screen.cpp:396
+# noxsdl/src/browser_screen.cpp:403
 #@ 6cfd3ac3: \s    Enter / double-click: join     R: refresh     Esc: quit
 menus.browser.keys_hint = \s    Enter / double-click: join     R: refresh     Esc: quit
 # noxsdl/src/browser_screen.cpp:282
@@ -12526,10 +12526,10 @@ menus.browser.mode.kotr = kotr
 # noxsdl/src/mode_column.hpp:76
 #@ 09d0cf3d: quest
 menus.browser.mode.quest = quest
-# noxsdl/src/browser_screen.cpp:529
+# noxsdl/src/browser_screen.cpp:536
 #@ 6a175148: \s(NoX Core only)
 menus.browser.noxcore_only_mark = \s(NoX Core only)
-# noxsdl/src/browser_screen.cpp:565
+# noxsdl/src/browser_screen.cpp:572
 #@ f79070b7: {ms} ms
 menus.browser.ping_ms = {ms} ms
 # noxsdl/src/browser_screen.cpp:271
@@ -12562,10 +12562,10 @@ menus.browser.status_not_found = Address not found
 # noxsdl/src/browser_screen.cpp:149
 #@ bc3b88aa: Online
 menus.browser.status_online = Online
-# noxsdl/src/browser_screen.cpp:394
+# noxsdl/src/browser_screen.cpp:401
 #@ 75792b09: Nox games
 menus.browser.title = Nox games
-# noxsdl/src/browser_screen.cpp:531
+# noxsdl/src/browser_screen.cpp:538
 #@ 644d5488: \s(Update needed)
 menus.browser.update_needed_mark = \s(Update needed)
 # noxsdl/src/character_labels.hpp:35
@@ -12592,10 +12592,10 @@ menus.common.cancel = Cancel
 # noxsdl/src/menus_servers.cpp:215
 #@ cd86acc3: Close
 menus.common.close = Close
-# noxsdl/src/menus.cpp:177, noxsdl/src/quit_menu.cpp:84, noxsdl/src/quit_menu.cpp:105
+# noxsdl/src/menus.cpp:180, noxsdl/src/quit_menu.cpp:84, noxsdl/src/quit_menu.cpp:105
 #@ e26d8706: \s- WIP
 menus.common.wip_suffix = \s- WIP
-# noxsdl/src/menus.cpp:382
+# noxsdl/src/menus.cpp:385
 #@ 40a44dac: Your NoX Core is too out of date for this game.
 menus.dialog.client_too_old = Your NoX Core is too out of date for this game.
 # noxsdl/src/host_listing.hpp:60
@@ -12613,22 +12613,22 @@ menus.host_listing.why_no_xwis = XWIS is off here (--no-xwis)
 # noxsdl/src/host_listing.hpp:42
 #@ 353cc175: you aren't logged in to XWIS (Online > Network), and XWIS lists a game under its host's login
 menus.host_listing.why_not_logged_in = you aren't logged in to XWIS (Online > Network), and XWIS lists a game under its host's login
-# noxsdl/src/menus.cpp:443, noxsdl/src/menus_modes.cpp:477
+# noxsdl/src/menus.cpp:446, noxsdl/src/menus_modes.cpp:480
 #@ 291bbe93: Game Modes
 menus.main.game_modes = Game Modes
-# noxsdl/src/menus_modes.cpp:409
+# noxsdl/src/menus_modes.cpp:412
 #@ 421f4a16: {name} (built in)
 menus.modes.built_in_name = {name} (built in)
-# noxsdl/src/menus_modes.cpp:420
+# noxsdl/src/menus_modes.cpp:423
 #@ 66743dea: {mode}: {description}
 menus.modes.campaign_mark_row = {mode}: {description}
 # noxsdl/src/mode_list.cpp:155
 #@ 96bbf648: The game's own
 menus.modes.campaign_own = The game's own
-# noxsdl/src/menus_modes.cpp:417
+# noxsdl/src/menus_modes.cpp:420
 #@ bd7d04e8: {campaign}, with friends.
 menus.modes.campaign_row = {campaign}, with friends.
-# noxsdl/src/menus_modes.cpp:368
+# noxsdl/src/menus_modes.cpp:371
 #@ 0845bcfd: {name} settings: {campaign}
 menus.modes.campaign_settings_heading = {name} settings: {campaign}
 # noxsdl/src/menus_modes.cpp:62
@@ -12646,16 +12646,16 @@ menus.modes.col_players = Players
 # noxsdl/src/menus_modes.cpp:64
 #@ 555c5249: Stock clients
 menus.modes.col_stock_clients = Stock clients
-# noxsdl/src/menus_modes.cpp:334
+# noxsdl/src/menus_modes.cpp:337
 #@ f044a536: {name} didn't load
 menus.modes.didnt_load_heading = {name} didn't load
-# noxsdl/src/menus_modes.cpp:415
+# noxsdl/src/menus_modes.cpp:418
 #@ 3a082c19: Didn't load: {why}
 menus.modes.didnt_load_row = Didn't load: {why}
-# noxsdl/src/menus_modes.cpp:344
+# noxsdl/src/menus_modes.cpp:347
 #@ d85f539a: Map Editor: the map, who may edit and the sandbox are chosen in its session dialog, after your character.
 menus.modes.editor_about_hosted = Map Editor: the map, who may edit and the sandbox are chosen in its session dialog, after your character.
-# noxsdl/src/menus_modes.cpp:346
+# noxsdl/src/menus_modes.cpp:349
 #@ 2ac3e64c: Map Editor: your own maps, on this computer. Its File > Host a Session shares one with others.
 menus.modes.editor_about_local = Map Editor: your own maps, on this computer. Its File > Host a Session shares one with others.
 # noxsdl/src/mode_list.cpp:195
@@ -12667,7 +12667,7 @@ menus.modes.editor_description_local = Build and edit your own maps.
 # noxsdl/src/mode_list.cpp:191
 #@ 4a2cad46: Map Editor
 menus.modes.editor_name = Map Editor
-# noxsdl/src/menus_modes.cpp:375
+# noxsdl/src/menus_modes.cpp:378
 #@ 43169c37: (the first {n})
 menus.modes.first_options = (the first {n})
 # noxsdl/src/menus_modes.cpp:77
@@ -12682,7 +12682,7 @@ menus.modes.levels_map_files = Map files
 # noxsdl/src/mode_list.cpp:50
 #@ 61e6be1a: No
 menus.modes.no = No
-# noxsdl/src/menus_modes.cpp:360
+# noxsdl/src/menus_modes.cpp:363
 #@ 0fe66a74: {name}: no settings to choose here.
 menus.modes.no_settings = {name}: no settings to choose here.
 # noxsdl/src/menus_modes.cpp:74
@@ -12694,7 +12694,7 @@ menus.modes.option_off = Off
 # noxsdl/src/mode_list.cpp:315
 #@ 60e47df0: On
 menus.modes.option_on = On
-# noxsdl/src/menus_modes.cpp:340
+# noxsdl/src/menus_modes.cpp:343
 #@ 19fbfc76: Quest: the game's own. Its settings are chosen in the game, as always.
 menus.modes.quest_about = Quest: the game's own. Its settings are chosen in the game, as always.
 # noxsdl/src/mode_list.cpp:185
@@ -12706,34 +12706,34 @@ menus.modes.quest_name = Quest
 # noxsdl/src/menus_modes.cpp:75
 #@ 0815aad4: Refresh
 menus.modes.refresh = Refresh
-# noxsdl/src/menus_modes.cpp:371
+# noxsdl/src/menus_modes.cpp:374
 #@ 89a6b661: {name} settings
 menus.modes.settings_heading = {name} settings
-# noxsdl/src/menus_modes.cpp:460
+# noxsdl/src/menus_modes.cpp:463
 #@ 0ae8097f: Start
 menus.modes.start = Start
 # noxsdl/src/mode_list.cpp:50
 #@ b3a43630: Yes
 menus.modes.yes = Yes
-# noxsdl/src/menus.cpp:2513
+# noxsdl/src/menus.cpp:2604
 #@ 034ee216: Check that your save folder is writable and has free space. See the log for details.
 menus.save_failed.body = Check that your save folder is writable and has free space. See the log for details.
-# noxsdl/src/menus.cpp:2512
+# noxsdl/src/menus.cpp:2603
 #@ 0685388d: Save failed
 menus.save_failed.title = Save failed
 # noxsdl/src/menus_servers.cpp:150, noxsdl/src/menus_servers.cpp:212
 #@ 9dc3aa14: Add
 menus.servers.add = Add
-# noxsdl/src/menus.cpp:642
+# noxsdl/src/menus.cpp:675
 #@ 02f448d1: Add/Remove
 menus.servers.add_remove = Add/Remove
-# noxsdl/src/menus.cpp:644
+# noxsdl/src/menus.cpp:677
 #@ 06e309b3: Add or remove saved server addresses
 menus.servers.add_remove_tip = Add or remove saved server addresses
 # noxsdl/src/menus_servers.cpp:183
 #@ 858b3346: Server added.
 menus.servers.added = Server added.
-# noxsdl/src/menus.cpp:2067
+# noxsdl/src/menus.cpp:2153
 #@ aa489a85: Address not found. Refresh to try again.
 menus.servers.address_not_found_refresh = Address not found. Refresh to try again.
 # noxsdl/src/menus_servers.cpp:210
@@ -12757,13 +12757,13 @@ menus.servers.confirm_remove = Remove saved address?
 # noxsdl/src/menus_servers.cpp:97
 #@ 435c2969: Add/Remove Servers
 menus.servers.dialog_title = Add/Remove Servers
-# noxsdl/src/menus.cpp:654, noxsdl/src/menus_modes.cpp:477
+# noxsdl/src/menus.cpp:687, noxsdl/src/menus_modes.cpp:480
 #@ c67511e6: Host Custom
 menus.servers.host_custom = Host Custom
-# noxsdl/src/menus.cpp:1359
+# noxsdl/src/menus.cpp:1406
 #@ 6a810ecf: Saved server
 menus.servers.info_saved_server = Saved server
-# noxsdl/src/menus.cpp:1359
+# noxsdl/src/menus.cpp:1406
 #@ 6d7302f2: Server
 menus.servers.info_server = Server
 # noxsdl/src/menus_servers.cpp:116
@@ -13265,29 +13265,29 @@ options.weather.on = On
 #@ 8dc6c6d9: Reduced
 options.weather.reduced = Reduced
 
-# noxsdl/src/menus.cpp:389, noxsdl/src/editor/map_editor.cpp:275
+# noxsdl/src/menus.cpp:392, noxsdl/src/editor/map_editor.cpp:275
 #@ db79a3a6: {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
 script.memory_tricks = {map} uses memory tricks of the original game that NoX Core does not run. Look for a NoX Core version of it.
 
-# noxsdl/src/server_options.cpp:451
+# noxsdl/src/server_options.cpp:460
 #@ 5d1d1713: All Leave
 server.bots.all_leave = All Leave
-# noxsdl/src/server_options.cpp:451
+# noxsdl/src/server_options.cpp:460
 #@ 6b788baf: Every bot leaves
 server.bots.all_leave_tip = Every bot leaves
 # noxsdl/src/server_options.cpp:36
 #@ 5d3846ec: Conjurers
 server.bots.conjurers = Conjurers
-# noxsdl/src/server_options.cpp:447
+# noxsdl/src/server_options.cpp:456
 #@ 8520a210: Difficulty
 server.bots.difficulty = Difficulty
-# noxsdl/src/server_options.cpp:499
+# noxsdl/src/server_options.cpp:508
 #@ 8bd078b8: In the game: {in} of {wanted} ({most} at most)
 server.bots.in_game = In the game: {in} of {wanted} ({most} at most)
-# noxsdl/src/server_options.cpp:444
+# noxsdl/src/server_options.cpp:453
 #@ 1169b83a: One fewer
 server.bots.one_fewer = One fewer
-# noxsdl/src/server_options.cpp:445
+# noxsdl/src/server_options.cpp:454
 #@ d868d598: One more
 server.bots.one_more = One more
 # noxsdl/src/hosting.cpp:154
@@ -13311,16 +13311,16 @@ server.bots.state_waiting_map = waiting for the map
 # noxsdl/src/hosting.cpp:156
 #@ 75a4b320: watching
 server.bots.state_watching = watching
-# noxsdl/src/server_options.cpp:440
+# noxsdl/src/server_options.cpp:449
 #@ 48630a97: Bots
 server.bots.tab = Bots
-# noxsdl/src/server_options.cpp:440
+# noxsdl/src/server_options.cpp:449
 #@ 4e79811b: Bots this game runs itself, to play with or against
 server.bots.tab_tip = Bots this game runs itself, to play with or against
 # noxsdl/src/server_options.cpp:37
 #@ 6c33113b: Easy
 server.bots.tier_easy = Easy
-# noxsdl/src/server_options.cpp:448
+# noxsdl/src/server_options.cpp:457
 #@ 7e9f3b9c: The easiest the bots are: click for the next
 server.bots.tier_from_tip = The easiest the bots are: click for the next
 # noxsdl/src/server_options.cpp:39
@@ -13329,13 +13329,13 @@ server.bots.tier_hard = Hard
 # noxsdl/src/server_options.cpp:38
 #@ 09be5f96: Medium
 server.bots.tier_medium = Medium
-# noxsdl/src/server_options.cpp:449
+# noxsdl/src/server_options.cpp:458
 #@ 42454824: to
 server.bots.tier_to = to
-# noxsdl/src/server_options.cpp:450
+# noxsdl/src/server_options.cpp:459
 #@ 755b0933: The hardest the bots are: click for the next
 server.bots.tier_to_tip = The hardest the bots are: click for the next
-# noxsdl/src/server_options.cpp:441
+# noxsdl/src/server_options.cpp:450
 #@ b4cc071d: Bots this game runs:
 server.bots.title = Bots this game runs:
 # noxsdl/src/server_options.cpp:34
@@ -13344,10 +13344,10 @@ server.bots.warriors = Warriors
 # noxsdl/src/server_options.cpp:35
 #@ 64f4a01b: Wizards
 server.bots.wizards = Wizards
-# noxsdl/src/server_options.cpp:305, noxsdl/src/server_options_server.cpp:643
+# noxsdl/src/server_options.cpp:314, noxsdl/src/server_options_server.cpp:643
 #@ aa5c4d5a: Not in a {campaign} game
 server.common.not_in_campaign = Not in a {campaign} game
-# noxsdl/src/server_options.cpp:678
+# noxsdl/src/server_options.cpp:687
 #@ dc6e881d: Co-op: set the name and access, then click OK
 server.game.coop_hint = Co-op: set the name and access, then click OK
 # noxsdl/src/server_options_server.cpp:619

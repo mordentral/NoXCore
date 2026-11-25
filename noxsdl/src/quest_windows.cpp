@@ -66,6 +66,10 @@ QuestWindows::QuestWindows(gui::Resources res, const std::filesystem::path& wind
             w->show(false);
         }
     }
+    if (keys_) {
+        // ((noxcpp) Shown while the game plays on: the game controller's buttons stay the game's.)
+        keys_->nav = gui::Window::Nav::Off;
+    }
 }
 
 void QuestWindows::show(gui::Window* w)

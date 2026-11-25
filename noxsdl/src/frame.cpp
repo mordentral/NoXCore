@@ -94,6 +94,7 @@ bool fitTarget(SDL_Renderer* renderer, SDL_Texture*& target, int w, int h)
 /// texture the size of the output, for endFrame to put on the screen through the ramp.
 void beginFrame(App& app)
 {
+    padMenuFrame(app); // ((noxcpp) the pad: which window has it, held directions; nothing without one)
     if (!gammaRamp(app) && !app.letterboxed) {
         return;
     }

@@ -67,6 +67,10 @@ public:
     {
         return selected_ >= 0 && selected_ < static_cast<int>(rows_.size()) ? &rows_[static_cast<std::size_t>(selected_)] : nullptr;
     }
+    /// (noxcpp) The selected row (0 up; 0 with none listed) and, for the game controller's A in
+    /// place of a click on it, the point (output pixels) a click on it would be at, as last drawn.
+    int selectedRow() const { return selected_; }
+    SDL_FPoint selectedRowPoint() const;
     /// The listed game at `server` ("a.b.c.d:port"; null: not listed).
     const nox::lobby::ServerEntry* entryFor(const std::string& server) const;
     /// Whether the list has `server` ("a.b.c.d:port") as a game that answered its ping but not

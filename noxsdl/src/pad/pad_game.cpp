@@ -16,6 +16,7 @@
 #include "backend_hooks.hpp"
 #include "cursor_pick.hpp"
 #include "pad/pad_play.hpp"
+#include "gui_nav.hpp"
 
 #include "noxcore/io/file.hpp"
 
@@ -165,9 +166,12 @@ bool padHasMenus(const App& app)
     if (!app.live || app.joinWaiting || (app.movie && app.movie->active())) {
         return true;
     }
+    // (and the game's windows that own Escape: the message of the day, the host's Server Settings,
+    // the map download)
     return (app.quitMenu && app.quitMenu->isOpen()) || (app.chat && app.chat->isOpen()) ||
            (app.console && app.console->isOpen()) || (app.options && app.options->isOpen()) ||
-           (app.inputConfig && app.inputConfig->isOpen());
+           (app.inputConfig && app.inputConfig->isOpen()) || (app.motdWindow && app.motdWindow->isOpen()) ||
+           (app.serverOptions && app.serverOptions->isOpen()) || (app.mapDownload && app.live->client().downloadPercent());
 }
 
 std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
@@ -189,23 +193,22 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
     followReleases(app);
     const unsigned bit = 1u << static_cast<unsigned>(edge->button);
     // A menu, or a window that owns Escape (chat, the console), has the input: MenuBack's button is
-    // Escape there (each screen's own Escape); the other menu actions are told to padMenuAction.
-    if (edge->down && padHasMenus(app)) {
-        const auto menu = app.padRouter.menuActions(edge->button);
-        for (std::size_t a = 0; a < pad::kPadActionCount; ++a) {
-            if (menu.has(static_cast<PadAction>(a)) && static_cast<PadAction>(a) != PadAction::MenuBack) {
-                padMenuAction(app, static_cast<PadAction>(a));
-            }
-        }
-        if (menu.has(PadAction::MenuBack)) {
-            app.padEscapes |= bit;
-            event = keyEvent(SDLK_ESCAPE, SDL_SCANCODE_ESCAPE, true);
-            return std::nullopt;
-        }
-    } else if (!edge->down && (app.padEscapes & bit)) {
+    // Escape there (each screen's own Escape; marked as the pad's: gui::padEscape); the D-pad, the
+    // other menu actions go on as the menus' nav events (padMenuInput, pad_menu.cpp).
+    if (edge->down && padHasMenus(app) && app.padRouter.menuActions(edge->button).has(PadAction::MenuBack)) {
+        app.padEscapes |= bit;
+        event = keyEvent(SDLK_ESCAPE, SDL_SCANCODE_ESCAPE, true);
+        event.key.which = gui::kPadKeyboard;
+        return std::nullopt;
+    }
+    if (!edge->down && (app.padEscapes & bit)) {
         app.padEscapes &= ~bit;
         event = keyEvent(SDLK_ESCAPE, SDL_SCANCODE_ESCAPE, false);
+        event.key.which = gui::kPadKeyboard;
         return std::nullopt;
+    }
+    if (edge->down) {
+        padMenuInput(app, *edge, event);
     }
     return edge;
 }
@@ -264,12 +267,6 @@ void padAction(App& app, pad::PadAction action, bool down)
 void padActionsDropped(App& app)
 {
     padPlayDropped(app); // (the free cursor's buttons)
-}
-
-void padMenuAction(App& /*app*/, pad::PadAction action)
-{
-    // The menus' MenuAccept and tabs (MenuBack goes on as Escape: padEventFirst). Not handled yet.
-    (void)action;
 }
 
 PadSteer padSteer(App& app)

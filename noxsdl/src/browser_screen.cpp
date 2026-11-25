@@ -304,6 +304,13 @@ bool BrowserScreen::sawStock(const std::string& server) const
     });
 }
 
+SDL_FPoint BrowserScreen::selectedRowPoint() const
+{
+    const Layout& l = lastLayout_;
+    const float row = static_cast<float>(std::max(selected_ - scroll_, 0)) + 0.5f;
+    return {area_.x + area_.w * 0.35f, l.top + l.rowHeight * row};
+}
+
 std::optional<std::string> BrowserScreen::handleEvent(const SDL_Event& event, std::uint64_t nowMs)
 {
     // Uses the layout of the last draw, so clicks map onto the rows as they were shown.

@@ -7,7 +7,6 @@
 namespace noxsdl::gui {
 
 namespace st = nox::gui::status;
-namespace sy = nox::gui::style;
 using nox::gui::Color;
 using nox::gui::WindowType;
 
@@ -23,116 +22,9 @@ SDL_Color sdl(const Color& c)
     return {c.r, c.g, c.b, 255};
 }
 
-// client_gui_flag (setShellUp / shellUp).
-bool shellFlag = false;
-
 } // namespace
 
-int fontLine(const Window& w)
-{
-    return w.largeFont ? static_cast<int>(std::lround(16.0f * w.largeScale)) : 10;
-}
-
-int listLineHeight(const Window& w)
-{
-    const auto* d = std::get_if<nox::gui::ListBoxData>(&w.data);
-    return std::max(fontLine(w), d ? static_cast<int>(d->lineHeight) : 0);
-}
-
-void setShellUp(bool up)
-{
-    shellFlag = up;
-}
-
-bool shellUp()
-{
-    return shellFlag;
-}
-
-void setDialogFonts(Window& dialog, bool large)
-{
-    for (const std::int32_t id : {4005, 4004}) {
-        if (Window* w = dialog.find(id)) {
-            w->largeFont = large;
-        }
-    }
-}
-
-// ------------------------------------------------------------------------------------ Window
-
-// Copies a .wnd definition, resolving its text and tooltip ids through the string table.
-Window::Window(const nox::gui::WindowDef& def, Window* parentWindow, const Resources& res)
-    : id(def.id), rect{def.x, def.y, def.width, def.height}, type(def.type), status(def.status), style(def.style),
-      group(def.group), enabledColor(def.enabledColor), disabledColor(def.disabledColor),
-      hiliteColor(def.hiliteColor), selectedColor(def.selectedColor), textColor(def.textColor),
-      backgroundColor(def.backgroundColor), backgroundImage(def.backgroundImage), enabledImage(def.enabledImage),
-      disabledImage(def.disabledImage), hiliteImage(def.hiliteImage), selectedImage(def.selectedImage),
-      imageOffset{def.imageOffsetX, def.imageOffsetY}, data(def.data), parent(parentWindow)
-{
-    // The font: "large", else the default ("default", "small"); none at all is the large one
-    // while the shell is up.
-    largeFont = nox::gui::usesLargeFont(def.font, shellUp());
-    const auto resolve = [&](const std::string& textId) -> std::string {
-        if (textId.empty() || !res.strings) {
-            return textId;
-        }
-        const auto t = res.strings->text(textId);
-        return t ? nox::strings::toUtf8(*t) : std::string{};
-    };
-    text = resolve(def.text);
-    tooltip = resolve(def.tooltip);
-    if (auto* st = std::get_if<nox::gui::StaticTextData>(&data)) {
-        text = resolve(st->text);
-    }
-    if (const auto* rb = std::get_if<nox::gui::RadioButtonData>(&data)) {
-        radioValue = rb->value;
-    }
-    if (const auto* sl = std::get_if<nox::gui::SliderData>(&data)) {
-        sliderValue = sl->min;
-    }
-    if (const auto* ef = std::get_if<nox::gui::EntryFieldData>(&data)) {
-        entryMax = ef->maxLength == 0 ? 256 : std::min<std::size_t>(ef->maxLength, 256);  // 0 in the file: the 256 limit
-    }
-}
-
-void Window::show(bool visibleNow)
-{
-    if (visibleNow) {
-        status &= ~st::Hidden;
-    } else {
-        status |= st::Hidden;
-    }
-}
-
-SDL_Point Window::screenPos() const
-{
-    SDL_Point p{rect.x, rect.y};
-    for (const Window* w = parent; w; w = w->parent) {
-        p.x += w->rect.x;
-        p.y += w->rect.y;
-    }
-    return p;
-}
-
-Window* Window::find(std::int32_t wanted)
-{
-    if (id == wanted) {
-        return this;
-    }
-    for (auto& c : children) {
-        if (Window* hit = c->find(wanted)) {
-            return hit;
-        }
-    }
-    return nullptr;
-}
-
-void Window::notify(int message)
-{
-    if (parent && parent->proc) {
-        parent->proc(*parent, message, *this);
-    }
-}
+// (The windows themselves, and their fonts' lines: gui_window.cpp.)
 
 // ----------------------------------------------------------------------------------- Painter
 
@@ -368,19 +260,6 @@ std::string Gui::text(const std::string& id, const std::string& source) const
     return id;
 }
 
-// Builds a window and its children from a definition, depth first.
-std::unique_ptr<Window> Gui::build(const nox::gui::WindowDef& def, Window* parent, const Proc& proc)
-{
-    auto w = std::make_unique<Window>(def, parent, res_);
-    if (def.type == WindowType::User) {
-        w->proc = proc; // the file's procedure for its USER windows
-    }
-    for (const auto& c : def.children) {
-        w->children.push_back(build(c, w.get(), proc));
-    }
-    return w;
-}
-
 Window* Gui::load(const std::filesystem::path& file, Proc proc)
 {
     return load(nox::gui::loadWindowFile(file), std::move(proc));
@@ -388,14 +267,15 @@ Window* Gui::load(const std::filesystem::path& file, Proc proc)
 
 Window* Gui::load(const nox::gui::WindowDef& def, Proc proc)
 {
-    tops_.push_back(build(def, nullptr, proc));
+    tops_.push_back(buildWindowTree(def, nullptr, res_.strings, proc));
     return tops_.back().get();
 }
 
 // Destroys a top-level window: its slides go, hover and press are cleared, and so are the
-// modal and the focus if they were in it.
+// modal, the focus and the pad's focus if they were in it.
 void Gui::destroy(Window* top)
 {
+    nav_.forget(top);
     std::erase_if(slides_, [&](const auto& s) {
         for (const Window* w = s->window; w; w = w->parent) {
             if (w == top) {
@@ -445,6 +325,7 @@ void Gui::destroyAll()
     hover_ = nullptr;
     pressed_ = nullptr;
     modal_ = nullptr;
+    nav_.clear(); // ((noxcpp) the pad's focus with them)
 }
 
 Slide* Gui::slideIn(Window* window, SDL_Point from, SDL_Point speedIn, SDL_Point speedOut)
@@ -537,6 +418,76 @@ void Gui::draw(SDL_Renderer* renderer, int width, int height)
     pass([](std::uint32_t s) { return (s & st::Below) != 0; });
     pass([](std::uint32_t s) { return (s & (st::Below | st::Above)) == 0; });
     pass([](std::uint32_t s) { return (s & st::Above) != 0; });
+    if (navConnected()) {
+        drawNav(p); // ((noxcpp) the game controller's focus: nothing without a pad)
+    }
+}
+
+void Gui::drawNav(Painter& p)
+{
+    if (!padNav_) {
+        return;
+    }
+    const std::vector<Window*> candidates = navCandidates(scene());
+    if (candidates.empty()) {
+        return;
+    }
+    navClaim(this);
+    if (navOwner() != this || !navPadInUse()) {
+        return;
+    }
+    // Settled once the screen has: the first focus and where it comes back to are picked where the
+    // windows are, not on the way in.
+    if (!sliding()) {
+        nav_.settle(candidates, hover_, true);
+    }
+    const Window* f = nav_.focus();
+    if (!f || std::ranges::find(candidates, f) == candidates.end()) {
+        return;
+    }
+    const SDL_Rect r = screenRect(*f);
+    p.outline(r.x - 3, r.y - 3, r.w + 6, r.h + 6, Color{24, 16, 4});
+    p.outline(r.x - 2, r.y - 2, r.w + 4, r.h + 4, Color{250, 204, 82});
+    p.outline(r.x - 1, r.y - 1, r.w + 2, r.h + 2, Color{250, 204, 82});
+}
+
+void Gui::padFocus(Window* w)
+{
+    if (w && navPadInUse()) {
+        nav_.focusOn(w, hover_);
+    }
+}
+
+bool Gui::stepTabs(std::span<Window* const> tabs, int step)
+{
+    const int n = static_cast<int>(tabs.size());
+    int on = -1;
+    for (int i = 0; i < n; ++i) {
+        if (tabs[static_cast<std::size_t>(i)] && isChecked(*tabs[static_cast<std::size_t>(i)])) {
+            on = i;
+            break;
+        }
+    }
+    const int start = on >= 0 ? on : (step > 0 ? -1 : n); // (none on: the first, or the last)
+    for (int k = 1; k <= n; ++k) {
+        const int i = ((start + (step > 0 ? k : -k)) % n + n) % n;
+        Window* t = tabs[static_cast<std::size_t>(i)];
+        if (i == on || !t || !shownAndEnabled(*t)) {
+            continue;
+        }
+        nav_.focusOn(t, hover_);
+        activate(*t, focus_);
+        return true;
+    }
+    return false;
+}
+
+bool Gui::navigate(NavInput input)
+{
+    if (sliding()) {
+        return true; // (no clicks reach a screen while it slides: no pad either)
+    }
+    return nav_.input(input, scene(), hover_, focus_, tabs_);
 }
 
 void Gui::drawWindow(Window& w, Painter& p)
@@ -1060,53 +1011,12 @@ void Gui::drawByType(Window& w, Painter& p)
     }
 }
 
-Window* Gui::hit(Window& w, int x, int y, bool press)
-{
-    // A press goes only to ENABLED windows (cursorUpdate pass
-    // over the others and what's in them); the mouse's hover finds them too (their tooltips).
-    if (w.hidden() || (press && !w.enabled())) {
-        return nullptr;
-    }
-    const SDL_Point pos = w.screenPos();
-    const bool inside = x >= pos.x && y >= pos.y && x < pos.x + w.rect.w && y < pos.y + w.rect.h;
-    // The last child in the file first: puts each new child at the head of the
-    // list and searches it from there (the drawing, walks the
-    // same list, so the file's first child is drawn on top yet is the last to get the mouse).
-    for (auto it = w.children.rbegin(); it != w.children.rend(); ++it) {
-        if (Window* h = hit(**it, x, y, press)) {
-            return h;
-        }
-    }
-    if (inside && !(w.status & st::NoInput)) {
-        return &w;
-    }
-    return nullptr;
-}
-
 // The window at (x, y) over all the top-level windows: only the modal one's if set, else ABOVE
-// ones first, then the rest, then BELOW ones, the newest first in each.
+// ones first, then the rest, then BELOW ones, the newest first in each (gui_nav.cpp's hitScene,
+// which the pad's focus searches too; a press only ENABLED ones).
 Window* Gui::hitTop(int x, int y, bool press)
 {
-    if (modal_) {
-        return hit(*modal_, x, y, press);
-    }
-    const auto pass = [&](auto keep) -> Window* {
-        for (auto it = tops_.rbegin(); it != tops_.rend(); ++it) {
-            if (keep((*it)->status)) {
-                if (Window* h = hit(**it, x, y, press)) {
-                    return h;
-                }
-            }
-        }
-        return nullptr;
-    };
-    if (Window* h = pass([](std::uint32_t s) { return (s & st::Above) != 0; })) {
-        return h;
-    }
-    if (Window* h = pass([](std::uint32_t s) { return (s & (st::Below | st::Above)) == 0; })) {
-        return h;
-    }
-    return pass([](std::uint32_t s) { return (s & st::Below) != 0; });
+    return hitScene(scene(), x, y, press);
 }
 
 void Gui::dragSlider(Window& w, SDL_Point at)
@@ -1138,35 +1048,25 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
         const SDL_FPoint l = p.toLayout(ox, oy);
         return SDL_Point{static_cast<int>(std::floor(l.x)), static_cast<int>(std::floor(l.y))};
     };
-    const auto isButton = [](const Window& w) {
-        return w.type == WindowType::PushButton || w.type == WindowType::RadioButton ||
-               w.type == WindowType::CheckBox;
-    };
+    // (noxcpp) The game controller's menu input: the Gui that has the pad takes it (gui_nav.hpp).
+    if (const auto in = navInput(event)) {
+        if (!padNav_ || navOwner() != this) {
+            return false;
+        }
+        return navigate(*in);
+    }
     switch (event.type) {
     case SDL_EVENT_MOUSE_MOTION: {
         const SDL_Point at = layoutPoint(event.motion.x, event.motion.y);
-        // A held slider follows the mouse; otherwise track which window the mouse is on.
+        // A held slider follows the mouse; otherwise track which window the mouse is on
+        // (0x12 / 0x11 to the widgets that track the mouse: hoverTo).
         if (pressed_ && pressed_->enabled() &&
             (pressed_->type == WindowType::VertSlider || pressed_->type == WindowType::HorzSlider)) {
             dragSlider(*pressed_, at);
             return true;
         }
         Window* h = hitTop(at.x, at.y, false);
-        if (h != hover_) {
-            // 0x12 / 0x11 to the widgets that track the mouse.
-            if (hover_ && isButton(*hover_) && (hover_->style & sy::MouseTrack)) {
-                hover_->state &= ~kLit;
-                hover_->notify(Unhover);
-                if (hover_->type == WindowType::PushButton) {
-                    hover_->state &= ~kPressed;  // dragged off: the release won't click it
-                }
-            }
-            hover_ = h;
-            if (hover_ && hover_->enabled() && isButton(*hover_) && (hover_->style & sy::MouseTrack)) {
-                hover_->state |= kLit;
-                hover_->notify(Hover);
-            }
-        }
+        hoverTo(hover_, h);
         return h != nullptr;
     }
     case SDL_EVENT_MOUSE_BUTTON_DOWN: {
@@ -1229,36 +1129,17 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
         if (!w || !w->enabled()) {
             return h != nullptr;
         }
+        // What a click does is activate()'s (gui_nav.cpp), the pad's A's too.
         switch (w->type) {
         case WindowType::PushButton:
             if ((w->state & kPressed) && h == w) {
-                w->state &= ~kPressed;
-                w->notify(Clicked); // wndButtonProc, message 6
+                activate(*w, focus_); // wndButtonProc, message 6
             }
             w->state &= ~kPressed;
-            break;
-        case WindowType::CheckBox:
-            if (h == w) {
-                w->state ^= kPressed; // (so the parent sees the new state)
-                w->notify(Clicked);
-            }
             break;
         case WindowType::VertSlider:
         case WindowType::HorzSlider:
             dragSlider(*w, at);
-            break;
-        case WindowType::RadioButton:
-            if (h == w && !(w->state & kPressed)) {
-                w->notify(Clicked); // wndRadioButtonProc: the others in its group go off
-                if (w->parent) {
-                    for (auto& s : w->parent->children) {
-                        if (s.get() != w && s->group == w->group) {
-                            s->state &= ~kPressed;
-                        }
-                    }
-                }
-                w->state |= kPressed;
-            }
             break;
         case WindowType::ScrollListBox:
             if (h == w) {
@@ -1277,13 +1158,14 @@ bool Gui::handleEvent(const SDL_Event& event, int width, int height)
                 }
                 if (at.y >= top && row < static_cast<int>(w->lines.size())) {
                     w->selectedLine = row;
-                    w->notify(Clicked);
+                    activate(*w, focus_); // (Clicked on that line)
                 }
             }
             break;
         default:
+            // Check boxes flip, radio buttons go on, entry fields keep the focus their press gave.
             if (h == w) {
-                w->notify(Clicked);
+                activate(*w, focus_);
             }
             break;
         }

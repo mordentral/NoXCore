@@ -1474,7 +1474,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
     // amount box or message is up).
     if (live && app->tradeScreens && menuClosed() &&
         (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP ||
-         event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_WHEEL) &&
+         event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_WHEEL || gui::isNavEvent(*event)) &&
         app->tradeScreens->handleEvent(*event, app->live->client().world(), cam.viewWidth, cam.viewHeight)) {
         return SDL_APP_CONTINUE;
     }
