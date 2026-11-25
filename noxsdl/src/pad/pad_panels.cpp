@@ -2,8 +2,11 @@
 #include "pad/pad_panels.hpp"
 
 #include "gui_focus_frame.hpp"
+#include "pad/pad_glyphs.hpp"
 #include "pad/pad_play.hpp"
 #include "pointer_map.hpp"
+
+#include "noxcore/strings/l10n.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -11,6 +14,7 @@
 #include <array>
 #include <cmath>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace noxsdl {
@@ -518,38 +522,58 @@ void bookPress(App& app, const Spot& cur, PanelPress p, PadButton b)
     }
 }
 
-/// A press on a bar slot or a trap tray slot.
-void barPress(App& app, const Spot& cur, PanelPress p)
+bool onBarSlot(const Spot& s)
+{
+    return s.panel == Panel::Bars || s.panel == Panel::Traps;
+}
+
+/// The bar slot's or the trap tray slot's spell (its id; 0 empty).
+std::uint32_t slotSpell(const App& app, const Spot& s)
+{
+    if (s.panel == Panel::Bars) {
+        return app.bars.rows[static_cast<std::size_t>(s.index / 5)][static_cast<std::size_t>(s.index % 5)].id;
+    }
+    return s.panel == Panel::Traps ? app.bars.currentTrap()[static_cast<std::size_t>(s.index)].id : 0;
+}
+
+/// A press with the bars' spells (pad::barAct): on a bar slot or a trap tray slot, or anywhere while
+/// a bar's spell is held. Whether it was theirs (else the spot's panel's).
+bool barPress(App& app, const Spot& cur, PanelPress p)
 {
     auto& s = app.padPanels;
     if (s.holding == Holding::Item) {
-        return;
+        return onBarSlot(cur); // (an item goes in the inventory: on a slot, nothing)
     }
-    if (p == PanelPress::Accept || p == PanelPress::Move) {
+    switch (pad::barAct(p, onBarSlot(cur), s.holding == Holding::Bar)) {
+    case pad::BarAct::Panel:
+        return false;
+    case pad::BarAct::None:
+        return true;
+    case pad::BarAct::PickUp:
         // The mouse's way: the press picks the spell up, the release on another slot swaps.
-        if (s.holding == Holding::Bar) {
-            leftMouse(app, false, cur.box.cx(), cur.box.cy());
-            s.holding = Holding::None;
-            log(app, "spell put down at", cur);
-        } else {
-            leftMouse(app, true, cur.box.cx(), cur.box.cy());
-            if (app.barDrag) {
-                s.holding = Holding::Bar;
-                log(app, "spell picked up at", cur);
-            }
+        leftMouse(app, true, cur.box.cx(), cur.box.cy());
+        if (app.barDrag) {
+            s.holding = Holding::Bar;
+            log(app, "spell picked up at", cur);
         }
-        return;
-    }
-    if (p == PanelPress::Back) {
-        if (s.holding == Holding::Bar) {
-            app.barDrag.reset();
-            s.holding = Holding::None;
-        } else {
-            back(app);
-        }
-        return;
-    }
-    if (p == PanelPress::Drop && s.holding == Holding::None) {
+        return true;
+    case pad::BarAct::PutDown:
+        leftMouse(app, false, cur.box.cx(), cur.box.cy());
+        s.holding = Holding::None;
+        log(app, "spell put down at", cur);
+        return true;
+    case pad::BarAct::DropOff:
+        // Let go off the bar, as the mouse's drag there: its slot emptied.
+        dropBarDragOff(app);
+        s.holding = Holding::None;
+        log(app, "spell dropped off the bar at", cur);
+        return true;
+    case pad::BarAct::Cancel:
+        app.barDrag.reset();
+        s.holding = Holding::None;
+        log(app, "spell put back from", cur);
+        return true;
+    case pad::BarAct::Empty:
         // Emptied, as a drag off the bar empties it.
         if (cur.panel == Panel::Bars) {
             app.bars.rows[static_cast<std::size_t>(cur.index / 5)][static_cast<std::size_t>(cur.index % 5)] = {};
@@ -557,7 +581,12 @@ void barPress(App& app, const Spot& cur, PanelPress p)
             app.bars.currentTrap()[static_cast<std::size_t>(cur.index)] = {};
         }
         log(app, "emptied", cur);
+        return true;
+    case pad::BarAct::Leave:
+        back(app);
+        return true;
     }
+    return true;
 }
 
 } // namespace
@@ -729,6 +758,9 @@ bool padPanelsPress(App& app, const pad::PadEdge& edge)
         }
         return false;
     }
+    if (barPress(app, cur, p)) {
+        return true; // (the bars' slots, and a bar's spell held: dropped off the bar anywhere else)
+    }
     switch (cur.panel) {
     case Panel::Inventory:
         inventoryPress(app, cur, p);
@@ -738,8 +770,7 @@ bool padPanelsPress(App& app, const pad::PadEdge& edge)
         break;
     case Panel::Bars:
     case Panel::Traps:
-        barPress(app, cur, p);
-        break;
+        break; // (barPress's)
     case Panel::Summon:
         if (p == PanelPress::Accept) {
             clickHere(app, middle(cur));
@@ -797,6 +828,115 @@ bool padPanelsTakeBack(App& app, gui::NavInput in, SDL_FRect from)
     return true;
 }
 
+bool padBarTipShown(const App& app)
+{
+    const auto& s = app.padPanels;
+    if (!s.active || !s.still || s.inWindows || !s.at || !app.pads.padInUse() || !app.renderGui || !app.font) {
+        return false;
+    }
+    return pad::barTipShown(onBarSlot(*s.at), slotSpell(app, *s.at) != 0, s.holding == Holding::Bar);
+}
+
+namespace {
+
+/// The bar slot's tooltip as the game draws its own (drawTooltip: yellow lines 10 game pixels apart
+/// on a darkened box), its spell's title over the pad's buttons for it (A Move, X Remove; held, A
+/// Place, B Cancel), beside the slot: never over it, the other slots or the book.
+void drawBarTip(App& app)
+{
+    const auto& s = app.padPanels;
+    const Spot& cur = *s.at;
+    const int w = app.camera.viewWidth;
+    const int h = app.camera.viewHeight;
+    const float k = Hud::scale(w, h);
+    const bool holding = s.holding == Holding::Bar;
+    Font& font = *app.font;
+    constexpr float kFontHeight = 10; // (drawTooltip's line)
+    const int size = font.lineSize(kFontHeight, k);
+    // The buttons' line: their glyphs a little taller than the text, readable at any scale.
+    const float glyphH = std::round(std::max(12 * k, pad::kMinPairHeight));
+    const float buttonsH = glyphH + std::round(2 * k);
+    std::string title;
+    if (!holding && app.hud) {
+        // The slot's own tooltip (Hud::tooltip: its spell's or ability's title).
+        const auto& client = app.live->client();
+        title = app.hud->tooltip(client.world(), client.netCode(), quickbarState(app), cur.box.cx(), cur.box.cy(), w, h);
+    }
+    const pad::BarTipPresses presses = pad::barTipPresses(holding);
+    const auto word = [](PanelPress p) -> std::string_view {
+        switch (p) {
+        case PanelPress::Accept: return NOX_TR("game.pad.prompt.move", "Move");
+        case PanelPress::Drop: return NOX_TR("game.pad.prompt.remove", "Remove");
+        case PanelPress::Back: return NOX_TR("game.pad.prompt.cancel", "Cancel");
+        default: return {};
+        }
+    };
+    const std::array<std::string, 2> words{
+        std::string(holding ? std::string_view(NOX_TR("game.pad.prompt.place", "Place")) : word(presses.first)),
+        std::string(word(presses.second))};
+    const pad::PromptStyle style = app.padConfig.settings.prompts;
+    const std::array<pad::PromptLabels, 2> buttons{pad::PromptLabels{std::nullopt, app.pads.label(pad::panelButton(presses.first), style)},
+                                                   pad::PromptLabels{std::nullopt, app.pads.label(pad::panelButton(presses.second), style)}};
+    // Its size, in output pixels: the padding and lines drawTooltip's.
+    const float pad2 = 2 * k;
+    const float space = std::round(3 * k);
+    const float between = std::round(8 * k);
+    float buttonsW = 0;
+    for (std::size_t i = 0; i < 2; ++i) {
+        buttonsW += pad::promptWidth(&font, buttons[i], glyphH) + space + font.measure(words[i], size) + (i == 0 ? between : 0);
+    }
+    const float titleW = title.empty() ? 0 : font.measure(title, size);
+    const float boxW = std::ceil(std::max(titleW, buttonsW) + 2 * pad2);
+    const float titleH = title.empty() ? 0 : kFontHeight * k;
+    const float boxH = std::ceil(titleH + buttonsH + 2 * pad2);
+    // Beside the slot, clear of the other spots and the book; a bar slot with the target nugget over
+    // it (10 game pixels: it takes clicks too).
+    const auto withNugget = [k](const Spot& sp) {
+        NavBox b = sp.box;
+        if (sp.panel == Panel::Bars) {
+            b.y -= 10 * k;
+            b.h += 10 * k;
+        }
+        return b;
+    };
+    boxes.clear();
+    for (const auto& sp : s.spots) {
+        if (!sp.sameAs(cur)) {
+            boxes.push_back(withNugget(sp));
+        }
+    }
+    if (app.book) {
+        if (const auto b = app.book->bounds(w, h)) {
+            boxes.push_back(boxOf(*b));
+        }
+    }
+    if (!app.barsExpanded && !app.trapOpen) {
+        const SDL_FRect t = Hud::spellSetTitleBox(w, h); // ("Spell Set n" over the bar)
+        boxes.push_back(NavBox{t.x * k, t.y * k, t.w * k, t.h * k});
+    }
+    const NavBox at = pad::barTipPlace(withNugget(cur), boxW, boxH, boxes, NavBox{0, 0, static_cast<float>(w), static_cast<float>(h)}, std::round(3 * k));
+    SDL_SetRenderDrawBlendMode(app.renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(app.renderer, 0, 0, 0, 128); // (drawTooltip's box)
+    const SDL_FRect box = rectOf(at);
+    SDL_RenderFillRect(app.renderer, &box);
+    constexpr SDL_Color kYellow{255, 255, 0, 255};
+    float y = at.y + pad2;
+    if (!title.empty()) {
+        font.draw(title, at.x + pad2, y, size, kYellow);
+        y += titleH;
+    }
+    static const pad::GlyphInk ink{{1, 1, 1, 1}, {0.05f, 0.04f, 0.03f, 0.85f}, {0.55f, 0.52f, 0.48f, 1}}; // (the HUD's slot keys')
+    const float cy = y + buttonsH / 2;
+    float x = at.x + pad2;
+    for (std::size_t i = 0; i < 2; ++i) {
+        x += pad::drawPrompt(app.renderer, &font, buttons[i], x, cy, glyphH, ink) + space;
+        font.draw(words[i], x, std::round(cy - font.lineHeight(size) / 2), size, kYellow);
+        x += font.measure(words[i], size) + between;
+    }
+}
+
+} // namespace
+
 void drawPadPanels(App& app)
 {
     const auto& s = app.padPanels;
@@ -809,6 +949,9 @@ void drawPadPanels(App& app)
     const float in = std::round(unit * 2);
     r = {r.x + in, r.y + in, r.w - 2 * in, r.h - 2 * in};
     gui::drawFocusFrame(app.renderer, r, unit, s.holding != Holding::None ? gui::FocusLook::Holding : gui::FocusLook::Normal);
+    if (padBarTipShown(app)) {
+        drawBarTip(app);
+    }
 }
 
 } // namespace noxsdl

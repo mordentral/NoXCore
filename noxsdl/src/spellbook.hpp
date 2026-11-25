@@ -147,6 +147,8 @@ public:
     /// What an entry or the page's icon puts on a bar, as dragging it there would (the guide's
     /// creature: its summon, when we can summon them); 0 for nothing (or another spot).
     std::uint32_t padSpell(const PadSpot& spot, const BookContext& ctx) const;
+    /// The open book's box in output pixels (what contains() tests), for what's drawn beside it.
+    std::optional<SDL_FRect> bounds(int w, int h) const;
 
 private:
     enum class Anim { None, Forward, Backward };

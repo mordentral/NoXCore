@@ -8403,8 +8403,16 @@ game.pad.button.square = 네모
 game.pad.button.top = 위 버튼
 #@ e58886a5 mt: Triangle
 game.pad.button.triangle = 세모
+#@ 35afca3b mt: Cancel
+game.pad.prompt.cancel = 취소
+#@ 7f2c2a34 mt: Move
+game.pad.prompt.move = 이동
 #@ 5b12cc35 mt: Pick up
 game.pad.prompt.pickup = 줍기
+#@ 9ad2489c mt: Place
+game.pad.prompt.place = 놓기
+#@ 21a5901d mt: Remove
+game.pad.prompt.remove = 제거
 #@ 96d3996f mt: Talk
 game.pad.prompt.talk = 대화
 #@ f6f1dff9 mt: Trade

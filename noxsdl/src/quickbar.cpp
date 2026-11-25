@@ -364,6 +364,16 @@ std::optional<nox::client::BarSlot> dropOnBars(App& app, nox::client::BarSlot wh
     return old;
 }
 
+/// A drag let go off the bar: the slot it came from (a set's, the trap tray's) emptied.
+void emptyDragSource(App& app, const App::BarDrag& drag)
+{
+    if (drag.set < 0) {
+        app.bars.currentTrap()[static_cast<std::size_t>(drag.slot)] = {};
+    } else {
+        app.bars.rows[static_cast<std::size_t>(drag.set)][static_cast<std::size_t>(drag.slot)] = {};
+    }
+}
+
 /// The left button on the spell bars (quickBarWnd and its buttons): pressing a
 /// slot picks its spell up; letting go on another slot swaps them, off the bar empties it, on
 /// the same slot clicks it. Returns whether the bars took it.
@@ -396,7 +406,7 @@ bool barsMouse(App& app, bool down, float x, float y)
             if (const auto old = dropOnBars(app, drag.what, false, x, y, true)) {
                 from = *old;
             } else if (!Hud::inBarArea(x, y, w, h)) {
-                from = {};
+                emptyDragSource(app, drag);
             }
             return true;
         }
@@ -422,7 +432,7 @@ bool barsMouse(App& app, bool down, float x, float y)
         if (const auto old = dropOnBars(app, drag.what, false, x, y)) {
             from = *old; // another set's slot: what it held comes back here
         } else if (!Hud::inBarArea(x, y, w, h)) {
-            from = {}; // dragged off the bar
+            emptyDragSource(app, drag); // dragged off the bar
         }
         return true;
     }
@@ -1104,6 +1114,16 @@ bool leftMouse(App& app, bool down, float x, float y)
         return true;
     }
     return (pieces || !down) && barsMouse(app, down, x, y);
+}
+
+void dropBarDragOff(App& app)
+{
+    if (!app.barDrag) {
+        return;
+    }
+    const auto drag = *app.barDrag;
+    app.barDrag.reset();
+    emptyDragSource(app, drag); // (as barsMouse's release off the bar)
 }
 
 } // namespace noxsdl

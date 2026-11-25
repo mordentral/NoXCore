@@ -988,6 +988,9 @@ void bookEvents(App& app);
 void loadBars(App& app);
 void saveBars(App& app);
 bool leftMouse(App& app, bool down, float x, float y);
+/// (noxcpp) The bar's spell being dragged let go off the bar, as the mouse's release there: the
+/// slot it came from emptied (the game controller's drop off the bar).
+void dropBarDragOff(App& app);
 /// (noxcpp) A book's spell or ability put on slot `slot` of the set in use, as the book's drop there
 /// (the game controller's slot buttons on a book entry).
 void bookSpellToSlot(App& app, std::uint32_t id, int slot);

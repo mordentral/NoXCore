@@ -114,4 +114,39 @@ std::optional<DragEnd> padDragEnd(PanelPress p);
 /// modifier's layer), from the config's bindings. Nullopt: none.
 std::optional<int> slotOfButton(const PadConfig& config, PadButton b);
 
+/// The button a panel press is on (panelPress's other way round); South for None.
+PadButton panelButton(PanelPress p);
+
+/// What a press does with the bars' spells: on a bar slot or a trap tray slot (`onSlot`), and
+/// anywhere while a bar's spell is held (`holding`), as the mouse's drag does. Panel: not the
+/// bars', the spot's own panel's.
+///  - On a slot, nothing held: A (or Y) picks its spell up, X empties it, B leaves (as Escape).
+///  - On a slot, holding: A (or Y) puts it down there (swapped, as the mouse's release), X drops it
+///    off the bar, B cancels.
+///  - Elsewhere, holding: A, Y or X drops it off the bar (its slot emptied, as a drag off the bar
+///    does), B cancels; the rest the panel's (nothing while holding).
+enum class BarAct : std::uint8_t { Panel, None, PickUp, PutDown, DropOff, Cancel, Empty, Leave };
+BarAct barAct(PanelPress p, bool onSlot, bool holding);
+
+/// The bar slot's tooltip with the pad's buttons: shown while the cursor is on a slot that holds a
+/// spell, or while one is held.
+inline bool barTipShown(bool onSlot, bool filled, bool holding)
+{
+    return onSlot && (filled || holding);
+}
+/// The two presses the tooltip names: A Move and X Remove; holding, A Place and B Cancel.
+struct BarTipPresses {
+    PanelPress first = PanelPress::Accept;
+    PanelPress second = PanelPress::Drop;
+    bool operator==(const BarTipPresses&) const = default;
+};
+BarTipPresses barTipPresses(bool holding);
+
+/// Where a `w` x `h` tooltip goes beside the slot `slot`, covering none of `avoid` (the other spots,
+/// the book, the bar's title) and kept inside `screen`: above it (raised past a low thing in the way,
+/// by no more than the slot's height), else to its right past what's beside it (the rest of its
+/// row), else to its left the same way, else below; none of those clear: above it anyway. `gap`
+/// apart from what it's beside.
+NavBox barTipPlace(const NavBox& slot, float w, float h, std::span<const NavBox> avoid, const NavBox& screen, float gap);
+
 } // namespace noxsdl::pad

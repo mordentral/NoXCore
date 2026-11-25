@@ -213,4 +213,103 @@ std::optional<int> slotOfButton(const PadConfig& config, PadButton b)
     return std::nullopt;
 }
 
+PadButton panelButton(PanelPress p)
+{
+    switch (p) {
+    case PanelPress::Back: return PadButton::East;
+    case PanelPress::Drop: return PadButton::West;
+    case PanelPress::Move: return PadButton::North;
+    case PanelPress::Secondary: return PadButton::RightShoulder;
+    case PanelPress::PreviousPage: return PadButton::LeftShoulder;
+    default: return PadButton::South;
+    }
+}
+
+BarAct barAct(PanelPress p, bool onSlot, bool holding)
+{
+    const bool place = p == PanelPress::Accept || p == PanelPress::Move;
+    if (p == PanelPress::Back && (onSlot || holding)) {
+        return holding ? BarAct::Cancel : BarAct::Leave;
+    }
+    if (holding) {
+        if (place) {
+            return onSlot ? BarAct::PutDown : BarAct::DropOff;
+        }
+        if (p == PanelPress::Drop) {
+            return BarAct::DropOff;
+        }
+        return onSlot ? BarAct::None : BarAct::Panel;
+    }
+    if (!onSlot) {
+        return BarAct::Panel;
+    }
+    if (place) {
+        return BarAct::PickUp;
+    }
+    return p == PanelPress::Drop ? BarAct::Empty : BarAct::None;
+}
+
+BarTipPresses barTipPresses(bool holding)
+{
+    return holding ? BarTipPresses{PanelPress::Accept, PanelPress::Back} : BarTipPresses{PanelPress::Accept, PanelPress::Drop};
+}
+
+namespace {
+
+bool overlaps(const NavBox& a, const NavBox& b)
+{
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+bool inside(const NavBox& a, const NavBox& screen)
+{
+    return a.x >= screen.x && a.y >= screen.y && a.x + a.w <= screen.x + screen.w && a.y + a.h <= screen.y + screen.h;
+}
+
+/// The first of `avoid` `b` overlaps, or none.
+const NavBox* hits(const NavBox& b, std::span<const NavBox> avoid)
+{
+    for (const auto& a : avoid) {
+        if (overlaps(b, a)) {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+NavBox barTipPlace(const NavBox& slot, float w, float h, std::span<const NavBox> avoid, const NavBox& screen, float gap)
+{
+    const auto clampX = [&](float x) { return std::clamp(x, screen.x, std::max(screen.x, screen.x + screen.w - w)); };
+    const float midY = std::round(slot.cy() - h / 2);
+    const NavBox above{clampX(std::round(slot.cx() - w / 2)), slot.y - gap - h, w, h};
+    const auto clear = [&](const NavBox& b) { return inside(b, screen) && !hits(b, avoid) && !overlaps(b, slot); };
+    // Above, raised past a low thing in the way (the bar's title), never more than the slot's height.
+    NavBox up = above;
+    for (std::size_t steps = 0; steps <= avoid.size() && inside(up, screen) && above.y - up.y <= slot.h; ++steps) {
+        const NavBox* in = hits(up, avoid);
+        if (!in) {
+            return up;
+        }
+        up.y = in->y - gap - h;
+    }
+    // Beside it, walked on past each box in the way (its row's other slots).
+    for (const int side : {1, -1}) {
+        NavBox b{side > 0 ? slot.x + slot.w + gap : slot.x - gap - w, midY, w, h};
+        for (std::size_t steps = 0; steps <= avoid.size() && inside(b, screen); ++steps) {
+            const NavBox* in = hits(b, avoid);
+            if (!in) {
+                return b;
+            }
+            b.x = side > 0 ? in->x + in->w + gap : in->x - gap - w;
+        }
+    }
+    const NavBox below{clampX(std::round(slot.cx() - w / 2)), slot.y + slot.h + gap, w, h};
+    if (clear(below)) {
+        return below;
+    }
+    return {above.x, std::max(screen.y, above.y), w, h};
+}
+
 } // namespace noxsdl::pad

@@ -12644,9 +12644,21 @@ game.pad.button.top = Top button
 # noxsdl/src/pad/pad_labels.cpp:146
 #@ e58886a5: Triangle
 game.pad.button.triangle = Triangle
+# noxsdl/src/pad/pad_panels.cpp:870
+#@ 35afca3b: Cancel
+game.pad.prompt.cancel = Cancel
+# noxsdl/src/pad/pad_panels.cpp:868
+#@ 7f2c2a34: Move
+game.pad.prompt.move = Move
 # noxsdl/src/pad/pad_play.cpp:596
 #@ 5b12cc35: Pick up
 game.pad.prompt.pickup = Pick up
+# noxsdl/src/pad/pad_panels.cpp:875
+#@ 9ad2489c: Place
+game.pad.prompt.place = Place
+# noxsdl/src/pad/pad_panels.cpp:869
+#@ 21a5901d: Remove
+game.pad.prompt.remove = Remove
 # noxsdl/src/pad/pad_play.cpp:597
 #@ 96d3996f: Talk
 game.pad.prompt.talk = Talk
@@ -12666,10 +12678,10 @@ game.screenshot.failed = screenshot: couldn't write {path}
 #@ 0941a2e6: screenshot: {path}
 game.screenshot.saved = screenshot: {path}
 
-# noxsdl/src/hud.cpp:591
+# noxsdl/src/hud.cpp:597
 #@ 5b298c95: Spell Set {n}
 hud.quickbar.spell_set = Spell Set {n}
-# noxsdl/src/hud.cpp:572
+# noxsdl/src/hud.cpp:578
 #@ f7fa068e: Trap Set {n}
 hud.quickbar.trap_set = Trap Set {n}
 

@@ -261,6 +261,12 @@ SDL_FPoint Hud::trapSlotPosition(int w, int h, int slot)
     return {l.trapSlotX(slot), l.trapSlotY()};
 }
 
+SDL_FRect Hud::spellSetTitleBox(int w, int h)
+{
+    const Layout l = layoutFor(w, h);
+    return {l.barX() + 115, l.barY() + 6, 101, 14}; // (QuickBarTitle's child the title's centred on)
+}
+
 std::optional<int> Hud::trapSlotAt(const QuickbarState& bar, float x, float y, int w, int h) const
 {
     if (!bar.trapOpen) {

@@ -15,7 +15,10 @@
 //              slot of the set in use; A clicks (turns to the entry's page, casts the icon's spell,
 //              the arrows, the tabs); LB / RB turn the page elsewhere; walking off its side too.
 //   bars       (with the inventory or the book open) A or Y picks a slot's spell up and puts it
-//              down on another (swapped), X empties it; the trap tray's slots likewise.
+//              down on another (swapped), X empties it; held, A anywhere off the bars (the book,
+//              the inventory) or X drops it off the bar (its slot emptied, as the mouse's drag off
+//              the bar), B puts it back; the trap tray's slots likewise. The slot's tooltip names
+//              the buttons (A Move, X Remove; held, A Place, B Cancel) under its spell's title.
 //   cage       A clicks a creature (its command list), a line of the list, the order button; B
 //              puts the list away.
 //   windows    the map vote's cards, a mode's windows (a campfire's spells, an altar's cards, the
@@ -50,7 +53,11 @@ bool padPanelsPress(App& app, const pad::PadEdge& edge);
 /// The shop's, dialog's or trade's windows' pad focus leaving them `in`'s way from `from` (output
 /// pixels): the cursor takes the pad there if it has a spot that way.
 bool padPanelsTakeBack(App& app, gui::NavInput in, SDL_FRect from);
-/// The cursor's highlight (drawPadOverlay's).
+/// The cursor's highlight and, on a bar slot, the slot's tooltip with the buttons
+/// (drawPadOverlay's).
 void drawPadPanels(App& app);
+/// Whether the cursor's bar slot tooltip is up this frame (the game's own tooltip gives way to it:
+/// one box, the spell's title in it).
+bool padBarTipShown(const App& app);
 
 } // namespace noxsdl

@@ -8495,8 +8495,16 @@ game.pad.button.square = Квадрат
 game.pad.button.top = Верхняя кнопка
 #@ e58886a5 mt: Triangle
 game.pad.button.triangle = Треугольник
+#@ 35afca3b mt: Cancel
+game.pad.prompt.cancel = Отмена
+#@ 7f2c2a34 mt: Move
+game.pad.prompt.move = Переместить
 #@ 5b12cc35 mt: Pick up
 game.pad.prompt.pickup = Поднять
+#@ 9ad2489c mt: Place
+game.pad.prompt.place = Поставить
+#@ 21a5901d mt: Remove
+game.pad.prompt.remove = Убрать
 #@ 96d3996f mt: Talk
 game.pad.prompt.talk = Говорить
 #@ f6f1dff9 mt: Trade

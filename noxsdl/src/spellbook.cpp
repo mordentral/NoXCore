@@ -352,6 +352,16 @@ bool Spellbook::contains(float x, float y, int w, int h) const
     return inside(x / s, y / s, o.x, o.y, kWidth, kHeight);
 }
 
+std::optional<SDL_FRect> Spellbook::bounds(int w, int h) const
+{
+    if (!open_) {
+        return std::nullopt;
+    }
+    const float s = Hud::scale(w, h);
+    const SDL_FPoint o = origin(static_cast<int>(static_cast<float>(h) / s));
+    return SDL_FRect{o.x * s, o.y * s, kWidth * s, kHeight * s};
+}
+
 void Spellbook::padSpots(int w, int h, std::vector<PadSpot>& out) const
 {
     out.clear();

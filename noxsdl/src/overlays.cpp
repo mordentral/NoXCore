@@ -2,6 +2,7 @@
 // feed, names and flag labels, the game-over banner, health bars, friend dots, damage numbers,
 // chat bubbles and tooltips.
 #include "app.hpp"
+#include "pad/pad_panels.hpp"
 #include "pad/pad_play.hpp"
 #include "player_art.hpp"
 #include "team_colors.hpp"
@@ -986,6 +987,9 @@ std::string liveTooltip(App& app)
     // None while a menu is up or a spell is being dragged.
     if (!app.live || !app.hud || menuWindowUp(app) || (app.book && app.book->dragging()) || app.barDrag) {
         return {};
+    }
+    if (padBarTipShown(app)) {
+        return {}; // ((noxcpp) the pad's bar slot tooltip has the slot's title, with its buttons)
     }
     auto& client = app.live->client();
     const auto& world = client.world();
