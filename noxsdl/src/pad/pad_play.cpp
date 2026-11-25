@@ -1,5 +1,6 @@
 // (noxcpp) The game controller in a game (pad_play.hpp).
 #include "pad/pad_play.hpp"
+#include "pad/pad_glyphs.hpp"
 
 #include "cursor_pick.hpp"
 #include "friend_dot.hpp"
@@ -701,32 +702,6 @@ std::optional<View3D::Ring> padInteractRing(App& app)
     return View3D::Ring{at.x, at.y, s.interact->radius, paletteColor(color)};
 }
 
-namespace {
-
-/// What's printed on the button bound to `action` (its first binding), for a prompt.
-std::string buttonLabel(const App& app, std::string_view action)
-{
-    for (const auto& b : app.padConfig.bindings) {
-        if (b.action != action) {
-            continue;
-        }
-        switch (app.pads.faceLabel(b.button)) {
-        case SDL_GAMEPAD_BUTTON_LABEL_A: return "A";
-        case SDL_GAMEPAD_BUTTON_LABEL_B: return "B";
-        case SDL_GAMEPAD_BUTTON_LABEL_X: return "X";
-        case SDL_GAMEPAD_BUTTON_LABEL_Y: return "Y";
-        case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return NOX_TR("game.pad.button.cross", "Cross");
-        case SDL_GAMEPAD_BUTTON_LABEL_CIRCLE: return NOX_TR("game.pad.button.circle", "Circle");
-        case SDL_GAMEPAD_BUTTON_LABEL_SQUARE: return NOX_TR("game.pad.button.square", "Square");
-        case SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE: return NOX_TR("game.pad.button.triangle", "Triangle");
-        default: return std::string(pad::padButtonName(b.button));
-        }
-    }
-    return {};
-}
-
-} // namespace
-
 void drawPadOverlay(App& app, float scale)
 {
     drawPadPanels(app); // (the panels' snap cursor, pad_panels.cpp)
@@ -747,8 +722,9 @@ void drawPadOverlay(App& app, float scale)
         case CursorType::Use: word = NOX_TR("game.pad.prompt.use", "Use"); break;
         default: return;
         }
-        const std::string button = buttonLabel(app, "Interact");
-        const std::string text = button.empty() ? std::string(word) : "[" + button + "] " + std::string(word);
+        // The button's glyph (the HUD's and the Controller screen's), then the word.
+        const pad::PromptLabels button = padPrompt(app, "Interact");
+        const std::string text(word);
         WorldPoint at = s.interact->at;
         if (s.interact->drawable) {
             if (const auto* d = app.live->client().world().drawable(*s.interact->drawable)) {
@@ -758,12 +734,17 @@ void drawPadOverlay(App& app, float scale)
         }
         const SDL_FPoint sp = toScreen(app, at);
         const int size = std::clamp(static_cast<int>(std::lround(11 * app.camera.zoom)), 9, 64);
-        const float w = app.font->measure(text, size);
+        const float gh = static_cast<float>(size) * 1.25f;
+        const float gw = pad::promptWidth(app.font.get(), button, gh);
+        const float gap = gw > 0 ? static_cast<float>(size) * 0.4f : 0;
+        const float w = gw + gap + app.font->measure(text, size);
         const float x = std::round(sp.x - w / 2);
         const float y = std::round(sp.y - s.interact->radius * app.camera.zoom - 2.2f * static_cast<float>(size));
+        static const pad::GlyphInk ink{{1, 1, 1, 1}, {0.04f, 0.04f, 0.04f, 0.8f}, {0.55f, 0.55f, 0.55f, 1}};
+        pad::drawPrompt(app.renderer, app.font.get(), button, x, y + app.font->lineHeight(size) / 2, gh, ink);
         const float shadow = std::max(1.0f, std::round(app.camera.zoom));
-        app.font->draw(text, x + shadow, y + shadow, size, {8, 8, 8, 255});
-        app.font->draw(text, x, y, size, {255, 255, 255, 255});
+        app.font->draw(text, x + gw + gap + shadow, y + shadow, size, {8, 8, 8, 255});
+        app.font->draw(text, x + gw + gap, y, size, {255, 255, 255, 255});
     }
 }
 

@@ -317,8 +317,10 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
         } else if (a == "--gpu-driver") {
             opts.useGpu = true;
             opts.gpuDriver = next();
-        } else if (a == "--open-inventory") {
-            app.openInventory = true;
+        } else if (a == "--open-inventory" || a == "--open-controller") {
+            // (one branch: the chain is as deep as the compiler takes; --open-controller: (noxcpp) the
+            // Controller screen once in the game)
+            (a == "--open-inventory" ? app.openInventory : app.openController) = true;
         } else if (a == "--open-book") {
             // the book once in the game; with a number, turned to that entry's page
             app.openBook = i + 1 < argc && std::isdigit(static_cast<unsigned char>(argv[i + 1][0]))

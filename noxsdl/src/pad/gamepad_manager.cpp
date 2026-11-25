@@ -148,6 +148,14 @@ SDL_GamepadButtonLabel GamepadManager::faceLabel(PadButton b) const
     return SDL_GetGamepadButtonLabelForType(SDL_GAMEPAD_TYPE_STANDARD, sdl);
 }
 
+ButtonLabel GamepadManager::label(PadButton b, PromptStyle style) const
+{
+    SDL_Gamepad* g = active();
+    const LabelFamily family = labelFamily(style, activeType(), g != nullptr);
+    const SDL_GamepadButtonLabel face = style == PromptStyle::Auto && g ? faceLabel(b) : familyFaceLabel(family, b);
+    return buttonLabel(b, family, face);
+}
+
 bool GamepadManager::isDown(PadButton b) const
 {
     const Pad* p = find(active_);
@@ -251,7 +259,7 @@ std::optional<PadEdge> GamepadManager::handleEvent(const SDL_Event& event)
         const SDL_GamepadAxis yAxis = leftStick ? SDL_GAMEPAD_AXIS_LEFTY : SDL_GAMEPAD_AXIS_RIGHTY;
         const float x = axisUnit(axis == xAxis ? event.gaxis.value : SDL_GetGamepadAxis(p->gamepad, xAxis));
         const float y = axisUnit(axis == yAxis ? event.gaxis.value : SDL_GetGamepadAxis(p->gamepad, yAxis));
-        if (std::hypot(x, y) > settings_.deadZone) {
+        if (std::hypot(x, y) > (leftStick ? settings_.deadZone : settings_.rightDeadZone)) {
             touched(p->id);
         }
         return std::nullopt;
@@ -299,7 +307,7 @@ void GamepadManager::sample(std::uint64_t nowNs)
     frame_.left = radialDeadZone({axisUnit(axis(SDL_GAMEPAD_AXIS_LEFTX)), axisUnit(axis(SDL_GAMEPAD_AXIS_LEFTY))},
                                  settings_.deadZone, settings_.outerDeadZone);
     frame_.right = radialDeadZone({axisUnit(axis(SDL_GAMEPAD_AXIS_RIGHTX)), axisUnit(axis(SDL_GAMEPAD_AXIS_RIGHTY))},
-                                  settings_.deadZone, settings_.outerDeadZone);
+                                  settings_.rightDeadZone, settings_.outerDeadZone);
     if (settings_.invertY) {
         frame_.right.y = -frame_.right.y;
     }

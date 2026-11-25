@@ -11,6 +11,8 @@
 //   Game Window Size      VideoSize: 65, 75, 85 or 100 percent (windowOptionsProc).
 //   Colour depth          16-bit, as always here; 8-bit is off.
 //   Input Config          closes this and opens the input configuration (InputCfg.wnd).
+//   Controller            (noxsdl's, under Input Config) closes this and opens the Controller screen
+//                         (controller_window.hpp): the game controller's buttons and settings.
 //   volume sliders        FXVolume, DialogVolume, MusicVolume (0-16384), live as they move; the
 //                         three checkboxes switch sound effects, speech and music on and off.
 //                         A slider at 0 switches its part off, raised it switches it back on;
@@ -130,6 +132,7 @@ public:
         std::function<void(const nox::config::Config&)> onChange; ///< a setting changed
         std::function<void(const nox::config::Config&)> onClose;  ///< closed (save it)
         std::function<void()> onInputConfig; ///< Input Config pressed (this has closed)
+        std::function<void()> onController;  ///< (noxcpp) Controller pressed (this has closed)
         std::function<void(const Extras&)> onExtras; ///< one of noxsdl's switches changed
         std::function<void(const SoundOn&)> onSound; ///< a sound checkbox changed
         /// Gone for good (Escape, close()), not on to the input configuration: from the menus,

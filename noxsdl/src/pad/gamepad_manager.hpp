@@ -16,6 +16,7 @@
 #pragma once
 
 #include "pad/pad_bindings.hpp"
+#include "pad/pad_labels.hpp"
 #include "pad/pad_math.hpp"
 
 #include <SDL3/SDL.h>
@@ -87,6 +88,9 @@ public:
     /// label, by the pad's type when there's no pad open (SDL_GAMEPAD_BUTTON_LABEL_UNKNOWN for a
     /// button that isn't a face button).
     SDL_GamepadButtonLabel faceLabel(PadButton b) const;
+    /// What `b` is called on the screen (pad_labels.hpp): `style`'s family, or (Auto) the active
+    /// pad's own labels; by place with no pad.
+    ButtonLabel label(PadButton b, PromptStyle style) const;
 
     /// The device the player last touched.
     InputDevice activeDevice() const { return device_; }

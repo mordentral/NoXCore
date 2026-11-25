@@ -1377,6 +1377,15 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         app->inputConfig->handleEvent(*event, app->camera.viewWidth, app->camera.viewHeight);
         return SDL_APP_CONTINUE;
     }
+    // (noxcpp) The Controller screen the same, with the pad's buttons too (as they are while it waits
+    // for one).
+    if (app->controllerWindow && app->controllerWindow->isOpen() && event->type != SDL_EVENT_QUIT) {
+        if (app->input && (event->type == SDL_EVENT_KEY_UP || event->type == SDL_EVENT_MOUSE_BUTTON_UP || (padEdge && !padEdge->down))) {
+            app->input->releaseAll();
+        }
+        app->controllerWindow->handleEvent(*event, padEdge, app->camera.viewWidth, app->camera.viewHeight);
+        return SDL_APP_CONTINUE;
+    }
     if (app->options && app->options->isOpen() && event->type != SDL_EVENT_QUIT) {
         if (app->input && (event->type == SDL_EVENT_KEY_UP || event->type == SDL_EVENT_MOUSE_BUTTON_UP || (padEdge && !padEdge->down))) {
             app->input->releaseAll();
@@ -1818,6 +1827,9 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
     if (app.inputConfig) {
         app.inputConfig->update(SDL_GetTicks());
     }
+    if (app.controllerWindow) {
+        app.controllerWindow->update(SDL_GetTicks());
+    }
     if (app.quitRequested) {
         return SDL_APP_SUCCESS;
     }
@@ -1837,6 +1849,9 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
     }
     if (app.inputConfig) {
         app.inputConfig->draw(app.renderer, app.camera.viewWidth, app.camera.viewHeight);
+    }
+    if (app.controllerWindow) {
+        app.controllerWindow->draw(app.renderer, app.camera.viewWidth, app.camera.viewHeight);
     }
     if (const float scale = menuSparkScale(static_cast<float>(app.camera.viewWidth), static_cast<float>(app.camera.viewHeight));
         scale > 0) {
@@ -1868,6 +1883,9 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
     }
     if (app.options && app.options->isOpen()) {
         app.tooltip = app.options->tooltip(); // noxsdl's switches say what they do
+        drawTooltip(app, true);
+    } else if (app.controllerWindow && app.controllerWindow->isOpen()) {
+        app.tooltip = app.controllerWindow->tooltip();
         drawTooltip(app, true);
     }
     drawFps(app);
@@ -1955,6 +1973,13 @@ void updateGameWindows(App& app)
     }
     if (app.inputConfig) {
         app.inputConfig->update(SDL_GetTicks());
+    }
+    if (app.controllerWindow) {
+        if (app.openController && app.live->client().stage() == nox::client::HeadlessClient::Stage::InGame) {
+            app.openController = false;
+            app.controllerWindow->open(app.padConfig);
+        }
+        app.controllerWindow->update(SDL_GetTicks());
     }
     if (app.inventory) {
         if (app.openInventory && app.live->client().stage() == nox::client::HeadlessClient::Stage::InGame &&
@@ -2489,9 +2514,10 @@ void drawGameHud(App& app)
     // (The game's own HUD pieces: not while we observe, nor under a mod's covering window.)
     const bool hudPieces = gameHudShown(app);
     if (app.renderGui && hudPieces && !(app.tradeScreens && app.tradeScreens->hidesHud())) {
-        app.hud->draw(app.renderer, app.font.get(), *app.sprites, client.world(), client.netCode(),
-                       quickbarState(app), app.camera.viewWidth, app.camera.viewHeight,
-                       gameFrame(app));
+        QuickbarState bar = quickbarState(app);
+        bar.padPrompts = padHudPrompts(app); // ((noxcpp) the pad's buttons in the keys' places while it's in use)
+        app.hud->draw(app.renderer, app.font.get(), *app.sprites, client.world(), client.netCode(), bar, app.camera.viewWidth,
+                      app.camera.viewHeight, gameFrame(app));
     }
     // The windows over the HUD below: at the HUD's scale, with the mouse.
     const int hudW = app.camera.viewWidth;
@@ -2997,6 +3023,9 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     if (app->live && app->inputConfig) {
         app->inputConfig->draw(app->renderer, app->camera.viewWidth, app->camera.viewHeight);
     }
+    if (app->live && app->controllerWindow) {
+        app->controllerWindow->draw(app->renderer, app->camera.viewWidth, app->camera.viewHeight);
+    }
     if (app->live && app->discon) {
         app->discon->draw(app->renderer, app->camera.viewWidth, app->camera.viewHeight); // (the icon; the lag window over the game's)
     }
@@ -3027,6 +3056,9 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     app->tipItem = 0; // (liveTooltip's to set)
     if (app->options && app->options->isOpen()) {
         app->tooltip = app->options->tooltip(); // noxsdl's switches, in the menus and in a game
+        drawTooltip(*app, true);
+    } else if (app->controllerWindow && app->controllerWindow->isOpen()) {
+        app->tooltip = app->controllerWindow->tooltip();
         drawTooltip(*app, true);
     } else if (app->live && app->renderGui && !briefing) {
         app->tooltip = liveTooltip(*app);

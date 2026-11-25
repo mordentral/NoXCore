@@ -32,6 +32,7 @@
 #include "chat_entry.hpp"
 #include "cinematics.hpp"
 #include "console.hpp"
+#include "controller_window.hpp"
 #include "creature_bar.hpp"
 #include "cursor.hpp"
 #include "discon_window.hpp"
@@ -363,6 +364,7 @@ struct App {
     int serverOptionsPage = 0;                          ///< --server-options-page N: on that page (ServerOptions::showPageForTest)
     std::string askPasswordTest;                        ///< --ask-password HOST (with --browse): the join's password dialog for HOST
     bool openInventory = false;                         ///< --open-inventory: likewise (tests)
+    bool openController = false;                        ///< (noxcpp) --open-controller: the Controller screen, once in the game (tests)
     std::optional<int> openBook;                        ///< --open-book [N]: the book, at entry N's page (tests)
     /// --mouse-script "MS down|up|rdown|rup|move|esc|goto X Y; ...": the left (or right: moving) button
     /// pressed, let go or the mouse moved at window pixel (X, Y), or Escape (in a game), or (goto) the console's "nx goto X Y" (in a game), MS after joining a game, or in the menus after start-up
@@ -452,6 +454,8 @@ struct App {
     bool padFocused = true;            ///< the window has the focus (its focus events; a hidden one never gets any)
     std::optional<pad::StickVec> padAim; ///< the way the left stick last leaned (one long), while the pad's in use
     pad::PlayState padPlay;            ///< the pad in a game: aim, target, pointer, free cursor (pad/pad_play.hpp)
+    pad::PromptCache padPrompts;       ///< the HUD's pad prompts, made again when the config or the pad changes
+    pad::RumbleWatch padRumble;        ///< our health and level as last seen (the rumble's cue)
     pad::PanelState padPanels;         ///< the pad's snap cursor on the game's panels (pad/pad_panels.hpp)
     pad::OskState osk;                 ///< the pad's on-screen keyboard (pad/osk_game.cpp)
     /// The view in a game, as the game's Options set it: how much of the world shows (one of its
@@ -538,6 +542,7 @@ struct App {
     bool renderBubbles = true; ///< RenderBubbles: chat bubbles
     std::unique_ptr<OptionsWindow> options; ///< the game's Options window
     std::unique_ptr<InputConfigWindow> inputConfig; ///< Options' Input Config: the key bindings
+    std::unique_ptr<ControllerWindow> controllerWindow; ///< (noxcpp) Options' Controller: the pad's buttons and settings
     std::unique_ptr<ChatEntry> chat;        ///< typing a chat line (Chat / TeamChat)
     std::unique_ptr<MapDownload> mapDownload; ///< the map download screen (mapdnld.wnd)
     std::unique_ptr<RankBoard> rankBoard;     ///< the scoreboard (ToggleRank, F9)
@@ -1028,6 +1033,8 @@ bool liveControls(App& app, const std::vector<std::string>& controls);
 void startPads(App& app);
 /// noxcore_controller.cfg read (the defaults without one) and applied.
 void loadPadConfig(App& app);
+/// noxcore_controller.cfg as the file has it (the defaults without one), not applied.
+pad::PadConfig readPadConfig(const App& app);
 /// `config` in use: the router, the dead zones, the game controls' pad bindings (what's held let go).
 void applyPadConfig(App& app, pad::PadConfig config);
 /// app.padConfig written to noxcore_controller.cfg (beside noxcore.cfg; never nox.cfg).
@@ -1048,6 +1055,10 @@ void padRelease(App& app, const pad::PadEdge& edge);
 void padPress(App& app, const pad::PadEdge& edge);
 /// The pad's own game actions (Interact, TargetNext / TargetPrevious, FreeCursor), pressed or let go.
 void padAction(App& app, pad::PadAction action, bool down);
+/// The HUD's pad prompts (the slots' and potions' buttons) while the pad is the device in use, else null.
+const pad::HudPrompts* padHudPrompts(App& app);
+/// An action's prompt (its button, after the modifier's when it's on that layer), as named now.
+pad::PromptLabels padPrompt(const App& app, std::string_view action);
 /// What the pad's own actions hold let go (InputBindings::releaseAll's moments).
 void padActionsDropped(App& app);
 // (pad/pad_menu.cpp: the pad in the menus and the game's windows)

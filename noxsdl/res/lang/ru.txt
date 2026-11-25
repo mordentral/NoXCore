@@ -1855,6 +1855,107 @@ content.text_form.save_as_tip = Записывает новый файл (ник
 #@ a29f3abb mt: What the game reads
 content.text_form.what_game_reads = Что читает игра
 
+#@ 708e1acb mt: Free Cursor
+controller.action.free_cursor = Свободный курсор
+#@ 1e2eb9ef mt: Interact
+controller.action.interact = Взаимодействие
+#@ 50b26149 mt: Accept
+controller.action.menu_accept = Принять
+#@ c2954bc2 mt: Back
+controller.action.menu_back = Назад
+#@ 4eddf33c mt: Second Layer (hold)
+controller.action.modifier = Второй слой (удерживать)
+#@ 29436cfe mt: Tab Right
+controller.action.tab_next = Вкладка вправо
+#@ 49dda025 mt: Tab Left
+controller.action.tab_previous = Вкладка влево
+#@ a06512a1 mt: Next Target
+controller.action.target_next = Следующая цель
+#@ ba70c761 mt: Previous Target
+controller.action.target_previous = Предыдущая цель
+#@ 58de2772 mt: Normal
+controller.aim.normal = Обычная
+#@ 0dc6b4aa mt: Off
+controller.aim.off = Выкл.
+#@ 0dad409a mt: Strong
+controller.aim.strong = Сильная
+#@ 6de87ae9 mt: Weak
+controller.aim.weak = Слабая
+#@ 1e9d32c2 mt: With {button} held
+controller.caption.layer = С зажатой {button}
+#@ b84fa13e mt: Left stick: walk, and run when leant far
+controller.caption.left_stick = Левый стик: шаг, а при сильном наклоне бег
+#@ cf5d2702 mt: Right stick: aim; a flick picks the next target
+controller.caption.right_stick = Правый стик: прицел; рывок выбирает следующую цель
+#@ 0a77a91f mt: Action
+controller.header.action = Действие
+#@ 33881a91 mt: Button
+controller.header.button = Кнопка
+#@ 5ce477a4 mt: Or
+controller.header.second = Или
+#@ c52bff6d mt: In the menus
+controller.list.menus = В меню
+#@ 201a7a8b mt: Kept While Held
+controller.lock.held = Пока зажата
+#@ 8db969e1 mt: Picked Again
+controller.lock.retarget = Выбирать заново
+#@ b986d834 mt: No controller connected: the buttons are named by place.
+controller.none = Контроллер не подключён: кнопки названы по расположению.
+#@ 2fac5a23 mt: Taken from {actions}.
+controller.notice.moved = Снято с: {actions}.
+#@ 92ddfd57 mt: That button can't go there.
+controller.notice.refused = Эту кнопку сюда назначить нельзя.
+#@ 58e09c50 mt: Swapped with {actions}.
+controller.notice.swapped = Обмен с: {actions}.
+#@ 15d528af mt: Hold {button} to leave it as it is, or press Escape.
+controller.popup.cancel = Удерживайте {button}, чтобы оставить как было, или нажмите Escape.
+#@ f50675e4 mt: Escape leaves it as it is.
+controller.popup.cancel_key = Escape оставляет как было.
+#@ 21ddb45c mt: {action}, with {button} held
+controller.popup.layer = {action}, с зажатой {button}
+#@ 85283a00 mt: Press a button on the controller for
+controller.popup.press = Нажмите кнопку на контроллере для
+#@ 2d49b726 mt: As the Controller
+controller.prompts.auto = Как на контроллере
+#@ 5095b20d mt: Aim Assist
+controller.setting.aim_assist = Помощь в прицеливании
+#@ 0db04146 mt: Invert the Right Stick's Up and Down
+controller.setting.invert = Инвертировать правый стик по вертикали
+#@ fdafe205 mt: Left Stick Dead Zone {value}
+controller.setting.left_dead_zone = Мёртвая зона левого стика {value}
+#@ fdc42ecf mt: Target Lock
+controller.setting.lock = Захват цели
+#@ ff943461 mt: Button Names
+controller.setting.prompts = Названия кнопок
+#@ 3239c498 mt: Right Stick Dead Zone {value}
+controller.setting.right_dead_zone = Мёртвая зона правого стика {value}
+#@ 3abf931c mt: Rumble (when hurt and on a level up)
+controller.setting.rumble = Вибрация (при ранении и новом уровне)
+#@ 228bfdd5 mt: Run From a Lean of {value}
+controller.setting.run = Бег с наклона {value}
+#@ ccebaaea mt: Aim Speed x{value}
+controller.setting.speed = Скорость прицела x{value}
+#@ 5acb3098 mt: Show the {button} Layer
+controller.show_layer = Показать слой {button}
+#@ 014251c6 mt: Buttons
+controller.tab.buttons = Кнопки
+#@ 4b058728 mt: Settings
+controller.tab.settings = Настройки
+#@ 290fb48a mt: How strongly attacks and spells turn to the enemy you aim\nnear. Other players get only a light pull at any setting.
+controller.tip.aim_assist = Насколько сильно атаки и заклинания доворачивают к врагу,\nрядом с которым вы целитесь. Других игроков тянет слабо при любой настройке.
+#@ a3d002b1 mt: How far the stick must lean before it counts.\nRaise it if the player creeps or the aim drifts\nwith the stick let go.
+controller.tip.dead_zone = Насколько нужно наклонить стик, чтобы он сработал.\nУвеличьте, если персонаж ползёт или прицел смещается\nс отпущенным стиком.
+#@ f64dc3eb mt: Kept While Held: the target stays while the attack or spell\nbutton is held. Picked Again: the best target as you turn.
+controller.tip.lock = Пока зажата: цель держится, пока зажата кнопка атаки или\nзаклинания. Выбирать заново: лучшая цель по мере поворота.
+#@ ad7275d7 mt: The names and symbols shown for the buttons, on this\nscreen and on the spell bar: as the connected controller's,\nor always one family's.
+controller.tip.prompts = Названия и значки кнопок на этом экране и на панели\nзаклинаний: как у подключённого контроллера\nили всегда одного семейства.
+#@ ec799022 mt: How far the left stick leans before the player runs\n(less than that walks, as a near mouse pointer does).
+controller.tip.run = Насколько наклонить левый стик, чтобы персонаж побежал\n(меньше — шаг, как с близким указателем мыши).
+#@ ac682598 mt: How fast the right stick moves the aim and the free cursor.
+controller.tip.speed = Как быстро правый стик двигает прицел и свободный курсор.
+#@ a15e8ea1 mt: Controller
+controller.title = Контроллер
+
 #@ 0fc035e3 mt: Add to Category
 editor.browser.add_to_category = Добавить в категорию
 #@ c5e6dd64 mt: Pick a type to see it here; click on the map to place it (Object tool).
@@ -8286,12 +8387,28 @@ game.map_vote.title_next = Голосуйте за следующую карту
 game.map_vote.votes[one] = {n} голос
 game.map_vote.votes[few] = {n} голоса
 game.map_vote.votes[many] = {n} голосов
+#@ a0b1ed5e mt: Bottom button
+game.pad.button.bottom = Нижняя кнопка
 #@ 812746a9 mt: Circle
 game.pad.button.circle = Круг
 #@ b663d53b mt: Cross
 game.pad.button.cross = Крест
+#@ febc3941 mt: D-pad Down
+game.pad.button.dpad_down = Крестовина вниз
+#@ bc6967dc mt: D-pad Left
+game.pad.button.dpad_left = Крестовина влево
+#@ 1d3b4229 mt: D-pad Right
+game.pad.button.dpad_right = Крестовина вправо
+#@ cf7627b4 mt: D-pad Up
+game.pad.button.dpad_up = Крестовина вверх
+#@ 8ec7c5a4 mt: Left button
+game.pad.button.left = Левая кнопка
+#@ f4a72e6f mt: Right button
+game.pad.button.right = Правая кнопка
 #@ fac98c66 mt: Square
 game.pad.button.square = Квадрат
+#@ 4db8edf0 mt: Top button
+game.pad.button.top = Верхняя кнопка
 #@ e58886a5 mt: Triangle
 game.pad.button.triangle = Треугольник
 #@ 5b12cc35 mt: Pick up
@@ -8801,6 +8918,8 @@ modes.tide.strip.slain = Убито: {n}
 #@ 65b80e99 mt: Stage {n}
 modes.tide.strip.stage = Этап {n}
 
+#@ a15e8ea1 mt: Controller
+options.controller = Контроллер
 #@ 3d2aca78 mt: Fullscreen
 options.display.fullscreen = Полный экран
 #@ 07ac0fc5 mt: Fullscreen Windowed
@@ -8912,14 +9031,6 @@ options.weather.on = Вкл.
 #@ 8dc6c6d9 mt: Reduced
 options.weather.reduced = Ослаблено
 
-#@ 812746a9 mt: Circle
-osk.button.circle = Круг
-#@ b663d53b mt: Cross
-osk.button.cross = Крест
-#@ fac98c66 mt: Square
-osk.button.square = Квадрат
-#@ e58886a5 mt: Triangle
-osk.button.triangle = Треугольник
 #@ 2bf1f0ff mt: caps lock
 osk.hint.caps = Caps Lock
 #@ 27cb3b23 mt: close

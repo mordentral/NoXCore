@@ -111,18 +111,21 @@ std::optional<bool> flag(std::string_view v)
 
 constexpr std::string_view kAimNames[] = {"off", "weak", "normal", "strong"};
 constexpr std::string_view kLockNames[] = {"held", "retarget"};
+constexpr std::string_view kPromptNames[] = {"auto", "xbox", "playstation", "switch"};
 
 /// A settings line read into `s`; false when `name` isn't a setting or its value doesn't read.
 bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
 {
-    if (sameName(name, "DeadZone") || sameName(name, "OuterDeadZone") || sameName(name, "TriggerThreshold") ||
-        sameName(name, "Sensitivity") || sameName(name, "RunThreshold")) {
+    if (sameName(name, "DeadZone") || sameName(name, "RightDeadZone") || sameName(name, "OuterDeadZone") ||
+        sameName(name, "TriggerThreshold") || sameName(name, "Sensitivity") || sameName(name, "RunThreshold")) {
         const auto f = number(value);
         if (!f) {
             return false;
         }
         if (sameName(name, "DeadZone")) {
-            s.deadZone = std::clamp(*f, 0.0f, 0.9f);
+            s.deadZone = std::clamp(*f, 0.0f, kMaxDeadZone);
+        } else if (sameName(name, "RightDeadZone")) {
+            s.rightDeadZone = std::clamp(*f, 0.0f, kMaxDeadZone);
         } else if (sameName(name, "OuterDeadZone")) {
             s.outerDeadZone = std::clamp(*f, 0.1f, 1.0f);
         } else if (sameName(name, "TriggerThreshold")) {
@@ -130,9 +133,18 @@ bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
         } else if (sameName(name, "RunThreshold")) {
             s.runThreshold = std::clamp(*f, kMinRunThreshold, kMaxRunThreshold);
         } else {
-            s.sensitivity = std::clamp(*f, 0.25f, 4.0f);
+            s.sensitivity = std::clamp(*f, kMinSensitivity, kMaxSensitivity);
         }
         return true;
+    }
+    if (sameName(name, "Prompts")) {
+        for (std::size_t i = 0; i < std::size(kPromptNames); ++i) {
+            if (sameName(value, kPromptNames[i])) {
+                s.prompts = static_cast<PromptStyle>(i);
+                return true;
+            }
+        }
+        return false;
     }
     if (sameName(name, "AimAssist")) {
         for (std::size_t i = 0; i < std::size(kAimNames); ++i) {
@@ -165,7 +177,8 @@ bool readSetting(PadSettings& s, std::string_view name, std::string_view value)
 
 bool isSettingName(std::string_view name)
 {
-    for (const std::string_view n : {"DeadZone", "OuterDeadZone", "TriggerThreshold", "Sensitivity", "RunThreshold", "AimAssist", "LockMode", "InvertY", "Rumble"}) {
+    for (const std::string_view n : {"DeadZone", "RightDeadZone", "OuterDeadZone", "TriggerThreshold", "Sensitivity", "RunThreshold",
+                                     "AimAssist", "LockMode", "InvertY", "Rumble", "Prompts"}) {
         if (sameName(name, n)) {
             return true;
         }
@@ -382,6 +395,7 @@ std::string formatPadConfig(const PadConfig& c)
     }
     const PadSettings& s = c.settings;
     out += "DeadZone = " + numberText(s.deadZone) + "\n";
+    out += "RightDeadZone = " + numberText(s.rightDeadZone) + "\n";
     out += "OuterDeadZone = " + numberText(s.outerDeadZone) + "\n";
     out += "TriggerThreshold = " + numberText(s.triggerThreshold) + "\n";
     out += "Sensitivity = " + numberText(s.sensitivity) + "\n";
@@ -390,6 +404,7 @@ std::string formatPadConfig(const PadConfig& c)
     out += "LockMode = " + std::string(kLockNames[static_cast<std::size_t>(s.lockMode)]) + "\n";
     out += std::string("InvertY = ") + (s.invertY ? "1" : "0") + "\n";
     out += std::string("Rumble = ") + (s.rumble ? "1" : "0") + "\n";
+    out += "Prompts = " + std::string(kPromptNames[static_cast<std::size_t>(s.prompts)]) + "\n";
     const std::string modifier(padButtonName(c.modifier().value_or(PadButton::LeftTrigger)));
     for (const std::string_view action : allActionNames()) {
         const auto mine = c.bindingsFor(action);
@@ -409,6 +424,11 @@ std::string formatPadConfig(const PadConfig& c)
         out.append(line).append("\n");
     }
     return out;
+}
+
+void orderBindings(PadConfig& config)
+{
+    sortBindings(config);
 }
 
 void PadRouter::configure(const PadConfig& config)

@@ -90,4 +90,32 @@ inline float stickReach(float tilt, float runThreshold = kDefaultRunThreshold)
     return kRunDistance + (kRunReach - kRunDistance) * ((t - th) / (1.0f - th));
 }
 
+/// The rumble's cue (noxcore_controller.cfg's Rumble): the player's health and level as last seen,
+/// a pulse when the health drops (the same player, the same maximum: not a new life or a new
+/// level's bigger bar) or the level goes up. The first reading of a player only takes note.
+struct RumbleWatch {
+    enum class Pulse : std::uint8_t { None, Hurt, LevelUp };
+    std::uint16_t self = 0;
+    std::uint16_t health = 0;
+    std::uint16_t maxHealth = 0;
+    std::uint8_t level = 0;
+
+    Pulse step(std::uint16_t who, std::uint16_t nowHealth, std::uint16_t nowMax, std::uint8_t nowLevel)
+    {
+        Pulse p = Pulse::None;
+        if (who == self && who != 0) {
+            if (level != 0 && nowLevel > level) {
+                p = Pulse::LevelUp;
+            } else if (health != 0 && nowMax == maxHealth && nowHealth < health) {
+                p = Pulse::Hurt;
+            }
+        }
+        self = who;
+        health = nowHealth;
+        maxHealth = nowMax;
+        level = nowLevel;
+        return p;
+    }
+};
+
 } // namespace noxsdl::pad

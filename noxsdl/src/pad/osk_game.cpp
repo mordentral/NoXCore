@@ -181,33 +181,11 @@ void closeOsk(App& app, bool flush)
     SDL_Log("osk: closed");
 }
 
-/// What a button is called on the pad in use (its face's label; the bumpers, trigger, stick and
-/// Start by the pad's family).
+/// What a button is called on the pad in use, in words (pad_labels.hpp: the Controller screen's and
+/// the HUD's names, by the Prompts setting).
 std::string buttonName(const App& app, PadButton b)
 {
-    switch (app.pads.faceLabel(b)) {
-    case SDL_GAMEPAD_BUTTON_LABEL_A: return "A";
-    case SDL_GAMEPAD_BUTTON_LABEL_B: return "B";
-    case SDL_GAMEPAD_BUTTON_LABEL_X: return "X";
-    case SDL_GAMEPAD_BUTTON_LABEL_Y: return "Y";
-    case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return NOX_TR("osk.button.cross", "Cross");
-    case SDL_GAMEPAD_BUTTON_LABEL_CIRCLE: return NOX_TR("osk.button.circle", "Circle");
-    case SDL_GAMEPAD_BUTTON_LABEL_SQUARE: return NOX_TR("osk.button.square", "Square");
-    case SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE: return NOX_TR("osk.button.triangle", "Triangle");
-    default: break;
-    }
-    const SDL_GamepadType t = app.pads.activeType();
-    const bool ps = t == SDL_GAMEPAD_TYPE_PS3 || t == SDL_GAMEPAD_TYPE_PS4 || t == SDL_GAMEPAD_TYPE_PS5;
-    const bool sw = t == SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO || t == SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT ||
-                    t == SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT || t == SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR;
-    switch (b) {
-    case PadButton::LeftShoulder: return ps ? "L1" : sw ? "L" : "LB";
-    case PadButton::RightShoulder: return ps ? "R1" : sw ? "R" : "RB";
-    case PadButton::LeftTrigger: return ps ? "L2" : sw ? "ZL" : "LT";
-    case PadButton::LeftStick: return "L3";
-    case PadButton::Start: return ps ? "Options" : sw ? "+" : "Start";
-    default: return std::string(pad::padButtonName(b));
-    }
+    return pad::labelWords(app.pads.label(b, app.padConfig.settings.prompts));
 }
 
 /// The texts it draws, in the interface's language (made when it opens, never a frame).

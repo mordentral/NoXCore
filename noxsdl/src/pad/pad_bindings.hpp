@@ -6,7 +6,7 @@
 // Cross on a PlayStation one and B on a Switch one, so one file serves every pad. The file:
 //
 //     # comments
-//     DeadZone = 0.18          (the settings: PadSettings below)
+//     DeadZone = 0.18          (the settings: PadSettings below; DeadZone the left stick's)
 //     InvokeSlot1 = West       (an action and its button)
 //     QuickCurePoison = LT + DpadUp   (the modifier's layer: held LT, then the button)
 //     ToggleConsole = None     (no button)
@@ -109,14 +109,23 @@ enum class AimAssist : std::uint8_t { Off, Weak, Normal, Strong };
 /// turns (retarget). LockMode = held / retarget.
 enum class LockMode : std::uint8_t { WhileHeld, Retarget };
 
+/// The buttons' names shown (the prompts, the Controller screen): the connected pad's (auto), or
+/// always one family's. Prompts = auto / xbox / playstation / switch.
+enum class PromptStyle : std::uint8_t { Auto, Xbox, PlayStation, Switch };
+
 /// RunThreshold's range: the left stick's tilt (past the dead zone) where its cursor point
 /// reaches the server's run distance.
 inline constexpr float kMinRunThreshold = 0.3f;
 inline constexpr float kMaxRunThreshold = 0.95f;
+/// The inner dead zones' and Sensitivity's ranges (as the file is read).
+inline constexpr float kMaxDeadZone = 0.9f;
+inline constexpr float kMinSensitivity = 0.25f;
+inline constexpr float kMaxSensitivity = 4.0f;
 
 /// The file's settings.
 struct PadSettings {
-    float deadZone = 0.18f;         ///< DeadZone: the sticks' inner dead zone (0-0.9)
+    float deadZone = 0.18f;         ///< DeadZone: the left stick's inner dead zone (0-0.9)
+    float rightDeadZone = 0.18f;    ///< RightDeadZone: the right stick's (0-0.9)
     float outerDeadZone = 0.95f;    ///< OuterDeadZone: full tilt from here (above DeadZone, to 1)
     float triggerThreshold = 0.35f; ///< TriggerThreshold: a trigger's press (0.05-0.95)
     float sensitivity = 1.0f;       ///< Sensitivity: the aim and the free cursor's speed (0.25-4)
@@ -125,6 +134,7 @@ struct PadSettings {
     LockMode lockMode = LockMode::WhileHeld;
     bool invertY = false; ///< InvertY: the right stick's up and down swapped
     bool rumble = false;  ///< Rumble: off by default
+    PromptStyle prompts = PromptStyle::Auto; ///< Prompts: the buttons' names shown
 
     bool operator==(const PadSettings&) const = default;
 };
@@ -172,6 +182,9 @@ PadConfig parsePadConfig(std::string_view text);
 /// The file's text: a short header, the settings, every action's lines (None for an action with
 /// no button), then otherLines. parsePadConfig gives back the same config.
 std::string formatPadConfig(const PadConfig& config);
+/// The bindings in the actions' order (padActionNames), each action's kept as they are: the order
+/// parsePadConfig gives them in (so an edited config compares equal to its file read back).
+void orderBindings(PadConfig& config);
 
 /// The game's code for a pad button on a layer, as InputBindings matches it with the keys' and
 /// mouse buttons' (0x40000 up: no name in nox.cfg, so it never reaches that file).

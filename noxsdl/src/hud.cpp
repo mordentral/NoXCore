@@ -2,6 +2,7 @@
 #include "hud.hpp"
 
 #include "draw_box.hpp"
+#include "pad/pad_glyphs.hpp"
 #include "quickbar_mana.hpp"
 
 #include "noxcore/strings/l10n.hpp"
@@ -432,6 +433,12 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         }
     };
     const auto textWidth = [&](const std::string& t) { return font ? font->measureGameText(t, l.s) : 0.0f; };
+    // (noxcpp) A key's place with the game controller's button instead: its glyph, small, the
+    // cell's top left at game pixel (gx, gy) as the key's text.
+    const auto padKey = [&](const pad::PromptLabels& prompt, float gx, float gy, float size) {
+        static const pad::GlyphInk ink{{1, 1, 1, 1}, {0.05f, 0.04f, 0.03f, 0.85f}, {0.55f, 0.52f, 0.48f, 1}};
+        pad::drawPrompt(renderer, font, prompt, gx * l.s, (gy + 4.5f) * l.s, size * l.s, ink);
+    };
 
     // ---- the quickbar (quickBarCreate)
     const float bx = l.barX();
@@ -594,6 +601,10 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         // The slot's key, on its plate's child at (13, 39): the key it's bound to as this keyboard
         // prints it (the game's own letters are default.cfg's, whatever the binding or layout: VD-66).
         const auto at = static_cast<std::size_t>(i);
+        if (qb.padPrompts) {
+            padKey(qb.padPrompts->slots[at], l.slotX(i) + 13, l.slotY() + 29, 10);
+            continue;
+        }
         text(qb.slotKeys ? (*qb.slotKeys)[at] : kSlotKeys[at], l.slotX(i) + 13, l.slotY() + 29, {255, 255, 255, 255});
     }
     // ---- the meters (guiHealthManaInit)
@@ -712,6 +723,10 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
             text(std::to_string(count), px - 2, py + 10 - 9, {255, 255, 255, 255});
         }
         const auto at = static_cast<std::size_t>(kind);
+        if (qb.padPrompts) {
+            padKey(qb.padPrompts->potions[at], px - 2, py + 0x21 - 9, 8); // (smaller: 28 apart, cure poison's two glyphs)
+            continue;
+        }
         text(qb.potionKeys ? (*qb.potionKeys)[at] : kPotionKeys[at], px - 2, py + 0x21 - 9, {255, 255, 255, 255});
     }
 

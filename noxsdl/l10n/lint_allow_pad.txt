@@ -7,9 +7,13 @@ noxsdl/src/pad/virtual_pad.hpp: "NoX Core test pad"
 noxsdl/src/pad/pad_play.cpp: "Action"
 noxsdl/src/pad/pad_play.cpp: "Interact"
 noxsdl/src/mouse_handover.hpp: "the game controller"
+file noxsdl/src/pad/pad_remap.cpp      # the actions' names as noxcore_controller.cfg has them (the screen shows their titles)
+file noxsdl/src/pad/pad_labels.cpp     # what's printed on the pads' buttons (LB, L1, ZL, Menu, Options, +), as on the hardware
+noxsdl/src/controller_window.cpp: "WindowDir:Back"
+# (the pad families' own names, as on the hardware and its boxes)
+noxsdl/src/controller_window.cpp: "Xbox"
+noxsdl/src/controller_window.cpp: "Switch"
 # (the on-screen keyboard: the game's control names its quick chat fires, the names printed on a pad's buttons)
 noxsdl/src/pad/osk_game.cpp: "Taunt"
 noxsdl/src/pad/osk_game.cpp: "Laugh"
 noxsdl/src/pad/osk_game.cpp: "Point"
-noxsdl/src/pad/osk_game.cpp: "Options"
-noxsdl/src/pad/osk_game.cpp: "Start"

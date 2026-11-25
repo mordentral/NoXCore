@@ -24,6 +24,8 @@ constexpr std::int32_t kRes640 = 321, kRes1024Wide = 324; // (800x600 and 1024x7
 constexpr std::int32_t kResBox = 326, kResItem = 3260;
 constexpr std::int32_t kDepth8 = 331, kDepth16 = 332;
 constexpr std::int32_t kInputConfig = 341;
+constexpr std::int32_t kController = 342; ///< (noxsdl's) under Input Config, kControllerGap below it
+constexpr int kControllerGap = 4;
 constexpr std::int32_t kFxVolume = 351, kDialogVolume = 352, kMusicVolume = 353;
 constexpr std::int32_t kFxOn = 361, kDialogOn = 362, kMusicOn = 363;
 constexpr std::int32_t kClose = 371;
@@ -435,7 +437,33 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
         optionsDef.children.insert(optionsDef.children.begin(), std::make_move_iterator(items.begin()),
                                    std::make_move_iterator(items.end()));
     }
+    // (noxcpp) Controller: a plain button under Input Config, in the drop-downs' colours.
+    if (const auto input = std::ranges::find(optionsDef.children, kInputConfig, &nox::gui::WindowDef::id);
+        input != optionsDef.children.end()) {
+        nox::gui::WindowDef pad = *input;
+        pad.id = kController;
+        pad.y = input->y + input->height + kControllerGap;
+        pad.height = 18;
+        pad.status = st::Enabled | st::NoFocus;
+        pad.backgroundImage.clear();
+        pad.enabledImage.clear();
+        pad.disabledImage.clear();
+        pad.hiliteImage.clear();
+        pad.selectedImage.clear();
+        pad.imageOffsetX = pad.imageOffsetY = 0;
+        pad.text.clear();
+        pad.tooltip.clear();
+        pad.enabledColor = {150, 110, 40};
+        pad.hiliteColor = {240, 180, 42};
+        pad.backgroundColor = {16, 12, 8};
+        pad.selectedColor = {70, 52, 20};
+        pad.disabledColor = {24, 24, 24};
+        optionsDef.children.push_back(std::move(pad));
+    }
     window_ = gui_.load(optionsDef, proc);
+    if (gui::Window* w = window_->find(kController)) {
+        w->text = NOX_TR("options.controller", "Controller");
+    }
     // A drop-down's button and choices all in the small font, so one list never mixes faces.
     if (gui::Window* box = window_->find(kResBox)) {
         box->dropArrow = true;
@@ -809,6 +837,10 @@ void OptionsWindow::goOn(After after)
         if (callbacks_.onInputConfig) {
             callbacks_.onInputConfig();
         }
+    } else if (after == After::Controller) {
+        if (callbacks_.onController) {
+            callbacks_.onController();
+        }
     } else if (callbacks_.onDismissed) {
         callbacks_.onDismissed();
     }
@@ -972,6 +1004,10 @@ bool OptionsWindow::onMessage(int message, gui::Window& from)
     if (from.id == kInputConfig) {
         // (From the menus: once Options has slid out.)
         deferred_.push_back([this] { closeThen(After::InputConfig); });
+        return true;
+    }
+    if (from.id == kController) {
+        deferred_.push_back([this] { closeThen(After::Controller); });
         return true;
     }
     return false;

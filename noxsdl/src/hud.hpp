@@ -8,7 +8,8 @@
 //              the poison tube when poisoned; each tube a 15 x 125 column filled from the bottom
 //              in red or blue, the empty part darkened, bubbles rising in it (guiHealthManaTubeDraw); under
 //              them the potion slots (cure poison, health, mana) with what each holds, how many
-//              (the first stack's), and their keys (guiBottleSlotDrawFn; the health slot a red
+//              (the first stack's), and their keys (the game controller's buttons while it's in
+//              use) (guiBottleSlotDrawFn; the health slot a red
 //              potion, else meat, else an apple: bottle_slots.hpp). Clicking a tube toggles the small bars beside our
 //              player (guiHealthManaTubeProc, drawHealthManaBar); clicking a potion slot drinks one.
 //   quickbar   320 wide, centred, 74 from the bottom: QuickBarBase with its five 34 x 34 slots
@@ -46,6 +47,7 @@
 #pragma once
 
 #include "bottle_slots.hpp"
+#include "pad/pad_labels.hpp"
 #include "sprite_cache.hpp"
 #include "text.hpp"
 #include "thing_art.hpp"
@@ -112,6 +114,9 @@ struct QuickbarState {
     /// (InputBindings::slotLabels / potionLabels); nullptr: default.cfg's letters.
     const std::array<std::string, 5>* slotKeys = nullptr;
     const std::array<std::string, 3>* potionKeys = nullptr;
+    /// (noxcpp) While the game controller is the device in use: its buttons for the slots and
+    /// potions, drawn small in the keys' places (pad_glyphs.hpp); nullptr: the keys.
+    const pad::HudPrompts* padPrompts = nullptr;
 };
 
 class Hud {

@@ -124,6 +124,7 @@ public:
     enum class After : std::uint8_t {
         Dismissed,   ///< gone for good (Escape, Close, the menus' Back): the menus told (onDismissed)
         InputConfig, ///< on to the key bindings (onInputConfig); the menus keep Options up
+        Controller,  ///< (noxcpp) on to the Controller screen (onController), as InputConfig
     };
     /// How a close goes.
     enum class Close : std::uint8_t {

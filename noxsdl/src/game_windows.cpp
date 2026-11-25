@@ -214,6 +214,11 @@ void makeGameWindows(App* app, const gui::Resources& res)
             app->inputConfig->open(app->input->config());
         }
     };
+    optionCallbacks.onController = [app] {
+        if (app->controllerWindow) {
+            app->controllerWindow->open(app->padConfig);
+        }
+    };
     app->options = std::make_unique<OptionsWindow>(res, gameDir / "window", std::move(optionCallbacks));
     // The input configuration (InputCfg.wnd): Back sets the bindings and writes nox.cfg;
     // either way Options comes back.
@@ -226,6 +231,17 @@ void makeGameWindows(App* app, const gui::Resources& res)
     };
     inputCallbacks.onClose = [app] { openOptions(*app); };
     app->inputConfig = std::make_unique<InputConfigWindow>(res, gameDir, std::move(inputCallbacks));
+    // (noxcpp) The Controller screen: its changes in use at once, Back writes noxcore_controller.cfg;
+    // either way Options comes back.
+    ControllerWindow::Callbacks padCallbacks;
+    padCallbacks.onApply = [app](const pad::PadConfig& c) { applyPadConfig(*app, c); };
+    padCallbacks.onSave = [app](const pad::PadConfig& c) {
+        applyPadConfig(*app, c);
+        savePadConfig(*app);
+    };
+    padCallbacks.saved = [app] { return readPadConfig(*app); };
+    padCallbacks.onClose = [app] { openOptions(*app); };
+    app->controllerWindow = std::make_unique<ControllerWindow>(res, gameDir / "window", app->pads, std::move(padCallbacks));
 
     // The console (F1), with the game's commands and noxsdl's debug switches.
     app->console = std::make_unique<Console>(app->font.get(), app->strings.get());

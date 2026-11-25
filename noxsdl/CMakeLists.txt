@@ -108,6 +108,7 @@ add_executable(noxsdl WIN32
     src/move_predictor.cpp
     src/input.cpp
     src/input_config_window.cpp
+    src/controller_window.cpp
     src/inventory.cpp
     src/inventory_grid.cpp
     src/item_names.cpp
@@ -145,10 +146,14 @@ add_executable(noxsdl WIN32
     src/pad/pad_aim.cpp
     src/pad/pad_bindings.cpp
     src/pad/pad_game.cpp
+    src/pad/pad_glyphs.cpp
+    src/pad/pad_labels.cpp
     src/pad/pad_menu.cpp
+    src/pad/pad_picture.cpp
     src/pad/pad_panel_nav.cpp
     src/pad/pad_panels.cpp
     src/pad/pad_play.cpp
+    src/pad/pad_remap.cpp
     src/pad/virtual_pad.cpp
     src/minimap.cpp
     src/map_thumbnail.cpp

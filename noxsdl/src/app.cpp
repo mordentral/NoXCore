@@ -196,7 +196,7 @@ bool ownDeadFlag(App& app)
 bool menuWindowUp(const App& app)
 {
     return (app.quitMenu && app.quitMenu->isOpen()) || (app.options && app.options->isOpen()) ||
-           (app.inputConfig && app.inputConfig->isOpen());
+           (app.inputConfig && app.inputConfig->isOpen()) || (app.controllerWindow && app.controllerWindow->isOpen());
 }
 
 /// A world on the view: a game's once it's in (not over a map's load), or the map viewer's.

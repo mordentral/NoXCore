@@ -91,6 +91,28 @@ void followReleases(App& app)
     }
 }
 
+/// The rumble (Rumble on): a short pulse when our health drops, a longer one on a level up, while
+/// the pad is in use. Off, nothing is kept (the next reading after it's switched on only takes note).
+void padRumbleFrame(App& app)
+{
+    if (!app.padConfig.settings.rumble || !app.live) {
+        app.padRumble.self = 0;
+        return;
+    }
+    const auto& client = app.live->client();
+    const auto& me = client.world().self();
+    const auto pulse = app.padRumble.step(static_cast<std::uint16_t>(client.netCode()), me.health, me.maxHealth, me.level);
+    SDL_Gamepad* g = app.pads.padInUse() ? app.pads.active() : nullptr;
+    if (!g || pulse == pad::RumbleWatch::Pulse::None) {
+        return;
+    }
+    if (pulse == pad::RumbleWatch::Pulse::LevelUp) {
+        SDL_RumbleGamepad(g, 0x9000, 0x9000, 450);
+    } else {
+        SDL_RumbleGamepad(g, 0x7000, 0xB000, 140);
+    }
+}
+
 } // namespace
 
 void startPads(App& app)
@@ -115,18 +137,22 @@ void startPads(App& app)
     }
 }
 
-void loadPadConfig(App& app)
+pad::PadConfig readPadConfig(const App& app)
 {
-    pad::PadConfig config = pad::defaultPadConfig();
     const auto path = padConfigPath(app);
     std::error_code ec;
-    if (std::filesystem::exists(path, ec)) {
-        std::ifstream in(path, std::ios::binary);
-        std::ostringstream text;
-        text << in.rdbuf();
-        config = pad::parsePadConfig(text.str());
+    if (!std::filesystem::exists(path, ec)) {
+        return pad::defaultPadConfig();
     }
-    applyPadConfig(app, std::move(config));
+    std::ifstream in(path, std::ios::binary);
+    std::ostringstream text;
+    text << in.rdbuf();
+    return pad::parsePadConfig(text.str());
+}
+
+void loadPadConfig(App& app)
+{
+    applyPadConfig(app, readPadConfig(app));
 }
 
 void applyPadConfig(App& app, pad::PadConfig config)
@@ -138,6 +164,39 @@ void applyPadConfig(App& app, pad::PadConfig config)
     if (app.input) {
         app.input->setPadBindings(app.padRouter.gameBindings());
     }
+    ++app.padPrompts.generation; // (the HUD's prompts made again)
+}
+
+pad::PromptLabels padPrompt(const App& app, std::string_view action)
+{
+    const pad::ActionButtons on = pad::actionButtons(app.padConfig, action);
+    pad::PromptLabels out;
+    const pad::PromptStyle style = app.padConfig.settings.prompts;
+    if (on.button) {
+        out.button = app.pads.label(*on.button, style);
+    }
+    if (on.modifier) {
+        out.modifier = app.pads.label(*on.modifier, style);
+    }
+    return out;
+}
+
+const pad::HudPrompts* padHudPrompts(App& app)
+{
+    if (!app.pads.connected() || !app.pads.padInUse()) {
+        return nullptr;
+    }
+    // Made again only when the config, the pad or its kind changed.
+    const std::uint64_t key = (static_cast<std::uint64_t>(app.padPrompts.generation) << 32) ^
+                              (static_cast<std::uint64_t>(app.pads.activeId()) << 8) ^ static_cast<std::uint64_t>(app.pads.activeType());
+    if (key != app.padPrompts.key) {
+        app.padPrompts.key = key;
+        for (std::size_t i = 0; i < app.padPrompts.hud.slots.size(); ++i) {
+            app.padPrompts.hud.slots[i] = padPrompt(app, "InvokeSlot" + std::to_string(i + 1));
+        }
+        app.padPrompts.hud.potions = {padPrompt(app, "QuickHealth"), padPrompt(app, "QuickMana"), padPrompt(app, "QuickCurePoison")};
+    }
+    return &app.padPrompts.hud;
 }
 
 bool savePadConfig(const App& app)
@@ -157,7 +216,7 @@ bool padGameInput(const App& app)
     return app.live && !app.joinWaiting && app.padFocused && !oskOpen(app) && !editorHasInput(app) && !(app.movie && app.movie->active()) &&
            !(app.quitMenu && app.quitMenu->isOpen()) && !(app.chat && app.chat->isOpen()) &&
            !(app.console && app.console->isOpen()) && !(app.options && app.options->isOpen()) &&
-           !(app.inputConfig && app.inputConfig->isOpen());
+           !(app.inputConfig && app.inputConfig->isOpen()) && !(app.controllerWindow && app.controllerWindow->isOpen());
 }
 
 bool padHasMenus(const App& app)
@@ -172,7 +231,8 @@ bool padHasMenus(const App& app)
     // the map download)
     return (app.quitMenu && app.quitMenu->isOpen()) || (app.chat && app.chat->isOpen()) ||
            (app.console && app.console->isOpen()) || (app.options && app.options->isOpen()) ||
-           (app.inputConfig && app.inputConfig->isOpen()) || (app.motdWindow && app.motdWindow->isOpen()) ||
+           (app.inputConfig && app.inputConfig->isOpen()) || (app.controllerWindow && app.controllerWindow->isOpen()) ||
+           (app.motdWindow && app.motdWindow->isOpen()) ||
            (app.serverOptions && app.serverOptions->isOpen()) || (app.mapDownload && app.live->client().downloadPercent());
 }
 
@@ -197,6 +257,9 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
         return std::nullopt;
     }
     followReleases(app);
+    if (app.controllerWindow && app.controllerWindow->capturing()) {
+        return edge; // (the Controller screen waits for a button: each as it is, none Escape or the menus')
+    }
     if (edge->down && padPanelsPress(app, *edge)) {
         return std::nullopt; // (the panels' snap cursor's, pad_panels.cpp: nothing else sees it)
     }
@@ -289,6 +352,7 @@ PadSteer padSteer(App& app)
     }
     app.pads.sample(SDL_GetTicksNS());
     followReleases(app);
+    padRumbleFrame(app);
     if (!app.pads.padInUse()) {
         app.padAim.reset();
         padPlayIdle(app);
