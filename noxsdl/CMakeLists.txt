@@ -143,6 +143,8 @@ add_executable(noxsdl WIN32
     src/pad/pad_bindings.cpp
     src/pad/pad_game.cpp
     src/pad/pad_menu.cpp
+    src/pad/pad_panel_nav.cpp
+    src/pad/pad_panels.cpp
     src/pad/pad_play.cpp
     src/pad/virtual_pad.cpp
     src/minimap.cpp

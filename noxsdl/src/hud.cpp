@@ -251,6 +251,12 @@ std::optional<std::pair<int, int>> Hud::slotAt(const QuickbarState& bar, float x
     return std::nullopt;
 }
 
+SDL_FPoint Hud::trapSlotPosition(int w, int h, int slot)
+{
+    const Layout l = layoutFor(w, h);
+    return {l.trapSlotX(slot), l.trapSlotY()};
+}
+
 std::optional<int> Hud::trapSlotAt(const QuickbarState& bar, float x, float y, int w, int h) const
 {
     if (!bar.trapOpen) {

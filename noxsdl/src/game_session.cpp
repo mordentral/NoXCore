@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include "game_data_swap.hpp"
 #include "new_game.hpp"
+#include "pad/pad_panels.hpp"
 
 #include "noxcore/client/inform_text.hpp"
 #include "noxcore/client/solo_saves.hpp"
@@ -197,6 +198,7 @@ void startTradeScreens(App& app)
     };
     a.centredMessage = [&app](const std::string& words) { centredMessage(app, words); };
     a.pointer = [&app] { return mousePos(app); }; // (in the game's pixels, as its events are)
+    a.padLeave = [&app](gui::NavInput in, SDL_FRect from) { return padPanelsTakeBack(app, in, from); }; // (noxcpp: pad_panels.cpp)
     app.tradeScreens = std::make_unique<TradeScreens>(res, app.gameDir / "window", *app.inventory, *app.itemNames,
                                                       *app.art, std::move(a));
     app.inventory->setGameData(&app.gameData); // the stats page's maximums

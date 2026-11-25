@@ -147,6 +147,8 @@ public:
     std::optional<std::pair<int, int>> slotAt(const QuickbarState& bar, float x, float y, int w, int h) const;
     /// The trap tray's slot at output pixel (x, y), if the tray is open.
     std::optional<int> trapSlotAt(const QuickbarState& bar, float x, float y, int w, int h) const;
+    /// (noxcpp) The tray's slot `slot`'s top left in game pixels (34 x 34), as slotPosition's.
+    static SDL_FPoint trapSlotPosition(int w, int h, int slot);
     /// gamedata.bin, for the trap costs and the abilities' cooldowns (nullptr: none known).
     void setGameData(const nox::things::GameData* data) { gameData_ = data; }
     /// The game's flags, which of gamedata.bin's lines it reads (SOLO in a solo game, ARENA online).

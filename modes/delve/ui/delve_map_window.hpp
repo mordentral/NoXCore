@@ -54,6 +54,15 @@ public:
     /// A click on the button opens or closes the map; one on the open map, or Escape while it's
     /// open, is the map's. Returns whether the event was taken (so goes no further).
     bool handleEvent(const SDL_Event& event, const std::optional<Run>& run, int w, int h, float scale);
+    /// (noxcpp) The game controller's snap cursor: while the map (or the records' table) is open,
+    /// its button (a click, or Escape, puts it away); nullopt else.
+    std::optional<SDL_FRect> padSpot(const std::optional<Run>& run, int w, int h, float scale) const
+    {
+        if (!open_ || !font_ || (!run && !hasRecords())) {
+            return std::nullopt;
+        }
+        return buttonRect(w, h, scale);
+    }
 
 private:
     struct Layout {

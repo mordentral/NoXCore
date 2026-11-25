@@ -499,6 +499,31 @@ void TideWindow::drawAsk(SDL_Renderer* renderer, const std::optional<std::uint8_
                 hover ? kGold : kWhite);
 }
 
+void TideWindow::padSpots(const Offer& offer, const std::optional<Results>& results, int w, int h, float scale, std::vector<SDL_FRect>& out) const
+{
+    if (!font_) {
+        return;
+    }
+    if (resultsOpen_ && results) {
+        out.push_back(resultsLayout(*results, w, h, scale).ok);
+        return;
+    }
+    if (!offer.picks.empty()) {
+        const CardsLayout l = cardsLayout(offer, w, h, scale);
+        out.insert(out.end(), l.cards.begin(), l.cards.end());
+    }
+}
+
+void TideWindow::padAskSpots(const std::optional<std::uint8_t>& ask, int w, int h, float scale, std::vector<SDL_FRect>& out) const
+{
+    if (!ask || !font_) {
+        return;
+    }
+    const AskLayout l = askLayout(w, h, scale);
+    out.insert(out.end(), l.rows.begin(), l.rows.end());
+    out.push_back(l.cancel);
+}
+
 bool TideWindow::handleAskEvent(const SDL_Event& event, const std::optional<std::uint8_t>& ask, int w, int h, float scale,
                                 std::optional<std::uint8_t>& chosen, bool& dismissed) const
 {

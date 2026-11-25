@@ -93,6 +93,15 @@ MapVoteWindow::Layout MapVoteWindow::layout(const State& vote, int w, int h, flo
     return l;
 }
 
+void MapVoteWindow::padCards(const State& vote, int w, int h, float scale, std::vector<SDL_FRect>& out) const
+{
+    out.clear();
+    if (!shown_ || !vote.open || vote.kind != 0 || folded_ || !font_) {
+        return;
+    }
+    out = layout(vote, w, h, scale).cards;
+}
+
 void MapVoteWindow::draw(SDL_Renderer* renderer, const State& vote, int w, int h, float scale, SDL_FPoint mouse)
 {
     if (!shown_ || !font_) {

@@ -142,6 +142,33 @@ std::optional<int> SummonWindow::itemAt(float gx, float gy) const
     return std::nullopt;
 }
 
+bool SummonWindow::padSpots(const nox::client::World& world, int w, int h, std::vector<SDL_FRect>& out) const
+{
+    out.clear();
+    const float s = Hud::scale(w, h);
+    const auto add = [&](const Rect& r) { out.push_back({r.x * s, r.y * s, r.w * s, r.h * s}); };
+    if (menu_) {
+        for (std::size_t i = 0; i < kLines.size(); ++i) {
+            add({menu_->box.x, menu_->box.y + static_cast<float>(i) * menu_->step, menu_->box.w, menu_->itemH});
+        }
+        return true;
+    }
+    if (state_ != 2) {
+        return false;
+    }
+    add(buttonRect(w, h));
+    const Rect box = boxRect(w, h);
+    for (int cx = 0; cx < 2; ++cx) {
+        for (int cy = 0; cy < 2; ++cy) {
+            const Rect cell{box.x + static_cast<float>(cx) * kCell, box.y + static_cast<float>(cy) * kCell, kCell, kCell};
+            if (creatureAt(world, cell.x + kCell / 2, cell.y + kCell / 2, w, h)) {
+                add(cell);
+            }
+        }
+    }
+    return false;
+}
+
 void SummonWindow::open(float gx, float gy, std::optional<std::uint16_t> creature, int w, int h)
 {
     // wndSummonCreateList: as wide as the widest line + 8, centred on the click

@@ -15,6 +15,7 @@
 #include "app.hpp"
 #include "backend_hooks.hpp"
 #include "cursor_pick.hpp"
+#include "pad/pad_panels.hpp"
 #include "pad/pad_play.hpp"
 #include "gui_nav.hpp"
 
@@ -191,6 +192,9 @@ std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event)
         return std::nullopt;
     }
     followReleases(app);
+    if (edge->down && padPanelsPress(app, *edge)) {
+        return std::nullopt; // (the panels' snap cursor's, pad_panels.cpp: nothing else sees it)
+    }
     const unsigned bit = 1u << static_cast<unsigned>(edge->button);
     // A menu, or a window that owns Escape (chat, the console), has the input: MenuBack's button is
     // Escape there (each screen's own Escape; marked as the pad's: gui::padEscape); the D-pad, the
@@ -275,6 +279,7 @@ PadSteer padSteer(App& app)
         if (app.padPlay.hasPointer || app.padPlay.collecting) {
             padPlayIdle(app); // (the last pad gone)
         }
+        padPanelsIdle(app);
         return PadSteer::None;
     }
     app.pads.sample(SDL_GetTicksNS());
@@ -282,16 +287,27 @@ PadSteer padSteer(App& app)
     if (!app.pads.padInUse()) {
         app.padAim.reset();
         padPlayIdle(app);
+        padPanelsIdle(app);
         return PadSteer::None;
     }
     const auto at = app.live->client().position();
     if (!padGameInput(app) || app.view3d.active() || !at || (app.cinematics && app.cinematics->screenUp())) {
         padPlayIdle(app); // (a briefing's screen: the mouse's pointer, as it has the mouse)
+        padPanelsIdle(app);
         return PadSteer::None;
+    }
+    // The panels' snap cursor (pad_panels.cpp): on the inventory or the book the player stands.
+    const PanelFrame panels = padPanelsFrame(app);
+    if (panels == PanelFrame::Still) {
+        return PadSteer::Holds;
     }
     // The stick's walk (its cursor point out by its tilt), the aim and the target, the pointer
     // (pad_play.cpp).
-    return padPlaySteer(app, static_cast<float>(at->first), static_cast<float>(at->second));
+    const PadSteer steer = padPlaySteer(app, static_cast<float>(at->first), static_cast<float>(at->second));
+    if (panels == PanelFrame::Dpad) {
+        padPanelsPointer(app); // (on the window's spot, over the aim)
+    }
+    return steer;
 }
 
 void runPadScript(App& app, std::uint64_t elapsedMs)

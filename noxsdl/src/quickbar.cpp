@@ -551,6 +551,23 @@ Spellbook::Actions bookActions(App& app)
     return a;
 }
 
+} // namespace
+
+void bookSpellToSlot(App& app, std::uint32_t id, int slot)
+{
+    // (noxcpp, the game controller's) As the book's drop on that slot of the set in use.
+    if (id == 0 || slot < 0 || slot > 4) {
+        return;
+    }
+    const int w = app.camera.viewWidth;
+    const int h = app.camera.viewHeight;
+    const float s = Hud::scale(w, h);
+    const SDL_FPoint p = Hud::slotPosition(w, h, app.bars.row, slot, app.barsExpanded, app.bars.row);
+    dropOnBars(app, {id, false}, true, (p.x + 17) * s, (p.y + 17) * s);
+}
+
+namespace {
+
 /// The flight's start (bookFillAll: the solo moment (0, kind)) or landing
 /// (Game_SetPaused(0)) on the solo game we host (solo.hpp).
 void hostBookFlight(App& app, bool begins, int kind)

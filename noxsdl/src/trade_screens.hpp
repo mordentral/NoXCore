@@ -81,6 +81,10 @@ public:
         /// The pointer where the game has it, in the same pixels as its events (mousePos); unset,
         /// SDL's mouse as it is.
         std::function<SDL_FPoint()> pointer;
+        /// (noxcpp) The game controller's focus on these windows going `input`'s way with nothing
+        /// more of theirs that way (`from` the window it's on, output pixels): true when the
+        /// panels' snap cursor (pad/pad_panels.cpp) took the pad from there.
+        std::function<bool(gui::NavInput input, SDL_FRect from)> padLeave;
     };
 
     TradeScreens(gui::Resources res, std::filesystem::path windowDir, Inventory& inventory, ItemNames& names,
@@ -110,6 +114,21 @@ public:
     /// `at`, 1 to `most`, no price; `yes` gets the count.
     void askAmount(const std::string& label, std::uint16_t typeId, const std::array<std::uint8_t, 4>& mods, int most,
                    SDL_FPoint at, int w, int h, std::function<void(int)> yes);
+
+    /// (noxcpp) The game controller. The window system's pad focus (gui_nav.hpp) goes over these
+    /// windows' buttons, and into the shop's stock and the trade's offers, whose cells it steps
+    /// through itself (A on a stock cell buys, on our offer takes it back). Off: the panels' snap
+    /// cursor has the pad (these windows take none of it).
+    void setPadNavigation(bool on) { gui_.setPadNavigation(on); }
+    /// Whether these windows have the window system's pad focus now.
+    bool hasPad() const { return gui::navOwner() == &gui_; }
+    /// The amount box or a message is up (over everything: it has the pad).
+    bool modalUp() const { return amount_.has_value() || messageBox_ != nullptr; }
+    /// Where the pad's focus is here, in output pixels (the cell it's on in the stock or an offer,
+    /// else the window's middle), for the pointer; nullopt with none.
+    std::optional<SDL_FPoint> padPointer(int w, int h) const;
+    /// The open shop's, dialog's or trade's window, in output pixels (where the pad goes to them).
+    std::optional<SDL_FRect> padBounds(int w, int h) const;
 
 private:
     /// Actions::pointer's point.
@@ -158,6 +177,22 @@ private:
     bool anyOpen() const { return shop_.open || dialog_.open || trade_.open || amount_ || messageBox_; }
     void notEnoughGold(std::uint32_t shortBy);
     std::optional<int> stockAt(SDL_FPoint layout) const;
+    /// A press on stock slot `slot` (Buy mode), at layout point `l`: the amount box for it, or not
+    /// enough gold. Whether it was a slot with stock.
+    bool pressStock(int slot, SDL_FPoint l);
+    /// (noxcpp) The pad's way through these windows: every button's edge (padLeave), the stock's
+    /// and the offers' cells.
+    void padWindows();
+    bool padEdge(gui::Window& self, gui::NavInput in);
+    bool padStock(gui::Window& self, gui::NavInput in);
+    bool padOffer(gui::Window& self, gui::NavInput in, bool ours);
+    /// A layout rectangle in output pixels (the layout's placement).
+    SDL_FRect toOutput(SDL_Rect r, int w, int h) const;
+    int padStock_ = 0;    ///< the stock slot the pad's on ([row + column * 10])
+    int padOffer_ = 0;    ///< the offer cell the pad's on ([row + column * 2])
+    int lastW_ = 640, lastH_ = 480; ///< the output's size as last drawn
+    const gui::Window* padLastFocus_ = nullptr; ///< the pad's focus as last drawn (compared only)
+    SDL_Rect padLastRect_{};                    ///< and where it was
     std::optional<int> offerAt(SDL_FPoint layout, bool ours) const;
     void scrollStock(int to);
     void scrollDialog(int to);

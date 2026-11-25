@@ -352,6 +352,67 @@ bool Spellbook::contains(float x, float y, int w, int h) const
     return inside(x / s, y / s, o.x, o.y, kWidth, kHeight);
 }
 
+void Spellbook::padSpots(int w, int h, std::vector<PadSpot>& out) const
+{
+    out.clear();
+    if (!open_) {
+        return;
+    }
+    const float s = Hud::scale(w, h);
+    const SDL_FPoint o = origin(static_cast<int>(static_cast<float>(h) / s));
+    const auto add = [&](PadSpotKind kind, int index, float x, float y, float bw, float bh) {
+        out.push_back({kind, index, SDL_FRect{(o.x + x) * s, (o.y + y) * s, bw * s, bh * s}});
+    };
+    if (listMode_) {
+        // The list page's titles, a line each down two columns (the second past x 0x91, as
+        // mouseDown reads them).
+        const int lines = linesPerColumn();
+        for (int row = 0; row < perPage(); ++row) {
+            const int index = row + listPage_ * perPage();
+            if (index >= listed_) {
+                break;
+            }
+            const int col = row / lines;
+            add(PadSpotKind::Entry, index, col == 0 ? 24.0f : 147.0f, static_cast<float>(0x13 + (row % lines) * kLine),
+                0x78, static_cast<float>(kLine));
+        }
+    } else if (entry_ < static_cast<int>(entries_.size())) {
+        add(PadSpotKind::Icon, entry_, 0x3F, 0x13, 0x1E, 0x1E);
+    }
+    const bookpages::Place here{listMode_, listPage_, entry_};
+    if (bookpages::backShown(here)) {
+        add(PadSpotKind::Back, 0, 0x18, 0x8A, 0x14, 0x14);
+    }
+    if (bookpages::forwardShown(here, listed_)) {
+        add(PadSpotKind::Forward, 0, 0xE9, 0x8A, 0x14, 0x14);
+    }
+    add(PadSpotKind::GuideTab, 0, 0x101, 0xF, 0x1B, 0x28);
+    add(PadSpotKind::SpellsTab, 0, 0xFD, 0x3D, 0x1B, 0x28);
+}
+
+std::uint32_t Spellbook::padSpell(const PadSpot& spot, const BookContext& ctx) const
+{
+    if (spot.index < 0 || spot.index >= static_cast<int>(entries_.size())) {
+        return 0;
+    }
+    const auto e = entries_[static_cast<std::size_t>(spot.index)];
+    if (spot.kind == PadSpotKind::Entry) {
+        // As the list's drag (bookListWndProc).
+        if (guide_) {
+            return canSummon(ctx) ? nox::things::guideSummonSpell(static_cast<int>(e)) : 0;
+        }
+        return e;
+    }
+    if (spot.kind == PadSpotKind::Icon) {
+        // As the icon's (bookWndFn): not the summon and mark spells.
+        if (guide_) {
+            return canSummon(ctx) ? nox::things::guideSummonSpell(static_cast<int>(e)) : 0;
+        }
+        return entryClass(e, ctx) == 0 || !(nox::client::spellFlags(things_, e) & 0x15000) ? e : 0;
+    }
+    return 0;
+}
+
 std::string Spellbook::tooltip(float x, float y, int w, int h, const BookContext& ctx) const
 {
     if (!open_ || !contains(x, y, w, h)) {

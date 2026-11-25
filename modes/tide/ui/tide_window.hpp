@@ -50,6 +50,11 @@ public:
                      std::optional<std::size_t>& pick);
 
     bool resultsOpen() const noexcept { return resultsOpen_; }
+    /// (noxcpp) The game controller's snap cursor: what a click picks, added to `out` (output
+    /// pixels): the results' OK while they're open, else a level-up's cards; the question's rows and
+    /// Cancel while it's asked.
+    void padSpots(const Offer& offer, const std::optional<Results>& results, int w, int h, float scale, std::vector<SDL_FRect>& out) const;
+    void padAskSpots(const std::optional<std::uint8_t>& ask, int w, int h, float scale, std::vector<SDL_FRect>& out) const;
 
     /// The lobby gate's question (the server's kAsk: `ask` the difficulty now, while it's open):
     /// "Begin the run at which difficulty?", the four, each with what it does, and Cancel.

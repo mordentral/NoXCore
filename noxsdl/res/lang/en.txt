@@ -12260,7 +12260,7 @@ game.chat.team = Team
 # noxsdl/src/game_data_swap.cpp:105
 #@ 7007f0e1: another game is hosted here
 game.data.hosting_other = another game is hosted here
-# noxsdl/src/game_session.cpp:47
+# noxsdl/src/game_session.cpp:48
 #@ 67d33758: Asked the host for edit rights.
 game.edit_session.asked_rights = Asked the host for edit rights.
 # noxsdl/src/main.cpp:2081
@@ -12303,56 +12303,56 @@ game.load_failed.no_game = Nox wasn't found.\n\nPut noxcore.exe (with its files)
 # noxsdl/src/main.cpp:693, noxsdl/src/main.cpp:1202
 #@ 28bae6e6: NoX Core: loading failed
 game.load_failed.title = NoX Core: loading failed
-# noxsdl/src/map_vote_window.cpp:175
+# noxsdl/src/map_vote_window.cpp:184
 #@ d5e93d19: drawing...
 game.map_vote.drawing = drawing...
-# noxsdl/src/map_vote_window.cpp:133
+# noxsdl/src/map_vote_window.cpp:142
 #@ 6ccef3dd: The vote failed
 game.map_vote.failed = The vote failed
-# noxsdl/src/map_vote_window.cpp:129
+# noxsdl/src/map_vote_window.cpp:138
 #@ 998ecb1c: Next map: {map}
 game.map_vote.next_map = Next map: {map}
-# noxsdl/src/map_vote_window.cpp:132
+# noxsdl/src/map_vote_window.cpp:141
 #@ d15a903f: No votes: the map cycle goes on
 game.map_vote.no_votes = No votes: the map cycle goes on
-# noxsdl/src/map_vote_window.cpp:174
+# noxsdl/src/map_vote_window.cpp:183
 #@ 734ab8da: not on this computer
 game.map_vote.not_here = not on this computer
-# noxsdl/src/map_vote_window.cpp:127
+# noxsdl/src/map_vote_window.cpp:136
 #@ ec8aad98: {n} s left - click a map, or type its number in chat
 game.map_vote.time_left = {n} s left - click a map, or type its number in chat
-# noxsdl/src/map_vote_window.cpp:123
+# noxsdl/src/map_vote_window.cpp:132
 #@ d0a622a3: Map vote: a majority changes the map now
 game.map_vote.title_called = Map vote: a majority changes the map now
-# noxsdl/src/map_vote_window.cpp:122
+# noxsdl/src/map_vote_window.cpp:131
 #@ 55e3b734: Vote for the next map
 game.map_vote.title_next = Vote for the next map
-# noxsdl/src/map_vote_window.cpp:204
+# noxsdl/src/map_vote_window.cpp:213
 #@ a69381cf: {n} vote | {n} votes
 game.map_vote.votes[one] = {n} vote
 game.map_vote.votes[other] = {n} votes
-# noxsdl/src/pad/pad_play.cpp:718
+# noxsdl/src/pad/pad_play.cpp:719
 #@ 812746a9: Circle
 game.pad.button.circle = Circle
-# noxsdl/src/pad/pad_play.cpp:717
+# noxsdl/src/pad/pad_play.cpp:718
 #@ b663d53b: Cross
 game.pad.button.cross = Cross
-# noxsdl/src/pad/pad_play.cpp:719
+# noxsdl/src/pad/pad_play.cpp:720
 #@ fac98c66: Square
 game.pad.button.square = Square
-# noxsdl/src/pad/pad_play.cpp:720
+# noxsdl/src/pad/pad_play.cpp:721
 #@ e58886a5: Triangle
 game.pad.button.triangle = Triangle
-# noxsdl/src/pad/pad_play.cpp:742
+# noxsdl/src/pad/pad_play.cpp:744
 #@ 5b12cc35: Pick up
 game.pad.prompt.pickup = Pick up
-# noxsdl/src/pad/pad_play.cpp:743
+# noxsdl/src/pad/pad_play.cpp:745
 #@ 96d3996f: Talk
 game.pad.prompt.talk = Talk
-# noxsdl/src/pad/pad_play.cpp:744
+# noxsdl/src/pad/pad_play.cpp:746
 #@ f6f1dff9: Trade
 game.pad.prompt.trade = Trade
-# noxsdl/src/pad/pad_play.cpp:745
+# noxsdl/src/pad/pad_play.cpp:747
 #@ ba1c5c94: Use
 game.pad.prompt.use = Use
 # noxsdl/src/quit_menu.cpp:102
@@ -12365,10 +12365,10 @@ game.screenshot.failed = screenshot: couldn't write {path}
 #@ 0941a2e6: screenshot: {path}
 game.screenshot.saved = screenshot: {path}
 
-# noxsdl/src/hud.cpp:574
+# noxsdl/src/hud.cpp:580
 #@ 5b298c95: Spell Set {n}
 hud.quickbar.spell_set = Spell Set {n}
-# noxsdl/src/hud.cpp:555
+# noxsdl/src/hud.cpp:561
 #@ f7fa068e: Trap Set {n}
 hud.quickbar.trap_set = Trap Set {n}
 
@@ -13007,10 +13007,10 @@ modes.tide.cards.title = Level {n}!  Choose one
 # noxsdl/src/mode_list.cpp:22
 #@ 40c139a7: Survive an endless tide of the undead.
 modes.tide.description = Survive an endless tide of the undead.
-# modes/tide/ui/tide_ui.cpp:114
+# modes/tide/ui/tide_ui.cpp:135
 #@ d77224a8: You're out of this run. OK: watch the others till it ends. Quit: leave the game.
 modes.tide.game_over.question = You're out of this run. OK: watch the others till it ends. Quit: leave the game.
-# modes/tide/ui/tide_ui.cpp:113
+# modes/tide/ui/tide_ui.cpp:134
 #@ 8b7671a3: The Tide Takes You
 modes.tide.game_over.title = The Tide Takes You
 # modes/tide/ui/tide_window.cpp:94

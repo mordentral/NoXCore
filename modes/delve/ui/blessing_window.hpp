@@ -31,6 +31,15 @@ public:
     /// was the panel's.
     bool handleEvent(const SDL_Event& event, Offer offer, int w, int h, float scale,
                      std::optional<nox::server::delvemap::Blessing>& pick) const;
+    /// (noxcpp) The game controller's snap cursor: the cards while there's an offer, added to `out`
+    /// (output pixels).
+    void padSpots(Offer offer, int w, int h, float scale, std::vector<SDL_FRect>& out) const
+    {
+        if (!offer.empty() && font_) {
+            const Layout l = layout(offer, w, h, scale);
+            out.insert(out.end(), l.cards.begin(), l.cards.end());
+        }
+    }
 
 private:
     struct Layout {

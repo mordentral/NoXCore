@@ -125,6 +125,22 @@ public:
         (void)app;
         return false;
     }
+    /// (noxcpp) The game controller's snap cursor (pad/pad_panels.cpp): the places on the mode's
+    /// windows up now that a click picks (output pixels), added to `out`; `escapes`: Escape puts
+    /// that window away (the pad's B sends one). None: the pad leaves the mode's windows to its free
+    /// cursor.
+    struct PadSpot {
+        SDL_FRect box{};
+        bool escapes = false;
+    };
+    virtual void padSpots(const App& app, int viewWidth, int viewHeight, float hudScale, std::vector<PadSpot>& out) const
+    {
+        (void)app;
+        (void)viewWidth;
+        (void)viewHeight;
+        (void)hudScale;
+        (void)out;
+    }
     /// Whether the mode's windows cover the game's own HUD pieces now (a script UI's window opened
     /// with cover = true): those aren't drawn and take no mouse (gameHudShown).
     virtual bool coversHud() const { return false; }

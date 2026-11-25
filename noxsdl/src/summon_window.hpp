@@ -38,6 +38,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace noxsdl {
 
@@ -62,6 +63,17 @@ public:
     /// The creatures the world draws highlighted (drawable flag 0x40000000, guiDrawSummonBox): the one in
     /// the cage cell under the mouse, or all of them while it's on the order's button.
     std::set<std::uint16_t> highlighted(float x, float y, int w, int h, const nox::client::World& world) const;
+    /// (noxcpp) The game controller's snap cursor: into `out` (cleared first, output pixels) the
+    /// command list's lines while it's up, else the cage's order button and the cells with a
+    /// creature while it's down. Whether the list is up (it takes every click then).
+    bool padSpots(const nox::client::World& world, int w, int h, std::vector<SDL_FRect>& out) const;
+    /// The command list put away (the pad's B), if it's up.
+    void closeList()
+    {
+        if (menu_) {
+            close();
+        }
+    }
 
 private:
     struct Rect {

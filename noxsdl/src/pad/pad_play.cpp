@@ -3,6 +3,7 @@
 
 #include "cursor_pick.hpp"
 #include "friend_dot.hpp"
+#include "pad/pad_panels.hpp"
 #include "pointer_map.hpp"
 
 #include "noxcore/strings/l10n.hpp"
@@ -728,6 +729,7 @@ std::string buttonLabel(const App& app, std::string_view action)
 
 void drawPadOverlay(App& app, float scale)
 {
+    drawPadPanels(app); // (the panels' snap cursor, pad_panels.cpp)
     const auto& s = app.padPlay;
     // The reticle while the right stick aims (and a moment after).
     if (s.reticle && app.cursor) {

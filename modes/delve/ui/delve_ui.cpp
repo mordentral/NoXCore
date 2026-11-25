@@ -85,6 +85,24 @@ public:
         return false;
     }
 
+    // (noxcpp) The game controller's: the open map's button, a campfire's spells, an altar's cards.
+    void padSpots(const App&, int viewWidth, int viewHeight, float hudScale, std::vector<PadSpot>& out) const override
+    {
+        if (!delve_) {
+            return;
+        }
+        const nox::client::DelveClient& c = *delve_;
+        if (const auto b = map_.padSpot(c.run(), viewWidth, viewHeight, hudScale)) {
+            out.push_back({*b, true});
+        }
+        std::vector<SDL_FRect> boxes;
+        campfire_.padSpots(c.campfire(), viewWidth, viewHeight, hudScale, boxes);
+        blessing_.padSpots(c.blessingOffer(), viewWidth, viewHeight, hudScale, boxes);
+        for (const auto& b : boxes) {
+            out.push_back({b, false});
+        }
+    }
+
     void update(App&) override
     {
         if (!delve_) {

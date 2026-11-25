@@ -134,6 +134,20 @@ public:
 
     void draw(SDL_Renderer* renderer, const BookContext& ctx, int w, int h);
 
+    /// (noxcpp) The game controller's snap cursor (pad/pad_panels.cpp): the open book's spots, in
+    /// output pixels: the list page's entries (`index` the entry's), or the page's icon; the arrows
+    /// shown; the two tabs. A click on each is the mouse's (leftMouse).
+    enum class PadSpotKind : std::uint8_t { Entry, Icon, Back, Forward, SpellsTab, GuideTab };
+    struct PadSpot {
+        PadSpotKind kind = PadSpotKind::Entry;
+        int index = 0;
+        SDL_FRect box{};
+    };
+    void padSpots(int w, int h, std::vector<PadSpot>& out) const;
+    /// What an entry or the page's icon puts on a bar, as dragging it there would (the guide's
+    /// creature: its summon, when we can summon them); 0 for nothing (or another spot).
+    std::uint32_t padSpell(const PadSpot& spot, const BookContext& ctx) const;
+
 private:
     enum class Anim { None, Forward, Backward };
 

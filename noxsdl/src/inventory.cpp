@@ -1128,14 +1128,7 @@ bool Inventory::mouseDown(float x, float y, int w, int h, const nox::client::Wor
     // The page buttons (not while identifying): the journal for the tray, keeping
     // each one's scroll, and the stats for the doll.
     if (button(243, 170, 34, 34) && !identify_) {
-        if (journal_) {
-            journalScroll_ = scroll_;
-            scroll_ = trayScroll_;
-        } else {
-            trayScroll_ = scroll_;
-            scroll_ = std::min(journalScroll_, std::max(0, journalHeight_ - 150));
-        }
-        journal_ = !journal_;
+        toggleJournal();
         return true;
     }
     if (button(5, 186, 34, 34) && !identify_) {
@@ -1203,12 +1196,7 @@ bool Inventory::mouseUp(float x, float y, int w, int h, const nox::client::World
         const float px0 = x / s0;
         const float py0 = y / s0 - static_cast<float>(slide_);
         if (state_ == 2 && !journal_ && in(kSpecial, px0, py0) && (static_cast<int>(py0) - 13) / kCell == 1) {
-            if (identify_) {
-                stopIdentify();
-            } else {
-                identify_ = true;
-                identified_.reset();
-            }
+            toggleIdentify();
             return true;
         }
         return state_ == 2 && contains(x, y, w, h);
@@ -1219,34 +1207,78 @@ bool Inventory::mouseUp(float x, float y, int w, int h, const nox::client::World
     if (!inv.count(d.netCode)) {
         return true;
     }
-    const auto& item = inv.at(d.netCode);
-    const TypeArt* a = art_.get(item.typeId);
-    const bool wearable = a && (a->classes & (oc::Weapon | oc::Armor | oc::Wand));
     const float s = Hud::scale(w, h);
     const float px = x / s;
     const float py = y / s - static_cast<float>(slide_);
+    // Where it ends: outside the panel; a quick click where it was taken (a third of a second,
+    // within 10 pixels); the secondary weapon's box (the doll page's); the doll; a cell; elsewhere
+    // on the panel.
+    const float dx = d.pressed.x - px;
+    const float dy = d.pressed.y - py;
+    std::optional<int> cell;
+    DragEnd end = DragEnd::Panel;
+    if (!contains(x, y, w, h)) {
+        end = DragEnd::Outside;
+    } else if (nowMs - d.atMs < 333 && dx * dx + dy * dy < 100) {
+        end = DragEnd::QuickClick;
+    } else if (!identify_ && !stats_ && in(kSecondaryBox, px, py)) {
+        end = DragEnd::SecondaryBox;
+    } else if (in(kDoll, px, py)) {
+        end = DragEnd::Doll;
+    } else if ((cell = cellAt(px, py))) {
+        end = DragEnd::Cell;
+    }
+    endDrag(d, end, cell, SDL_FPoint{x, y}, end == DragEnd::Outside ? toWorld(x, y) : SDL_Point{}, world, actions);
+    return true;
+}
+
+void Inventory::endDrag(const Drag& d, DragEnd end, std::optional<int> toCell, SDL_FPoint at, SDL_Point ground,
+                        const nox::client::World& world, const Actions& actions)
+{
+    const auto& inv = world.self().inventory;
+    const auto& item = inv.at(d.netCode);
+    const TypeArt* a = art_.get(item.typeId);
+    DragFacts facts;
+    facts.fromCell = d.fromCell.has_value();
+    facts.wearable = a && (a->classes & (oc::Weapon | oc::Armor | oc::Wand));
+    facts.weaponLike = a && (a->classes & (oc::Weapon | oc::Wand));
+    facts.equipped = item.equipped;
+    facts.quiver = actions.weaponBit && actions.weaponBit(item.typeId) == 2;
+    if (facts.quiver) {
+        facts.bowWorn = std::ranges::any_of(inv, [&](const auto& e) { return e.second.equipped && (actions.weaponBit(e.second.typeId) & 0xC); });
+    }
+    if (end == DragEnd::Cell && !d.fromCell && toCell) {
+        // A worn piece onto a cell holding one to wear in its place: a weapon or wand for a weapon
+        // or wand, armour of its kind.
+        const auto& there = grid_.cell(*toCell).items;
+        const TypeArt* ta = !there.empty() && inv.count(there.front()) ? art_.get(inv.at(there.front()).typeId) : nullptr;
+        facts.cellSwaps = ta && a &&
+                          (((ta->classes & oc::Armor) && (a->classes & oc::Armor) && ta->subclasses == a->subclasses) ||
+                           ((ta->classes & (oc::Weapon | oc::Wand)) && (a->classes & (oc::Weapon | oc::Wand))));
+    }
+    const ItemAsk ask = dragAsk(end, facts);
     // (noxcpp, OB-156) The secondary weapon no longer one where the drag ends so (endsSecondary:
     // dropped out, worn, or quick-clicked), as the exe's take-out made it none, the server told.
-    const auto ended = [&](DragEnd end) {
-        if (d.secondary && endsSecondary(end) && clearSecondary_) {
+    const auto ended = [&](DragEnd e) {
+        if (d.secondary && endsSecondary(e) && clearSecondary_) {
             clearSecondary_();
         }
     };
 
-    // Outside the panel: onto the ground at the cursor (CliNet_SendDropDraggedItem); a stack asks
-    // how many first (the amount box, DropLabel, its most the cell's count with the dragged one).
-    // Either way it's back in its cell till the server says it's dropped (the inventory window's put-back);
-    // the box's answer drops that many of the cell holding it then, from its first.
-    if (!contains(x, y, w, h)) {
+    switch (end) {
+    case DragEnd::Outside: {
+        // Outside the panel: onto the ground at the cursor (CliNet_SendDropDraggedItem); a stack asks
+        // how many first (the amount box, DropLabel, its most the cell's count with the dragged one).
+        // Either way it's back in its cell till the server says it's dropped (the inventory window's put-back);
+        // the box's answer drops that many of the cell holding it then, from its first.
         ended(DragEnd::Outside);
-        const SDL_Point at = toWorld(x, y);
         const std::size_t rest = d.fromCell ? grid_.cell(*d.fromCell).items.size() : 0;
         putBack(d, false);
         if (rest != 0 && askAmount_) {
             const auto drop = actions.drop;
             const std::uint16_t netCode = d.netCode;
-            askAmount_(text("guiinv.c:DropLabel"), item.typeId, item.modifiers, static_cast<int>(rest + 1),
-                       SDL_FPoint{x, y}, [this, drop, netCode, at](int n) {
+            askAmount_(text("guiinv.c:DropLabel"), item.typeId, item.modifiers, static_cast<int>(rest + 1), at,
+                       [this, drop, netCode, ground](int n) {
                            const auto cell = grid_.find(netCode);
                            if (!cell) {
                                return;
@@ -1254,94 +1286,312 @@ bool Inventory::mouseUp(float x, float y, int w, int h, const nox::client::World
                            const std::vector<std::uint16_t> stack = grid_.cell(*cell).items;
                            for (int i = 0; i < n && i < static_cast<int>(stack.size()); ++i) {
                                if (drop) {
-                                   drop(stack[static_cast<std::size_t>(i)], at.x, at.y);
+                                   drop(stack[static_cast<std::size_t>(i)], ground.x, ground.y);
                                }
                            }
                        });
-            return true;
+            return;
         }
         if (actions.drop) {
-            actions.drop(d.netCode, at.x, at.y);
+            actions.drop(d.netCode, ground.x, ground.y);
         }
-        return true;
+        return;
     }
-    // A quick click where it was taken: use it, or put it on / take it off (the inventory window's case 7).
-    const float dx = d.pressed.x - px;
-    const float dy = d.pressed.y - py;
-    if (nowMs - d.atMs < 333 && dx * dx + dy * dy < 100) {  // a third of a second, within 10 pixels
+    case DragEnd::QuickClick:
+        // A quick click where it was taken: use it, or put it on / take it off (the inventory window's case 7).
         putBack(d, false); // (back at its stack's end)
         ended(DragEnd::QuickClick);
-        if (!wearable) {
-            if (actions.use) {
-                actions.use(d.netCode);
-            }
-        } else if (item.equipped) {
-            if (actions.unequip) {
-                actions.unequip(d.netCode);
-            }
-        } else if (actions.equip) {
+        if (ask == ItemAsk::Use && actions.use) {
+            actions.use(d.netCode);
+        } else if (ask == ItemAsk::Unequip && actions.unequip) {
+            actions.unequip(d.netCode);
+        } else if (ask == ItemAsk::Equip && actions.equip) {
             actions.equip(d.netCode);
         }
-        return true;
-    }
-    // Onto the secondary weapon's box (its window's case 6): a weapon or wand from the tray (not a
-    // worn one) becomes the secondary, a quiver only with a bow or crossbow worn; the worn weapon
-    // put away there comes off and becomes the secondary, or swaps with it.
-    const bool weaponLike = a && (a->classes & (oc::Weapon | oc::Wand));
-    if (!identify_ && !stats_ && in(kSecondaryBox, px, py)) {
+        return;
+    case DragEnd::SecondaryBox:
+        // Onto the secondary weapon's box (its window's case 6): a weapon or wand from the tray (not a
+        // worn one) becomes the secondary, a quiver only with a bow or crossbow worn; the worn weapon
+        // put away there comes off and becomes the secondary, or swaps with it.
         if (d.fromCell) {
             putBack(d, false); // (back in its cell first, whatever it is)
-            if (weaponLike && !item.equipped && actions.secondary) {
-                bool make = true;
-                // A quiver (weapon bit 2) only while a bow or crossbow (bits 4 / 8) is worn.
-                if (actions.weaponBit && actions.weaponBit(item.typeId) == 2) {
-                    make = std::ranges::any_of(inv, [&](const auto& e) {
-                        return e.second.equipped && (actions.weaponBit(e.second.typeId) & 0xC);
-                    });
-                }
-                if (make) {
-                    actions.secondary(d.netCode);
-                }
+            if (ask == ItemAsk::Secondary && actions.secondary) {
+                actions.secondary(d.netCode);
             }
-        } else if (weaponLike && actions.putAwayWeapon) {
+        } else if (ask == ItemAsk::PutAwayWeapon && actions.putAwayWeapon) {
             actions.putAwayWeapon(d.netCode);
         }
-        return true;
-    }
-    // Onto the doll: wear it (and back in its cell).
-    if (in(kDoll, px, py)) {
+        return;
+    case DragEnd::Doll:
+        // Onto the doll: wear it (and back in its cell).
         putBack(d, false);
-        if (d.fromCell && wearable && !item.equipped && actions.equip) {
+        if (ask == ItemAsk::Equip && actions.equip) {
             ended(DragEnd::Doll);
             actions.equip(d.netCode);
         }
-        return true;
-    }
-    // Into the tray: a worn piece taken from the doll comes off, unless the cell holds one to
-    // wear in its place (a weapon or wand for a weapon or wand, armour of its kind): that goes on.
-    // Otherwise, when it was its cell's last, it moves there if the cell is empty or
-    // holds a stack of its type with room, and the grid closes up;
-    // else it's back at the end of its own cell's stack.
-    if (const auto cell = cellAt(px, py)) {
+        return;
+    case DragEnd::Cell:
+        // Into the tray: a worn piece taken from the doll comes off, unless the cell holds one to
+        // wear in its place: that goes on. Otherwise, when it was its cell's last, it moves there if
+        // the cell is empty or holds a stack of its type with room, and the grid closes up;
+        // else it's back at the end of its own cell's stack.
         if (!d.fromCell) {
-            const auto& there = grid_.cell(*cell).items;
-            const TypeArt* ta = !there.empty() && inv.count(there.front()) ? art_.get(inv.at(there.front()).typeId) : nullptr;
-            const bool swaps = ta && a &&
-                               (((ta->classes & oc::Armor) && (a->classes & oc::Armor) && ta->subclasses == a->subclasses) ||
-                                ((ta->classes & (oc::Weapon | oc::Wand)) && (a->classes & (oc::Weapon | oc::Wand))));
-            if (swaps && actions.equip) {
-                actions.equip(there.front());
+            if (ask == ItemAsk::EquipThere && actions.equip) {
+                actions.equip(grid_.cell(*toCell).items.front());
             } else if (actions.unequip) {
                 actions.unequip(d.netCode);
             }
-            return true;
+            return;
         }
-        if (grid_.drop(*d.fromCell, *cell, d.netCode, d.typeId)) {
+        if (grid_.drop(*d.fromCell, *toCell, d.netCode, d.typeId)) {
             sound(0x318); // InventoryDrop
         }
+        return;
+    case DragEnd::Panel:
+        putBack(d, false);
+        return;
+    }
+}
+
+void Inventory::toggleJournal()
+{
+    // The journal for the tray and back, each keeping its scroll.
+    if (journal_) {
+        journalScroll_ = scroll_;
+        scroll_ = trayScroll_;
+    } else {
+        trayScroll_ = scroll_;
+        scroll_ = std::min(journalScroll_, std::max(0, journalHeight_ - 150));
+    }
+    journal_ = !journal_;
+}
+
+void Inventory::toggleIdentify()
+{
+    if (identify_) {
+        stopIdentify();
+    } else {
+        identify_ = true;
+        identified_.reset();
+    }
+}
+
+// ------------------------------------------------------------------- the game controller
+
+namespace {
+
+/// The doll's slots as the pad's spots (from the doll's corner, x0, y0, x1, y1): kDollSlots', but
+/// the weapon's and the shield's, which take the doll's sides under the others, only the parts
+/// of them the others don't cover.
+constexpr std::array<SDL_Rect, 9> kPadDollSlots{{kDollSlots[0], kDollSlots[1], kDollSlots[2], kDollSlots[3], kDollSlots[4],
+                                                 kDollSlots[5], kDollSlots[6], {0, 20, 62, 180}, {151, 20, 200, 180}}};
+
+} // namespace
+
+void Inventory::padSpots(int w, int h, std::vector<PadSpot>& out) const
+{
+    out.clear();
+    if (state_ != 2) {
+        return;
+    }
+    const float s = Hud::scale(w, h);
+    const float top = static_cast<float>(slide_);
+    // (panel points x0, y0 to x1, y1, ends out)
+    const auto add = [&](PadSpotKind kind, int index, float x0, float y0, float x1, float y1) {
+        out.push_back({kind, index, SDL_FRect{x0 * s, (y0 + top) * s, (x1 - x0) * s, (y1 - y0) * s}});
+    };
+    if (journal_) {
+        add(PadSpotKind::Journal, 0, kTray.x, kTray.y, kTray.w + 1, kTray.h + 1);
+    } else {
+        for (int r = 0; r < 3; ++r) {
+            add(PadSpotKind::Special, r, kSpecial.x, static_cast<float>(13 + r * kCell), kSpecial.w + 1,
+                static_cast<float>(13 + (r + 1) * kCell));
+        }
+        // The rows in view, each at least half shown (the slider may leave the tray between rows).
+        const int first = scroll_ / kCell;
+        const int last = std::min(kRows - 1, (scroll_ + 149) / kCell);
+        for (int row = first; row <= last; ++row) {
+            const int y0 = 13 + row * kCell - scroll_;
+            const int c0 = std::max(y0, 13);
+            const int c1 = std::min(y0 + kCell, 163);
+            if (c1 - c0 < kCell / 2) {
+                continue;
+            }
+            for (int col = 0; col < kCols; ++col) {
+                const int x0 = 314 + col * kCell;
+                add(PadSpotKind::Cell, InventoryGrid::index(col, row), static_cast<float>(x0), static_cast<float>(c0),
+                    static_cast<float>(x0 + kCell), static_cast<float>(c1));
+            }
+        }
+    }
+    if (!stats_ && !identify_) {
+        for (int i = 0; i < static_cast<int>(kPadDollSlots.size()); ++i) {
+            const SDL_Rect& r = kPadDollSlots[static_cast<std::size_t>(i)];
+            add(PadSpotKind::Doll, i, static_cast<float>(11 + r.x), static_cast<float>(15 + r.y), static_cast<float>(12 + r.w),
+                static_cast<float>(16 + r.h));
+        }
+        add(PadSpotKind::Secondary, 0, kSecondaryBox.x, kSecondaryBox.y, kSecondaryBox.w + 1, kSecondaryBox.h + 1);
+    }
+    if (!identify_) {
+        add(PadSpotKind::JournalButton, 0, 243, 170, 243 + 34, 170 + 34);
+        add(PadSpotKind::StatsButton, 0, 5, 186, 5 + 34, 186 + 34);
+    }
+}
+
+int Inventory::trayLastFilledRow() const
+{
+    for (int row = kRows - 1; row >= 0; --row) {
+        for (int col = 0; col < kCols; ++col) {
+            if (!grid_.at(col, row).items.empty()) {
+                return row;
+            }
+        }
+    }
+    return -1;
+}
+
+std::optional<Inventory::Drag> Inventory::padGrab(const PadSpot& spot, int w, int h, const nox::client::World& world,
+                                                  std::uint32_t nowMs)
+{
+    // As mouseDown takes: nothing while identifying or in a shop's sell or repair mode.
+    if (state_ != 2 || identify_ || shopMode_ != ShopMode::None) {
+        return std::nullopt;
+    }
+    const float s = Hud::scale(w, h);
+    const SDL_FPoint p{(spot.box.x + spot.box.w / 2) / s, (spot.box.y + spot.box.h / 2) / s - static_cast<float>(slide_)};
+    const auto& inv = world.self().inventory;
+    if (spot.kind == PadSpotKind::Cell && !journal_) {
+        const auto& c = grid_.cell(spot.index);
+        if (c.items.empty() || !inv.count(c.items.front())) {
+            return std::nullopt;
+        }
+        const std::uint16_t typeId = c.typeId;
+        const auto nc = grid_.take(spot.index);
+        sound(0x317); // InventoryPickup
+        return Drag{*nc, typeId, spot.index, p, nowMs, *nc == world.self().secondaryWeapon};
+    }
+    if (spot.kind == PadSpotKind::Doll && !stats_) {
+        const auto nc = wornAt(world, p.x, p.y);
+        if (!nc) {
+            return std::nullopt;
+        }
+        sound(0x317);
+        return Drag{*nc, inv.at(*nc).typeId, std::nullopt, p, nowMs};
+    }
+    return std::nullopt;
+}
+
+bool Inventory::padItemAction(const PadSpot& spot, DragEnd end, int w, int h, SDL_Point ground, const nox::client::World& world,
+                              const Actions& actions)
+{
+    if (drag_) {
+        return false; // (one's held: Y's place first)
+    }
+    const auto d = padGrab(spot, w, h, world, 0);
+    if (!d) {
+        return false;
+    }
+    endDrag(*d, end, std::nullopt, SDL_FPoint{spot.box.x + spot.box.w / 2, spot.box.y + spot.box.h / 2}, ground, world, actions);
+    return true;
+}
+
+bool Inventory::padAccept(const PadSpot& spot, int w, int h, SDL_Point ground, const nox::client::World& world, const Actions& actions)
+{
+    if (state_ != 2) {
+        return false;
+    }
+    switch (spot.kind) {
+    case PadSpotKind::JournalButton:
+        if (identify_) {
+            return false;
+        }
+        toggleJournal();
+        return true;
+    case PadSpotKind::StatsButton:
+        if (identify_) {
+            return false;
+        }
+        stats_ = !stats_;
+        return true;
+    case PadSpotKind::Special:
+        if (spot.index == 1 && !journal_) {
+            toggleIdentify(); // the magnifier
+            return true;
+        }
+        return false;
+    case PadSpotKind::Journal:
+    case PadSpotKind::Secondary:
+        return false;
+    case PadSpotKind::Cell: {
+        if (journal_) {
+            return false;
+        }
+        const auto& c = grid_.cell(spot.index);
+        if (identify_) {
+            // Identify mode: the item shown.
+            if (!c.items.empty()) {
+                identified_ = c.items.front();
+            }
+            return true;
+        }
+        if (shopMode_ != ShopMode::None) {
+            // A shop's sell or repair mode asks the shop about it.
+            if (!c.items.empty() && shopPick_) {
+                shopPick_(c.items.front());
+            }
+            return true;
+        }
+        break;
+    }
+    case PadSpotKind::Doll:
+        if (identify_ || shopMode_ != ShopMode::None) {
+            return true; // (the mouse's press takes nothing there then)
+        }
+        break;
+    }
+    return padItemAction(spot, DragEnd::QuickClick, w, h, ground, world, actions);
+}
+
+bool Inventory::padTake(const PadSpot& spot, int w, int h, const nox::client::World& world, std::uint32_t nowMs)
+{
+    if (drag_) {
+        return false;
+    }
+    drag_ = padGrab(spot, w, h, world, nowMs);
+    return drag_.has_value();
+}
+
+bool Inventory::padPlace(const PadSpot& spot, const nox::client::World& world, const Actions& actions)
+{
+    if (!drag_) {
+        return false;
+    }
+    const Drag d = *drag_;
+    drag_.reset();
+    if (!world.self().inventory.count(d.netCode)) {
         return true;
     }
-    putBack(d, false);
+    // As the mouse's release on the spot: a cell moves it there, the doll wears it, the secondary
+    // box makes it the secondary; elsewhere on the panel it goes back.
+    DragEnd end = DragEnd::Panel;
+    std::optional<int> cell;
+    switch (spot.kind) {
+    case PadSpotKind::Cell:
+        if (!journal_) {
+            end = DragEnd::Cell;
+            cell = spot.index;
+        }
+        break;
+    case PadSpotKind::Doll:
+        end = DragEnd::Doll;
+        break;
+    case PadSpotKind::Secondary:
+        end = DragEnd::SecondaryBox;
+        break;
+    default:
+        break;
+    }
+    endDrag(d, end, cell, SDL_FPoint{spot.box.x + spot.box.w / 2, spot.box.y + spot.box.h / 2}, SDL_Point{}, world, actions);
     return true;
 }
 

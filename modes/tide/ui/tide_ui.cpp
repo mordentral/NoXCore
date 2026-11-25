@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace noxsdl {
 
@@ -88,6 +89,26 @@ public:
             return true;
         }
         return false;
+    }
+
+    // (noxcpp) The game controller's: the results' OK, a level-up's cards, the question's rows.
+    void padSpots(const App&, int viewWidth, int viewHeight, float hudScale, std::vector<PadSpot>& out) const override
+    {
+        if (!tide_) {
+            return;
+        }
+        const nox::client::TideClient& c = *tide_;
+        std::vector<SDL_FRect> boxes;
+        window_.padAskSpots(c.ask(), viewWidth, viewHeight, hudScale, boxes);
+        for (const auto& b : boxes) {
+            out.push_back({b, true}); // (Escape: put the question away)
+        }
+        boxes.clear();
+        window_.padSpots(c.offer(), c.results(), viewWidth, viewHeight, hudScale, boxes);
+        const bool results = window_.resultsOpen() && c.results();
+        for (const auto& b : boxes) {
+            out.push_back({b, results});
+        }
     }
 
     void drawHud(App&, SDL_Renderer* renderer, const HudFrame& hud) override

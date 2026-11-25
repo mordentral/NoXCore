@@ -100,4 +100,47 @@ constexpr bool endsSecondary(DragEnd end)
     return end == DragEnd::Outside || end == DragEnd::QuickClick || end == DragEnd::Doll;
 }
 
+/// What the dragged item is, for what its drag's end asks of the server.
+struct DragFacts {
+    bool fromCell = true;    ///< taken from a cell (else worn, from the doll)
+    bool wearable = false;   ///< a weapon, armour or wand
+    bool weaponLike = false; ///< a weapon or wand
+    bool equipped = false;
+    bool quiver = false;     ///< a quiver (weapon class bit 2)
+    bool bowWorn = false;    ///< a bow or crossbow is worn
+    /// Dropped from the doll on a cell holding one to wear in its place (a weapon or wand for a
+    /// weapon or wand, armour of its kind).
+    bool cellSwaps = false;
+};
+/// What a drag's end asks (Inventory::Actions): Use, Equip, Unequip, Drop (on the ground), the
+/// Secondary weapon, PutAwayWeapon (the worn weapon put away on the secondary box), EquipThere
+/// (the cell's item worn in the dragged one's place), Move (within the grid: nothing asked), None.
+enum class ItemAsk : std::uint8_t { None, Use, Equip, Unequip, Drop, Secondary, PutAwayWeapon, EquipThere, Move };
+/// The mouse's drag (Inventory::mouseUp) and the pad's direct actions both end here.
+constexpr ItemAsk dragAsk(DragEnd end, const DragFacts& f)
+{
+    switch (end) {
+    case DragEnd::Outside:
+        return ItemAsk::Drop;
+    case DragEnd::QuickClick:
+        return !f.wearable ? ItemAsk::Use : f.equipped ? ItemAsk::Unequip : ItemAsk::Equip;
+    case DragEnd::SecondaryBox:
+        if (f.fromCell) {
+            // A weapon or wand from the tray (not a worn one); a quiver only with a bow or crossbow worn.
+            return f.weaponLike && !f.equipped && (!f.quiver || f.bowWorn) ? ItemAsk::Secondary : ItemAsk::None;
+        }
+        return f.weaponLike ? ItemAsk::PutAwayWeapon : ItemAsk::None;
+    case DragEnd::Doll:
+        return f.fromCell && f.wearable && !f.equipped ? ItemAsk::Equip : ItemAsk::None;
+    case DragEnd::Cell:
+        if (!f.fromCell) {
+            return f.cellSwaps ? ItemAsk::EquipThere : ItemAsk::Unequip;
+        }
+        return ItemAsk::Move;
+    case DragEnd::Panel:
+        return ItemAsk::None;
+    }
+    return ItemAsk::None;
+}
+
 } // namespace noxsdl

@@ -16,6 +16,7 @@
 //   editor_glue.cpp      the map editor's glue: opening it, its play-test and edit sessions
 //   pad/pad_game.cpp      the game controller: the pads, noxcore_controller.cfg, its buttons routed
 //   (pad/pad_play.cpp     the pad in a game: aim, targets, interact, its pointer: pad/pad_play.hpp)
+//   (pad/pad_panels.cpp   the pad's snap cursor on the game's panels: pad/pad_panels.hpp)
 // main.cpp has SDL's callbacks, the frame and the input's routing; command_line.hpp the
 // command line's reading.
 #pragma once
@@ -63,6 +64,7 @@
 #include "options_window.hpp"
 #include "pad/gamepad_manager.hpp"
 #include "pad/pad_bindings.hpp"
+#include "pad/pad_panels_state.hpp"
 #include "pad/pad_play_state.hpp"
 #include "pad/virtual_pad.hpp"
 #include "pencil_icon.hpp"
@@ -448,6 +450,7 @@ struct App {
     bool padFocused = true;            ///< the window has the focus (its focus events; a hidden one never gets any)
     std::optional<pad::StickVec> padAim; ///< the way the left stick last leaned (one long), while the pad's in use
     pad::PlayState padPlay;            ///< the pad in a game: aim, target, pointer, free cursor (pad/pad_play.hpp)
+    pad::PanelState padPanels;         ///< the pad's snap cursor on the game's panels (pad/pad_panels.hpp)
     /// The view in a game, as the game's Options set it: how much of the world shows (one of its
     /// screen resolutions: one screen pixel was one world unit), and the game window's size in
     /// percent (VideoSize, 40-100; Page Up / Page Down step it by 2, draw_setCutSize). The resolution's
@@ -968,6 +971,9 @@ void bookEvents(App& app);
 void loadBars(App& app);
 void saveBars(App& app);
 bool leftMouse(App& app, bool down, float x, float y);
+/// (noxcpp) A book's spell or ability put on slot `slot` of the set in use, as the book's drop there
+/// (the game controller's slot buttons on a book entry).
+void bookSpellToSlot(App& app, std::uint32_t id, int slot);
 
 // live_scene.cpp
 void syncWalls(App& app);
