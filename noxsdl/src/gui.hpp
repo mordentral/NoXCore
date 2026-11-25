@@ -217,6 +217,9 @@ public:
     /// (noxcpp) A list whose line the pad's up and down move clicks the line as it goes (as a click
     /// would); off, only the pad's A clicks it (a list whose click does more than choose).
     bool navLineClicks = true;
+    /// (noxcpp) Text to read (a dialog's words, a message's list box): never the pad's focus; the
+    /// pad scrolls it (up / down with nothing else that way, the right stick).
+    bool navText = false;
 
     /// (noxcpp) How its text fits its box (Gui::fitText): worked out when the text, the box, the
     /// fonts or the scale change, kept till then. AsDrawn: as the game draws it (it fits: one line,

@@ -23,6 +23,9 @@ constexpr std::array<int, kSlots> kSlotX{0, 38, 75, 112, 149};
 /// 0x26 cure poison), from default.cfg.
 constexpr std::array<const char*, kSlots> kSlotKeys{"A", "S", "D", "F", "G"};
 constexpr std::array<const char*, 3> kPotionKeys{"X", "C", "Z"};
+/// (noxcpp) The middle of a slot's key plate from the slot's left (its key's letter is drawn at 13):
+/// the pad's prompt is centred on it.
+constexpr float kSlotKeyMiddleX = 16;
 
 // Meters: the frame at (W - 91, H - 201); tubes and potion slots inside it.
 constexpr int kMeterW = 91, kMeterH = 201;
@@ -433,11 +436,12 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         }
     };
     const auto textWidth = [&](const std::string& t) { return font ? font->measureGameText(t, l.s) : 0.0f; };
-    // (noxcpp) A key's place with the game controller's button instead: its glyph, small, the
-    // cell's top left at game pixel (gx, gy) as the key's text.
-    const auto padKey = [&](const pad::PromptLabels& prompt, float gx, float gy, float size) {
+    // (noxcpp) A key's place with the game controller's button instead: its glyph (or the
+    // modifier's and the button's), small, centred on game pixel (cx, cy).
+    const auto padKey = [&](const pad::PromptLabels& prompt, float cx, float cy, float size) {
         static const pad::GlyphInk ink{{1, 1, 1, 1}, {0.05f, 0.04f, 0.03f, 0.85f}, {0.55f, 0.52f, 0.48f, 1}};
-        pad::drawPrompt(renderer, font, prompt, gx * l.s, (gy + 4.5f) * l.s, size * l.s, ink);
+        const float width = pad::promptWidth(font, prompt, size * l.s);
+        pad::drawPrompt(renderer, font, prompt, std::round(cx * l.s - width / 2), cy * l.s, size * l.s, ink);
     };
 
     // ---- the quickbar (quickBarCreate)
@@ -597,12 +601,18 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
     }
     nuggets(bars.row, true);
     drawNamed(qb.bookOpen ? named_.bookButtonLit : named_.bookButton, bx - 1, by + 35);
+    if (qb.padPrompts && named_.bookButton && named_.bookButton->image) {
+        // (noxcpp) The book's button: what opens it on the pad, centred on its foot as the slots'.
+        if (const Sprite* sp = sprites.get(*named_.bookButton->image)) {
+            padKey(qb.padPrompts->book, bx - 1 + sp->offsetX + sp->width / 2, by + 35 + sp->offsetY + sp->height - 2, 10);
+        }
+    }
     for (int i = 0; i < kSlots; ++i) {
         // The slot's key, on its plate's child at (13, 39): the key it's bound to as this keyboard
         // prints it (the game's own letters are default.cfg's, whatever the binding or layout: VD-66).
         const auto at = static_cast<std::size_t>(i);
         if (qb.padPrompts) {
-            padKey(qb.padPrompts->slots[at], l.slotX(i) + 13, l.slotY() + 29, 10);
+            padKey(qb.padPrompts->slots[at], l.slotX(i) + kSlotKeyMiddleX, l.slotY() + 29 + 4.5f, 10); // (centred on the plate)
             continue;
         }
         text(qb.slotKeys ? (*qb.slotKeys)[at] : kSlotKeys[at], l.slotX(i) + 13, l.slotY() + 29, {255, 255, 255, 255});
@@ -724,7 +734,8 @@ void Hud::draw(SDL_Renderer* renderer, Font* font, SpriteCache& sprites, const n
         }
         const auto at = static_cast<std::size_t>(kind);
         if (qb.padPrompts) {
-            padKey(qb.padPrompts->potions[at], px - 2, py + 0x21 - 9, 8); // (smaller: 28 apart, cure poison's two glyphs)
+            // (smaller: 28 apart, cure poison's two glyphs; centred under the slot's middle)
+            padKey(qb.padPrompts->potions[at], px + 14, py + 0x21 - 9 + 4.5f, 8);
             continue;
         }
         text(qb.potionKeys ? (*qb.potionKeys)[at] : kPotionKeys[at], px - 2, py + 0x21 - 9, {255, 255, 255, 255});

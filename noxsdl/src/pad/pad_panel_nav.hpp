@@ -37,6 +37,11 @@ struct NavBox {
 /// The spot `dir` goes to from `from` (an index into `spots`; `from` itself, if it's among them,
 /// is never picked), nullopt with none that way.
 std::optional<std::size_t> navPick(std::span<const NavBox> spots, const NavBox& from, NavDir dir);
+/// The right stick's jump: the spot `dir` goes to from `from` among those of another group than
+/// `fromGroup` (`groups[i]` is spot i's: the tray, the doll, a button column, a bar...), as navPick
+/// picks; nullopt with none outside the group that way.
+std::optional<std::size_t> navJump(std::span<const NavBox> spots, std::span<const int> groups, const NavBox& from, int fromGroup,
+                                   NavDir dir);
 /// The spot nearest `to`'s middle (the one a lost selection falls back to), nullopt with none.
 std::optional<std::size_t> navNearest(std::span<const NavBox> spots, const NavBox& to);
 
@@ -56,8 +61,8 @@ struct TrayStep {
     bool operator==(const TrayStep&) const = default;
 };
 std::optional<TrayStep> trayEdgeStep(int row, const TrayView& view, NavDir dir);
-/// How far down the cursor may scroll the tray: a row past the last that holds anything (an empty
-/// row to move things into), all of it while an item is held, never past `last` (19).
+/// How far down the cursor may scroll the tray: the last row that holds anything (empty cells are no
+/// stops), all of it while an item is held (anywhere to put it), never past `last` (19).
 int trayLastRow(int lastFilledRow, bool holding, int last = 19);
 
 /// A held direction's repeat (the D-pad's or the left stick's): a step on its press, then the

@@ -69,11 +69,14 @@ struct PromptLabels {
     bool operator==(const PromptLabels&) const = default;
 };
 
-/// The HUD's pad prompts: the five slots' (InvokeSlot1-5) and the potions' (QuickHealth,
-/// QuickMana, QuickCurePoison), made again only when the bindings or the pad change (`key`).
+/// The HUD's pad prompts: the five slots' (InvokeSlot1-5), the potions' (QuickHealth, QuickMana,
+/// QuickCurePoison), the spellbook's (ToggleBook, under its button) and the weapon swap's
+/// (SwapWeapons, the inventory's), made again only when the bindings or the pad change (`key`).
 struct HudPrompts {
     std::array<PromptLabels, 5> slots;
     std::array<PromptLabels, 3> potions;
+    PromptLabels book;
+    PromptLabels swap;
 };
 struct PromptCache {
     HudPrompts hud;

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 namespace noxsdl::pad {
 
@@ -79,6 +80,21 @@ std::optional<std::size_t> navPick(std::span<const NavBox> spots, const NavBox& 
     return best;
 }
 
+std::optional<std::size_t> navJump(std::span<const NavBox> spots, std::span<const int> groups, const NavBox& from, int fromGroup,
+                                   NavDir dir)
+{
+    std::vector<NavBox> outside;
+    std::vector<std::size_t> index;
+    for (std::size_t i = 0; i < spots.size() && i < groups.size(); ++i) {
+        if (groups[i] != fromGroup) {
+            outside.push_back(spots[i]);
+            index.push_back(i);
+        }
+    }
+    const auto pick = navPick(outside, from, dir);
+    return pick ? std::optional<std::size_t>(index[*pick]) : std::nullopt;
+}
+
 std::optional<std::size_t> navNearest(std::span<const NavBox> spots, const NavBox& to)
 {
     std::optional<std::size_t> best;
@@ -110,7 +126,7 @@ int trayLastRow(int lastFilledRow, bool holding, int last)
     if (holding) {
         return last;
     }
-    return std::clamp(lastFilledRow + 1, 0, last);
+    return std::clamp(lastFilledRow, 0, last);
 }
 
 std::optional<NavDir> NavRepeat::frame(std::optional<NavDir> heldNow, std::uint64_t nowMs)

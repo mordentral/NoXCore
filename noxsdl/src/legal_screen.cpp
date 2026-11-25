@@ -30,6 +30,8 @@ LegalScreen::LegalScreen(gui::Resources res, const std::filesystem::path& window
         return true;
     });
     gui_.setModal(screen_);
+    // ((noxcpp) No game controller focus here: any of its buttons goes on, as a key does.)
+    gui_.setPadNavigation(false);
     if (gui::Window* v = screen_->find(kVersion)) {
         v->text = std::string("V:") + nox::version(); // ("V:%S", the exe's version)
     }

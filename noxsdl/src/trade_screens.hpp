@@ -183,7 +183,10 @@ private:
     /// (noxcpp) The pad's way through these windows: every button's edge (padLeave), the stock's
     /// and the offers' cells.
     void padWindows();
-    bool padEdge(gui::Window& self, gui::NavInput in);
+    /// A step (or the right stick's jump) off `self` the way `in` goes: to the nearest of these
+    /// windows that way (from `cell`, the stock's or an offer's cell the pad is on, when given: its
+    /// focus moved here; else the window system's own step), or out to the panels (padLeave).
+    bool padEdge(gui::Window& self, gui::NavInput in, std::optional<SDL_Rect> cell = std::nullopt);
     bool padStock(gui::Window& self, gui::NavInput in);
     bool padOffer(gui::Window& self, gui::NavInput in, bool ours);
     /// A layout rectangle in output pixels (the layout's placement).

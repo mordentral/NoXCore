@@ -24,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace noxsdl {
@@ -105,6 +106,9 @@ public:
     /// cell: the rows and a pixel, as the game spaces its lines).
     float ascent(int pixelSize);
     float lineHeight(int pixelSize);
+    /// (noxcpp) How far below a line's top a string's ink starts and ends (its glyphs' drawn pixels),
+    /// for centring a short label on a point in any face; {0, 0} for no ink.
+    std::pair<float, float> inkSpan(std::string_view utf8, int pixelSize);
     /// The pixel size whose lines are `gamePixels` game pixels tall at `scale` screen pixels a
     /// game pixel (rounded), at least `least`: the windows' text sizes. On the game's cell a
     /// default.fnt line (10) is its 9 rows at `scale`, a large.fnt one (16) its 15.

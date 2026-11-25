@@ -377,6 +377,7 @@ void Menus::askJoinPassword(const std::string& host, const nox::client::PlayerPr
     }
     gui_.setModal(dialog_);
     gui_.setFocus(dialog_->find(kDlgEntry));
+    gui_.setNavDefault(dialog_->find(kDlgEntry)); // ((noxcpp) the pad starts on the field: A types)
 }
 
 void Menus::tooOldNotice()
@@ -650,6 +651,10 @@ void Menus::enter(State s)
                 }
                 return true;
             }
+            if (message == gui::PadScrolled && from.id == kInfoList) {
+                scrollGameInfo(from.scroll); // ((noxcpp) the pad scrolled the description: its slider with it)
+                return true;
+            }
             if (message != gui::Clicked) {
                 return false;
             }
@@ -698,15 +703,14 @@ void Menus::enter(State s)
             padGameList(*list);
         }
         if (gui::Window* info = screen_->find(kInfoList)) {
-            // (noxcpp) The description box's lines scrolled by the pad's up and down, as its arrows.
-            info->padInput = [this](gui::Window& self, gui::NavInput in) {
-                if (in != gui::NavInput::Up && in != gui::NavInput::Down) {
-                    return false;
+            // (noxcpp) The description is read, not chosen: the pad scrolls it (up / down past Join,
+            // the right stick), so its arrows aren't stops.
+            info->navText = true;
+            for (const std::int32_t id : {kInfoUp, kInfoDown}) {
+                if (gui::Window* w = screen_->find(id)) {
+                    w->nav = gui::Window::Nav::Off;
                 }
-                const int was = self.scroll;
-                scrollGameInfo(self.scroll + (in == gui::NavInput::Down ? 1 : -1));
-                return self.scroll != was;
-            };
+            }
         }
         if (!std::exchange(keepList_, false)) { // (the join's wait: the list as it was)
             refreshGames();

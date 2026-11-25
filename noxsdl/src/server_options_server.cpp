@@ -534,6 +534,7 @@ void ServerOptions::openRename()
     gui_.setModal(rename_);
     if (gui::Window* entry = rename_->find(kDlgEntry)) {
         gui_.setFocus(entry);
+        gui_.setNavDefault(entry); // ((noxcpp) the pad starts on the field: A types)
         if (sdlWindow_) {
             SDL_StartTextInput(sdlWindow_);
         }

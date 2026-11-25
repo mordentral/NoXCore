@@ -210,6 +210,26 @@ float Font::lineHeight(int pixelSize)
     return face(pixelSize).lineHeight;
 }
 
+std::pair<float, float> Font::inkSpan(std::string_view utf8, int pixelSize)
+{
+    Face& f = face(pixelSize);
+    float top = 0;
+    float bottom = 0;
+    bool any = false;
+    for (std::size_t pos = 0; pos < utf8.size();) {
+        const Glyph& g = glyph(f, nextCodepoint(utf8, pos));
+        if (!g.page || g.source.h <= 0) {
+            continue;
+        }
+        // (drawRun puts a glyph's bitmap the ascent below the line's top, plus its offset)
+        const float t = f.ascent + g.offsetY;
+        top = any ? std::min(top, t) : t;
+        bottom = any ? std::max(bottom, t + g.source.h) : t + g.source.h;
+        any = true;
+    }
+    return {top, bottom};
+}
+
 float Font::linePerEm()
 {
     return onGameCell_ ? (cell_.rows + 1) / cell_.rows : lineHeight(100) / 100.0f;

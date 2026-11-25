@@ -128,6 +128,16 @@ void Menus::setupChat()
             slider->thumbLength = 46;
         }
         scrollList(parts.list, 0);
+        // ((noxcpp) The game controller: the lists' arrows aren't stops (the pad moves a list's
+        // line, or scrolls the messages, which are read, not chosen).)
+        for (const std::int32_t id : {parts.up, parts.down}) {
+            if (gui::Window* w = screen_->find(id)) {
+                w->nav = gui::Window::Nav::Off;
+            }
+        }
+    }
+    if (gui::Window* messages = screen_->find(kChatMessages)) {
+        messages->navText = true;
     }
     for (const auto id : {kChatFindPage, kChatOptions, kChatServer, kChatClans, kChatLadder}) {
         wip(screen_, id);
@@ -473,6 +483,10 @@ bool Menus::onChat(int message, gui::Window& from)
                 list->scroll = gui::scrollFromSlider(*sl, from.sliderValue, most);
             }
         }
+        return true;
+    }
+    if (message == gui::PadScrolled) {
+        scrollList(from.id, from.scroll); // ((noxcpp) the pad scrolled a list: its slider with it)
         return true;
     }
     if (message == gui::EntryEntered && from.id == kChatEntry) {

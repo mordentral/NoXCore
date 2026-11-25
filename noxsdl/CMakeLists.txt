@@ -96,6 +96,7 @@ add_executable(noxsdl WIN32
     src/gpu_shaders.cpp
     src/gui.cpp
     src/gui_nav.cpp
+    src/gui_focus_frame.cpp
     src/gui_window.cpp
     src/hd_video.cpp
     src/hd_water.cpp

@@ -195,6 +195,8 @@ const pad::HudPrompts* padHudPrompts(App& app)
             app.padPrompts.hud.slots[i] = padPrompt(app, "InvokeSlot" + std::to_string(i + 1));
         }
         app.padPrompts.hud.potions = {padPrompt(app, "QuickHealth"), padPrompt(app, "QuickMana"), padPrompt(app, "QuickCurePoison")};
+        app.padPrompts.hud.book = padPrompt(app, "ToggleBook");
+        app.padPrompts.hud.swap = padPrompt(app, "SwapWeapons");
     }
     return &app.padPrompts.hud;
 }

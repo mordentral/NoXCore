@@ -2554,6 +2554,11 @@ void drawGameHud(App& app)
         app.inventory->setMulticlass(client.multiclass());
         app.inventory->setGameFlags(gameFlags(app));
         app.inventory->setGameFrame(gameFrame(app));
+        if (const pad::HudPrompts* prompts = padHudPrompts(app)) { // ((noxcpp) the pad's swap button for its "V")
+            app.inventory->setPadSwapPrompt(&prompts->swap);
+        } else {
+            app.inventory->setPadSwapPrompt(nullptr);
+        }
         app.inventory->draw(app.renderer, client.world(), client.netCode(), app.camera.viewWidth,
                              app.camera.viewHeight, mousePos(app));
     }

@@ -1,6 +1,7 @@
 // (noxcpp) The game controller's snap cursor on the game's panels (pad_panels.hpp).
 #include "pad/pad_panels.hpp"
 
+#include "gui_focus_frame.hpp"
 #include "pad/pad_play.hpp"
 #include "pointer_map.hpp"
 
@@ -30,6 +31,7 @@ std::vector<Spellbook::PadSpot> bookSpots;
 std::vector<SDL_FRect> rects;
 std::vector<ModeUi::PadSpot> modeSpots;
 std::vector<NavBox> boxes;
+std::vector<int> groups;
 
 NavBox boxOf(const SDL_FRect& r)
 {
@@ -98,7 +100,7 @@ bool gather(App& app)
     const auto& world = app.live->client().world();
     bool still = false;
     if (app.inventory && app.inventory->isOpen()) {
-        app.inventory->padSpots(w, h, invSpots);
+        app.inventory->padSpots(w, h, world, app.padPanels.holding == Holding::Item, invSpots);
         for (const auto& s : invSpots) {
             out.push_back({Panel::Inventory, static_cast<std::uint8_t>(s.kind), s.index, boxOf(s.box)});
         }
@@ -333,6 +335,20 @@ void step(App& app, NavDir dir)
                 app.inventory->padScroll(t->scroll);
                 s.at->index = InventoryGrid::index(col, t->row);
                 gather(app);
+                // (that cell empty, so no stop: the filled one of the row nearest its column; the
+                // tray fills row by row, so the row's last filled one at most)
+                const auto cellAt = [&](int c) {
+                    return std::ranges::find_if(s.spots, [&](const Spot& sp) {
+                        return sp.panel == Panel::Inventory && sp.kind == static_cast<std::uint8_t>(Inventory::PadSpotKind::Cell) &&
+                               sp.index == InventoryGrid::index(c, t->row);
+                    });
+                };
+                for (int c = col; c >= 0; --c) {
+                    if (const auto it = cellAt(c); it != s.spots.end()) {
+                        s.at = *it;
+                        break;
+                    }
+                }
                 settle(app);
                 log(app, "scrolled to", *s.at);
                 return;
@@ -369,6 +385,35 @@ void step(App& app, NavDir dir)
     }
     s.at = s.spots[*next];
     log(app, "to", *s.at);
+}
+
+/// The right stick's jump `dir`: out of the selected spot's group (the tray, the doll, a column...)
+/// to the nearest spot of another that way; none on the panels that way, the shop's (the dialog's,
+/// the trade's) windows when they're that way. Nothing else that way: nothing.
+void jump(App& app, NavDir dir)
+{
+    auto& s = app.padPanels;
+    if (!s.at) {
+        return;
+    }
+    fillBoxes(app);
+    groups.clear();
+    for (const auto& sp : s.spots) {
+        groups.push_back(pad::spotGroup(sp));
+    }
+    if (const auto next = pad::navJump(boxes, groups, s.at->box, pad::spotGroup(*s.at), dir)) {
+        s.at = s.spots[*next];
+        log(app, "jumped to", *s.at);
+        return;
+    }
+    if (tradeWindowsUp(app)) {
+        if (const auto r = app.tradeScreens->padBounds(app.camera.viewWidth, app.camera.viewHeight)) {
+            const std::array<NavBox, 1> window{boxOf(*r)};
+            if (pad::navPick(window, s.at->box, dir)) {
+                handToWindows(app, true);
+            }
+        }
+    }
 }
 
 /// A press on the inventory's spot (`p` its action).
@@ -562,6 +607,16 @@ PanelFrame padPanelsFrame(App& app)
         if (const auto d = s.repeat.frame(held, SDL_GetTicks())) {
             step(app, *d);
         }
+        // The right stick on the inventory's and the book's screens: out of the group that way.
+        if (still) {
+            s.right = pad::stickDir(app.pads.frame().right, s.right);
+            if (const auto d = s.jumpRepeat.frame(s.right, SDL_GetTicks())) {
+                jump(app, *d);
+            }
+        } else {
+            s.right.reset();
+            s.jumpRepeat.clear();
+        }
     }
     if (still) {
         padPlayIdle(app); // (no aim, no target: the player stands)
@@ -748,23 +803,12 @@ void drawPadPanels(App& app)
     if (!s.active || s.inWindows || !s.at || !app.pads.padInUse() || !app.renderGui) {
         return;
     }
-    // A gold frame round the spot, two pixels in and a dark one outside it.
-    const float t = std::max(1.0f, std::round(Hud::scale(app.camera.viewWidth, app.camera.viewHeight)));
-    const SDL_FRect r = rectOf(s.at->box);
-    SDL_SetRenderDrawBlendMode(app.renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(app.renderer, 20, 12, 0, 200);
-    for (int i = 0; i < static_cast<int>(t); ++i) {
-        const SDL_FRect o{r.x - t - static_cast<float>(i), r.y - t - static_cast<float>(i), r.w + 2 * (t + static_cast<float>(i)),
-                          r.h + 2 * (t + static_cast<float>(i))};
-        SDL_RenderRect(app.renderer, &o);
-    }
-    const bool held = s.holding != Holding::None;
-    SDL_SetRenderDrawColor(app.renderer, held ? 120 : 255, held ? 220 : 205, held ? 255 : 70, 255);
-    for (int i = 0; i < static_cast<int>(2 * t); ++i) {
-        const SDL_FRect o{r.x - static_cast<float>(i) + t - 1, r.y - static_cast<float>(i) + t - 1, r.w - 2 * (t - 1) + 2 * static_cast<float>(i),
-                          r.h - 2 * (t - 1) + 2 * static_cast<float>(i)};
-        SDL_RenderRect(app.renderer, &o);
-    }
+    // The menus' focus frame round the spot, a little inside it (pale steel while holding).
+    const float unit = Hud::scale(app.camera.viewWidth, app.camera.viewHeight);
+    SDL_FRect r = rectOf(s.at->box);
+    const float in = std::round(unit * 2);
+    r = {r.x + in, r.y + in, r.w - 2 * in, r.h - 2 * in};
+    gui::drawFocusFrame(app.renderer, r, unit, s.holding != Holding::None ? gui::FocusLook::Holding : gui::FocusLook::Normal);
 }
 
 } // namespace noxsdl

@@ -47,6 +47,7 @@
 #include "sprite_cache.hpp"
 #include "text.hpp"
 #include "item_names.hpp"
+#include "pad/pad_labels.hpp"
 #include "thing_art.hpp"
 
 #include "noxcore/client/world.hpp"
@@ -92,6 +93,9 @@ public:
     /// (A script mode's UI API 5: nox.hudReserve) The bottom of a box, in screen pixels, the buffs'
     /// row keeps out of: it starts below it whenever it would start higher. 0: none.
     void setBuffsBelow(float px) { buffsBelowPx_ = px; }
+    /// (noxcpp) The game controller's weapon swap button(s) drawn in place of the swap key "V" (the
+    /// weapon ring's tab, the secondary box's knob), centred there; null (no pad in use): the "V".
+    void setPadSwapPrompt(const pad::PromptLabels* prompt) { padSwap_ = prompt; }
     /// The cells that could take `count` more of `typeId`: empty ones, and stacks of it
     /// with room (31; food 3, or 9 in games with flag 0x800 / 0x1000 of `gameFlags`; never a
     /// NOT_STACKABLE thing).
@@ -236,8 +240,10 @@ public:
     };
     /// The spots of the panel while it's fully open (none else), into `out` (cleared first): the
     /// cells in view, the doll's slots and the secondary box (the doll page, not identifying), the
-    /// special column (or the journal's page), the page buttons (not while identifying).
-    void padSpots(int w, int h, std::vector<PadSpot>& out) const;
+    /// special column (or the journal's page), the page buttons (not while identifying). Only the
+    /// cells, doll slots and secondary box that hold something, unless `holding` (an item carried:
+    /// every place it can be put down).
+    void padSpots(int w, int h, const nox::client::World& world, bool holding, std::vector<PadSpot>& out) const;
     /// The tray's first row in view, and the last holding anything (-1: none).
     int trayFirstRow() const { return scroll_ / kCellSize; }
     int trayLastFilledRow() const;
@@ -350,6 +356,7 @@ private:
     std::array<float, 4> classMax(const nox::client::World& world, int cls) const;
     bool multiclass_ = false;
     float buffsBelowPx_ = 0; ///< (setBuffsBelow)
+    const pad::PromptLabels* padSwap_ = nullptr; ///< (setPadSwapPrompt)
     /// How far the buffs' row moves down (game units at scale `s`) to start below setBuffsBelow's
     /// box: none while its top is below the box already (the panel open), else to 4 below it.
     float buffsDown(float s) const

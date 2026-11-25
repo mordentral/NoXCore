@@ -28,6 +28,10 @@ void MotdWindow::show(const std::string& text)
             }
             return true;
         }
+        if (message == gui::PadScrolled && from.id == kList) {
+            scrollTo(from.scroll); // ((noxcpp) the pad scrolled it: the slider with it)
+            return true;
+        }
         if (message != gui::Clicked) {
             return false;
         }
@@ -46,6 +50,15 @@ void MotdWindow::show(const std::string& text)
         return false;
     });
     gui::useSliderThumb(window_->find(kSlider));
+    // ((noxcpp) The game controller: the text is read, scrolled by the pad; its arrows aren't stops.)
+    if (gui::Window* list = window_->find(kList)) {
+        list->navText = true;
+    }
+    for (const std::int32_t id : {kUp, kDown}) {
+        if (gui::Window* w = window_->find(id)) {
+            w->nav = gui::Window::Nav::Off;
+        }
+    }
     // The MOTD's lines: up to a line end ('\r' dropped), an empty one a space.
     if (gui::Window* list = window_->find(kList)) {
         list->lines.clear();

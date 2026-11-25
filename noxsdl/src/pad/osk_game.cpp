@@ -18,6 +18,7 @@
 // B closes (the chat line and the console shut with it, as Escape does), LB / RB the quick-chat list
 // in a game's chat. Nothing here runs without a pad.
 #include "app.hpp"
+#include "gui_focus_frame.hpp"
 #include "gui_nav.hpp"
 #include "pad/osk.hpp"
 
@@ -400,15 +401,14 @@ void oskFrame(App& app)
 
 namespace {
 
-// The look: the game's black dialogs with their border, gold text (dlg.wnd's 240 180 42), the pad's
-// gold for what the pad is on.
+// The look: the game's black dialogs with their border, gold text (dlg.wnd's 240 180 42), the
+// menus' focus frame (gui_focus_frame.hpp) on what the pad is on.
 constexpr Color kText{240, 180, 42};
 constexpr Color kTextLit{255, 236, 160};
 constexpr Color kDim{150, 128, 96};
 constexpr Color kKeyFill{26, 20, 12};
 constexpr Color kKeyEdge{112, 84, 34};
-constexpr Color kKeyOn{88, 64, 22};
-constexpr Color kPadGold{250, 204, 82};
+constexpr Color kKeyOn{70, 50, 18};
 constexpr Color kBoxFill{10, 8, 6};
 
 constexpr int kHalf = 12;     ///< a half key's width
@@ -432,9 +432,9 @@ void drawKey(App& app, gui::Painter& p, const pad::OskKey& k, bool on, int x, in
     const OskState& s = app.osk;
     const bool shiftLit = k.kind == OskKeyKind::Shift && (s.osk.shiftOnce() || app.pads.isDown(PadButton::LeftTrigger) || s.osk.capsLock());
     p.fill(x, y, w, kKeyH, on ? kKeyOn : kKeyFill);
-    p.outline(x, y, w, kKeyH, on ? kPadGold : shiftLit ? kText : kKeyEdge);
+    p.outline(x, y, w, kKeyH, shiftLit ? kText : kKeyEdge);
     if (on) {
-        p.outline(x + 1, y + 1, w - 2, kKeyH - 2, kPadGold);
+        gui::drawFocusFrame(p.renderer(), p.toOutput(x, y, w, kKeyH), p.scale(), gui::FocusLook::Lit); // (the menus' focus look)
     }
     const Color& c = on ? kTextLit : kText;
     switch (k.kind) {
@@ -560,7 +560,7 @@ void drawOsk(App& app)
             const bool on = s.osk.quickPane() && s.osk.quickIndex() == i;
             if (on) {
                 p.fill(qx + 2, at - 1, qw - 4, kQuickLineH, kKeyOn);
-                p.outline(qx + 2, at - 1, qw - 4, kQuickLineH, kPadGold);
+                gui::drawFocusFrame(p.renderer(), p.toOutput(qx + 2, at - 1, qw - 4, kQuickLineH), p.scale(), gui::FocusLook::Lit);
             }
             p.text(s.quick[i].text, qx + 6, at, false, on ? kTextLit : s.quick[i].control.empty() ? kText : kDim);
         }

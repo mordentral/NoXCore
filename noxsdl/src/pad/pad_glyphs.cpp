@@ -124,15 +124,17 @@ SDL_Color byte(SDL_FColor c)
     return {b(c.r), b(c.g), b(c.b), b(c.a)};
 }
 
-/// Text centred on (cx, cy).
+/// Text centred on (cx, cy): its ink's middle there, whatever the face's line and ascent (the HD
+/// fonts' and the original style's alike).
 void centredText(Font* font, const std::string& text, float cx, float cy, int size, SDL_FColor c)
 {
     if (!font || text.empty()) {
         return;
     }
     const float w = font->measure(text, size);
-    const float lh = font->lineHeight(size);
-    font->draw(text, std::round(cx - w / 2), std::round(cy - lh / 2), size, byte(c));
+    const auto [top, bottom] = font->inkSpan(text, size);
+    const float middle = bottom > top ? (top + bottom) / 2 : font->lineHeight(size) / 2;
+    font->draw(text, std::round(cx - w / 2), std::round(cy - middle), size, byte(c));
 }
 
 float boxWidth(Font* font, const ButtonLabel& l, float h)

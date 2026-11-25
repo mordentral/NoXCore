@@ -118,7 +118,7 @@ SDL_Event navEvent(NavInput input)
 
 std::optional<NavInput> navInput(const SDL_Event& event)
 {
-    if (event.type != navEventType() || event.user.code < 0 || event.user.code > static_cast<Sint32>(NavInput::TabNext)) {
+    if (event.type != navEventType() || event.user.code < 0 || event.user.code > static_cast<Sint32>(NavInput::JumpRight)) {
         return std::nullopt;
     }
     return static_cast<NavInput>(event.user.code);
@@ -275,11 +275,17 @@ bool navKind(const Window& w)
     if (w.nav != Window::Nav::Auto) {
         return w.nav == Window::Nav::On;
     }
+    if (w.navText) {
+        return false; // (read, not chosen: the pad scrolls it)
+    }
     if (w.padInput) {
         return true;
     }
     if (w.status & st::NoInput) {
         return false;
+    }
+    if (w.rect.w >= 640 && w.rect.h >= 480) {
+        return false; // (the whole screen's button: a splash's "click anywhere", any button goes on)
     }
     switch (w.type) {
     case WindowType::ScrollListBox:
@@ -313,6 +319,97 @@ std::vector<Window*> navCandidates(const Scene& scene)
         collect(*t, scene, out);
     }
     return out;
+}
+
+// ------------------------------------------------------------------- groups and text to read
+
+const Window* navGroup(const Window& w)
+{
+    if (w.padInput || w.type == WindowType::ScrollListBox || !w.parent) {
+        return &w;
+    }
+    return w.parent;
+}
+
+Window* jumpTarget(const std::vector<Window*>& candidates, const Window& from, NavInput way)
+{
+    const Window* group = navGroup(from);
+    std::vector<SDL_Rect> rects;
+    std::vector<Window*> outside;
+    for (Window* c : candidates) {
+        if (c != &from && navGroup(*c) != group) {
+            rects.push_back(screenRect(*c));
+            outside.push_back(c);
+        }
+    }
+    const int i = pickInDirection(screenRect(from), rects, way);
+    return i >= 0 ? outside[static_cast<std::size_t>(i)] : nullptr;
+}
+
+bool scrollText(Window& w, int dir)
+{
+    if (w.type != WindowType::ScrollListBox || dir == 0 || w.lines.empty()) {
+        return false;
+    }
+    // The last first line: as many of the last lines as fit the box (below its title) in view.
+    const int count = static_cast<int>(w.lines.size());
+    const int room = w.rect.h - (w.text.empty() ? 0 : fontLine(w) + 1);
+    int most = count;
+    for (int used = 0; most > 0;) {
+        used += lineHeight(w, w.lines[static_cast<std::size_t>(most - 1)]);
+        if (used > room) {
+            break;
+        }
+        --most;
+    }
+    const int to = std::clamp(w.scroll + (dir > 0 ? 1 : -1), 0, std::max(most, 0));
+    if (to == w.scroll) {
+        return false;
+    }
+    w.scroll = to;
+    w.notify(PadScrolled);
+    return true;
+}
+
+namespace {
+
+Window* findText(Window& w)
+{
+    if (w.hidden()) {
+        return nullptr;
+    }
+    if (w.navText && w.type == WindowType::ScrollListBox && !w.lines.empty()) {
+        return &w;
+    }
+    for (auto& c : w.children) {
+        if (Window* t = findText(*c)) {
+            return t;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+Window* textToScroll(const Scene& scene, const Window* near)
+{
+    if (scene.modal) {
+        return findText(*scene.modal);
+    }
+    const Window* nearTop = near ? topOf(near) : nullptr;
+    for (const auto& t : scene.tops) {
+        if (t.get() == nearTop) {
+            if (Window* w = findText(*t)) {
+                return w;
+            }
+        }
+    }
+    for (auto it = scene.tops.rbegin(); it != scene.tops.rend(); ++it) {
+        if (Window* w = findText(**it)) {
+            return w;
+        }
+    }
+    return nullptr;
 }
 
 // ---------------------------------------------------------------------- what a window does
@@ -542,6 +639,23 @@ bool Navigator::input(NavInput in, const Scene& scene, Window*& hover, Window*& 
         activate(f, typing);
         return true;
     }
+    // Text to read scrolled (when there's some), up or down.
+    const auto scroll = [&](NavInput way) {
+        if (way == NavInput::Up || way == NavInput::Down) {
+            if (Window* t = textToScroll(scene, &f)) {
+                scrollText(*t, way == NavInput::Down ? 1 : -1);
+            }
+        }
+    };
+    // The right stick: out of the focus's group, the nearest that way; nothing outside, the text.
+    if (isJump(in)) {
+        if (Window* t = jumpTarget(candidates, f, jumpWay(in))) {
+            focusOn(t, hover);
+        } else {
+            scroll(jumpWay(in));
+        }
+        return true;
+    }
     // In place: a slider steps, a list's line moves, till its end.
     if (f.type == WindowType::HorzSlider && (in == NavInput::Left || in == NavInput::Right)) {
         stepSlider(f, in == NavInput::Right ? 1 : -1);
@@ -577,8 +691,10 @@ bool Navigator::input(NavInput in, const Scene& scene, Window*& hover, Window*& 
     }
     if (next) {
         focusOn(next, hover);
+    } else {
+        scroll(in); // (nothing that way: the text, if any; else still the menu's press)
     }
-    return true; // (nothing that way: still the menu's press)
+    return true;
 }
 
 void Navigator::forget(const Window* top)

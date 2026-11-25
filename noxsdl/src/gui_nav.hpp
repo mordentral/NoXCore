@@ -7,6 +7,13 @@
 //               push, radio and check buttons, list boxes, horizontal sliders and entry fields
 //               (upright sliders are list scroll bars: their list moves instead). A window can be
 //               put in or left out (Window::nav), or take the pad's input itself (Window::padInput).
+//               Never text to read (Window::navText: a dialog's words, a message's list) nor a
+//               button that covers the whole screen (a splash screen's "click anywhere").
+//   text        a text to read scrolls with the pad's up / down when nothing is that way, and
+//               with the right stick when nothing is outside the focus's group that way.
+//   groups      the right stick (NavInput::Jump...) leaves the focus's group (navGroup: a list,
+//               a cell area, or the buttons beside it in their window) for the nearest that way
+//               outside it; the D-pad and the left stick move within.
 //   moving      the nearest candidate the way pressed (pickInDirection); the focus does what the
 //               mouse's pointing does (Gui's hover, kLit, Hover / Unhover to the parent), so a
 //               screen's sounds, tooltips and picks follow it as they follow the mouse.
@@ -38,8 +45,23 @@ namespace noxsdl::gui {
 class Window;
 class Gui;
 
-/// What the pad asks of a menu.
-enum class NavInput : std::uint8_t { Up, Down, Left, Right, Accept, TabPrevious, TabNext };
+/// What the pad asks of a menu. Jump...: the right stick's, out of the focus's group that way.
+enum class NavInput : std::uint8_t { Up, Down, Left, Right, Accept, TabPrevious, TabNext, JumpUp, JumpDown, JumpLeft, JumpRight };
+
+inline bool isJump(NavInput in)
+{
+    return in >= NavInput::JumpUp && in <= NavInput::JumpRight;
+}
+/// A jump's way as the D-pad's (Up, Down, Left, Right); any other input as it is.
+inline NavInput jumpWay(NavInput in)
+{
+    return isJump(in) ? static_cast<NavInput>(static_cast<int>(in) - static_cast<int>(NavInput::JumpUp)) : in;
+}
+/// The other way: a way (Up, Down, Left, Right) as the right stick's jump.
+inline NavInput jumpOf(NavInput way)
+{
+    return static_cast<NavInput>(static_cast<int>(NavInput::JumpUp) + static_cast<int>(way));
+}
 
 /// The SDL event the pad's menu input travels as (an SDL user event of its own, registered once):
 /// through SDL_AppEvent's order like any other, to the Gui that takes it.
@@ -102,8 +124,20 @@ Window* hitWindow(Window& w, int x, int y, bool press);
 /// the newest first in each.
 Window* hitScene(const Scene& scene, int x, int y, bool press);
 
-/// Whether a window is the kind the pad goes to (its type, or Window::nav / padInput).
+/// Whether a window is the kind the pad goes to (its type, or Window::nav / padInput); never text to
+/// read (Window::navText) or a window covering the whole 640 x 480 screen (unless Window::nav On).
 bool navKind(const Window& w);
+/// The group a focus on `w` moves within: a list or a window with its own pad input is one by
+/// itself; a button (or a slider, an entry) and the others in the window it's in are one.
+const Window* navGroup(const Window& w);
+/// The nearest candidate of another group than `from`'s the way `way` (Up, Down, Left, Right) goes,
+/// or null.
+Window* jumpTarget(const std::vector<Window*>& candidates, const Window& from, NavInput way);
+/// A text to read (Window::navText) scrolled a line down (+1) or up (-1): a list box's first line
+/// shown, as far as its last line in view; its parent hears PadScrolled. False when it can't.
+bool scrollText(Window& w, int dir);
+/// The scene's text to read that scrolls, the one in `near`'s top-level window first; null for none.
+Window* textToScroll(const Scene& scene, const Window* near);
 /// Whether it and every window it's in are shown, and it's enabled.
 bool shownAndEnabled(const Window& w);
 /// The scene's candidates, in no particular order.

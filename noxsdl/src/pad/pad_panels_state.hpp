@@ -5,6 +5,7 @@
 #include "pad/pad_panel_nav.hpp"
 
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <vector>
 
@@ -25,6 +26,29 @@ struct Spot {
     bool sameAs(const Spot& o) const { return panel == o.panel && kind == o.kind && index == o.index; }
 };
 
+/// The group a spot is in, for the right stick's jump out of it (navJump): a panel's spots of one
+/// kind together (the inventory's tray, its doll with the secondary box, its special column with the
+/// journal's page, its page buttons; the book's entries with its icon, its arrows, its tabs), a
+/// bar set, the trap tray, the cage's creatures or its list, a window's cards.
+inline int spotGroup(const Spot& s)
+{
+    const int panel = static_cast<int>(s.panel) * 16;
+    switch (s.panel) {
+    case Panel::Inventory: {
+        static constexpr int kInventory[] = {0, 1, 1, 2, 2, 3, 3}; // Cell, Doll, Secondary, Special, Journal, the two buttons
+        return panel + (s.kind < std::size(kInventory) ? kInventory[s.kind] : 4);
+    }
+    case Panel::Book: {
+        static constexpr int kBook[] = {0, 0, 1, 1, 2, 2}; // Entry, Icon, Back, Forward, the two tabs
+        return panel + (s.kind < std::size(kBook) ? kBook[s.kind] : 3);
+    }
+    case Panel::Bars:
+        return panel + s.index / 5; // (a set's five)
+    default:
+        return panel + s.kind;
+    }
+}
+
 struct PanelState {
     /// The snap cursor has the pad this frame (a panel or a window to pick on is up, the pad is in
     /// use, nothing over the game); `still`: it has the left stick too and the player stands (the
@@ -38,6 +62,8 @@ struct PanelState {
     std::optional<Spot> at;  ///< the one selected
     NavRepeat repeat;
     std::optional<NavDir> stick; ///< the left stick's way held
+    NavRepeat jumpRepeat;        ///< the right stick's jumps out of a group, held
+    std::optional<NavDir> right; ///< the right stick's way held
     /// Y's move under way: an inventory item on the cursor (the inventory's drag), or a bar's
     /// spell (App::barDrag).
     enum class Holding : std::uint8_t { None, Item, Bar };
@@ -50,6 +76,8 @@ struct PanelState {
         spots.clear();
         repeat.clear();
         stick.reset();
+        jumpRepeat.clear();
+        right.reset();
     }
 };
 

@@ -4,6 +4,7 @@
 #include "inventory.hpp"
 
 #include "hud.hpp"
+#include "pad/pad_glyphs.hpp"
 #include "player_art.hpp"
 #include "repair_shade.hpp"
 
@@ -644,6 +645,17 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
     const auto textWidth = [&](const std::string& t, bool small = true) {
         return font_ ? font_->measure(t, small ? smallSize : textSize) / s : 0.0f;
     };
+    // (noxcpp) The game controller's weapon swap button(s) centred on game pixel (cx, cy), `size`
+    // high, in the swap key's place; false with no pad in use (the key's own then).
+    const auto padSwapKey = [&](float cx, float cy, float size) {
+        if (!padSwap_) {
+            return false;
+        }
+        static const pad::GlyphInk ink{{1, 1, 1, 1}, {0.05f, 0.04f, 0.03f, 0.85f}, {0.55f, 0.52f, 0.48f, 1}};
+        const float width = pad::promptWidth(font_, *padSwap_, size * s);
+        pad::drawPrompt(r, font_, *padSwap_, std::round(cx * s - width / 2), cy * s, size * s, ink);
+        return true;
+    };
     // Ammo and charges (ours, not the game's blue): white and bold, the font drawn twice a pixel
     // apart over a dark shadow, right-aligned to `right`.
     const auto ammoText = [&](const std::string& t, float right, float gy) {
@@ -716,8 +728,9 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
             }
         }
         // The swap key (control 0x23, SwapWeapons) in white in the small font, its cell's top
-        // left at the window's (0x13, 0x66): in the ring's bottom-left tab.
-        if (font_) {
+        // left at the window's (0x13, 0x66): in the ring's bottom-left tab. ((noxcpp) The pad's
+        // button(s) there instead while it's in use, centred where the letter's middle is.)
+        if (font_ && !padSwapKey(wx + 0x13 + 3, wy + 0x66 + 3.5f, 8)) {
             font_->drawGameText("V", wx + 0x13, wy + 0x66, s, {255, 255, 255, 255});
         }
     }
@@ -838,7 +851,11 @@ void Inventory::draw(SDL_Renderer* r, const nox::client::World& world, std::uint
             const auto& item = inv.at(secondary);
             drawItem(r, item.typeId, item.modifiers, bx + 25, by + 25, s);
         }
-        text("V", bx + 0x16, by + 0x29 - 8, {255, 255, 255, 255});
+        // The swap key on the box's knob, its cell's top left at (0x16, 0x29) as the game puts it
+        // (its letter's middle on the knob's: (25, 44)); the pad's button(s) there while it's in use.
+        if (font_ && !padSwapKey(bx + 25, by + 44, 8)) {
+            font_->drawGameText("V", bx + 0x16, by + 0x29, s, {255, 255, 255, 255});
+        }
     }
     if (font_ && !identify_) {
         const auto lines = font_->wrap(title(world, us), textSize, 196 * s);
@@ -1388,7 +1405,7 @@ constexpr std::array<SDL_Rect, 9> kPadDollSlots{{kDollSlots[0], kDollSlots[1], k
 
 } // namespace
 
-void Inventory::padSpots(int w, int h, std::vector<PadSpot>& out) const
+void Inventory::padSpots(int w, int h, const nox::client::World& world, bool holding, std::vector<PadSpot>& out) const
 {
     out.clear();
     if (state_ != 2) {
@@ -1418,6 +1435,9 @@ void Inventory::padSpots(int w, int h, std::vector<PadSpot>& out) const
                 continue;
             }
             for (int col = 0; col < kCols; ++col) {
+                if (!holding && grid_.at(col, row).items.empty()) {
+                    continue; // (an empty cell is a stop only for something carried there)
+                }
                 const int x0 = 314 + col * kCell;
                 add(PadSpotKind::Cell, InventoryGrid::index(col, row), static_cast<float>(x0), static_cast<float>(c0),
                     static_cast<float>(x0 + kCell), static_cast<float>(c1));
@@ -1427,10 +1447,16 @@ void Inventory::padSpots(int w, int h, std::vector<PadSpot>& out) const
     if (!stats_ && !identify_) {
         for (int i = 0; i < static_cast<int>(kPadDollSlots.size()); ++i) {
             const SDL_Rect& r = kPadDollSlots[static_cast<std::size_t>(i)];
-            add(PadSpotKind::Doll, i, static_cast<float>(11 + r.x), static_cast<float>(15 + r.y), static_cast<float>(12 + r.w),
-                static_cast<float>(16 + r.h));
+            const float x0 = static_cast<float>(11 + r.x), y0 = static_cast<float>(15 + r.y);
+            const float x1 = static_cast<float>(12 + r.w), y1 = static_cast<float>(16 + r.h);
+            if (!holding && !wornAt(world, (x0 + x1) / 2, (y0 + y1) / 2)) {
+                continue; // (nothing worn there: what a click at its middle takes is nothing)
+            }
+            add(PadSpotKind::Doll, i, x0, y0, x1, y1);
         }
-        add(PadSpotKind::Secondary, 0, kSecondaryBox.x, kSecondaryBox.y, kSecondaryBox.w + 1, kSecondaryBox.h + 1);
+        if (holding || world.self().secondaryWeapon != 0) {
+            add(PadSpotKind::Secondary, 0, kSecondaryBox.x, kSecondaryBox.y, kSecondaryBox.w + 1, kSecondaryBox.h + 1);
+        }
     }
     if (!identify_) {
         add(PadSpotKind::JournalButton, 0, 243, 170, 243 + 34, 170 + 34);

@@ -38,6 +38,8 @@ struct Repeat {
     std::optional<NavInput> stick;     ///< the stick's held direction
     NavInput input = NavInput::Up;
     std::uint64_t nextMs = 0;
+    std::optional<NavInput> right;     ///< the right stick's held way (its jumps out of the focus's group)
+    std::uint64_t rightNextMs = 0;
 };
 Repeat repeat;
 bool wasConnected = false;
@@ -59,17 +61,18 @@ void push(NavInput in)
     SDL_PushEvent(&e);
 }
 
-/// The left stick's way in the menus (the larger of its two leans), with hysteresis.
-std::optional<NavInput> stickWay(const App& app, std::optional<NavInput> held)
+/// A stick's way in the menus (the larger of its two leans), with hysteresis.
+std::optional<NavInput> stickWay(const App& app, std::optional<NavInput> held, bool right = false)
 {
     SDL_Gamepad* g = app.pads.active();
     if (!g) {
         return std::nullopt;
     }
     const pad::PadSettings& s = app.pads.settings();
-    const pad::StickVec v = pad::radialDeadZone({pad::axisUnit(SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTX)),
-                                                 pad::axisUnit(SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTY))},
-                                                s.deadZone, s.outerDeadZone);
+    const pad::StickVec v =
+        pad::radialDeadZone({pad::axisUnit(SDL_GetGamepadAxis(g, right ? SDL_GAMEPAD_AXIS_RIGHTX : SDL_GAMEPAD_AXIS_LEFTX)),
+                             pad::axisUnit(SDL_GetGamepadAxis(g, right ? SDL_GAMEPAD_AXIS_RIGHTY : SDL_GAMEPAD_AXIS_LEFTY))},
+                            right ? s.rightDeadZone : s.deadZone, s.outerDeadZone);
     const float tilt = v.length();
     if (tilt < (held ? kStickLetGo : kStickPress)) {
         return std::nullopt;
@@ -130,6 +133,21 @@ void padMenuFrame(App& app)
     if (oskOpen(app) || !padMenusUp(app)) { // (the on-screen keyboard has the pad's directions)
         repeat = {};
         return;
+    }
+    // The right stick: a push jumps out of the focus's group that way (repeating while held), in
+    // the menus and the game's windows that have the pad.
+    {
+        const std::optional<NavInput> way = stickWay(app, repeat.right, true);
+        if (way != repeat.right) {
+            repeat.right = way;
+            if (way) {
+                push(gui::jumpOf(*way));
+                repeat.rightNextMs = now + kFirstMs;
+            }
+        } else if (way && now >= repeat.rightNextMs) {
+            push(gui::jumpOf(*way));
+            repeat.rightNextMs = now + kEveryMs;
+        }
     }
     // A held D-pad direction.
     if (repeat.button) {

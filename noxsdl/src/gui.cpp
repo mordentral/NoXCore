@@ -1,6 +1,8 @@
 // The window system's windows, painter, drawing and input (gui.hpp describes the design).
 #include "gui.hpp"
 
+#include "gui_focus_frame.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -445,10 +447,10 @@ void Gui::drawNav(Painter& p)
     if (!f || std::ranges::find(candidates, f) == candidates.end()) {
         return;
     }
+    // The game's own look leads: a button lit as the mouse lights it gets a faint frame only.
     const SDL_Rect r = screenRect(*f);
-    p.outline(r.x - 3, r.y - 3, r.w + 6, r.h + 6, Color{24, 16, 4});
-    p.outline(r.x - 2, r.y - 2, r.w + 4, r.h + 4, Color{250, 204, 82});
-    p.outline(r.x - 1, r.y - 1, r.w + 2, r.h + 2, Color{250, 204, 82});
+    const bool litItself = (f->state & kLit) && (f->status & st::Image) && !f->hiliteImage.empty();
+    drawFocusFrame(p.renderer(), p.toOutput(r.x, r.y, r.w, r.h), p.scale(), litItself ? FocusLook::Lit : FocusLook::Normal);
 }
 
 void Gui::padFocus(Window* w)

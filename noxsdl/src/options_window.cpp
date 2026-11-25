@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -25,7 +26,9 @@ constexpr std::int32_t kResBox = 326, kResItem = 3260;
 constexpr std::int32_t kDepth8 = 331, kDepth16 = 332;
 constexpr std::int32_t kInputConfig = 341;
 constexpr std::int32_t kController = 342; ///< (noxsdl's) under Input Config, kControllerGap below it
+constexpr std::int32_t kControllerArt = 343; ///< (noxsdl's) its art: Input Config's, from OptionsBG
 constexpr int kControllerGap = 4;
+constexpr int kControllerShift = 20 + kControllerGap; ///< how far below Input Config (its height and the gap)
 constexpr std::int32_t kFxVolume = 351, kDialogVolume = 352, kMusicVolume = 353;
 constexpr std::int32_t kFxOn = 361, kDialogOn = 362, kMusicOn = 363;
 constexpr std::int32_t kClose = 371;
@@ -437,32 +440,48 @@ void OptionsWindow::open(const nox::config::Config& config, bool inGame, const E
         optionsDef.children.insert(optionsDef.children.begin(), std::make_move_iterator(items.begin()),
                                    std::make_move_iterator(items.end()));
     }
-    // (noxcpp) Controller: a plain button under Input Config, in the drop-downs' colours.
+    // (noxcpp) Controller: under Input Config, Input Config's own button again: its art (the part of
+    // OptionsBG it sits on, under it as a window that takes no click), its lit image and its text.
     if (const auto input = std::ranges::find(optionsDef.children, kInputConfig, &nox::gui::WindowDef::id);
         input != optionsDef.children.end()) {
         nox::gui::WindowDef pad = *input;
         pad.id = kController;
         pad.y = input->y + input->height + kControllerGap;
-        pad.height = 18;
-        pad.status = st::Enabled | st::NoFocus;
-        pad.backgroundImage.clear();
-        pad.enabledImage.clear();
-        pad.disabledImage.clear();
-        pad.hiliteImage.clear();
-        pad.selectedImage.clear();
-        pad.imageOffsetX = pad.imageOffsetY = 0;
         pad.text.clear();
         pad.tooltip.clear();
-        pad.enabledColor = {150, 110, 40};
-        pad.hiliteColor = {240, 180, 42};
-        pad.backgroundColor = {16, 12, 8};
-        pad.selectedColor = {70, 52, 20};
-        pad.disabledColor = {24, 24, 24};
+        // (the art's window after the button: drawn before it, a click passing it to the button)
+        nox::gui::WindowDef art = pad;
+        art.id = kControllerArt;
+        art.type = nox::gui::WindowType::User;
+        art.typeName = "USER";
+        art.status = st::Enabled | st::NoFocus | st::NoInput;
+        art.style = nox::gui::style::User;
+        art.hiliteImage.clear();
+        art.selectedImage.clear();
+        art.text.clear();
         optionsDef.children.push_back(std::move(pad));
+        optionsDef.children.push_back(std::move(art));
     }
     window_ = gui_.load(optionsDef, proc);
     if (gui::Window* w = window_->find(kController)) {
         w->text = NOX_TR("options.controller", "Controller");
+    }
+    if (gui::Window* art = window_->find(kControllerArt)) {
+        // OptionsBG moved so Input Config's place on it lands here, clipped to the button.
+        art->draw = [](gui::Window& self, gui::Painter& p) {
+            const SDL_Point at = self.screenPos();
+            const SDL_Point from = self.parent ? self.parent->screenPos() : SDL_Point{};
+            const SDL_FRect clipF = p.toOutput(at.x, at.y, self.rect.w, self.rect.h);
+            const SDL_Rect clip{static_cast<int>(std::floor(clipF.x)), static_cast<int>(std::floor(clipF.y)),
+                                static_cast<int>(std::ceil(clipF.w)), static_cast<int>(std::ceil(clipF.h))};
+            SDL_Renderer* r = p.renderer();
+            SDL_Rect was{};
+            const bool clipped = SDL_RenderClipEnabled(r);
+            SDL_GetRenderClipRect(r, &was);
+            SDL_SetRenderClipRect(r, &clip);
+            p.image(self.parent ? self.parent->backgroundImage : std::string("OptionsBG"), from.x, from.y + kControllerShift);
+            SDL_SetRenderClipRect(r, clipped ? &was : nullptr);
+        };
     }
     // A drop-down's button and choices all in the small font, so one list never mixes faces.
     if (gui::Window* box = window_->find(kResBox)) {
