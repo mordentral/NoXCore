@@ -136,6 +136,10 @@ add_executable(noxsdl WIN32
     src/menus_wolchat.cpp
     src/options_window.cpp
     src/overlays.cpp
+    src/pad/gamepad_manager.cpp
+    src/pad/pad_bindings.cpp
+    src/pad/pad_game.cpp
+    src/pad/virtual_pad.cpp
     src/minimap.cpp
     src/map_thumbnail.cpp
     src/map_vote_window.cpp

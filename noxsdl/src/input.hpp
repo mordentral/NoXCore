@@ -9,6 +9,9 @@
 //
 // The game's own input layer (which fires which of its bindings on the press and which every
 // frame) isn't traced; the split above is how the game plays.
+//
+// (noxcpp) A game controller's buttons are bound beside nox.cfg's keys (setPadBindings: pad codes,
+// pad/pad_bindings.hpp), matched and held the same way, and never written to nox.cfg.
 #pragma once
 
 #include "noxcore/config/nox_config.hpp"
@@ -34,8 +37,17 @@ public:
     {
         config_ = std::move(config);
         down_.clear();
+        ++releases_;
         configChanged();
     }
+    /// (noxcpp) The game controller's bindings (each one pad code, pad::padCode, firing its
+    /// controls), beside the config's: kept through setConfig, never in config().
+    void setPadBindings(std::vector<nox::config::Binding> bindings)
+    {
+        padBindings_ = std::move(bindings);
+        configChanged();
+    }
+    const std::vector<nox::config::Binding>& padBindings() const { return padBindings_; }
     /// Changes one setting (not the bindings), keeping what's held.
     void setSetting(std::string_view name, std::string value)
     {
@@ -54,7 +66,14 @@ public:
     std::vector<std::string> press(std::uint32_t code);
     void release(std::uint32_t code);
     /// Forgets what's held (a menu took the keyboard; the window lost focus).
-    void releaseAll() { down_.clear(); }
+    void releaseAll()
+    {
+        down_.clear();
+        ++releases_;
+    }
+    /// How many times everything held was forgotten (releaseAll, setConfig): the pad layer lets go
+    /// of what it holds when this moves on.
+    std::uint32_t releases() const { return releases_; }
     bool isDown(std::uint32_t code) const { return down_.contains(code); }
 
     /// Whether any binding of `control` is fully held.
@@ -90,6 +109,9 @@ private:
     nox::config::Config config_;
     std::set<std::uint32_t> down_;
     std::vector<std::vector<std::size_t>> bindingsByControl_; ///< indexes in config_.bindings
+    std::vector<nox::config::Binding> padBindings_;           ///< (noxcpp) the game controller's
+    std::vector<std::vector<std::size_t>> padByControl_;      ///< indexes in padBindings_
+    std::uint32_t releases_ = 0;
     bool translucentConsole_ = true;
     std::array<std::string, 5> slotLabels_;
     std::array<std::string, 3> potionLabels_;

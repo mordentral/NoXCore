@@ -219,8 +219,8 @@ SDL_Event scriptedMouseEvent(const App::ScriptedMouse& m)
 }
 
 /// Each frame in a game: the test switches' steps once in (--spawn, --goto, --pickup-test,
-/// --hold-move, --chat-test, --drop-equipped, --award-test, --mouse-script, the --fake-* screens,
-/// --cast-test).
+/// --hold-move, --chat-test, --drop-equipped, --award-test, --mouse-script, --pad-script, the
+/// --fake-* screens, --cast-test).
 void runGameTests(App& app, bool inGame)
 {
     auto& client = app.live->client();
@@ -306,6 +306,9 @@ void runGameTests(App& app, bool inGame)
             SDL_Event e = scriptedMouseEvent(m);
             SDL_PushEvent(&e);
         }
+    }
+    if (inGame) {
+        runPadScript(app, SDL_GetTicks() - app.inGameSinceMs); // (--pad-script: times from joining)
     }
     // (The quest's, 7 and 8: in a quest map, not its chat map (flag 0x80), no briefing up.)
     const bool fakeQuestReady = app.fakeScreen < 7 || app.fakeScreen > 8 || ((gameFlags(app) & 0x1080u) == 0x1000u && app.cinematics &&

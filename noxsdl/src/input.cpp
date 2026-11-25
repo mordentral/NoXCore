@@ -80,13 +80,15 @@ std::vector<std::string> InputBindings::press(std::uint32_t code)
 {
     down_.insert(code);
     std::vector<std::string> out;
-    for (const auto& b : config_.bindings) {
-        if (std::ranges::find(b.keys, code) == b.keys.end()) {
-            continue;
-        }
-        // A binding fires when this key completes it: every key of its combination held.
-        if (std::ranges::all_of(b.keys, [&](std::uint32_t k) { return down_.contains(k); })) {
-            out.insert(out.end(), b.controls.begin(), b.controls.end());
+    for (const auto* list : {&config_.bindings, &padBindings_}) {
+        for (const auto& b : *list) {
+            if (std::ranges::find(b.keys, code) == b.keys.end()) {
+                continue;
+            }
+            // A binding fires when this key completes it: every key of its combination held.
+            if (std::ranges::all_of(b.keys, [&](std::uint32_t k) { return down_.contains(k); })) {
+                out.insert(out.end(), b.controls.begin(), b.controls.end());
+            }
         }
     }
     return out;
@@ -127,6 +129,11 @@ bool InputBindings::held(int control) const
             return true;
         }
     }
+    for (const std::size_t b : padByControl_[static_cast<std::size_t>(control)]) {
+        if (std::ranges::all_of(padBindings_[b].keys, [&](std::uint32_t k) { return down_.contains(k); })) {
+            return true;
+        }
+    }
     return false;
 }
 
@@ -138,6 +145,17 @@ void InputBindings::configChanged()
     for (std::size_t i = 0; i < controls.size(); ++i) {
         for (const auto* b : config_.bindingsFor(controls[i].name)) {
             bindingsByControl_[i].push_back(static_cast<std::size_t>(b - config_.bindings.data()));
+        }
+    }
+    padByControl_.assign(controls.size(), {});
+    for (std::size_t b = 0; b < padBindings_.size(); ++b) {
+        for (const auto& name : padBindings_[b].controls) {
+            if (const int i = control(name); i >= 0) {
+                auto& list = padByControl_[static_cast<std::size_t>(i)];
+                if (list.empty() || list.back() != b) {
+                    list.push_back(b);
+                }
+            }
         }
     }
     const auto translucent = config_.setting("TranslucentConsole");

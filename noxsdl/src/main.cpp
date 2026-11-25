@@ -20,7 +20,7 @@
 // --screenshot renders into a PNG and exits (in a live game, --shot-after seconds after
 // joining, then leaves) for checking the renderer headless.
 // Movies (movie_player.hpp): the menus start with the start-up's movies and legal screen, but
-// for --menu-clicks, --mouse-script and --screenshot (--startup: anyway); --no-movies plays
+// for --menu-clicks, --mouse-script, --pad-script and --screenshot (--startup: anyway); --no-movies plays
 // none, --movie NAME plays movies\NAME first, --no-hd-movies keeps to the VQAs, --hd-dir DIR
 // looks for the HD movies and FFmpeg's DLLs there instead of HDVideo\ beside the exe.
 // The log (log_output.hpp) goes to noxcore-log.txt beside the exe and to stderr. On Windows
@@ -770,6 +770,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     if (app->input) {
         app->input->layoutChanged(); // (the key labels by this keyboard's layout, known now SDL's up)
     }
+    startPads(*app); // (noxcpp: the game controllers, beside the video; none is no matter)
     if (opts.useGpu) {
         // SDL's GPU renderer, on Direct3D 12 on Windows unless told otherwise (our shaders are
         // DXIL there); elsewhere on SDL's choice (Vulkan, for which they're SPIR-V).
@@ -1109,7 +1110,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             // --menu-clicks, --mouse-script and --screenshot go straight to the main menu (or
             // --browse to the game list); --movie NAME plays that movie first.
             const bool automated =
-                !opts.forceStartUp && (!opts.menuClicks.empty() || !app->mouseScript.empty() || !app->screenshot.empty());
+                !opts.forceStartUp && (!opts.menuClicks.empty() || !app->mouseScript.empty() || !app->padScript.empty() ||
+                                       !app->screenshot.empty());
             if (opts.browse) {
                 if (app->audio) {
                     app->audio->music(25); // the menus' music, "shell" (game_showMainMenu)
@@ -1225,6 +1227,9 @@ void pressWithHand(App& app, std::uint32_t code, Act act)
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 {
     auto* app = static_cast<App*>(appstate);
+    // (noxcpp) The game controllers first: the pads kept, the device in use; a pad button's edge
+    // for the bindings below (or, with a menu up, its MenuBack as Escape: the event is that key's).
+    const std::optional<pad::PadEdge> padEdge = padEventFirst(*app, *event);
     if (event->type == SDL_EVENT_KEYMAP_CHANGED && app->input) {
         app->input->layoutChanged(); // (another keyboard layout: the keys' labels as it prints them)
     }
@@ -1260,7 +1265,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
             return SDL_APP_CONTINUE;
         }
         if (!app->playTestCaptured) {
-            app->editor->handleEvent(*event);
+            if (!pad::GamepadManager::isPadEvent(*event)) { // (the editor ignores the pads)
+                app->editor->handleEvent(*event);
+            }
             return SDL_APP_CONTINUE;
         }
         if (event->type == SDL_EVENT_KEY_DOWN && !event->key.repeat && event->key.key == SDLK_F2) {
@@ -1321,7 +1328,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
             sessionToGame(*app); // (back to the session's game)
             return SDL_APP_CONTINUE;
         }
-        app->editor->handleEvent(*event);
+        if (!pad::GamepadManager::isPadEvent(*event)) { // (the editor ignores the pads)
+            app->editor->handleEvent(*event);
+        }
         return SDL_APP_CONTINUE;
     }
     // The mouse in the game's output pixels (a letterboxed game's from its area's corner).
@@ -1353,7 +1362,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         if (event->type == SDL_EVENT_QUIT) {
             return SDL_APP_SUCCESS;
         }
-        if (app->input && (event->type == SDL_EVENT_KEY_UP || event->type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+        if (app->input && (event->type == SDL_EVENT_KEY_UP || event->type == SDL_EVENT_MOUSE_BUTTON_UP || (padEdge && !padEdge->down))) {
             app->input->releaseAll();
         }
         app->movie->handleEvent(*event);
@@ -1369,7 +1378,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         return SDL_APP_CONTINUE;
     }
     if (app->options && app->options->isOpen() && event->type != SDL_EVENT_QUIT) {
-        if (app->input && (event->type == SDL_EVENT_KEY_UP || event->type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+        if (app->input && (event->type == SDL_EVENT_KEY_UP || event->type == SDL_EVENT_MOUSE_BUTTON_UP || (padEdge && !padEdge->down))) {
             app->input->releaseAll();
         }
         app->options->handleEvent(*event, app->camera.viewWidth, app->camera.viewHeight);
@@ -1417,6 +1426,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
                 app->book->cancelDrag();
             }
         }
+    }
+    if (padEdge && !padEdge->down) {
+        padRelease(*app, *padEdge); // (noxcpp: a pad button's, as a key's)
     }
     // A mode's window's press ends at its release whoever has the pointer now (its press went to
     // no one else), and is let go when the focus goes.
@@ -1509,6 +1521,14 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
     // typed in; the game goes on round them.
     if (live && app->serverOptions && app->serverOptions->isOpen() && event->type != SDL_EVENT_QUIT &&
         app->serverOptions->handleEvent(app->window, *event, cam.viewWidth, cam.viewHeight)) {
+        return SDL_APP_CONTINUE;
+    }
+    // (noxcpp) A pad button's press nothing above took: its bindings in a game (padPress: none while
+    // the chat, the console or a menu has the input).
+    if (padEdge) {
+        if (padEdge->down) {
+            padPress(*app, *padEdge);
+        }
         return SDL_APP_CONTINUE;
     }
     // Nothing above took it: the bindings in a game, the viewer's own keys and mouse otherwise.
@@ -1791,6 +1811,7 @@ SDL_AppResult menusFrame(App& app, bool shotReady)
         }
         SDL_PushEvent(&e);
     }
+    runPadScript(app, SDL_GetTicks()); // (--pad-script in the menus: times from start-up)
     if (app.movie && app.movie->active()) {
         // A movie (the start-up's, or the main menu's Intro): it alone is drawn.
         app.movie->update(SDL_GetTicks());
@@ -2222,15 +2243,23 @@ void sendGameInput(App& app)
     static const int kMoveForward = InputBindings::control("MoveForward");
     static const int kInvertSpellTarget = InputBindings::control("InvertSpellTarget");
     const bool keysFree = !(app.quitMenu && app.quitMenu->isOpen());
+    // (noxcpp) The left stick first: moving the way it leans (its move and cursor point sent), or
+    // at rest with the pad in use facing the way it last went; else the mouse's, as ever.
+    const PadSteer steer = padSteer(app);
     const bool attacking3d = keysFree && app.input && app.input->held(kAction); // (the 3D view faces the crosshair while attacking)
-    const bool moving = keysFree && ((app.input && app.input->held(kMoveForward)) || app.view3d.walking(attacking3d));
-    if (moving) {
+    const bool moving = steer == PadSteer::Moves ||
+                        (keysFree && ((app.input && app.input->held(kMoveForward)) || app.view3d.walking(attacking3d)));
+    if (steer == PadSteer::Moves) {
+        // (sent by padSteer)
+    } else if (moving) {
         client.move(app.view3d.walkFacing(facingToMouse(app), attacking3d)); // (the 3D view's keys)
     } else {
         if (app.running) {
             client.move(std::nullopt);
         }
-        client.face(facingToMouse(app));
+        if (steer == PadSteer::None) {
+            client.face(facingToMouse(app));
+        }
     }
     app.running = moving;
     client.setAttack(keysFree && app.input && app.input->held(kAction));
@@ -2248,7 +2277,7 @@ void sendGameInput(App& app)
             uiSound(app, 0x399);
         }
     }
-    {
+    if (steer == PadSteer::None) { // (the pad's cursor point is padSteer's)
         const SDL_FPoint m = mousePos(app);
         client.setCursor(static_cast<int>(app.camera.left() + m.x / app.camera.zoom),
                          static_cast<int>(app.camera.top() + m.y / app.camera.zoom));
@@ -3101,6 +3130,8 @@ void SDL_AppQuit(void* appstate, SDL_AppResult /*result*/)
         app->mapPictures.reset(); // (the map vote's pictures too)
         app->legal.reset();
         app->audio.reset(); // (writes --audio-capture's file)
+        app->scriptPad.reset(); // (--pad-script's pad, then the pads and their subsystem)
+        app->pads.shutdown();
         if (app->gammaTarget) {
             SDL_DestroyTexture(app->gammaTarget);
         }

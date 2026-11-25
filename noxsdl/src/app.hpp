@@ -14,6 +14,7 @@
 //   frame.cpp             the frame's way to the screen: targets, gamma, present, screenshots
 //   game_cursor.cpp       the game's cursor: which one this frame shows, and its draw
 //   editor_glue.cpp      the map editor's glue: opening it, its play-test and edit sessions
+//   pad/pad_game.cpp      the game controller: the pads, noxcore_controller.cfg, its buttons routed
 // main.cpp has SDL's callbacks, the frame and the input's routing; command_line.hpp the
 // command line's reading.
 #pragma once
@@ -59,6 +60,9 @@
 #include "movie_player.hpp"
 #include "net_stat.hpp"
 #include "options_window.hpp"
+#include "pad/gamepad_manager.hpp"
+#include "pad/pad_bindings.hpp"
+#include "pad/virtual_pad.hpp"
 #include "pencil_icon.hpp"
 #include "port_mapper.hpp"
 #include "quest_windows.hpp"
@@ -363,7 +367,19 @@ struct App {
         float x = 0, y = 0;
     };
     std::vector<ScriptedMouse> mouseScript;
-    bool expandBarsTest = false;                        ///< --all-spell-sets: the five sets shown (tests)
+    /// (noxcpp) --pad-script "MS press|release|tap BUTTON; MS stick L|R X Y; MS trigger L|R V; ...":
+    /// a made-up pad (scriptPad, pad/virtual_pad.hpp) driven so, MS after joining a game, or in the
+    /// menus after start-up (tests of the pad's input); BUTTON by noxcore_controller.cfg's names.
+    struct ScriptedPad {
+        enum Kind : std::uint8_t { Press, Release, LeftStick, RightStick, LeftTrigger, RightTrigger };
+        std::uint64_t atMs = 0;
+        Kind kind = Press;
+        pad::PadButton button = pad::PadButton::South;
+        float x = 0, y = 0; ///< a stick's point, a trigger's x
+    };
+    std::vector<ScriptedPad> padScript;
+    std::unique_ptr<pad::VirtualPad> scriptPad;
+    bool expandBarsTest = false;                       ///< --all-spell-sets: the five sets shown (tests)
     std::uint32_t awardTest = 0; ///< --award-test N: spell N awarded as a quest does (shown, to the bars), 2 s in
     bool dropEquipped = false;   ///< --drop-equipped: what we wear and hold taken off, 1.5 s in (tests)
     bool quitRequested = false;
@@ -419,6 +435,17 @@ struct App {
     std::unique_ptr<Minimap> minimap; ///< live: the map (TAB; 1 / 2 zoom)
     /// nox.cfg's key bindings (default.cfg's until something is saved).
     std::unique_ptr<InputBindings> input;
+    /// (noxcpp) The game controllers (pad/gamepad_manager.hpp), noxcore_controller.cfg's settings and
+    /// bindings (padConfig: applyPadConfig) and what they make of a button (padRouter; its game
+    /// controls in `input` under pad codes).
+    pad::GamepadManager pads;
+    pad::PadConfig padConfig;
+    pad::PadRouter padRouter;
+    std::uint32_t padReleasesSeen = 0; ///< input->releases() as the pad's layer last saw it
+    std::uint32_t padEscapes = 0;      ///< a bit per PadButton: its press went on as Escape (padEventFirst)
+    bool padFocused = true;            ///< the window has the focus (its focus events; a hidden one never gets any)
+    bool padRunning = false;           ///< the left stick ran last frame (padSteer)
+    std::optional<pad::StickVec> padAim; ///< the way the left stick last leaned (one long), while the pad's in use
     /// The view in a game, as the game's Options set it: how much of the world shows (one of its
     /// screen resolutions: one screen pixel was one world unit), and the game window's size in
     /// percent (VideoSize, 40-100; Page Up / Page Down step it by 2, draw_setCutSize). The resolution's
@@ -978,6 +1005,45 @@ void tryPickup(App& app, std::uint16_t netCode);
 bool liveControl(App& app, std::string_view control);
 /// The controls a key or button press fired; whether there were any.
 bool liveControls(App& app, const std::vector<std::string>& controls);
+
+// pad/pad_game.cpp (noxcpp: the game controller in the program)
+/// The pads started (SDL's gamepad subsystem; gamecontrollerdb.txt beside the program),
+/// noxcore_controller.cfg read, --pad-script's pad attached. After the window is made.
+void startPads(App& app);
+/// noxcore_controller.cfg read (the defaults without one) and applied.
+void loadPadConfig(App& app);
+/// `config` in use: the router, the dead zones, the game controls' pad bindings (what's held let go).
+void applyPadConfig(App& app, pad::PadConfig config);
+/// app.padConfig written to noxcore_controller.cfg (beside noxcore.cfg; never nox.cfg).
+bool savePadConfig(const App& app);
+/// Whether the pad drives the game now: in a game, the window focused, no chat, console, in-game
+/// menu, Options, input config, movie or editor having the input.
+bool padGameInput(const App& app);
+/// Whether a menu, or a window owning Escape (chat, the console), has the input: the pad's MenuBack
+/// is Escape then.
+bool padHasMenus(const App& app);
+/// First for every event: the pads kept; a pad button's or trigger's edge returned for padRelease /
+/// padPress, unless it went on as an Escape key (`event` is that key's then).
+std::optional<pad::PadEdge> padEventFirst(App& app, SDL_Event& event);
+/// A pad button's release: what its press holds let go (whatever has the input).
+void padRelease(App& app, const pad::PadEdge& edge);
+/// A pad button's press that reached the game's controls (gated by padGameInput): its controls
+/// fired (liveControls), the pad's own actions told to padAction.
+void padPress(App& app, const pad::PadEdge& edge);
+/// The pad's own game actions (Interact, TargetNext / TargetPrevious, FreeCursor), pressed or let go.
+void padAction(App& app, pad::PadAction action, bool down);
+/// What the pad's own actions hold let go (InputBindings::releaseAll's moments).
+void padActionsDropped(App& app);
+/// The menus' MenuAccept and tabs pressed while a menu has the pad.
+void padMenuAction(App& app, pad::PadAction action);
+/// The left stick this frame (sendGameInput, first): the pads read; walking or running the way it
+/// leans (Moves: the move and the cursor point sent), or at rest with the pad in use, facing the way
+/// it last leaned (Holds: the facing and cursor point sent); None: the mouse's as ever.
+enum class PadSteer : std::uint8_t { None, Holds, Moves };
+PadSteer padSteer(App& app);
+/// --pad-script's steps due `elapsedMs` in (after joining, or from start-up in the menus).
+void runPadScript(App& app, std::uint64_t elapsedMs);
+std::vector<App::ScriptedPad> parsePadScript(std::string_view script);
 
 // test_drive.cpp
 void pickupTest(App& app);

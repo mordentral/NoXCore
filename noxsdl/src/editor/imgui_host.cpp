@@ -498,6 +498,9 @@ ImGuiHost::ImGuiHost(SDL_Window* window, SDL_Renderer* renderer, std::string ini
     }
     mono_ = io.Fonts->AddFontDefaultVector(); // (the script panel's fixed-width source font)
     ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_);
+    // No pads for the editors (the game's are the game's): none opened or read, so ImGui never
+    // navigates with one (NavEnableGamepad stays off too).
+    ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual, nullptr, 0);
     ImGui_ImplSDLRenderer3_Init(renderer_);
 
     // The floating panels' windows: imgui_impl_sdl3 makes them (when the platform can), we draw them.

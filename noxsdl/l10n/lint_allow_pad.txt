@@ -1,0 +1,5 @@
+# The game controller's English that no player reads as UI text (lint_allow.txt has the format).
+
+file noxsdl/src/pad/pad_bindings.cpp   # noxcore_controller.cfg's keywords and header (a settings file's names, English as nox.cfg's)
+noxsdl/src/pad/pad_game.cpp: "NoX Core script pad"
+noxsdl/src/pad/virtual_pad.hpp: "NoX Core test pad"

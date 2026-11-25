@@ -59,6 +59,10 @@ StartOptions parseCommandLine(App& app, int argc, char* argv[])
             return *opts.hostSettings;
         };
         // (outside the chain below, which is at the compiler's nesting limit)
+        if (a == "--pad-script") {
+            app.padScript = parsePadScript(next()); // (noxcpp) a made-up pad's steps (App::ScriptedPad)
+            continue;
+        }
         if (a == "--fake-dialog-text") {
             app.fakeScreen = 2; // --fake-dialog with this string id's line (tests)
             app.fakeDialogText = next();
