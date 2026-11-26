@@ -3172,6 +3172,7 @@ void SDL_AppQuit(void* appstate, SDL_AppResult /*result*/)
             SDL_DestroyTexture(app->playTestGamma);
         }
         app->view.reset();
+        app->modImages.reset();
         app->sprites.reset();
         fxdraw::smooth() = {};
         fxdraw::spellFx() = {};

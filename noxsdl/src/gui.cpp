@@ -158,16 +158,21 @@ std::vector<std::string> Painter::centredLines(const std::string& utf8, bool lar
     return noxsdl::centredLines(utf8, static_cast<float>(wrapWidth) * scale_, font(large)->advances(pixelSize(large)));
 }
 
+const Sprite* Painter::modImage(const std::string& name) const
+{
+    return res_.modImage && !name.empty() ? res_.modImage(name) : nullptr;
+}
+
 void Painter::image(const std::string& name, int x, int y)
 {
     const auto ref = namedImage(res_.things, name);
-    drawSprite(ref ? res_.sprites.get(*ref) : nullptr, x, y);
+    drawSprite(ref ? res_.sprites.get(*ref) : modImage(name), x, y);
 }
 
 void Painter::image(const std::string& name, int x, int y, bool dim)
 {
     const auto ref = namedImage(res_.things, name);
-    const Sprite* s = ref ? res_.sprites.get(*ref) : nullptr;
+    const Sprite* s = ref ? res_.sprites.get(*ref) : modImage(name);
     if (!dim || !s || !s->texture) {
         drawSprite(s, x, y);
         return;
@@ -183,7 +188,7 @@ void Painter::image(const std::string& name, int x, int y, bool dim)
 void Painter::image(const std::string& name, int x, int y, const SpriteCache::Materials& materials)
 {
     const auto ref = namedImage(res_.things, name);
-    drawSprite(ref ? res_.sprites.tinted(*ref, materials) : nullptr, x, y);
+    drawSprite(ref ? res_.sprites.tinted(*ref, materials) : modImage(name), x, y);
 }
 
 void Painter::drawSprite(const Sprite* s, int x, int y)

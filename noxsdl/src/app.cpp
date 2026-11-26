@@ -6,6 +6,7 @@
 #include "pointer_map.hpp"
 
 #include "noxcore/client/inform_text.hpp"
+#include "noxcore/modes/script/script_ui.hpp"
 #include "noxcore/server/solo.hpp"
 #include "noxcore/strings/l10n.hpp"
 #include "noxcore/util/random.hpp"
@@ -244,6 +245,17 @@ gui::Resources guiResources(App& app)
     gui::Resources res{app.things, *app.sprites, app.font.get(), app.strings.get()};
     res.playSound = [&app](std::uint32_t id) { uiSound(app, id); };
     res.largeFont = app.largeFont.get();
+    // (noxcpp) A name the game's pictures haven't: the hosted mod's picture of that name, as its
+    // UI's set came (a dialog's StoryPic portrait).
+    res.modImage = [&app](const std::string& name) -> const Sprite* {
+        if (!app.scriptUi || !app.scriptUi->assets() || !app.renderer) {
+            return nullptr;
+        }
+        if (!app.modImages) {
+            app.modImages = std::make_unique<ModImages>(app.renderer);
+        }
+        return app.modImages->get(app.scriptUi->assets(), name);
+    };
     return res;
 }
 

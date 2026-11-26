@@ -12531,7 +12531,7 @@ editor.window.tool_options = Tool Options
 #@ 1d756bcb: Waypoints
 editor.window.waypoints = Waypoints
 
-# noxsdl/src/app.cpp:127
+# noxsdl/src/app.cpp:128
 #@ 2329c92c: Team
 game.chat.team = Team
 # noxsdl/src/cursor_labels.hpp:29

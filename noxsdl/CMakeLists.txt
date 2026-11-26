@@ -114,6 +114,7 @@ add_executable(noxsdl WIN32
     src/inventory.cpp
     src/inventory_grid.cpp
     src/item_names.cpp
+    src/mod_images.cpp
     src/summon_window.cpp
     src/trade_screens.cpp
     src/light_cone.cpp

@@ -80,6 +80,9 @@ struct Resources {
     std::function<void(std::uint32_t soundId)> playSound;
     /// large.fnt's: the windows drawn in the large font (Window::largeFont); none, the default's.
     Font* largeFont = nullptr;
+    /// (noxcpp) A picture none of thing.bin's named images has, by that name: the hosted mod's
+    /// (mod_images.hpp); may be empty, or give null.
+    std::function<const Sprite*(const std::string& name)> modImage;
 
     void sound(std::uint32_t id) const
     {
@@ -363,7 +366,8 @@ public:
     /// A blended fill (the exe's alpha rectangles).
     void fillAlpha(int x, int y, int w, int h, SDL_Color c);
     void outline(int x, int y, int w, int h, const nox::gui::Color& c); ///< one-pixel border lines
-    /// An image by name (thing.bin's named images; animations play), at its own offset.
+    /// An image by name (thing.bin's named images; animations play), at its own offset; (noxcpp) a
+    /// name none of them has, the hosted mod's picture of that name (Resources::modImage).
     void image(const std::string& name, int x, int y);
     /// (noxcpp) The same darkened, `dim` set (a greyed control's: Window::dimDisabled); else as image.
     void image(const std::string& name, int x, int y, bool dim);
@@ -402,6 +406,7 @@ public:
 
 private:
     void drawSprite(const Sprite* s, int x, int y);
+    const Sprite* modImage(const std::string& name) const;
 
     SDL_Renderer* renderer_;
     const Resources& res_;

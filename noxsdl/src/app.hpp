@@ -60,6 +60,7 @@
 #include "map_vote_window.hpp"
 #include "menus.hpp"
 #include "minimap.hpp"
+#include "mod_images.hpp"
 #include "mode_ui.hpp"
 #include "motd_window.hpp"
 #include "mouse_handover.hpp"
@@ -219,6 +220,9 @@ struct App {
     SpellLimits spellLimits; ///< live: spells refused while our last one is out (the HUD marks them)
     std::unique_ptr<nox::video::VideoBag> bag;
     std::unique_ptr<SpriteCache> sprites;
+    /// (noxcpp) The hosted mod's own pictures the windows ask for by name (mod_images.hpp), made at
+    /// the first such draw.
+    std::unique_ptr<ModImages> modImages;
     std::unique_ptr<GpuShaders> shaders; ///< our shaders on SDL's GPU renderer
     SDL_Texture* white = nullptr;        ///< the white pixel smooth effects draw on
     std::unique_ptr<Bloom> bloom;        ///< the effects' bloom (GPU renderer; --no-bloom)

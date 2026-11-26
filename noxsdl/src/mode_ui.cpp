@@ -81,6 +81,9 @@ void unbindModeClients(App& app)
         app.scriptUi->setStrings(nullptr); // (the game's texts gone from nox.csf's lookups)
     }
     app.scriptUi = nullptr;
+    if (app.modImages) {
+        app.modImages->clear(); // (the mod's pictures' textures go with its game)
+    }
 }
 
 bool isModeFakeFlag(std::string_view flag)
