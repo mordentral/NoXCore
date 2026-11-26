@@ -6,7 +6,7 @@
 //              exe's order (cursorLoadAll), drawn at the mouse less (64, 64) plus the image's offset.
 //              Move, the in-game arrow, picks its frame from the mouse's angle round the screen
 //              centre in 32 steps, the running arrows (+32) beyond 100 units or while running.
-//   labels     some carry a word in yellow (guicursor.c's PICKUP, SHOPKEEPER, ...).
+//   labels     some carry a word in yellow (guicurs.c's PICKUP, SHOPKEEPER, ...: cursor_labels.hpp).
 //   hover      the drawable under the mouse: its footprint (EXTENT circle, or a box turned 45
 //              degrees) stood up from ZSIZE's bottom to its top (0 to 30 for a type without a
 //              ZSIZE line, as the client's thing reader leaves it), as a capsule or prism, in whole
@@ -22,6 +22,7 @@
 //              menus, the pointer.
 #pragma once
 
+#include "cursor_labels.hpp"
 #include "cursor_pick.hpp"
 #include "sprite_cache.hpp"
 #include "text.hpp"
@@ -88,12 +89,11 @@ public:
 
 private:
     const nox::things::ImageDef* image(CursorType type) const;
-    std::string label(const char* id) const;
 
     const nox::things::ThingDb& things_;
     SpriteCache& sprites_;
     Font* font_;
-    const nox::strings::StringTable* strings_;
+    CursorLabels labels_;
 };
 
 } // namespace noxsdl

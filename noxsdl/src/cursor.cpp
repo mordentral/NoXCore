@@ -42,7 +42,7 @@ float hoverDepth(const TypeArt& art, float y, float z)
 
 Cursor::Cursor(const nox::things::ThingDb& things, SpriteCache& sprites, Font* font,
                const nox::strings::StringTable* strings)
-    : things_(things), sprites_(sprites), font_(font), strings_(strings)
+    : things_(things), sprites_(sprites), font_(font), labels_(strings)
 {
 }
 
@@ -53,20 +53,6 @@ const nox::things::ImageDef* Cursor::image(CursorType type) const
         return nullptr;
     }
     return things_.findImage(kCursorImages[index]); // (each name's first image, as thing.bin lists them)
-}
-
-std::string Cursor::label(const char* id) const
-{
-    if (!strings_) {
-        return id;
-    }
-    // Str_GetString with guicursor.c as the source.
-    for (const std::string& key : {std::string("guicursor.c:") + id, std::string(id)}) {
-        if (const auto t = strings_->text(key)) {
-            return nox::strings::toUtf8(*t);
-        }
-    }
-    return id;
 }
 
 int Cursor::moveFrame(float mx, float my, float width, float height, bool running)
@@ -132,31 +118,31 @@ void Cursor::draw(SDL_Renderer* renderer, CursorType type, float x, float y, flo
     constexpr float kFontHeight = 10;
     // Font pixel size that makes a line 10 game pixels high at this scale (lineHeight is per 100 px).
     const int size = font_->lineSize(kFontHeight, scale);
-    const auto text = [&](const char* id, float dx, float dy) {
-        font_->draw(label(id), x + dx * scale, y + dy * scale, size, kYellow);
+    const auto text = [&](CursorLabel which, float dx, float dy) {
+        font_->draw(labels_.get(which), x + dx * scale, y + dy * scale, size, kYellow);
     };
     switch (type) {
     case CursorType::Grab:
-        text("GRAB", -10, -kFontHeight);
+        text(CursorLabel::Grab, -10, -kFontHeight);
         break;
     case CursorType::Pickup:
-        text("PICKUP", -15, kFontHeight);
+        text(CursorLabel::Pickup, -15, kFontHeight);
         break;
     case CursorType::Trade:
-        text("SHOPKEEPER", -25, -kFontHeight);
+        text(CursorLabel::Shopkeeper, -25, -kFontHeight);
         break;
     case CursorType::Talk:
-        text("TALK", -15, -kFontHeight);
+        text(CursorLabel::Talk, -15, -kFontHeight);
         break;
     case CursorType::Identify:
     case CursorType::IdentifyNo:
-        text("IDENTIFY", -15, 24);
+        text(CursorLabel::Identify, -15, 24);
         break;
     case CursorType::Repair:
-        text("REPAIR", -15, -kFontHeight);
+        text(CursorLabel::Repair, -15, -kFontHeight);
         break;
     case CursorType::Use:
-        text("USE", -10, kFontHeight);
+        text(CursorLabel::Use, -10, kFontHeight);
         break;
     default:
         break;

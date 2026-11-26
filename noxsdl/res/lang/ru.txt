@@ -8419,6 +8419,20 @@ editor.window.waypoints = Путевые точки
 
 #@ 2329c92c mt: Team
 game.chat.team = Команде
+#@ deecc13f mt: GRAB
+game.cursor.grab = ВЗЯТЬ
+#@ 261f521d mt: IDENTIFY
+game.cursor.identify = ОПОЗНАТЬ
+#@ 26474c05 mt: PICKUP
+game.cursor.pickup = ПОДОБРАТЬ
+#@ b2c4c374 mt: REPAIR
+game.cursor.repair = ПОЧИНИТЬ
+#@ 698302db mt: SHOPKEEPER
+game.cursor.shopkeeper = ТОРГОВЕЦ
+#@ d9adb08f mt: TALK
+game.cursor.talk = ГОВОРИТЬ
+#@ 9a6bdc14 mt: USE
+game.cursor.use = ИСПОЛЬЗОВАТЬ
 #@ 7007f0e1 mt: another game is hosted here
 game.data.hosting_other = здесь уже запущена другая игра
 #@ 67d33758 mt: Asked the host for edit rights.

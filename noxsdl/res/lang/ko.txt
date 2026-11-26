@@ -8331,6 +8331,20 @@ editor.window.waypoints = 웨이포인트
 
 #@ 2329c92c mt: Team
 game.chat.team = 팀
+#@ deecc13f mt: GRAB
+game.cursor.grab = 잡기
+#@ 261f521d mt: IDENTIFY
+game.cursor.identify = 감정
+#@ 26474c05 mt: PICKUP
+game.cursor.pickup = 줍기
+#@ b2c4c374 mt: REPAIR
+game.cursor.repair = 수리
+#@ 698302db mt: SHOPKEEPER
+game.cursor.shopkeeper = 상인
+#@ d9adb08f mt: TALK
+game.cursor.talk = 대화
+#@ 9a6bdc14 mt: USE
+game.cursor.use = 사용
 #@ 7007f0e1 mt: another game is hosted here
 game.data.hosting_other = 여기서 이미 다른 게임을 호스팅하고 있습니다
 #@ 67d33758 mt: Asked the host for edit rights.

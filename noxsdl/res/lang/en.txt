@@ -12534,6 +12534,27 @@ editor.window.waypoints = Waypoints
 # noxsdl/src/app.cpp:127
 #@ 2329c92c: Team
 game.chat.team = Team
+# noxsdl/src/cursor_labels.hpp:29
+#@ deecc13f: GRAB
+game.cursor.grab = GRAB
+# noxsdl/src/cursor_labels.hpp:33
+#@ 261f521d: IDENTIFY
+game.cursor.identify = IDENTIFY
+# noxsdl/src/cursor_labels.hpp:30
+#@ 26474c05: PICKUP
+game.cursor.pickup = PICKUP
+# noxsdl/src/cursor_labels.hpp:34
+#@ b2c4c374: REPAIR
+game.cursor.repair = REPAIR
+# noxsdl/src/cursor_labels.hpp:31
+#@ 698302db: SHOPKEEPER
+game.cursor.shopkeeper = SHOPKEEPER
+# noxsdl/src/cursor_labels.hpp:32
+#@ d9adb08f: TALK
+game.cursor.talk = TALK
+# noxsdl/src/cursor_labels.hpp:35
+#@ 9a6bdc14: USE
+game.cursor.use = USE
 # noxsdl/src/game_data_swap.cpp:105
 #@ 7007f0e1: another game is hosted here
 game.data.hosting_other = another game is hosted here
